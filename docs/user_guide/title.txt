@@ -1,11 +1,11 @@
 ---
-title: Template DotNet Tool User Guide
-subtitle: A .NET Reference Implementation for CLI Tools
+title: ReviewCenter User Guide
+subtitle: Web-based code review for regulated projects
 author: DEMA Consulting
-description: A .NET Reference Implementation for CLI Tools
+description: Web-based code review for regulated projects
 lang: en-US
 keywords:
-  - Template DotNet Tool
+  - ReviewCenter
   - .NET
   - Command-Line Tool
   - Documentation

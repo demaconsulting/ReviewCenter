@@ -1,13 +1,14 @@
 # Introduction
 
-This document provides the detailed design for the Template DotNet Tool, a .NET command-line
-application demonstrating best practices for DEMA Consulting DotNet Tools. It covers local
-software items (systems, subsystems, and units) and the OTS software items they consume.
+This document provides the detailed design for the ReviewCenter, a web-based formal code
+review service with a companion .NET command-line interface (currently the command-line
+scaffold). It covers local software items (systems, subsystems, and units) and the OTS
+software items they consume.
 
 ## Purpose
 
 The purpose of this document is to describe the internal design of each software unit that
-comprises the Template DotNet Tool. It captures data models, algorithms, key methods, and
+comprises the ReviewCenter. It captures data models, algorithms, key methods, and
 inter-unit interactions at a level of detail sufficient for formal code review, compliance
 verification, and future maintenance. A reviewer should be able to understand how each item
 satisfies its requirements without reading source code. The document does not restate
@@ -17,7 +18,7 @@ requirements; it explains how they are realized.
 
 Local items:
 
-- **TemplateDotNetTool**: system, subsystem, and unit design for all local components.
+- **ReviewCenter**: system, subsystem, and unit design for all local components.
 
 OTS items:
 
@@ -52,7 +53,7 @@ the OTS items listed in Scope above are build-time/pipeline tooling, documented 
 ## Folder Layout
 
 - **src/** - source files and projects
-  - **DemaConsulting.TemplateDotNetTool/** - main application source
+  - **DemaConsulting.ReviewCenter/** - main application source
     - **Cli/** - command-line interface subsystem
     - **SelfTest/** - self-validation subsystem
     - **Utilities/** - shared utilities subsystem
@@ -87,5 +88,5 @@ Review-sets: defined in `.reviewmark.yaml`
 
 ## References
 
-- Template DotNet Tool User Guide
-- Template DotNet Tool Repository (<https://github.com/demaconsulting/TemplateDotNetTool>)
+- ReviewCenter User Guide
+- ReviewCenter Repository (<https://github.com/demaconsulting/ReviewCenter>)

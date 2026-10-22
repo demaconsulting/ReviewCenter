@@ -1,11 +1,11 @@
 ---
-title: Template DotNet Tool Requirements
-subtitle: Requirements Specification for the Template DotNet Tool
+title: ReviewCenter Requirements
+subtitle: Requirements Specification for the ReviewCenter
 author: DEMA Consulting
-description: Requirements Specification for the Template DotNet Tool
+description: Requirements Specification for the ReviewCenter
 lang: en-US
 keywords:
-  - Template DotNet Tool
+  - ReviewCenter
   - Requirements
   - Specification
   - .NET

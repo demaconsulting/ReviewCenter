@@ -1,21 +1,15 @@
 # Project Overview
 
-> **Downstream customization required**: Replace the `TODO` values below with
-> values specific to the target repository. These values are the canonical source
-> for project-wide template placeholders used throughout the repository.
-
-- **project-name**: TODO — repository/project name (e.g., `ReqStream`)
-- **organization**: TODO — organization name for document authorship (e.g., `DEMA Consulting`)
-- **project-tagline**: TODO — document subtitle; 4–8 words, noun phrase, no period
-  (e.g., `Requirements traceability for .NET projects`)
-- **description**: TODO — full project description, may be multiple sentences
-- **languages**: TODO — programming languages used (e.g., `C#`, `C++`)
-- **technologies**: TODO — key technologies and frameworks (e.g., `.NET`, `CMake`)
+- **project-name**: ReviewCenter
+- **organization**: DEMA Consulting
+- **project-tagline**: Web-based code review for regulated projects
+- **description**: DEMA Consulting ASP.NET Core web service, with a companion command-line interface,
+  for performing formal code reviews of file sets against earlier revisions, using project-specific
+  checklists, threaded review comments, and re-authenticated reviewer sign-off.
+- **languages**: C#
+- **technologies**: .NET, ASP.NET Core, xUnit, ReqStream, ReviewMark, SysML2Tools, Pandoc
 
 # Project Structure
-
-> **Downstream customization required**: Replace `{project}` and
-> `{test-project}` with the actual source and test project folder names.
 
 ```text
 ├── docs/
@@ -31,9 +25,9 @@
 │   ├── user_guide/
 │   └── verification/
 ├── src/
-│   └── {project}/
+│   └── DemaConsulting.ReviewCenter/
 └── test/
-    └── {test-project}/
+    └── DemaConsulting.ReviewCenter.Tests/
 ```
 
 # Language and Spelling (ALL Agents)
