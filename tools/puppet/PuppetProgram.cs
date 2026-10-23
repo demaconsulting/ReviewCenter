@@ -369,9 +369,9 @@ internal static class PuppetProgram
                 {
                     // The daemon publishes Failed before it tears the browser and server down: let it finish
                     // (or stop it), then remove the session while this start still holds the start lock
-                    await WaitForDaemonExitAsync(daemon, services, cancellationToken);
-                    AbortStart(sessionId, daemon, services.Store);
-                    WriteLine(error, $"Could not start the session: {info.Error}");
+                    await WaitUntilGoneAsync(() => services.Store.IsAlive(daemon), services, cancellationToken);
+                    var cleaned = await AbortStartAsync(sessionId, daemon, services);
+                    WriteLine(error, $"Could not start the session: {info.Error}{UnconfirmedNote(cleaned, sessionId)}");
                     return ExitStartFailed;
                 }
 
@@ -379,10 +379,10 @@ internal static class PuppetProgram
                 {
                     // One last look: the daemon may have published its result just before exiting
                     info = services.Store.TryRead(sessionId);
-                    AbortStart(sessionId, daemon, services.Store);
+                    var cleaned = await AbortStartAsync(sessionId, daemon, services);
                     WriteLine(
                         error,
-                        $"The session daemon exited unexpectedly during start-up{(info?.Error is null ? "." : ": " + info.Error)}");
+                        $"The session daemon exited unexpectedly during start-up{(info?.Error is null ? "." : ": " + info.Error)}{UnconfirmedNote(cleaned, sessionId)}");
                     return ExitStartFailed;
                 }
 
@@ -392,37 +392,105 @@ internal static class PuppetProgram
         catch (OperationCanceledException)
         {
             // Do not leave a half-started daemon behind when the caller gives up
-            AbortStart(sessionId, daemon, services.Store);
+            var cleaned = await AbortStartAsync(sessionId, daemon, services);
+            if (!cleaned)
+            {
+                WriteLine(error, UnconfirmedNote(false, sessionId).TrimStart());
+            }
+
             throw;
         }
 
         // Do not leave a half-started daemon behind
-        AbortStart(sessionId, daemon, services.Store);
-        WriteLine(error, $"The session did not become ready within {timeout.TotalSeconds:0} seconds.");
+        var abandoned = await AbortStartAsync(sessionId, daemon, services);
+        WriteLine(
+            error,
+            $"The session did not become ready within {timeout.TotalSeconds:0} seconds.{UnconfirmedNote(abandoned, sessionId)}");
         return ExitStartFailed;
     }
 
     /// <summary>
-    ///     Abandons a start: stops the launched daemon and whatever it recorded, and removes the session file.
+    ///     Describes a cleanup that could not be confirmed.
+    /// </summary>
+    /// <param name="confirmed">Whether every process was confirmed stopped.</param>
+    /// <param name="sessionId">The session id.</param>
+    /// <returns>An empty string when confirmed; otherwise a sentence to append to the message.</returns>
+    private static string UnconfirmedNote(bool confirmed, string sessionId)
+    {
+        return confirmed
+            ? string.Empty
+            : $" Some processes of session '{sessionId}' could not be confirmed stopped; its record was kept so that a later command can finish the cleanup.";
+    }
+
+    /// <summary>
+    ///     Abandons a start: stops the launched daemon and whatever it recorded, and removes the session file
+    ///     once everything is confirmed stopped.
     /// </summary>
     /// <remarks>
     ///     Processes are always identified by id and start time, never by name. The launched daemon is
     ///     known even when it never wrote a session file; when it did, the file also lists the server and
-    ///     browser it started.
+    ///     browser it started. Termination is asynchronous, so the processes are polled (and the kill
+    ///     repeated) for up to the stop timeout. The session file is the only record that lets a later
+    ///     command find a survivor, so it is deleted only when no recorded process is left.
     /// </remarks>
     /// <param name="sessionId">The session id.</param>
     /// <param name="daemon">The identity of the launched daemon.</param>
-    /// <param name="store">The session store.</param>
-    private static void AbortStart(string sessionId, ProcessIdentity daemon, SessionStore store)
+    /// <param name="services">The collaborators.</param>
+    /// <returns><c>true</c> when everything was confirmed stopped and the record removed.</returns>
+    private static async Task<bool> AbortStartAsync(string sessionId, ProcessIdentity daemon, PuppetServices services)
     {
+        var store = services.Store;
         var recorded = store.TryRead(sessionId);
-        if (recorded is not null)
+        var confirmed = await TerminateAndConfirmAsync(recorded, daemon, services);
+        if (confirmed)
         {
-            store.Terminate(recorded);
+            store.Delete(sessionId);
         }
 
-        store.Terminate(daemon);
-        store.Delete(sessionId);
+        return confirmed;
+    }
+
+    /// <summary>
+    ///     Terminates a daemon and the processes a session recorded, and waits (bounded) until they are gone.
+    /// </summary>
+    /// <remarks>
+    ///     The kill is repeated on every poll, which is harmless because a process is only ever killed while
+    ///     it still has the recorded identity. The wait deliberately ignores caller cancellation: cleanup
+    ///     must finish (within the stop timeout) even when the caller has given up.
+    /// </remarks>
+    /// <param name="recorded">The session record, when one was written.</param>
+    /// <param name="daemon">The identity of the daemon.</param>
+    /// <param name="services">The collaborators.</param>
+    /// <returns><c>true</c> when no daemon, server, or browser of the session is alive any more.</returns>
+    private static async Task<bool> TerminateAndConfirmAsync(SessionInfo? recorded, ProcessIdentity daemon, PuppetServices services)
+    {
+        var store = services.Store;
+        var deadline = DateTime.UtcNow + (services.StopTimeout ?? DefaultStopTimeout);
+        while (true)
+        {
+            if (recorded is not null)
+            {
+                store.Terminate(recorded);
+            }
+
+            if (recorded is null || recorded.DaemonPid != daemon.ProcessId || recorded.DaemonStartTimeUtc != daemon.StartTimeUtc)
+            {
+                // The record does not name this daemon (or there is no record): terminate it by its own identity
+                store.Terminate(daemon);
+            }
+            var alive = store.IsAlive(daemon) || (recorded is not null && store.HasLiveProcesses(recorded));
+            if (!alive)
+            {
+                return true;
+            }
+
+            if (DateTime.UtcNow >= deadline)
+            {
+                return false;
+            }
+
+            await Task.Delay(StopPollInterval, CancellationToken.None);
+        }
     }
 
 
@@ -540,16 +608,12 @@ internal static class PuppetProgram
         catch (PuppetException) when (command.Verb == "stop")
         {
             // A daemon that cannot be asked to stop is stopped by force
-            ForceStop(info, services.Store);
-            WriteLine(output, $"Session '{sessionId}' stopped (forced).");
-            return ExitOk;
+            return ReportStop(sessionId, await ForceStopAsync(info, services), forced: true, output, error);
         }
 
         if (command.Verb == "stop" && response.Ok)
         {
-            await StopSessionAsync(info, services, cancellationToken);
-            WriteLine(output, $"Session '{sessionId}' stopped.");
-            return ExitOk;
+            return ReportStop(sessionId, await StopSessionAsync(info, services, cancellationToken), forced: false, output, error);
         }
 
         if (response.Ok)
@@ -611,32 +675,43 @@ internal static class PuppetProgram
     }
 
     /// <summary>
+    ///     Reports the outcome of a stop.
+    /// </summary>
+    /// <param name="sessionId">The session id.</param>
+    /// <param name="confirmed">Whether every process of the session was confirmed stopped.</param>
+    /// <param name="forced">Whether the daemon had to be stopped by force.</param>
+    /// <param name="output">Normal output.</param>
+    /// <param name="error">Error output.</param>
+    /// <returns>The exit code.</returns>
+    private static int ReportStop(string sessionId, bool confirmed, bool forced, TextWriter output, TextWriter error)
+    {
+        if (confirmed)
+        {
+            WriteLine(output, $"Session '{sessionId}' stopped{(forced ? " (forced)" : string.Empty)}.");
+            return ExitOk;
+        }
+
+        WriteLine(
+            error,
+            $"Session '{sessionId}' could not be confirmed stopped; its record was kept. Run 'stop --session {sessionId}' again.");
+        return ExitFailed;
+    }
+
+    /// <summary>
     ///     Waits for the daemon to finish its teardown after a stop request, then releases everything the
     ///     session recorded and removes its file, unless a newer session has replaced it.
     /// </summary>
     /// <param name="info">The session being stopped.</param>
     /// <param name="services">The collaborators.</param>
     /// <param name="cancellationToken">Cancels the wait.</param>
-    /// <returns>A task that completes when the session has been released.</returns>
-    private static async Task StopSessionAsync(SessionInfo info, PuppetServices services, CancellationToken cancellationToken)
+    /// <returns><c>true</c> when everything was confirmed stopped.</returns>
+    private static async Task<bool> StopSessionAsync(SessionInfo info, PuppetServices services, CancellationToken cancellationToken)
     {
         await WaitUntilGoneAsync(() => services.Store.IsDaemonAlive(info), services, cancellationToken);
 
         // A daemon that ignored the request for too long is killed here; one whose teardown failed may have
         // left a server or browser behind, which its session file still records
-        ForceStop(info, services.Store);
-    }
-
-    /// <summary>
-    ///     Waits for a launched daemon to exit, up to the stop timeout.
-    /// </summary>
-    /// <param name="daemon">The identity of the daemon.</param>
-    /// <param name="services">The collaborators.</param>
-    /// <param name="cancellationToken">Cancels the wait.</param>
-    /// <returns>A task that completes when the daemon is gone or the wait timed out.</returns>
-    private static Task WaitForDaemonExitAsync(ProcessIdentity daemon, PuppetServices services, CancellationToken cancellationToken)
-    {
-        return WaitUntilGoneAsync(() => services.Store.IsAlive(daemon), services, cancellationToken);
+        return await ForceStopAsync(info, services);
     }
 
     /// <summary>
@@ -656,20 +731,30 @@ internal static class PuppetProgram
     }
 
     /// <summary>
-    ///     Kills the daemon, server, and browser of a session and deletes its file, unless a newer session has taken its place.
+    ///     Kills the daemon, server, and browser of a session, and deletes its file once they are confirmed
+    ///     gone, unless a newer session has taken its place.
     /// </summary>
     /// <remarks>
     ///     The session file is re-read first: the daemon may have recorded more processes, or marked the
-    ///     session failed, since <paramref name="info"/> was read. The file is then deleted only if it
-    ///     still describes the same daemon, so a <c>start</c> that published a replacement in the
-    ///     meantime keeps its session.
+    ///     session failed, since <paramref name="info"/> was read. Termination is confirmed (bounded) before
+    ///     anything is deleted; if a process survives, the file is kept so a later command can still
+    ///     identify it. The file is then deleted only if it still describes the same daemon, so a
+    ///     <c>start</c> that published a replacement in the meantime keeps its session.
     /// </remarks>
     /// <param name="info">The session.</param>
-    /// <param name="store">The session store.</param>
-    private static void ForceStop(SessionInfo info, SessionStore store)
+    /// <param name="services">The collaborators.</param>
+    /// <returns><c>true</c> when every process of the session was confirmed stopped.</returns>
+    private static async Task<bool> ForceStopAsync(SessionInfo info, PuppetServices services)
     {
+        var store = services.Store;
         var current = store.TryRead(info.SessionId);
-        store.Terminate(current is not null && SessionStore.IsSameSession(current, info) ? current : info);
-        store.DeleteIfSame(info.SessionId, info);
+        var target = current is not null && SessionStore.IsSameSession(current, info) ? current : info;
+        var confirmed = await TerminateAndConfirmAsync(target, new ProcessIdentity(target.DaemonPid, target.DaemonStartTimeUtc), services);
+        if (confirmed)
+        {
+            store.DeleteIfSame(info.SessionId, info);
+        }
+
+        return confirmed;
     }
 }

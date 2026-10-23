@@ -443,6 +443,96 @@ public class SessionStoreTests
     }
 
     /// <summary>
+    ///     Starts a long-running child process that does nothing, for the kill tests.
+    /// </summary>
+    /// <returns>The started process.</returns>
+    private static System.Diagnostics.Process StartIdleProcess()
+    {
+        var startInfo = OperatingSystem.IsWindows()
+            ? new System.Diagnostics.ProcessStartInfo("ping", "-n 60 127.0.0.1")
+            : new System.Diagnostics.ProcessStartInfo("sleep", "60");
+        startInfo.RedirectStandardOutput = true;
+        startInfo.UseShellExecute = false;
+        startInfo.CreateNoWindow = true;
+        return System.Diagnostics.Process.Start(startInfo) ?? throw new InvalidOperationException("The idle process did not start.");
+    }
+
+    /// <summary>
+    ///     Test that the real kill never terminates a process whose start time differs from the recorded one (a
+    ///     recycled process id), and terminates the process when the identity matches.
+    /// </summary>
+    [Fact]
+    public void SessionStore_KillProcess_RealProcess_KillsOnlyWhenStartTimeMatches()
+    {
+        // Arrange: a running child process and its real start time
+        using var child = StartIdleProcess();
+        try
+        {
+            var start = child.StartTime.ToUniversalTime();
+
+            // Act: kill with a start time that belongs to another process, then with the real one
+            SessionStore.KillProcess(child.Id, start.AddHours(-1));
+            var survivedMismatch = !child.WaitForExit(500);
+            SessionStore.KillProcess(child.Id, start);
+            var exitedOnMatch = child.WaitForExit(30000);
+
+            // Assert: the mismatch left it running; the match ended it
+            Assert.True(survivedMismatch);
+            Assert.True(exitedOnMatch);
+        }
+        finally
+        {
+            if (!child.HasExited)
+            {
+                child.Kill(entireProcessTree: true);
+            }
+        }
+    }
+
+    /// <summary>
+    ///     Test that killing a process id nobody uses is silently ignored.
+    /// </summary>
+    [Fact]
+    public void SessionStore_KillProcess_NoSuchProcess_DoesNothing()
+    {
+        // Arrange: a process id that cannot exist
+        // Act: kill it
+        var exception = Record.Exception(() => SessionStore.KillProcess(int.MaxValue, DateTime.UtcNow));
+
+        // Assert: nothing was thrown
+        Assert.Null(exception);
+    }
+
+    /// <summary>
+    ///     Test that the live-process check covers the daemon, the server, and the browser, and ignores unrecorded ones.
+    /// </summary>
+    [Fact]
+    public void SessionStore_HasLiveProcesses_ChecksDaemonServerAndBrowserOnly_WhenRecorded()
+    {
+        // Arrange: a store where only one chosen process id is alive
+        using var temp = new TempDirectory();
+        var alive = 0;
+        var store = new SessionStore(temp.Path, (pid, _) => pid == alive, (_, _) => { });
+        var recorded = CreateInfo("busy", daemonPid: 111, serverPid: 222, browserPid: 333);
+        var unrecorded = CreateInfo("busy", daemonPid: 111, serverPid: 0, browserPid: 0);
+
+        // Act: check with each process alive in turn, and with nothing alive
+        var results = new List<bool>();
+        foreach (var pid in new[] { 111, 222, 333, 999 })
+        {
+            alive = pid;
+            results.Add(store.HasLiveProcesses(recorded));
+        }
+
+        alive = 0;
+        var unrecordedWithPidZeroAlive = store.HasLiveProcesses(unrecorded);
+
+        // Assert: each recorded process counts, an unrelated one does not, and pid 0 is never consulted
+        Assert.Equal([true, true, true, false], results);
+        Assert.False(unrecordedWithPidZeroAlive);
+    }
+
+    /// <summary>
     ///     Test that terminating a session kills the browser, the server, and the daemon by their recorded identities.
     /// </summary>
     [Fact]

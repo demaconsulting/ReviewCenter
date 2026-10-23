@@ -104,6 +104,9 @@ browser) have changed.
 
 **IsAlive**: Checks a process identity.
 
+**HasLiveProcesses**: True when the recorded daemon, or the recorded server or browser (when their ids are set), is
+still alive by id and start time. Callers use it to confirm a cleanup before they delete a session file.
+
 **Terminate**: Ends one process identity, or the browser, the server, and the daemon of a session, each together with
 its child processes. Every process is ended only when its id and start time match, so a recycled process id is
 never ended and nothing is ended by name.
@@ -111,8 +114,12 @@ never ended and nothing is ended by name.
 **IsProcessAlive**: Returns true only when a process with the given id exists, has not exited, and started within two
 seconds of the recorded start time. The start time guards against the operating system reusing a process id.
 
-**KillProcess**: Ends a process and its children, but only when `IsProcessAlive` confirms it is the recorded
-process.
+**KillProcess**: Ends a process and its children, but only when it is the recorded process. The process is acquired
+once and its operating system handle is opened before the start time is compared, and the same process object is
+then killed. Where a handle pins one process (Windows), the process that was checked is the process that is ended,
+so a process id recycled between the check and the kill cannot be hit. On platforms without such a handle the check
+and the kill are adjacent operations on one object, which leaves only a very small window; the operating system
+offers no portable way to close it entirely.
 
 ### Error Handling
 

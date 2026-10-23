@@ -109,14 +109,22 @@ sections:
           - id: ReviewCenterPuppet-SessionStore-ProcessTermination
             title: >-
               The SessionStore unit shall end the browser, the server, and the daemon of a session only when
-              the process id and the recorded start time match, and shall never end a process by name.
+              the process id and the recorded start time match, never by name, shall validate that identity
+              on the very process object it then terminates, and shall be able to tell whether any recorded
+              process is still alive.
             justification: |
               A daemon that is stuck, or a start that has to be abandoned, must not leave a browser or a
               server behind. Because process ids are recycled, ending a process by id alone could kill an
-              unrelated program, so the start time is verified as well.
+              unrelated program, so the start time is verified as well, on the same operating system handle
+              that is then used to end the process, so that no recycling can happen between check and kill.
+              Callers that must not delete a session record before its processes are gone need to ask
+              whether any of them is still alive.
             tests:
               - SessionStore_Terminate_Session_KillsBrowserServerAndDaemonWithTheirStartTimes
               - SessionStore_Terminate_UnrecordedBrowserAndServer_OnlyKillsDaemon
+              - SessionStore_KillProcess_RealProcess_KillsOnlyWhenStartTimeMatches
+              - SessionStore_KillProcess_NoSuchProcess_DoesNothing
+              - SessionStore_HasLiveProcesses_ChecksDaemonServerAndBrowserOnly_WhenRecorded
 
           - id: ReviewCenterPuppet-SessionStore-StartReservation
             title: >-

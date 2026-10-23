@@ -29,7 +29,8 @@ N/A - standard test environment. Each test creates its own temporary folder with
   (`DeleteIfSame`) keeps a different session, leaves the file while another start holds the reservation, and treats a
   missing file as deleted.
 - The browser, the server, and the daemon of a session are ended with the process ids and start times that were
-  recorded; a browser or server that was never recorded is not touched.
+  recorded; a browser or server that was never recorded is not touched. A real process is ended only when its start
+  time matches, and the check can tell whether any recorded process is still alive.
 - Exactly one of several simultaneous callers reserves a session id; the rest are refused until it is released; a
   reservation is taken over only when its owner is gone or its content is unreadable and older than the grace period.
 - On Unix platforms the session folder is created with mode 0700 and a session file with mode 0600.
@@ -146,6 +147,20 @@ recorded start time. This scenario is tested by
 **SessionStore_Terminate_UnrecordedBrowserAndServer_OnlyKillsDaemon**: A session that recorded no browser and no
 server is terminated; only the daemon is passed to the kill action. This scenario is tested by
 `SessionStore_Terminate_UnrecordedBrowserAndServer_OnlyKillsDaemon`.
+
+**SessionStore_KillProcess_RealProcess_KillsOnlyWhenStartTimeMatches**: A real idle child process is started. Killing
+it with a start time that belongs to another process leaves it running; killing it with its real start time ends it.
+This scenario is tested by `SessionStore_KillProcess_RealProcess_KillsOnlyWhenStartTimeMatches`. The identity check
+and the kill act on one acquired process object; the remaining platform-dependent window between them cannot be
+provoked deterministically, so it is covered by the design rather than by a test.
+
+**SessionStore_KillProcess_NoSuchProcess_DoesNothing**: Killing a process id that no process uses throws nothing. This
+scenario is tested by `SessionStore_KillProcess_NoSuchProcess_DoesNothing`.
+
+**SessionStore_HasLiveProcesses_ChecksDaemonServerAndBrowserOnly_WhenRecorded**: With only the daemon, only the server,
+or only the browser of a record alive, the check is true; with only an unrelated process alive it is false; and a
+record with no server and no browser never consults process id 0. This scenario is tested by
+`SessionStore_HasLiveProcesses_ChecksDaemonServerAndBrowserOnly_WhenRecorded`.
 
 **SessionStore_TryReserve_SecondCaller_IsRefusedUntilReleased**: The first reservation of an id succeeds, a second
 is refused, and after the release a new reservation succeeds. This scenario is tested by

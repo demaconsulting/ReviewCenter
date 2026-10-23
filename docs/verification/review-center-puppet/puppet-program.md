@@ -26,10 +26,11 @@ helper, and the tests need permission to open loopback TCP ports for the one tes
   that the session is already being started; a failed launch gives the id back.
 - A start that times out, is cancelled, or whose daemon dies ends the launched daemon (identified by process id and
   start time, even when no session file exists), also ends the server and the browser a partial session file
-  records, and leaves no session state behind.
+  records, and removes the session state only once all of them are confirmed gone within a bounded wait (repeating
+  the kill meanwhile); when one survives, the record is kept and the error says so.
 - Commands are forwarded to the daemon and its answer is printed; a failed command returns exit code 1, and `stop`
-  ends the daemon and removes the session file, but never removes or ends the processes of a newer session that
-  replaced it in the meantime.
+  ends the daemon and removes the session file once the processes are confirmed gone (otherwise it keeps the file and
+  returns exit code 1), but never removes or ends the processes of a newer session that replaced it in the meantime.
 - `list` reports "No active sessions." when there are none and reports and removes stale sessions.
 - An unknown session or no running session returns exit code 2; a stale session returns exit code 3 and its file is
   removed; invalid arguments return exit code 1 with a message.
@@ -96,6 +97,18 @@ terminated with their own start time and the session file is removed. This scena
 start is waiting; the cancellation is raised to the caller after the launched daemon has been terminated and the
 session state removed. This scenario is tested by `PuppetProgram_Run_StartCancelled_TerminatesLaunchedDaemonAndCleansUp`.
 
+**PuppetProgram_Run_StartTimesOutAndProcessSurvives_KeepsRecordAndReportsUnconfirmed**: The daemon recorded a server
+and never becomes ready, and every kill has no effect (the processes always look alive). After the start time-out
+and the bounded stop wait, `start` exits with code 4, says that some processes could not be confirmed stopped, keeps
+the session record unchanged, and has repeated the kill of the server while waiting. This scenario is tested by
+`PuppetProgram_Run_StartTimesOutAndProcessSurvives_KeepsRecordAndReportsUnconfirmed`.
+
+**PuppetProgram_Run_StartTimesOutAndProcessesDieSlowly_DeletesRecordOnceConfirmedGone**: The recorded processes only
+disappear after the second round of kills. `start` exits with code 4 without an "unconfirmed" note, the record was
+present whenever a process still looked alive, every process was killed again after the first attempt, and the
+record is removed at the end. This scenario is tested by
+`PuppetProgram_Run_StartTimesOutAndProcessesDieSlowly_DeletesRecordOnceConfirmedGone`.
+
 **PuppetProgram_Run_StartMissingServerAssembly_ExitsFourWithHint**: `start --server` names a file that does not
 exist; the exit code is 4 and the message says the assembly was not found. This scenario is tested by
 `PuppetProgram_Run_StartMissingServerAssembly_ExitsFourWithHint`.
@@ -116,6 +129,11 @@ scenario is tested by `PuppetProgram_Run_StopForced_SessionReplacedMeanwhile_Kee
 `stop` request; as it answers, it publishes a replacement session and the fake daemon counts as gone. `stop` exits
 with code 0, none of the replacement's processes were terminated, and the replacement file is unchanged. This
 scenario is tested by `PuppetProgram_Run_StopAccepted_SessionReplacedAfterDaemonExit_KeepsReplacement`.
+
+**PuppetProgram_Run_StopForcedAndProcessSurvives_KeepsRecordAndExitsOne**: A stored session looks live, its control
+port refuses connections, and its processes cannot be killed. `stop` exits with code 1, says the stop could not be
+confirmed, and the session record is still there for a retry. This scenario is tested by
+`PuppetProgram_Run_StopForcedAndProcessSurvives_KeepsRecordAndExitsOne`.
 
 **PuppetProgram_Run_ListWithNoSessions_ReportsNone**: `list` over an empty store exits with code 0 and prints "No
 active sessions." This scenario is tested by `PuppetProgram_Run_ListWithNoSessions_ReportsNone`.

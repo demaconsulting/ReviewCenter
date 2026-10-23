@@ -61,17 +61,23 @@ sections:
           - id: ReviewCenterPuppet-PuppetProgram-StartAbort
             title: >-
               The PuppetProgram unit shall end the daemon it launched, together with any server and browser
-              already recorded, and remove the partial session state, when a start times out, is cancelled, or
-              finds the daemon dead, even if no session file was written yet.
+              already recorded, when a start times out, is cancelled, or finds the daemon dead, even if no
+              session file was written yet, and shall remove the partial session state only after every one
+              of those processes is confirmed gone within a bounded wait (repeating the kill meanwhile),
+              keeping the record and saying so when one survives.
             justification: |
               A start that gives up must not leave a background daemon, a server, or a browser running with
               nobody able to reach them. The daemon is known from the moment it is launched, so it can be
-              ended even before it has written any session file.
+              ended even before it has written any session file. Termination is asynchronous and can fail, and
+              the session file is the only record that lets a later command find a survivor, so it is deleted
+              only once the processes are confirmed gone.
             tests:
               - PuppetProgram_Run_StartTimesOutWithNoSessionFile_TerminatesLaunchedDaemon
               - PuppetProgram_Run_StartTimesOutWithRecordedProcesses_TerminatesBrowserServerAndDaemon
               - PuppetProgram_Run_StartCancelled_TerminatesLaunchedDaemonAndCleansUp
               - PuppetProgram_Run_StartDaemonDiesEarly_ExitsFour
+              - PuppetProgram_Run_StartTimesOutAndProcessSurvives_KeepsRecordAndReportsUnconfirmed
+              - PuppetProgram_Run_StartTimesOutAndProcessesDieSlowly_DeletesRecordOnceConfirmedGone
 
           - id: ReviewCenterPuppet-PuppetProgram-ClientCommands
             title: >-
@@ -88,16 +94,19 @@ sections:
             title: >-
               The PuppetProgram unit shall stop a session on request by asking its daemon to shut down,
               waiting for the daemon to end (forcing it, and the server and browser the session records, to
-              end if it does not or cannot be asked), and removing the session file, but shall never remove
-              or end the processes of a newer session that replaced it in the meantime.
+              end if it does not or cannot be asked), and removing the session file only once they are
+              confirmed gone (keeping the file and exiting with code 1 when one survives), but shall never
+              remove or end the processes of a newer session that replaced it in the meantime.
             justification: |
               A stopped session must release the server, the browser, and the session file so that nothing
               keeps running after the developer or coding agent has finished. A start for the same id can
-              publish a new session while the stop is finishing, and the stop must not destroy it.
+              publish a new session while the stop is finishing, and the stop must not destroy it. The file
+              is the only record of a surviving process, so it is kept until the processes are confirmed gone.
             tests:
               - PuppetProgram_Run_ClientCommandsAgainstDaemon_ClickMissingElementAndStop
               - PuppetProgram_Run_StopForced_SessionReplacedMeanwhile_KeepsReplacement
               - PuppetProgram_Run_StopAccepted_SessionReplacedAfterDaemonExit_KeepsReplacement
+              - PuppetProgram_Run_StopForcedAndProcessSurvives_KeepsRecordAndExitsOne
 
           - id: ReviewCenterPuppet-PuppetProgram-List
             title: >-

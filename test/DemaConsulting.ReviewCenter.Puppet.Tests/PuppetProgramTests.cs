@@ -284,7 +284,9 @@ public class PuppetProgramTests
         var server = Path.Combine(temp.Path, "server.dll");
         await File.WriteAllTextAsync(server, "x", Xunit.TestContext.Current.CancellationToken);
         var launcher = new FakeDaemonLauncher();
-        var services = CreateServices(temp, launcher, () => true, stopTimeout: TimeSpan.FromMilliseconds(100));
+        var killed = new List<(int Pid, DateTime Start)>();
+        var services = CreateServices(
+            temp, launcher, () => killed.Count == 0, (pid, start) => killed.Add((pid, start)), stopTimeout: TimeSpan.FromMilliseconds(100));
         launcher.OnLaunch = (id, _) => services.Store.Write(CreateInfo(id, SessionStatus.Failed, "Chromium is not installed."));
 
         // Act: start
@@ -316,7 +318,7 @@ public class PuppetProgramTests
             () =>
             {
                 // Only polls made while the file exists are counted: the file must outlive the daemon
-                if (!File.Exists(sessionFile))
+                if (!File.Exists(sessionFile) || checksWhileFilePresent >= 4)
                 {
                     return false;
                 }
@@ -351,7 +353,7 @@ public class PuppetProgramTests
         var launcher = new FakeDaemonLauncher { ReportedPid = 4242, ReportedStartTimeUtc = daemonStart };
         var killed = new List<(int Pid, DateTime Start)>();
         var services = CreateServices(
-            temp, launcher, () => true, (pid, start) => killed.Add((pid, start)), stopTimeout: TimeSpan.FromMilliseconds(200));
+            temp, launcher, () => killed.Count == 0, (pid, start) => killed.Add((pid, start)), stopTimeout: TimeSpan.FromMilliseconds(200));
         launcher.OnLaunch = (id, _) => services.Store.Write(new SessionInfo(
             id, SessionStatus.Failed, 40000, "token", "http://127.0.0.1:5999", 4242, daemonStart, 5151, serverStart,
             0, default, "The server could not be stopped."));
@@ -365,6 +367,110 @@ public class PuppetProgramTests
         Assert.Contains((5151, serverStart), killed);
         Assert.Contains((4242, daemonStart), killed);
         Assert.Null(services.Store.TryRead("demo"));
+    }
+
+    /// <summary>
+    ///     Test that an abandoned start keeps the session record, and says so, when a recorded process survives the
+    ///     bounded wait, so a later command can still identify it; the kill is repeated while waiting.
+    /// </summary>
+    [Fact]
+    public async Task PuppetProgram_Run_StartTimesOutAndProcessSurvives_KeepsRecordAndReportsUnconfirmed()
+    {
+        // Arrange: a daemon that recorded a server and never becomes ready, and kills that have no effect
+        using var temp = new TempDirectory();
+        var server = Path.Combine(temp.Path, "server.dll");
+        await File.WriteAllTextAsync(server, "x", Xunit.TestContext.Current.CancellationToken);
+        var daemonStart = new DateTime(2025, 3, 1, 12, 0, 0, DateTimeKind.Utc);
+        var serverStart = daemonStart.AddSeconds(5);
+        var launcher = new FakeDaemonLauncher { ReportedPid = 4242, ReportedStartTimeUtc = daemonStart };
+        var killed = new List<(int Pid, DateTime Start)>();
+        var services = CreateServices(
+            temp, launcher, () => true, (pid, start) => killed.Add((pid, start)), TimeSpan.FromMilliseconds(300), TimeSpan.FromMilliseconds(400));
+        var written = new SessionInfo(
+            "slow", SessionStatus.Starting, 40000, "token", "http://127.0.0.1:5999", 4242, daemonStart, 5151, serverStart,
+            0, default, null);
+        launcher.OnLaunch = (_, _) => services.Store.Write(written);
+
+        // Act: start
+        var result = await RunAsync(services, "start", "--session", "slow", "--server", server);
+
+        // Assert: exit 4 naming the unconfirmed cleanup, the record is kept, and the kill was repeated
+        Assert.Equal(4, result.ExitCode);
+        Assert.Contains("could not be confirmed stopped", result.Error, StringComparison.Ordinal);
+        Assert.Equal(written, services.Store.TryRead("slow"));
+        Assert.True(killed.Count(k => k.Pid == 5151) > 1, "The kill should be repeated while waiting.");
+    }
+
+    /// <summary>
+    ///     Test that an abandoned start waits for slow-to-die processes and removes the session record only after
+    ///     they are confirmed gone.
+    /// </summary>
+    [Fact]
+    public async Task PuppetProgram_Run_StartTimesOutAndProcessesDieSlowly_DeletesRecordOnceConfirmedGone()
+    {
+        // Arrange: recorded server and browser that only disappear after the second round of kills
+        using var temp = new TempDirectory();
+        var server = Path.Combine(temp.Path, "server.dll");
+        await File.WriteAllTextAsync(server, "x", Xunit.TestContext.Current.CancellationToken);
+        var daemonStart = new DateTime(2025, 3, 1, 12, 0, 0, DateTimeKind.Utc);
+        var launcher = new FakeDaemonLauncher { ReportedPid = 4242, ReportedStartTimeUtc = daemonStart };
+        var killed = new List<(int Pid, DateTime Start)>();
+        var recordExistedWhileAlive = true;
+        var sessionFile = Path.Combine(temp.Path, "slow.json");
+        var services = CreateServices(
+            temp,
+            launcher,
+            () =>
+            {
+                var dies = killed.Count >= 6;
+                if (killed.Count > 0 && !dies)
+                {
+                    // Processes still look alive after a kill: the record must still be there
+                    recordExistedWhileAlive &= File.Exists(sessionFile);
+                }
+
+                return !dies;
+            },
+            (pid, start) => killed.Add((pid, start)),
+            TimeSpan.FromMilliseconds(300),
+            TimeSpan.FromSeconds(10));
+        launcher.OnLaunch = (id, _) => services.Store.Write(new SessionInfo(
+            id, SessionStatus.Starting, 40000, "token", "http://127.0.0.1:5999", 4242, daemonStart, 5151,
+            daemonStart.AddSeconds(5), 6161, daemonStart.AddSeconds(10), null));
+
+        // Act: start
+        var result = await RunAsync(services, "start", "--session", "slow", "--server", server);
+
+        // Assert: the record stayed while any process was alive, was removed once all were gone, and nothing
+        // was reported as unconfirmed
+        Assert.Equal(4, result.ExitCode);
+        Assert.DoesNotContain("could not be confirmed", result.Error, StringComparison.Ordinal);
+        Assert.True(recordExistedWhileAlive);
+        Assert.True(killed.Count >= 6, "Every recorded process should have been killed again after the first attempt.");
+        Assert.Null(services.Store.TryRead("slow"));
+    }
+
+    /// <summary>
+    ///     Test that a forced stop keeps the session record, exits 1, and says so, when a process of the session
+    ///     survives the bounded wait.
+    /// </summary>
+    [Fact]
+    public async Task PuppetProgram_Run_StopForcedAndProcessSurvives_KeepsRecordAndExitsOne()
+    {
+        // Arrange: a live-looking session whose control port refuses connections and whose processes cannot be killed
+        using var temp = new TempDirectory();
+        var start = new DateTime(2025, 3, 1, 12, 0, 0, DateTimeKind.Utc);
+        var session = CreateProcessInfo("demo", GetUnusedPort(), "token", 111, start);
+        var services = CreateServices(temp, alive: () => true, stopTimeout: TimeSpan.FromMilliseconds(300));
+        services.Store.Write(session);
+
+        // Act: stop the session
+        var result = await RunAsync(services, "stop", "--session", "demo");
+
+        // Assert: failure naming the unconfirmed stop, and the record is still there for a later retry
+        Assert.Equal(1, result.ExitCode);
+        Assert.Contains("could not be confirmed stopped", result.Error, StringComparison.Ordinal);
+        Assert.Equal(session, services.Store.TryRead("demo"));
     }
 
     /// <summary>
@@ -402,7 +508,7 @@ public class PuppetProgramTests
         var killed = new List<(int Pid, DateTime Start)>();
         var services = CreateServices(
             temp,
-            alive: () => true,
+            alive: () => killed.Count == 0,
             kill: (pid, start) =>
             {
                 killed.Add((pid, start));
@@ -635,7 +741,7 @@ public class PuppetProgramTests
         var launcher = new FakeDaemonLauncher { ReportedPid = 4242, ReportedStartTimeUtc = daemonStart };
         var killed = new List<(int Pid, DateTime Start)>();
         var services = CreateServices(
-            temp, launcher, () => true, (pid, start) => killed.Add((pid, start)), TimeSpan.FromMilliseconds(300));
+            temp, launcher, () => killed.Count == 0, (pid, start) => killed.Add((pid, start)), TimeSpan.FromMilliseconds(300));
 
         // Act: start
         var result = await RunAsync(services, "start", "--session", "slow", "--server", server);
@@ -664,7 +770,7 @@ public class PuppetProgramTests
         var launcher = new FakeDaemonLauncher { ReportedPid = 4242, ReportedStartTimeUtc = daemonStart };
         var killed = new List<(int Pid, DateTime Start)>();
         var services = CreateServices(
-            temp, launcher, () => true, (pid, start) => killed.Add((pid, start)), TimeSpan.FromMilliseconds(300));
+            temp, launcher, () => killed.Count == 0, (pid, start) => killed.Add((pid, start)), TimeSpan.FromMilliseconds(300));
         launcher.OnLaunch = (id, _) => services.Store.Write(new SessionInfo(
             id, SessionStatus.Starting, 40000, "token", "http://127.0.0.1:5999", 4242, daemonStart, 5151, serverStart,
             6161, browserStart, null));
@@ -694,7 +800,7 @@ public class PuppetProgramTests
         var daemonStart = new DateTime(2025, 3, 1, 12, 0, 0, DateTimeKind.Utc);
         var launcher = new FakeDaemonLauncher { ReportedPid = 4242, ReportedStartTimeUtc = daemonStart };
         var killed = new List<(int Pid, DateTime Start)>();
-        var services = CreateServices(temp, launcher, () => true, (pid, start) => killed.Add((pid, start)));
+        var services = CreateServices(temp, launcher, () => killed.Count == 0, (pid, start) => killed.Add((pid, start)));
         using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(Xunit.TestContext.Current.CancellationToken);
         cancellation.CancelAfter(TimeSpan.FromMilliseconds(300));
 

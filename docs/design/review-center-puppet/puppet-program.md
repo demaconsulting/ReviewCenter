@@ -58,8 +58,13 @@ the file while this start still holds the reservation. The reason from the file 
 **Start abort**: When the wait ends without a ready session (time-out, cancellation, a dead daemon, or a failed
 daemon that has been waited for), `start`
 terminates the daemon it launched, identified by its process id and start time and known even though no session file
-may have been written yet. It also terminates the server and the browser that a partly written session file records,
-and deletes the session file. A cancellation is re-raised after this cleanup. Nothing is ended by name.
+may have been written yet. It also terminates the server and the browser that a partly written session file records.
+Termination is asynchronous and can fail, and the file is the only record that lets a later command find a survivor,
+so the abort polls (every 100 milliseconds, up to the stop time-out, repeating the kill on each poll and ignoring
+caller cancellation) until no process of the daemon and the file is alive, and deletes the file only then. When a
+process survives, the file is kept and the error says that the cleanup could not be confirmed; a later `start`,
+`stop`, or lookup finds the survivors through the file. A cancellation is re-raised after this cleanup. Nothing is
+ended by name.
 
 **Client command handling**: Resolves the session (the `--session` option, the `REVIEWCENTER_PUPPET_SESSION`
 environment variable, or the only running session), looks it up in `SessionStore`, builds a `ControlRequest` with
@@ -71,9 +76,12 @@ tests) for the daemon to end, then runs `ForceStop`. A daemon that cannot be ask
 **ForceStop**: Re-reads the session file, because the daemon may have recorded more processes or marked the session
 `Failed` since the stop began. When the file still describes the same session (`SessionStore.IsSameSession`), it
 terminates the browser, the server, and the daemon from that fresh record, otherwise from the record the stop
-examined; each is verified by process id and start time, so a newer session's processes are never touched. It then
-deletes the file with `SessionStore.DeleteIfSame`, which keeps a replacement session that a concurrent `start`
-published in the meantime. The same path handles a daemon whose own teardown failed and left a server running.
+examined; each is verified by process id and start time, so a newer session's processes are never touched. It uses
+the same bounded terminate-and-confirm loop as the start abort, and only when every process is confirmed gone does it
+delete the file with `SessionStore.DeleteIfSame`, which keeps a replacement session that a concurrent `start`
+published in the meantime. When a process survives, the file is kept, `stop` prints that the stop could not be
+confirmed, and returns exit code 1 so that the command can be repeated. The same path handles a daemon whose own
+teardown failed and left a server running.
 
 **Named values**: the session id length, the default start time-out, the stop time-out, the two polling intervals,
 and the grace period added to a control exchange are named constants, so that their meaning is documented once.

@@ -889,6 +889,19 @@ internal sealed class SessionStore
     }
 
     /// <summary>
+    ///     Checks whether any process a session recorded (daemon, server, browser) is still running.
+    /// </summary>
+    /// <param name="info">The session record.</param>
+    /// <returns><c>true</c> when at least one recorded process, identified by id and start time, is alive.</returns>
+    public bool HasLiveProcesses(SessionInfo info)
+    {
+        ArgumentNullException.ThrowIfNull(info);
+        return _isProcessAlive(info.DaemonPid, info.DaemonStartTimeUtc) ||
+               (info.ServerPid > 0 && _isProcessAlive(info.ServerPid, info.ServerStartTimeUtc)) ||
+               (info.BrowserPid > 0 && _isProcessAlive(info.BrowserPid, info.BrowserStartTimeUtc));
+    }
+
+    /// <summary>
     ///     Kills the browser and the server a session recorded, ignoring ones that never started.
     /// </summary>
     /// <param name="info">The session record.</param>
@@ -919,8 +932,7 @@ internal sealed class SessionStore
         try
         {
             using var process = Process.GetProcessById(pid);
-            return !process.HasExited &&
-                   (process.StartTime.ToUniversalTime() - startTimeUtc).Duration() < StartTimeTolerance;
+            return IsSameProcess(process, startTimeUtc);
         }
         catch (ArgumentException)
         {
@@ -940,26 +952,63 @@ internal sealed class SessionStore
     }
 
     /// <summary>
+    ///     Decides whether an acquired process is still running and started at the recorded time.
+    /// </summary>
+    /// <param name="process">The process object to inspect.</param>
+    /// <param name="startTimeUtc">The recorded start time.</param>
+    /// <returns><c>true</c> when the process has not exited and started within the tolerance of the recorded time.</returns>
+    private static bool IsSameProcess(Process process, DateTime startTimeUtc)
+    {
+        return !process.HasExited &&
+               (process.StartTime.ToUniversalTime() - startTimeUtc).Duration() < StartTimeTolerance;
+    }
+
+    /// <summary>
     ///     Terminates the process (and its children) identified by a pid and start time, if it is still the same process.
     /// </summary>
+    /// <remarks>
+    ///     The process is acquired once. Its operating system handle is opened before the start time is
+    ///     checked, and the same object is then killed, so that where the platform ties a handle to one
+    ///     process instance (Windows) the process that was checked is the process that is terminated and
+    ///     a pid recycled in between cannot be hit. Where the platform offers no such handle, the check and
+    ///     the kill are adjacent operations on one object, which leaves only a very small window.
+    /// </remarks>
     /// <param name="pid">The process id.</param>
     /// <param name="startTimeUtc">The recorded start time, used to avoid killing a recycled pid.</param>
     public static void KillProcess(int pid, DateTime startTimeUtc)
     {
-        if (!IsProcessAlive(pid, startTimeUtc))
-        {
-            return;
-        }
-
         try
         {
             using var process = Process.GetProcessById(pid);
+            PinHandle(process);
+            if (!IsSameProcess(process, startTimeUtc))
+            {
+                return;
+            }
+
             process.Kill(entireProcessTree: true);
         }
         catch (Exception ex) when (ex is ArgumentException or InvalidOperationException
                                        or System.ComponentModel.Win32Exception)
         {
             // Already gone or not ours to stop; nothing more to do
+        }
+    }
+
+    /// <summary>
+    ///     Opens the operating system handle of a process object so that it keeps addressing that process.
+    /// </summary>
+    /// <param name="process">The process object.</param>
+    private static void PinHandle(Process process)
+    {
+        try
+        {
+            _ = process.SafeHandle;
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or NotSupportedException
+                                       or System.ComponentModel.Win32Exception)
+        {
+            // Exited, access refused, or not supported here: the identity check that follows decides what to do
         }
     }
 }
