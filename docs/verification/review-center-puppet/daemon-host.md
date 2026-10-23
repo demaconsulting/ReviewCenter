@@ -138,6 +138,12 @@ with status 200 and the body `Unhealthy`, with status 200 and an empty body, and
 reported as a mismatch whose detail names the status and the expected text, so the start fails instead of driving
 another service. This scenario is tested by `DaemonHost_HealthProbe_SuccessWithoutExactBody_IsMismatchNamingTheAnswer`.
 
+**DaemonHost_HealthProbe_Redirect_IsMismatchAndNotFollowed**: A loopback listener answers `/health` with a 302
+redirect to a second loopback listener. The probe, created by the readiness client factory, reports a mismatch that
+names status 302, and the second listener never receives a connection, so a redirect cannot lead the probe to
+another endpoint that answers like a healthy server. This scenario is tested by
+`DaemonHost_HealthProbe_Redirect_IsMismatchAndNotFollowed`.
+
 **DaemonHost_HealthProbe_ErrorStatusOrNoListener_IsNotReady**: A loopback listener answers `/health` with status 503,
 and a second probe targets a port nothing listens on. Both are reported as not ready, so the runner keeps polling.
 This scenario is tested by `DaemonHost_HealthProbe_ErrorStatusOrNoListener_IsNotReady`.

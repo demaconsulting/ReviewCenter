@@ -277,8 +277,10 @@ public class DaemonHostTests
     /// <param name="status">The status line text, such as <c>200 OK</c>.</param>
     /// <param name="body">The response body.</param>
     /// <param name="cancellationToken">Cancels the wait for the request.</param>
+    /// <param name="extraHeaders">Additional response header lines, each ending in <c>\r\n</c>.</param>
     /// <returns>The base URL the probe should use, and the task that completes once the request was answered.</returns>
-    private static (string Url, Task Served) ServeOnce(string status, string body, CancellationToken cancellationToken)
+    private static (string Url, Task Served) ServeOnce(
+        string status, string body, CancellationToken cancellationToken, string extraHeaders = "")
     {
         var listener = new System.Net.Sockets.TcpListener(System.Net.IPAddress.Loopback, 0);
         listener.Start();
@@ -297,7 +299,7 @@ public class DaemonHostTests
                     }
 
                     var length = System.Text.Encoding.UTF8.GetByteCount(body);
-                    var response = $"HTTP/1.1 {status}\r\nContent-Type: text/plain\r\nContent-Length: {length}\r\nConnection: close\r\n\r\n{body}";
+                    var response = $"HTTP/1.1 {status}\r\nContent-Type: text/plain\r\n{extraHeaders}Content-Length: {length}\r\nConnection: close\r\n\r\n{body}";
                     await stream.WriteAsync(System.Text.Encoding.UTF8.GetBytes(response), cancellationToken);
                     await stream.FlushAsync(cancellationToken);
                 }
@@ -350,6 +352,38 @@ public class DaemonHostTests
         Assert.Equal(HealthState.Mismatch, probe.State);
         Assert.Contains(status[..3], probe.Detail, StringComparison.Ordinal);
         Assert.Contains(ServerProcessRunner.HealthyText, probe.Detail, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    ///     Test that a redirect from the probed port is a mismatch and is not followed, so a process that wins the port
+    ///     race cannot send the probe to another endpoint that answers like a healthy server.
+    /// </summary>
+    [Fact]
+    public async Task DaemonHost_HealthProbe_Redirect_IsMismatchAndNotFollowed()
+    {
+        // Arrange: a "healthy" target that must never be contacted, and a listener that redirects /health to it
+        using var http = ServerProcessRunner.CreateHealthClient();
+        var target = new System.Net.Sockets.TcpListener(System.Net.IPAddress.Loopback, 0);
+        target.Start();
+        try
+        {
+            var targetUrl = $"http://127.0.0.1:{((System.Net.IPEndPoint)target.LocalEndpoint).Port}/health";
+            var (url, served) = ServeOnce(
+                "302 Found", string.Empty, Xunit.TestContext.Current.CancellationToken, $"Location: {targetUrl}\r\n");
+
+            // Act: probe the redirecting listener
+            var probe = await ServerProcessRunner.ProbeHealthAsync(http, url, Xunit.TestContext.Current.CancellationToken);
+            await served;
+
+            // Assert: a mismatch naming the redirect, and nothing ever connected to the redirect target
+            Assert.Equal(HealthState.Mismatch, probe.State);
+            Assert.Contains("302", probe.Detail, StringComparison.Ordinal);
+            Assert.False(target.Pending());
+        }
+        finally
+        {
+            target.Stop();
+        }
     }
 
     /// <summary>

@@ -36,7 +36,9 @@ lines of its output, and waits up to 30 seconds for the `/health` endpoint to an
 refused connection means "not ready yet" and polling continues, while a success answer with any other status or body
 (another process that took the port between choosing it and the server binding it, or a misconfigured endpoint) fails
 the start at once with a `PuppetException` that names the answer and includes the captured output. The classification
-is done by `ProbeHealthAsync`. The server runs as a separate
+is done by `ProbeHealthAsync`. The readiness client does not follow redirects (`CreateHealthClient`), and a 3xx answer
+is a mismatch, so another process on the port cannot send the probe to a different endpoint that answers
+`200 Healthy`. The server runs as a separate
 process so that Puppet exercises exactly what ships: the real assembly, its real start-up, and its real health
 endpoint. The polling interval, the health request time-out, and the kill wait are named constants. Stopping the
 server is verified: after the kill, the runner waits for the process to exit; if it has not exited it ends the

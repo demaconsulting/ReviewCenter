@@ -222,7 +222,7 @@ internal sealed class ServerProcessRunner : IServerRunner
         ConcurrentQueue<string> output,
         CancellationToken cancellationToken)
     {
-        using var http = new HttpClient { Timeout = HealthRequestTimeout };
+        using var http = CreateHealthClient();
         var deadline = DateTime.UtcNow + HealthTimeout;
         while (DateTime.UtcNow < deadline)
         {
@@ -256,6 +256,20 @@ internal sealed class ServerProcessRunner : IServerRunner
     }
 
     /// <summary>
+    ///     Creates the client used for readiness probes.
+    /// </summary>
+    /// <remarks>
+    ///     Redirects are not followed: the probe must judge the answer of the process on the chosen
+    ///     port itself. Following a redirect would let another process that won the port race send the
+    ///     probe to any endpoint that answers <c>200 Healthy</c> (and cause an unintended request).
+    /// </remarks>
+    /// <returns>A client with a short request timeout and automatic redirects disabled.</returns>
+    internal static HttpClient CreateHealthClient()
+    {
+        return new HttpClient(new HttpClientHandler { AllowAutoRedirect = false }) { Timeout = HealthRequestTimeout };
+    }
+
+    /// <summary>
     ///     Requests <c>/health</c> once and decides whether the exact ReviewCenter health answer came back.
     /// </summary>
     /// <remarks>
@@ -274,6 +288,14 @@ internal sealed class ServerProcessRunner : IServerRunner
         try
         {
             using var response = await http.GetAsync($"{url}/health", cancellationToken);
+            if ((int)response.StatusCode is >= 300 and < 400)
+            {
+                // A redirect is never the ReviewCenter health answer: something else owns the port
+                return new HealthProbe(
+                    HealthState.Mismatch,
+                    $"/health answered with the redirect status {(int)response.StatusCode} instead of 200 with '{HealthyText}'");
+            }
+
             if (!response.IsSuccessStatusCode)
             {
                 return new HealthProbe(HealthState.NotReady, $"status {(int)response.StatusCode}");

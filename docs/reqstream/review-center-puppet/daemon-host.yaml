@@ -102,6 +102,7 @@ sections:
             tests:
               - DaemonHost_HealthProbe_ExactHealthyAnswer_IsHealthy
               - DaemonHost_HealthProbe_SuccessWithoutExactBody_IsMismatchNamingTheAnswer
+              - DaemonHost_HealthProbe_Redirect_IsMismatchAndNotFollowed
               - DaemonHost_HealthProbe_ErrorStatusOrNoListener_IsNotReady
 
           - id: ReviewCenterPuppet-DaemonHost-ProtocolSessionRelease
