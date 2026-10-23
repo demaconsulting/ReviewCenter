@@ -68,3 +68,9 @@ returns its identity without ending the process. This scenario is tested by
 termination reports a partial tree kill (`AggregateException`) is reported as a `PuppetException` that keeps the
 original reason, says that child processes may still be running, and carries the partial-kill exception as its inner
 exception. This scenario is tested by `DaemonLauncher_CaptureIdentity_PartialTreeKill_IsReportedWithTheOriginalReason`.
+
+**DaemonLauncher_CaptureIdentity_TerminationRefused_IsReportedWithTheOriginalReason**: A failing capture whose
+termination reports that the process may still be running (the Windows `TerminateProcess` failure for a process that
+has not exited) is reported as a `PuppetException` that keeps the original reason, says the process may still be
+running, and carries the termination failure as its inner exception. This scenario is tested by
+`DaemonLauncher_CaptureIdentity_TerminationRefused_IsReportedWithTheOriginalReason`.

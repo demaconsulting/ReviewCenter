@@ -690,7 +690,8 @@ internal sealed class SessionStore
     ///     Several parties can delete the same file at about the same moment (the daemon finishing its
     ///     cleanup, a <c>stop</c> command, or a <c>start</c> that is aborting). On Windows a delete that
     ///     races another delete can fail with an access error although the file is going away, so a
-    ///     failure is retried briefly and is ignored once the file is gone.
+    ///     failure is retried briefly; a retry that finds the file gone succeeds, and only a successful delete
+    ///     counts as removal.
     /// </remarks>
     /// <param name="sessionId">The session id.</param>
     private void Delete(string sessionId)
@@ -710,30 +711,32 @@ internal sealed class SessionStore
         {
             try
             {
-                // Deleting a file that does not exist is not an error
+                // Deleting a file that does not exist is not an error, so a delete that a concurrent party
+                // completed in the meantime succeeds on the next attempt
                 File.Delete(path);
+                return;
+            }
+            catch (DirectoryNotFoundException)
+            {
+                // The directory is gone, so the file is too
                 return;
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
             {
-                // A concurrent delete that won the race leaves nothing to do
-                if (!File.Exists(path))
-                {
-                    return;
-                }
-
+                // Only a successful delete counts as removal: File.Exists cannot tell a missing file from one
+                // that cannot be inspected, so it is not used to decide that the file is gone
                 _sleep(DeleteRetryDelay);
             }
         }
 
-        // The last attempt: a failure propagates unless the file is gone anyway
+        // The last attempt: a persistent failure propagates
         try
         {
             File.Delete(path);
         }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException && !File.Exists(path))
+        catch (DirectoryNotFoundException)
         {
-            // A concurrent delete won the race
+            // The directory is gone, so the file is too
         }
     }
 

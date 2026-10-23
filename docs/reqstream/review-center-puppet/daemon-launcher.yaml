@@ -41,3 +41,4 @@ sections:
               - DaemonLauncher_CaptureIdentity_IdentityCannotBeRead_EndsCreatedProcessAndRethrows
               - DaemonLauncher_CaptureIdentity_TerminationFailsOrNotNeeded_OriginalOutcomeIsKept
               - DaemonLauncher_CaptureIdentity_PartialTreeKill_IsReportedWithTheOriginalReason
+              - DaemonLauncher_CaptureIdentity_TerminationRefused_IsReportedWithTheOriginalReason

@@ -218,7 +218,10 @@ The guards that appear most often are:
 1. **Daemon records (`Starting`, `Ready`, `Failed`)**. *Check/act*: `WriteIfOwner` (SessionStore entry 2). *If replaced
    or reused*: the daemon is superseded: it writes nothing more, tears down its own server and browser, leaves the other
    session's file, and exits with 4. A failure record that cannot be written is absorbed, so it cannot skip the
-   teardown or hide the original failure.
+   teardown or hide the original failure. A superseded daemon whose own teardown then fails cannot leave a failure
+   record (the file is the replacement's), so a survivor is not recorded; this is accepted because a replacement can
+   only be published after the old daemon was declared dead and its recorded server and browser were already ended by
+   that cleanup, and the daemon's own teardown is a second attempt at the same processes.
 2. **Final delete of the record**. *Check*: the record is still the one this daemon published. *Act*: delete it.
    *Guard*: `DeleteIfSame` under the reservation; if a `start` holds the reservation the record is left for it.
 3. **Control port**. *Check/act*: the listener binds port 0 and keeps the socket for the life of the daemon, so no other

@@ -104,9 +104,11 @@ internal sealed class DaemonLauncher : IDaemonLauncher
     /// <remarks>
     ///     A process that is running without a recorded identity can never be cleaned up by identity, so a
     ///     failure to capture it must not leave the process behind. The termination itself is best effort: a
-    ///     process that is already gone, or that cannot be ended, does not replace the original failure. A
-    ///     partial tree kill (<see cref="AggregateException"/>) is the exception: descendants may still be
-    ///     running with no identity to find them by, so the failure that is reported says so.
+    ///     process that is already gone does not replace the original failure. A refused termination of a
+    ///     process that is still running, or a partial tree kill (<see cref="AggregateException"/>), is the
+    ///     exception: the process or its descendants may still be running with no identity to find them by, so
+    ///     the failure that is reported says so (<see cref="PuppetException"/> from <paramref name="terminate"/>
+    ///     marks the refused case).
     /// </remarks>
     /// <param name="capture">Reads the identity of the created process.</param>
     /// <param name="terminate">Ends the created process.</param>
@@ -125,12 +127,12 @@ internal sealed class DaemonLauncher : IDaemonLauncher
             {
                 terminate();
             }
-            catch (AggregateException partialKill)
+            catch (Exception incomplete) when (incomplete is AggregateException or PuppetException)
             {
                 throw new PuppetException(
-                    $"{captureFailure.Message} The process was ended, but some of its child processes could not be " +
-                    "ended and may still be running.",
-                    partialKill);
+                    $"{captureFailure.Message} The process could not be ended completely, so it or some of its " +
+                    "child processes may still be running.",
+                    incomplete);
             }
             catch (Exception ex) when (ex is ArgumentException or InvalidOperationException or NotSupportedException
                                            or System.ComponentModel.Win32Exception)
@@ -256,7 +258,7 @@ internal sealed class DaemonLauncher : IDaemonLauncher
 
                         return new ProcessIdentity((int)info.ProcessId, DateTime.FromFileTimeUtc(created));
                     },
-                    () => NativeMethods.TerminateProcess(info.ProcessHandle, 1));
+                    () => TerminateCreatedProcess(info.ProcessHandle));
                 error = 0;
                 return true;
             }
@@ -271,6 +273,33 @@ internal sealed class DaemonLauncher : IDaemonLauncher
         identity = default;
         error = Marshal.GetLastPInvokeError();
         return false;
+    }
+
+    /// <summary>
+    ///     Ends a process that was just created, through the handle of its creation.
+    /// </summary>
+    /// <remarks>
+    ///     <c>TerminateProcess</c> reports failure through its return value, and it fails for a process that
+    ///     has already exited as well as for one that refuses to die. The exit time of the process tells the two
+    ///     apart: a process that is gone has one; a process that is running, or that cannot be examined, may
+    ///     still be running with no recorded identity.
+    /// </remarks>
+    /// <param name="processHandle">The handle returned by the creation.</param>
+    /// <exception cref="PuppetException">Thrown when the process may still be running after the attempt.</exception>
+    private static void TerminateCreatedProcess(IntPtr processHandle)
+    {
+        if (NativeMethods.TerminateProcess(processHandle, 1))
+        {
+            return;
+        }
+
+        var reason = new Win32Exception(Marshal.GetLastPInvokeError()).Message;
+        if (NativeMethods.GetProcessTimes(processHandle, out _, out var exited, out _, out _) && exited != 0)
+        {
+            return;
+        }
+
+        throw new PuppetException($"The process could not be terminated: {reason}");
     }
 
     /// <summary>

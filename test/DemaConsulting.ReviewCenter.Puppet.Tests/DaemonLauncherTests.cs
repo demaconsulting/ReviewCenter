@@ -130,6 +130,27 @@ public class DaemonLauncherTests
     }
 
     /// <summary>
+    ///     Test that a termination that was refused for a process that may still be running is reported
+    ///     instead of being treated as a process that is already gone.
+    /// </summary>
+    [Fact]
+    public void DaemonLauncher_CaptureIdentity_TerminationRefused_IsReportedWithTheOriginalReason()
+    {
+        // Arrange: a capture that fails, and a termination that reports the process may still be running
+        var refused = new PuppetException("The process could not be terminated: Access is denied.");
+
+        // Act: capture the identity
+        var thrown = Assert.Throws<PuppetException>(() => DaemonLauncher.CaptureIdentity(
+            () => throw new PuppetException("start time unreadable"),
+            () => throw refused));
+
+        // Assert: the report keeps the original reason and says the process may still be running
+        Assert.Contains("start time unreadable", thrown.Message);
+        Assert.Contains("may still be running", thrown.Message);
+        Assert.Same(refused, thrown.InnerException);
+    }
+
+    /// <summary>
     ///     Test that every argument is quoted in the Windows command line.
     /// </summary>
     [Fact]
