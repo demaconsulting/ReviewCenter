@@ -245,15 +245,18 @@ jobs:
 
       - name: Publish self-contained executable
         shell: bash
+        env:
+          # Passed via the environment (not interpolated into the script) so a crafted version cannot inject shell
+          VERSION: ${{ inputs.version }}
         run: |
           set -euo pipefail
-          NAME="reviewcenter-${{ inputs.version }}-${{ matrix.rid }}"
+          NAME="reviewcenter-${VERSION}-${{ matrix.rid }}"
           dotnet publish src/DemaConsulting.ReviewCenter/DemaConsulting.ReviewCenter.csproj \
             --configuration Release \
             --runtime ${{ matrix.rid }} \
             --self-contained \
             --property:PublishSingleFile=true \
-            --property:Version=${{ inputs.version }} \
+            --property:Version="${VERSION}" \
             --output "dist/${NAME}"
           mv "dist/${NAME}/DemaConsulting.ReviewCenter${{ matrix.exe }}" "dist/${NAME}/reviewcenter${{ matrix.exe }}"
           rm -f dist/${NAME}/*.pdb dist/${NAME}/*.xml dist/${NAME}/web.config
@@ -263,8 +266,10 @@ jobs:
       - name: Package executable (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
+        env:
+          VERSION: ${{ inputs.version }}
         run: |
-          $name = "reviewcenter-${{ inputs.version }}-${{ matrix.rid }}"
+          $name = "reviewcenter-$($env:VERSION)-${{ matrix.rid }}"
           $archive = "dist/$name.zip"
           Compress-Archive -Path "dist/$name" -DestinationPath $archive
           $hash = (Get-FileHash -Algorithm SHA256 -Path $archive).Hash.ToLowerInvariant()
@@ -274,9 +279,11 @@ jobs:
       - name: Package executable (Linux)
         if: runner.os == 'Linux'
         shell: bash
+        env:
+          VERSION: ${{ inputs.version }}
         run: |
           set -euo pipefail
-          NAME="reviewcenter-${{ inputs.version }}-${{ matrix.rid }}"
+          NAME="reviewcenter-${VERSION}-${{ matrix.rid }}"
           # tar.gz keeps the executable permission bit, which zip and artifact upload would lose
           tar -czf "dist/${NAME}.tar.gz" -C dist "${NAME}"
           (cd dist && sha256sum "${NAME}.tar.gz" > "${NAME}.tar.gz.sha256")
@@ -429,8 +436,10 @@ jobs:
       - name: Verify and extract archive (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
+        env:
+          VERSION: ${{ inputs.version }}
         run: |
-          $archive = "release/reviewcenter-${{ inputs.version }}-${{ matrix.rid }}.zip"
+          $archive = "release/reviewcenter-$($env:VERSION)-${{ matrix.rid }}.zip"
           $expected = (Get-Content "$archive.sha256").Split(' ')[0]
           $actual = (Get-FileHash -Algorithm SHA256 -Path $archive).Hash.ToLowerInvariant()
           if ($actual -ne $expected) { Write-Error "Checksum mismatch: $actual != $expected"; exit 1 }
@@ -440,11 +449,13 @@ jobs:
       - name: Verify and extract archive (Linux)
         if: runner.os == 'Linux'
         shell: bash
+        env:
+          VERSION: ${{ inputs.version }}
         run: |
           set -euo pipefail
-          (cd release && sha256sum -c "reviewcenter-${{ inputs.version }}-${{ matrix.rid }}.tar.gz.sha256")
+          (cd release && sha256sum -c "reviewcenter-${VERSION}-${{ matrix.rid }}.tar.gz.sha256")
           mkdir app
-          tar -xzf "release/reviewcenter-${{ inputs.version }}-${{ matrix.rid }}.tar.gz" -C app
+          tar -xzf "release/reviewcenter-${VERSION}-${{ matrix.rid }}.tar.gz" -C app
           echo "✓ Archive verified and extracted"
 
       # === CAPTURE TOOL VERSIONS ===

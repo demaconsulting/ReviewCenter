@@ -56,8 +56,10 @@ Get-FileHash reviewcenter-<version>-win-x64.zip -Algorithm SHA256
 Expand-Archive reviewcenter-<version>-win-x64.zip -DestinationPath .
 ```
 
-Keep the extracted files together, because the executable serves the web assets that sit beside it. Start the server
-with `reviewcenter serve` (`reviewcenter.exe serve` on Windows). No release has been published yet; until one is, build
+Keep the extracted files together, because the executable serves the web assets that sit beside it. Either add the
+extracted folder to your `PATH`, or run the executable by its path (`./reviewcenter-<version>-linux-x64/reviewcenter`
+or `.\reviewcenter-<version>-win-x64\reviewcenter.exe`). Start the server with `reviewcenter serve`
+(`reviewcenter.exe serve` on Windows) once it is on your `PATH`. No release has been published yet; until one is, build
 it from source with the .NET 10 SDK:
 
 ```bash
