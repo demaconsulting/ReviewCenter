@@ -497,8 +497,35 @@ jobs:
           if [ -n "$(ls -A "${EMPTY_ROOT}")" ]; then
             echo "✗ ${EMPTY_ROOT} is not empty"; exit 1
           fi
-          echo "EMPTY_DOTNET_ROOT=${EMPTY_ROOT}" >> "${GITHUB_ENV}"
           echo "✓ Empty .NET root prepared at ${EMPTY_ROOT}"
+
+      # Negative control for the isolation: build a tiny framework-dependent executable in this job, show it
+      # runs with the runner's normal environment, and show it can NOT run with DOTNET_ROOT and
+      # DOTNET_ROOT_X64 pointing at the empty folder. This proves the isolation hides the runner's installed
+      # runtime, so the steps below passing means the published executable really bundles its own runtime.
+      # The folder comes from runner.temp (not from GITHUB_ENV) so its value is known when the step starts.
+      - name: Verify .NET isolation (negative control)
+        shell: bash
+        env:
+          ISOLATED_DOTNET_ROOT: ${{ runner.temp }}/empty-dotnet-root
+        run: |
+          set -euo pipefail
+          echo "Isolated .NET root: ${ISOLATED_DOTNET_ROOT}"
+          [ -d "${ISOLATED_DOTNET_ROOT}" ] || { echo "✗ Isolated .NET root does not exist"; exit 1; }
+          CONTROL_DIR="${RUNNER_TEMP}/isolation-control"
+          dotnet new console --name isolationcontrol --output "${CONTROL_DIR}" --force > /dev/null
+          dotnet build "${CONTROL_DIR}" --configuration Release --output "${CONTROL_DIR}/out" > /dev/null
+          CONTROL_EXE="${CONTROL_DIR}/out/isolationcontrol${{ matrix.exe }}"
+          "${CONTROL_EXE}" > /dev/null \
+            || { echo "✗ Framework-dependent control does not run with the normal environment"; exit 1; }
+          echo "✓ Framework-dependent control runs with the runner's installed runtime"
+          if DOTNET_ROOT="${ISOLATED_DOTNET_ROOT}" DOTNET_ROOT_X64="${ISOLATED_DOTNET_ROOT}" \
+              "${CONTROL_EXE}" > control.log 2>&1; then
+            echo "✗ Framework-dependent control still ran: the isolation does not hide the installed runtime"
+            exit 1
+          fi
+          echo "✓ Framework-dependent control fails under the isolation:"
+          sed 's/^/    /' control.log
 
       # A framework-dependent single-file executable is a few hundred KiB while the self-contained one is
       # about 100 MiB, so a size well between the two proves the runtime is bundled. Revisit the threshold if
@@ -518,9 +545,11 @@ jobs:
       - name: Test version display
         shell: bash
         env:
-          DOTNET_ROOT: ${{ env.EMPTY_DOTNET_ROOT }}
-          DOTNET_ROOT_X64: ${{ env.EMPTY_DOTNET_ROOT }}
+          DOTNET_ROOT: ${{ runner.temp }}/empty-dotnet-root
+          DOTNET_ROOT_X64: ${{ runner.temp }}/empty-dotnet-root
         run: |
+          echo "DOTNET_ROOT=${DOTNET_ROOT} DOTNET_ROOT_X64=${DOTNET_ROOT_X64}"
+          [ -d "${DOTNET_ROOT}" ] || { echo "✗ Isolated .NET root is missing"; exit 1; }
           echo "Testing reviewcenter --version..."
           "$REVIEWCENTER_EXE" --version || { echo "✗ Version command failed"; exit 1; }
           echo "✓ Version command succeeded"
@@ -528,9 +557,11 @@ jobs:
       - name: Test help display
         shell: bash
         env:
-          DOTNET_ROOT: ${{ env.EMPTY_DOTNET_ROOT }}
-          DOTNET_ROOT_X64: ${{ env.EMPTY_DOTNET_ROOT }}
+          DOTNET_ROOT: ${{ runner.temp }}/empty-dotnet-root
+          DOTNET_ROOT_X64: ${{ runner.temp }}/empty-dotnet-root
         run: |
+          echo "DOTNET_ROOT=${DOTNET_ROOT} DOTNET_ROOT_X64=${DOTNET_ROOT_X64}"
+          [ -d "${DOTNET_ROOT}" ] || { echo "✗ Isolated .NET root is missing"; exit 1; }
           echo "Testing reviewcenter --help..."
           "$REVIEWCENTER_EXE" --help || { echo "✗ Help command failed"; exit 1; }
           echo "✓ Help command succeeded"
@@ -538,9 +569,11 @@ jobs:
       - name: Run self-validation
         shell: bash
         env:
-          DOTNET_ROOT: ${{ env.EMPTY_DOTNET_ROOT }}
-          DOTNET_ROOT_X64: ${{ env.EMPTY_DOTNET_ROOT }}
+          DOTNET_ROOT: ${{ runner.temp }}/empty-dotnet-root
+          DOTNET_ROOT_X64: ${{ runner.temp }}/empty-dotnet-root
         run: |
+          echo "DOTNET_ROOT=${DOTNET_ROOT} DOTNET_ROOT_X64=${DOTNET_ROOT_X64}"
+          [ -d "${DOTNET_ROOT}" ] || { echo "✗ Isolated .NET root is missing"; exit 1; }
           echo "Running self-validation..."
           # The file name carries the platform (windows/ubuntu) and runtime (net10.0) that the platform
           # requirements use as ReqStream source filters
@@ -552,9 +585,11 @@ jobs:
       - name: Test web server
         shell: bash
         env:
-          DOTNET_ROOT: ${{ env.EMPTY_DOTNET_ROOT }}
-          DOTNET_ROOT_X64: ${{ env.EMPTY_DOTNET_ROOT }}
+          DOTNET_ROOT: ${{ runner.temp }}/empty-dotnet-root
+          DOTNET_ROOT_X64: ${{ runner.temp }}/empty-dotnet-root
         run: |
+          echo "DOTNET_ROOT=${DOTNET_ROOT} DOTNET_ROOT_X64=${DOTNET_ROOT_X64}"
+          [ -d "${DOTNET_ROOT}" ] || { echo "✗ Isolated .NET root is missing"; exit 1; }
           set -u
           # Let the OS pick a free loopback port so a busy fixed port on the runner cannot fail the smoke test
           PORT=$(pwsh -NoProfile -Command '

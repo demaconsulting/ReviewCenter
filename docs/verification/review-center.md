@@ -24,7 +24,9 @@ Platform verification additionally runs against the distributed artifact. In the
 single-file executable for each supported platform (win-x64 on `windows-latest`, linux-x64 on `ubuntu-latest`) is
 extracted from its release archive and run with `DOTNET_ROOT` and `DOTNET_ROOT_X64` pointing to an existing, empty
 folder, so no installed .NET runtime can be found by it (a missing folder would let the executable fall back to the
-global installation). A preceding check also asserts that the executable is larger than 20 MiB, which a
+global installation). A negative control proves the isolation works: a tiny framework-dependent executable built in
+the same job must run with the normal environment and must fail under the isolated one. A further check asserts that
+the executable is larger than 20 MiB, which a
 framework-dependent publish is not. The commands run are: `--version`, `--help`,
 `--validate --results validation-<os>-net10.0-<rid>.trx`, and a `serve` smoke test that checks `/health`, the home
 page, and the Blazor script. The self-validation results (`ReviewCenter_VersionDisplay` and
