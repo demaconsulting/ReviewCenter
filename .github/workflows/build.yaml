@@ -88,8 +88,10 @@ jobs:
           path: artifacts/
 
   # Builds and unit-tests the project on supported operating systems to ensure
-  # unit-tests operate on all platforms and to run SonarScanner for generating
-  # the code quality report.
+  # unit-tests operate on all platforms, runs SonarScanner for generating the
+  # code quality report, and publishes the self-contained single-file executable
+  # that is distributed with each release. Chromium is installed so the Puppet
+  # end-to-end test runs (and fails, rather than skips, when Chromium is missing).
   build:
     name: Build ${{ matrix.os }}
     needs: quality-checks
@@ -99,7 +101,13 @@ jobs:
 
     strategy:
       matrix:
-        os: [windows-latest, ubuntu-latest]
+        include:
+          - os: windows-latest
+            rid: win-x64
+            exe: .exe
+          - os: ubuntu-latest
+            rid: linux-x64
+            exe: ''
 
     runs-on: ${{ matrix.os }}
 
@@ -179,7 +187,36 @@ jobs:
           --configuration Release
           --property:Version=${{ inputs.version }}
 
+      # Playwright downloads Chromium separately from its NuGet package. The browser is cached per operating
+      # system and Playwright version (the version is pinned in the Puppet project file). On a cache hit the
+      # install is a no-op; on Linux the system dependencies of Chromium are still installed every run because
+      # they live outside the cache.
+      - name: Cache Playwright browsers
+        uses: actions/cache@v6
+        with:
+          path: |
+            ~/.cache/ms-playwright
+            ~/AppData/Local/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('tools/puppet/*.csproj') }}
+
+      - name: Install Chromium for Playwright (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: >
+          ./test/DemaConsulting.ReviewCenter.Puppet.Tests/bin/Release/net10.0/playwright.ps1
+          install chromium
+
+      - name: Install Chromium for Playwright (Linux)
+        if: runner.os == 'Linux'
+        shell: pwsh
+        run: >
+          ./test/DemaConsulting.ReviewCenter.Puppet.Tests/bin/Release/net10.0/playwright.ps1
+          install --with-deps chromium
+
       - name: Test
+        env:
+          # Makes the Puppet end-to-end test fail instead of skip when Chromium cannot be launched
+          REVIEWCENTER_REQUIRE_CHROMIUM: 'true'
         run: >
           dotnet test
           --no-build
@@ -199,13 +236,51 @@ jobs:
           end
           /d:sonar.token="${{ secrets.SONAR_TOKEN }}"
 
-      - name: Create Dotnet Tool
-        run: >
-          dotnet pack
-          --no-build
-          --no-restore
-          --configuration Release
-          --property:PackageVersion=${{ inputs.version }}
+      # === PUBLISH SELF-CONTAINED EXECUTABLE ===
+      # ReviewCenter ships as a self-contained single-file executable per platform (no installed .NET runtime
+      # needed). It is published natively on each operating system, packaged with the files it needs at run time
+      # (the web assets and the endpoint configuration), and accompanied by a SHA-256 checksum. The exe is
+      # renamed to the documented command name; the assembly name stays DemaConsulting.ReviewCenter.
+      # Downstream projects: Add any additional packaging steps here.
+
+      - name: Publish self-contained executable
+        shell: bash
+        run: |
+          set -euo pipefail
+          NAME="reviewcenter-${{ inputs.version }}-${{ matrix.rid }}"
+          dotnet publish src/DemaConsulting.ReviewCenter/DemaConsulting.ReviewCenter.csproj \
+            --configuration Release \
+            --runtime ${{ matrix.rid }} \
+            --self-contained \
+            --property:PublishSingleFile=true \
+            --property:Version=${{ inputs.version }} \
+            --output "dist/${NAME}"
+          mv "dist/${NAME}/DemaConsulting.ReviewCenter${{ matrix.exe }}" "dist/${NAME}/reviewcenter${{ matrix.exe }}"
+          rm -f dist/${NAME}/*.pdb dist/${NAME}/*.xml dist/${NAME}/web.config
+          echo "Published files:"
+          ls -l "dist/${NAME}"
+
+      - name: Package executable (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $name = "reviewcenter-${{ inputs.version }}-${{ matrix.rid }}"
+          $archive = "dist/$name.zip"
+          Compress-Archive -Path "dist/$name" -DestinationPath $archive
+          $hash = (Get-FileHash -Algorithm SHA256 -Path $archive).Hash.ToLowerInvariant()
+          [System.IO.File]::WriteAllText("$archive.sha256", "$hash  $name.zip`n")
+          Get-Content "$archive.sha256"
+
+      - name: Package executable (Linux)
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          NAME="reviewcenter-${{ inputs.version }}-${{ matrix.rid }}"
+          # tar.gz keeps the executable permission bit, which zip and artifact upload would lose
+          tar -czf "dist/${NAME}.tar.gz" -C dist "${NAME}"
+          (cd dist && sha256sum "${NAME}.tar.gz" > "${NAME}.tar.gz.sha256")
+          cat "dist/${NAME}.tar.gz.sha256"
 
       # === UPLOAD ARTIFACTS ===
       # This section uploads all generated artifacts for use by downstream jobs.
@@ -217,13 +292,15 @@ jobs:
           name: artifacts-build-${{ matrix.os }}
           path: artifacts/
 
-      - name: Upload packages
+      - name: Upload release archives
         uses: actions/upload-artifact@v7
         with:
-          name: packages-${{ matrix.os }}
+          name: release-${{ matrix.os }}
           path: |
-            src/DemaConsulting.ReviewCenter/bin/Release/*.nupkg
-            src/DemaConsulting.ReviewCenter/bin/Release/*.snupkg
+            dist/*.zip
+            dist/*.tar.gz
+            dist/*.sha256
+          if-no-files-found: error
 
   # Runs CodeQL security and quality analysis, gathering results to include
   # in the code quality report.
@@ -295,11 +372,12 @@ jobs:
           name: artifacts-codeql
           path: artifacts/
 
-  # Performs integration testing on a matrix of operating systems and .NET runtimes,
-  # involving basic tool execution and running self-validation to ensure compatibility
-  # across different platforms and runtime versions.
+  # Performs integration testing on a matrix of operating systems, running the published
+  # self-contained executable (extracted from the release archive, with no .NET runtime
+  # available to it) through basic execution, self-validation, and a web server smoke test
+  # to ensure the distributed artifact works on every supported platform.
   integration-test:
-    name: Integration Test ${{ matrix.os }} .NET ${{ matrix.dotnet-version }}
+    name: Integration Test ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     needs: build
     permissions:
@@ -307,12 +385,23 @@ jobs:
 
     strategy:
       matrix:
-        os: [windows-latest, ubuntu-latest]
-        dotnet-version: ['10.x']
+        include:
+          - os: windows-latest
+            rid: win-x64
+            exe: .exe
+          - os: ubuntu-latest
+            rid: linux-x64
+            exe: ''
+
+    env:
+      # The published executable after extraction (the archive holds one folder named after itself)
+      REVIEWCENTER_EXE: app/reviewcenter-${{ inputs.version }}-${{ matrix.rid }}/reviewcenter${{ matrix.exe }}
 
     steps:
       # === INSTALL DEPENDENCIES ===
       # This section installs all required dependencies and tools for integration testing.
+      # The dotnet SDK is only needed for the Continuous Compliance tools (VersionMark); the
+      # executable under test is self-contained and does not use it.
       # Downstream projects: Add any additional dependency installations here.
 
       - name: Checkout
@@ -322,29 +411,41 @@ jobs:
             .versionmark.yaml
             .config/dotnet-tools.json
 
-      - name: Download package
+      - name: Download release archive
         uses: actions/download-artifact@v8
         with:
-          name: packages-${{ matrix.os }}
-          path: packages
+          name: release-${{ matrix.os }}
+          path: release
 
       - name: Setup dotnet
         uses: actions/setup-dotnet@v6
         with:
-          dotnet-version: ${{ matrix.dotnet-version }}
+          dotnet-version: 10.x
 
       - name: Restore Tools
         run: >
           dotnet tool restore
 
-      - name: Install tool from package
+      - name: Verify and extract archive (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $archive = "release/reviewcenter-${{ inputs.version }}-${{ matrix.rid }}.zip"
+          $expected = (Get-Content "$archive.sha256").Split(' ')[0]
+          $actual = (Get-FileHash -Algorithm SHA256 -Path $archive).Hash.ToLowerInvariant()
+          if ($actual -ne $expected) { Write-Error "Checksum mismatch: $actual != $expected"; exit 1 }
+          Expand-Archive -Path $archive -DestinationPath app
+          Write-Host "✓ Archive verified and extracted"
+
+      - name: Verify and extract archive (Linux)
+        if: runner.os == 'Linux'
         shell: bash
         run: |
-          echo "Installing package version ${{ inputs.version }} from: packages/"
-          dotnet tool install --global \
-            --add-source packages \
-            --version ${{ inputs.version }} \
-            DemaConsulting.ReviewCenter
+          set -euo pipefail
+          (cd release && sha256sum -c "reviewcenter-${{ inputs.version }}-${{ matrix.rid }}.tar.gz.sha256")
+          mkdir app
+          tar -xzf "release/reviewcenter-${{ inputs.version }}-${{ matrix.rid }}.tar.gz" -C app
+          echo "✓ Archive verified and extracted"
 
       # === CAPTURE TOOL VERSIONS ===
       # This section captures the versions of all tools used in the integration tests.
@@ -355,41 +456,93 @@ jobs:
         run: |
           mkdir -p artifacts
           echo "Capturing tool versions..."
-          # Create short job ID: int-windows-10, int-ubuntu-10
+          # Create short job ID: int-windows, int-ubuntu
           OS_SHORT=$(echo "${{ matrix.os }}" | sed 's/-latest//')
-          DOTNET_SHORT=$(echo "${{ matrix.dotnet-version }}" | sed 's/\.x$//')
-          JOB_ID="int-${OS_SHORT}-${DOTNET_SHORT}"
+          JOB_ID="int-${OS_SHORT}"
           dotnet versionmark --capture --job-id "${JOB_ID}" \
             --output "artifacts/versionmark-${JOB_ID}.json" -- \
             dotnet git versionmark
           echo "✓ Tool versions captured"
 
       # === RUN INTEGRATION TESTS ===
-      # This section runs the integration tests for the tool.
+      # This section runs the integration tests against the published executable. DOTNET_ROOT points to a
+      # folder that does not exist, so the steps fail if the executable depends on an installed runtime.
       # Downstream projects: Add any additional integration test steps here.
 
       - name: Test version display
         shell: bash
+        env:
+          DOTNET_ROOT: /nonexistent-dotnet-root
         run: |
           echo "Testing reviewcenter --version..."
-          reviewcenter --version || { echo "✗ Version command failed"; exit 1; }
+          "$REVIEWCENTER_EXE" --version || { echo "✗ Version command failed"; exit 1; }
           echo "✓ Version command succeeded"
 
       - name: Test help display
         shell: bash
+        env:
+          DOTNET_ROOT: /nonexistent-dotnet-root
         run: |
           echo "Testing reviewcenter --help..."
-          reviewcenter --help || { echo "✗ Help command failed"; exit 1; }
+          "$REVIEWCENTER_EXE" --help || { echo "✗ Help command failed"; exit 1; }
           echo "✓ Help command succeeded"
 
       - name: Run self-validation
         shell: bash
+        env:
+          DOTNET_ROOT: /nonexistent-dotnet-root
         run: |
           echo "Running self-validation..."
-          reviewcenter --validate \
-            --results artifacts/validation-${{ matrix.os }}-dotnet${{ matrix.dotnet-version }}.trx \
+          # The file name carries the platform (windows/ubuntu) and runtime (net10.0) that the platform
+          # requirements use as ReqStream source filters
+          "$REVIEWCENTER_EXE" --validate \
+            --results "artifacts/validation-${{ matrix.os }}-net10.0-${{ matrix.rid }}.trx" \
             || { echo "✗ Self-validation failed"; exit 1; }
           echo "✓ Self-validation succeeded"
+
+      - name: Test web server
+        shell: bash
+        env:
+          DOTNET_ROOT: /nonexistent-dotnet-root
+        run: |
+          set -u
+          URL="http://127.0.0.1:5189"
+          echo "Starting reviewcenter serve on ${URL}..."
+          "$REVIEWCENTER_EXE" serve --urls "${URL}" > serve.log 2>&1 &
+          SERVER_PID=$!
+          stop_server() {
+            kill "${SERVER_PID}" 2>/dev/null || true
+            # A shell kill does not reach a native Windows process, so stop it by image name there
+            if [ "${RUNNER_OS}" = "Windows" ]; then
+              taskkill //F //IM reviewcenter.exe > /dev/null 2>&1 || true
+            fi
+          }
+          trap stop_server EXIT
+
+          READY=false
+          for _ in $(seq 1 60); do
+            if curl --silent --fail --output health.txt "${URL}/health"; then
+              READY=true
+              break
+            fi
+            sleep 1
+          done
+          if [ "${READY}" != "true" ]; then
+            echo "✗ Health check did not succeed"; cat serve.log; exit 1
+          fi
+          echo "✓ Health check succeeded: $(cat health.txt)"
+
+          curl --silent --fail --output home.html "${URL}/" \
+            || { echo "✗ Home page request failed"; cat serve.log; exit 1; }
+          grep -q "hello-button" home.html \
+            || { echo "✗ Home page does not contain the hello button"; cat serve.log; exit 1; }
+          echo "✓ Home page served"
+
+          STATUS=$(curl --silent --output /dev/null --write-out '%{http_code}' "${URL}/_framework/blazor.web.js")
+          if [ "${STATUS}" != "200" ]; then
+            echo "✗ Blazor script returned HTTP ${STATUS}"; cat serve.log; exit 1
+          fi
+          echo "✓ Blazor script served"
 
       # === UPLOAD ARTIFACTS ===
       # This section uploads all generated artifacts for use by downstream jobs.
@@ -399,7 +552,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: artifacts-validation-${{ matrix.os }}-dotnet${{ matrix.dotnet-version }}
+          name: artifacts-validation-${{ matrix.os }}-net10.0
           path: artifacts/
 
   # Builds the supporting documentation including user guides, requirements,

@@ -7,30 +7,21 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
 
-    <!-- The Web SDK defaults IsPackable to false; the tool package is still produced by this project -->
-    <IsPackable>true</IsPackable>
+    <!-- ReviewCenter is distributed as self-contained single-file executables (see the CI workflow), never as a
+         NuGet package. The self-contained and single-file settings are deliberately passed to 'dotnet publish'
+         only: setting a runtime identifier here would move the build output folder that the tests and Puppet use. -->
+    <IsPackable>false</IsPackable>
+    <RuntimeIdentifiers>win-x64;linux-x64</RuntimeIdentifiers>
 
-    <!-- NuGet Tool Package Configuration -->
-    <PackAsTool>true</PackAsTool>
-    <ToolCommandName>reviewcenter</ToolCommandName>
-    <PackageId>DemaConsulting.ReviewCenter</PackageId>
+    <!-- Product Metadata -->
     <Version>0.0.0</Version>
-    <Authors>DEMA Consulting</Authors>
     <Company>DEMA Consulting</Company>
-    <Description>Web-based code review service for regulated projects</Description>
-    <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageProjectUrl>https://github.com/demaconsulting/ReviewCenter</PackageProjectUrl>
-    <RepositoryUrl>https://github.com/demaconsulting/ReviewCenter</RepositoryUrl>
-    <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageIcon>Icon.png</PackageIcon>
-    <PackageTags>code-review;compliance;dotnet-tool</PackageTags>
     <Copyright>Copyright DEMA Consulting</Copyright>
     <Title>ReviewCenter</Title>
     <Product>DemaConsulting.ReviewCenter</Product>
+    <RepositoryUrl>https://github.com/demaconsulting/ReviewCenter</RepositoryUrl>
 
-    <!-- Symbol Package Configuration -->
-    <IncludeSymbols>true</IncludeSymbols>
-    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+    <!-- Source Link Configuration -->
     <PublishRepositoryUrl>true</PublishRepositoryUrl>
     <EmbedUntrackedSources>true</EmbedUntrackedSources>
     <ContinuousIntegrationBuild Condition="'$(GITHUB_ACTIONS)' == 'true'">true</ContinuousIntegrationBuild>
@@ -41,12 +32,6 @@
     <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
     <EnableNETAnalyzers>true</EnableNETAnalyzers>
     <AnalysisLevel>latest</AnalysisLevel>
-
-    <!-- SBOM Configuration -->
-    <GenerateSBOM>true</GenerateSBOM>
-    <SBOMPackageName>$(PackageId)</SBOMPackageName>
-    <SBOMPackageVersion>$(Version)</SBOMPackageVersion>
-    <SBOMPackageSupplier>Organization: $(Company)</SBOMPackageSupplier>
   </PropertyGroup>
 
   <!-- Runtime Dependencies -->
@@ -56,7 +41,6 @@
 
   <!-- Build Tool Dependencies -->
   <ItemGroup>
-    <PackageReference Include="Microsoft.Sbom.Targets" Version="4.1.13" PrivateAssets="All" />
     <PackageReference Include="Microsoft.SourceLink.GitHub" Version="10.0.402" PrivateAssets="All" />
     <PackageReference Include="Polyfill" Version="11.4.5" PrivateAssets="All" />
   </ItemGroup>
@@ -65,7 +49,7 @@
   <ItemGroup>
     <!-- Analyzer packages use child-element form to configure both PrivateAssets and IncludeAssets:
          - PrivateAssets="all" prevents these build-time analyzers from becoming transitive dependencies
-           in packages that consume this tool.
+           in projects that consume this one.
          - IncludeAssets lists all asset types (including 'analyzers' and 'buildtransitive') to ensure
            Roslyn analyzers and MSBuild targets are fully activated during the build. -->
     <PackageReference Include="Microsoft.CodeAnalysis.NetAnalyzers" Version="10.0.402">
@@ -80,11 +64,6 @@
 
   <ItemGroup>
     <InternalsVisibleTo Include="DemaConsulting.ReviewCenter.Tests" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <None Include="..\..\README.md" Pack="true" PackagePath="\" />
-    <None Include="..\..\Icon.png" Pack="true" PackagePath="\" />
   </ItemGroup>
 
 </Project>

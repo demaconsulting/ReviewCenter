@@ -29,9 +29,27 @@ namespace DemaConsulting.ReviewCenter.Puppet.Tests;
 internal static class PlaywrightAvailability
 {
     /// <summary>
+    ///     The environment variable that turns a missing Chromium from a skip into a failure. CI sets it to
+    ///     <c>true</c> after installing Chromium, so the end-to-end evidence can never be skipped silently.
+    /// </summary>
+    internal const string RequireChromiumVariable = "REVIEWCENTER_REQUIRE_CHROMIUM";
+
+    /// <summary>
     ///     The cached outcome of the one-time launch attempt.
     /// </summary>
     private static readonly Lazy<Task<string?>> Result = new(ProbeAsync);
+
+    /// <summary>
+    ///     Gets a value indicating whether the environment requires Chromium to be available.
+    /// </summary>
+    /// <returns><c>true</c> when <see cref="RequireChromiumVariable"/> is set to <c>true</c>.</returns>
+    public static bool IsChromiumRequired()
+    {
+        return string.Equals(
+            Environment.GetEnvironmentVariable(RequireChromiumVariable),
+            "true",
+            StringComparison.OrdinalIgnoreCase);
+    }
 
     /// <summary>
     ///     Gets the reason Chromium is unavailable, or <c>null</c> when it can be launched.
@@ -43,23 +61,35 @@ internal static class PlaywrightAvailability
     }
 
     /// <summary>
-    ///     Tries to launch headless Chromium once.
+    ///     Tries to launch headless Chromium, retrying a few times because a browser start can fail transiently
+    ///     while the machine is busy (for example when other test projects run in parallel).
     /// </summary>
-    /// <returns>The skip reason, or <c>null</c> when the launch succeeded.</returns>
+    /// <returns>The skip reason, or <c>null</c> when a launch succeeded.</returns>
     private static async Task<string?> ProbeAsync()
     {
-        try
+        const int attempts = 3;
+        PlaywrightException? last = null;
+        for (var attempt = 1; attempt <= attempts; attempt++)
         {
-            using var playwright = await Playwright.CreateAsync();
-            await using var browser = await playwright.Chromium.LaunchAsync(new BrowserTypeLaunchOptions { Headless = true });
-            return null;
+            try
+            {
+                using var playwright = await Playwright.CreateAsync();
+                await using var browser = await playwright.Chromium.LaunchAsync(new BrowserTypeLaunchOptions { Headless = true });
+                return null;
+            }
+            catch (PlaywrightException ex)
+            {
+                last = ex;
+                if (attempt < attempts)
+                {
+                    await Task.Delay(TimeSpan.FromSeconds(2));
+                }
+            }
         }
-        catch (PlaywrightException ex)
-        {
-            var firstLine = ex.Message.Split('\n')[0].Trim();
-            return "Headless Chromium cannot be launched here (" + firstLine + "). Install it once with: " +
-                   "pwsh <test output folder>/playwright.ps1 install chromium";
-        }
+
+        var firstLine = last!.Message.Split('\n')[0].Trim();
+        return "Headless Chromium cannot be launched here (" + firstLine + "). Install it once with: " +
+               "pwsh <test output folder>/playwright.ps1 install chromium";
     }
 }
 
@@ -67,8 +97,11 @@ internal static class PlaywrightAvailability
 ///     End-to-end test that runs the real Puppet executable against the real ReviewCenter server in headless Chromium.
 /// </summary>
 /// <remarks>
-///     This test is not linked to a requirement: it verifies the whole tool chain rather than one unit, and it is
-///     skipped with a clear reason when Chromium is not installed, so the build never fails because of a missing browser.
+///     This test is requirement-linked evidence for the Puppet system requirements for the session commands, the
+///     session lifecycle, and error reporting: it runs the real executable, real server, and real headless Chromium.
+///     Locally it is skipped with a clear reason when Chromium is not installed. CI installs Chromium and sets
+///     <c>REVIEWCENTER_REQUIRE_CHROMIUM=true</c>, which turns a missing or broken browser into a failure so the
+///     evidence can never be skipped silently.
 /// </remarks>
 public class PuppetEndToEndTests
 {
@@ -114,8 +147,13 @@ public class PuppetEndToEndTests
     [Fact]
     public async Task PuppetEndToEnd_HelloAndCounter_DrivenThroughCommands_ShowGreetingAndCount()
     {
-        // Arrange: skip with a clear reason when Chromium cannot run here
+        // Arrange: skip with a clear reason when Chromium cannot run here, unless the environment requires it
         var unavailable = await PlaywrightAvailability.GetUnavailableReasonAsync();
+        if (unavailable is not null && PlaywrightAvailability.IsChromiumRequired())
+        {
+            Assert.Fail(PlaywrightAvailability.RequireChromiumVariable + " is true but Chromium is unavailable: " + unavailable);
+        }
+
         Assert.SkipUnless(unavailable is null, unavailable ?? string.Empty);
         var session = "e2e" + Guid.NewGuid().ToString("N")[..8];
         var screenshot = Path.Combine(Path.GetTempPath(), session + ".png");
@@ -144,6 +182,7 @@ public class PuppetEndToEndTests
             Assert.Equal(0, shot.ExitCode);
             Assert.True(new FileInfo(screenshot).Length > 1000, "The screenshot should be a real PNG image.");
             Assert.Equal(1, missing.ExitCode);
+            Assert.False(string.IsNullOrWhiteSpace(missing.Error), "A failed command should explain the failure on standard error.");
             Assert.Equal(0, stop.ExitCode);
             Assert.DoesNotContain(session, list.Output, StringComparison.Ordinal);
         }

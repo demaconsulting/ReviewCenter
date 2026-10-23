@@ -216,4 +216,4 @@ documented under Design Constraints.
   itself down after 30 minutes.
 - Testability: the server process, the browser, and the daemon launcher are used through interfaces so that the
   tool is verified with fakes on machines without Chromium. The production adapters are exercised by one real-browser
-  end-to-end test.
+  end-to-end test, which CI runs with Chromium installed and which is linked to the system requirements.

@@ -18,8 +18,10 @@ The production adapters that are replaced by fakes, namely the server process ru
 the detached process launch, are not part of these tests. They are exercised by the real-browser end-to-end test
 `PuppetEndToEnd_HelloAndCounter_DrivenThroughCommands_ShowGreetingAndCount`, which starts the real ReviewCenter
 server, launches Chromium, and drives the hello and counter buttons of the home page through the commands. That test
-skips itself with a clear reason when Chromium is not installed. It is supplemental evidence and is deliberately not
-linked to a requirement, so that a machine without Chromium does not fail the requirements report.
+is requirement-linked evidence for `ReviewCenterPuppet-System-Lifecycle`, `ReviewCenterPuppet-System-Commands`, and
+`ReviewCenterPuppet-System-Errors` on both platforms. The CI pipeline installs Chromium before the tests run and sets
+`REVIEWCENTER_REQUIRE_CHROMIUM=true`, so a missing or broken browser fails the test instead of skipping it. Without
+that variable, as on a developer machine that has not installed Chromium, the test skips itself with a clear reason.
 
 ## Test Environment
 

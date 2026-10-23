@@ -5,9 +5,9 @@
 # These requirements belong to the ReviewCenterPuppet system, so their IDs use that prefix.
 #
 # The requirements describe only what can be proven in any environment, so they are linked to tests
-# that need no browser and always run. Driving a real Chromium is covered by a supplemental
-# end-to-end test that skips where Chromium is not installed; it is deliberately not linked to a
-# requirement, because ReqStream treats a skipped test as missing evidence.
+# that need no browser and always run. Driving a real Chromium is covered by the real-browser
+# end-to-end test, which is linked to the ReviewCenterPuppet system requirements (not to these OTS
+# requirements): CI installs Chromium and fails that test when the browser is missing.
 
 sections:
   - title: OTS Software Requirements

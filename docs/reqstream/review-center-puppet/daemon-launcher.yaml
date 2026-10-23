@@ -4,7 +4,8 @@
 # PURPOSE:
 # - Define requirements for the DaemonLauncher unit (tools/puppet/DaemonLauncher.cs)
 # - Only the command-line construction can be verified in isolation; starting a detached process
-#   is exercised by the real-browser end-to-end test and a manual demonstration
+#   is exercised by the real-browser end-to-end test (which CI runs with Chromium installed and
+#   which is linked to the Puppet system requirements) and a manual demonstration
 
 sections:
   - title: ReviewCenterPuppet Requirements

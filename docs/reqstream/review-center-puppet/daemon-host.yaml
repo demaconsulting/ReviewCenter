@@ -5,8 +5,8 @@
 # - Define requirements for the DaemonHost unit (tools/puppet/DaemonHost.cs, with the production
 #   adapters in tools/puppet/ServerProcessRunner.cs and tools/puppet/PlaywrightBrowser.cs)
 # - DaemonHost is verified with fake server and browser abstractions; the production adapters
-#   are exercised only by the real-browser end-to-end test, which is not linked to a requirement
-#   because it is skipped on machines without Chromium
+#   are exercised by the real-browser end-to-end test, which is linked to the system-level
+#   requirements ReviewCenterPuppet-System-Lifecycle, -Commands, and -Errors (CI installs Chromium)
 
 sections:
   - title: ReviewCenterPuppet Requirements

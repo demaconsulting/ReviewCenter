@@ -4,8 +4,10 @@
 # PURPOSE:
 # - Define system-level requirements describing what end-users need the tool to provide
 # - These requirements capture the externally visible behavior of the complete system
-# - System requirements are validated through integration tests that exercise the
-#   published dotnet DLL end-to-end
+# - System requirements are validated through integration tests: the xUnit tests run the published
+#   dotnet DLL end-to-end, and CI runs the self-validation of the published self-contained
+#   executable (extracted from its release archive) on each supported platform, which produces the
+#   platform evidence in platform-requirements.yaml
 
 sections:
   - title: System-Level Requirements

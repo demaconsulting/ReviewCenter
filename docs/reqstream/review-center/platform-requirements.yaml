@@ -1,46 +1,57 @@
 ---
 # System-Level Platform Requirements
 #
-# These requirements specify the platforms and runtimes the tool must support.
+# These requirements specify the platforms and runtime the distributed tool must support.
 # They ensure the tool works across the required execution environments.
 #
-# Test links can include a source filter prefix (e.g. "windows@", "ubuntu@", "dotnet10.x@") to restrict
+# ReviewCenter is distributed as a self-contained single-file executable for win-x64 and linux-x64
+# (net10.0 only; the .NET runtime is bundled, so no .NET installation is needed). The evidence is the
+# self-validation that CI runs on the published executable, extracted from its release archive, on
+# windows-latest and ubuntu-latest, with no .NET runtime available to it.
+#
+# Test links can include a source filter prefix (e.g. "windows@", "ubuntu@", "net10.0@") to restrict
 # which test results count as evidence for a requirement. This is critical for platform and runtime
-# requirements - removing these filters invalidates the evidence-based proof.
+# requirements - removing these filters invalidates the evidence-based proof. The filter is matched
+# against the TRX file name, which CI sets to validation-<os>-net10.0-<rid>.trx.
 #
 # Source filter prefixes:
 #   windows@TestName      - proves the test passed on a Windows platform
 #   ubuntu@TestName       - proves the test passed on a Linux (Ubuntu) platform
-#   dotnet10.x@TestName   - proves the self-validation test ran with .NET 10.x runtime
+#   net10.0@TestName      - proves the self-validation test ran with the bundled .NET 10 (net10.0) runtime
 
 sections:
   - title: Platform Support
     requirements:
       - id: ReviewCenter-Platform-Windows
-        title: The tool shall execute successfully on Windows platforms.
+        title: The tool shall execute successfully on Windows (win-x64) as a self-contained single-file executable.
         tags: [system]
         justification: |
-          DEMA Consulting tools must support Windows as a major development platform.
+          DEMA Consulting tools must support Windows as a major development platform. Operators install a
+          service rather than a developer tool, so the published win-x64 executable must run without an
+          installed .NET runtime.
         tests:
           # Tests link to "windows" to ensure results come from Windows platform
           - "windows@ReviewCenter_VersionDisplay"
           - "windows@ReviewCenter_HelpDisplay"
 
       - id: ReviewCenter-Platform-Linux
-        title: The tool shall execute successfully on Linux platforms.
+        title: The tool shall execute successfully on Linux (linux-x64) as a self-contained single-file executable.
         tags: [system]
         justification: |
-          DEMA Consulting tools must support Linux for CI/CD and containerized environments.
+          DEMA Consulting tools must support Linux for CI/CD and containerized environments. The published
+          linux-x64 executable must run without an installed .NET runtime.
         tests:
           # Tests link to "ubuntu" to ensure results come from Linux platform
           - "ubuntu@ReviewCenter_VersionDisplay"
           - "ubuntu@ReviewCenter_HelpDisplay"
 
       - id: ReviewCenter-Platform-Net10
-        title: The tool shall support .NET 10 runtime.
+        title: The tool shall run on the .NET 10 runtime that is bundled into the self-contained executable.
         tags: [system]
         justification: |
-          .NET 10 support ensures the tool remains compatible with the latest .NET ecosystem.
+          .NET 10 support ensures the tool remains compatible with the latest .NET ecosystem. The runtime
+          is bundled into the executable, so the version the tool runs on does not depend on what is
+          installed on the operator's machine.
         tests:
-          - "dotnet10.x@ReviewCenter_VersionDisplay"
-          - "dotnet10.x@ReviewCenter_HelpDisplay"
+          - "net10.0@ReviewCenter_VersionDisplay"
+          - "net10.0@ReviewCenter_HelpDisplay"

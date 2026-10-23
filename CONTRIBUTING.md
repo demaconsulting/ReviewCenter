@@ -182,7 +182,7 @@ All markdown files must follow these rules (enforced by markdownlint):
 - Lists must be surrounded by blank lines
 - Use reference-style links: `[text][ref]` with `[ref]: url` at document end
 - **Exceptions**:
-  - `README.md` uses absolute URLs (it's included in the NuGet package)
+  - `README.md` uses absolute URLs (it's the project landing page and is read outside the repository)
   - AI agent markdown files (`.github/agents/*.agent.md`) use inline links
     `[text](url)` so URLs are visible in agent context
 
@@ -282,8 +282,8 @@ Releases are managed by project maintainers. The process includes:
 1. Version bump in project files
 2. Tag the release in Git
 3. Build and test across all supported platforms
-4. Publish NuGet package
-5. Create GitHub release with artifacts and release notes
+4. Publish the self-contained win-x64 and linux-x64 executables as archives with SHA-256 checksums
+5. Create GitHub release with the archives, checksums, documents, and release notes
 
 ## Getting Help
 

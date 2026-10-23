@@ -15,14 +15,15 @@ answer, is verified with a Playwright `IPage` created with a dispatch proxy whos
 listeners that return canned answers; the rest is exercised by the real-browser end-to-end test
 `PuppetEndToEnd_HelloAndCounter_DrivenThroughCommands_ShowGreetingAndCount`, which starts the real ReviewCenter
 server, launches headless Chromium, runs the Puppet executable as separate processes, and drives the hello and
-counter buttons. That test skips with a clear reason when Chromium cannot be launched and is supplemental evidence
-only; it is not linked to a requirement.
+counter buttons. That test is requirement-linked evidence for the Puppet system requirements; CI installs Chromium and
+fails it, rather than skipping it, when the browser cannot be launched.
 
 ### Test Environment
 
 The unit tests use the standard test environment and need permission to open loopback TCP ports. The end-to-end test
 additionally needs the built ReviewCenter server assembly and an installed Chromium; Chromium is installed once with
-the Playwright installation script.
+the Playwright installation script (CI does this on every platform, with the browser cached). Setting
+`REVIEWCENTER_REQUIRE_CHROMIUM=true` makes a missing browser a failure; without it the test skips with a reason.
 
 ### Acceptance Criteria
 
@@ -50,7 +51,8 @@ the Playwright installation script.
   refused connection means "not ready yet", and any other success answer is a mismatch that fails the start.
 - The temporary DevTools session used to learn the browser's process identity is detached after the query, also when
   the query fails or the browser has already closed, and a failing detach is tolerated.
-- The end-to-end test passes where Chromium is available, and is skipped with a reason where it is not.
+- The end-to-end test passes where Chromium is available. Where it is not, the test skips with a reason, except
+  when `REVIEWCENTER_REQUIRE_CHROMIUM=true` (set in CI), where it fails.
 
 ### Test Scenarios
 
@@ -157,10 +159,12 @@ and a start time, and the session was detached exactly once. This scenario is te
 query and the detach with "Target closed". The query returns no identity and throws nothing, and the detach was
 attempted once. This scenario is tested by `DaemonHost_PlaywrightBrowser_DetachFailsBecauseBrowserClosed_IsTolerated`.
 
-**PuppetEndToEnd_HelloAndCounter_DrivenThroughCommands_ShowGreetingAndCount**: Supplemental, not linked to a
-requirement. The test starts a session with the real executable, navigates to the home page, clicks the hello
+**PuppetEndToEnd_HelloAndCounter_DrivenThroughCommands_ShowGreetingAndCount**: Requirement-linked evidence for
+`ReviewCenterPuppet-System-Lifecycle`, `-Commands`, and `-Errors` on Windows and Linux. The test starts a session with
+the real executable, navigates to the home page, clicks the hello
 button, reads the greeting, clicks the counter button twice and reads the count 2, takes a screenshot that is a real
 image, fails a click on an element that does not exist with exit code 1, stops the session, and checks that the
 session is no longer listed. Because the commands are separate processes, it also demonstrates that the detached
-daemon survives between commands. The test is skipped when Chromium is unavailable. This scenario is tested by
+daemon survives between commands. The test is skipped when Chromium is unavailable, unless the environment variable
+`REVIEWCENTER_REQUIRE_CHROMIUM` is `true` (CI), in which case it fails. This scenario is tested by
 `PuppetEndToEnd_HelloAndCounter_DrivenThroughCommands_ShowGreetingAndCount`.
