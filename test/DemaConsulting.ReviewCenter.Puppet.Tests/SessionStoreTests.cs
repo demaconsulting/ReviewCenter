@@ -620,4 +620,209 @@ public class SessionStoreTests
         Assert.Empty(Directory.EnumerateFiles(directory, "*.tmp"));
         store.Release("locked");
     }
+
+    /// <summary>
+    ///     Test that a session replaced by a concurrent start while a stale one is being cleaned up is not deleted,
+    ///     and is examined on its own merits instead.
+    /// </summary>
+    [Fact]
+    public void SessionStore_Lookup_SessionReplacedDuringCleanup_KeepsReplacementAndReportsItLive()
+    {
+        // Arrange: a stale session whose daemon check publishes a replacement from another store (a concurrent start)
+        using var temp = new TempDirectory();
+        var killed = new List<int>();
+        var publisher = new SessionStore(temp.Path);
+        var replacement = CreateInfo("busy", daemonPid: 999) with { ControlToken = "new-token" };
+        var store = new SessionStore(
+            temp.Path,
+            (pid, _) =>
+            {
+                if (pid != 111)
+                {
+                    return true;
+                }
+
+                publisher.Write(replacement);
+                return false;
+            },
+            (pid, _) => killed.Add(pid));
+        store.Write(CreateInfo("busy", daemonPid: 111, serverPid: 222, browserPid: 333));
+
+        // Act: look it up
+        var result = store.Lookup("busy", out var info);
+
+        // Assert: the replacement survived and is reported live; only the old session's leftovers were stopped
+        Assert.Equal(SessionLookup.Live, result);
+        Assert.Equal(replacement, info);
+        Assert.Equal(replacement, store.TryRead("busy"));
+        Assert.Equal([333, 222], killed);
+    }
+
+    /// <summary>
+    ///     Test that a stale session is left in place, and still reported stale, while a start holds the lock for its
+    ///     id: that start replaces or cleans the file itself.
+    /// </summary>
+    [Fact]
+    public void SessionStore_Lookup_StartLockHeldByAnotherStart_LeavesFileAndReportsStale()
+    {
+        // Arrange: a stale session and a start that holds the lock (this process counts as the live lock owner)
+        using var temp = new TempDirectory();
+        var store = new SessionStore(temp.Path, (pid, _) => pid == Environment.ProcessId, (_, _) => { });
+        store.Write(CreateInfo("held", daemonPid: 111));
+        Assert.True(store.TryReserve("held"));
+
+        // Act: look the session up while the lock is held
+        var result = store.Lookup("held", out var info);
+
+        // Assert: stale, but the file was not deleted
+        Assert.Equal(SessionLookup.Stale, result);
+        Assert.Null(info);
+        Assert.True(File.Exists(store.GetPath("held")));
+        store.Release("held");
+    }
+
+    /// <summary>
+    ///     Test that a session that keeps being replaced is reported as an error rather than looped on or deleted.
+    /// </summary>
+    [Fact]
+    public void SessionStore_Lookup_SessionKeepsBeingReplaced_ThrowsAndDeletesNothing()
+    {
+        // Arrange: every daemon check publishes yet another dead session
+        using var temp = new TempDirectory();
+        var publisher = new SessionStore(temp.Path);
+        var generation = 0;
+        var store = new SessionStore(
+            temp.Path,
+            (pid, _) =>
+            {
+                generation++;
+                publisher.Write(CreateInfo("churn", daemonPid: 1000 + generation) with { ControlToken = "t" + generation });
+                return pid < 0;
+            },
+            (_, _) => { });
+        store.Write(CreateInfo("churn", daemonPid: 111));
+
+        // Act: look it up
+        var exception = Record.Exception(() => store.Lookup("churn", out _));
+
+        // Assert: a clear error, and the latest session file is still there
+        Assert.IsType<PuppetException>(exception);
+        Assert.True(File.Exists(store.GetPath("churn")));
+    }
+
+    /// <summary>
+    ///     Test that the file is deleted, and the start lock released, when it still holds the examined session.
+    /// </summary>
+    [Fact]
+    public void SessionStore_DeleteIfSame_SameSession_DeletesFileAndReleasesLock()
+    {
+        // Arrange: a stored session
+        using var temp = new TempDirectory();
+        var store = new SessionStore(temp.Path);
+        var info = CreateInfo("demo");
+        store.Write(info);
+
+        // Act: delete it as the examined session
+        var outcome = store.DeleteIfSame("demo", info);
+
+        // Assert: deleted, and the lock is free again
+        Assert.Equal(DeleteOutcome.Deleted, outcome);
+        Assert.False(File.Exists(store.GetPath("demo")));
+        Assert.True(store.TryReserve("demo"));
+        store.Release("demo");
+    }
+
+    /// <summary>
+    ///     Test that a file holding a different session (another daemon or token) is never deleted.
+    /// </summary>
+    [Fact]
+    public void SessionStore_DeleteIfSame_ReplacedSession_KeepsFile()
+    {
+        // Arrange: the examined session was replaced by one with another daemon, and one with another token
+        using var temp = new TempDirectory();
+        var store = new SessionStore(temp.Path);
+        var examined = CreateInfo("demo", daemonPid: 111);
+        var otherDaemon = CreateInfo("demo", daemonPid: 222);
+        var otherToken = examined with { ControlToken = "other" };
+
+        // Act: try to delete the examined session while each replacement is in place
+        store.Write(otherDaemon);
+        var daemonOutcome = store.DeleteIfSame("demo", examined);
+        store.Write(otherToken);
+        var tokenOutcome = store.DeleteIfSame("demo", examined);
+
+        // Assert: both reported as replaced, and the file is still there
+        Assert.Equal(DeleteOutcome.Replaced, daemonOutcome);
+        Assert.Equal(DeleteOutcome.Replaced, tokenOutcome);
+        Assert.Equal(otherToken, store.TryRead("demo"));
+    }
+
+    /// <summary>
+    ///     Test that nothing is deleted while a start holds the lock, and that a caller that is that start can delete.
+    /// </summary>
+    [Fact]
+    public void SessionStore_DeleteIfSame_StartLock_SkipsForOthersAndAllowsOwner()
+    {
+        // Arrange: a stored session and a start holding the lock (this process counts as a live lock owner)
+        using var temp = new TempDirectory();
+        var store = new SessionStore(temp.Path, (pid, _) => pid == Environment.ProcessId, (_, _) => { });
+        var info = CreateInfo("demo");
+        store.Write(info);
+        Assert.True(store.TryReserve("demo"));
+
+        // Act: delete as a bystander, then as the lock owner
+        var bystander = store.DeleteIfSame("demo", info);
+        var existedAfterBystander = File.Exists(store.GetPath("demo"));
+        var owner = store.DeleteIfSame("demo", info, startLockHeld: true);
+
+        // Assert: the bystander was refused, the owner deleted, and the owner's lock is still held
+        Assert.Equal(DeleteOutcome.Busy, bystander);
+        Assert.True(existedAfterBystander);
+        Assert.Equal(DeleteOutcome.Deleted, owner);
+        Assert.False(File.Exists(store.GetPath("demo")));
+        Assert.False(store.TryReserve("demo"));
+        store.Release("demo");
+    }
+
+    /// <summary>
+    ///     Test that a missing file counts as deleted, and that a corrupt file is deleted only if it was examined as corrupt.
+    /// </summary>
+    [Fact]
+    public void SessionStore_DeleteIfSame_MissingAndCorruptFiles_FollowTheExaminedState()
+    {
+        // Arrange: a store with no file, then a corrupt file
+        using var temp = new TempDirectory();
+        var store = new SessionStore(temp.Path);
+        var missing = store.DeleteIfSame("gone", CreateInfo("gone"));
+        var path = store.GetPath("bad");
+        File.WriteAllText(path, "garbage");
+
+        // Act: delete the corrupt file as a readable session, then as the corrupt file it was
+        var asReadable = store.DeleteIfSame("bad", CreateInfo("bad"));
+        var existedAfterReadable = File.Exists(path);
+        var asCorrupt = store.DeleteIfSame("bad", null);
+
+        // Assert: missing is deleted; the corrupt file survived the wrong expectation and was removed by the right one
+        Assert.Equal(DeleteOutcome.Deleted, missing);
+        Assert.Equal(DeleteOutcome.Replaced, asReadable);
+        Assert.True(existedAfterReadable);
+        Assert.Equal(DeleteOutcome.Deleted, asCorrupt);
+        Assert.False(File.Exists(path));
+    }
+
+    /// <summary>
+    ///     Test that two records belong to the same session only when daemon identity and control token match.
+    /// </summary>
+    [Fact]
+    public void SessionStore_IsSameSession_ComparesDaemonIdentityAndToken()
+    {
+        // Arrange: a record and variations of it
+        var info = CreateInfo("demo");
+
+        // Act and assert: status and server details do not matter; daemon pid, start time, and token do
+        Assert.True(SessionStore.IsSameSession(info, info with { Status = SessionStatus.Failed, ServerPid = 1 }));
+        Assert.False(SessionStore.IsSameSession(info, info with { DaemonPid = info.DaemonPid + 1 }));
+        Assert.False(SessionStore.IsSameSession(info, info with { DaemonStartTimeUtc = info.DaemonStartTimeUtc.AddMinutes(1) }));
+        Assert.False(SessionStore.IsSameSession(info, info with { ControlToken = "other" }));
+    }
 }

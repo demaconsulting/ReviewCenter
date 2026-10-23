@@ -49,6 +49,11 @@ internal sealed class FakeBrowserPage : IBrowserPage
     /// </summary>
     public Exception? UnexpectedFailure { get; set; }
 
+    /// <summary>
+    ///     Gets the timeouts, in milliseconds, passed to <see cref="ScreenshotAsync"/> so far.
+    /// </summary>
+    public List<int> ScreenshotTimeoutsMs { get; } = [];
+
     /// <inheritdoc />
     public Task GotoAsync(string url, int timeoutMs)
     {
@@ -78,9 +83,10 @@ internal sealed class FakeBrowserPage : IBrowserPage
     }
 
     /// <inheritdoc />
-    public Task<byte[]> ScreenshotAsync(bool fullPage)
+    public Task<byte[]> ScreenshotAsync(bool fullPage, int timeoutMs)
     {
         Calls.Add($"screenshot fullPage={fullPage}");
+        ScreenshotTimeoutsMs.Add(timeoutMs);
         if (UnexpectedFailure is not null)
         {
             return Task.FromException<byte[]>(UnexpectedFailure);
@@ -240,6 +246,11 @@ public class FailingScreenshotPage : DispatchProxy
     public Exception? ScreenshotFailure { get; set; }
 
     /// <summary>
+    ///     Gets the options the screenshot was requested with, or <c>null</c> if none was requested.
+    /// </summary>
+    public PageScreenshotOptions? RequestedOptions { get; private set; }
+
+    /// <summary>
     ///     Creates a page whose screenshot faults with the given exception.
     /// </summary>
     /// <param name="failure">The exception the screenshot task faults with.</param>
@@ -251,11 +262,22 @@ public class FailingScreenshotPage : DispatchProxy
         return page;
     }
 
+    /// <summary>
+    ///     Gets the proxy behind a page created by <see cref="Create(Exception)"/>, to inspect what it received.
+    /// </summary>
+    /// <param name="page">The page created by <see cref="Create(Exception)"/>.</param>
+    /// <returns>The proxy.</returns>
+    public static FailingScreenshotPage From(IPage page)
+    {
+        return (FailingScreenshotPage)(object)page;
+    }
+
     /// <inheritdoc />
     protected override object? Invoke(MethodInfo? targetMethod, object?[]? args)
     {
         if (targetMethod?.Name == nameof(IPage.ScreenshotAsync))
         {
+            RequestedOptions = args?.OfType<PageScreenshotOptions>().FirstOrDefault();
             return Task.FromException<byte[]>(ScreenshotFailure ?? new InvalidOperationException("No failure configured."));
         }
 

@@ -73,8 +73,9 @@ sections:
           - id: ReviewCenterPuppet-DaemonHost-UnexpectedFailure
             title: >-
               The DaemonHost unit shall answer a command that fails unexpectedly, including a failed
-              screenshot, with a failed response, shall treat an unexpected start-up failure like a start
-              failure (failed session, exit code 4), and shall always release the browser and the server.
+              screenshot or a screenshot that exceeds the command's timeout, with a failed response, shall
+              treat an unexpected start-up failure like a start failure (failed session, exit code 4), and
+              shall always release the browser and the server.
             justification: |
               When the browser dies mid-session, the caller needs a clear error and a session that can still
               be stopped cleanly. An unexpected failure must never leave a browser or server running or end
@@ -83,6 +84,23 @@ sections:
               - DaemonHost_Run_ScreenshotThrowsUnexpected_ReturnsFailureAndKeepsServing
               - DaemonHost_Run_BrowserLaunchThrowsUnexpected_WritesFailedSessionAndReturnsFour
               - DaemonHost_PlaywrightPage_ScreenshotFails_ThrowsPuppetException
+              - DaemonHost_PlaywrightPage_ScreenshotTimesOut_AppliesTimeoutAndThrowsPuppetException
+
+          - id: ReviewCenterPuppet-DaemonHost-ReadinessCheck
+            title: >-
+              The DaemonHost unit shall consider the server ready only when its health endpoint answers status
+              200 with the exact body "Healthy", keep waiting while the endpoint is unavailable or answers an
+              error status, and fail the start with the answer it saw when a success answer has any other
+              content.
+            justification: |
+              The port is chosen before the server binds it, so another local process could answer in its
+              place, and a success status with other content is not proof that the ReviewCenter server is the
+              one answering. Driving the browser against the wrong service would report a session that does
+              not test the application.
+            tests:
+              - DaemonHost_HealthProbe_ExactHealthyAnswer_IsHealthy
+              - DaemonHost_HealthProbe_SuccessWithoutExactBody_IsMismatchNamingTheAnswer
+              - DaemonHost_HealthProbe_ErrorStatusOrNoListener_IsNotReady
 
           - id: ReviewCenterPuppet-DaemonHost-ProtocolSessionRelease
             title: >-

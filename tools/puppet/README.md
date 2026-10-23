@@ -24,8 +24,12 @@ If Chromium is missing, `start` fails with exit code 4 and prints this same comm
 Run Puppet from the repository root (replace `Debug` with `Release` if you built that configuration):
 
 ```powershell
-$puppet = "dotnet tools/puppet/bin/Debug/net10.0/DemaConsulting.ReviewCenter.Puppet.dll"
+$puppet = "tools/puppet/bin/Debug/net10.0/DemaConsulting.ReviewCenter.Puppet.dll"
 ```
+
+In the examples below, run Puppet as `dotnet $puppet <command>`. The `$puppet` variable holds only the path of the
+DLL: PowerShell does not split a string such as `"dotnet <path>"` into a program and its argument when it is invoked
+with `&`, so the program name stays outside the variable.
 
 | Command                                  | What it does                                                    |
 |------------------------------------------|-----------------------------------------------------------------|
@@ -58,14 +62,14 @@ not give it.
 ### Example
 
 ```powershell
-& $puppet start --session demo
-& $puppet goto / --session demo
-& $puppet screenshot --out demo-before.png --session demo
-& $puppet click hello-button --session demo
-& $puppet text hello-message --session demo
-& $puppet click counter-button --session demo
-& $puppet text counter-value --session demo
-& $puppet stop --session demo
+dotnet $puppet start --session demo
+dotnet $puppet goto / --session demo
+dotnet $puppet screenshot --out demo-before.png --session demo
+dotnet $puppet click hello-button --session demo
+dotnet $puppet text hello-message --session demo
+dotnet $puppet click counter-button --session demo
+dotnet $puppet text counter-value --session demo
+dotnet $puppet stop --session demo
 ```
 
 ## Exit codes
@@ -84,7 +88,8 @@ not give it.
 `__daemon` verb) and waits until the daemon reports that the server and browser are ready. The daemon:
 
 - starts the ReviewCenter server with `dotnet DemaConsulting.ReviewCenter.dll serve --urls http://127.0.0.1:<port>`
-  on a free port and waits for its `/health` endpoint;
+  on a free port and waits for its `/health` endpoint to answer `200` with the exact body `Healthy` (any other
+  successful answer means another service took the port, and the start fails);
 - launches headless Chromium and opens one page;
 - listens for commands on a free port of the loopback interface, protected by a random token;
 - shuts everything down on `stop`, or after 30 minutes without a command.

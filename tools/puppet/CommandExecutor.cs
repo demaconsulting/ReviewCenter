@@ -67,8 +67,9 @@ internal interface IBrowserPage
     ///     Captures a PNG screenshot.
     /// </summary>
     /// <param name="fullPage">Whether to capture the whole scrollable page instead of the viewport.</param>
+    /// <param name="timeoutMs">The maximum time to wait for the screenshot.</param>
     /// <returns>The PNG bytes.</returns>
-    Task<byte[]> ScreenshotAsync(bool fullPage);
+    Task<byte[]> ScreenshotAsync(bool fullPage, int timeoutMs);
 
     /// <summary>
     ///     Produces a textual snapshot of the page: its URL, title, accessibility tree, and test ids.
@@ -218,7 +219,7 @@ internal sealed class CommandExecutor
             $"{_sessionId}-{DateTime.Now:yyyyMMdd-HHmmss-fff}.png");
         path = Path.GetFullPath(path);
 
-        var bytes = await _page.ScreenshotAsync(request.FullPage);
+        var bytes = await _page.ScreenshotAsync(request.FullPage, request.TimeoutMs);
         try
         {
             Directory.CreateDirectory(Path.GetDirectoryName(path)!);

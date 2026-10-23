@@ -195,6 +195,26 @@ public class CommandExecutorTests
     }
 
     /// <summary>
+    ///     Test that screenshot receives the request's per-command timeout, so it cannot outlive the client exchange.
+    /// </summary>
+    [Fact]
+    public async Task CommandExecutor_Execute_Screenshot_PassesRequestTimeoutToPage()
+    {
+        // Arrange: an executor over a fake page and a request with a distinctive timeout
+        using var temp = new TempDirectory();
+        var page = new FakeBrowserPage();
+        var executor = new CommandExecutor(page, BaseUrl, "s", temp.Path);
+        var request = new ControlRequest("t", "screenshot", null, null, null, false, 1234);
+
+        // Act: take a screenshot
+        var response = await executor.ExecuteAsync(request);
+
+        // Assert: the page was given the request's timeout
+        Assert.True(response.Ok);
+        Assert.Equal([1234], page.ScreenshotTimeoutsMs);
+    }
+
+    /// <summary>
     ///     Test that snapshot returns the page's snapshot text.
     /// </summary>
     [Fact]

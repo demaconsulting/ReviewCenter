@@ -73,6 +73,7 @@ sections:
         children:
           - ReviewCenterPuppet-PuppetProgram-StartAbort
           - ReviewCenterPuppet-SessionStore-StaleCleanup
+          - ReviewCenterPuppet-SessionStore-GuardedDelete
           - ReviewCenterPuppet-SessionStore-ProcessIdentity
           - ReviewCenterPuppet-SessionStore-ProcessTermination
           - ReviewCenterPuppet-DaemonHost-ServerStopFailure
@@ -80,6 +81,8 @@ sections:
         tests:
           - ReviewCenterPuppet_Start_NeverBecomesReady_TerminatesDaemonAndLeavesNothingBehind
           - ReviewCenterPuppet_Start_ServerCannotStart_ReportsStartFailureAndLeavesNothingBehind
+          - ReviewCenterPuppet_Start_FailureWithFailedTeardown_TerminatesLeftoverServerAndLeavesNothingBehind
+          - ReviewCenterPuppet_Stop_DaemonTeardownFails_TerminatesRecordedServerAndRemovesSession
           - ReviewCenterPuppet_Session_DaemonDiedWithoutCleanup_ReportsStaleAndEndsLeftoverProcesses
 
       - id: ReviewCenterPuppet-System-Security
@@ -170,6 +173,7 @@ sections:
           - ReviewCenterPuppet-ControlChannel-UnexpectedFailure
           - ReviewCenterPuppet-CommandExecutor-FailureReporting
           - ReviewCenterPuppet-DaemonHost-StartFailure
+          - ReviewCenterPuppet-DaemonHost-ReadinessCheck
           - ReviewCenterPuppet-DaemonHost-UnexpectedFailure
         tests:
           - ReviewCenterPuppet_Errors_UnknownSessionAndMissingElement_ReportDistinctExitCodes

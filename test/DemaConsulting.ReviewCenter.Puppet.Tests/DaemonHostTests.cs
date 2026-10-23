@@ -272,6 +272,111 @@ public class DaemonHostTests
     }
 
     /// <summary>
+    ///     Answers a single HTTP request on a loopback port with a canned response, for the health probe tests.
+    /// </summary>
+    /// <param name="status">The status line text, such as <c>200 OK</c>.</param>
+    /// <param name="body">The response body.</param>
+    /// <param name="cancellationToken">Cancels the wait for the request.</param>
+    /// <returns>The base URL the probe should use, and the task that completes once the request was answered.</returns>
+    private static (string Url, Task Served) ServeOnce(string status, string body, CancellationToken cancellationToken)
+    {
+        var listener = new System.Net.Sockets.TcpListener(System.Net.IPAddress.Loopback, 0);
+        listener.Start();
+        var url = $"http://127.0.0.1:{((System.Net.IPEndPoint)listener.LocalEndpoint).Port}";
+        var served = Task.Run(
+            async () =>
+            {
+                try
+                {
+                    using var client = await listener.AcceptTcpClientAsync(cancellationToken);
+                    await using var stream = client.GetStream();
+                    using var reader = new StreamReader(stream);
+                    while (await reader.ReadLineAsync(cancellationToken) is { Length: > 0 })
+                    {
+                        // Skip the request line and headers
+                    }
+
+                    var length = System.Text.Encoding.UTF8.GetByteCount(body);
+                    var response = $"HTTP/1.1 {status}\r\nContent-Type: text/plain\r\nContent-Length: {length}\r\nConnection: close\r\n\r\n{body}";
+                    await stream.WriteAsync(System.Text.Encoding.UTF8.GetBytes(response), cancellationToken);
+                    await stream.FlushAsync(cancellationToken);
+                }
+                finally
+                {
+                    listener.Stop();
+                }
+            },
+            cancellationToken);
+        return (url, served);
+    }
+
+    /// <summary>
+    ///     Test that only the exact ReviewCenter health answer (status 200, body <c>Healthy</c>) counts as healthy.
+    /// </summary>
+    [Fact]
+    public async Task DaemonHost_HealthProbe_ExactHealthyAnswer_IsHealthy()
+    {
+        // Arrange: a listener that answers like the ReviewCenter server
+        using var http = new HttpClient();
+        var (url, served) = ServeOnce("200 OK", ServerProcessRunner.HealthyText, Xunit.TestContext.Current.CancellationToken);
+
+        // Act: probe it
+        var probe = await ServerProcessRunner.ProbeHealthAsync(http, url, Xunit.TestContext.Current.CancellationToken);
+        await served;
+
+        // Assert: healthy
+        Assert.Equal(HealthState.Healthy, probe.State);
+    }
+
+    /// <summary>
+    ///     Test that a success status with the wrong body, or with no body, is a mismatch (some other service on the
+    ///     port) rather than a healthy ReviewCenter server.
+    /// </summary>
+    [Theory]
+    [InlineData("200 OK", "Unhealthy")]
+    [InlineData("200 OK", "")]
+    [InlineData("204 No Content", "")]
+    public async Task DaemonHost_HealthProbe_SuccessWithoutExactBody_IsMismatchNamingTheAnswer(string status, string body)
+    {
+        // Arrange: a listener that answers /health with a success status but not the health text
+        using var http = new HttpClient();
+        var (url, served) = ServeOnce(status, body, Xunit.TestContext.Current.CancellationToken);
+
+        // Act: probe it
+        var probe = await ServerProcessRunner.ProbeHealthAsync(http, url, Xunit.TestContext.Current.CancellationToken);
+        await served;
+
+        // Assert: a mismatch whose detail names the status and the expected text
+        Assert.Equal(HealthState.Mismatch, probe.State);
+        Assert.Contains(status[..3], probe.Detail, StringComparison.Ordinal);
+        Assert.Contains(ServerProcessRunner.HealthyText, probe.Detail, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    ///     Test that an unsuccessful status, or no listener at all, means the server is not ready yet.
+    /// </summary>
+    [Fact]
+    public async Task DaemonHost_HealthProbe_ErrorStatusOrNoListener_IsNotReady()
+    {
+        // Arrange: a listener that answers 503, and a port nothing listens on
+        using var http = new HttpClient();
+        var (url, served) = ServeOnce("503 Service Unavailable", "starting", Xunit.TestContext.Current.CancellationToken);
+        var closed = new System.Net.Sockets.TcpListener(System.Net.IPAddress.Loopback, 0);
+        closed.Start();
+        var closedUrl = $"http://127.0.0.1:{((System.Net.IPEndPoint)closed.LocalEndpoint).Port}";
+        closed.Stop();
+
+        // Act: probe both
+        var unavailable = await ServerProcessRunner.ProbeHealthAsync(http, url, Xunit.TestContext.Current.CancellationToken);
+        await served;
+        var refused = await ServerProcessRunner.ProbeHealthAsync(http, closedUrl, Xunit.TestContext.Current.CancellationToken);
+
+        // Assert: both are "not ready yet", so the caller keeps polling
+        Assert.Equal(HealthState.NotReady, unavailable.State);
+        Assert.Equal(HealthState.NotReady, refused.State);
+    }
+
+    /// <summary>
     ///     Test that a daemon with no commands shuts itself down after the idle timeout and cleans up.
     /// </summary>
     [Fact]
@@ -378,12 +483,35 @@ public class DaemonHostTests
         var page = new PlaywrightPage(FailingScreenshotPage.Create(new PlaywrightException("Target closed\nlong call log")));
 
         // Act: take a screenshot
-        var exception = await Assert.ThrowsAsync<PuppetException>(() => page.ScreenshotAsync(false));
+        var exception = await Assert.ThrowsAsync<PuppetException>(() => page.ScreenshotAsync(false, 5000));
 
         // Assert: the message names the screenshot and the first line only
         Assert.Contains("screenshot", exception.Message, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("Target closed", exception.Message, StringComparison.Ordinal);
         Assert.DoesNotContain("call log", exception.Message, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    ///     Test that the Playwright page adapter applies the per-command timeout to the screenshot so a hung
+    ///     capture cannot block the daemon's control loop, and reports an expired timeout as a
+    ///     <see cref="PuppetException"/>.
+    /// </summary>
+    [Fact]
+    public async Task DaemonHost_PlaywrightPage_ScreenshotTimesOut_AppliesTimeoutAndThrowsPuppetException()
+    {
+        // Arrange: a Playwright page whose screenshot times out
+        var playwrightPage = FailingScreenshotPage.Create(new TimeoutException("Timeout 2000ms exceeded."));
+        var page = new PlaywrightPage(playwrightPage);
+
+        // Act: take a screenshot with a 2 s timeout
+        var exception = await Assert.ThrowsAsync<PuppetException>(() => page.ScreenshotAsync(true, 2000));
+
+        // Assert: the timeout was handed to Playwright, and the failure names the timeout in seconds
+        var options = FailingScreenshotPage.From(playwrightPage).RequestedOptions;
+        Assert.NotNull(options);
+        Assert.Equal(2000, options.Timeout);
+        Assert.True(options.FullPage);
+        Assert.Contains("Timed out after 2 s", exception.Message, StringComparison.Ordinal);
     }
 
     /// <summary>

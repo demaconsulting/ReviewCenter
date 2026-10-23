@@ -31,7 +31,12 @@ the browser process (zero when they cannot be determined); disposing it closes t
 
 **ServerProcessRunner** (production `IServerRunner`): picks a free loopback port, runs
 `dotnet <server assembly> serve --urls http://127.0.0.1:<port>` in the folder of the assembly, keeps the last 20
-lines of its output, and waits up to 30 seconds for the `/health` endpoint to answer. The server runs as a separate
+lines of its output, and waits up to 30 seconds for the `/health` endpoint to answer. The server is ready only when
+`/health` answers status 200 with the exact body `Healthy` (the text `ServerHost` returns); a non-success status or a
+refused connection means "not ready yet" and polling continues, while a success answer with any other status or body
+(another process that took the port between choosing it and the server binding it, or a misconfigured endpoint) fails
+the start at once with a `PuppetException` that names the answer and includes the captured output. The classification
+is done by `ProbeHealthAsync`. The server runs as a separate
 process so that Puppet exercises exactly what ships: the real assembly, its real start-up, and its real health
 endpoint. The polling interval, the health request time-out, and the kill wait are named constants. Stopping the
 server is verified: after the kill, the runner waits for the process to exit; if it has not exited it ends the
@@ -52,7 +57,9 @@ cryptic Playwright message by one that names the `playwright.ps1` script next to
 the command timeout. After `goto` it waits for the `data-interactive='true'` marker when the page advertises one,
 because a Blazor Server page ignores clicks until its live connection exists. Element commands wait for the element
 to be attached before acting. The snapshot is the URL, the title, the accessibility tree of the body, and the list
-of the test ids present. Playwright timeouts and failures, including a failed screenshot, become `PuppetException`
+of the test ids present. The screenshot uses the command timeout as the Playwright screenshot timeout, so a page that
+never settles fails within the time the caller asked for. Playwright timeouts and failures, including a failed or
+timed-out screenshot, become `PuppetException`
 messages that name the selector (where there is one) and the timeout.
 
 ### Key Methods

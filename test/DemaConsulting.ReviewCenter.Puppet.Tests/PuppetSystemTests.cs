@@ -337,6 +337,58 @@ public class PuppetSystemTests
     }
 
     /// <summary>
+    ///     Test that a stop whose daemon could not stop the server still ends that server (found through the session
+    ///     file the daemon leaves behind) and removes the session.
+    /// </summary>
+    [Fact]
+    public async Task ReviewCenterPuppet_Stop_DaemonTeardownFails_TerminatesRecordedServerAndRemovesSession()
+    {
+        // Arrange: a running session whose server cannot be disposed
+        using var env = new DaemonEnvironment();
+        var start = await RunAsync(env.Services, "start", "--session", "leaky", "--server", env.ServerDll);
+        var recorded = env.Store.TryRead("leaky")!;
+        env.Server.DisposeFailure = new PuppetException("The server would not stop.");
+
+        // Act: stop it, then list
+        var stop = await RunAsync(env.Services, "stop", "--session", "leaky");
+        var list = await RunAsync(env.Services, "list");
+
+        // Assert: the stop succeeded, the daemon reported failure, the leftover server was ended by id and start
+        // time, and no session remains
+        Assert.Equal(0, start.ExitCode);
+        Assert.Equal(0, stop.ExitCode);
+        Assert.Equal(4, await env.Daemon!);
+        Assert.Contains((recorded.ServerPid, recorded.ServerStartTimeUtc), env.Killed);
+        Assert.Empty(env.Store.ListIds());
+        Assert.Contains("No active sessions.", list.Output, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    ///     Test that a start that fails while the daemon's teardown also fails waits for the daemon, ends the server
+    ///     the failed teardown left behind, and leaves no session state.
+    /// </summary>
+    [Fact]
+    public async Task ReviewCenterPuppet_Start_FailureWithFailedTeardown_TerminatesLeftoverServerAndLeavesNothingBehind()
+    {
+        // Arrange: a daemon whose browser cannot launch and whose server cannot be disposed
+        using var env = new DaemonEnvironment();
+        env.Browser.Failure = new PuppetException("Chromium is not installed.");
+        env.Server.DisposeFailure = new PuppetException("The server would not stop.");
+
+        // Act: start, and wait for the daemon to end
+        var start = await RunAsync(env.Services, "start", "--session", "broken", "--server", env.ServerDll);
+        var exit = await env.Daemon!.WaitAsync(TimeSpan.FromSeconds(30), Xunit.TestContext.Current.CancellationToken);
+
+        // Assert: reported as the original failure, the leftover server was ended by identity, and nothing remains
+        Assert.Equal(4, start.ExitCode);
+        Assert.Contains("Chromium is not installed.", start.Error, StringComparison.Ordinal);
+        Assert.Equal(4, exit);
+        Assert.Contains(env.Killed, k => k.Pid == Environment.ProcessId);
+        Assert.Empty(env.Store.ListIds());
+        Assert.True(env.Store.TryReserve("broken"));
+    }
+
+    /// <summary>
     ///     Test that the next command after a daemon died without cleaning up reports a stale session, ends the
     ///     processes it left behind, and removes the session.
     /// </summary>

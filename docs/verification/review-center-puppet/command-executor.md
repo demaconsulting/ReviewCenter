@@ -52,6 +52,11 @@ temporary folder succeeds, returns that path, and the file exists. This scenario
 file in the default folder whose name starts with the session id, and returns its path. This scenario is tested by
 `CommandExecutor_Execute_ScreenshotWithoutOut_UsesDefaultLocation`.
 
+**CommandExecutor_Execute_Screenshot_PassesRequestTimeoutToPage**: `screenshot` is executed with a request timeout
+of 1234 milliseconds. The fake page records the timeout it was asked to apply to the screenshot, which equals the
+request's timeout rather than a built-in default. This scenario is tested by
+`CommandExecutor_Execute_Screenshot_PassesRequestTimeoutToPage`.
+
 **CommandExecutor_Execute_Snapshot_ReturnsSnapshotText**: `snapshot` returns the text "fake snapshot" of the fake
 page. This scenario is tested by `CommandExecutor_Execute_Snapshot_ReturnsSnapshotText`.
 

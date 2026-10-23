@@ -76,11 +76,29 @@ soon as the file is gone.
 sessions), in ordinal sorted order. It returns an empty list when the folder does not exist.
 
 **Lookup**: Returns `Unknown` when there is no file. Returns `Live` with the session when the recorded daemon
-process is alive. Otherwise it stops the server and the browser process that the file records, if any, deletes the
-file, and returns `Stale`. A corrupt file is therefore also stale. A file that stays locked or inaccessible after the
+process is alive. Otherwise it stops the server and the browser process that the file records, if any (by their
+recorded identities, so a newer session's processes are never touched), then removes the file with `DeleteIfSame`
+and returns `Stale`. A corrupt file is therefore also stale. If `DeleteIfSame` reports that the file now holds a
+different session (a concurrent `start` replaced the stale one in between), nothing is deleted and the lookup
+examines the new file instead; this repeats at most three times before a `PuppetException` says the session kept
+changing. If a `start` holds the reservation for the id, the stale file is left for that `start` to replace or
+clean and the result is still `Stale`; the `start` command itself passes `startLockHeld` because it already owns
+the reservation. A file that stays locked or inaccessible after the
 retries is neither: `Lookup` throws a `PuppetException` saying the session file is temporarily unreadable, and
 deletes nothing and stops no process, so a live session can never be removed because of a transient I/O error. A file
 that vanishes between the existence check and the read is reported as `Unknown`.
+
+**DeleteIfSame**: Deletes the file of a session on behalf of a caller that examined it earlier (for example a `stop`
+or a stale lookup), but only if it still holds that session. It takes the start reservation first, so no `start` can
+publish a replacement between the check and the delete; when another start holds the reservation it returns `Busy`
+and deletes nothing. It then re-reads the file: a missing file counts as `Deleted`, an unreadable one is `Busy`, a
+different session (compared with `IsSameSession`) is `Replaced` and is kept, and a matching one is deleted. A
+corrupt file matches only an examination that found it corrupt (`expected` is `null`). The reservation is released
+afterwards unless the caller passed `startLockHeld`.
+
+**IsSameSession**: True when two records have the same session id, daemon process id, daemon start time, and control
+token, which identifies one daemon instance of a session even when other fields (status, recorded server and
+browser) have changed.
 
 **IsDaemonAlive**: Checks the recorded daemon of a session.
 

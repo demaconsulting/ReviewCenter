@@ -73,14 +73,38 @@ sections:
           - id: ReviewCenterPuppet-SessionStore-StaleCleanup
             title: >-
               The SessionStore unit shall report a session whose daemon is gone or whose file is unreadable
-              as stale, delete its file, and stop a server and a browser the dead daemon left running.
+              as stale, stop a server and a browser the dead daemon left running, and delete the file only
+              when it still holds the session that was examined and no start holds the reservation for its
+              id; a session published by a concurrent start in the meantime shall be kept and examined
+              itself.
             justification: |
               A crash, reboot, or killed terminal leaves a file whose daemon is gone. Without cleanup every
               later command would fail confusingly, and an orphaned server or browser would keep running and
-              consume resources.
+              consume resources. Deleting by name alone could remove the brand-new session of a start that
+              replaced the stale one between the check and the delete.
             tests:
               - SessionStore_ReadStale_DeadDaemon_CleansUpAndReports
               - SessionStore_Lookup_CorruptFile_CleansUpAndReportsStale
+              - SessionStore_Lookup_SessionReplacedDuringCleanup_KeepsReplacementAndReportsItLive
+              - SessionStore_Lookup_StartLockHeldByAnotherStart_LeavesFileAndReportsStale
+              - SessionStore_Lookup_SessionKeepsBeingReplaced_ThrowsAndDeletesNothing
+
+          - id: ReviewCenterPuppet-SessionStore-GuardedDelete
+            title: >-
+              The SessionStore unit shall delete a session file on behalf of a caller that examined it only
+              when the file still describes the same daemon and control token, shall leave it when another
+              session replaced it or another start holds the reservation for the id, and shall treat a
+              missing file as deleted.
+            justification: |
+              Stop and cleanup read a session, decide it is finished, and delete it later. A new start can
+              publish a replacement session for the same id in between, and deleting by name would destroy it
+              and orphan its daemon, server, and browser.
+            tests:
+              - SessionStore_DeleteIfSame_SameSession_DeletesFileAndReleasesLock
+              - SessionStore_DeleteIfSame_ReplacedSession_KeepsFile
+              - SessionStore_DeleteIfSame_StartLock_SkipsForOthersAndAllowsOwner
+              - SessionStore_DeleteIfSame_MissingAndCorruptFiles_FollowTheExaminedState
+              - SessionStore_IsSameSession_ComparesDaemonIdentityAndToken
 
           - id: ReviewCenterPuppet-SessionStore-ProcessTermination
             title: >-

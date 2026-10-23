@@ -10,8 +10,9 @@ the ready session file, and then talk to it with `ControlClient`.
 
 The production adapters of this unit, `ServerProcessRunner` and the Playwright classes `PlaywrightBrowserLauncher`
 and `PlaywrightPage`, cannot be fully verified with fakes. The one adapter behavior that needs no browser, the
-translation of a failed screenshot into a `PuppetException`, is verified with a Playwright `IPage` created with a
-dispatch proxy whose screenshot fails; the rest is exercised by the real-browser end-to-end test
+translation of a failed or timed-out screenshot into a `PuppetException` and the classification of a `/health`
+answer, is verified with a Playwright `IPage` created with a dispatch proxy whose screenshot fails and with loopback
+listeners that return canned answers; the rest is exercised by the real-browser end-to-end test
 `PuppetEndToEnd_HelloAndCounter_DrivenThroughCommands_ShowGreetingAndCount`, which starts the real ReviewCenter
 server, launches headless Chromium, runs the Puppet executable as separate processes, and drives the hello and
 counter buttons. That test skips with a clear reason when Chromium cannot be launched and is supplemental evidence
@@ -43,7 +44,10 @@ the Playwright installation script.
   still does not exit is reported as a `PuppetException` that names the process, and the host records a failed
   session and returns exit code 4 rather than reporting a completed cleanup.
 - A failed Playwright screenshot is reported as a `PuppetException` that names the screenshot and keeps only the
-  first line of the Playwright message.
+  first line of the Playwright message; the command timeout is handed to Playwright, and a screenshot that times out
+  is reported as a timeout.
+- The server counts as ready only when `/health` answers status 200 with the body `Healthy`; an error status or a
+  refused connection means "not ready yet", and any other success answer is a mismatch that fails the start.
 - The temporary DevTools session used to learn the browser's process identity is detached after the query, also when
   the query fails or the browser has already closed, and a failing detach is tolerated.
 - The end-to-end test passes where Chromium is available, and is skipped with a reason where it is not.
@@ -108,6 +112,25 @@ description containing the message, and the server was disposed. This scenario i
 screenshot faults with a `PlaywrightException` with a two-line message throws a `PuppetException` that mentions the
 screenshot and the first line only. No browser is needed. This scenario is tested by
 `DaemonHost_PlaywrightPage_ScreenshotFails_ThrowsPuppetException`.
+
+**DaemonHost_PlaywrightPage_ScreenshotTimesOut_AppliesTimeoutAndThrowsPuppetException**: A `PlaywrightPage` over a
+proxy `IPage` that records the screenshot options and whose screenshot faults with a timeout exception is asked for
+a full-page screenshot with a 2000 millisecond timeout. The options the proxy received carry a timeout of 2000 and
+the full-page flag, and the `PuppetException` says the screenshot timed out after 2 s. No browser is needed. This
+scenario is tested by `DaemonHost_PlaywrightPage_ScreenshotTimesOut_AppliesTimeoutAndThrowsPuppetException`.
+
+**DaemonHost_HealthProbe_ExactHealthyAnswer_IsHealthy**: A loopback listener answers `/health` with status 200 and
+the body `Healthy`; the probe reports healthy. This scenario is tested by
+`DaemonHost_HealthProbe_ExactHealthyAnswer_IsHealthy`.
+
+**DaemonHost_HealthProbe_SuccessWithoutExactBody_IsMismatchNamingTheAnswer**: A loopback listener answers `/health`
+with status 200 and the body `Unhealthy`, with status 200 and an empty body, and with status 204. Each answer is
+reported as a mismatch whose detail names the status and the expected text, so the start fails instead of driving
+another service. This scenario is tested by `DaemonHost_HealthProbe_SuccessWithoutExactBody_IsMismatchNamingTheAnswer`.
+
+**DaemonHost_HealthProbe_ErrorStatusOrNoListener_IsNotReady**: A loopback listener answers `/health` with status 503,
+and a second probe targets a port nothing listens on. Both are reported as not ready, so the runner keeps polling.
+This scenario is tested by `DaemonHost_HealthProbe_ErrorStatusOrNoListener_IsNotReady`.
 
 **DaemonHost_PlaywrightBrowser_ProcessQuery_DetachesProtocolSession**: A fake DevTools session answers the process
 query with a gpu process and a browser process that is the test process. The query returns the browser's process id

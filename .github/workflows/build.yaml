@@ -117,10 +117,7 @@ jobs:
       - name: Setup dotnet
         uses: actions/setup-dotnet@v6
         with:
-          dotnet-version: |
-            8.x
-            9.x
-            10.x
+          dotnet-version: 10.x
 
       - name: Restore Tools
         run: >
@@ -260,10 +257,7 @@ jobs:
       - name: Setup dotnet
         uses: actions/setup-dotnet@v6
         with:
-          dotnet-version: |
-            8.x
-            9.x
-            10.x
+          dotnet-version: 10.x
 
       - name: Restore Tools
         run: >
@@ -314,7 +308,7 @@ jobs:
     strategy:
       matrix:
         os: [windows-latest, ubuntu-latest, macos-latest]
-        dotnet-version: ['8.x', '9.x', '10.x']
+        dotnet-version: ['10.x']
 
     steps:
       # === INSTALL DEPENDENCIES ===
@@ -361,7 +355,7 @@ jobs:
         run: |
           mkdir -p artifacts
           echo "Capturing tool versions..."
-          # Create short job ID: int-windows-8, int-ubuntu-9, int-macos-10, etc.
+          # Create short job ID: int-windows-10, int-ubuntu-10, int-macos-10
           OS_SHORT=$(echo "${{ matrix.os }}" | sed 's/-latest//')
           DOTNET_SHORT=$(echo "${{ matrix.dotnet-version }}" | sed 's/\.x$//')
           JOB_ID="int-${OS_SHORT}-${DOTNET_SHORT}"

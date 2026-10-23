@@ -102,6 +102,27 @@ internal enum SessionLookup
 }
 
 /// <summary>
+///     The outcome of a conditional delete of a session file (see <see cref="SessionStore.DeleteIfSame"/>).
+/// </summary>
+internal enum DeleteOutcome
+{
+    /// <summary>
+    ///     The file was the expected session and was removed, or it was already gone.
+    /// </summary>
+    Deleted,
+
+    /// <summary>
+    ///     The file now describes a different session (a newer <c>start</c> replaced it) and was left alone.
+    /// </summary>
+    Replaced,
+
+    /// <summary>
+    ///     A <c>start</c> holds the start lock, or the file could not be read; nothing was deleted.
+    /// </summary>
+    Busy
+}
+
+/// <summary>
 ///     The classified result of reading a session file.
 /// </summary>
 internal enum ReadOutcome
@@ -211,6 +232,12 @@ internal sealed class SessionStore
     ///     How long a replacement waits between two attempts.
     /// </summary>
     private static readonly TimeSpan ReplaceRetryDelay = TimeSpan.FromMilliseconds(25);
+
+    /// <summary>
+    ///     How many times <see cref="Lookup"/> re-examines a session file that a concurrent <c>start</c>
+    ///     replaced while the lookup was cleaning up the previous record.
+    /// </summary>
+    private const int LookupAttempts = 3;
 
     /// <summary>
     ///     JSON options shared by all reads and writes.
@@ -653,6 +680,87 @@ internal sealed class SessionStore
     }
 
     /// <summary>
+    ///     Deletes a session file only if it still describes the session the caller examined.
+    /// </summary>
+    /// <remarks>
+    ///     A caller that read a session, decided it is finished (stopped or stale), and then deletes the
+    ///     file by name can remove a newer session that a concurrent <c>start</c> published in between.
+    ///     This method closes that window: it takes the start lock (so no <c>start</c> can publish while
+    ///     it checks and deletes), re-reads the file, and deletes it only when the daemon identity and
+    ///     control token still match. When a <c>start</c> already holds the lock the file is left alone:
+    ///     that start looks the old session up itself and replaces or cleans it. A caller that already
+    ///     holds the start lock (the <c>start</c> command itself) passes <paramref name="startLockHeld"/>.
+    /// </remarks>
+    /// <param name="sessionId">The session id.</param>
+    /// <param name="expected">
+    ///     The record that was examined; <c>null</c> when the examined file was corrupt (only a still
+    ///     corrupt file is then deleted).
+    /// </param>
+    /// <param name="startLockHeld"><c>true</c> when the caller already owns the start lock for the id.</param>
+    /// <returns>Whether the file was deleted, replaced by another session, or could not be examined safely.</returns>
+    public DeleteOutcome DeleteIfSame(string sessionId, SessionInfo? expected, bool startLockHeld = false)
+    {
+        var reserved = false;
+        if (!startLockHeld)
+        {
+            if (!TryReserve(sessionId))
+            {
+                return DeleteOutcome.Busy;
+            }
+
+            reserved = true;
+        }
+
+        try
+        {
+            var (outcome, current) = ReadWithRetry(GetPath(sessionId));
+            if (outcome == ReadOutcome.Missing)
+            {
+                return DeleteOutcome.Deleted;
+            }
+
+            if (outcome == ReadOutcome.Unavailable)
+            {
+                return DeleteOutcome.Busy;
+            }
+
+            // A readable record must be the one examined; a corrupt file only matches a corrupt examination
+            var same = current is null ? expected is null : expected is not null && IsSameSession(current, expected);
+            if (!same)
+            {
+                return DeleteOutcome.Replaced;
+            }
+
+            Delete(sessionId);
+            return DeleteOutcome.Deleted;
+        }
+        finally
+        {
+            if (reserved)
+            {
+                Release(sessionId);
+            }
+        }
+    }
+
+    /// <summary>
+    ///     Decides whether two records describe the same session instance: the same daemon process
+    ///     (id and start time) holding the same control token.
+    /// </summary>
+    /// <param name="first">One record.</param>
+    /// <param name="second">The other record.</param>
+    /// <returns><c>true</c> when both records belong to the same daemon.</returns>
+    public static bool IsSameSession(SessionInfo first, SessionInfo second)
+    {
+        ArgumentNullException.ThrowIfNull(first);
+        ArgumentNullException.ThrowIfNull(second);
+        return first.SessionId == second.SessionId &&
+               first.ControlToken == second.ControlToken &&
+               first.DaemonPid == second.DaemonPid &&
+               first.DaemonStartTimeUtc == second.DaemonStartTimeUtc;
+    }
+
+    /// <summary>
     ///     Lists the ids of all session files, sorted.
     /// </summary>
     /// <returns>The ids found; empty when the directory does not exist.</returns>
@@ -676,50 +784,63 @@ internal sealed class SessionStore
     /// </summary>
     /// <param name="sessionId">The session id.</param>
     /// <param name="info">Receives the session when the result is <see cref="SessionLookup.Live"/>.</param>
+    /// <param name="startLockHeld"><c>true</c> when the caller (a <c>start</c>) already owns the start lock for the id.</param>
     /// <returns>
     ///     <see cref="SessionLookup.Unknown"/> when no file exists; <see cref="SessionLookup.Stale"/>
-    ///     when the file existed but the daemon is gone (the file is deleted and a still-running
-    ///     orphaned server or browser is stopped) or is corrupt; otherwise <see cref="SessionLookup.Live"/>.
+    ///     when the file existed but the daemon is gone (a still-running orphaned server or browser is
+    ///     stopped, and the file is deleted unless a concurrent <c>start</c> owns the id, in which case that
+    ///     start replaces it) or is corrupt; otherwise <see cref="SessionLookup.Live"/>. A file that a
+    ///     concurrent <c>start</c> replaced during the cleanup is never deleted; it is looked at again.
     /// </returns>
     /// <exception cref="PuppetException">
-    ///     Thrown when the file stays unreadable (locked or access refused) after a brief retry. The state
-    ///     of the session is then unknown, so nothing is deleted or stopped.
+    ///     Thrown when the file stays unreadable (locked or access refused) after a brief retry, or keeps
+    ///     being replaced. The state of the session is then unknown, so nothing is deleted or stopped.
     /// </exception>
-    public SessionLookup Lookup(string sessionId, out SessionInfo? info)
+    public SessionLookup Lookup(string sessionId, out SessionInfo? info, bool startLockHeld = false)
     {
         info = null;
         var path = GetPath(sessionId);
-        if (!File.Exists(path))
+        for (var attempt = 1; attempt <= LookupAttempts; attempt++)
         {
-            return SessionLookup.Unknown;
-        }
-
-        var (outcome, read) = ReadWithRetry(path);
-        switch (outcome)
-        {
-            case ReadOutcome.Missing:
-                // The daemon (or a stop) removed the file between the existence check and the read
+            if (!File.Exists(path))
+            {
                 return SessionLookup.Unknown;
-            case ReadOutcome.Unavailable:
-                // An indeterminate read proves nothing about the daemon: never clean up on it
-                throw new PuppetException(
-                    $"The session file for '{sessionId}' is temporarily unreadable; nothing was changed. Try again.");
+            }
+
+            var (outcome, read) = ReadWithRetry(path);
+            switch (outcome)
+            {
+                case ReadOutcome.Missing:
+                    // The daemon (or a stop) removed the file between the existence check and the read
+                    return SessionLookup.Unknown;
+                case ReadOutcome.Unavailable:
+                    // An indeterminate read proves nothing about the daemon: never clean up on it
+                    throw new PuppetException(
+                        $"The session file for '{sessionId}' is temporarily unreadable; nothing was changed. Try again.");
+            }
+
+            if (read is not null && _isProcessAlive(read.DaemonPid, read.DaemonStartTimeUtc))
+            {
+                info = read;
+                return SessionLookup.Live;
+            }
+
+            // The daemon is gone (or the file is corrupt): stop anything it left running (processes are
+            // identified by pid and start time, so a newer session's processes are never touched), then
+            // remove the file only if it still is the record that was examined
+            if (read is not null)
+            {
+                KillOrphans(read);
+            }
+
+            if (DeleteIfSame(sessionId, read, startLockHeld) != DeleteOutcome.Replaced)
+            {
+                return SessionLookup.Stale;
+            }
         }
 
-        if (read is not null && _isProcessAlive(read.DaemonPid, read.DaemonStartTimeUtc))
-        {
-            info = read;
-            return SessionLookup.Live;
-        }
-
-        // The daemon is gone (or the file is corrupt): remove the evidence and any server or browser it left running
-        if (read is not null)
-        {
-            KillOrphans(read);
-        }
-
-        Delete(sessionId);
-        return SessionLookup.Stale;
+        throw new PuppetException(
+            $"The session '{sessionId}' kept changing while it was being examined; nothing was changed. Try again.");
     }
 
     /// <summary>

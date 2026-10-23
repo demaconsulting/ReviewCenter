@@ -84,6 +84,19 @@ reports healthy and the start time-out is short. `start` returns exit code 4, th
 with the process id and start time the launcher reported, and no session file or reservation remains. This scenario
 is tested by `ReviewCenterPuppet_Start_NeverBecomesReady_TerminatesDaemonAndLeavesNothingBehind`.
 
+**ReviewCenterPuppet_Start_FailureWithFailedTeardown_TerminatesLeftoverServerAndLeavesNothingBehind**: The fake
+browser cannot launch and the fake server cannot be disposed. `start` returns exit code 4 with the browser's reason
+(the original failure, not the teardown failure), the daemon ended with exit code 4, and the server the daemon
+left behind was terminated with its recorded process id and start time because `start` waited for the daemon and
+used the session file that was still in place. No session file or reservation remains. This scenario is tested by
+`ReviewCenterPuppet_Start_FailureWithFailedTeardown_TerminatesLeftoverServerAndLeavesNothingBehind`.
+
+**ReviewCenterPuppet_Stop_DaemonTeardownFails_TerminatesRecordedServerAndRemovesSession**: A session is started
+and the fake server is then set to fail when disposed. `stop` returns exit code 0, the daemon ended with exit code 4
+and left a failed session file, the server recorded in that file was terminated with its process id and start time,
+and `list` shows no session. This scenario is tested by
+`ReviewCenterPuppet_Stop_DaemonTeardownFails_TerminatesRecordedServerAndRemovesSession`.
+
 **ReviewCenterPuppet_Session_DaemonDiedWithoutCleanup_ReportsStaleAndEndsLeftoverProcesses**: A session file is
 written for a daemon that no longer exists but whose server and browser are still recorded as alive. A command for
 the session returns exit code 3; the browser and the server were terminated with their recorded start times, and

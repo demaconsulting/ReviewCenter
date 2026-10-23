@@ -12,7 +12,7 @@ implementation uses Playwright and belongs to `DaemonHost`.
 ### Data Model
 
 **IBrowserPage**: the operations of the browser page: `GotoAsync(url, timeoutMs)`, `ClickAsync(selector, timeoutMs)`,
-`FillAsync(selector, text, timeoutMs)`, `TextAsync(selector, timeoutMs)`, `ScreenshotAsync(fullPage)`, and
+`FillAsync(selector, text, timeoutMs)`, `TextAsync(selector, timeoutMs)`, `ScreenshotAsync(fullPage, timeoutMs)`, and
 `SnapshotAsync(timeoutMs)`. Implementations report expected failures, such as an element that does not appear in time,
 as a `PuppetException`.
 
@@ -35,7 +35,8 @@ Behavior by command:
 - `click`: resolves the selector with `SelectorResolver` and clicks the element.
 - `fill`: resolves the selector and enters the text; missing text is treated as an empty string.
 - `text`: resolves the selector and returns the text of the element.
-- `screenshot`: captures the page, optionally the full scrollable page, and writes the PNG to the output path. When no
+- `screenshot`: captures the page, optionally the full scrollable page, and writes the PNG to the output path. The
+  command timeout is applied to taking the screenshot. When no
   path is given the file is named `<session id>-<timestamp>.png` in the default folder. The response carries the
   absolute path of the file.
 - `snapshot`: returns the text snapshot of the page.

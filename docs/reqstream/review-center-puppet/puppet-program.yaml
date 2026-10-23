@@ -29,14 +29,18 @@ sections:
           - id: ReviewCenterPuppet-PuppetProgram-StartFailure
             title: >-
               The PuppetProgram unit shall exit with code 4 and the reason when a session cannot be started,
-              and shall leave no session file behind.
+              wait for a daemon that reported the failure to finish releasing its browser and server (ending
+              it and what it recorded if it does not), and only then remove the session file.
             justification: |
               A session can fail to start because the server assembly is missing, the server or browser
               fails, or the daemon dies. A dedicated exit code with the reason lets a script or coding agent
               tell a start failure from a command failure, and removing the file keeps a failed attempt from
-              looking like a session.
+              looking like a session. The file is also the only record of a server or browser that a failed
+              teardown left running, so it must not be deleted while the daemon may still be releasing them.
             tests:
               - PuppetProgram_Run_StartDaemonFailed_ExitsFourWithReason
+              - PuppetProgram_Run_StartDaemonFailed_WaitsForDaemonExitBeforeDeletingSession
+              - PuppetProgram_Run_StartDaemonFailedAndNeverExits_TerminatesRecordedProcessesAndDeletesSession
               - PuppetProgram_Run_StartDaemonDiesEarly_ExitsFour
               - PuppetProgram_Run_StartMissingServerAssembly_ExitsFourWithHint
 
@@ -82,13 +86,18 @@ sections:
 
           - id: ReviewCenterPuppet-PuppetProgram-Stop
             title: >-
-              The PuppetProgram unit shall stop a session on request by asking its daemon to shut down, and
-              shall confirm that the daemon has ended and the session file is gone.
+              The PuppetProgram unit shall stop a session on request by asking its daemon to shut down,
+              waiting for the daemon to end (forcing it, and the server and browser the session records, to
+              end if it does not or cannot be asked), and removing the session file, but shall never remove
+              or end the processes of a newer session that replaced it in the meantime.
             justification: |
               A stopped session must release the server, the browser, and the session file so that nothing
-              keeps running after the developer or coding agent has finished.
+              keeps running after the developer or coding agent has finished. A start for the same id can
+              publish a new session while the stop is finishing, and the stop must not destroy it.
             tests:
               - PuppetProgram_Run_ClientCommandsAgainstDaemon_ClickMissingElementAndStop
+              - PuppetProgram_Run_StopForced_SessionReplacedMeanwhile_KeepsReplacement
+              - PuppetProgram_Run_StopAccepted_SessionReplacedAfterDaemonExit_KeepsReplacement
 
           - id: ReviewCenterPuppet-PuppetProgram-List
             title: >-

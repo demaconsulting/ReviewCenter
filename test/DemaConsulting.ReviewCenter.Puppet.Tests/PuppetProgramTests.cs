@@ -67,17 +67,19 @@ public class PuppetProgramTests
     /// <param name="alive">Decides whether a process counts as alive.</param>
     /// <param name="kill">Records process kills; <c>null</c> ignores them.</param>
     /// <param name="startTimeout">How long <c>start</c> waits for readiness; <c>null</c> keeps the default.</param>
+    /// <param name="stopTimeout">How long a daemon gets to finish its teardown; <c>null</c> keeps the default.</param>
     /// <returns>The services.</returns>
     private static PuppetServices CreateServices(
         TempDirectory temp,
         FakeDaemonLauncher? launcher = null,
         Func<bool>? alive = null,
         Action<int, DateTime>? kill = null,
-        TimeSpan? startTimeout = null)
+        TimeSpan? startTimeout = null,
+        TimeSpan? stopTimeout = null)
     {
         var store = new SessionStore(temp.Path, (_, _) => alive?.Invoke() ?? false, kill ?? ((_, _) => { }));
         return new PuppetServices(
-            store, launcher ?? new FakeDaemonLauncher(), new FakeServerRunner(), new FakeBrowserLauncher(), startTimeout);
+            store, launcher ?? new FakeDaemonLauncher(), new FakeServerRunner(), new FakeBrowserLauncher(), startTimeout, stopTimeout);
     }
 
     /// <summary>
@@ -282,7 +284,7 @@ public class PuppetProgramTests
         var server = Path.Combine(temp.Path, "server.dll");
         await File.WriteAllTextAsync(server, "x", Xunit.TestContext.Current.CancellationToken);
         var launcher = new FakeDaemonLauncher();
-        var services = CreateServices(temp, launcher, () => true);
+        var services = CreateServices(temp, launcher, () => true, stopTimeout: TimeSpan.FromMilliseconds(100));
         launcher.OnLaunch = (id, _) => services.Store.Write(CreateInfo(id, SessionStatus.Failed, "Chromium is not installed."));
 
         // Act: start
@@ -292,6 +294,191 @@ public class PuppetProgramTests
         Assert.Equal(4, result.ExitCode);
         Assert.Contains("Chromium is not installed.", result.Error, StringComparison.Ordinal);
         Assert.Null(services.Store.TryRead("demo"));
+    }
+
+    /// <summary>
+    ///     Test that a failed start leaves the session file in place until the daemon has finished tearing down
+    ///     the browser and server, so a failed teardown can still be found through the file.
+    /// </summary>
+    [Fact]
+    public async Task PuppetProgram_Run_StartDaemonFailed_WaitsForDaemonExitBeforeDeletingSession()
+    {
+        // Arrange: a daemon that publishes Failed and stays alive for three polls before exiting
+        using var temp = new TempDirectory();
+        var server = Path.Combine(temp.Path, "server.dll");
+        await File.WriteAllTextAsync(server, "x", Xunit.TestContext.Current.CancellationToken);
+        var sessionFile = Path.Combine(temp.Path, "demo.json");
+        var checksWhileFilePresent = 0;
+        var launcher = new FakeDaemonLauncher();
+        var services = CreateServices(
+            temp,
+            launcher,
+            () =>
+            {
+                // Only polls made while the file exists are counted: the file must outlive the daemon
+                if (!File.Exists(sessionFile))
+                {
+                    return false;
+                }
+
+                checksWhileFilePresent++;
+                return checksWhileFilePresent <= 3;
+            });
+        launcher.OnLaunch = (id, _) => services.Store.Write(CreateInfo(id, SessionStatus.Failed, "Chromium is not installed."));
+
+        // Act: start
+        var result = await RunAsync(services, "start", "--session", "demo", "--server", server);
+
+        // Assert: the daemon was polled while the file was still present, and only then was the file removed
+        Assert.Equal(4, result.ExitCode);
+        Assert.Equal(4, checksWhileFilePresent);
+        Assert.Null(services.Store.TryRead("demo"));
+    }
+
+    /// <summary>
+    ///     Test that a failed start whose daemon never exits stops the daemon and whatever it recorded (a server
+    ///     that its failed teardown left running), by identity, before removing the session.
+    /// </summary>
+    [Fact]
+    public async Task PuppetProgram_Run_StartDaemonFailedAndNeverExits_TerminatesRecordedProcessesAndDeletesSession()
+    {
+        // Arrange: a daemon that publishes Failed with a recorded server and then never exits, and a short stop timeout
+        using var temp = new TempDirectory();
+        var server = Path.Combine(temp.Path, "server.dll");
+        await File.WriteAllTextAsync(server, "x", Xunit.TestContext.Current.CancellationToken);
+        var daemonStart = new DateTime(2025, 3, 1, 12, 0, 0, DateTimeKind.Utc);
+        var serverStart = daemonStart.AddSeconds(5);
+        var launcher = new FakeDaemonLauncher { ReportedPid = 4242, ReportedStartTimeUtc = daemonStart };
+        var killed = new List<(int Pid, DateTime Start)>();
+        var services = CreateServices(
+            temp, launcher, () => true, (pid, start) => killed.Add((pid, start)), stopTimeout: TimeSpan.FromMilliseconds(200));
+        launcher.OnLaunch = (id, _) => services.Store.Write(new SessionInfo(
+            id, SessionStatus.Failed, 40000, "token", "http://127.0.0.1:5999", 4242, daemonStart, 5151, serverStart,
+            0, default, "The server could not be stopped."));
+
+        // Act: start
+        var result = await RunAsync(services, "start", "--session", "demo", "--server", server);
+
+        // Assert: exit 4 with the reason, the server and daemon were terminated by identity, and the file is gone
+        Assert.Equal(4, result.ExitCode);
+        Assert.Contains("The server could not be stopped.", result.Error, StringComparison.Ordinal);
+        Assert.Contains((5151, serverStart), killed);
+        Assert.Contains((4242, daemonStart), killed);
+        Assert.Null(services.Store.TryRead("demo"));
+    }
+
+    /// <summary>
+    ///     Creates a ready session record with the given daemon, server, and browser.
+    /// </summary>
+    /// <param name="id">The session id.</param>
+    /// <param name="controlPort">The control port.</param>
+    /// <param name="token">The control token.</param>
+    /// <param name="firstPid">The daemon process id; the server and browser ids follow it.</param>
+    /// <param name="start">The daemon start time; the server and browser start a second and two seconds later.</param>
+    /// <returns>The record.</returns>
+    private static SessionInfo CreateProcessInfo(string id, int controlPort, string token, int firstPid, DateTime start)
+    {
+        return new SessionInfo(
+            id, SessionStatus.Ready, controlPort, token, "http://127.0.0.1:5999", firstPid, start, firstPid + 1,
+            start.AddSeconds(1), firstPid + 2, start.AddSeconds(2), null);
+    }
+
+    /// <summary>
+    ///     Test that a forced stop (the daemon cannot be asked) never deletes a session that a concurrent start
+    ///     published in the meantime, and never stops the new session's processes.
+    /// </summary>
+    [Fact]
+    public async Task PuppetProgram_Run_StopForced_SessionReplacedMeanwhile_KeepsReplacement()
+    {
+        // Arrange: a live-looking session whose control port refuses connections, and a kill action that, as the
+        // old daemon is killed, lets a concurrent start publish a replacement session
+        using var temp = new TempDirectory();
+        var oldStart = new DateTime(2025, 3, 1, 12, 0, 0, DateTimeKind.Utc);
+        var newStart = oldStart.AddHours(1);
+        var deadPort = GetUnusedPort();
+        var old = CreateProcessInfo("demo", deadPort, "old-token", 111, oldStart);
+        var replacement = CreateProcessInfo("demo", deadPort, "new-token", 444, newStart);
+        var publisher = new SessionStore(temp.Path);
+        var killed = new List<(int Pid, DateTime Start)>();
+        var services = CreateServices(
+            temp,
+            alive: () => true,
+            kill: (pid, start) =>
+            {
+                killed.Add((pid, start));
+                if (pid == 111)
+                {
+                    publisher.Write(replacement);
+                }
+            });
+        services.Store.Write(old);
+
+        // Act: stop the session
+        var result = await RunAsync(services, "stop", "--session", "demo");
+
+        // Assert: reported as forced, the old processes were stopped by identity, and the replacement is untouched
+        Assert.Equal(0, result.ExitCode);
+        Assert.Contains("forced", result.Output, StringComparison.Ordinal);
+        Assert.Equal([(113, oldStart.AddSeconds(2)), (112, oldStart.AddSeconds(1)), (111, oldStart)], killed);
+        Assert.Equal(replacement, services.Store.TryRead("demo"));
+    }
+
+    /// <summary>
+    ///     Test that a stop the daemon accepted never deletes a session that a concurrent start published after the
+    ///     old daemon exited, and never stops the new session's processes.
+    /// </summary>
+    [Fact]
+    public async Task PuppetProgram_Run_StopAccepted_SessionReplacedAfterDaemonExit_KeepsReplacement()
+    {
+        // Arrange: a control server that accepts the stop, ends the "daemon", and lets a new start publish its session
+        using var temp = new TempDirectory();
+        var oldStart = new DateTime(2025, 3, 1, 12, 0, 0, DateTimeKind.Utc);
+        var newStart = oldStart.AddHours(1);
+        var publisher = new SessionStore(temp.Path);
+        using var daemonGone = new ManualResetEventSlim();
+        using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(Xunit.TestContext.Current.CancellationToken);
+        var replacement = CreateProcessInfo("demo", 40001, "new-token", 444, newStart);
+        using var control = new ControlServer(
+            "old-token",
+            (_, _) =>
+            {
+                publisher.Write(replacement);
+                daemonGone.Set();
+                return Task.FromResult(new ControlResponse(true, 0, "Session stopping"));
+            });
+        var serving = control.RunAsync(TimeSpan.FromSeconds(30), cancellation.Token);
+        var killed = new List<(int Pid, DateTime Start)>();
+        var services = CreateServices(
+            temp, alive: () => !daemonGone.IsSet, kill: (pid, start) => killed.Add((pid, start)));
+        services.Store.Write(CreateProcessInfo("demo", control.Port, "old-token", 111, oldStart));
+
+        // Act: stop the session, then end the control server
+        var result = await RunAsync(services, "stop", "--session", "demo");
+        await cancellation.CancelAsync();
+        await serving;
+
+        // Assert: stopped normally, nothing of the new session was killed, and its file is untouched
+        Assert.Equal(0, result.ExitCode);
+        Assert.DoesNotContain(killed, k => k.Pid >= 444);
+        Assert.Equal(replacement, services.Store.TryRead("demo"));
+    }
+
+    /// <summary>
+    ///     Finds a loopback port that nothing is listening on.
+    /// </summary>
+    /// <returns>The port.</returns>
+    private static int GetUnusedPort()
+    {
+        var listener = new System.Net.Sockets.TcpListener(System.Net.IPAddress.Loopback, 0);
+        listener.Start();
+        try
+        {
+            return ((System.Net.IPEndPoint)listener.LocalEndpoint).Port;
+        }
+        finally
+        {
+            listener.Stop();
+        }
     }
 
     /// <summary>

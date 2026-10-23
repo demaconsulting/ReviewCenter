@@ -26,6 +26,34 @@ using System.Net.Sockets;
 namespace DemaConsulting.ReviewCenter.Puppet;
 
 /// <summary>
+///     How a health request was answered.
+/// </summary>
+internal enum HealthState
+{
+    /// <summary>
+    ///     The server answered the exact ReviewCenter health response.
+    /// </summary>
+    Healthy,
+
+    /// <summary>
+    ///     Nothing usable answered yet (connection refused, request hung, or a non-success status); try again.
+    /// </summary>
+    NotReady,
+
+    /// <summary>
+    ///     A success response arrived that is not the ReviewCenter health response; the answering service is not the expected server.
+    /// </summary>
+    Mismatch
+}
+
+/// <summary>
+///     The classified answer to one health request.
+/// </summary>
+/// <param name="State">The classification.</param>
+/// <param name="Detail">A short explanation for messages; empty when healthy.</param>
+internal readonly record struct HealthProbe(HealthState State, string Detail);
+
+/// <summary>
 ///     Starts the ReviewCenter server as a child process on a free loopback port and waits for it to be healthy.
 /// </summary>
 /// <remarks>
@@ -62,6 +90,17 @@ internal sealed class ServerProcessRunner : IServerRunner
     ///     How many trailing output lines are kept for the failure message.
     /// </summary>
     private const int KeptOutputLines = 20;
+
+    /// <summary>
+    ///     The exact body the ReviewCenter health endpoint answers with; the server defines the same value
+    ///     (the Puppet does not reference the server assembly, so it is repeated here).
+    /// </summary>
+    internal const string HealthyText = "Healthy";
+
+    /// <summary>
+    ///     How many characters of an unexpected health response body appear in the failure message.
+    /// </summary>
+    private const int MaxShownBodyLength = 80;
 
     /// <summary>
     ///     Starts the server and waits until <c>/health</c> answers.
@@ -195,23 +234,67 @@ internal sealed class ServerProcessRunner : IServerRunner
                     string.Join(Environment.NewLine, output));
             }
 
-            try
+            var probe = await ProbeHealthAsync(http, url, cancellationToken);
+            switch (probe.State)
             {
-                using var response = await http.GetAsync($"{url}/health", cancellationToken);
-                if (response.IsSuccessStatusCode)
-                {
+                case HealthState.Healthy:
                     return;
-                }
-            }
-            catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException)
-            {
-                // Not accepting connections yet; try again shortly
+                case HealthState.Mismatch:
+                    // Something answered, but not the ReviewCenter health endpoint (for example another process
+                    // that took the port between choosing it and the server binding it): fail instead of driving it
+                    throw new PuppetException(
+                        $"The service answering at {url} is not the ReviewCenter server: {probe.Detail}.{Environment.NewLine}" +
+                        string.Join(Environment.NewLine, output));
             }
 
             await Task.Delay(HealthPollInterval, cancellationToken);
         }
 
-        throw new PuppetException($"The ReviewCenter server at {url} did not become healthy within {HealthTimeout.TotalSeconds:0} seconds.");
+        throw new PuppetException(
+            $"The ReviewCenter server at {url} did not become healthy within {HealthTimeout.TotalSeconds:0} seconds.{Environment.NewLine}" +
+            string.Join(Environment.NewLine, output));
+    }
+
+    /// <summary>
+    ///     Requests <c>/health</c> once and decides whether the exact ReviewCenter health answer came back.
+    /// </summary>
+    /// <remarks>
+    ///     A success status alone is not proof: the port is chosen before the server binds it, so another
+    ///     local process could answer instead, and a misconfigured endpoint could answer with a success
+    ///     status and no content. Only status 200 with the body <see cref="HealthyText"/> counts as healthy.
+    ///     A non-success status or a refused connection means "not ready yet"; any other answer is a
+    ///     mismatch.
+    /// </remarks>
+    /// <param name="http">The client to use.</param>
+    /// <param name="url">The server base URL.</param>
+    /// <param name="cancellationToken">Cancels the request.</param>
+    /// <returns>The classified answer.</returns>
+    internal static async Task<HealthProbe> ProbeHealthAsync(HttpClient http, string url, CancellationToken cancellationToken)
+    {
+        try
+        {
+            using var response = await http.GetAsync($"{url}/health", cancellationToken);
+            if (!response.IsSuccessStatusCode)
+            {
+                return new HealthProbe(HealthState.NotReady, $"status {(int)response.StatusCode}");
+            }
+
+            var body = await response.Content.ReadAsStringAsync(cancellationToken);
+            if (response.StatusCode == HttpStatusCode.OK && body == HealthyText)
+            {
+                return new HealthProbe(HealthState.Healthy, string.Empty);
+            }
+
+            var shown = body.Length > MaxShownBodyLength ? body[..MaxShownBodyLength] + "..." : body;
+            return new HealthProbe(
+                HealthState.Mismatch,
+                $"/health answered status {(int)response.StatusCode} with body '{shown}' instead of 200 with '{HealthyText}'");
+        }
+        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException && !cancellationToken.IsCancellationRequested)
+        {
+            // Not accepting connections yet (or a request that hung); try again shortly
+            return new HealthProbe(HealthState.NotReady, ex.Message);
+        }
     }
 
     /// <summary>

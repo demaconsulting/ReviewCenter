@@ -285,16 +285,19 @@ unchanged.
 ## Puppet Example Workflow
 
 ```powershell
-$puppet = "dotnet tools/puppet/bin/Debug/net10.0/DemaConsulting.ReviewCenter.Puppet.dll"
-& $puppet start --session demo
-& $puppet goto / --session demo
-& $puppet click hello-button --session demo
-& $puppet text hello-message --session demo
-& $puppet click counter-button --session demo
-& $puppet text counter-value --session demo
-& $puppet screenshot --out demo.png --session demo
-& $puppet stop --session demo
+$puppet = "tools/puppet/bin/Debug/net10.0/DemaConsulting.ReviewCenter.Puppet.dll"
+dotnet $puppet start --session demo
+dotnet $puppet goto / --session demo
+dotnet $puppet click hello-button --session demo
+dotnet $puppet text hello-message --session demo
+dotnet $puppet click counter-button --session demo
+dotnet $puppet text counter-value --session demo
+dotnet $puppet screenshot --out demo.png --session demo
+dotnet $puppet stop --session demo
 ```
+
+The `$puppet` variable holds only the path of the DLL; the example invokes it with `dotnet`, because PowerShell does
+not split a string such as `"dotnet <path>"` into a program and an argument when it is run with `&`.
 
 ## Puppet Exit Codes
 

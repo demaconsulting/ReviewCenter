@@ -56,13 +56,16 @@ sections:
           - id: ReviewCenterPuppet-CommandExecutor-Screenshot
             title: >-
               The CommandExecutor unit shall save a screenshot to the requested path, or to a default
-              location named after the session when no path is given, and return the path written.
+              location named after the session when no path is given, return the path written, and apply the
+              command's timeout to taking the screenshot.
             justification: |
               Screenshots let a person or a coding agent see the page, and the returned path tells the
-              caller where to find the image.
+              caller where to find the image. A page that never settles must fail within the time the caller
+              asked for instead of waiting for the browser's own default limit.
             tests:
               - CommandExecutor_Execute_ScreenshotWithOut_WritesFileAndReturnsPath
               - CommandExecutor_Execute_ScreenshotWithoutOut_UsesDefaultLocation
+              - CommandExecutor_Execute_Screenshot_PassesRequestTimeoutToPage
 
           - id: ReviewCenterPuppet-CommandExecutor-Snapshot
             title: The CommandExecutor unit shall return a text snapshot of the current page.

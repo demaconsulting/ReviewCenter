@@ -33,12 +33,17 @@ namespace DemaConsulting.ReviewCenter.Puppet;
 ///     How long <c>start</c> waits for the session to become ready; <c>null</c> selects
 ///     <see cref="PuppetProgram.DefaultStartTimeout"/>. Tests shorten it.
 /// </param>
+/// <param name="StopTimeout">
+///     How long <c>start</c> and <c>stop</c> wait for a daemon to finish its teardown before it is killed;
+///     <c>null</c> selects <see cref="PuppetProgram.DefaultStopTimeout"/>. Tests shorten it.
+/// </param>
 internal sealed record PuppetServices(
     SessionStore Store,
     IDaemonLauncher DaemonLauncher,
     IServerRunner ServerRunner,
     IBrowserLauncher BrowserLauncher,
-    TimeSpan? StartTimeout = null)
+    TimeSpan? StartTimeout = null,
+    TimeSpan? StopTimeout = null)
 {
     /// <summary>
     ///     Gets the production collaborators.
@@ -109,9 +114,9 @@ internal static class PuppetProgram
     internal static readonly TimeSpan DefaultStartTimeout = TimeSpan.FromSeconds(90);
 
     /// <summary>
-    ///     How long <c>stop</c> waits for the daemon to finish its teardown before it is killed.
+    ///     The default for how long <c>start</c> and <c>stop</c> wait for the daemon to finish its teardown before it is killed.
     /// </summary>
-    private static readonly TimeSpan StopTimeout = TimeSpan.FromSeconds(30);
+    internal static readonly TimeSpan DefaultStopTimeout = TimeSpan.FromSeconds(30);
 
     /// <summary>
     ///     How often <c>start</c> re-reads the session file while waiting for the daemon; short enough to
@@ -300,7 +305,7 @@ internal static class PuppetProgram
         {
             // Look under the lock: another start may have finished since the lock was last free. Refuse to
             // clobber a running session; quietly replace the leftovers of a dead one
-            var existing = services.Store.Lookup(sessionId, out _);
+            var existing = services.Store.Lookup(sessionId, out _, startLockHeld: true);
             if (existing == SessionLookup.Live)
             {
                 WriteLine(error, $"Session '{sessionId}' is already running. Use 'stop --session {sessionId}' first.");
@@ -362,7 +367,10 @@ internal static class PuppetProgram
 
                 if (info is { Status: SessionStatus.Failed })
                 {
-                    services.Store.Delete(sessionId);
+                    // The daemon publishes Failed before it tears the browser and server down: let it finish
+                    // (or stop it), then remove the session while this start still holds the start lock
+                    await WaitForDaemonExitAsync(daemon, services, cancellationToken);
+                    AbortStart(sessionId, daemon, services.Store);
                     WriteLine(error, $"Could not start the session: {info.Error}");
                     return ExitStartFailed;
                 }
@@ -539,7 +547,7 @@ internal static class PuppetProgram
 
         if (command.Verb == "stop" && response.Ok)
         {
-            await WaitForDaemonExitAsync(info, services.Store, cancellationToken);
+            await StopSessionAsync(info, services, cancellationToken);
             WriteLine(output, $"Session '{sessionId}' stopped.");
             return ExitOk;
         }
@@ -603,37 +611,65 @@ internal static class PuppetProgram
     }
 
     /// <summary>
-    ///     Waits for the daemon to finish its teardown after a stop request, and removes the session file if it remains.
+    ///     Waits for the daemon to finish its teardown after a stop request, then releases everything the
+    ///     session recorded and removes its file, unless a newer session has replaced it.
     /// </summary>
     /// <param name="info">The session being stopped.</param>
-    /// <param name="store">The session store.</param>
+    /// <param name="services">The collaborators.</param>
     /// <param name="cancellationToken">Cancels the wait.</param>
-    /// <returns>A task that completes when the daemon is gone or the wait timed out.</returns>
-    private static async Task WaitForDaemonExitAsync(SessionInfo info, SessionStore store, CancellationToken cancellationToken)
+    /// <returns>A task that completes when the session has been released.</returns>
+    private static async Task StopSessionAsync(SessionInfo info, PuppetServices services, CancellationToken cancellationToken)
     {
-        var deadline = DateTime.UtcNow + StopTimeout;
-        while (DateTime.UtcNow < deadline && store.IsDaemonAlive(info))
-        {
-            await Task.Delay(StopPollInterval, cancellationToken);
-        }
+        await WaitUntilGoneAsync(() => services.Store.IsDaemonAlive(info), services, cancellationToken);
 
-        // If the daemon ignored the request for too long, finish the job so nothing is left running
-        if (store.IsDaemonAlive(info))
-        {
-            ForceStop(info, store);
-        }
-
-        store.Delete(info.SessionId);
+        // A daemon that ignored the request for too long is killed here; one whose teardown failed may have
+        // left a server or browser behind, which its session file still records
+        ForceStop(info, services.Store);
     }
 
     /// <summary>
-    ///     Kills the daemon, server, and browser of a session and deletes its file.
+    ///     Waits for a launched daemon to exit, up to the stop timeout.
     /// </summary>
+    /// <param name="daemon">The identity of the daemon.</param>
+    /// <param name="services">The collaborators.</param>
+    /// <param name="cancellationToken">Cancels the wait.</param>
+    /// <returns>A task that completes when the daemon is gone or the wait timed out.</returns>
+    private static Task WaitForDaemonExitAsync(ProcessIdentity daemon, PuppetServices services, CancellationToken cancellationToken)
+    {
+        return WaitUntilGoneAsync(() => services.Store.IsAlive(daemon), services, cancellationToken);
+    }
+
+    /// <summary>
+    ///     Polls until a process is gone or the stop timeout has passed.
+    /// </summary>
+    /// <param name="isAlive">Tells whether the process is still running.</param>
+    /// <param name="services">The collaborators (carry the timeout).</param>
+    /// <param name="cancellationToken">Cancels the wait.</param>
+    /// <returns>A task that completes when the process is gone or the timeout passed.</returns>
+    private static async Task WaitUntilGoneAsync(Func<bool> isAlive, PuppetServices services, CancellationToken cancellationToken)
+    {
+        var deadline = DateTime.UtcNow + (services.StopTimeout ?? DefaultStopTimeout);
+        while (DateTime.UtcNow < deadline && isAlive())
+        {
+            await Task.Delay(StopPollInterval, cancellationToken);
+        }
+    }
+
+    /// <summary>
+    ///     Kills the daemon, server, and browser of a session and deletes its file, unless a newer session has taken its place.
+    /// </summary>
+    /// <remarks>
+    ///     The session file is re-read first: the daemon may have recorded more processes, or marked the
+    ///     session failed, since <paramref name="info"/> was read. The file is then deleted only if it
+    ///     still describes the same daemon, so a <c>start</c> that published a replacement in the
+    ///     meantime keeps its session.
+    /// </remarks>
     /// <param name="info">The session.</param>
     /// <param name="store">The session store.</param>
     private static void ForceStop(SessionInfo info, SessionStore store)
     {
-        store.Terminate(info);
-        store.Delete(info.SessionId);
+        var current = store.TryRead(info.SessionId);
+        store.Terminate(current is not null && SessionStore.IsSameSession(current, info) ? current : info);
+        store.DeleteIfSame(info.SessionId, info);
     }
 }

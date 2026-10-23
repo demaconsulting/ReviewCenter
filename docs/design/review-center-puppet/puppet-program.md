@@ -45,9 +45,18 @@ fails at once with exit code 1 and an error that says so, and launches nothing. 
 rejects an id that is already live, cleans up a stale file, launches the daemon through `IDaemonLauncher`, and polls
 the session file every 200 milliseconds for up to 90 seconds. It prints the session id and the server URL when the
 status is `Ready` and returns 4 with the reason when the status is `Failed`, when the daemon dies, or when the time
-runs out. The reservation is released in a `finally` block on every path, including a failed launch.
+runs out. The reservation is released in a `finally` block on every path, including a failed launch. The existing
+session is looked up with the reservation already held (`startLockHeld`), so the lookup can clean up a stale file
+without competing with this start for the lock.
 
-**Start abort**: When the wait ends without a ready session (time-out, cancellation, or a dead daemon), `start`
+**Failed start**: The daemon publishes `Failed` before it releases the browser and the server, and the session file
+is the only record of a server or browser that the teardown could not stop. `start` therefore does not delete the
+file when it first sees `Failed`: it waits (polling every 100 milliseconds, up to the stop time-out) for the daemon
+to exit, then runs the start abort described below, which terminates whatever the file still records and deletes
+the file while this start still holds the reservation. The reason from the file is printed and the exit code is 4.
+
+**Start abort**: When the wait ends without a ready session (time-out, cancellation, a dead daemon, or a failed
+daemon that has been waited for), `start`
 terminates the daemon it launched, identified by its process id and start time and known even though no session file
 may have been written yet. It also terminates the server and the browser that a partly written session file records,
 and deletes the session file. A cancellation is re-raised after this cleanup. Nothing is ended by name.
@@ -55,8 +64,16 @@ and deletes the session file. A cancellation is re-raised after this cleanup. No
 **Client command handling**: Resolves the session (the `--session` option, the `REVIEWCENTER_PUPPET_SESSION`
 environment variable, or the only running session), looks it up in `SessionStore`, builds a `ControlRequest` with
 the stored token, sends it with `ControlClient`, prints the message of the response, and returns its exit code. For
-`stop` it also waits up to 30 seconds for the daemon to end and, if it does not, ends the browser, the server, and
-the daemon by force, each verified by process id and start time.
+`stop` it also waits up to the stop time-out (30 seconds by default; `PuppetServices.StopTimeout` shortens it for
+tests) for the daemon to end, then runs `ForceStop`. A daemon that cannot be asked at all goes straight to
+`ForceStop`.
+
+**ForceStop**: Re-reads the session file, because the daemon may have recorded more processes or marked the session
+`Failed` since the stop began. When the file still describes the same session (`SessionStore.IsSameSession`), it
+terminates the browser, the server, and the daemon from that fresh record, otherwise from the record the stop
+examined; each is verified by process id and start time, so a newer session's processes are never touched. It then
+deletes the file with `SessionStore.DeleteIfSame`, which keeps a replacement session that a concurrent `start`
+published in the meantime. The same path handles a daemon whose own teardown failed and left a server running.
 
 **Named values**: the session id length, the default start time-out, the stop time-out, the two polling intervals,
 and the grace period added to a control exchange are named constants, so that their meaning is documented once.

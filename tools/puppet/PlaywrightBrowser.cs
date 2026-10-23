@@ -314,13 +314,18 @@ internal sealed class PlaywrightPage(IPage page) : IBrowserPage
     ///     Captures a PNG screenshot.
     /// </summary>
     /// <param name="fullPage">Whether to capture the whole scrollable page.</param>
+    /// <param name="timeoutMs">The maximum time to wait for the screenshot.</param>
     /// <returns>The PNG bytes.</returns>
-    /// <exception cref="PuppetException">Thrown when the screenshot cannot be taken (for example the browser went away).</exception>
-    public async Task<byte[]> ScreenshotAsync(bool fullPage)
+    /// <exception cref="PuppetException">Thrown when the screenshot cannot be taken in time (for example the browser went away).</exception>
+    public async Task<byte[]> ScreenshotAsync(bool fullPage, int timeoutMs)
     {
         try
         {
-            return await page.ScreenshotAsync(new PageScreenshotOptions { FullPage = fullPage, Type = ScreenshotType.Png });
+            return await page.ScreenshotAsync(new PageScreenshotOptions { FullPage = fullPage, Type = ScreenshotType.Png, Timeout = timeoutMs });
+        }
+        catch (TimeoutException)
+        {
+            throw new PuppetException($"Timed out after {Seconds(timeoutMs)} s taking a screenshot.");
         }
         catch (PlaywrightException ex)
         {

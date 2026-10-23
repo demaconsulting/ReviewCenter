@@ -20,14 +20,16 @@ helper, and the tests need permission to open loopback TCP ports for the one tes
 - `start` prints the session id and server URL when the daemon reports ready, generates an eight-character id when
   none is given, and refuses to replace a live session without launching anything.
 - `start` returns exit code 4 with the reason when the daemon reports failure, dies early, or the server assembly is
-  missing, and no failed session file remains.
+  missing, and no failed session file remains. After a reported failure it waits for the daemon to exit (ending it,
+  and the server and browser the file records, if it does not within the stop time-out) before it removes the file.
 - Of several start commands for one id, only one launches a daemon; the others return exit code 1 with a message
   that the session is already being started; a failed launch gives the id back.
 - A start that times out, is cancelled, or whose daemon dies ends the launched daemon (identified by process id and
   start time, even when no session file exists), also ends the server and the browser a partial session file
   records, and leaves no session state behind.
 - Commands are forwarded to the daemon and its answer is printed; a failed command returns exit code 1, and `stop`
-  ends the daemon and removes the session file.
+  ends the daemon and removes the session file, but never removes or ends the processes of a newer session that
+  replaced it in the meantime.
 - `list` reports "No active sessions." when there are none and reports and removes stale sessions.
 - An unknown session or no running session returns exit code 2; a stale session returns exit code 3 and its file is
   removed; invalid arguments return exit code 1 with a message.
@@ -50,6 +52,17 @@ with code 1, the message says that it is already running, and nothing was launch
 **PuppetProgram_Run_StartDaemonFailed_ExitsFourWithReason**: The fake daemon writes a failed session with the reason
 "Chromium is not installed."; `start` exits with code 4, shows the reason, and the session file is removed. This
 scenario is tested by `PuppetProgram_Run_StartDaemonFailed_ExitsFourWithReason`.
+
+**PuppetProgram_Run_StartDaemonFailed_WaitsForDaemonExitBeforeDeletingSession**: The fake daemon writes a failed
+session and its liveness check reports it alive for three polls and then gone. Every poll made while the file exists
+is counted: there are four, so `start` waited for the daemon to exit, and only then exited with code 4 and removed
+the file. This scenario is tested by `PuppetProgram_Run_StartDaemonFailed_WaitsForDaemonExitBeforeDeletingSession`.
+
+**PuppetProgram_Run_StartDaemonFailedAndNeverExits_TerminatesRecordedProcessesAndDeletesSession**: The fake daemon
+writes a failed session that records a server, and never exits; the stop time-out is 200 milliseconds. `start` exits
+with code 4 and shows the reason, the recorded server and the daemon were terminated with their recorded start
+times, and the file is removed. This scenario is tested by
+`PuppetProgram_Run_StartDaemonFailedAndNeverExits_TerminatesRecordedProcessesAndDeletesSession`.
 
 **PuppetProgram_Run_StartDaemonDiesEarly_ExitsFour**: The fake launcher reports a process id that does not exist
 and writes no file; `start` exits with code 4 and says the daemon exited unexpectedly, and no session file remains.
@@ -91,6 +104,18 @@ exist; the exit code is 4 and the message says the assembly was not found. This 
 `click` and `text` succeed and print their results. After the fake page is set to fail, `click` exits with code 1
 and prints "No element matching". `stop` exits with code 0, the daemon task ends with code 0, and the session file is
 gone. This scenario is tested by `PuppetProgram_Run_ClientCommandsAgainstDaemon_ClickMissingElementAndStop`.
+
+**PuppetProgram_Run_StopForced_SessionReplacedMeanwhile_KeepsReplacement**: A stored session looks live, but its
+control port refuses connections, so `stop` goes straight to the forced stop. The kill action, when it ends the old
+daemon, lets another store publish a replacement session with a different daemon and token (a concurrent `start`).
+`stop` exits with code 0 and says it was forced; the browser, server, and daemon of the old session were terminated
+by their recorded identities, none of the replacement's processes were, and the replacement file is unchanged. This
+scenario is tested by `PuppetProgram_Run_StopForced_SessionReplacedMeanwhile_KeepsReplacement`.
+
+**PuppetProgram_Run_StopAccepted_SessionReplacedAfterDaemonExit_KeepsReplacement**: A real control server accepts the
+`stop` request; as it answers, it publishes a replacement session and the fake daemon counts as gone. `stop` exits
+with code 0, none of the replacement's processes were terminated, and the replacement file is unchanged. This
+scenario is tested by `PuppetProgram_Run_StopAccepted_SessionReplacedAfterDaemonExit_KeepsReplacement`.
 
 **PuppetProgram_Run_ListWithNoSessions_ReportsNone**: `list` over an empty store exits with code 0 and prints "No
 active sessions." This scenario is tested by `PuppetProgram_Run_ListWithNoSessions_ReportsNone`.

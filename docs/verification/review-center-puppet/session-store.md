@@ -23,6 +23,11 @@ N/A - standard test environment. Each test creates its own temporary folder with
 - A session without a file is unknown, and a session whose daemon runs is live and keeps its file.
 - A session whose daemon is gone, or whose file is corrupt, is stale, its file is deleted, and the orphaned browser
   and server are stopped.
+- A stale session's file is deleted only when it still holds the examined session and no start holds the
+  reservation; a session that a concurrent start published in the meantime is kept and examined itself, and a
+  session that keeps changing is reported as an error. A delete on behalf of a caller that examined a session
+  (`DeleteIfSame`) keeps a different session, leaves the file while another start holds the reservation, and treats a
+  missing file as deleted.
 - The browser, the server, and the daemon of a session are ended with the process ids and start times that were
   recorded; a browser or server that was never recorded is not touched.
 - Exactly one of several simultaneous callers reserves a session id; the rest are refused until it is released; a
@@ -61,6 +66,41 @@ passed to the kill action, in that order, while the dead daemon was not. This sc
 
 **SessionStore_Lookup_CorruptFile_CleansUpAndReportsStale**: A corrupt session file is reported as `Stale` and
 deleted. This scenario is tested by `SessionStore_Lookup_CorruptFile_CleansUpAndReportsStale`.
+
+**SessionStore_Lookup_SessionReplacedDuringCleanup_KeepsReplacementAndReportsItLive**: The liveness check of a stale
+session's dead daemon publishes a replacement session (new daemon, new token) from another store, as a concurrent
+`start` would. The lookup does not delete the replacement: it examines it and returns `Live` with the replacement
+record, the file still holds the replacement, and only the old session's browser and server were stopped. This
+scenario is tested by `SessionStore_Lookup_SessionReplacedDuringCleanup_KeepsReplacementAndReportsItLive`.
+
+**SessionStore_Lookup_StartLockHeldByAnotherStart_LeavesFileAndReportsStale**: A stale session's id is reserved by a
+start whose owner is alive. The lookup returns `Stale` but the file is not deleted. This scenario is tested by
+`SessionStore_Lookup_StartLockHeldByAnotherStart_LeavesFileAndReportsStale`.
+
+**SessionStore_Lookup_SessionKeepsBeingReplaced_ThrowsAndDeletesNothing**: Every liveness check publishes yet another
+dead session. After three attempts the lookup throws a `PuppetException` and the latest file is still there. This
+scenario is tested by `SessionStore_Lookup_SessionKeepsBeingReplaced_ThrowsAndDeletesNothing`.
+
+**SessionStore_DeleteIfSame_SameSession_DeletesFileAndReleasesLock**: A stored session is deleted as the examined
+session; the outcome is `Deleted`, the file is gone, and the reservation can be taken again afterwards. This scenario
+is tested by `SessionStore_DeleteIfSame_SameSession_DeletesFileAndReleasesLock`.
+
+**SessionStore_DeleteIfSame_ReplacedSession_KeepsFile**: The file holds a session with another daemon, and then one
+with another token. Each delete of the examined session returns `Replaced` and the file is kept. This scenario is
+tested by `SessionStore_DeleteIfSame_ReplacedSession_KeepsFile`.
+
+**SessionStore_DeleteIfSame_StartLock_SkipsForOthersAndAllowsOwner**: While a start holds the reservation, a delete by
+a bystander returns `Busy` and keeps the file; the same delete with `startLockHeld` returns `Deleted` and leaves the
+reservation held. This scenario is tested by `SessionStore_DeleteIfSame_StartLock_SkipsForOthersAndAllowsOwner`.
+
+**SessionStore_DeleteIfSame_MissingAndCorruptFiles_FollowTheExaminedState**: A missing file counts as `Deleted`. A
+corrupt file is kept (`Replaced`) when the caller examined a readable session and is deleted when the caller
+examined it as corrupt. This scenario is tested by
+`SessionStore_DeleteIfSame_MissingAndCorruptFiles_FollowTheExaminedState`.
+
+**SessionStore_IsSameSession_ComparesDaemonIdentityAndToken**: Records that differ only in status or server details
+are the same session; records that differ in daemon process id, daemon start time, or control token are not. This
+scenario is tested by `SessionStore_IsSameSession_ComparesDaemonIdentityAndToken`.
 
 **SessionStore_Lookup_FileTemporarilyLocked_RetriesAndReportsLive**: The file of a live session is held exclusively
 for about 150 milliseconds while it is looked up; the lookup retries, returns `Live`, nothing is deleted, and no
