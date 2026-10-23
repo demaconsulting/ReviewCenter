@@ -180,6 +180,12 @@ treated as held while it is young and taken over once it is older than the grace
 **SessionStore_TryReserve_Reserved_IsNotListedAsSession**: A reserved id does not appear in the session listing.
 This scenario is tested by `SessionStore_TryReserve_Reserved_IsNotListedAsSession`.
 
+**SessionStore_TryReserve_LockDeletionPending_IsRefusedWithoutErrorThenTakenOnceGone**: On Windows, a lock file
+that is still pending deletion makes the exclusive create fail with an access-denied error. The reservation is
+refused (not thrown) while the deletion is pending and succeeds once it completes. This scenario is tested by
+`SessionStore_TryReserve_LockDeletionPending_IsRefusedWithoutErrorThenTakenOnceGone`; the test is skipped with a
+stated reason on other platforms.
+
 **SessionStore_Write_UnixPlatform_CreatesOwnerOnlyDirectoryAndFile**: On Unix platforms, a session is written into
 a folder that did not exist; the folder has mode 0700 and the file mode 0600. The test is skipped with a stated
 reason on Windows, where the per-user temporary folder provides the isolation and no mode is set, so the requirement

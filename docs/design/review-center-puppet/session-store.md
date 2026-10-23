@@ -54,7 +54,9 @@ cannot be read and is older than a grace period of 10 seconds (a lock that was j
 counts as held). The takeover renames the stale lock aside before deleting it and then tries the exclusive create
 once more. The takeover of a stale lock is best effort: two callers that reclaim the same stale lock at the same
 moment together with a third fresh caller could in theory all succeed, which is accepted because the owner of a
-stale lock is already dead and the daemon launch itself is still guarded by the session lookup that follows.
+stale lock is already dead and the daemon launch itself is still guarded by the session lookup that follows. On
+Windows, a lock file that is still pending deletion (another handle is open on it) makes the exclusive create fail
+with an access-denied error; this is treated as the lock being held, so the caller is refused instead of failing.
 
 **Release**: Deletes the lock file of a session id, if it exists. Failure to delete is ignored.
 

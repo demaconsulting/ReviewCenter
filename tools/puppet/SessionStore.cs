@@ -459,6 +459,13 @@ internal sealed class SessionStore
             // released it. Either way the caller looks at the file again and tries once more
             return false;
         }
+        catch (UnauthorizedAccessException) when (OperatingSystem.IsWindows())
+        {
+            // Windows refuses to create a file whose deletion is still pending, which is what a lock that was
+            // just released looks like while another caller still has it open. The directory is private to this
+            // user, so this is not a permission problem: treat the lock as held and let the caller look again
+            return false;
+        }
     }
 
     /// <summary>

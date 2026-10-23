@@ -141,7 +141,7 @@ sections:
               - SessionStore_TryReserve_LockOfOtherOwner_IsTakenOverOnlyWhenOwnerIsGone
               - SessionStore_TryReserve_UnreadableLock_IsTakenOverOnlyWhenOld
               - SessionStore_TryReserve_Reserved_IsNotListedAsSession
-
+              - SessionStore_TryReserve_LockDeletionPending_IsRefusedWithoutErrorThenTakenOnceGone
           - id: ReviewCenterPuppet-SessionStore-PrivateFiles
             title: >-
               The SessionStore unit shall create the session folder and the session files so that only their

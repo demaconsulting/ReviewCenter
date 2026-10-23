@@ -661,6 +661,36 @@ public class SessionStoreTests
     }
 
     /// <summary>
+    ///     Test that a lock whose deletion is still pending (released while another caller still has it open) is
+    ///     treated as held rather than raising an access error, and can be taken once it is really gone.
+    /// </summary>
+    [Fact]
+    public void SessionStore_TryReserve_LockDeletionPending_IsRefusedWithoutErrorThenTakenOnceGone()
+    {
+        // Arrange: a lock file that is pending deletion because a second handle stays open after the first, which
+        // was opened with delete-on-close, has closed
+        Assert.SkipUnless(OperatingSystem.IsWindows(), "A pending delete only exists on Windows.");
+        using var temp = new TempDirectory();
+        var store = new SessionStore(temp.Path, (_, _) => true, (_, _) => { });
+        var lockPath = Path.ChangeExtension(store.GetPath("demo"), ".lock");
+        var creator = new FileStream(
+            lockPath, FileMode.CreateNew, FileAccess.ReadWrite, FileShare.ReadWrite | FileShare.Delete, 4096, FileOptions.DeleteOnClose);
+        var reader = new FileStream(lockPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+        creator.Dispose();
+
+        // Act: try to take the lock while the deletion is pending, then again after the reader has closed
+        bool? duringPending = null;
+        var exception = Record.Exception(() => duringPending = store.TryReserve("demo"));
+        reader.Dispose();
+        var afterwards = store.TryReserve("demo");
+
+        // Assert: refused without an exception while pending, and available afterwards
+        Assert.Null(exception);
+        Assert.False(duringPending);
+        Assert.True(afterwards);
+    }
+
+    /// <summary>
     ///     Test that when many callers take the start lock for the same id at once exactly one wins.
     /// </summary>
     [Fact]
