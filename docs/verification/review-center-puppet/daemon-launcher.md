@@ -17,8 +17,9 @@ requirement-linked evidence for the Puppet system requirements, and CI runs it w
 
 ### Test Environment
 
-N/A - standard test environment. The command-line tests need no processes, files, or network access. The class runs
-in the serial `Sequential` xUnit collection because the launch test starts a real child process.
+N/A - standard test environment. The command-line tests need no processes, files, or network access; the identity
+tests use fakes except for one that starts a real child process. The class runs in the serial `Sequential` xUnit
+collection because of that launch test.
 
 ### Acceptance Criteria
 
@@ -52,3 +53,13 @@ tested by `DaemonLauncher_BuildCommandLine_EmbeddedQuote_IsEscaped`.
 `SessionStore.IsProcessAlive`, `SessionStore.KillProcess` with that identity ends the process, and the process is
 then reported as gone; a `finally` block ends the process if an assertion fails first. This scenario is tested by
 `DaemonLauncher_LaunchProcess_ReportsIdentityOfTheCreatedProcess`.
+
+**DaemonLauncher_CaptureIdentity_IdentityCannotBeRead_EndsCreatedProcessAndRethrows**: The identity capture of a
+just-created process fails (as when the start time cannot be read). The terminate action that stands for the created
+process is run, and the caller receives the original `PuppetException`. This scenario is tested by
+`DaemonLauncher_CaptureIdentity_IdentityCannotBeRead_EndsCreatedProcessAndRethrows`.
+
+**DaemonLauncher_CaptureIdentity_TerminationFailsOrNotNeeded_OriginalOutcomeIsKept**: A failing capture whose
+termination also fails (the process is already gone) still surfaces the original failure, and a successful capture
+returns its identity without ending the process. This scenario is tested by
+`DaemonLauncher_CaptureIdentity_TerminationFailsOrNotNeeded_OriginalOutcomeIsKept`.

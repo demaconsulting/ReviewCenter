@@ -127,8 +127,11 @@ The guards that appear most often are:
    `IsSameSession`. *Act*: replace the file. *Window*: milliseconds between the read and the move. *If replaced or
    reused*: a record of another session is never overwritten once seen, so a force-stopped daemon cannot clobber a new
    session. *Guard*: ownership check; an unreadable file fails loudly instead of guessing. *Residual*: another session
-   publishing inside the read-to-move window; a new session can publish only after the old file was deleted, which the
-   old daemon's own supersede check normally precedes (see residual risks).
+   publishing inside the read-to-move window. It cannot happen while the invariant holds that every path that deletes
+   or replaces a session record first confirms that the recorded daemon is gone (by identity), so a replacement
+   session never exists while the old daemon can still write. Only a failed confirmation (a process that cannot be
+   ended) keeps the record in place, and then no replacement is published. The check is therefore a second line of
+   defense, not an atomic compare-and-swap (see residual risks).
 3. **DeleteIfSame**. *Check*: take the start reservation, re-read the file, compare with the examined record. *Act*:
    delete the file. *Window*: none against a `start` (it needs the reservation to publish); a daemon's own
    `WriteIfOwner` of the same session may interleave, and deleting that file is the intent. *If replaced or reused*:
@@ -151,8 +154,11 @@ The guards that appear most often are:
    *Act*: delete the lock, then create it. *Window*: previously the path was checked and then renamed and deleted
    separately, so a second reclaimer could delete the first one's fresh lock. *If replaced or reused*: now the check
    and the delete use one open handle (Windows: delete sharing, so the path stays bound to the file; Unix: exclusive
-   open), so only the file that was judged is deleted. *Guard*: lock held on the handle; a sharing or access error means
-   "held", a missing file means "free"; no renamed leftover is created.
+   open, which is an advisory lock), so only the file that was judged is deleted. The one caller that deletes without taking
+   part in that exclusion is `Release`, which unlinks without opening; it is called only by the process that owns the
+   lock, and a reclaimer judges a lock stale only when its owner is gone, so the two cannot meet for one lock.
+   *Guard*: lock held on the handle; a sharing or access error means "held", a missing file means "free"; no renamed
+   leftover is created.
 8. **Release (delete the own lock)**. *Check*: none (the owner deletes its own lock). *Act*: delete. *Window*: a
    reclaimer has the file open. *If replaced or reused*: another caller can reclaim the lock only after this process
    was judged dead, which identity makes impossible while it runs. *Guard*: retried for `IOException` and
@@ -217,7 +223,9 @@ The guards that appear most often are:
 4. **Launch identity (DaemonLauncher)**. *Check*: none. *Act*: the identity (id and start time) is read from the creation
    handle (Windows) or from the `Process` object that started the child. *Window*: previously the id was looked up again
    after the launch, so a daemon that exited at once could have its id recycled and be recorded with another process's
-   start time, which the abort would then trust. *Guard*: the identity belongs to the process that was created.
+   start time, which the abort would then trust. When the identity cannot be read at all, the created process is ended
+   through the same handle before the failure propagates, so no daemon runs without a recorded identity. *Guard*: the
+   identity belongs to the process that was created.
 
 #### ServerProcessRunner and PlaywrightBrowser
 
@@ -229,7 +237,9 @@ The guards that appear most often are:
    closed, because the server process must bind the port itself.
 2. **Readiness probe**. *Check*: the answer of `/health`. *Act*: treat the server as ready and drive the browser at it.
    *Guard*: strict answer plus the exit check above (this was already strict about status and body; the exit check is
-   new).
+   new). These narrow the race but cannot prove that the answering service is the server that was started: the server
+   is an arbitrary application whose only contract is the health endpoint, so no authenticated handshake exists to
+   verify (see residual risks).
 3. **Server stop**. *Check*: the process exited after the first kill. *Act*: kill the tree again, then fail loudly.
    *Window*: none that matters: the runner holds its own `Process` object, so there is no pid reuse. *Guard*: `TryKill`
    absorbs the already-gone failures.
@@ -267,7 +277,11 @@ These cannot be closed completely and are accepted:
 - **Browser identity from DevTools**. See the browser identity query above.
 - **Port reuse after a daemon dies**. See ControlClient above; the strict response parser is the mitigation.
 - **Free port selection**. See above; the strict probe and the exit check turn the outcome into a failed start.
-- **Interval in `WriteIfOwner`**. See SessionStore entry 2.
+- **Interval in `WriteIfOwner`**. See SessionStore entry 2; accepted because of the invariant stated there.
+- **Release and the Unix advisory lock**. See SessionStore entry 7; the two paths are separated by lock ownership, not
+  by the operating system.
+- **Deletion that stays `Busy`**. A stop or abort whose processes are confirmed gone but whose record cannot be
+  removed keeps the record; the next command finds the daemon gone, reports the session as stale, and removes it.
 - **Leftover temporary files**. A writer killed between creating the temporary file and moving it leaves an owner-only
   `.tmp` file in the session folder. It is never read as a session.
 - **A daemon recording after the final abort read**. The last read of an abort cannot be followed by another round

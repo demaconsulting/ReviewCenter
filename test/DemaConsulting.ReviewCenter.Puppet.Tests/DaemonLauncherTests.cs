@@ -66,6 +66,49 @@ public class DaemonLauncherTests
     }
 
     /// <summary>
+    ///     Test that a launch whose identity cannot be read ends the process it just created and still reports
+    ///     the original failure: a running daemon without a recorded identity could never be cleaned up.
+    /// </summary>
+    [Fact]
+    public void DaemonLauncher_CaptureIdentity_IdentityCannotBeRead_EndsCreatedProcessAndRethrows()
+    {
+        // Arrange: a capture that fails, and a terminate action that records that it was used
+        var terminated = false;
+
+        // Act: capture the identity
+        var thrown = Assert.Throws<PuppetException>(() => DaemonLauncher.CaptureIdentity(
+            () => throw new PuppetException("start time unreadable"),
+            () => terminated = true));
+
+        // Assert: the process was ended and the caller sees the original failure
+        Assert.True(terminated);
+        Assert.Equal("start time unreadable", thrown.Message);
+    }
+
+    /// <summary>
+    ///     Test that a failing termination (the process is already gone) does not replace the original failure,
+    ///     and that a successful capture does not end the process.
+    /// </summary>
+    [Fact]
+    public void DaemonLauncher_CaptureIdentity_TerminationFailsOrNotNeeded_OriginalOutcomeIsKept()
+    {
+        // Arrange: a process that is already gone, so ending it fails the way a vanished process does
+        var identity = new ProcessIdentity(1234, DateTime.UtcNow);
+        var terminatedOnSuccess = false;
+
+        // Act: a failing capture with a failing termination, then a successful capture
+        var thrown = Assert.Throws<PuppetException>(() => DaemonLauncher.CaptureIdentity(
+            () => throw new PuppetException("start time unreadable"),
+            () => throw new InvalidOperationException("already exited")));
+        var captured = DaemonLauncher.CaptureIdentity(() => identity, () => terminatedOnSuccess = true);
+
+        // Assert: the capture failure survived, and a good capture left the process alone
+        Assert.Equal("start time unreadable", thrown.Message);
+        Assert.Equal(identity, captured);
+        Assert.False(terminatedOnSuccess);
+    }
+
+    /// <summary>
     ///     Test that every argument is quoted in the Windows command line.
     /// </summary>
     [Fact]

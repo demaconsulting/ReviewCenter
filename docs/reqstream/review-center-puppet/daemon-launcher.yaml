@@ -29,11 +29,14 @@ sections:
           - id: ReviewCenterPuppet-DaemonLauncher-ProcessIdentity
             title: >-
               The DaemonLauncher unit shall report, for a process it starts, the process id and start time of
-              the process that was actually created, read from the creation itself and not by looking the id up
-              afterwards.
+              the process that was actually created, even when the process exits at once and its id is reused,
+              and shall end a process whose identity it cannot determine instead of leaving it running unrecorded.
             justification: |
               Every later liveness check and kill of the daemon is judged by this identity. If it were looked up
               after the launch, a daemon that exited at once and whose id was recycled could be recorded with
-              another program's start time, and that program could later be ended by mistake.
+              another program's start time, and that program could later be ended by mistake. A daemon that runs
+              without any recorded identity can never be cleaned up, so it must not be left behind.
             tests:
               - DaemonLauncher_LaunchProcess_ReportsIdentityOfTheCreatedProcess
+              - DaemonLauncher_CaptureIdentity_IdentityCannotBeRead_EndsCreatedProcessAndRethrows
+              - DaemonLauncher_CaptureIdentity_TerminationFailsOrNotNeeded_OriginalOutcomeIsKept

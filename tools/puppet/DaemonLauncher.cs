@@ -99,6 +99,30 @@ internal sealed class DaemonLauncher : IDaemonLauncher
     }
 
     /// <summary>
+    ///     Captures the identity of a process that has just been created, ending the process when that fails.
+    /// </summary>
+    /// <remarks>
+    ///     A process that is running without a recorded identity can never be cleaned up by identity, so a
+    ///     failure to capture it must not leave the process behind. The termination itself is best effort: a
+    ///     process that is already gone, or that cannot be ended, does not replace the original failure.
+    /// </remarks>
+    /// <param name="capture">Reads the identity of the created process.</param>
+    /// <param name="terminate">Ends the created process.</param>
+    /// <returns>The captured identity.</returns>
+    internal static ProcessIdentity CaptureIdentity(Func<ProcessIdentity> capture, Action terminate)
+    {
+        try
+        {
+            return capture();
+        }
+        catch
+        {
+            SessionStore.TryKill(terminate);
+            throw;
+        }
+    }
+
+    /// <summary>
     ///     Builds a Windows command line, quoting each argument.
     /// </summary>
     /// <param name="executable">The executable path.</param>
@@ -198,14 +222,21 @@ internal sealed class DaemonLauncher : IDaemonLauncher
             try
             {
                 // The creation time is read through the handle returned by the creation, which addresses exactly
-                // the process that was created even if it has already exited and its id has been reused
-                if (!NativeMethods.GetProcessTimes(info.ProcessHandle, out var created, out _, out _, out _))
-                {
-                    throw new PuppetException(
-                        $"Could not read the start time of the session daemon: {new Win32Exception(Marshal.GetLastPInvokeError()).Message}");
-                }
+                // the process that was created even if it has already exited and its id has been reused. When it
+                // cannot be read the caller would have no identity to clean up with, so the process is ended
+                // through the same handle before the failure propagates.
+                identity = CaptureIdentity(
+                    () =>
+                    {
+                        if (!NativeMethods.GetProcessTimes(info.ProcessHandle, out var created, out _, out _, out _))
+                        {
+                            throw new PuppetException(
+                                $"Could not read the start time of the session daemon: {new Win32Exception(Marshal.GetLastPInvokeError()).Message}");
+                        }
 
-                identity = new ProcessIdentity((int)info.ProcessId, DateTime.FromFileTimeUtc(created));
+                        return new ProcessIdentity((int)info.ProcessId, DateTime.FromFileTimeUtc(created));
+                    },
+                    () => NativeMethods.TerminateProcess(info.ProcessHandle, 1));
                 error = 0;
                 return true;
             }
@@ -249,14 +280,21 @@ internal sealed class DaemonLauncher : IDaemonLauncher
         {
             using var process = Process.Start(startInfo) ?? throw new PuppetException("Could not start the session daemon.");
 
-            // The start time is read from the object that started the child, which addresses exactly that child
-            var identity = new ProcessIdentity(process.Id, process.StartTime.ToUniversalTime());
+            // The start time is read from the object that started the child, which addresses exactly that child.
+            // When it cannot be read (or the pipes cannot be closed) there is no identity for the caller to clean
+            // up with, so the child is ended through the same object before the failure propagates.
+            return CaptureIdentity(
+                () =>
+                {
+                    var identity = new ProcessIdentity(process.Id, process.StartTime.ToUniversalTime());
 
-            // Closing our ends means the daemon never blocks on, or holds open, the caller's pipes
-            process.StandardInput.Close();
-            process.StandardOutput.Close();
-            process.StandardError.Close();
-            return identity;
+                    // Closing our ends means the daemon never blocks on, or holds open, the caller's pipes
+                    process.StandardInput.Close();
+                    process.StandardOutput.Close();
+                    process.StandardError.Close();
+                    return identity;
+                },
+                () => process.Kill(true));
         }
         catch (Win32Exception ex)
         {
@@ -419,4 +457,14 @@ internal static partial class NativeMethods
     [LibraryImport("kernel32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
     public static partial bool GetProcessTimes(IntPtr process, out long creation, out long exit, out long kernel, out long user);
+
+    /// <summary>
+    ///     Ends a process immediately (<c>TerminateProcess</c>).
+    /// </summary>
+    /// <param name="process">A process handle with terminate access.</param>
+    /// <param name="exitCode">The exit code the process reports.</param>
+    /// <returns><c>true</c> on success.</returns>
+    [LibraryImport("kernel32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static partial bool TerminateProcess(IntPtr process, uint exitCode);
 }
