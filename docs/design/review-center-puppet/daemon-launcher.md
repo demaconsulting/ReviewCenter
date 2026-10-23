@@ -30,7 +30,8 @@ by process id after the launch, because a daemon that exits at once could have i
 that has already exited by the time its start time is read, or whose time cannot be read, is reported as a start
 failure; before that failure propagates, `CaptureIdentity` ends the created process (through the creation handle on
 Windows, through the `Process` object elsewhere), because a daemon without a recorded identity could never be cleaned
-up. The termination is best effort and never replaces the original failure.
+up. The termination is best effort and never replaces the original failure, except that a partial tree kill (the
+root ended but a descendant could not be) is reported as a failure that says child processes may remain.
 
 **BuildCommandLine**: Builds a Windows command line. The executable and every argument are enclosed in double quotes,
 so a path with spaces stays one argument. Inside the quotes, each double quote is escaped with a backslash and every

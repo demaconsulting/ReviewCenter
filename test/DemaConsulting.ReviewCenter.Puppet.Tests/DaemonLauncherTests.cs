@@ -109,6 +109,27 @@ public class DaemonLauncherTests
     }
 
     /// <summary>
+    ///     Test that a partial tree kill during identity capture is reported, because descendants may still be
+    ///     running with no identity to clean them up by.
+    /// </summary>
+    [Fact]
+    public void DaemonLauncher_CaptureIdentity_PartialTreeKill_IsReportedWithTheOriginalReason()
+    {
+        // Arrange: a capture that fails, and a termination that ends the root but not a descendant
+        var partial = new AggregateException(new InvalidOperationException("child could not be ended"));
+
+        // Act: capture the identity
+        var thrown = Assert.Throws<PuppetException>(() => DaemonLauncher.CaptureIdentity(
+            () => throw new PuppetException("start time unreadable"),
+            () => throw partial));
+
+        // Assert: the report keeps the original reason and says that child processes may remain
+        Assert.Contains("start time unreadable", thrown.Message);
+        Assert.Contains("child processes", thrown.Message);
+        Assert.Same(partial, thrown.InnerException);
+    }
+
+    /// <summary>
     ///     Test that every argument is quoted in the Windows command line.
     /// </summary>
     [Fact]

@@ -290,6 +290,10 @@ These cannot be closed completely and are accepted:
   by the operating system.
 - **Deletion that stays `Busy`**. A stop or abort whose processes are confirmed gone but whose record cannot be
   removed keeps the record; the next command finds the daemon gone, reports the session as stale, and removes it.
+- **Descendants of a server whose root exited by itself**. Once the server root has exited, .NET cannot enumerate or
+  end its remaining descendants portably (that needs a Windows job object or a Unix process group), so the stop
+  reports a clean stop and a child that outlived the root may keep running. The partial-kill reports cover the case
+  where the root is alive when the kill starts. Server runs are short-lived test fixtures, so this is accepted.
 - **Leftover temporary files**. A writer killed between creating the temporary file and moving it leaves an owner-only
   `.tmp` file in the session folder. It is never read as a session.
 - **A daemon recording after the final abort read**. The last read of an abort cannot be followed by another round

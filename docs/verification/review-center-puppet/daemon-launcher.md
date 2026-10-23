@@ -63,3 +63,8 @@ process is run, and the caller receives the original `PuppetException`. This sce
 termination also fails (the process is already gone) still surfaces the original failure, and a successful capture
 returns its identity without ending the process. This scenario is tested by
 `DaemonLauncher_CaptureIdentity_TerminationFailsOrNotNeeded_OriginalOutcomeIsKept`.
+
+**DaemonLauncher_CaptureIdentity_PartialTreeKill_IsReportedWithTheOriginalReason**: A failing capture whose
+termination reports a partial tree kill (`AggregateException`) is reported as a `PuppetException` that keeps the
+original reason, says that child processes may still be running, and carries the partial-kill exception as its inner
+exception. This scenario is tested by `DaemonLauncher_CaptureIdentity_PartialTreeKill_IsReportedWithTheOriginalReason`.

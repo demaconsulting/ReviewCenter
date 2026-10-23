@@ -104,7 +104,9 @@ internal sealed class DaemonLauncher : IDaemonLauncher
     /// <remarks>
     ///     A process that is running without a recorded identity can never be cleaned up by identity, so a
     ///     failure to capture it must not leave the process behind. The termination itself is best effort: a
-    ///     process that is already gone, or that cannot be ended, does not replace the original failure.
+    ///     process that is already gone, or that cannot be ended, does not replace the original failure. A
+    ///     partial tree kill (<see cref="AggregateException"/>) is the exception: descendants may still be
+    ///     running with no identity to find them by, so the failure that is reported says so.
     /// </remarks>
     /// <param name="capture">Reads the identity of the created process.</param>
     /// <param name="terminate">Ends the created process.</param>
@@ -115,9 +117,27 @@ internal sealed class DaemonLauncher : IDaemonLauncher
         {
             return capture();
         }
-        catch
+        catch (Exception captureFailure)
         {
-            SessionStore.TryKill(terminate);
+            // A partial tree kill means part of the process tree may be left running with no identity to
+            // clean it up by, so it is reported instead of being treated as a process that is already gone.
+            try
+            {
+                terminate();
+            }
+            catch (AggregateException partialKill)
+            {
+                throw new PuppetException(
+                    $"{captureFailure.Message} The process was ended, but some of its child processes could not be " +
+                    "ended and may still be running.",
+                    partialKill);
+            }
+            catch (Exception ex) when (ex is ArgumentException or InvalidOperationException or NotSupportedException
+                                           or System.ComponentModel.Win32Exception)
+            {
+                // The process is already gone or is not ours to end; the capture failure is the story.
+            }
+
             throw;
         }
     }
