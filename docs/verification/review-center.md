@@ -12,15 +12,31 @@ The `serve` scenarios start the tool as a long-running process through the `Serv
 helper, which launches `dotnet <assembly> serve --urls http://127.0.0.1:<port>` on a free
 loopback port chosen by the operating system and polls the health endpoint until the server
 answers. The tests then use HTTP requests against that server and stop the process when they
-finish. No fixed port is assumed, so the scenarios can run in parallel.
+finish. The operating system picks the port, so no fixed port is assumed; the test classes that start server
+processes or change console state belong to the serial `Sequential` xUnit collection and run one at a time, while
+the in-memory test-server classes (which open no port and start no process) run in parallel.
 
 `Runner.Run` merges stdout and stderr into a single combined output string. Per-stream assertions
 (e.g., "standard error is empty") are not possible at this level; all assertions are made
 against the combined output.
 
+Platform verification additionally runs against the distributed artifact. In the CI pipeline the self-contained
+single-file executable for each supported platform (win-x64 on `windows-latest`, linux-x64 on `ubuntu-latest`) is
+extracted from its release archive and run with `DOTNET_ROOT` and `DOTNET_ROOT_X64` pointing to an existing, empty
+folder, so no installed .NET runtime can be found by it (a missing folder would let the executable fall back to the
+global installation). A negative control proves the isolation works: a tiny framework-dependent executable built in
+the same job must run with the normal environment and must fail under the isolated one. A further check asserts that
+the executable is larger than 20 MiB, which a
+framework-dependent publish is not. The commands run are: `--version`, `--help`,
+`--validate --results validation-<os>-net10.0-<rid>.trx`, and a `serve` smoke test that checks `/health`, the home
+page, and the Blazor script. The self-validation results (`ReviewCenter_VersionDisplay` and
+`ReviewCenter_HelpDisplay`) in those TRX files are the evidence for the platform requirements; the platform
+(`windows`, `ubuntu`) and runtime (`net10.0`) in the file name are the source filters.
+
 ## Test Environment
 
-Integration tests run on net10.0 on Windows and Linux. All scenarios are expected to
+Integration tests run on net10.0 on Windows and Linux; the published-executable checks run on the same two
+platforms. All scenarios are expected to
 produce identical results on all supported platforms, with one exception: the graceful-stop scenario
 sends a termination signal to a child process, which Windows cannot do, so it is skipped there with a
 reason. Temporary files and directories are

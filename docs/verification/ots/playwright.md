@@ -49,9 +49,9 @@ no executable exists.
 
 ### Limitations
 
-Launching a real Chromium, loading pages, clicking, reading text, and taking screenshots are not requirement-level
-evidence for this OTS item, because that evidence needs a browser that the build pipeline does not install. Those
-behaviors are exercised only by the supplemental end-to-end test
-`PuppetEndToEnd_HelloAndCounter_DrivenThroughCommands_ShowGreetingAndCount`, which is skipped where Chromium cannot be
-launched and is not linked to any requirement; every other Puppet test replaces Playwright with fakes. Linking the
-end-to-end test to requirements would need a pipeline step that installs Chromium.
+Launching a real Chromium, loading pages, clicking, reading text, and taking screenshots are not evidence for the OTS
+requirements of this item, which stay browser-free. Those behaviors are exercised by the end-to-end test
+`PuppetEndToEnd_HelloAndCounter_DrivenThroughCommands_ShowGreetingAndCount`, which is linked to the Puppet system
+requirements. The CI pipeline installs Chromium (cached per operating system and Playwright version) and makes the
+test fail instead of skip when the browser cannot be launched; locally the test skips when Chromium is not installed.
+Every other Puppet test replaces Playwright with fakes.

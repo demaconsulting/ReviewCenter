@@ -7,7 +7,6 @@
 [![Build][badge-build]][link-build]
 [![Quality Gate][badge-quality]][link-quality]
 [![Security][badge-security]][link-security]
-[![NuGet][badge-nuget]][link-nuget]
 
 ReviewCenter is a DEMA Consulting ASP.NET Core web service, with a companion command-line interface,
 for performing formal code reviews of file sets against earlier revisions. It supports threaded review
@@ -26,12 +25,12 @@ The current release provides:
 - **Standardized Command-Line Interface**: Context class handling common arguments
   (`serve`, `--urls`, `--version`, `--help`, `--silent`, `--validate`, `--results`, `--depth`, `--log`)
 - **Self-Validation**: Built-in validation tests with TRX/JUnit output
-- **Multi-Platform Support**: Builds and runs on Windows and Linux
-- **Modern .NET**: Targets .NET 10 (`net10.0`)
+- **Multi-Platform Support**: Self-contained single-file executables for Windows (win-x64) and Linux (linux-x64)
+- **Modern .NET**: Built on .NET 10 (`net10.0`); the runtime is bundled, so no installation is needed
 - **Puppet Developer Tool**: A separate in-repository tool that drives the web interface in headless Chromium
-  from the command line (see `tools/puppet/README.md`); it is not part of the distributed package
+  from the command line (see `tools/puppet/README.md`); it is not part of the distributed executables
 - **Comprehensive CI/CD**: GitHub Actions workflows with quality checks, builds, and
-  integration tests
+  integration tests of the published executables
 - **Linting Enforcement**: markdownlint, cspell, and yamllint enforced on every CI run
 - **Continuous Compliance**: Compliance evidence generated automatically on every CI run, following
   the [Continuous Compliance][link-continuous-compliance] methodology
@@ -42,17 +41,39 @@ The current release provides:
 
 ## Installation
 
-ReviewCenter is under development and no release has been published yet, so there is nothing to install from NuGet
-or GitHub Releases. To run it, build it from source with the .NET 10 SDK:
+ReviewCenter is distributed as self-contained single-file executables for **win-x64** and **linux-x64**. The .NET
+runtime is bundled, so nothing else needs to be installed. Download the archive for your platform from the
+[GitHub Releases][link-releases] page:
+
+- `reviewcenter-<version>-win-x64.zip` (Windows)
+- `reviewcenter-<version>-linux-x64.tar.gz` (Linux)
+
+Each archive has a matching `.sha256` checksum file. Verify the download, extract it, and start the server:
+
+```bash
+# Linux: verify (in the download folder), extract, and run
+sha256sum -c reviewcenter-<version>-linux-x64.tar.gz.sha256
+tar -xzf reviewcenter-<version>-linux-x64.tar.gz
+./reviewcenter-<version>-linux-x64/reviewcenter serve
+```
+
+```powershell
+# Windows: verify (compare with the value in the .sha256 file), extract, and run
+Get-FileHash reviewcenter-<version>-win-x64.zip -Algorithm SHA256
+Expand-Archive reviewcenter-<version>-win-x64.zip -DestinationPath .
+.\reviewcenter-<version>-win-x64\reviewcenter.exe serve
+```
+
+Keep the files of the archive together: the executable serves the web assets that sit beside it. No release has been
+published yet; until one is, build from source with the .NET 10 SDK:
 
 ```bash
 dotnet build
 dotnet run --project src/DemaConsulting.ReviewCenter -- serve
 ```
 
-The planned distribution is self-contained executables for win-x64 and linux-x64 (see `architecture.md`); the
-release pipeline has not been reworked for that yet. The command-line examples below use `reviewcenter`, the command
-name of the published executable; when running from source, replace `reviewcenter` with
+The command-line examples below use `reviewcenter`, the command name of the published executable (put its folder on
+your `PATH` or run it by path); when running from source, replace `reviewcenter` with
 `dotnet run --project src/DemaConsulting.ReviewCenter --`.
 
 ## Usage
@@ -157,13 +178,17 @@ On validation failure the tool will exit with a non-zero exit code.
 
 The `tools/puppet` folder contains **Puppet**, a developer tool that starts the ReviewCenter server, opens it in
 headless Chromium, and lets a person or a coding agent look at and drive the web interface with short commands
-such as `click`, `text`, and `screenshot`. Puppet is not part of the distributed package. To use it, build it and
+such as `click`, `text`, and `screenshot`. Puppet is not part of the distributed executables. To use it, build it and
 download Chromium once:
 
 ```bash
 dotnet build tools/puppet
 pwsh tools/puppet/bin/Debug/net10.0/playwright.ps1 install chromium
 ```
+
+CI installs Chromium (cached per operating system) on every run and runs the Puppet end-to-end test with
+`REVIEWCENTER_REQUIRE_CHROMIUM=true`, so a missing browser fails the build instead of skipping the test; on a
+developer machine without Chromium the test skips with a message.
 
 See `tools/puppet/README.md` for the commands, exit codes, and an example session.
 
@@ -206,7 +231,6 @@ By contributing to this project, you agree that your contributions will be licen
 [badge-build]: https://img.shields.io/github/actions/workflow/status/demaconsulting/ReviewCenter/build_on_push.yaml?style=plastic
 [badge-quality]: https://sonarcloud.io/api/project_badges/measure?project=demaconsulting_ReviewCenter&metric=alert_status
 [badge-security]: https://sonarcloud.io/api/project_badges/measure?project=demaconsulting_ReviewCenter&metric=security_rating
-[badge-nuget]: https://img.shields.io/nuget/v/DemaConsulting.ReviewCenter?style=plastic
 
 <!-- Link References -->
 [link-forks]: https://github.com/demaconsulting/ReviewCenter/network/members
@@ -216,6 +240,6 @@ By contributing to this project, you agree that your contributions will be licen
 [link-build]: https://github.com/demaconsulting/ReviewCenter/actions/workflows/build_on_push.yaml
 [link-quality]: https://sonarcloud.io/dashboard?id=demaconsulting_ReviewCenter
 [link-security]: https://sonarcloud.io/dashboard?id=demaconsulting_ReviewCenter
-[link-nuget]: https://www.nuget.org/packages/DemaConsulting.ReviewCenter
+[link-releases]: https://github.com/demaconsulting/ReviewCenter/releases
 [link-guide]: https://github.com/demaconsulting/ReviewCenter/blob/main/docs/user_guide/introduction.md
 [link-continuous-compliance]: https://github.com/demaconsulting/ContinuousCompliance

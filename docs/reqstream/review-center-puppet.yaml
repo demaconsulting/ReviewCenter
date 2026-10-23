@@ -5,9 +5,13 @@
 # - Define system-level requirements describing what developers and coding agents need the
 #   Puppet development tool to provide
 # - Puppet is a separate software system that is not part of the distributed ReviewCenter package
-# - System requirements are validated through tests that run the whole command pipeline
-#   (command line, session files, control channel, daemon, executor) with only the browser
-#   and the server process replaced by fakes, so they run on any machine without Chromium
+# - System requirements are validated by two kinds of tests: tests that run the whole command
+#   pipeline (command line, session files, control channel, daemon, executor) with only the browser
+#   and the server process replaced by fakes, so they run on any machine without Chromium, and the
+#   real-browser end-to-end test, which drives the real executable, server, and headless Chromium.
+#   CI installs Chromium and makes a missing browser fail that test, so it is requirement evidence.
+#   The end-to-end test is linked with the windows@ and ubuntu@ filters to prove it passed on both
+#   supported platforms.
 
 sections:
   - title: ReviewCenterPuppet Requirements
@@ -43,6 +47,8 @@ sections:
           - ReviewCenterPuppet-DaemonLauncher-ArgumentsPreserved
         tests:
           - ReviewCenterPuppet_Session_StartDriveStop_RunsEveryCommandAndCleansUp
+          - windows@PuppetEndToEnd_HelloAndCounter_DrivenThroughCommands_ShowGreetingAndCount
+          - ubuntu@PuppetEndToEnd_HelloAndCounter_DrivenThroughCommands_ShowGreetingAndCount
 
       - id: ReviewCenterPuppet-System-ExclusiveStart
         title: >-
@@ -129,6 +135,8 @@ sections:
           - ReviewCenterPuppet-CommandExecutor-Snapshot
         tests:
           - ReviewCenterPuppet_Session_StartDriveStop_RunsEveryCommandAndCleansUp
+          - windows@PuppetEndToEnd_HelloAndCounter_DrivenThroughCommands_ShowGreetingAndCount
+          - ubuntu@PuppetEndToEnd_HelloAndCounter_DrivenThroughCommands_ShowGreetingAndCount
 
       - id: ReviewCenterPuppet-System-Selectors
         title: >-
@@ -178,3 +186,5 @@ sections:
           - ReviewCenterPuppet_Errors_UnknownSessionAndMissingElement_ReportDistinctExitCodes
           - ReviewCenterPuppet_Start_ServerCannotStart_ReportsStartFailureAndLeavesNothingBehind
           - ReviewCenterPuppet_Session_DaemonDiedWithoutCleanup_ReportsStaleAndEndsLeftoverProcesses
+          - windows@PuppetEndToEnd_HelloAndCounter_DrivenThroughCommands_ShowGreetingAndCount
+          - ubuntu@PuppetEndToEnd_HelloAndCounter_DrivenThroughCommands_ShowGreetingAndCount

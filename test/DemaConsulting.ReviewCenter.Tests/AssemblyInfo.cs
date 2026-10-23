@@ -20,11 +20,11 @@
 
 namespace DemaConsulting.ReviewCenter.Tests;
 
-// Tests share Console state, so they must not run in parallel.
+// Tests share Console state, TCP ports, and server processes, so they must not run in parallel.
 /// <summary>
 /// Defines the Sequential test collection.
 /// Tests in this collection are disabled from running in parallel to
-/// prevent conflicts when sharing Console state.
+/// prevent conflicts when sharing Console state, TCP ports, and server processes.
 /// </summary>
 [CollectionDefinition("Sequential", DisableParallelization = true)]
 public sealed class SequentialCollection { }

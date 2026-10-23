@@ -13,7 +13,7 @@ daemon after the launching command has ended cannot be asserted in a unit test w
 They are exercised by the real-browser end-to-end test
 `PuppetEndToEnd_HelloAndCounter_DrivenThroughCommands_ShowGreetingAndCount`, in which every command is a separate
 process and the daemon must therefore survive between them, and by a manual demonstration. The end-to-end test is
-supplemental evidence and is not linked to a requirement.
+requirement-linked evidence for the Puppet system requirements, and CI runs it with Chromium installed.
 
 ### Test Environment
 

@@ -25,6 +25,7 @@ namespace DemaConsulting.ReviewCenter.Puppet.Tests;
 /// <summary>
 ///     Unit tests for the <see cref="SessionStore"/>.
 /// </summary>
+[Collection("Sequential")]
 public class SessionStoreTests
 {
     /// <summary>
@@ -199,28 +200,38 @@ public class SessionStoreTests
 
     /// <summary>
     ///     Test that a file that is locked for a moment (as during an atomic replacement) is retried and the
-    ///     session is still found live, not treated as stale.
+    ///     session is still found live, not treated as stale. The lock is released by the retry wait itself,
+    ///     so the scenario does not depend on timing.
     /// </summary>
     [Fact]
-    public async Task SessionStore_Lookup_FileTemporarilyLocked_RetriesAndReportsLive()
+    public void SessionStore_Lookup_FileTemporarilyLocked_RetriesAndReportsLive()
     {
-        // Arrange: a live session whose file is held exclusively for a short while
+        // Arrange: a live session whose file is held exclusively until the first retry wait
         using var temp = new TempDirectory();
         var killed = new List<int>();
-        var store = new SessionStore(temp.Path, (_, _) => true, (pid, _) => killed.Add(pid));
+        var sleeps = 0;
+        FileStream? hold = null;
+        var store = new SessionStore(
+            temp.Path,
+            (_, _) => true,
+            (pid, _) => killed.Add(pid),
+            _ =>
+            {
+                sleeps++;
+                hold?.Dispose();
+            });
         store.Write(CreateInfo("busy"));
-        var hold = new FileStream(store.GetPath("busy"), FileMode.Open, FileAccess.ReadWrite, FileShare.None);
-        var release = Task.Run(async () =>
-        {
-            await Task.Delay(150, TestContext.Current.CancellationToken);
-            await hold.DisposeAsync();
-        }, TestContext.Current.CancellationToken);
+        hold = new FileStream(store.GetPath("busy"), FileMode.Open, FileAccess.ReadWrite, FileShare.None);
 
         // Act: look it up while it is locked
         var result = store.Lookup("busy", out var info);
-        await release;
+        hold.Dispose();
 
-        // Assert: live, nothing deleted, nothing killed
+        // Assert: the lookup waited at least once, then found it live; nothing deleted, nothing killed.
+        // The retry is expected on every platform: .NET enforces FileShare.None on Unix with advisory file
+        // locks, so the read open is refused there too (verified on Linux); only File.Move over a locked
+        // file differs (see the write test).
+        Assert.True(sleeps >= 1);
         Assert.Equal(SessionLookup.Live, result);
         Assert.NotNull(info);
         Assert.True(File.Exists(store.GetPath("busy")));
@@ -305,27 +316,35 @@ public class SessionStoreTests
     }
 
     /// <summary>
-    ///     Test that a replacement refused for a moment is retried and succeeds.
+    ///     Test that a replacement refused for a moment is retried and succeeds. The lock is released by the
+    ///     retry wait itself, so the scenario does not depend on timing.
     /// </summary>
     [Fact]
-    public async Task SessionStore_Write_TargetTemporarilyLocked_RetriesAndSucceeds()
+    public void SessionStore_Write_TargetTemporarilyLocked_RetriesAndSucceeds()
     {
-        // Arrange: an existing session file that is locked briefly
+        // Arrange: an existing session file that is locked until the first retry wait
         using var temp = new TempDirectory();
-        var store = new SessionStore(temp.Path, (_, _) => true, (_, _) => { });
+        var sleeps = 0;
+        FileStream? hold = null;
+        var store = new SessionStore(
+            temp.Path,
+            (_, _) => true,
+            (_, _) => { },
+            _ =>
+            {
+                sleeps++;
+                hold?.Dispose();
+            });
         store.Write(CreateInfo("held", daemonPid: 1));
-        var hold = new FileStream(store.GetPath("held"), FileMode.Open, FileAccess.ReadWrite, FileShare.None);
-        var release = Task.Run(async () =>
-        {
-            await Task.Delay(150, TestContext.Current.CancellationToken);
-            await hold.DisposeAsync();
-        }, TestContext.Current.CancellationToken);
+        hold = new FileStream(store.GetPath("held"), FileMode.Open, FileAccess.ReadWrite, FileShare.None);
 
         // Act: replace the file while it is locked
         store.Write(CreateInfo("held", daemonPid: 2));
-        await release;
+        hold.Dispose();
 
-        // Assert: the new content is in place and no temporary file remains
+        // Assert: on Windows the replacement was refused and retried; the new content is in place and no
+        // temporary file remains (Unix renames over a locked file, so no retry is needed there)
+        Assert.True(sleeps >= 1 || !OperatingSystem.IsWindows());
         Assert.Equal(2, store.TryRead("held")!.DaemonPid);
         Assert.Empty(Directory.GetFiles(temp.Path, "*.tmp"));
     }

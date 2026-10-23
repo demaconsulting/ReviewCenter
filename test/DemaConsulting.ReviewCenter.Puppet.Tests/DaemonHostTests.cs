@@ -25,6 +25,7 @@ namespace DemaConsulting.ReviewCenter.Puppet.Tests;
 /// <summary>
 ///     Unit tests for the <see cref="DaemonHost"/>, using a fake server and a fake browser.
 /// </summary>
+[Collection("Sequential")]
 public class DaemonHostTests
 {
     /// <summary>

@@ -74,25 +74,12 @@ body:
     validations:
       required: true
 
-  - type: dropdown
-    id: dotnet-version
-    attributes:
-      label: .NET Version
-      description: What version of .NET are you using?
-      options:
-        - ".NET 8"
-        - ".NET 9"
-        - ".NET 10"
-        - Other (please specify in additional context)
-    validations:
-      required: true
-
   - type: input
     id: os
     attributes:
       label: Operating System
       description: What operating system are you using?
-      placeholder: e.g., Windows 11, Ubuntu 22.04
+      placeholder: e.g., Windows 11 (win-x64), Ubuntu 22.04 (linux-x64)
 
   - type: textarea
     id: additional-context

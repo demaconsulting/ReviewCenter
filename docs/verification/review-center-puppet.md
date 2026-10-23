@@ -18,15 +18,22 @@ The production adapters that are replaced by fakes, namely the server process ru
 the detached process launch, are not part of these tests. They are exercised by the real-browser end-to-end test
 `PuppetEndToEnd_HelloAndCounter_DrivenThroughCommands_ShowGreetingAndCount`, which starts the real ReviewCenter
 server, launches Chromium, and drives the hello and counter buttons of the home page through the commands. That test
-skips itself with a clear reason when Chromium is not installed. It is supplemental evidence and is deliberately not
-linked to a requirement, so that a machine without Chromium does not fail the requirements report.
+is requirement-linked evidence for `ReviewCenterPuppet-System-Lifecycle`, `ReviewCenterPuppet-System-Commands`, and
+`ReviewCenterPuppet-System-Errors` on both platforms. The CI pipeline installs Chromium before the tests run and sets
+`REVIEWCENTER_REQUIRE_CHROMIUM=true`, so a missing or broken browser fails the test instead of skipping it. Without
+that variable, as on a developer machine that has not installed Chromium, the test skips itself with a clear reason.
 
 ## Test Environment
 
 The tests run on net10.0 on Windows and Linux. Each test creates its own temporary session folder with the
-`TempDirectory` helper and removes it afterwards, so tests do not share session files and can run in parallel. No
+`TempDirectory` helper and removes it afterwards, so tests do not share session files. No
 network access, browser, or installed ReviewCenter server is needed; the loopback control channel binds a random
-local port, so the environment must allow opening loopback TCP ports.
+local port, so the environment must allow opening loopback TCP ports. Test classes that bind loopback ports, start
+child processes or a browser, change process-wide environment variables, or are sensitive to timing (the control
+channel, daemon host, program, system, end-to-end, Playwright, and session store tests) belong to the serial
+`Sequential` xUnit collection, so they run one at a time; the remaining classes use only fakes and run in parallel.
+In CI the two test assemblies also run one after the other (`--max-parallel-test-modules 1`), because a serial
+collection isolates tests only within its own assembly.
 
 ## Acceptance Criteria
 

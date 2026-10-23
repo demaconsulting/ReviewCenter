@@ -67,7 +67,9 @@ callers that only want to display a session.
 **Reading**: Both `TryRead` and `Lookup` open the file with full sharing (read, write, and delete), so the daemon's
 replacement can proceed while a read is in flight. A sharing or access error is retried about twenty times, 25
 milliseconds apart (roughly half a second). The result is classified as read, missing, corrupt, or unavailable. Only
-missing and corrupt files justify cleanup; a file that stays unavailable says nothing about the daemon.
+missing and corrupt files justify cleanup; a file that stays unavailable says nothing about the daemon. The wait
+between the attempts of a read and of a move is an optional delegate of the `SessionStore` constructor; it defaults
+to a real thread sleep and exists so tests can release a held lock deterministically instead of racing a timer.
 
 **Delete**: Removes a session file if it exists; deleting a missing file is not an error. The daemon's own cleanup
 and a `start` that aborts can delete the same file at the same moment, and on Windows a delete that loses that race

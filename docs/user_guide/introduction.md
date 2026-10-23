@@ -36,17 +36,39 @@ compliance evidence is generated automatically on every CI run.
 
 # Installation
 
-ReviewCenter is under development and no release has been published yet. To run it, build it from source with the
-.NET 10 SDK (a .NET runtime that supports `net10.0` is required):
+ReviewCenter is distributed as self-contained single-file executables for win-x64 and linux-x64, so no .NET runtime
+needs to be installed. Download the archive for your platform from the project's GitHub Releases page:
+
+- `reviewcenter-<version>-win-x64.zip` (Windows)
+- `reviewcenter-<version>-linux-x64.tar.gz` (Linux)
+
+Each archive is accompanied by a `.sha256` checksum file. Verify the download before extracting it:
+
+```bash
+# Linux (run in the download folder)
+sha256sum -c reviewcenter-<version>-linux-x64.tar.gz.sha256
+tar -xzf reviewcenter-<version>-linux-x64.tar.gz
+```
+
+```powershell
+# Windows: the printed hash must equal the value in the .sha256 file
+Get-FileHash reviewcenter-<version>-win-x64.zip -Algorithm SHA256
+Expand-Archive reviewcenter-<version>-win-x64.zip -DestinationPath .
+```
+
+Keep the extracted files together, because the executable serves the web assets that sit beside it. Either add the
+extracted folder to your `PATH`, or run the executable by its path (`./reviewcenter-<version>-linux-x64/reviewcenter`
+or `.\reviewcenter-<version>-win-x64\reviewcenter.exe`). Start the server with `reviewcenter serve`
+(`reviewcenter.exe serve` on Windows) once it is on your `PATH`. No release has been published yet; until one is, build
+it from source with the .NET 10 SDK:
 
 ```bash
 dotnet build
 dotnet run --project src/DemaConsulting.ReviewCenter -- serve
 ```
 
-The planned distribution is self-contained executables for win-x64 and linux-x64, which will not need a separate
-.NET runtime. The examples in this guide use `reviewcenter`, the command name of the published executable; when
-running from source, replace `reviewcenter` with `dotnet run --project src/DemaConsulting.ReviewCenter --`.
+The examples in this guide use `reviewcenter`, the command name of the published executable; when running from
+source, replace `reviewcenter` with `dotnet run --project src/DemaConsulting.ReviewCenter --`.
 
 # Usage
 
@@ -239,7 +261,7 @@ Then open `http://localhost:8080` in a browser, or check `http://localhost:8080/
 
 # Puppet Development Tool
 
-Puppet is a developer tool, not part of the distributed ReviewCenter package. It lets a person, or a coding
+Puppet is a developer tool, not part of the distributed ReviewCenter executables. It lets a person, or a coding
 agent, look at and drive the ReviewCenter web interface from the command line. It starts the ReviewCenter server on
 a random local port, opens it in headless Chromium, and then accepts short commands such as `click`, `text`, and
 `screenshot`. Puppet is its own software system in this repository, with its own requirements, design, and
@@ -256,7 +278,8 @@ pwsh tools/puppet/bin/Debug/net10.0/playwright.ps1 install chromium
 ```
 
 Replace `Debug` with `Release` if that configuration was built. If Chromium is missing, `start` fails with exit
-code 4 and prints the install command.
+code 4 and prints the install command. The CI pipeline performs the same Chromium installation before it runs the
+Puppet end-to-end test.
 
 ## Puppet Commands
 

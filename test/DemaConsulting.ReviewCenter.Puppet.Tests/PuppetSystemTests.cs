@@ -27,6 +27,7 @@ namespace DemaConsulting.ReviewCenter.Puppet.Tests;
 ///     channel, daemon, executor) with only the browser and the server process replaced by fakes, so the
 ///     tests run on any machine without Chromium.
 /// </summary>
+[Collection("Sequential")]
 public class PuppetSystemTests
 {
     /// <summary>

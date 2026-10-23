@@ -29,8 +29,10 @@ namespace DemaConsulting.ReviewCenter.Puppet.Tests;
 ///     These tests prove what the Puppet tool needs of Playwright and can be proven anywhere: the driver and the
 ///     browser installation script are delivered with the build output, and a failed browser launch is reported as a
 ///     <see cref="PlaywrightException"/>. They never skip and never call the Chromium availability probe. Driving a
-///     real Chromium is covered separately by the supplemental end-to-end test, which is not linked to a requirement.
+///     real Chromium is covered separately by the end-to-end test, which CI runs with Chromium installed and which is
+///     linked to the Puppet system requirements.
 /// </remarks>
+[Collection("Sequential")]
 public class PlaywrightOtsTests
 {
     /// <summary>

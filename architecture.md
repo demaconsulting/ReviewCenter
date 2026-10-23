@@ -249,8 +249,10 @@ drive the real user interface during development.
     HTTPS origin. Database backups are the operator's responsibility. Logging is structured only. Reason: this
     matches the small-scale, self-hosted deployment model and keeps operations simple.
 21. **Distribution**: self-contained single-file net10.0 executables for win-x64 and linux-x64, with no NuGet tool.
-    This requires reworking the template-derived CI/release pipeline, which is currently a multi-target net8/9/10
-    dotnet tool. Reason: operators install a service, not a developer tool, and should not need a .NET runtime.
+    The CI/release pipeline builds them natively on each OS, packages them as a zip (Windows) or tar.gz (Linux) with a
+    SHA-256 checksum, runs `--validate` and a `serve` smoke test against the extracted executable, and attaches the
+    archives to the GitHub release. Reason: operators install a service, not a developer tool, and should not need a
+    .NET runtime.
 22. **Notifications**: in-app inbox plus SMTP email only. Reason: these cover the review workflow at this scale, and
     webhooks and git-host status posting are out of scope.
 23. **Designed-in extension points**: ReviewLifecycle is a rule-driven state machine (future workflows, rounds,
@@ -268,21 +270,19 @@ The architecture above is the target design. Only a first slice is implemented s
 - **Planned and deferred**: Api, Identity, Core, Storage, ContentSources, Evidence, and Messaging. They have no code,
   requirements, design documents, or verification documents yet, so the SysML2 model and the design documentation
   describe the implemented items only and are deliberately partial.
-- **Pipeline**: the CI/release pipeline and the NuGet tool packaging still reflect the template. They have not been
-  reworked for the self-contained win-x64 and linux-x64 executables (see Open Concerns).
+- **Pipeline**: the CI/release pipeline builds net10.0 only and publishes the self-contained win-x64 and linux-x64
+  executables (see decision 21). CI installs Chromium so the Puppet end-to-end test runs and is linked to the Puppet
+  requirements. The release workflow attaches the archives and checksums to the GitHub release.
 
 ## Open Concerns
 
-1. 🔴 **HIGH** CI/release pipeline rework: the template pipeline (multi-target net8/9/10, NuGet tool pack,
-   tool-install integration tests) must be replaced with net10.0 self-contained win-x64/linux-x64 publishing and
-   artifact-based integration tests.
-2. 🟡 **MEDIUM** PDF evidence library: the choice is deferred. Needs a non-commercial-license library that can write
+1. 🟡 **MEDIUM** PDF evidence library: the choice is deferred. Needs a non-commercial-license library that can write
    the Keywords metadata and eventually PDF/A.
-3. 🟡 **MEDIUM** Database migrations: deferred, so there is no upgrade path until implemented. Schema changes before
+2. 🟡 **MEDIUM** Database migrations: deferred, so there is no upgrade path until implemented. Schema changes before
    then require recreating the database.
-4. 🟡 **MEDIUM** GitSource fidelity: verify early that the git CLI filter approach reproduces the CI checkout bytes,
+3. 🟡 **MEDIUM** GitSource fidelity: verify early that the git CLI filter approach reproduces the CI checkout bytes,
    including LFS and binary files.
-5. 🟢 **LOW** ReviewMark `file` field: confirm ReviewMark's url evidence source accepts a non-PDF report URL in
+4. 🟢 **LOW** ReviewMark `file` field: confirm ReviewMark's url evidence source accepts a non-PDF report URL in
    `file`. Covered by the contract tests.
-6. 🟢 **LOW** Provider coverage: testing on SQLite only leaves PostgreSQL/SQL Server provider differences unverified.
-7. 🟢 **LOW** AI-assisted review: deferred, with identity and role details to be designed.
+5. 🟢 **LOW** Provider coverage: testing on SQLite only leaves PostgreSQL/SQL Server provider differences unverified.
+6. 🟢 **LOW** AI-assisted review: deferred, with identity and role details to be designed.

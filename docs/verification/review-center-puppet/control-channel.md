@@ -10,7 +10,8 @@ timeouts end to end without any other Puppet unit. The message functions are ver
 ### Test Environment
 
 N/A - standard test environment. The tests require permission to open loopback TCP ports; they use ports chosen by
-the operating system, so they can run in parallel.
+the operating system and run in the serial `Sequential` xUnit collection of the Puppet test project, so they never
+compete with other port- or process-using tests for CPU or sockets.
 
 ### Acceptance Criteria
 
