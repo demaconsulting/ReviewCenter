@@ -27,4 +27,4 @@ namespace DemaConsulting.ReviewCenter.Puppet.Tests;
 ///     and timing-sensitive file locks.
 /// </summary>
 [CollectionDefinition("Sequential", DisableParallelization = true)]
-public sealed class SequentialCollection;
+public sealed class SequentialCollection { }
