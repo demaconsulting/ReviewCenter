@@ -73,7 +73,10 @@ Sequence: create the control server with a new token; write the session file as 
 token, and the daemon's process identity; start the server and record its URL and process identity; launch the
 browser, record its process identity, and create the `CommandExecutor`; write the session file as `Ready`; and serve
 the control channel until it ends. In a `finally` block that runs on every path, the browser is closed first and the
-server second. After a normal end the session file is deleted.
+server second. After a normal end the session file is deleted conditionally (`DeleteIfSame`, under the start lock):
+only the record this daemon published is removed, so a replacement session that another `start` published for the
+same id is never deleted. When a `start` holds the lock, the record is left for that start (or the next lookup, which
+finds this daemon gone) to clean up; the server and browser are already released by then.
 
 **HandleAsync**: The handler of the control server. The `stop` command cancels the session and answers success.
 Every other command goes to the `CommandExecutor`; while the session is still starting, such a command is answered

@@ -125,6 +125,12 @@ internal sealed class FakeServerRunner : IServerRunner
     public Exception? DisposeFailure { get; set; }
 
     /// <summary>
+    ///     Gets or sets an action run while a started server is disposed, to simulate something happening
+    ///     during the shutdown of a session (for example a new <c>start</c> publishing a replacement).
+    /// </summary>
+    public Action? OnDispose { get; set; }
+
+    /// <summary>
     ///     Gets the number of servers disposed so far.
     /// </summary>
     public int DisposedCount { get; private set; }
@@ -167,6 +173,7 @@ internal sealed class FakeServerRunner : IServerRunner
         public ValueTask DisposeAsync()
         {
             owner.DisposedCount++;
+            owner.OnDispose?.Invoke();
             return owner.DisposeFailure is null ? ValueTask.CompletedTask : ValueTask.FromException(owner.DisposeFailure);
         }
     }

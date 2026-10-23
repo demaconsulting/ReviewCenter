@@ -524,7 +524,7 @@ internal static class PuppetProgram
     /// <param name="output">Normal output.</param>
     /// <param name="services">The collaborators.</param>
     /// <returns>The exit code (always success).</returns>
-    private static async Task<int> ListAsync(TextWriter output, PuppetServices services)
+    private static Task<int> ListAsync(TextWriter output, PuppetServices services)
     {
         var printed = 0;
         foreach (var id in services.Store.ListIds())
@@ -551,7 +551,7 @@ internal static class PuppetProgram
             WriteLine(output, "No active sessions.");
         }
 
-        return ExitOk;
+        return Task.FromResult(ExitOk);
     }
 
     /// <summary>

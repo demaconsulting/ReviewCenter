@@ -238,7 +238,11 @@ internal sealed class DaemonHost
 
         if (exitCode == 0)
         {
-            _store.Delete(sessionId);
+            // Remove only the record this daemon published, and only while no start holds the lock. A
+            // replacement session (a different daemon or token) is never deleted; when a start holds
+            // the lock the record is left, and that start or the next lookup finds this daemon gone
+            // and cleans it up (its server and browser are already released)
+            _store.DeleteIfSame(sessionId, info);
         }
 
         return exitCode;

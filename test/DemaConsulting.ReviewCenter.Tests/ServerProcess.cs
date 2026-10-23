@@ -184,7 +184,7 @@ internal sealed class ServerProcess : IDisposable
     }
 
     /// <summary>
-    ///     Polls the health endpoint until it answers 200 or the timeout elapses.
+    ///     Polls the health endpoint until it answers 200 with the exact body <c>Healthy</c> or the timeout elapses.
     /// </summary>
     /// <param name="timeout">Maximum time to wait.</param>
     /// <returns><c>true</c> when the server became healthy in time.</returns>
@@ -196,8 +196,10 @@ internal sealed class ServerProcess : IDisposable
         {
             try
             {
-                var response = await client.GetAsync($"{BaseUrl}/health");
-                if (response.IsSuccessStatusCode)
+                // Same contract as the production probe: status 200 with exactly the body "Healthy"
+                using var response = await client.GetAsync($"{BaseUrl}/health");
+                if (response.StatusCode == System.Net.HttpStatusCode.OK &&
+                    await response.Content.ReadAsStringAsync() == "Healthy")
                 {
                     return true;
                 }

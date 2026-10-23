@@ -400,8 +400,59 @@ public class DaemonHostTests
     }
 
     /// <summary>
-    ///     Test that a command failing unexpectedly (a crashed browser during a screenshot) is answered with a failed
-    ///     response, that the session keeps serving, and that a later stop still releases everything.
+    ///     Test that a clean shutdown leaves a replacement session alone: when another daemon published a record
+    ///     for the same id while this one was shutting down, the replacement must survive.
+    /// </summary>
+    [Fact]
+    public async Task DaemonHost_Run_ReplacementPublishedDuringShutdown_IsNotDeleted()
+    {
+        // Arrange: a server whose shutdown is the moment another daemon takes over the session id
+        using var temp = new TempDirectory();
+        var store = new SessionStore(temp.Path);
+        var replacement = new SessionInfo(
+            "demo", SessionStatus.Ready, 4321, "replacement-token", "http://127.0.0.1:5998", 999999,
+            DateTime.UtcNow, 0, default, 0, default, null);
+        var server = new FakeServerRunner { OnDispose = () => store.Write(replacement) };
+        var browser = new FakeBrowserLauncher();
+        var host = new DaemonHost(store, server, browser, TimeSpan.FromMilliseconds(200));
+
+        // Act: run until the idle shutdown
+        var exitCode = await host.RunAsync("demo", "server.dll", Xunit.TestContext.Current.CancellationToken);
+
+        // Assert: a clean exit that kept the replacement record untouched
+        Assert.Equal(0, exitCode);
+        var remaining = store.TryRead("demo");
+        Assert.NotNull(remaining);
+        Assert.Equal("replacement-token", remaining.ControlToken);
+        Assert.Equal(999999, remaining.DaemonPid);
+    }
+
+    /// <summary>
+    ///     Test that a clean shutdown does not delete the record while a <c>start</c> holds the start lock for the id;
+    ///     that start (or the next lookup) cleans it up instead.
+    /// </summary>
+    [Fact]
+    public async Task DaemonHost_Run_StartLockHeldDuringShutdown_LeavesRecordForTheStart()
+    {
+        // Arrange: a start command that holds the lock for the id when the daemon shuts down
+        using var temp = new TempDirectory();
+        var store = new SessionStore(temp.Path);
+        var server = new FakeServerRunner { OnDispose = () => Assert.True(store.TryReserve("demo")) };
+        var browser = new FakeBrowserLauncher();
+        var host = new DaemonHost(store, server, browser, TimeSpan.FromMilliseconds(200));
+
+        // Act: run until the idle shutdown
+        var exitCode = await host.RunAsync("demo", "server.dll", Xunit.TestContext.Current.CancellationToken);
+
+        // Assert: still a clean exit, resources released, and the record was left alone
+        Assert.Equal(0, exitCode);
+        Assert.Equal(1, browser.DisposedCount);
+        Assert.NotNull(store.TryRead("demo"));
+        store.Release("demo");
+    }
+
+    /// <summary>
+    ///     Test that a command failing unexpectedly (a crashed browser during a screenshot) is answered with a failed    ///     response, that the session keeps serving, and that a later stop still releases everything.
     /// </summary>
     [Fact]
     public async Task DaemonHost_Run_ScreenshotThrowsUnexpected_ReturnsFailureAndKeepsServing()

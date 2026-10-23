@@ -269,12 +269,18 @@ public class SessionStoreTests
         var writing = true;
         var writer = Task.Run(() =>
         {
-            for (var i = 0; i < 300; i++)
+            try
             {
-                store.Write(CreateInfo("race"));
+                for (var i = 0; i < 300; i++)
+                {
+                    store.Write(CreateInfo("race"));
+                }
             }
-
-            writing = false;
+            finally
+            {
+                // Always release the looking-up loop, so a failed write fails the test instead of hanging it
+                Volatile.Write(ref writing, false);
+            }
         }, TestContext.Current.CancellationToken);
 
         // Act: look it up continuously until the writer is done
@@ -282,6 +288,9 @@ public class SessionStoreTests
         do
         {
             results.Add(store.Lookup("race", out _));
+
+            // A real client does not poll in a tight loop; yielding keeps the interleaving but lets the writer finish
+            await Task.Delay(1, TestContext.Current.CancellationToken);
         }
         while (Volatile.Read(ref writing));
 

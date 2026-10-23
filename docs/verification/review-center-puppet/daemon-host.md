@@ -97,6 +97,16 @@ does not become healthy; the host returns 4 and the session file records the rea
 0, the server and the browser were each disposed once, and the session file is removed. This scenario is tested by
 `DaemonHost_Run_Idle_ShutsDownAndRemovesSession`.
 
+**DaemonHost_Run_ReplacementPublishedDuringShutdown_IsNotDeleted**: While the fake server is being disposed, a
+different session record (another daemon and control token) is published for the same id. After the host returns 0,
+the replacement record is still present and unchanged. This scenario is tested by
+`DaemonHost_Run_ReplacementPublishedDuringShutdown_IsNotDeleted`.
+
+**DaemonHost_Run_StartLockHeldDuringShutdown_LeavesRecordForTheStart**: A start lock for the id is held when the
+host finishes shutting down. The host still returns 0 and releases the browser, and leaves the record in place for
+that start (or the next lookup) to clean up. This scenario is tested by
+`DaemonHost_Run_StartLockHeldDuringShutdown_LeavesRecordForTheStart`.
+
 **DaemonHost_Run_ScreenshotThrowsUnexpected_ReturnsFailureAndKeepsServing**: The fake page throws an
 `InvalidOperationException` with a two-line message when a screenshot is taken. The `screenshot` request returns a
 failed response with exit code 1 that names the exception type and the first line only; a following `click` still

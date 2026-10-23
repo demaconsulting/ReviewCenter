@@ -58,6 +58,8 @@ sections:
               Abandoned sessions must clean up after themselves.
             tests:
               - DaemonHost_Run_Idle_ShutsDownAndRemovesSession
+              - DaemonHost_Run_ReplacementPublishedDuringShutdown_IsNotDeleted
+              - DaemonHost_Run_StartLockHeldDuringShutdown_LeavesRecordForTheStart
 
           - id: ReviewCenterPuppet-DaemonHost-StartFailure
             title: >-
