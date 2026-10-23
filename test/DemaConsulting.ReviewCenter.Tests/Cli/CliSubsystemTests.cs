@@ -445,4 +445,66 @@ public class CliSubsystemTests
             }
         }
     }
+
+    /// <summary>
+    ///     Test that Context and Program work together to handle the serve verb and --urls option.
+    /// </summary>
+    [Fact]
+    public async Task CliSubsystem_ServeFlow_ContextAndProgram_ServesOnRequestedUrlAndStops()
+    {
+        // Arrange: parse serve with an explicit loopback URL
+        var url = $"http://127.0.0.1:{ServerProcess.GetFreePort()}";
+        using var context = Context.Create(["serve", "--urls", url, "--silent"]);
+        using var cts = new CancellationTokenSource();
+
+        // Assert: parsing recorded the verb and the URL
+        Assert.True(context.Serve, "Context should parse the serve verb");
+        Assert.Equal(url, context.Urls);
+
+        // Act: run the program on a background thread and wait for the health endpoint
+        var serverTask = Task.Run(() => Program.RunWithCancellation(context, cts.Token), TestContext.Current.CancellationToken);
+        try
+        {
+            using var client = new HttpClient { Timeout = TimeSpan.FromSeconds(2) };
+            var healthy = false;
+            var deadline = DateTime.UtcNow.AddSeconds(30);
+            while (!healthy && DateTime.UtcNow < deadline && !serverTask.IsCompleted)
+            {
+                try
+                {
+                    healthy = (await client.GetAsync($"{url}/health", TestContext.Current.CancellationToken)).IsSuccessStatusCode;
+                }
+                catch (HttpRequestException)
+                {
+                    await Task.Delay(100, TestContext.Current.CancellationToken);
+                }
+            }
+
+            // Assert: the server is reachable on the requested URL
+            Assert.True(healthy, "Server should answer on the URL given to --urls");
+        }
+        finally
+        {
+            await cts.CancelAsync();
+            await serverTask.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
+        }
+
+        // Assert: a requested stop is a clean exit
+        Assert.Equal(0, context.ExitCode);
+    }
+
+    /// <summary>
+    ///     Test that Context rejects --urls without serve and Program is never reached.
+    /// </summary>
+    [Fact]
+    public void CliSubsystem_UrlsWithoutServe_Context_RejectsArgumentCombination()
+    {
+        // Arrange: no setup required; the argument combination is the input under test
+
+        // Act: parse --urls without serve
+        var exception = Record.Exception(() => Context.Create(["--urls", "http://127.0.0.1:6001"]));
+
+        // Assert: the combination is rejected during parsing
+        Assert.IsType<ArgumentException>(exception);
+    }
 }

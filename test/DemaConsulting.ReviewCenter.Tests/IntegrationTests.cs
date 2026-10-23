@@ -367,5 +367,165 @@ public class IntegrationTests
         Assert.Equal(0, exitCode);
         Assert.Contains("###", output);
     }
+
+    /// <summary>
+    ///     Test that the serve verb starts a server whose health endpoint answers "Healthy".
+    /// </summary>
+    [Fact]
+    public async Task ReviewCenter_ServeVerb_Started_HealthEndpointReturnsHealthy()
+    {
+        // Arrange: start the server on a free port
+        using var server = ServerProcess.Start();
+
+        // Act: wait for the server and request the health endpoint
+        var healthy = await server.WaitUntilHealthyAsync(TimeSpan.FromSeconds(30));
+        using var client = new HttpClient();
+        var response = healthy ? await client.GetAsync($"{server.BaseUrl}/health", TestContext.Current.CancellationToken) : null;
+
+        // Assert: 200 with the plain-text body
+        Assert.True(healthy, "Server did not become healthy in time");
+        Assert.NotNull(response);
+        Assert.Equal(System.Net.HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal("Healthy", await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
+    }
+
+    /// <summary>
+    ///     Test that the serve verb listens on the URL given with --urls.
+    /// </summary>
+    [Fact]
+    public async Task ReviewCenter_ServeWithUrls_PortSpecified_ListensOnRequestedPort()
+    {
+        // Arrange: start the server; ServerProcess passes --urls with a free port
+        using var server = ServerProcess.Start();
+
+        // Act: wait until the requested address answers
+        var healthy = await server.WaitUntilHealthyAsync(TimeSpan.FromSeconds(30));
+
+        // Assert: the server answers on exactly the address that was requested
+        Assert.True(healthy, $"Server did not answer on {server.BaseUrl}");
+    }
+
+    /// <summary>
+    ///     Test that --urls without the serve verb is rejected with a non-zero exit code.
+    /// </summary>
+    [Fact]
+    public void ReviewCenter_UrlsWithoutServe_Provided_ReturnsError()
+    {
+        // Arrange: (none — constructor initializes _dllPath)
+
+        // Act: run the tool with --urls but no serve verb
+        var exitCode = Runner.Run(
+            out var output,
+            "dotnet",
+            _dllPath,
+            "--urls",
+            "http://127.0.0.1:6001");
+
+        // Assert: error names the verb that is required
+        Assert.NotEqual(0, exitCode);
+        Assert.Contains("serve", output);
+    }
+
+    /// <summary>
+    ///     Test that the home page served over HTTP contains the title and the interactive controls.
+    /// </summary>
+    [Fact]
+    public async Task ReviewCenter_ServeVerb_Started_HomePageContainsTitleAndControls()
+    {
+        // Arrange: start the server and wait for it
+        using var server = ServerProcess.Start();
+        var healthy = await server.WaitUntilHealthyAsync(TimeSpan.FromSeconds(30));
+        Assert.True(healthy, "Server did not become healthy in time");
+
+        // Act: request the home page and the Blazor client script
+        using var client = new HttpClient();
+        var html = await client.GetStringAsync($"{server.BaseUrl}/", TestContext.Current.CancellationToken);
+        var script = await client.GetByteArrayAsync($"{server.BaseUrl}/_framework/blazor.web.js", TestContext.Current.CancellationToken);
+
+        // Assert: title, test ids, and a non-empty client script (needed for interactivity)
+        Assert.Contains("<title>ReviewCenter</title>", html);
+        Assert.Contains("data-testid=\"hello-button\"", html);
+        Assert.Contains("data-testid=\"counter-button\"", html);
+        Assert.Contains("data-testid=\"counter-value\"", html);
+        Assert.NotEmpty(script);
+    }
+
+    /// <summary>
+    ///     Test that the serve verb writes a structured start-up log entry that names the listen URL.
+    /// </summary>
+    [Fact]
+    public async Task ReviewCenter_ServeVerb_Started_LogsStartupEntryWithListenUrl()
+    {
+        // Arrange: start the server on a free port and wait until it answers
+        using var server = ServerProcess.Start();
+        var healthy = await server.WaitUntilHealthyAsync(TimeSpan.FromSeconds(30));
+        Assert.True(healthy, "Server did not become healthy in time");
+
+        // Act: give the console logger a moment to flush the start-up entry
+        var expected = $"listening on {server.BaseUrl}";
+        var deadline = DateTime.UtcNow.AddSeconds(10);
+        while (DateTime.UtcNow < deadline && !server.Output.Contains(expected, StringComparison.Ordinal))
+        {
+            await Task.Delay(100, TestContext.Current.CancellationToken);
+        }
+
+        // Assert: the entry was written and names the address the server listens on
+        Assert.Contains("ReviewCenter server started", server.Output, StringComparison.Ordinal);
+        Assert.Contains(expected, server.Output, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    ///     Test that a running server stops by itself, with exit code zero, when it is asked to terminate the way a
+    ///     process supervisor or container runtime does. Not run on Windows, which cannot signal a child process.
+    /// </summary>
+    [Fact]
+    public async Task ReviewCenter_ServeVerb_TerminationRequested_StopsGracefullyWithExitCodeZero()
+    {
+        // Arrange: a running server (a termination signal cannot be sent to a child process on Windows)
+        Assert.SkipWhen(OperatingSystem.IsWindows(), "A graceful stop signal cannot be sent to a child process on Windows.");
+        using var server = ServerProcess.Start();
+        var healthy = await server.WaitUntilHealthyAsync(TimeSpan.FromSeconds(30));
+        Assert.True(healthy, "Server did not become healthy in time");
+
+        // Act: ask the server to terminate and wait for it to exit by itself
+        server.RequestGracefulStop();
+        var exitCode = server.WaitForExit(TimeSpan.FromSeconds(30));
+
+        // Assert: it stopped within the time limit with a successful exit code
+        Assert.NotNull(exitCode);
+        Assert.Equal(0, exitCode);
+    }
+
+    /// <summary>
+    ///     Test that the serve verb starting on a port already in use fails with a non-zero exit code.
+    /// </summary>
+    [Fact]
+    public void ReviewCenter_ServeVerb_PortInUse_ReturnsError()
+    {
+        // Arrange: occupy a port
+        var listener = new System.Net.Sockets.TcpListener(System.Net.IPAddress.Loopback, 0);
+        listener.Start();
+        try
+        {
+            var port = ((System.Net.IPEndPoint)listener.LocalEndpoint).Port;
+
+            // Act: try to serve on the occupied port
+            var exitCode = Runner.Run(
+                out var output,
+                "dotnet",
+                _dllPath,
+                "serve",
+                "--urls",
+                $"http://127.0.0.1:{port}");
+
+            // Assert: a clear error and a non-zero exit code, not an unhandled exception
+            Assert.NotEqual(0, exitCode);
+            Assert.Contains("Failed to start the server", output);
+        }
+        finally
+        {
+            listener.Stop();
+        }
+    }
 }
 

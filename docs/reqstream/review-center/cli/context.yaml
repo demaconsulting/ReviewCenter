@@ -95,3 +95,30 @@ sections:
           compliance workflows.
         tests:
           - Context_Create_LogFlag_InvalidPath_ThrowsInvalidOperationException
+
+      - id: ReviewCenter-Context-Serve
+        title: The Context class shall record whether the serve verb was specified.
+        justification: |
+          The web server must only be started when the operator asked for it, so the parsed
+          context has to distinguish an invocation with the serve verb from one without it.
+        tests:
+          - Context_Create_ServeVerb_SetsServe
+          - Context_Create_NoServeVerb_SetsServeFalse
+
+      - id: ReviewCenter-Context-Urls
+        title: >-
+          The Context class shall record the listen URL supplied with `--urls`, defaulting to
+          http://localhost:5000, and shall reject a missing or invalid URL or the option
+          without the serve verb with a descriptive error.
+        justification: |
+          The listen address must be known before the server starts, and a sensible default
+          that is reachable only from the local machine keeps a freshly started server private
+          unless the operator asks otherwise. A value that is not an absolute http or https URL
+          cannot be bound, so it is reported at argument parsing time with a clear message
+          instead of failing later during server start-up.
+        tests:
+          - Context_Create_ServeVerb_SetsServe
+          - Context_Create_UrlsFlag_SetsUrls
+          - Context_Create_UrlsWithoutServe_ThrowsArgumentException
+          - Context_Create_UrlsFlag_WithoutValue_ThrowsArgumentException
+          - Context_Create_InvalidUrls_ThrowsArgumentException

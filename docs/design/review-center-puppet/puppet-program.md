@@ -1,0 +1,94 @@
+## PuppetProgram
+
+![ReviewCenterPuppet Structure](ReviewCenterPuppetView.svg)
+
+### Purpose
+
+`PuppetProgram` is the entry point and command dispatcher of Puppet. It parses the command line, runs the verb
+that was requested, and maps every outcome to one of five exit codes. It orchestrates the `start`, `stop`, and
+`list` verbs itself and forwards every browser verb to the session daemon. `PuppetServices` bundles the
+collaborators it needs so that tests can replace them with fakes.
+
+### Data Model
+
+**Exit codes**: `ExitOk` (0), `ExitFailed` (1, a failed command or invalid arguments), `ExitUnknownSession` (2, no
+such session or none running), `ExitStaleSession` (3, the daemon is gone and the file was cleaned up), and
+`ExitStartFailed` (4, the session could not be started).
+
+**PuppetServices**: a record holding the `SessionStore`, the `IDaemonLauncher`, the `IServerRunner`, and the
+`IBrowserLauncher`, and optionally a start time-out that replaces the default. `PuppetServices.CreateDefault()`
+builds the production set with the real adapters.
+
+**ServerEnvironmentVariable**: `REVIEWCENTER_SERVER_DLL`, which overrides the default location of the server
+assembly.
+
+### Key Methods
+
+**Main**: Entry point of the process. Calls `RunAsync` with the production services and returns its exit code.
+
+**RunAsync**: Runs one command.
+
+- *Parameters*: the argument array, the output and error writers, the `PuppetServices`, and a cancellation token.
+- *Returns*: the exit code.
+
+Parses the arguments with `CommandLine.Parse`. For `--help` style requests it prints the usage text and returns 0.
+For the hidden `__daemon` verb it runs `DaemonHost`. For `start`, `list`, and the other verbs it calls the matching
+private handler.
+
+**ResolveServerPath**: Chooses the server assembly path. The `--server` option wins, then the
+`REVIEWCENTER_SERVER_DLL` environment variable, then the path recorded in the build metadata of the tool. A path
+that does not exist raises a `PuppetException` that tells the caller to build the solution or to set the option.
+
+**Start handling**: Resolves the server assembly, then reserves the session id with `SessionStore.TryReserve`
+(generating an eight-character id first when none was given). When the id is already reserved by another `start`, it
+fails at once with exit code 1 and an error that says so, and launches nothing. While it holds the reservation, it
+rejects an id that is already live, cleans up a stale file, launches the daemon through `IDaemonLauncher`, and polls
+the session file every 200 milliseconds for up to 90 seconds. It prints the session id and the server URL when the
+status is `Ready` and returns 4 with the reason when the status is `Failed`, when the daemon dies, or when the time
+runs out. The reservation is released in a `finally` block on every path, including a failed launch.
+
+**Start abort**: When the wait ends without a ready session (time-out, cancellation, or a dead daemon), `start`
+terminates the daemon it launched, identified by its process id and start time and known even though no session file
+may have been written yet. It also terminates the server and the browser that a partly written session file records,
+and deletes the session file. A cancellation is re-raised after this cleanup. Nothing is ended by name.
+
+**Client command handling**: Resolves the session (the `--session` option, the `REVIEWCENTER_PUPPET_SESSION`
+environment variable, or the only running session), looks it up in `SessionStore`, builds a `ControlRequest` with
+the stored token, sends it with `ControlClient`, prints the message of the response, and returns its exit code. For
+`stop` it also waits up to 30 seconds for the daemon to end and, if it does not, ends the browser, the server, and
+the daemon by force, each verified by process id and start time.
+
+**Named values**: the session id length, the default start time-out, the stop time-out, the two polling intervals,
+and the grace period added to a control exchange are named constants, so that their meaning is documented once.
+
+**List handling**: Prints one line per live session with its server URL, reports when there are none, and removes
+stale sessions it finds.
+
+### Known Limitation
+
+`stop` cannot interrupt a `start` that has not finished. The control loop of the daemon starts only after start-up
+completes, and a command received earlier is answered with a "retry shortly" failure. The start-up is bounded by the
+start time-out, after which the start is aborted as described above.
+
+**List handling**: Prints one line per live session with its server URL, reports when there are none, and removes
+stale sessions it finds.
+
+### Error Handling
+
+`ArgumentException` from `CommandLine` becomes exit code 1 with the message on the error writer. `PuppetException`
+from the control channel or from path resolution becomes exit code 1, or 4 during `start`. A `start` for an id that
+another `start` has reserved is exit code 1. An unknown session is
+exit code 2 and a stale session is exit code 3. The message text always names the problem and, where possible, the
+next step. Unexpected exceptions are not caught, so that the runtime records them.
+
+### Dependencies
+
+- **CommandLine**: parses the arguments.
+- **SessionStore**: looks up, lists, and deletes sessions.
+- **ControlChannel**: `ControlClient` sends the browser commands to the daemon.
+- **DaemonLauncher**: starts the daemon.
+- **DaemonHost**: runs inside the daemon for the `__daemon` verb.
+
+### Callers
+
+N/A - entry point, called by the host environment.

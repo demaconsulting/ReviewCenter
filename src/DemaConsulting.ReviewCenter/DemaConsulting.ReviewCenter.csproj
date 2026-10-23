@@ -1,11 +1,14 @@
-<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk.Web">
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
-    <TargetFrameworks>net8.0;net9.0;net10.0</TargetFrameworks>
+    <TargetFramework>net10.0</TargetFramework>
     <LangVersion>latest</LangVersion>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+
+    <!-- The Web SDK defaults IsPackable to false; the tool package is still produced by this project -->
+    <IsPackable>true</IsPackable>
 
     <!-- NuGet Tool Package Configuration -->
     <PackAsTool>true</PackAsTool>

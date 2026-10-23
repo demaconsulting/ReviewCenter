@@ -1,0 +1,19 @@
+@* App: the HTML shell and root component of the ReviewCenter web UI.
+
+   This is static server-side rendered markup: it emits the document skeleton, the router that
+   selects a page for the requested URL, and the Blazor client script that upgrades interactive
+   pages to a live server connection. Pages opt in to interactivity individually (see HomePage),
+   so everything outside a page stays cheap, static HTML. *@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <base href="/" />
+    <HeadOutlet />
+</head>
+<body>
+    <Routes />
+    <script src="_framework/blazor.web.js"></script>
+</body>
+</html>

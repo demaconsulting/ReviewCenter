@@ -3,6 +3,10 @@
     <Project Path="src/DemaConsulting.ReviewCenter/DemaConsulting.ReviewCenter.csproj" />
   </Folder>
   <Folder Name="/test/">
+    <Project Path="test/DemaConsulting.ReviewCenter.Puppet.Tests/DemaConsulting.ReviewCenter.Puppet.Tests.csproj" />
     <Project Path="test/DemaConsulting.ReviewCenter.Tests/DemaConsulting.ReviewCenter.Tests.csproj" />
+  </Folder>
+  <Folder Name="/tools/">
+    <Project Path="tools/puppet/DemaConsulting.ReviewCenter.Puppet.csproj" />
   </Folder>
 </Solution>

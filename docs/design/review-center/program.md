@@ -29,7 +29,7 @@ Creates a `Context` using `Context.Create(args)`, calls `Run(context)`, and retu
 `"Error: {message}"` to stderr and returns 1. Catches any other `Exception` — writes
 `"Unexpected error: {message}"` to stderr and re-throws so the runtime can record it.
 
-**Run**: Dispatches execution based on parsed flags.
+**Run**: Dispatches execution based on parsed flags, with no external stop request.
 
 - *Parameters*: `Context context` — the parsed context.
 - *Returns*: `void`.
@@ -39,20 +39,39 @@ Creates a `Context` using `Context.Create(args)`, calls `Run(context)`, and retu
 Inspects flags in priority order: (1) if `context.Version` is true, calls
 `context.WriteLine(Version)` and returns; (2) calls `PrintBanner`; (3) if `context.Help` is
 true, calls `PrintHelp` and returns; (4) if `context.Validate` is true, calls
-`Validation.Run(context)`; (5) otherwise calls `RunToolLogic(context)`.
+`Validation.Run(context)`; (5) if `context.Serve` is true, runs the web server through
+`ServerHost.RunAsync` and blocks until it stops; (6) otherwise calls `RunToolLogic(context)`.
+`Run` supplies no stop request; the process stops the server with Ctrl+C or a termination
+signal.
+
+**RunWithCancellation**: Dispatches execution like `Run`, with a request to stop long-running
+work.
+
+- *Parameters*: `Context context` — the parsed context; `CancellationToken cancellationToken` —
+  requests a graceful stop of the web server started by the `serve` verb. Ignored by all other
+  actions.
+- *Returns*: `void`.
+- *Preconditions*: `context` is not null.
+- *Postconditions*: Exactly one handler has been called; for `serve`, the method returns only
+  after the server has stopped, and any start-up failure has been reported through
+  `context.WriteError`.
+
+`Run` delegates to this method with `CancellationToken.None`. Tests use it to stop the server
+deterministically.
 
 **PrintBanner**: Writes the tool name, version, and copyright line to `context`.
 
 - *Parameters*: `Context context` — output target.
 - *Returns*: `void`.
 
-**PrintHelp**: Writes the usage synopsis and options table to `context`.
+**PrintHelp**: Writes the usage synopsis, the `serve` verb, and the options table (including
+`--urls`) to `context`.
 
 - *Parameters*: `Context context` — output target.
 - *Returns*: `void`.
 
-**RunToolLogic**: Placeholder for main tool logic; writes a demo message to `context`.
-Downstream projects replace this method body with actual tool behavior.
+**RunToolLogic**: Default action when no action was requested; writes a hint to `context`
+that points the user to the `serve` verb and to the help text.
 
 - *Parameters*: `Context context` — output target.
 - *Returns*: `void`.
@@ -63,8 +82,11 @@ Downstream projects replace this method body with actual tool behavior.
 `InvalidOperationException`) are written to stderr as `"Error: {message}"` and cause exit
 code 1 without a stack trace. Unexpected errors (`Exception`) are written to stderr as
 `"Unexpected error: {message}"` and re-thrown so the runtime can record them in event logs.
-`Run`, `PrintBanner`, `PrintHelp`, and `RunToolLogic` do not catch exceptions; all errors
-propagate to `Main`.
+`Run`, `RunWithCancellation`, `PrintBanner`, `PrintHelp`, and `RunToolLogic` do not catch
+exceptions; all errors propagate to `Main`. The exception is a web server that cannot start,
+for example because the address is in use: `ServerHost.RunAsync` reports it through
+`Context.WriteError` and returns a failure result, so `Program` treats it as an ordinary
+error that yields exit code 1 rather than an unhandled exception.
 
 ### Dependencies
 
@@ -72,6 +94,8 @@ propagate to `Main`.
   `Context.WriteError` for all output.
 - **Validation** — `Program.Run` calls `Validation.Run(context)` when the `--validate` flag is
   set.
+- **ServerHost** — `Program.RunWithCancellation` calls `ServerHost.RunAsync(context,
+  cancellationToken)` when the `serve` verb is present.
 
 ### Callers
 

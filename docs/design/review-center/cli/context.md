@@ -30,6 +30,14 @@ neither flag was present.
 **HeadingDepth**: `int` — Heading depth for markdown output; valid range 1–6, default 1;
 supplied via `--depth`.
 
+**Serve**: `bool` — `true` when the `serve` verb was present in the argument list.
+
+**Urls**: `string` — The URL the web server listens on; the value supplied via `--urls`, or
+`DefaultUrls` when the option was not supplied. Always an absolute http or https URL.
+
+**DefaultUrls**: `string` (constant) — `http://localhost:5000`; the loopback address used when
+`--urls` is not supplied, so that a freshly started server is not reachable from other machines.
+
 **ExitCode**: `int` (derived) — Returns 1 if `_hasErrors` is true; returns 0 otherwise.
 
 #### Key Methods
@@ -43,8 +51,11 @@ supplied via `--depth`.
   if `--log` was supplied.
 
 Delegates to the private `ArgumentParser` helper to parse flags, then opens the log file by
-calling `OpenLogFile` if `--log` was present. Throws `ArgumentException` for unknown or
-malformed arguments; throws `InvalidOperationException` if the log file cannot be opened.
+calling `OpenLogFile` if `--log` was present. The parser treats `serve` as a verb that sets
+`Serve`, and `--urls` as an option whose value must parse as an absolute http or https URL.
+After all arguments are consumed, the parser rejects a `--urls` value given without `serve`.
+Throws `ArgumentException` for unknown or malformed arguments; throws
+`InvalidOperationException` if the log file cannot be opened.
 
 **WriteLine**: Writes a message to standard output and to the log file.
 
@@ -72,9 +83,12 @@ malformed arguments; throws `InvalidOperationException` if the log file cannot b
 #### Error Handling
 
 `Create` throws `ArgumentException` ("Unsupported argument '{arg}'") for any unrecognized flag
-or missing required value. It throws `InvalidOperationException`
-("Failed to open log file '{path}': {detail}") when the `--log` file cannot be opened. Both
-exceptions propagate to `Program.Main`.
+or missing required value. For `--urls` it throws `ArgumentException` when the value is
+missing, when the value is not an absolute http or https URL
+("--urls requires an absolute http or https URL but was '{value}'"), and when `--urls` is
+supplied without the `serve` verb ("--urls requires the serve verb"). It throws
+`InvalidOperationException` ("Failed to open log file '{path}': {detail}") when the `--log`
+file cannot be opened. Both exceptions propagate to `Program.Main`.
 
 `WriteLine` and `WriteError` do not throw; they write to whichever output channels are
 available.
@@ -83,10 +97,12 @@ available.
 
 #### Dependencies
 
-- **.NET BCL** — `Console`, `StreamWriter`, and `Path` are the only dependencies. No other
-  tool units are used.
+- **.NET BCL** — `Console`, `StreamWriter`, `Path`, and `Uri` are the only dependencies. No
+  other tool units are used.
 
 #### Callers
 
 - **Program** — creates `Context` via `Context.Create` and calls `WriteLine` and `WriteError`.
 - **Validation** — receives `Context` from `Program` and calls `WriteLine` and `WriteError`.
+- **ServerHost** — reads `Urls` and `Silent`, and calls `WriteError` when the server cannot
+  start.

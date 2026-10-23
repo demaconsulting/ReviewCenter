@@ -1,0 +1,71 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Puppet: an in-repo developer tool that drives the ReviewCenter web UI in a headless browser.
+       It is NOT part of the distributed ReviewCenter package: nothing here is packed or published. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <AssemblyName>DemaConsulting.ReviewCenter.Puppet</AssemblyName>
+    <RootNamespace>DemaConsulting.ReviewCenter.Puppet</RootNamespace>
+
+    <!-- Developer tool only: never packed as a NuGet package -->
+    <IsPackable>false</IsPackable>
+
+    <!-- Required by the source-generated P/Invoke used to start the detached daemon on Windows -->
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+
+    <!-- Code Quality Configuration -->
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+    <EnableNETAnalyzers>true</EnableNETAnalyzers>
+    <AnalysisLevel>latest</AnalysisLevel>
+  </PropertyGroup>
+
+  <!-- Runtime Dependencies -->
+  <ItemGroup>
+    <!-- Playwright drives headless Chromium. The browser binary is not part of the package; it is
+         installed once with the playwright.ps1 script that the build copies to the output folder. -->
+    <PackageReference Include="Microsoft.Playwright" Version="1.64.1" />
+  </ItemGroup>
+
+  <!-- Build Tool Dependencies -->
+  <ItemGroup>
+    <PackageReference Include="Polyfill" Version="11.4.5" PrivateAssets="All" />
+  </ItemGroup>
+
+  <!-- Code Analysis Dependencies -->
+  <ItemGroup>
+    <!-- Child-element form configures both PrivateAssets and IncludeAssets so the analyzers are fully
+         activated during the build without becoming transitive dependencies. -->
+    <PackageReference Include="Microsoft.CodeAnalysis.NetAnalyzers" Version="10.0.402">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <PackageReference Include="SonarAnalyzer.CSharp" Version="10.35.0.4138">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+
+  <!-- The server is started by the Puppet daemon as a separate process. Referencing the project with
+       ReferenceOutputAssembly=false makes sure the server is built first without linking its assembly. -->
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\DemaConsulting.ReviewCenter\DemaConsulting.ReviewCenter.csproj"
+                      ReferenceOutputAssembly="false" />
+  </ItemGroup>
+
+  <!-- Record where the freshly built server assembly lives so 'start' works without extra arguments -->
+  <ItemGroup>
+    <AssemblyMetadata Include="ServerDllPath"
+                      Value="$([MSBuild]::NormalizePath('$(MSBuildThisFileDirectory)', '..', '..', 'src', 'DemaConsulting.ReviewCenter', 'bin', '$(Configuration)', '$(TargetFramework)', 'DemaConsulting.ReviewCenter.dll'))" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="DemaConsulting.ReviewCenter.Puppet.Tests" />
+  </ItemGroup>
+
+</Project>

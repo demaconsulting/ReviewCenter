@@ -5,20 +5,25 @@ This document contains the requirements for the ReviewCenter project.
 ## Purpose
 
 ReviewCenter is a web-based formal code review service with a companion .NET command-line
-interface. The current release provides the command-line scaffold: a standardized approach to
-command-line argument parsing, self-validation, and comprehensive documentation generation.
+interface. The service is an ASP.NET Core Blazor Server application started with the `serve`
+verb; the command-line interface provides argument parsing, self-validation, and comprehensive
+documentation generation. The repository also contains Puppet, a separate development tool that
+drives the web interface from the command line; it is specified as its own system, ReviewCenterPuppet.
 
 ## Scope
 
 This requirements document covers:
 
 - Command-line interface and options
+- The `serve` verb, the web home page, and the health endpoint
 - Self-validation framework
 - Test result output formats
 - Logging capabilities
-- Multi-platform support
+- Platform support
 - Documentation generation
 - CI/CD integration
+- The Puppet development tool (ReviewCenterPuppet system)
+- Off-the-shelf software items used by the above
 
 ## Audience
 

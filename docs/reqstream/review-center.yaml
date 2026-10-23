@@ -128,12 +128,13 @@ sections:
           - ReviewCenter_ValidateWithDepth_DepthThree_OutputsCorrectHeadingLevel
 
       - id: ReviewCenter-System-ValidateFailure
-        title: The tool shall return a non-zero exit code when the results file cannot be written.
+        title: >-
+          The tool shall return a non-zero exit code when the results file has an unsupported extension.
         tags: [system]
         justification: |
-          A non-zero exit code on results-write failure enables CI/CD pipelines to detect
-          and surface output errors automatically, preventing silent loss of validation
-          evidence in compliance-critical workflows.
+          A non-zero exit code when the requested results file cannot be produced in a supported
+          format enables CI/CD pipelines to detect and surface output errors automatically,
+          preventing silent loss of validation evidence in compliance-critical workflows.
         children:
           - ReviewCenter-SelfTest-InvalidExtension
         tests:
@@ -162,3 +163,68 @@ sections:
           - ReviewCenter-Cli-ResultAlias
         tests:
           - ReviewCenter_ResultAlias_LegacyFlag_WritesResultsFile
+
+      - id: ReviewCenter-System-Serve
+        title: The tool shall run the ReviewCenter web server until it is stopped when the serve verb is provided.
+        tags: [system]
+        justification: |
+          ReviewCenter is delivered as a web service. Operators need a single command that
+          starts the service in the foreground, keeps it running for users, and stops it
+          cleanly on request, so that it can be run under a process supervisor, a container,
+          or by a developer. Operators also need start-up and request activity written as
+          structured log entries so that the running service can be monitored and audited.
+        children:
+          - ReviewCenter-Program-Serve
+          - ReviewCenter-Cli-Serve
+          - ReviewCenter-Hosting-Logging
+        tests:
+          - ReviewCenter_ServeVerb_Started_HealthEndpointReturnsHealthy
+          - ReviewCenter_ServeVerb_Started_LogsStartupEntryWithListenUrl
+          - ubuntu@ReviewCenter_ServeVerb_TerminationRequested_StopsGracefullyWithExitCodeZero
+
+      - id: ReviewCenter-System-ServeUrls
+        title: >-
+          The tool shall listen on the URL given by the `--urls` option when the serve verb is
+          provided, and shall report an error and return a non-zero exit code when `--urls` is
+          given without the serve verb or the requested address cannot be used.
+        tags: [system]
+        justification: |
+          Operators must choose the address and port the service listens on so that it can
+          coexist with other services and sit behind a reverse proxy. Rejecting a misplaced
+          option or an unusable address with a clear error prevents a mistyped command from
+          silently starting nothing, or something other than what was requested.
+        children:
+          - ReviewCenter-Cli-Urls
+        tests:
+          - ReviewCenter_ServeWithUrls_PortSpecified_ListensOnRequestedPort
+          - ReviewCenter_UrlsWithoutServe_Provided_ReturnsError
+          - ReviewCenter_ServeVerb_PortInUse_ReturnsError
+
+      - id: ReviewCenter-System-HomePage
+        title: >-
+          The tool shall serve a home page titled ReviewCenter at the root URL of the web server,
+          offering a Hello button and a counter button.
+        tags: [system]
+        justification: |
+          The home page is the entry point of the web user interface. It proves that pages are
+          delivered to a browser and that the interactive server-side user interface needed by
+          later review features works end to end, including the client script it depends on.
+        children:
+          - ReviewCenter-Web-HomePage
+          - ReviewCenter-Web-Interactive
+        tests:
+          - ReviewCenter_ServeVerb_Started_HomePageContainsTitleAndControls
+
+      - id: ReviewCenter-System-Health
+        title: >-
+          The tool shall answer requests for the /health URL of the web server with HTTP status
+          200 and the text Healthy while the server is running.
+        tags: [system]
+        justification: |
+          Reverse proxies, container orchestrators, monitoring tools, and test tooling need a
+          simple, unauthenticated way to find out whether the service is up and ready to
+          accept requests.
+        children:
+          - ReviewCenter-Hosting-Health
+        tests:
+          - ReviewCenter_ServeVerb_Started_HealthEndpointReturnsHealthy

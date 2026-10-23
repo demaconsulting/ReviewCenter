@@ -1,0 +1,157 @@
+---
+# SessionStore Unit Requirements
+#
+# PURPOSE:
+# - Define requirements for the SessionStore unit (tools/puppet/SessionStore.cs)
+# - SessionStore is the only shared state between the short-lived client commands and the
+#   long-lived daemon, and it detects and cleans up sessions whose daemon has died
+
+sections:
+  - title: ReviewCenterPuppet Requirements
+    sections:
+      - title: SessionStore Requirements
+        requirements:
+          - id: ReviewCenterPuppet-SessionStore-Persistence
+            title: >-
+              The SessionStore unit shall write a session as a file that reads back unchanged, and shall
+              treat a missing or corrupt file as unreadable rather than failing.
+            justification: |
+              Client commands and the daemon exchange the control port and token only through the session
+              file, so it must round-trip exactly. A damaged file must not crash a command; it is handled as
+              a session that cannot be used.
+            tests:
+              - SessionStore_WriteRead_RoundTrip_ReturnsSameRecord
+              - SessionStore_TryRead_MissingSession_ReturnsNull
+              - SessionStore_TryRead_CorruptFile_ReturnsNull
+
+          - id: ReviewCenterPuppet-SessionStore-TransientRead
+            title: >-
+              The SessionStore unit shall retry reading a session file that is temporarily locked or being
+              replaced, and when the file stays unreadable shall report an error without deleting the file
+              or stopping any process.
+            justification: |
+              The daemon replaces its session file while other commands read it. A momentary sharing or
+              access error says nothing about whether the daemon is alive, so treating it as a stale
+              session would delete a live session and orphan its daemon, server, and browser.
+            tests:
+              - SessionStore_Lookup_FileTemporarilyLocked_RetriesAndReportsLive
+              - SessionStore_Lookup_FileStaysLocked_ThrowsAndKeepsSession
+              - SessionStore_WriteAndLookup_ConcurrentReplacement_NeverReportsStale
+
+          - id: ReviewCenterPuppet-SessionStore-ReplacementCleanup
+            title: >-
+              The SessionStore unit shall retry a session file replacement that is refused for a moment, and
+              shall remove its temporary file when the replacement fails.
+            justification: |
+              The temporary file contains the control token, so a failed replacement must not leave it
+              behind, and a momentary refusal must not lose the update.
+            tests:
+              - SessionStore_Write_TargetTemporarilyLocked_RetriesAndSucceeds
+              - SessionStore_Write_ReplacementFails_RemovesTemporaryFile
+
+          - id: ReviewCenterPuppet-SessionStore-SafePaths
+            title: >-
+              The SessionStore unit shall reject a session id that could place a file outside the session
+              folder.
+            justification: |
+              The session id becomes part of a file path, so an id containing path characters must be refused
+              to prevent reading, writing, or deleting files elsewhere on the machine.
+            tests:
+              - SessionStore_GetPath_InvalidId_ThrowsArgumentException
+
+          - id: ReviewCenterPuppet-SessionStore-Lookup
+            title: >-
+              The SessionStore unit shall report a session as unknown when it has no file and as live, with
+              its details, when its daemon is running.
+            justification: |
+              Every command first has to learn whether the session exists and can be used, and the three
+              outcomes lead to different exit codes.
+            tests:
+              - SessionStore_Lookup_NoFile_ReturnsUnknown
+              - SessionStore_Lookup_LiveDaemon_ReturnsLive
+
+          - id: ReviewCenterPuppet-SessionStore-StaleCleanup
+            title: >-
+              The SessionStore unit shall report a session whose daemon is gone or whose file is unreadable
+              as stale, delete its file, and stop a server and a browser the dead daemon left running.
+            justification: |
+              A crash, reboot, or killed terminal leaves a file whose daemon is gone. Without cleanup every
+              later command would fail confusingly, and an orphaned server or browser would keep running and
+              consume resources.
+            tests:
+              - SessionStore_ReadStale_DeadDaemon_CleansUpAndReports
+              - SessionStore_Lookup_CorruptFile_CleansUpAndReportsStale
+
+          - id: ReviewCenterPuppet-SessionStore-ProcessTermination
+            title: >-
+              The SessionStore unit shall end the browser, the server, and the daemon of a session only when
+              the process id and the recorded start time match, and shall never end a process by name.
+            justification: |
+              A daemon that is stuck, or a start that has to be abandoned, must not leave a browser or a
+              server behind. Because process ids are recycled, ending a process by id alone could kill an
+              unrelated program, so the start time is verified as well.
+            tests:
+              - SessionStore_Terminate_Session_KillsBrowserServerAndDaemonWithTheirStartTimes
+              - SessionStore_Terminate_UnrecordedBrowserAndServer_OnlyKillsDaemon
+
+          - id: ReviewCenterPuppet-SessionStore-StartReservation
+            title: >-
+              The SessionStore unit shall let exactly one of several simultaneous callers reserve a session id
+              for starting, shall refuse the others until the reservation is released, and shall take over a
+              reservation only when its owner is gone.
+            justification: |
+              Two simultaneous start commands for one session id must not both launch a daemon, or they would
+              fight over one session. A reservation left behind by a crashed start must not block the id for
+              ever.
+            tests:
+              - SessionStore_TryReserve_SecondCaller_IsRefusedUntilReleased
+              - SessionStore_TryReserve_ConcurrentCallers_ExactlyOneWins
+              - SessionStore_TryReserve_LockOfOtherOwner_IsTakenOverOnlyWhenOwnerIsGone
+              - SessionStore_TryReserve_UnreadableLock_IsTakenOverOnlyWhenOld
+              - SessionStore_TryReserve_Reserved_IsNotListedAsSession
+
+          - id: ReviewCenterPuppet-SessionStore-PrivateFiles
+            title: >-
+              The SessionStore unit shall create the session folder and the session files so that only their
+              owner can read them on platforms that have file permissions, and shall rely on the per-user
+              temporary folder on Windows.
+            justification: |
+              The session file holds the token that authorizes commands for the session, so another user on
+              the same machine must not be able to read it. The permissions are set when the folder and files
+              are created so that there is no moment at which they are readable by others.
+            tests:
+              - ubuntu@SessionStore_Write_UnixPlatform_CreatesOwnerOnlyDirectoryAndFile
+              - macos@SessionStore_Write_UnixPlatform_CreatesOwnerOnlyDirectoryAndFile
+
+          - id: ReviewCenterPuppet-SessionStore-Listing
+            title: >-
+              The SessionStore unit shall list the ids of the session files in sorted order, ignoring other
+              files, and return an empty list when the session folder does not exist.
+            justification: |
+              Listing sessions and choosing the only running session both depend on a stable, predictable
+              enumeration that tolerates a machine where Puppet has never run.
+            tests:
+              - SessionStore_ListIds_MixedFiles_ReturnsSortedSessionIds
+              - SessionStore_ListIds_NoDirectory_ReturnsEmpty
+
+          - id: ReviewCenterPuppet-SessionStore-Delete
+            title: >-
+              The SessionStore unit shall delete a session file and tolerate deleting one that is already gone,
+              including when several parties delete it at the same moment.
+            justification: |
+              Stopping, failing, and cleaning up can all race to delete the same file, so deletion must be
+              safe to repeat and to run concurrently.
+            tests:
+              - SessionStore_Delete_ExistingSession_RemovesFile
+              - SessionStore_Delete_ConcurrentCallers_NoneThrows
+
+          - id: ReviewCenterPuppet-SessionStore-ProcessIdentity
+            title: >-
+              The SessionStore unit shall consider a process alive only when its id exists and its start time
+              matches the recorded start time.
+            justification: |
+              Process ids are recycled by the operating system. Checking the start time as well prevents a
+              new, unrelated process from being mistaken for a dead daemon, or from being killed during
+              cleanup.
+            tests:
+              - SessionStore_IsProcessAlive_CurrentProcess_TrueOnlyWithMatchingStartTime

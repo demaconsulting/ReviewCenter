@@ -1,0 +1,33 @@
+---
+# bUnit OTS Software Requirements
+#
+# Requirements for the bUnit component testing library and the ASP.NET Core test host.
+
+sections:
+  - title: OTS Software Requirements
+    sections:
+      - title: bUnit Requirements
+        requirements:
+          - id: ReviewCenter-OTS-bUnit-Component
+            title: bUnit shall render Razor components in a test context and simulate user interaction.
+            justification: |
+              bUnit is the component testing library used to verify the Razor components of the
+              ReviewCenter web interface without a browser. Passing tests that render components,
+              click buttons, and assert on the resulting markup confirm the library functions
+              correctly.
+            tags: [ots]
+            tests:
+              - HomePage_HelloButton_Clicked_ShowsGreeting
+              - HomePage_CounterButton_ClickedThreeTimes_ShowsCountThree
+              - Routes_Render_RootUrl_RendersHomePage
+          - id: ReviewCenter-OTS-bUnit-TestHost
+            title: The ASP.NET Core test host shall serve the application in memory for request tests.
+            justification: |
+              Microsoft.AspNetCore.TestHost is used by the test project, alongside bUnit, to run the
+              web application in memory and send requests with a test client. Passing tests that
+              request the health and home routes confirm the hosting pipeline can be verified without
+              a network listener.
+            tags: [ots]
+            tests:
+              - ServerHost_CreateApplication_HealthRoute_Returns200Healthy
+              - WebSubsystem_HomeRoute_Requested_RendersTitleAndControls

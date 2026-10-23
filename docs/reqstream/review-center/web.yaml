@@ -1,0 +1,40 @@
+---
+# Web Subsystem Requirements
+#
+# PURPOSE:
+# - Define requirements for the ReviewCenter Web subsystem
+# - The Web subsystem spans the App (App.razor, Routes.razor) and HomePage (HomePage.razor) units
+# - Subsystem requirements describe the externally visible behavior of the web user interface
+
+sections:
+  - title: Web Subsystem Requirements
+    requirements:
+      - id: ReviewCenter-Web-HomePage
+        title: >-
+          The Web subsystem shall serve a home page at the root URL, inside an HTML document
+          titled ReviewCenter, offering a Hello button and a counter button with a visible count.
+        justification: |
+          The home page is the entry point of the web user interface. Delivering it in a
+          complete HTML document through a routing layer proves that the shell, the router,
+          and the page work together to put the page's controls in front of the user.
+        children:
+          - ReviewCenter-App-Shell
+          - ReviewCenter-App-Routing
+          - ReviewCenter-HomePage-Title
+          - ReviewCenter-HomePage-Hello
+          - ReviewCenter-HomePage-Counter
+        tests:
+          - WebSubsystem_HomeRoute_Requested_RendersTitleAndControls
+
+      - id: ReviewCenter-Web-Interactive
+        title: >-
+          The Web subsystem shall mark the home page as not yet interactive in its initial
+          server-rendered response, and as interactive once the live connection is established.
+        justification: |
+          Clicks made before the live server connection exists are lost. A marker on the page
+          lets users, automated tests, and tooling wait until the page can respond instead of
+          guessing with fixed delays.
+        children:
+          - ReviewCenter-HomePage-Interactive
+        tests:
+          - WebSubsystem_HomeRoute_InitialResponse_IsNotYetInteractive

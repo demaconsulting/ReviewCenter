@@ -1,0 +1,40 @@
+---
+# Hosting Subsystem Requirements
+#
+# PURPOSE:
+# - Define requirements for the ReviewCenter Hosting subsystem
+# - The Hosting subsystem spans ServerHost.cs (web server composition, endpoints, and logging)
+# - Subsystem requirements describe the externally visible behavior of the running web server
+
+sections:
+  - title: Hosting Subsystem Requirements
+    requirements:
+      - id: ReviewCenter-Hosting-Health
+        title: >-
+          The Hosting subsystem shall answer requests for the /health URL with HTTP status 200
+          and the text Healthy while the server is running, alongside the user interface routes.
+        justification: |
+          Reverse proxies, container orchestrators, monitoring tools, and test tooling need a
+          simple, unauthenticated way to find out whether the service is up. The health route
+          must coexist with the user interface routes on the same server so that one probe
+          reflects the state of the whole web service.
+        children:
+          - ReviewCenter-ServerHost-Health
+        tests:
+          - HostingSubsystem_HealthEndpoint_Requested_ReturnsHealthy
+          - HostingSubsystem_Routes_BothRegistered_HomeAndHealthAnswer
+
+      - id: ReviewCenter-Hosting-Logging
+        title: >-
+          The Hosting subsystem shall write structured log entries, including a start-up entry
+          that carries the listen URL as a named property, to the configured logging sinks.
+        justification: |
+          Operators need to confirm that the service started and where it is listening, and
+          log aggregation tools need named properties rather than pre-formatted text so that
+          entries can be searched and correlated. Framework request logging flowing to the
+          same sinks gives a single audit trail for the running service.
+        children:
+          - ReviewCenter-ServerHost-Logging
+          - ReviewCenter-ServerHost-SilentMode
+        tests:
+          - HostingSubsystem_Startup_LoggingConfigured_EmitsStructuredEntry

@@ -38,8 +38,11 @@ public class ValidationTests
         // Arrange: setup test conditions
         // No setup required — null is the input under test.
 
-        // Act & Assert: invoke Run with null context and verify ArgumentNullException is thrown
-        Assert.Throws<ArgumentNullException>(() => Validation.Run(null!));
+        // Act: invoke Run with null context
+        var exception = Record.Exception(() => Validation.Run(null!));
+
+        // Assert: verify ArgumentNullException is thrown
+        Assert.IsType<ArgumentNullException>(exception);
     }
 
     /// <summary>

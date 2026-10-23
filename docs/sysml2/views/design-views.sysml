@@ -16,11 +16,26 @@ package ReviewCenter {
         expose CliSubsystem;
     }
 
+    view HostingView {
+        expose HostingSubsystem;
+    }
+
+    view WebView {
+        expose WebSubsystem;
+    }
+
     view SelfTestView {
         expose SelfTestSubsystem;
     }
 
     view UtilitiesView {
         expose UtilitiesSubsystem;
+    }
+}
+
+// Reopens the separate ReviewCenterPuppet package (the Puppet dev tool software system).
+package ReviewCenterPuppet {
+    view ReviewCenterPuppetView {
+        expose ReviewCenterPuppetSystem;
     }
 }

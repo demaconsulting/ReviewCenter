@@ -3,7 +3,7 @@
   <PropertyGroup>
     <!-- Build Configuration -->
     <OutputType>Exe</OutputType>
-    <TargetFrameworks>net8.0;net9.0;net10.0</TargetFrameworks>
+    <TargetFramework>net10.0</TargetFramework>
     <LangVersion>latest</LangVersion>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
@@ -44,6 +44,14 @@
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
+  </ItemGroup>
+
+  <!-- Web Component Test Dependencies -->
+  <ItemGroup>
+    <!-- bUnit renders Razor components in memory so component behavior can be unit tested without a browser -->
+    <PackageReference Include="bunit" Version="2.12.5" />
+    <!-- TestHost provides the in-memory web server used to exercise the HTTP pipeline without a network port -->
+    <PackageReference Include="Microsoft.AspNetCore.TestHost" Version="10.0.13" />
   </ItemGroup>
 
   <!-- Code Analysis Dependencies -->

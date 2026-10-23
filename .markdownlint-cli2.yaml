@@ -53,3 +53,6 @@ ignores:
   - "**/generated/**"
   - "**/AGENT_REPORT_*.md"
   - "**/.agent-logs/**"
+  # Build output (the Playwright driver package copied into tools/puppet/bin ships its own markdown files)
+  - "**/bin/**"
+  - "**/obj/**"

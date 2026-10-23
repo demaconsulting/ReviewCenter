@@ -269,5 +269,104 @@ public class ProgramTests
             Console.SetOut(originalOut);
         }
     }
+
+    /// <summary>
+    ///     Test that Run with the serve verb starts the web server and stops it when cancelled.
+    /// </summary>
+    [Fact]
+    public async Task Program_Run_WithServeVerb_StartsServerAndStopsOnCancellation()
+    {
+        // Arrange: serve on a free loopback port, silent so no console noise
+        var url = $"http://127.0.0.1:{ServerProcess.GetFreePort()}";
+        using var context = Context.Create(["serve", "--urls", url, "--silent"]);
+        using var cts = new CancellationTokenSource();
+        var serverTask = Task.Run(() => Program.RunWithCancellation(context, cts.Token), TestContext.Current.CancellationToken);
+
+        try
+        {
+            // Act: wait for the health endpoint to answer
+            using var client = new HttpClient { Timeout = TimeSpan.FromSeconds(2) };
+            string? body = null;
+            var deadline = DateTime.UtcNow.AddSeconds(30);
+            while (body is null && DateTime.UtcNow < deadline && !serverTask.IsCompleted)
+            {
+                try
+                {
+                    body = await client.GetStringAsync($"{url}/health", TestContext.Current.CancellationToken);
+                }
+                catch (HttpRequestException)
+                {
+                    await Task.Delay(100, TestContext.Current.CancellationToken);
+                }
+            }
+
+            // Assert: the server answered while running
+            Assert.Equal("Healthy", body);
+        }
+        finally
+        {
+            // Stop the server and wait for Run to return
+            await cts.CancelAsync();
+            await serverTask.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
+        }
+
+        // Assert: a clean stop is not an error
+        Assert.Equal(0, context.ExitCode);
+    }
+
+    /// <summary>
+    ///     Test that Run with the serve verb reports an unusable address as an error instead of throwing.
+    /// </summary>
+    [Fact]
+    public void Program_Run_WithServeVerb_PortInUse_ReportsError()
+    {
+        // Arrange: occupy a port so the server cannot bind it
+        var listener = new System.Net.Sockets.TcpListener(System.Net.IPAddress.Loopback, 0);
+        listener.Start();
+        try
+        {
+            var port = ((System.Net.IPEndPoint)listener.LocalEndpoint).Port;
+            using var context = Context.Create(["serve", "--urls", $"http://127.0.0.1:{port}", "--silent"]);
+
+            // Act: try to start the server
+            Program.Run(context);
+
+            // Assert: failure is reported through the exit code, not an exception
+            Assert.Equal(1, context.ExitCode);
+        }
+        finally
+        {
+            listener.Stop();
+        }
+    }
+
+    /// <summary>
+    ///     Test that the help text documents the serve verb and the --urls option.
+    /// </summary>
+    [Fact]
+    public void Program_Run_WithHelpFlag_ListsServeVerbAndUrlsOption()
+    {
+        // Arrange: capture console output
+        var originalOut = Console.Out;
+        try
+        {
+            using var outWriter = new StringWriter();
+            Console.SetOut(outWriter);
+            using var context = Context.Create(["--help"]);
+
+            // Act: print help
+            Program.Run(context);
+
+            // Assert: the serve verb and --urls option are documented
+            var output = outWriter.ToString();
+            Assert.Contains("serve", output);
+            Assert.Contains("--urls", output);
+            Assert.Contains("http://localhost:5000", output);
+        }
+        finally
+        {
+            Console.SetOut(originalOut);
+        }
+    }
 }
 

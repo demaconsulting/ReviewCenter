@@ -9,6 +9,7 @@ needs-review:
   - "README.md"                   # Root README file
   - "requirements.yaml"           # Root requirements file
   - "**/*.cs"                     # All C# source and test files
+  - "**/*.razor"                  # All Razor component files
   - "docs/reqstream/**/*.yaml"    # Requirements files
   - "docs/design/**/*.md"         # Design documentation files
   - "docs/verification/**/*.md"   # Verification documentation files
@@ -62,11 +63,15 @@ reviews:
       - "docs/user_guide/**/*.md"
     paths:
       - "docs/reqstream/review-center.yaml"
+      - "docs/reqstream/quality.yaml"
       - "docs/design/introduction.md"
       - "docs/design/review-center.md"
       - "docs/verification/introduction.md"
       - "docs/verification/review-center.md"
       - "test/**/IntegrationTests.cs"
+      - "test/**/Runner.cs"
+      - "test/**/ServerProcess.cs"
+      - "test/**/AssemblyInfo.cs"
 
   - id: ReviewCenter-Design
     title: Review of ReviewCenter architectural and design consistency
@@ -178,13 +183,243 @@ reviews:
       - "src/**/Utilities/PathHelpers.cs"
       - "test/**/Utilities/PathHelpersTests.cs"
 
+  # ReviewCenter - Hosting
+  - id: ReviewCenter-Hosting
+    title: Review of ReviewCenter Hosting subsystem architecture and interfaces
+    context:
+      - docs/design/review-center.md
+      - docs/reqstream/review-center.yaml
+    paths:
+      - "docs/reqstream/review-center/hosting.yaml"
+      - "docs/design/review-center/hosting.md"
+      - "docs/verification/review-center/hosting.md"
+      - "test/**/Hosting/HostingSubsystemTests.cs"
+      - "test/**/TestWebApp.cs"
+
+  - id: ReviewCenter-Hosting-ServerHost
+    title: Review of ReviewCenter ServerHost unit implementation
+    context:
+      - docs/design/review-center.md
+      - docs/reqstream/review-center.yaml
+      - docs/design/review-center/hosting.md
+      - docs/reqstream/review-center/hosting.yaml
+    paths:
+      - "docs/reqstream/review-center/hosting/server-host.yaml"
+      - "docs/design/review-center/hosting/server-host.md"
+      - "docs/verification/review-center/hosting/server-host.md"
+      - "src/**/Hosting/ServerHost.cs"
+      - "src/**/Hosting/ServerHostOptions.cs"
+      - "test/**/Hosting/ServerHostTests.cs"
+
+  # ReviewCenter - Web
+  - id: ReviewCenter-Web
+    title: Review of ReviewCenter Web subsystem architecture and interfaces
+    context:
+      - docs/design/review-center.md
+      - docs/reqstream/review-center.yaml
+    paths:
+      - "docs/reqstream/review-center/web.yaml"
+      - "docs/design/review-center/web.md"
+      - "docs/verification/review-center/web.md"
+      - "test/**/Web/WebSubsystemTests.cs"
+      - "test/**/TestWebApp.cs"
+
+  - id: ReviewCenter-Web-App
+    title: Review of ReviewCenter App unit implementation
+    context:
+      - docs/design/review-center.md
+      - docs/reqstream/review-center.yaml
+      - docs/design/review-center/web.md
+      - docs/reqstream/review-center/web.yaml
+    paths:
+      - "docs/reqstream/review-center/web/app.yaml"
+      - "docs/design/review-center/web/app.md"
+      - "docs/verification/review-center/web/app.md"
+      - "src/**/Web/App.razor"
+      - "src/**/Web/Routes.razor"
+      - "src/**/Web/_Imports.razor"
+      - "test/**/Web/AppTests.cs"
+
+  - id: ReviewCenter-Web-HomePage
+    title: Review of ReviewCenter HomePage unit implementation
+    context:
+      - docs/design/review-center.md
+      - docs/reqstream/review-center.yaml
+      - docs/design/review-center/web.md
+      - docs/reqstream/review-center/web.yaml
+    paths:
+      - "docs/reqstream/review-center/web/home-page.yaml"
+      - "docs/design/review-center/web/home-page.md"
+      - "docs/verification/review-center/web/home-page.md"
+      - "src/**/Web/HomePage.razor"
+      - "src/**/Web/HomePage.razor.cs"
+      - "test/**/Web/HomePageTests.cs"
+
+  # ReviewCenterPuppet - Specials (separate software system, development tool)
+  - id: ReviewCenterPuppet-Architecture
+    title: Review of ReviewCenterPuppet system architecture and end-to-end operation
+    context:
+      - README.md
+      - "docs/user_guide/**/*.md"
+    paths:
+      - "docs/reqstream/review-center-puppet.yaml"
+      - "docs/design/introduction.md"
+      - "docs/design/review-center-puppet.md"
+      - "docs/verification/introduction.md"
+      - "docs/verification/review-center-puppet.md"
+      - "test/**/PuppetSystemTests.cs"
+      - "test/**/PuppetEndToEndTests.cs"
+      - "test/**/Fakes.cs"
+
+  - id: ReviewCenterPuppet-Design
+    title: Review of ReviewCenterPuppet architectural and design consistency
+    context:
+      - docs/reqstream/review-center-puppet.yaml
+    paths:
+      - "docs/design/introduction.md"
+      - "docs/design/review-center-puppet.md"
+      - "docs/design/review-center-puppet/**/*.md"
+      - "docs/design/ots.md"
+
+  - id: ReviewCenterPuppet-Verification
+    title: Review of ReviewCenterPuppet verification consistency and completeness
+    context:
+      - docs/reqstream/review-center-puppet.yaml
+    paths:
+      - "docs/verification/introduction.md"
+      - "docs/verification/review-center-puppet.md"
+      - "docs/verification/review-center-puppet/**/*.md"
+      - "docs/verification/ots.md"
+
+  - id: ReviewCenterPuppet-AllRequirements
+    title: Review of ReviewCenterPuppet requirements quality and traceability
+    context:
+      - docs/design/review-center-puppet.md
+      - docs/reqstream/review-center-puppet.yaml
+    paths:
+      - "docs/reqstream/review-center-puppet/**/*.yaml"
+
+  # ReviewCenterPuppet - Units
+  - id: ReviewCenterPuppet-PuppetProgram
+    title: Review of ReviewCenterPuppet PuppetProgram unit implementation
+    context:
+      - docs/design/review-center-puppet.md
+      - docs/reqstream/review-center-puppet.yaml
+    paths:
+      - "docs/reqstream/review-center-puppet/puppet-program.yaml"
+      - "docs/design/review-center-puppet/puppet-program.md"
+      - "docs/verification/review-center-puppet/puppet-program.md"
+      - "tools/puppet/PuppetProgram.cs"
+      - "test/**/PuppetProgramTests.cs"
+
+  - id: ReviewCenterPuppet-CommandLine
+    title: Review of ReviewCenterPuppet CommandLine unit implementation
+    context:
+      - docs/design/review-center-puppet.md
+      - docs/reqstream/review-center-puppet.yaml
+    paths:
+      - "docs/reqstream/review-center-puppet/command-line.yaml"
+      - "docs/design/review-center-puppet/command-line.md"
+      - "docs/verification/review-center-puppet/command-line.md"
+      - "tools/puppet/CommandLine.cs"
+      - "test/**/CommandLineTests.cs"
+
+  - id: ReviewCenterPuppet-SelectorResolver
+    title: Review of ReviewCenterPuppet SelectorResolver unit implementation
+    context:
+      - docs/design/review-center-puppet.md
+      - docs/reqstream/review-center-puppet.yaml
+    paths:
+      - "docs/reqstream/review-center-puppet/selector-resolver.yaml"
+      - "docs/design/review-center-puppet/selector-resolver.md"
+      - "docs/verification/review-center-puppet/selector-resolver.md"
+      - "tools/puppet/SelectorResolver.cs"
+      - "test/**/SelectorResolverTests.cs"
+
+  - id: ReviewCenterPuppet-SessionStore
+    title: Review of ReviewCenterPuppet SessionStore unit implementation
+    context:
+      - docs/design/review-center-puppet.md
+      - docs/reqstream/review-center-puppet.yaml
+    paths:
+      - "docs/reqstream/review-center-puppet/session-store.yaml"
+      - "docs/design/review-center-puppet/session-store.md"
+      - "docs/verification/review-center-puppet/session-store.md"
+      - "tools/puppet/SessionStore.cs"
+      - "test/**/SessionStoreTests.cs"
+
+  - id: ReviewCenterPuppet-ControlChannel
+    title: Review of ReviewCenterPuppet ControlChannel unit implementation
+    context:
+      - docs/design/review-center-puppet.md
+      - docs/reqstream/review-center-puppet.yaml
+    paths:
+      - "docs/reqstream/review-center-puppet/control-channel.yaml"
+      - "docs/design/review-center-puppet/control-channel.md"
+      - "docs/verification/review-center-puppet/control-channel.md"
+      - "tools/puppet/ControlProtocol.cs"
+      - "tools/puppet/ControlServer.cs"
+      - "test/**/ControlChannelTests.cs"
+
+  - id: ReviewCenterPuppet-CommandExecutor
+    title: Review of ReviewCenterPuppet CommandExecutor unit implementation
+    context:
+      - docs/design/review-center-puppet.md
+      - docs/reqstream/review-center-puppet.yaml
+    paths:
+      - "docs/reqstream/review-center-puppet/command-executor.yaml"
+      - "docs/design/review-center-puppet/command-executor.md"
+      - "docs/verification/review-center-puppet/command-executor.md"
+      - "tools/puppet/CommandExecutor.cs"
+      - "test/**/CommandExecutorTests.cs"
+
+  - id: ReviewCenterPuppet-DaemonHost
+    title: Review of ReviewCenterPuppet DaemonHost unit implementation
+    context:
+      - docs/design/review-center-puppet.md
+      - docs/reqstream/review-center-puppet.yaml
+    paths:
+      - "docs/reqstream/review-center-puppet/daemon-host.yaml"
+      - "docs/design/review-center-puppet/daemon-host.md"
+      - "docs/verification/review-center-puppet/daemon-host.md"
+      - "tools/puppet/DaemonHost.cs"
+      - "tools/puppet/ServerProcessRunner.cs"
+      - "tools/puppet/PlaywrightBrowser.cs"
+      - "test/**/DaemonHostTests.cs"
+
+  - id: ReviewCenterPuppet-DaemonLauncher
+    title: Review of ReviewCenterPuppet DaemonLauncher unit implementation
+    context:
+      - docs/design/review-center-puppet.md
+      - docs/reqstream/review-center-puppet.yaml
+    paths:
+      - "docs/reqstream/review-center-puppet/daemon-launcher.yaml"
+      - "docs/design/review-center-puppet/daemon-launcher.md"
+      - "docs/verification/review-center-puppet/daemon-launcher.md"
+      - "tools/puppet/DaemonLauncher.cs"
+      - "test/**/DaemonLauncherTests.cs"
+
   # OTS Items
+  - id: OTS-AspNetCore
+    title: Review of ASP.NET Core OTS verification evidence
+    paths:
+      - "docs/reqstream/ots/aspnetcore.yaml"
+      - "docs/design/ots/aspnetcore.md"
+      - "docs/verification/ots/aspnetcore.md"
+
   - id: OTS-BuildMark
     title: Review of BuildMark OTS verification evidence
     paths:
       - "docs/reqstream/ots/buildmark.yaml"
       - "docs/design/ots/buildmark.md"
       - "docs/verification/ots/buildmark.md"
+
+  - id: OTS-bUnit
+    title: Review of bUnit OTS verification evidence
+    paths:
+      - "docs/reqstream/ots/bunit.yaml"
+      - "docs/design/ots/bunit.md"
+      - "docs/verification/ots/bunit.md"
 
   - id: OTS-FileAssert
     title: Review of FileAssert OTS verification evidence
@@ -199,6 +434,14 @@ reviews:
       - "docs/reqstream/ots/pandoc.yaml"
       - "docs/design/ots/pandoc.md"
       - "docs/verification/ots/pandoc.md"
+
+  - id: OTS-Playwright
+    title: Review of Playwright OTS verification evidence
+    paths:
+      - "docs/reqstream/ots/playwright.yaml"
+      - "docs/design/ots/playwright.md"
+      - "docs/verification/ots/playwright.md"
+      - "test/**/PlaywrightOtsTests.cs"
 
   - id: OTS-ReqStream
     title: Review of ReqStream OTS verification evidence

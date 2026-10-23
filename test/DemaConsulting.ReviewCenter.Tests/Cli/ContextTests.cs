@@ -197,14 +197,109 @@ public class ContextTests
     }
 
     /// <summary>
+    ///     Test creating a context with the serve verb enables the serve action.
+    /// </summary>
+    [Fact]
+    public void Context_Create_ServeVerb_SetsServe()
+    {
+        // Act: parse the serve verb
+        using var context = Context.Create(["serve"]);
+
+        // Assert: serve is requested and the default URL applies
+        Assert.True(context.Serve);
+        Assert.Equal(Context.DefaultUrls, context.Urls);
+    }
+
+    /// <summary>
+    ///     Test that without the serve verb the serve action is off.
+    /// </summary>
+    [Fact]
+    public void Context_Create_NoServeVerb_SetsServeFalse()
+    {
+        // Act: parse a context with no verb
+        using var context = Context.Create([]);
+
+        // Assert: serve is not requested
+        Assert.False(context.Serve);
+    }
+
+    /// <summary>
+    ///     Test creating a context with --urls records the requested URL.
+    /// </summary>
+    [Fact]
+    public void Context_Create_UrlsFlag_SetsUrls()
+    {
+        // Act: parse serve with an explicit URL
+        using var context = Context.Create(["serve", "--urls", "http://127.0.0.1:6001"]);
+
+        // Assert: the URL is recorded
+        Assert.Equal("http://127.0.0.1:6001", context.Urls);
+    }
+
+    /// <summary>
+    ///     Test that --urls without the serve verb is rejected.
+    /// </summary>
+    [Fact]
+    public void Context_Create_UrlsWithoutServe_ThrowsArgumentException()
+    {
+        // Arrange: no setup required; the argument combination is the input under test
+
+        // Act: parse --urls without serve
+        var exception = Record.Exception(() => Context.Create(["--urls", "http://127.0.0.1:6001"]));
+
+        // Assert: --urls only makes sense with serve
+        var argumentException = Assert.IsType<ArgumentException>(exception);
+        Assert.Contains("serve", argumentException.Message);
+    }
+
+    /// <summary>
+    ///     Test that --urls without a value is rejected.
+    /// </summary>
+    [Fact]
+    public void Context_Create_UrlsFlag_WithoutValue_ThrowsArgumentException()
+    {
+        // Arrange: no setup required; the arguments are the input under test
+
+        // Act: parse --urls without a value
+        var exception = Record.Exception(() => Context.Create(["serve", "--urls"]));
+
+        // Assert: an ArgumentException naming the flag is thrown
+        var argumentException = Assert.IsType<ArgumentException>(exception);
+        Assert.Contains("--urls", argumentException.Message);
+    }
+
+    /// <summary>
+    ///     Test that --urls with a value that is not an absolute http or https URL is rejected.
+    /// </summary>
+    [Theory]
+    [InlineData("not-a-url")]
+    [InlineData("ftp://localhost:21")]
+    public void Context_Create_InvalidUrls_ThrowsArgumentException(string value)
+    {
+        // Arrange: no setup required; the invalid URL value is the input under test
+
+        // Act: parse --urls with an invalid value
+        var exception = Record.Exception(() => Context.Create(["serve", "--urls", value]));
+
+        // Assert: an ArgumentException naming the flag is thrown
+        var argumentException = Assert.IsType<ArgumentException>(exception);
+        Assert.Contains("--urls", argumentException.Message);
+    }
+
+    /// <summary>
     ///     Test creating a context with an unknown argument throws exception.
     /// </summary>
     [Fact]
     public void Context_Create_UnknownArgument_ThrowsArgumentException()
     {
-        // Act & Assert
-        var exception = Assert.Throws<ArgumentException>(() => Context.Create(["--unknown"]));
-        Assert.Contains("Unsupported argument", exception.Message);
+        // Arrange: no setup required; the unknown argument is the input under test
+
+        // Act: parse an unknown argument
+        var exception = Record.Exception(() => Context.Create(["--unknown"]));
+
+        // Assert: an ArgumentException reporting the unsupported argument is thrown
+        var argumentException = Assert.IsType<ArgumentException>(exception);
+        Assert.Contains("Unsupported argument", argumentException.Message);
     }
 
     /// <summary>
@@ -213,9 +308,14 @@ public class ContextTests
     [Fact]
     public void Context_Create_LogFlag_WithoutValue_ThrowsArgumentException()
     {
-        // Act & Assert
-        var exception = Assert.Throws<ArgumentException>(() => Context.Create(["--log"]));
-        Assert.Contains("--log", exception.Message);
+        // Arrange: no setup required; the arguments are the input under test
+
+        // Act: parse --log without a value
+        var exception = Record.Exception(() => Context.Create(["--log"]));
+
+        // Assert: an ArgumentException naming the flag is thrown
+        var argumentException = Assert.IsType<ArgumentException>(exception);
+        Assert.Contains("--log", argumentException.Message);
     }
 
     /// <summary>
@@ -224,9 +324,14 @@ public class ContextTests
     [Fact]
     public void Context_Create_ResultsFlag_WithoutValue_ThrowsArgumentException()
     {
-        // Act & Assert
-        var exception = Assert.Throws<ArgumentException>(() => Context.Create(["--results"]));
-        Assert.Contains("--results", exception.Message);
+        // Arrange: no setup required; the arguments are the input under test
+
+        // Act: parse --results without a value
+        var exception = Record.Exception(() => Context.Create(["--results"]));
+
+        // Assert: an ArgumentException naming the flag is thrown
+        var argumentException = Assert.IsType<ArgumentException>(exception);
+        Assert.Contains("--results", argumentException.Message);
     }
 
     /// <summary>
@@ -249,9 +354,14 @@ public class ContextTests
     [Fact]
     public void Context_Create_ResultAliasFlag_WithoutValue_ThrowsArgumentException()
     {
-        // Act & Assert
-        var exception = Assert.Throws<ArgumentException>(() => Context.Create(["--result"]));
-        Assert.Contains("--result", exception.Message);
+        // Arrange: no setup required; the arguments are the input under test
+
+        // Act: parse --result without a value
+        var exception = Record.Exception(() => Context.Create(["--result"]));
+
+        // Assert: an ArgumentException naming the flag is thrown
+        var argumentException = Assert.IsType<ArgumentException>(exception);
+        Assert.Contains("--result", argumentException.Message);
     }
 
     /// <summary>
@@ -288,9 +398,14 @@ public class ContextTests
     [Fact]
     public void Context_Create_DepthFlag_WithoutValue_ThrowsArgumentException()
     {
-        // Act & Assert
-        var exception = Assert.Throws<ArgumentException>(() => Context.Create(["--depth"]));
-        Assert.Contains("--depth", exception.Message);
+        // Arrange: no setup required; the arguments are the input under test
+
+        // Act: parse --depth without a value
+        var exception = Record.Exception(() => Context.Create(["--depth"]));
+
+        // Assert: an ArgumentException naming the flag is thrown
+        var argumentException = Assert.IsType<ArgumentException>(exception);
+        Assert.Contains("--depth", argumentException.Message);
     }
 
     /// <summary>
@@ -299,9 +414,14 @@ public class ContextTests
     [Fact]
     public void Context_Create_DepthFlag_NonIntegerValue_ThrowsArgumentException()
     {
-        // Act & Assert
-        var exception = Assert.Throws<ArgumentException>(() => Context.Create(["--depth", "abc"]));
-        Assert.Contains("--depth", exception.Message);
+        // Arrange: no setup required; the non-integer value is the input under test
+
+        // Act: parse --depth with a non-integer value
+        var exception = Record.Exception(() => Context.Create(["--depth", "abc"]));
+
+        // Assert: an ArgumentException naming the flag is thrown
+        var argumentException = Assert.IsType<ArgumentException>(exception);
+        Assert.Contains("--depth", argumentException.Message);
     }
 
     /// <summary>
@@ -310,9 +430,14 @@ public class ContextTests
     [Fact]
     public void Context_Create_DepthFlag_ZeroValue_ThrowsArgumentException()
     {
-        // Act & Assert
-        var exception = Assert.Throws<ArgumentException>(() => Context.Create(["--depth", "0"]));
-        Assert.Contains("--depth", exception.Message);
+        // Arrange: no setup required; the zero value is the input under test
+
+        // Act: parse --depth with a zero value
+        var exception = Record.Exception(() => Context.Create(["--depth", "0"]));
+
+        // Assert: an ArgumentException naming the flag is thrown
+        var argumentException = Assert.IsType<ArgumentException>(exception);
+        Assert.Contains("--depth", argumentException.Message);
     }
 
     /// <summary>
@@ -321,9 +446,14 @@ public class ContextTests
     [Fact]
     public void Context_Create_DepthFlag_ExceedsMaxValue_ThrowsArgumentException()
     {
-        // Act & Assert
-        var exception = Assert.Throws<ArgumentException>(() => Context.Create(["--depth", "7"]));
-        Assert.Contains("--depth", exception.Message);
+        // Arrange: no setup required; the out-of-range value is the input under test
+
+        // Act: parse --depth with a value above the maximum
+        var exception = Record.Exception(() => Context.Create(["--depth", "7"]));
+
+        // Assert: an ArgumentException naming the flag is thrown
+        var argumentException = Assert.IsType<ArgumentException>(exception);
+        Assert.Contains("--depth", argumentException.Message);
     }
 
     /// <summary>
@@ -501,8 +631,11 @@ public class ContextTests
         // Use a directory path so it cannot be opened as a file
         var invalidLogPath = Path.GetTempPath(); // temp directory itself, not a file
 
-        // Act & Assert
-        Assert.Throws<InvalidOperationException>(() => Context.Create(["--log", invalidLogPath]));
+        // Act: create a context whose log path cannot be opened
+        var exception = Record.Exception(() => Context.Create(["--log", invalidLogPath]));
+
+        // Assert: an InvalidOperationException is thrown
+        Assert.IsType<InvalidOperationException>(exception);
     }
 }
 

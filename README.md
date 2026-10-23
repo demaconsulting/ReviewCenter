@@ -14,17 +14,22 @@ for performing formal code reviews of file sets against earlier revisions. It su
 comments on code blocks and files, project-specific pass/fail/N/A checklists, primary and alternate
 reviewers, and re-authenticated electronic sign-off.
 
-The web service is under development; the current release provides the command-line scaffold.
+The `serve` verb runs ReviewCenter as an ASP.NET Core Blazor Server web application with a home page and a
+health endpoint. The review features themselves are still under development.
 
 ## Features
 
 The current release provides:
 
+- **Blazor Server Web Application**: `reviewcenter serve` hosts the web interface (home page at `/`) and a
+  `/health` endpoint, listening on `http://localhost:5000` by default or on the address given with `--urls`
 - **Standardized Command-Line Interface**: Context class handling common arguments
-  (`--version`, `--help`, `--silent`, `--validate`, `--results`, `--depth`, `--log`)
+  (`serve`, `--urls`, `--version`, `--help`, `--silent`, `--validate`, `--results`, `--depth`, `--log`)
 - **Self-Validation**: Built-in validation tests with TRX/JUnit output
 - **Multi-Platform Support**: Builds and runs on Windows, Linux, and macOS
-- **Multi-Runtime Support**: Targets .NET 8, 9, and 10
+- **Modern .NET**: Targets .NET 10 (`net10.0`)
+- **Puppet Developer Tool**: A separate in-repository tool that drives the web interface in headless Chromium
+  from the command line (see `tools/puppet/README.md`); it is not part of the distributed package
 - **Comprehensive CI/CD**: GitHub Actions workflows with quality checks, builds, and
   integration tests
 - **Linting Enforcement**: markdownlint, cspell, and yamllint enforced on every CI run
@@ -37,11 +42,18 @@ The current release provides:
 
 ## Installation
 
-Install the tool globally using the .NET CLI:
+ReviewCenter is under development and no release has been published yet, so there is nothing to install from NuGet
+or GitHub Releases. To run it, build it from source with the .NET 10 SDK:
 
 ```bash
-dotnet tool install -g DemaConsulting.ReviewCenter
+dotnet build
+dotnet run --project src/DemaConsulting.ReviewCenter -- serve
 ```
+
+The planned distribution is self-contained executables for win-x64 and linux-x64 (see `architecture.md`); the
+release pipeline has not been reworked for that yet. The command-line examples below use `reviewcenter`, the command
+name of the published executable; when running from source, replace `reviewcenter` with
+`dotnet run --project src/DemaConsulting.ReviewCenter --`.
 
 ## Usage
 
@@ -54,6 +66,12 @@ reviewcenter --version
 
 # Display help
 reviewcenter --help
+
+# Run the web server (default http://localhost:5000; home page at /, health check at /health)
+reviewcenter serve
+
+# Run the web server on another address
+reviewcenter serve --urls http://localhost:8080
 
 # Run self-validation
 reviewcenter --validate
@@ -73,6 +91,8 @@ reviewcenter --silent --log output.log
 
 | Option                                | Description                                                  |
 | ------------------------------------- | ------------------------------------------------------------ |
+| `serve`                               | Run the ReviewCenter web server until stopped                |
+| `--urls <url>`                        | Listen URL for `serve` (default: `http://localhost:5000`)    |
 | `-v`, `--version`                     | Display version information                                  |
 | `-?`, `-h`, `--help`                  | Display help message                                         |
 | `--silent`                            | Suppress console output                                      |
@@ -133,6 +153,20 @@ See the [User Guide][link-guide] for more details on the self-validation tests.
 
 On validation failure the tool will exit with a non-zero exit code.
 
+## Developer Tools
+
+The `tools/puppet` folder contains **Puppet**, a developer tool that starts the ReviewCenter server, opens it in
+headless Chromium, and lets a person or a coding agent look at and drive the web interface with short commands
+such as `click`, `text`, and `screenshot`. Puppet is not part of the distributed package. To use it, build it and
+download Chromium once:
+
+```bash
+dotnet build tools/puppet
+pwsh tools/puppet/bin/Debug/net10.0/playwright.ps1 install chromium
+```
+
+See `tools/puppet/README.md` for the commands, exit codes, and an example session.
+
 ## Documentation
 
 Generated documentation includes:
@@ -143,6 +177,15 @@ Generated documentation includes:
 - **Requirements**: Functional and non-functional requirements
 - **Requirements Justifications**: Detailed requirement rationale
 - **Trace Matrix**: Requirements to test traceability
+
+## TODO
+
+Planned but not yet implemented:
+
+- The review features of the ReviewCenter web service (the current web application is a starting point)
+- EF Core database migrations with an explicit `migrate` command
+- PDF/A evidence export of review records
+- AI-assisted review (planned to use an Azure OpenAI Service account)
 
 ## Contributing
 

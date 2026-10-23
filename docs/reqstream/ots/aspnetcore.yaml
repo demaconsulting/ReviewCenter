@@ -1,0 +1,34 @@
+---
+# ASP.NET Core OTS Software Requirements
+#
+# Requirements for the ASP.NET Core web platform functionality.
+
+sections:
+  - title: OTS Software Requirements
+    sections:
+      - title: ASP.NET Core Requirements
+        requirements:
+          - id: ReviewCenter-OTS-AspNetCore-Host
+            title: ASP.NET Core shall host the web application and answer HTTP requests on its mapped routes.
+            justification: |
+              ASP.NET Core with the Kestrel web server is the web platform on which the ReviewCenter
+              service runs. The service depends on it to route requests to the health endpoint and the
+              home page and to return the responses. Passing tests confirm the framework hosts the
+              application correctly, both in memory and in a real server process.
+            tags: [ots]
+            tests:
+              - ServerHost_CreateApplication_HealthRoute_Returns200Healthy
+              - ReviewCenter_ServeVerb_Started_HealthEndpointReturnsHealthy
+              - ReviewCenter_ServeVerb_Started_HomePageContainsTitleAndControls
+          - id: ReviewCenter-OTS-AspNetCore-Components
+            title: ASP.NET Core shall render Razor components and handle their interactive events.
+            justification: |
+              The ReviewCenter user interface is built from Razor components rendered by Blazor Server.
+              The service depends on the framework to render the routed page to HTML and to handle user
+              events such as button clicks. Passing tests confirm components render and respond
+              correctly.
+            tags: [ots]
+            tests:
+              - ReviewCenter_ServeVerb_Started_HomePageContainsTitleAndControls
+              - WebSubsystem_HomeRoute_Requested_RendersTitleAndControls
+              - HomePage_HelloButton_Clicked_ShowsGreeting

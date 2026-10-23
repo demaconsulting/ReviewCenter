@@ -17,9 +17,20 @@ flags and write output. The `Cli` subsystem contains one unit: `Context`.
 - *Role*: Provider.
 - *Contract*: Parses `string[] args` into flag properties and opens the log file if `--log` is
   present. Returns a fully initialized `Context`. Accepts `--result` as a legacy alias for
-  `--results`.
-- *Constraints*: Throws `ArgumentException` for unknown or malformed arguments; throws
-  `InvalidOperationException` when the log file cannot be opened.
+  `--results`, the `serve` verb, and `--urls <url>`, which sets the listen URL for `serve`
+  (default `http://localhost:5000`).
+- *Constraints*: Throws `ArgumentException` for unknown or malformed arguments, including
+  `--urls` without a value, `--urls` with a value that is not an absolute http or https URL,
+  and `--urls` without the `serve` verb; throws `InvalidOperationException` when the log file
+  cannot be opened.
+
+**Context.Serve** and **Context.Urls**: Read-only properties describing the serve request.
+
+- *Type*: In-process .NET properties.
+- *Role*: Provider.
+- *Contract*: `Serve` is true when the `serve` verb was supplied. `Urls` is the URL supplied
+  with `--urls`, or the default when none was supplied.
+- *Constraints*: Read-only; consumed by `Program` and by the `Hosting` subsystem.
 
 **Context.WriteLine**: Writes a message to stdout and to the log file.
 
@@ -60,7 +71,9 @@ own. All behavior is provided by `Context`. The `Program` unit creates a `Contex
 of each invocation and passes it to all other units that produce output.
 
 The subsystem has no dependencies on other tool subsystems; it uses only .NET BCL types
-(`Console`, `StreamWriter`).
+(`Console`, `StreamWriter`, `Uri`). The `Hosting` subsystem depends on it in the other
+direction: `ServerHost` reads the listen URL and the silent option from `Context`, and reports
+a failure to start through `Context.WriteError`.
 
 Error handling flows from `Context.Create` to `Program.Main`: argument parsing errors propagate
 as `ArgumentException`; log-file errors propagate as `InvalidOperationException`. Both are

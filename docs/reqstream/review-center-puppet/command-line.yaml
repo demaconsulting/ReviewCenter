@@ -1,0 +1,69 @@
+---
+# CommandLine Unit Requirements
+#
+# PURPOSE:
+# - Define requirements for the CommandLine unit (tools/puppet/CommandLine.cs)
+# - CommandLine parses the verb, its positional arguments, and the global options strictly,
+#   because the tool is run by scripts and coding agents that cannot ask what a command meant
+
+sections:
+  - title: ReviewCenterPuppet Requirements
+    sections:
+      - title: CommandLine Requirements
+        requirements:
+          - id: ReviewCenterPuppet-CommandLine-SessionId
+            title: >-
+              The CommandLine unit shall accept a session id of 1 to 32 letters, digits, hyphens, or
+              underscores and reject any other value.
+            justification: |
+              The session id names a file in the session folder. Limiting it to a tight character set keeps
+              every id usable as a file name and prevents an id from escaping the session folder.
+            tests:
+              - CommandLine_Parse_Session_IsCaptured
+              - CommandLine_Parse_InvalidSessionId_ThrowsArgumentException
+
+          - id: ReviewCenterPuppet-CommandLine-Timeout
+            title: >-
+              The CommandLine unit shall use a command timeout of 10 seconds unless the timeout option
+              provides another value.
+            justification: |
+              Every browser wait is bounded so that a missing element fails promptly. A short default suits
+              most commands, and the option lets a caller allow more time for slow pages.
+            tests:
+              - CommandLine_Parse_NoTimeout_UsesTenSecondDefault
+              - CommandLine_Parse_Timeout_OverridesDefault
+
+          - id: ReviewCenterPuppet-CommandLine-InvalidTimeout
+            title: >-
+              The CommandLine unit shall reject a timeout that is not a whole number of seconds from 1 to 600.
+            justification: |
+              A zero, negative, non-numeric, or enormous timeout would either fail immediately or let a
+              command hang, so it is rejected up front with a clear message.
+            tests:
+              - CommandLine_Parse_InvalidTimeout_ThrowsArgumentException
+
+          - id: ReviewCenterPuppet-CommandLine-OptionScope
+            title: >-
+              The CommandLine unit shall accept the output and full-page options only for the screenshot
+              command and the server option only for the start command.
+            justification: |
+              An option given to a command that ignores it is a typo that would otherwise pass silently, so
+              each option is accepted only where it has an effect.
+            tests:
+              - CommandLine_Parse_ScreenshotOptions_AreCaptured
+              - CommandLine_Parse_OutOnNonScreenshot_ThrowsArgumentException
+              - CommandLine_Parse_ServerOnStart_IsCaptured
+
+          - id: ReviewCenterPuppet-CommandLine-StrictParsing
+            title: >-
+              The CommandLine unit shall reject an unknown or missing command, a wrong number of arguments,
+              an unknown option, and an option without its value, with a message naming the problem.
+            justification: |
+              Scripts and coding agents need an immediate and specific message when a command is mistyped,
+              so parsing never guesses what the caller meant.
+            tests:
+              - CommandLine_Parse_UnknownCommand_ThrowsArgumentException
+              - CommandLine_Parse_NoArguments_ThrowsArgumentException
+              - CommandLine_Parse_WrongArgumentCount_ThrowsArgumentException
+              - CommandLine_Parse_UnknownOption_ThrowsArgumentException
+              - CommandLine_Parse_OptionWithoutValue_ThrowsArgumentException
