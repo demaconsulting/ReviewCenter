@@ -556,7 +556,13 @@ jobs:
           DOTNET_ROOT_X64: ${{ env.EMPTY_DOTNET_ROOT }}
         run: |
           set -u
-          URL="http://127.0.0.1:5189"
+          # Let the OS pick a free loopback port so a busy fixed port on the runner cannot fail the smoke test
+          PORT=$(pwsh -NoProfile -Command '
+            $l = [System.Net.Sockets.TcpListener]::new([System.Net.IPAddress]::Loopback, 0)
+            $l.Start(); $l.LocalEndpoint.Port; $l.Stop()')
+          PORT=$(echo "${PORT}" | tr -d '[:space:]')
+          if ! [[ "${PORT}" =~ ^[0-9]+$ ]]; then echo "✗ Could not allocate a free port: '${PORT}'"; exit 1; fi
+          URL="http://127.0.0.1:${PORT}"
           echo "Starting reviewcenter serve on ${URL}..."
           "$REVIEWCENTER_EXE" serve --urls "${URL}" > serve.log 2>&1 &
           SERVER_PID=$!

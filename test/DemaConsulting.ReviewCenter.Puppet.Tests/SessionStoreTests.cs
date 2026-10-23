@@ -227,7 +227,10 @@ public class SessionStoreTests
         var result = store.Lookup("busy", out var info);
         hold.Dispose();
 
-        // Assert: the lookup waited at least once, then found it live; nothing deleted, nothing killed
+        // Assert: the lookup waited at least once, then found it live; nothing deleted, nothing killed.
+        // The retry is expected on every platform: .NET enforces FileShare.None on Unix with advisory file
+        // locks, so the read open is refused there too (verified on Linux); only File.Move over a locked
+        // file differs (see the write test).
         Assert.True(sleeps >= 1);
         Assert.Equal(SessionLookup.Live, result);
         Assert.NotNull(info);
