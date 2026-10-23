@@ -17,11 +17,14 @@ requirement-linked evidence for the Puppet system requirements, and CI runs it w
 
 ### Test Environment
 
-N/A - standard test environment. The unit tests need no processes, files, or network access.
+N/A - standard test environment. The command-line tests need no processes, files, or network access. The class runs
+in the serial `Sequential` xUnit collection because the launch test starts a real child process.
 
 ### Acceptance Criteria
 
 - All unit tests pass with zero failures.
+- The identity reported for a launched process is that of the process that was created: it is alive by the session
+  store's own check, and the identity-checked kill ends it.
 - The session id and the server path reach the daemon unchanged, including when they contain spaces, quotes, or a
   trailing backslash (the round-trip scenario runs on Windows only).
 - An executable path and arguments that contain spaces are each enclosed in double quotes.
@@ -43,3 +46,9 @@ scenario is tested by `DaemonLauncher_BuildCommandLine_PathsWithSpaces_AreQuoted
 **DaemonLauncher_BuildCommandLine_EmbeddedQuote_IsEscaped**: An argument that contains a quote and an injected
 option is built into the command line `"p.exe" "a\" --evil \"b"`, which keeps it a single argument. This scenario is
 tested by `DaemonLauncher_BuildCommandLine_EmbeddedQuote_IsEscaped`.
+
+**DaemonLauncher_LaunchProcess_ReportsIdentityOfTheCreatedProcess**: A real idle executable (`ping` on Windows,
+`sleep` elsewhere) is launched through `LaunchProcess`. The reported process id and start time are accepted by
+`SessionStore.IsProcessAlive`, `SessionStore.KillProcess` with that identity ends the process, and the process is
+then reported as gone; a `finally` block ends the process if an assertion fails first. This scenario is tested by
+`DaemonLauncher_LaunchProcess_ReportsIdentityOfTheCreatedProcess`.

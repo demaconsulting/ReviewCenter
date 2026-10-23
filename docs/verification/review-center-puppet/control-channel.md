@@ -25,6 +25,9 @@ compete with other port- or process-using tests for CPU or sockets.
 - A handler that throws an unexpected exception produces a failed response (exit code 1) that names the exception
   type and the first line of its message, and later requests are still served.
 - A request survives a serialize and deserialize round trip with every field.
+- The client accepts only a JSON object with exactly a boolean `Ok`, an integer `ExitCode`, and a string `Message`;
+  `{}`, other JSON values, missing, extra, or mistyped properties, and non-JSON text fail with a `PuppetException`
+  naming the port, including when a foreign service on a loopback port answers `{}`.
 
 ### Test Scenarios
 
@@ -69,3 +72,14 @@ throws a `PuppetException`. This scenario is tested by `ControlChannel_Deseriali
 **ControlChannel_SerializeDeserialize_Request_RoundTrips**: A request with every field set is serialized and
 deserialized and the copy equals the original. This scenario is tested by
 `ControlChannel_SerializeDeserialize_Request_RoundTrips`.
+
+**ControlChannel_ParseResponse_AcceptsOnlyTheExactResponseShape**: The two genuine shapes (success with a message, and
+failure with exit code 2 and an empty message) parse. `{}`, an array, a bare string, an HTTP status line, an object
+without `Message`, an object with an extra property, and objects whose `Ok`, `ExitCode`, or `Message` has the wrong
+type each throw a `PuppetException` whose message names the port. This scenario is tested by
+`ControlChannel_ParseResponse_AcceptsOnlyTheExactResponseShape`.
+
+**ControlChannel_Send_ForeignServiceAnswersWithEmptyObject_ThrowsPuppetException**: A plain loopback listener that
+answers every request with `{}` plays the unrelated service on a reused port. The client throws a `PuppetException`
+saying the service did not answer like a Puppet session daemon, instead of returning a failed response with no
+message. This scenario is tested by `ControlChannel_Send_ForeignServiceAnswersWithEmptyObject_ThrowsPuppetException`.

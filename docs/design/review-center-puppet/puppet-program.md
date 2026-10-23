@@ -60,8 +60,15 @@ daemon that has been waited for), `start`
 terminates the daemon it launched, identified by its process id and start time and known even though no session file
 may have been written yet. It also terminates the server and the browser that a partly written session file records.
 Termination is asynchronous and can fail, and the file is the only record that lets a later command find a survivor,
-so the abort polls (every 100 milliseconds, up to the stop time-out, repeating the kill on each poll and ignoring
-caller cancellation) until no process of the daemon and the file is alive, and deletes the file only then. When a
+so the abort loops until no process of the daemon and the file is alive, and deletes the file only then. Each round
+kills the known processes (the browser, the server, then the daemon; the launched daemon by its own identity even
+when the file does not name it), polls every 100 milliseconds up to the stop time-out, repeating the kill on each poll
+and ignoring caller cancellation, and re-reads the file after the poll. Because the daemon is still running while it
+is being killed, it may record a server or browser after the abort last looked; when the record changed, the abort
+follows it (a start holds the reservation, so only the aborted daemon can have written it) and kills what it now
+names. The deletion is `DeleteIfSame` with the record last examined and the reservation held by this start: if it
+reports `Replaced` the abort starts another round (at most three), and if it reports `Busy` the cleanup is
+reported as unconfirmed with the file kept. There is no unconditional delete. When a
 process survives, the file is kept and the error says that the cleanup could not be confirmed; a later `start`,
 `stop`, or lookup finds the survivors through the file. A cancellation is re-raised after this cleanup. Nothing is
 ended by name.
@@ -77,7 +84,10 @@ tests) for the daemon to end, then runs `ForceStop`. A daemon that cannot be ask
 `Failed` since the stop began. When the file still describes the same session (`SessionStore.IsSameSession`), it
 terminates the browser, the server, and the daemon from that fresh record, otherwise from the record the stop
 examined; each is verified by process id and start time, so a newer session's processes are never touched. It uses
-the same bounded terminate-and-confirm loop as the start abort, and only when every process is confirmed gone does it
+the same bounded terminate-and-confirm loop as the start abort, except that it follows a changed record only when it
+is still the same session (`IsSameSession`): the daemon of that session may have recorded a server meanwhile, but a
+record of another session is never followed, because no start reservation is held that would prove it is ours. Only
+when every process is confirmed gone does it
 delete the file with `SessionStore.DeleteIfSame`, which keeps a replacement session that a concurrent `start`
 published in the meantime. When a process survives, the file is kept, `stop` prints that the stop could not be
 confirmed, and returns exit code 1 so that the command can be repeated. The same path handles a daemon whose own

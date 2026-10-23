@@ -74,30 +74,28 @@ internal sealed class DaemonLauncher : IDaemonLauncher
 
         arguments.AddRange([CommandLine.DaemonVerb, "--session", sessionId, "--server", serverPath]);
 
-        var pid = OperatingSystem.IsWindows()
-            ? LaunchWindows(executable, arguments)
-            : LaunchOther(executable, arguments);
-        return Identify(pid);
+        return LaunchProcess(executable, arguments);
     }
 
     /// <summary>
-    ///     Looks up the start time of a freshly launched process so it can be identified, and later
-    ///     terminated, without any risk of hitting a recycled process id.
+    ///     Starts a detached process and returns its identity, taken from the very process that was created.
     /// </summary>
-    /// <param name="pid">The process id returned by the launch.</param>
+    /// <remarks>
+    ///     The identity (process id and start time) is what every later kill and liveness check is judged by,
+    ///     so it must belong to the process that was created and not to whichever process holds the id a
+    ///     moment later. It is therefore read from the creation handle (Windows) or from the
+    ///     <see cref="Process"/> object that started the child (other platforms), never by looking the id up
+    ///     again after the launch.
+    /// </remarks>
+    /// <param name="executable">The executable path.</param>
+    /// <param name="arguments">The arguments.</param>
     /// <returns>The process id with its start time.</returns>
-    /// <exception cref="PuppetException">Thrown when the process is already gone.</exception>
-    private static ProcessIdentity Identify(int pid)
+    /// <exception cref="PuppetException">Thrown when the process cannot be created or its identity cannot be read.</exception>
+    internal static ProcessIdentity LaunchProcess(string executable, List<string> arguments)
     {
-        try
-        {
-            using var process = Process.GetProcessById(pid);
-            return new ProcessIdentity(pid, process.StartTime.ToUniversalTime());
-        }
-        catch (Exception ex) when (ex is ArgumentException or InvalidOperationException or Win32Exception)
-        {
-            throw new PuppetException("The session daemon exited immediately after it was started.", ex);
-        }
+        return OperatingSystem.IsWindows()
+            ? LaunchWindows(executable, arguments)
+            : LaunchOther(executable, arguments);
     }
 
     /// <summary>
@@ -162,9 +160,9 @@ internal sealed class DaemonLauncher : IDaemonLauncher
     /// </summary>
     /// <param name="executable">The executable path.</param>
     /// <param name="arguments">The arguments.</param>
-    /// <returns>The daemon's process id.</returns>
+    /// <returns>The daemon's process id and start time.</returns>
     /// <exception cref="PuppetException">Thrown when process creation fails.</exception>
-    private static int LaunchWindows(string executable, List<string> arguments)
+    private static ProcessIdentity LaunchWindows(string executable, List<string> arguments)
     {
         var commandLine = BuildCommandLine(executable, arguments);
         var workingDirectory = AppContext.BaseDirectory;
@@ -172,13 +170,13 @@ internal sealed class DaemonLauncher : IDaemonLauncher
         // First try to break away from the caller's job so the daemon survives the caller; a job that
         // forbids breakaway rejects the flag with "access denied", in which case start without it
         var baseFlags = NativeMethods.DetachedProcess | NativeMethods.CreateNewProcessGroup;
-        if (!TryCreateProcess(commandLine, workingDirectory, baseFlags | NativeMethods.CreateBreakawayFromJob, out var pid, out var error) &&
-            !TryCreateProcess(commandLine, workingDirectory, baseFlags, out pid, out error))
+        if (!TryCreateProcess(commandLine, workingDirectory, baseFlags | NativeMethods.CreateBreakawayFromJob, out var identity, out var error) &&
+            !TryCreateProcess(commandLine, workingDirectory, baseFlags, out identity, out error))
         {
             throw new PuppetException($"Could not start the session daemon: {new Win32Exception(error).Message}");
         }
 
-        return pid;
+        return identity;
     }
 
     /// <summary>
@@ -187,24 +185,39 @@ internal sealed class DaemonLauncher : IDaemonLauncher
     /// <param name="commandLine">The full command line.</param>
     /// <param name="workingDirectory">The working directory for the new process.</param>
     /// <param name="flags">The creation flags.</param>
-    /// <param name="pid">Receives the new process id on success.</param>
+    /// <param name="identity">Receives the new process id and start time on success.</param>
     /// <param name="error">Receives the Win32 error code on failure.</param>
     /// <returns><c>true</c> when the process was created.</returns>
-    private static bool TryCreateProcess(string commandLine, string workingDirectory, uint flags, out int pid, out int error)
+    /// <exception cref="PuppetException">Thrown when the process was created but its start time cannot be read.</exception>
+    private static bool TryCreateProcess(string commandLine, string workingDirectory, uint flags, out ProcessIdentity identity, out int error)
     {
         var startup = new NativeMethods.StartupInfo { Size = (uint)Marshal.SizeOf<NativeMethods.StartupInfo>() };
         if (NativeMethods.CreateProcess(null, commandLine, IntPtr.Zero, IntPtr.Zero, false, flags, IntPtr.Zero,
                 workingDirectory, in startup, out var info))
         {
-            // Only the process id is needed; release the handles so nothing is held open
-            NativeMethods.CloseHandle(info.ProcessHandle);
-            NativeMethods.CloseHandle(info.ThreadHandle);
-            pid = (int)info.ProcessId;
-            error = 0;
-            return true;
+            try
+            {
+                // The creation time is read through the handle returned by the creation, which addresses exactly
+                // the process that was created even if it has already exited and its id has been reused
+                if (!NativeMethods.GetProcessTimes(info.ProcessHandle, out var created, out _, out _, out _))
+                {
+                    throw new PuppetException(
+                        $"Could not read the start time of the session daemon: {new Win32Exception(Marshal.GetLastPInvokeError()).Message}");
+                }
+
+                identity = new ProcessIdentity((int)info.ProcessId, DateTime.FromFileTimeUtc(created));
+                error = 0;
+                return true;
+            }
+            finally
+            {
+                // Nothing else is needed from the handles; release them so nothing is held open
+                NativeMethods.CloseHandle(info.ProcessHandle);
+                NativeMethods.CloseHandle(info.ThreadHandle);
+            }
         }
 
-        pid = 0;
+        identity = default;
         error = Marshal.GetLastPInvokeError();
         return false;
     }
@@ -214,9 +227,9 @@ internal sealed class DaemonLauncher : IDaemonLauncher
     /// </summary>
     /// <param name="executable">The executable path.</param>
     /// <param name="arguments">The arguments.</param>
-    /// <returns>The daemon's process id.</returns>
-    /// <exception cref="PuppetException">Thrown when the process cannot be started.</exception>
-    private static int LaunchOther(string executable, List<string> arguments)
+    /// <returns>The daemon's process id and start time.</returns>
+    /// <exception cref="PuppetException">Thrown when the process cannot be started or exited immediately.</exception>
+    private static ProcessIdentity LaunchOther(string executable, List<string> arguments)
     {
         var startInfo = new ProcessStartInfo(executable)
         {
@@ -236,15 +249,22 @@ internal sealed class DaemonLauncher : IDaemonLauncher
         {
             using var process = Process.Start(startInfo) ?? throw new PuppetException("Could not start the session daemon.");
 
+            // The start time is read from the object that started the child, which addresses exactly that child
+            var identity = new ProcessIdentity(process.Id, process.StartTime.ToUniversalTime());
+
             // Closing our ends means the daemon never blocks on, or holds open, the caller's pipes
             process.StandardInput.Close();
             process.StandardOutput.Close();
             process.StandardError.Close();
-            return process.Id;
+            return identity;
         }
         catch (Win32Exception ex)
         {
             throw new PuppetException($"Could not start the session daemon: {ex.Message}", ex);
+        }
+        catch (InvalidOperationException ex)
+        {
+            throw new PuppetException("The session daemon exited immediately after it was started.", ex);
         }
     }
 }
@@ -385,4 +405,18 @@ internal static partial class NativeMethods
     [LibraryImport("kernel32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
     public static partial bool CloseHandle(IntPtr handle);
+
+    /// <summary>
+    ///     Reads the creation, exit, kernel, and user times of a process (<c>GetProcessTimes</c>); each is a
+    ///     <c>FileTime</c>, 100 nanosecond ticks since 1601 (UTC), which fits a 64 bit integer.
+    /// </summary>
+    /// <param name="process">A process handle with query access.</param>
+    /// <param name="creation">Receives the creation time.</param>
+    /// <param name="exit">Receives the exit time (undefined while the process runs).</param>
+    /// <param name="kernel">Receives the kernel mode time.</param>
+    /// <param name="user">Receives the user mode time.</param>
+    /// <returns><c>true</c> on success; call <see cref="Marshal.GetLastPInvokeError"/> on failure.</returns>
+    [LibraryImport("kernel32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static partial bool GetProcessTimes(IntPtr process, out long creation, out long exit, out long kernel, out long user);
 }

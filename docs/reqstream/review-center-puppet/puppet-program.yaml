@@ -78,6 +78,7 @@ sections:
               - PuppetProgram_Run_StartDaemonDiesEarly_ExitsFour
               - PuppetProgram_Run_StartTimesOutAndProcessSurvives_KeepsRecordAndReportsUnconfirmed
               - PuppetProgram_Run_StartTimesOutAndProcessesDieSlowly_DeletesRecordOnceConfirmedGone
+              - PuppetProgram_Run_StartAbandonedWhileDaemonRecordsServer_EndsLateRecordedServerAndDeletesRecord
 
           - id: ReviewCenterPuppet-PuppetProgram-ClientCommands
             title: >-
@@ -107,6 +108,7 @@ sections:
               - PuppetProgram_Run_StopForced_SessionReplacedMeanwhile_KeepsReplacement
               - PuppetProgram_Run_StopAccepted_SessionReplacedAfterDaemonExit_KeepsReplacement
               - PuppetProgram_Run_StopForcedAndProcessSurvives_KeepsRecordAndExitsOne
+              - PuppetProgram_Run_StopForced_DaemonRecordsServerMeanwhile_EndsItToo
 
           - id: ReviewCenterPuppet-PuppetProgram-List
             title: >-

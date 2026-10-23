@@ -25,8 +25,46 @@ namespace DemaConsulting.ReviewCenter.Puppet.Tests;
 /// <summary>
 ///     Unit tests for the <see cref="DaemonLauncher"/>.
 /// </summary>
+[Collection("Sequential")]
 public class DaemonLauncherTests
 {
+    /// <summary>
+    ///     Test that the identity a launch reports is the identity of the process that was actually created:
+    ///     the process store accepts it as alive, and the store's identity-checked kill ends exactly that process.
+    /// </summary>
+    [Fact]
+    public async Task DaemonLauncher_LaunchProcess_ReportsIdentityOfTheCreatedProcess()
+    {
+        // Arrange: a real long-running executable to launch
+        var (executable, arguments) = OperatingSystem.IsWindows()
+            ? (Path.Combine(Environment.SystemDirectory, "ping.exe"), new List<string> { "-n", "60", "127.0.0.1" })
+            : ("/bin/sleep", new List<string> { "60" });
+        var identity = default(ProcessIdentity);
+        try
+        {
+            // Act: launch it, then check and kill it using only the reported identity
+            identity = DaemonLauncher.LaunchProcess(executable, arguments);
+            var aliveAfterLaunch = SessionStore.IsProcessAlive(identity.ProcessId, identity.StartTimeUtc);
+            SessionStore.KillProcess(identity.ProcessId, identity.StartTimeUtc);
+            var deadline = DateTime.UtcNow.AddSeconds(10);
+            while (SessionStore.IsProcessAlive(identity.ProcessId, identity.StartTimeUtc) && DateTime.UtcNow < deadline)
+            {
+                await Task.Delay(25, Xunit.TestContext.Current.CancellationToken);
+            }
+
+            // Assert: the identity matched the live process, and the kill by identity ended it
+            Assert.True(aliveAfterLaunch);
+            Assert.False(SessionStore.IsProcessAlive(identity.ProcessId, identity.StartTimeUtc));
+        }
+        finally
+        {
+            if (identity.ProcessId != 0)
+            {
+                SessionStore.KillProcess(identity.ProcessId, identity.StartTimeUtc);
+            }
+        }
+    }
+
     /// <summary>
     ///     Test that every argument is quoted in the Windows command line.
     /// </summary>

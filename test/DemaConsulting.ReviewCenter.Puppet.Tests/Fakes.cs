@@ -131,6 +131,12 @@ internal sealed class FakeServerRunner : IServerRunner
     public Action? OnDispose { get; set; }
 
     /// <summary>
+    ///     Gets or sets an action run when <see cref="StartAsync"/> is called, to simulate something happening
+    ///     while the server starts (for example another session taking over the session id).
+    /// </summary>
+    public Action? OnStart { get; set; }
+
+    /// <summary>
     ///     Gets the number of servers disposed so far.
     /// </summary>
     public int DisposedCount { get; private set; }
@@ -138,6 +144,7 @@ internal sealed class FakeServerRunner : IServerRunner
     /// <inheritdoc />
     public async Task<IRunningServer> StartAsync(string serverPath, CancellationToken cancellationToken)
     {
+        OnStart?.Invoke();
         if (BlockUntilCancelled)
         {
             await Task.Delay(Timeout.Infinite, cancellationToken);

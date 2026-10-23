@@ -50,7 +50,10 @@ the Playwright installation script (CI does this on every platform, with the bro
   first line of the Playwright message; the command timeout is handed to Playwright, and a screenshot that times out
   is reported as a timeout.
 - The server counts as ready only when `/health` answers status 200 with the body `Healthy`; an error status or a
-  refused connection means "not ready yet", and any other success answer is a mismatch that fails the start.
+  refused connection means "not ready yet", and any other success answer is a mismatch that fails the start; a
+  healthy answer received after the server process has exited fails the start too.
+- A daemon whose session id was taken over by another session stops without changing that session's record; a
+  daemon that cannot write its failure record still disposes the server and browser and returns exit code 4.
 - The temporary DevTools session used to learn the browser's process identity is detached after the query, also when
   the query fails or the browser has already closed, and a failing detach is tolerated.
 - The end-to-end test passes where Chromium is available. Where it is not, the test skips with a reason, except
@@ -151,6 +154,26 @@ another endpoint that answers like a healthy server. This scenario is tested by
 **DaemonHost_HealthProbe_ErrorStatusOrNoListener_IsNotReady**: A loopback listener answers `/health` with status 503,
 and a second probe targets a port nothing listens on. Both are reported as not ready, so the runner keeps polling.
 This scenario is tested by `DaemonHost_HealthProbe_ErrorStatusOrNoListener_IsNotReady`.
+
+**DaemonHost_WaitUntilHealthy_ServerExitedBeforeHealthyAnswer_Fails**: A loopback listener answers `/health` with
+the exact healthy answer, but the server process is reported as exited (exit code 7) on the check made after the
+answer. The wait fails with a `PuppetException` naming the exit code and the fact that another service answered,
+instead of treating the answer as the server's. This scenario is tested by
+`DaemonHost_WaitUntilHealthy_ServerExitedBeforeHealthyAnswer_Fails`.
+
+**DaemonHost_WaitUntilHealthy_ServerRunningAndHealthy_Completes**: The same listener with a server process that
+keeps running completes the wait without error. This scenario is tested by
+`DaemonHost_WaitUntilHealthy_ServerRunningAndHealthy_Completes`.
+
+**DaemonHost_Run_SessionTakenOverWhileStarting_StopsAndLeavesOtherRecord**: While the fake server starts, another
+session's record is written under the same id. The host returns exit code 4, disposes the server it started, and the
+file still holds the other session's record, unchanged (no `Failed` record overwrote it). This scenario is tested by
+`DaemonHost_Run_SessionTakenOverWhileStarting_StopsAndLeavesOtherRecord`.
+
+**DaemonHost_Run_FailureRecordCannotBeWritten_StillTearsDownAndReturnsFour**: While the fake server starts, a
+directory takes the place of the session file, so no later record can be written, and the browser fails to launch.
+The host still disposes the server and returns exit code 4 instead of ending with an unhandled error. This
+scenario is tested by `DaemonHost_Run_FailureRecordCannotBeWritten_StillTearsDownAndReturnsFour`.
 
 **DaemonHost_PlaywrightBrowser_ProcessQuery_DetachesProtocolSession**: A fake DevTools session answers the process
 query with a gpu process and a browser process that is the test process. The query returns the browser's process id

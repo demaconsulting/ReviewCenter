@@ -407,48 +407,83 @@ public class SessionStoreTests
     }
 
     /// <summary>
-    ///     Test that deleting removes the file and tolerates a second delete.
+    ///     Test that a conditional delete removes the examined session's file and tolerates a second delete of
+    ///     the already missing file.
     /// </summary>
     [Fact]
-    public void SessionStore_Delete_ExistingSession_RemovesFile()
+    public void SessionStore_DeleteIfSame_ExistingSession_RemovesFileAndToleratesRepeat()
     {
         // Arrange: a stored session
         using var temp = new TempDirectory();
         var store = new SessionStore(temp.Path);
-        store.Write(CreateInfo("gone"));
+        var info = CreateInfo("gone");
+        store.Write(info);
 
         // Act: delete twice
-        store.Delete("gone");
-        store.Delete("gone");
+        var first = store.DeleteIfSame("gone", info);
+        var second = store.DeleteIfSame("gone", info);
 
-        // Assert: the file is gone and nothing threw
+        // Assert: the file is gone, both calls report it deleted, and no start lock is left behind
+        Assert.Equal(DeleteOutcome.Deleted, first);
+        Assert.Equal(DeleteOutcome.Deleted, second);
         Assert.False(File.Exists(store.GetPath("gone")));
+        Assert.False(File.Exists(Path.ChangeExtension(store.GetPath("gone"), ".lock")));
     }
 
     /// <summary>
-    ///     Test that several parties deleting the same session file at the same moment all complete without error.
+    ///     Test that several parties deleting the same session file at the same moment all complete without
+    ///     error: each either deletes it or finds a start lock held by a party that does.
     /// </summary>
     [Fact]
-    public async Task SessionStore_Delete_ConcurrentCallers_NoneThrows()
+    public async Task SessionStore_DeleteIfSame_ConcurrentCallers_NoneThrows()
     {
         // Arrange: many rounds, each with a stored session and several parties that will delete it together
         const int rounds = 25;
         const int callers = 6;
         using var temp = new TempDirectory();
         var store = new SessionStore(temp.Path);
+        var info = CreateInfo("busy");
 
         for (var round = 0; round < rounds; round++)
         {
-            store.Write(CreateInfo("busy"));
+            store.Write(info);
 
             // Act: delete from several threads at once
-            var exceptions = await Task.WhenAll(Enumerable.Range(0, callers)
-                .Select(_ => Task.Run(() => Record.Exception(() => store.Delete("busy")), Xunit.TestContext.Current.CancellationToken)));
+            var outcomes = await Task.WhenAll(Enumerable.Range(0, callers)
+                .Select(_ => Task.Run(
+                    () => Record.Exception(() => store.DeleteIfSame("busy", info)),
+                    Xunit.TestContext.Current.CancellationToken)));
 
             // Assert: nobody failed and the file is gone
-            Assert.All(exceptions, Assert.Null);
+            Assert.All(outcomes, Assert.Null);
             Assert.False(File.Exists(store.GetPath("busy")));
         }
+    }
+
+    /// <summary>
+    ///     Test that a delete that still fails after the retries (the file stays open elsewhere) reports that
+    ///     nothing was deleted instead of throwing, and keeps the file.
+    /// </summary>
+    [Fact]
+    public void SessionStore_DeleteIfSame_FileCannotBeRemoved_ReportsBusyAndKeepsFile()
+    {
+        // Arrange: a session file that no process may delete (held without delete sharing on Windows, in a
+        // read-only directory on Unix would need privileges, so the scenario is Windows only)
+        Assert.SkipUnless(OperatingSystem.IsWindows(), "Holding a file open to refuse deletion is a Windows behavior.");
+        using var temp = new TempDirectory();
+        var sleeps = 0;
+        var store = new SessionStore(temp.Path, (_, _) => true, (_, _) => { }, _ => sleeps++);
+        var info = CreateInfo("held");
+        store.Write(info);
+        using var hold = new FileStream(store.GetPath("held"), FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+
+        // Act: delete on behalf of a caller that examined the session
+        var outcome = store.DeleteIfSame("held", info);
+
+        // Assert: reported as not deleted after retrying, and the file is still there
+        Assert.Equal(DeleteOutcome.Busy, outcome);
+        Assert.True(sleeps >= 1);
+        Assert.True(File.Exists(store.GetPath("held")));
     }
 
     /// <summary>
@@ -972,5 +1007,196 @@ public class SessionStoreTests
         Assert.False(SessionStore.IsSameSession(info, info with { DaemonPid = info.DaemonPid + 1 }));
         Assert.False(SessionStore.IsSameSession(info, info with { DaemonStartTimeUtc = info.DaemonStartTimeUtc.AddMinutes(1) }));
         Assert.False(SessionStore.IsSameSession(info, info with { ControlToken = "other" }));
+    }
+
+    /// <summary>
+    ///     Test that a lock whose owner is gone is still not taken over while another party has the lock file
+    ///     open (it may be mid-write, or being removed by another reclaimer), and that the file is left alone.
+    /// </summary>
+    [Fact]
+    public void SessionStore_TryReserve_StaleLockOpenElsewhere_IsHeldAndKept()
+    {
+        // Arrange: a lock that names a dead owner but is held open without any sharing by another party
+        using var temp = new TempDirectory();
+        var store = new SessionStore(temp.Path, (_, _) => false, (_, _) => { });
+        var lockPath = Path.ChangeExtension(store.GetPath("demo"), ".lock");
+        Directory.CreateDirectory(temp.Path);
+        File.WriteAllText(
+            lockPath,
+            System.Text.Json.JsonSerializer.Serialize(new ProcessIdentity(1, new DateTime(2025, 1, 1, 0, 0, 0, DateTimeKind.Utc))));
+        bool reserved;
+        using (new FileStream(lockPath, FileMode.Open, FileAccess.ReadWrite, FileShare.None))
+        {
+            // Act: try to take the lock while it is open elsewhere
+            reserved = store.TryReserve("demo");
+        }
+
+        // Assert: refused without error, and the lock file was not removed
+        Assert.False(reserved);
+        Assert.True(File.Exists(lockPath));
+    }
+
+    /// <summary>
+    ///     Test that taking over a stale lock leaves nothing behind but the new lock: no renamed leftovers.
+    /// </summary>
+    [Fact]
+    public void SessionStore_TryReserve_StaleLock_IsReplacedByTheNewLockOnly()
+    {
+        // Arrange: a lock that names a dead owner
+        using var temp = new TempDirectory();
+        var store = new SessionStore(temp.Path, (_, _) => false, (_, _) => { });
+        Assert.True(store.TryReserve("demo"));
+
+        // Act: a second caller takes it over
+        var reserved = store.TryReserve("demo");
+
+        // Assert: the caller owns the lock now, and the folder holds just that one lock file
+        Assert.True(reserved);
+        Assert.Equal([Path.Combine(temp.Path, "demo.lock")], Directory.GetFiles(temp.Path));
+    }
+
+    /// <summary>
+    ///     Test that releasing a lock that another process still has open (Windows refuses the delete) is retried
+    ///     until the lock can be removed, so the id is not blocked until the owner exits. The other party lets
+    ///     go during the first retry wait, so the scenario does not depend on timing.
+    /// </summary>
+    [Fact]
+    public void SessionStore_Release_LockTemporarilyOpenElsewhere_RetriesAndRemovesLock()
+    {
+        // Arrange: a reserved id whose lock file is open elsewhere without delete sharing until the first wait
+        Assert.SkipUnless(OperatingSystem.IsWindows(), "Unix deletes a file that is open elsewhere without any refusal.");
+        using var temp = new TempDirectory();
+        var sleeps = 0;
+        FileStream? hold = null;
+        var store = new SessionStore(temp.Path, (_, _) => true, (_, _) => { }, _ =>
+        {
+            sleeps++;
+            hold?.Dispose();
+        });
+        Assert.True(store.TryReserve("demo"));
+        var lockPath = Path.ChangeExtension(store.GetPath("demo"), ".lock");
+        hold = new FileStream(lockPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+
+        // Act: release the lock
+        store.Release("demo");
+        hold.Dispose();
+
+        // Assert: it waited and retried, and the lock is gone, so the id can be reserved again
+        Assert.True(sleeps >= 1);
+        Assert.False(File.Exists(lockPath));
+        Assert.True(store.TryReserve("demo"));
+    }
+
+    /// <summary>
+    ///     Test that the daemon's conditional write publishes a first record, and later records of the same
+    ///     session, but refuses to overwrite a record that belongs to another session.
+    /// </summary>
+    [Fact]
+    public void SessionStore_WriteIfOwner_WritesOwnRecordsButNeverAnotherSessions()
+    {
+        // Arrange: a store and two sessions that share an id
+        using var temp = new TempDirectory();
+        var store = new SessionStore(temp.Path, (_, _) => true, (_, _) => { });
+        var mine = CreateInfo("demo");
+        var other = mine with { ControlToken = "other-token", DaemonPid = 777 };
+
+        // Act: publish into a missing file, update the same session, then try after another session took over
+        var first = store.WriteIfOwner(mine);
+        var update = store.WriteIfOwner(mine with { Status = SessionStatus.Starting });
+        store.Write(other);
+        var afterTakeover = store.WriteIfOwner(mine with { Status = SessionStatus.Failed, Error = "late" });
+
+        // Assert: the first two were written, the last was refused and the other session's record is intact
+        Assert.True(first);
+        Assert.True(update);
+        Assert.False(afterTakeover);
+        Assert.Equal(other, store.TryRead("demo"));
+    }
+
+    /// <summary>
+    ///     Test that a conditional write over a corrupt file replaces it (a corrupt record belongs to nobody).
+    /// </summary>
+    [Fact]
+    public void SessionStore_WriteIfOwner_CorruptFile_IsReplaced()
+    {
+        // Arrange: a corrupt session file
+        using var temp = new TempDirectory();
+        var store = new SessionStore(temp.Path, (_, _) => true, (_, _) => { });
+        File.WriteAllText(Path.Combine(temp.Path, "demo.json"), "{ not json");
+        var mine = CreateInfo("demo");
+
+        // Act: publish
+        var written = store.WriteIfOwner(mine);
+
+        // Assert: written
+        Assert.True(written);
+        Assert.Equal(mine, store.TryRead("demo"));
+    }
+
+    /// <summary>
+    ///     Test that a conditional write fails loudly, and writes nothing, when the current file cannot be read at
+    ///     all, because ownership is then unknown.
+    /// </summary>
+    [Fact]
+    public void SessionStore_WriteIfOwner_FileStaysLocked_ThrowsAndWritesNothing()
+    {
+        // Arrange: a session file that stays locked
+        using var temp = new TempDirectory();
+        var store = new SessionStore(temp.Path, (_, _) => true, (_, _) => { }, _ => { });
+        var existing = CreateInfo("demo", daemonPid: 1);
+        store.Write(existing);
+        Exception? exception;
+        using (new FileStream(store.GetPath("demo"), FileMode.Open, FileAccess.ReadWrite, FileShare.None))
+        {
+            // Act: publish while it is locked
+            exception = Record.Exception(() => store.WriteIfOwner(CreateInfo("demo", daemonPid: 2)));
+        }
+
+        // Assert: reported as a puppet error and the file still holds the earlier record
+        Assert.IsType<PuppetException>(exception);
+        Assert.Equal(existing, store.TryRead("demo"));
+    }
+
+    /// <summary>
+    ///     Test that a kill that reports "the process is gone or not accessible" (including the partial failure
+    ///     of a tree kill) is absorbed, while an unexpected failure is not hidden.
+    /// </summary>
+    [Fact]
+    public void SessionStore_TryKill_ClassifiesGoneProcessFailuresFromUnexpectedOnes()
+    {
+        // Arrange: kills that fail the ways Process.Kill documents, and one that fails unexpectedly
+        Action[] gone =
+        [
+            () => throw new InvalidOperationException("exited"),
+            () => throw new System.ComponentModel.Win32Exception(5),
+            () => throw new AggregateException(new InvalidOperationException("a descendant exited")),
+            () => throw new NotSupportedException("remote"),
+            () => throw new ArgumentException("no such process")
+        ];
+
+        // Act: run each
+        var results = gone.Select(kill => SessionStore.TryKill(kill)).ToList();
+        var succeeded = SessionStore.TryKill(() => { });
+        var unexpected = Record.Exception(() => SessionStore.TryKill(() => throw new DivideByZeroException()));
+
+        // Assert: failures that mean "gone" report false without throwing, success reports true, the rest propagates
+        Assert.All(results, Assert.False);
+        Assert.True(succeeded);
+        Assert.IsType<DivideByZeroException>(unexpected);
+    }
+
+    /// <summary>
+    ///     Test that start times match within the clock tolerance and not beyond it (a recycled id starts much later).
+    /// </summary>
+    [Fact]
+    public void SessionStore_IsSameStartTime_MatchesOnlyWithinTolerance()
+    {
+        // Arrange: a start time
+        var start = new DateTime(2025, 3, 1, 12, 0, 0, DateTimeKind.Utc);
+
+        // Act and assert: a sub-second difference matches in both directions, a minute does not
+        Assert.True(SessionStore.IsSameStartTime(start, start.AddMilliseconds(900)));
+        Assert.True(SessionStore.IsSameStartTime(start.AddMilliseconds(900), start));
+        Assert.False(SessionStore.IsSameStartTime(start, start.AddMinutes(1)));
     }
 }

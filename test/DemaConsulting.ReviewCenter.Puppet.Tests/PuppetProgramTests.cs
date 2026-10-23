@@ -571,6 +571,96 @@ public class PuppetProgramTests
     }
 
     /// <summary>
+    ///     Test that an abandoned start also ends a server that the daemon recorded after the start last looked at
+    ///     the session file (the daemon is still running while it is being killed), whether the file existed before
+    ///     or appeared only then, and removes the file afterwards.
+    /// </summary>
+    /// <param name="recordedBeforeAbort">Whether the daemon had written a record before the abort began.</param>
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task PuppetProgram_Run_StartAbandonedWhileDaemonRecordsServer_EndsLateRecordedServerAndDeletesRecord(bool recordedBeforeAbort)
+    {
+        // Arrange: a daemon that never becomes ready and that records its server only once it is being killed
+        using var temp = new TempDirectory();
+        var server = Path.Combine(temp.Path, "server.dll");
+        await File.WriteAllTextAsync(server, "x", Xunit.TestContext.Current.CancellationToken);
+        var daemonStart = new DateTime(2025, 3, 1, 12, 0, 0, DateTimeKind.Utc);
+        var serverStart = daemonStart.AddSeconds(5);
+        var starting = new SessionInfo(
+            "slow", SessionStatus.Starting, 40000, "token", "http://127.0.0.1:5999", 4242, daemonStart, 0, default, 0, default, null);
+        var withServer = starting with { ServerPid = 5151, ServerStartTimeUtc = serverStart };
+        var launcher = new FakeDaemonLauncher { ReportedPid = 4242, ReportedStartTimeUtc = daemonStart };
+        var publisher = new SessionStore(temp.Path);
+        var killed = new List<(int Pid, DateTime Start)>();
+        var services = CreateServices(
+            temp,
+            launcher,
+            alive: () => !killed.Any(k => k.Pid == 5151),
+            kill: (pid, start) =>
+            {
+                killed.Add((pid, start));
+                if (pid == 4242)
+                {
+                    publisher.Write(withServer);
+                }
+            },
+            startTimeout: TimeSpan.FromMilliseconds(300),
+            stopTimeout: TimeSpan.FromSeconds(10));
+        if (recordedBeforeAbort)
+        {
+            launcher.OnLaunch = (_, _) => services.Store.Write(starting);
+        }
+
+        // Act: start, which times out and is abandoned
+        var result = await RunAsync(services, "start", "--session", "slow", "--server", server);
+
+        // Assert: the late-recorded server was ended by its identity, nothing is reported unconfirmed, and the file is gone
+        Assert.Equal(4, result.ExitCode);
+        Assert.Contains((5151, serverStart), killed);
+        Assert.DoesNotContain("could not be confirmed", result.Error, StringComparison.Ordinal);
+        Assert.Null(services.Store.TryRead("slow"));
+    }
+
+    /// <summary>
+    ///     Test that a forced stop also ends a server that the daemon of the same session recorded after the stop
+    ///     last looked at the session file.
+    /// </summary>
+    [Fact]
+    public async Task PuppetProgram_Run_StopForced_DaemonRecordsServerMeanwhile_EndsItToo()
+    {
+        // Arrange: a session without a recorded server whose daemon records one as it is being killed
+        using var temp = new TempDirectory();
+        var start = new DateTime(2025, 3, 1, 12, 0, 0, DateTimeKind.Utc);
+        var serverStart = start.AddSeconds(1);
+        var bare = new SessionInfo(
+            "demo", SessionStatus.Ready, GetUnusedPort(), "token", "http://127.0.0.1:5999", 111, start, 0, default, 0, default, null);
+        var withServer = bare with { ServerPid = 112, ServerStartTimeUtc = serverStart };
+        var publisher = new SessionStore(temp.Path);
+        var killed = new List<(int Pid, DateTime Start)>();
+        var services = CreateServices(
+            temp,
+            alive: () => !killed.Any(k => k.Pid == 112),
+            kill: (pid, startTime) =>
+            {
+                killed.Add((pid, startTime));
+                if (pid == 111)
+                {
+                    publisher.Write(withServer);
+                }
+            });
+        services.Store.Write(bare);
+
+        // Act: stop the session (its control port refuses connections, so it is stopped by force)
+        var result = await RunAsync(services, "stop", "--session", "demo");
+
+        // Assert: stopped, the late server was ended by its identity, and the record was removed
+        Assert.Equal(0, result.ExitCode);
+        Assert.Contains((112, serverStart), killed);
+        Assert.Null(services.Store.TryRead("demo"));
+    }
+
+    /// <summary>
     ///     Finds a loopback port that nothing is listening on.
     /// </summary>
     /// <returns>The port.</returns>

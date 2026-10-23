@@ -93,7 +93,7 @@ sections:
               The DaemonHost unit shall consider the server ready only when its health endpoint answers status
               200 with the exact body "Healthy", keep waiting while the endpoint is unavailable or answers an
               error status, and fail the start with the answer it saw when a success answer has any other
-              content.
+              content, or when the server process has exited by the time a healthy answer arrives.
             justification: |
               The port is chosen before the server binds it, so another local process could answer in its
               place, and a success status with other content is not proof that the ReviewCenter server is the
@@ -104,6 +104,22 @@ sections:
               - DaemonHost_HealthProbe_SuccessWithoutExactBody_IsMismatchNamingTheAnswer
               - DaemonHost_HealthProbe_Redirect_IsMismatchAndNotFollowed
               - DaemonHost_HealthProbe_ErrorStatusOrNoListener_IsNotReady
+              - DaemonHost_WaitUntilHealthy_ServerExitedBeforeHealthyAnswer_Fails
+              - DaemonHost_WaitUntilHealthy_ServerRunningAndHealthy_Completes
+
+          - id: ReviewCenterPuppet-DaemonHost-SessionOwnership
+            title: >-
+              The DaemonHost unit shall publish its records only while the session file is its own, shall stop
+              without touching the file when another session took the id over, and shall still tear down its
+              server and browser and exit with code 4 when its failure record cannot be written.
+            justification: |
+              A daemon that was force-stopped while starting can still be running when the id is reused. Its
+              late status or failure record would overwrite the new session's record and orphan the new
+              session's processes. A failure to report a failure must never leave the server and browser it
+              started running.
+            tests:
+              - DaemonHost_Run_SessionTakenOverWhileStarting_StopsAndLeavesOtherRecord
+              - DaemonHost_Run_FailureRecordCannotBeWritten_StillTearsDownAndReturnsFour
 
           - id: ReviewCenterPuppet-DaemonHost-ProtocolSessionRelease
             title: >-

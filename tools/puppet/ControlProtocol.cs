@@ -143,6 +143,48 @@ internal static class ControlProtocol
     }
 
     /// <summary>
+    ///     Parses the answer a client received, accepting only exactly the shape the daemon sends.
+    /// </summary>
+    /// <remarks>
+    ///     The client connects to a loopback port that the session file names. That port can be taken by an
+    ///     unrelated process once the daemon is gone, and such a process may answer with anything. Like the
+    ///     server readiness probe, which accepts only the exact health answer, the client therefore accepts
+    ///     only a JSON object with exactly a boolean <c>Ok</c>, an integer <c>ExitCode</c>, and a string
+    ///     <c>Message</c>. A lenient parse would turn an unrelated answer (for example <c>{}</c>) into a
+    ///     "failed command" with no message. There are no redirects to follow on this channel: it is a raw
+    ///     line-delimited TCP exchange, not HTTP.
+    /// </remarks>
+    /// <param name="line">The received line.</param>
+    /// <param name="port">The port that answered, for the message.</param>
+    /// <returns>The response.</returns>
+    /// <exception cref="PuppetException">Thrown when the line is not exactly a control response.</exception>
+    public static ControlResponse ParseResponse(string line, int port)
+    {
+        try
+        {
+            using var document = JsonDocument.Parse(line);
+            var root = document.RootElement;
+            if (root.ValueKind == JsonValueKind.Object &&
+                root.EnumerateObject().Select(p => p.Name).Order(StringComparer.Ordinal)
+                    .SequenceEqual(["ExitCode", "Message", "Ok"], StringComparer.Ordinal) &&
+                root.GetProperty("Ok").ValueKind is JsonValueKind.True or JsonValueKind.False &&
+                root.GetProperty("ExitCode").ValueKind == JsonValueKind.Number &&
+                root.GetProperty("ExitCode").TryGetInt32(out var exitCode) &&
+                root.GetProperty("Message").ValueKind == JsonValueKind.String)
+            {
+                return new ControlResponse(root.GetProperty("Ok").GetBoolean(), exitCode, root.GetProperty("Message").GetString()!);
+            }
+        }
+        catch (JsonException)
+        {
+            // Not JSON at all: rejected below like any other unexpected answer
+        }
+
+        throw new PuppetException(
+            $"The service on port {port} did not answer like a Puppet session daemon; the session may be gone and its port reused.");
+    }
+
+    /// <summary>
     ///     Reads one line from a stream, enforcing <see cref="MaxLineLength"/>.
     /// </summary>
     /// <param name="reader">The reader.</param>
@@ -216,7 +258,7 @@ internal static class ControlClient
             var line = await ControlProtocol.ReadLineAsync(reader, timeoutSource.Token);
             return line is null
                 ? throw new PuppetException("The session daemon closed the connection without answering.")
-                : ControlProtocol.Deserialize<ControlResponse>(line);
+                : ControlProtocol.ParseResponse(line, port);
         }
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
         {

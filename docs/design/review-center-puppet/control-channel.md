@@ -33,9 +33,18 @@ names the exception type, so unanticipated failures stay visible without a stack
 **ControlProtocol.ReadLineAsync**: Reads one newline-terminated line with the length limit. Returns null when the peer
 closes the connection before a complete line arrives.
 
+**ControlProtocol.ParseResponse**: Parses the line a daemon answered with and accepts only a JSON object with exactly
+a boolean `Ok`, an integer `ExitCode`, and a string `Message`. Anything else (`{}`, another JSON value, a missing,
+extra, or mistyped property, or text that is not JSON) raises a `PuppetException` that names the port and says the
+service did not answer like a Puppet session daemon. The strictness mirrors the server readiness probe: once a daemon
+is gone its port can be taken by an unrelated service, which may answer with anything, and a lenient parse would turn
+that into a "failed command" with no message. There are no redirects to follow on this channel (it is a raw line
+exchange over TCP, not HTTP). The token that the client sends belongs to the dead daemon, so a foreign listener that
+receives it learns nothing of value.
+
 **ControlClient.SendAsync**: Opens a connection to the loopback address and the given port, sends the request line,
-reads the response line, and returns the response. One connection is used per command. The whole exchange is bounded
-by the timeout the caller supplies.
+reads the response line, and returns the response parsed with `ParseResponse`. One connection is used per command.
+The whole exchange is bounded by the timeout the caller supplies.
 
 **ControlServer constructor**: Starts listening on the loopback address with a port chosen by the operating system.
 `Port` exposes the port.
@@ -60,7 +69,8 @@ comes from `PuppetException.DescribeUnexpected` (`Unexpected error (<type>): <fi
 later requests, so one bad command cannot end the session without an answer. Only an out-of-memory condition is not
 caught. A client that disconnects before reading the
 answer is ignored. The client raises a `PuppetException` when it cannot connect, when the daemon closes the
-connection without answering, when the daemon does not answer in time, and when the answer is malformed. Cancellation
+connection without answering, when the daemon does not answer in time, and when the answer is malformed or is not
+exactly a control response. Cancellation
 by the caller is not converted.
 
 ### Dependencies

@@ -51,14 +51,20 @@ propagates to the caller.
 (`FileMode.CreateNew`), so of several simultaneous callers exactly one succeeds; the others get `false`. When the
 lock already exists, it is taken over only if it is stale: its recorded owner process is no longer alive, or it
 cannot be read and is older than a grace period of 10 seconds (a lock that was just created and is not yet written
-counts as held). The takeover renames the stale lock aside before deleting it and then tries the exclusive create
-once more. The takeover of a stale lock is best effort: two callers that reclaim the same stale lock at the same
-moment together with a third fresh caller could in theory all succeed, which is accepted because the owner of a
-stale lock is already dead and the daemon launch itself is still guarded by the session lookup that follows. On
-Windows, a lock file that is still pending deletion (another handle is open on it) makes the exclusive create fail
-with an access-denied error; this is treated as the lock being held, so the caller is refused instead of failing.
+counts as held). The takeover works on one open handle: the lock is opened (with delete sharing on Windows, and
+exclusively on Unix), its owner is judged from that same handle, and the file is deleted while the handle is still
+held, so the file that was judged stale is the file that is deleted. A lock that another party has open, or whose
+deletion is already pending, cannot be taken (the open or the exclusive create is refused with a sharing or access
+error), and that counts as held and leaves the file alone; a lock that vanished meanwhile counts as free. After the
+delete the caller tries the exclusive create once more. On Windows the handle ties the path to the file until it
+is closed, so two processes reclaiming cannot delete each other's fresh lock; on Unix the exclusive open makes the second
+reclaimer fail until the first is done. No renamed leftover file is created. A lock file that is still pending
+deletion makes the exclusive create fail with an access-denied error; this is treated as the lock being held, so
+the caller is refused instead of failing.
 
-**Release**: Deletes the lock file of a session id, if it exists. Failure to delete is ignored.
+**Release**: Deletes the lock file of a session id, if it exists. A delete that is refused for a moment (a sharing
+or access error, for example while a reclaimer has the file open) is retried; a delete that still fails after the
+retries is ignored, because a lock whose owner has exited is taken over by the next caller anyway.
 
 **TryRead**: Reads a session without checking the daemon. Returns null when the file is missing, is not valid JSON,
 or stays locked after the retries described under Reading. It never deletes anything, so a null result is safe for
@@ -71,10 +77,21 @@ missing and corrupt files justify cleanup; a file that stays unavailable says no
 between the attempts of a read and of a move is an optional delegate of the `SessionStore` constructor; it defaults
 to a real thread sleep and exists so tests can release a held lock deterministically instead of racing a timer.
 
-**Delete**: Removes a session file if it exists; deleting a missing file is not an error. The daemon's own cleanup
-and a `start` that aborts can delete the same file at the same moment, and on Windows a delete that loses that race
-can fail with a sharing or access error, so a failed delete is retried a few times after a short delay and ends as
-soon as the file is gone.
+**WriteIfOwner**: Writes a record on behalf of a daemon, but only while the session file is not another session's. It
+reads the current file (with the retries described under Reading); a missing or corrupt file, or a record of the same
+session (`IsSameSession`), is replaced by `Write` and the result is true; a record of a different session is left
+untouched and the result is false; a file that stays unreadable throws a `PuppetException`, because ownership is then
+unknown and writing would be a guess. The daemon uses it for every record it publishes, so a daemon that was
+force-stopped and superseded can no longer overwrite the new session's file. A very small window remains between the
+read and the replacement; it can only be hit by a start that publishes in exactly that moment, which needs the
+start reservation, and that reservation is only available after the old daemon's session was deleted by a stop.
+
+**Delete**: Private. Removes a session file if it exists; deleting a missing file is not an error. It is reachable
+only through `DeleteIfSame`, so every deletion of a session record is conditional. The daemon's own cleanup and a
+`start` that aborts can delete the same file at the same moment, and on Windows a delete that loses that race can
+fail with a sharing or access error (`IOException` or `UnauthorizedAccessException`), so a failed delete is retried a
+few times after a short delay (through the injectable wait) and ends as soon as the file is gone. If the file is
+still there after the last attempt the error propagates to `DeleteIfSame`, which reports `Busy`.
 
 **ListIds**: Returns the ids of the `.json` files in the folder whose names are valid ids (lock files are not
 sessions), in ordinal sorted order. It returns an empty list when the folder does not exist.
@@ -96,7 +113,8 @@ that vanishes between the existence check and the read is reported as `Unknown`.
 or a stale lookup), but only if it still holds that session. It takes the start reservation first, so no `start` can
 publish a replacement between the check and the delete; when another start holds the reservation it returns `Busy`
 and deletes nothing. It then re-reads the file: a missing file counts as `Deleted`, an unreadable one is `Busy`, a
-different session (compared with `IsSameSession`) is `Replaced` and is kept, and a matching one is deleted. A
+different session (compared with `IsSameSession`) is `Replaced` and is kept, and a matching one is deleted. A delete
+that fails with a sharing or access error after its retries is reported as `Busy` as well, with the file kept. A
 corrupt file matches only an examination that found it corrupt (`expected` is `null`). The reservation is released
 afterwards unless the caller passed `startLockHeld`.
 
@@ -116,14 +134,18 @@ its child processes. Every process is ended only when its id and start time matc
 never ended and nothing is ended by name.
 
 **IsProcessAlive**: Returns true only when a process with the given id exists, has not exited, and started within two
-seconds of the recorded start time. The start time guards against the operating system reusing a process id.
+seconds of the recorded start time (`IsSameStartTime`, also used by the callers that compare two recorded start
+times). The start time guards against the operating system reusing a process id.
 
 **KillProcess**: Ends a process and its children, but only when it is the recorded process. The process is acquired
 once and its operating system handle is opened before the start time is compared, and the same process object is
 then killed. Where a handle pins one process (Windows), the process that was checked is the process that is ended,
 so a process id recycled between the check and the kill cannot be hit. On platforms without such a handle the check
-and the kill are adjacent operations on one object, which leaves only a very small window; the operating system
-offers no portable way to close it entirely.
+and the kill are adjacent operations on one object, which leaves only a very small window (the residual risk is
+listed in the audit table of the ReviewCenterPuppet design chapter); the operating system offers no portable way to
+close it entirely. The kill goes through `TryKill`, which treats the failures that mean "already gone or not
+accessible" (including the `AggregateException` that a tree kill throws when a descendant could not be ended) as
+not killed and lets any other failure propagate, so callers that confirm by re-checking liveness stay in charge.
 
 ### Error Handling
 

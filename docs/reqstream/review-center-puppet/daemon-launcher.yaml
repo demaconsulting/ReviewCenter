@@ -25,3 +25,15 @@ sections:
               - DaemonLauncher_BuildCommandLine_PathsWithSpaces_AreQuoted
               - DaemonLauncher_BuildCommandLine_EmbeddedQuote_IsEscaped
               - windows@DaemonLauncher_BuildCommandLine_SpecialArguments_RoundTripThroughWindowsParsing
+
+          - id: ReviewCenterPuppet-DaemonLauncher-ProcessIdentity
+            title: >-
+              The DaemonLauncher unit shall report, for a process it starts, the process id and start time of
+              the process that was actually created, read from the creation itself and not by looking the id up
+              afterwards.
+            justification: |
+              Every later liveness check and kill of the daemon is judged by this identity. If it were looked up
+              after the launch, a daemon that exited at once and whose id was recycled could be recorded with
+              another program's start time, and that program could later be ended by mistake.
+            tests:
+              - DaemonLauncher_LaunchProcess_ReportsIdentityOfTheCreatedProcess

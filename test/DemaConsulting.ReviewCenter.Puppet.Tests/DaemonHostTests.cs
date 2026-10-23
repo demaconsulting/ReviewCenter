@@ -412,6 +412,112 @@ public class DaemonHostTests
     }
 
     /// <summary>
+    ///     Test that a healthy answer does not count when the server process has exited by then: the answer came
+    ///     from another service that took the port, so start-up must fail instead of driving it.
+    /// </summary>
+    [Fact]
+    public async Task DaemonHost_WaitUntilHealthy_ServerExitedBeforeHealthyAnswer_Fails()
+    {
+        // Arrange: a listener that answers healthy, and a server process that exits while the probe is in flight
+        var calls = 0;
+        var (url, served) = ServeOnce("200 OK", ServerProcessRunner.HealthyText, Xunit.TestContext.Current.CancellationToken);
+
+        // Act: wait for health; the exit is reported on the second check (the one after the healthy answer)
+        var exception = await Record.ExceptionAsync(() => ServerProcessRunner.WaitUntilHealthyAsync(
+            () => ++calls > 1,
+            () => 7,
+            url,
+            new System.Collections.Concurrent.ConcurrentQueue<string>(),
+            TimeSpan.FromSeconds(10),
+            Xunit.TestContext.Current.CancellationToken));
+        await served;
+
+        // Assert: reported as a failure naming the exit code and the foreign answer
+        Assert.IsType<PuppetException>(exception);
+        Assert.Contains("code 7", exception.Message, StringComparison.Ordinal);
+        Assert.Contains("another service", exception.Message, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    ///     Test that a healthy answer from a server that is still running completes the wait.
+    /// </summary>
+    [Fact]
+    public async Task DaemonHost_WaitUntilHealthy_ServerRunningAndHealthy_Completes()
+    {
+        // Arrange: a listener that answers healthy, and a server process that keeps running
+        var (url, served) = ServeOnce("200 OK", ServerProcessRunner.HealthyText, Xunit.TestContext.Current.CancellationToken);
+
+        // Act: wait for health
+        await ServerProcessRunner.WaitUntilHealthyAsync(
+            () => false,
+            () => 0,
+            url,
+            new System.Collections.Concurrent.ConcurrentQueue<string>(),
+            TimeSpan.FromSeconds(10),
+            Xunit.TestContext.Current.CancellationToken);
+        await served;
+
+        // Assert: it returned without throwing (reaching here), having been answered once
+        Assert.True(served.IsCompletedSuccessfully);
+    }
+
+    /// <summary>
+    ///     Test that a daemon whose session id was taken over by another session while it started stops without
+    ///     touching the other session's record, and without overwriting it with its own failure.
+    /// </summary>
+    [Fact]
+    public async Task DaemonHost_Run_SessionTakenOverWhileStarting_StopsAndLeavesOtherRecord()
+    {
+        // Arrange: a server runner that, while starting, lets another session publish under the same id
+        using var temp = new TempDirectory();
+        var store = new SessionStore(temp.Path);
+        var other = new SessionInfo(
+            "demo", SessionStatus.Ready, 40001, "other-token", "http://127.0.0.1:5998", 777,
+            new DateTime(2025, 3, 1, 12, 0, 0, DateTimeKind.Utc), 0, default, 0, default, null);
+        var server = new FakeServerRunner { OnStart = () => store.Write(other) };
+        var browser = new FakeBrowserLauncher();
+        var host = new DaemonHost(store, server, browser);
+
+        // Act: run the daemon
+        var exitCode = await host.RunAsync("demo", "server.dll", Xunit.TestContext.Current.CancellationToken);
+
+        // Assert: it stopped with exit 4, cleaned up its own processes, and the other session's record is intact
+        Assert.Equal(4, exitCode);
+        Assert.Equal(other, store.TryRead("demo"));
+        Assert.Equal(1, server.DisposedCount);
+    }
+
+    /// <summary>
+    ///     Test that a daemon that cannot record its failure (the session file cannot be replaced) still tears down
+    ///     and reports failure through its exit code instead of crashing with the files left running.
+    /// </summary>
+    [Fact]
+    public async Task DaemonHost_Run_FailureRecordCannotBeWritten_StillTearsDownAndReturnsFour()
+    {
+        // Arrange: a server start that leaves a directory in place of the session file, so no later record can be
+        // written, and a failing browser
+        using var temp = new TempDirectory();
+        var store = new SessionStore(temp.Path, (_, _) => true, (_, _) => { }, _ => { });
+        var server = new FakeServerRunner
+        {
+            OnStart = () =>
+            {
+                File.Delete(store.GetPath("demo"));
+                Directory.CreateDirectory(store.GetPath("demo"));
+            }
+        };
+        var browser = new FakeBrowserLauncher { Failure = new PuppetException("Chromium is not installed.") };
+        var host = new DaemonHost(store, server, browser);
+
+        // Act: run the daemon
+        var exitCode = await host.RunAsync("demo", "server.dll", Xunit.TestContext.Current.CancellationToken);
+
+        // Assert: exit 4, and the server that was started got stopped
+        Assert.Equal(4, exitCode);
+        Assert.Equal(1, server.DisposedCount);
+    }
+
+    /// <summary>
     ///     Test that a daemon with no commands shuts itself down after the idle timeout and cleans up.
     /// </summary>
     [Fact]

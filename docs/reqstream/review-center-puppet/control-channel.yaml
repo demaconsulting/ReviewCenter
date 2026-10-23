@@ -96,3 +96,18 @@ sections:
               and the session would look healthy until it was used again.
             tests:
               - ControlChannel_Send_HandlerThrowsUnexpected_ReturnsFailedResponseAndKeepsServing
+
+          - id: ReviewCenterPuppet-ControlChannel-ResponseStrictness
+            title: >-
+              The ControlChannel unit shall accept from the daemon only a JSON object with exactly a boolean
+              Ok, an integer ExitCode, and a string Message, and shall fail with an error naming the port for
+              any other answer.
+            justification: |
+              Once a daemon is gone its port can be taken by an unrelated service, which may answer with
+              anything. Turning such an answer into a "failed command" with an empty message would report a
+              session that does not exist as a live one that misbehaved. The server readiness probe is equally
+              strict about what it accepts. The channel is a raw line protocol, so there are no redirects to
+              follow.
+            tests:
+              - ControlChannel_ParseResponse_AcceptsOnlyTheExactResponseShape
+              - ControlChannel_Send_ForeignServiceAnswersWithEmptyObject_ThrowsPuppetException

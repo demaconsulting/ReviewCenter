@@ -125,6 +125,7 @@ sections:
               - SessionStore_KillProcess_RealProcess_KillsOnlyWhenStartTimeMatches
               - SessionStore_KillProcess_NoSuchProcess_DoesNothing
               - SessionStore_HasLiveProcesses_ChecksDaemonServerAndBrowserOnly_WhenRecorded
+              - SessionStore_TryKill_ClassifiesGoneProcessFailuresFromUnexpectedOnes
 
           - id: ReviewCenterPuppet-SessionStore-StartReservation
             title: >-
@@ -142,6 +143,9 @@ sections:
               - SessionStore_TryReserve_UnreadableLock_IsTakenOverOnlyWhenOld
               - SessionStore_TryReserve_Reserved_IsNotListedAsSession
               - SessionStore_TryReserve_LockDeletionPending_IsRefusedWithoutErrorThenTakenOnceGone
+              - SessionStore_TryReserve_StaleLockOpenElsewhere_IsHeldAndKept
+              - SessionStore_TryReserve_StaleLock_IsReplacedByTheNewLockOnly
+              - windows@SessionStore_Release_LockTemporarilyOpenElsewhere_RetriesAndRemovesLock
           - id: ReviewCenterPuppet-SessionStore-PrivateFiles
             title: >-
               The SessionStore unit shall create the session folder and the session files so that only their
@@ -167,14 +171,34 @@ sections:
 
           - id: ReviewCenterPuppet-SessionStore-Delete
             title: >-
-              The SessionStore unit shall delete a session file and tolerate deleting one that is already gone,
-              including when several parties delete it at the same moment.
+              The SessionStore unit shall delete a session file only through its guarded delete, tolerate a
+              file that is already gone, including when several parties delete it at the same moment, and
+              report, without throwing and without leaving a half-state, a file that cannot be removed.
             justification: |
               Stopping, failing, and cleaning up can all race to delete the same file, so deletion must be
-              safe to repeat and to run concurrently.
+              safe to repeat and to run concurrently. On Windows a delete can be refused while another party
+              has the file open; that must read as "busy, try again later", not as a crash that abandons the
+              cleanup halfway.
             tests:
-              - SessionStore_Delete_ExistingSession_RemovesFile
-              - SessionStore_Delete_ConcurrentCallers_NoneThrows
+              - SessionStore_DeleteIfSame_ExistingSession_RemovesFileAndToleratesRepeat
+              - SessionStore_DeleteIfSame_ConcurrentCallers_NoneThrows
+              - windows@SessionStore_DeleteIfSame_FileCannotBeRemoved_ReportsBusyAndKeepsFile
+
+          - id: ReviewCenterPuppet-SessionStore-ConditionalWrite
+            title: >-
+              The SessionStore unit shall let a daemon publish a record for its session only while the file
+              holds no record or a record of the same session, shall refuse and leave the file alone when it
+              holds another session's record, and shall fail loudly, writing nothing, when ownership cannot be
+              determined.
+            justification: |
+              A daemon that is being replaced (its session was force-stopped and the id reused) must not
+              overwrite the new session's record with its own status or failure; that would hide the new
+              session and orphan its processes. A record that cannot be read at all says nothing about
+              ownership, so writing then would be a guess.
+            tests:
+              - SessionStore_WriteIfOwner_WritesOwnRecordsButNeverAnotherSessions
+              - SessionStore_WriteIfOwner_CorruptFile_IsReplaced
+              - SessionStore_WriteIfOwner_FileStaysLocked_ThrowsAndWritesNothing
 
           - id: ReviewCenterPuppet-SessionStore-ProcessIdentity
             title: >-
@@ -186,3 +210,4 @@ sections:
               cleanup.
             tests:
               - SessionStore_IsProcessAlive_CurrentProcess_TrueOnlyWithMatchingStartTime
+              - SessionStore_IsSameStartTime_MatchesOnlyWithinTolerance

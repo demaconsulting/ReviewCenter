@@ -41,8 +41,13 @@ uses many threads, and relies on Windows file-lock behavior that CPU contention 
 - On Unix platforms the session folder is created with mode 0700 and a session file with mode 0600.
 - Listing returns sorted ids, ignores other files (including reservations), and returns an empty list when the folder
   does not exist.
-- Deleting twice, or from several threads at once, does not fail.
-- The current process is alive only when the recorded start time matches.
+- Deleting twice, or from several threads at once, does not fail; a delete that cannot proceed because another party
+  has the file open is reported as busy, not thrown.
+- A daemon's conditional write publishes into a missing, corrupt, or own-session file, refuses another session's
+  file, and fails without writing when the file cannot be read.
+- A lock that names a dead owner is not taken over while another party has the lock file open, a takeover leaves no
+  renamed file behind, and a release that is refused for a moment is retried.
+- The current process is alive only when the recorded start time matches within the clock tolerance.
 
 ### Test Scenarios
 
@@ -139,12 +144,31 @@ the listing returns exactly the two ids in sorted order. This scenario is tested
 **SessionStore_ListIds_NoDirectory_ReturnsEmpty**: A store pointing at a folder that was never created returns an
 empty list. This scenario is tested by `SessionStore_ListIds_NoDirectory_ReturnsEmpty`.
 
-**SessionStore_Delete_ExistingSession_RemovesFile**: A stored session is deleted twice; the file is gone and the
-second deletion does not fail. This scenario is tested by `SessionStore_Delete_ExistingSession_RemovesFile`.
+**SessionStore_DeleteIfSame_ExistingSession_RemovesFileAndToleratesRepeat**: A stored session is deleted twice
+through `DeleteIfSame`; the file is gone and the second deletion also reports `Deleted` without failing. This
+scenario is tested by `SessionStore_DeleteIfSame_ExistingSession_RemovesFileAndToleratesRepeat`.
 
-**SessionStore_Delete_ConcurrentCallers_NoneThrows**: In 25 rounds, a stored session is deleted by six threads at the
-same moment; no thread fails and the file is gone after each round. This scenario is tested by
-`SessionStore_Delete_ConcurrentCallers_NoneThrows`.
+**SessionStore_DeleteIfSame_ConcurrentCallers_NoneThrows**: In 25 rounds, a stored session is deleted by six threads
+at the same moment; no thread fails and the file is gone after each round. This scenario is tested by
+`SessionStore_DeleteIfSame_ConcurrentCallers_NoneThrows`.
+
+**SessionStore_DeleteIfSame_FileCannotBeRemoved_ReportsBusyAndKeepsFile**: On Windows, the session file is held open
+without delete sharing for the whole call. The delete is retried, runs out of attempts, and `DeleteIfSame` reports
+`Busy` instead of throwing; the file is still there and a later call, once the hold is gone, deletes it. This
+scenario is tested by `SessionStore_DeleteIfSame_FileCannotBeRemoved_ReportsBusyAndKeepsFile`; the test is skipped
+with a stated reason on other platforms, where deleting an open file is not refused.
+
+**SessionStore_WriteIfOwner_WritesOwnRecordsButNeverAnotherSessions**: A first record is written into a missing
+file and a changed record of the same session replaces it; after another session's record took the file, the next
+conditional write returns false and the other record is unchanged. This scenario is tested by
+`SessionStore_WriteIfOwner_WritesOwnRecordsButNeverAnotherSessions`.
+
+**SessionStore_WriteIfOwner_CorruptFile_IsReplaced**: A corrupt file belongs to nobody, so the conditional write
+replaces it. This scenario is tested by `SessionStore_WriteIfOwner_CorruptFile_IsReplaced`.
+
+**SessionStore_WriteIfOwner_FileStaysLocked_ThrowsAndWritesNothing**: The session file is held without sharing
+for the whole call. The conditional write throws a `PuppetException` because ownership cannot be determined, and the
+file keeps its earlier record. This scenario is tested by `SessionStore_WriteIfOwner_FileStaysLocked_ThrowsAndWritesNothing`.
 
 **SessionStore_Terminate_Session_KillsBrowserServerAndDaemonWithTheirStartTimes**: A session with a recorded
 browser, server, and daemon is terminated; the kill action receives all three process ids, each with its own
@@ -159,7 +183,13 @@ server is terminated; only the daemon is passed to the kill action. This scenari
 it with a start time that belongs to another process leaves it running; killing it with its real start time ends it.
 This scenario is tested by `SessionStore_KillProcess_RealProcess_KillsOnlyWhenStartTimeMatches`. The identity check
 and the kill act on one acquired process object; the remaining platform-dependent window between them cannot be
-provoked deterministically, so it is covered by the design rather than by a test.
+provoked deterministically, so it is covered by the design (the audit table in the ReviewCenterPuppet design
+chapter) rather than by a test.
+
+**SessionStore_TryKill_ClassifiesGoneProcessFailuresFromUnexpectedOnes**: Kill actions that fail the ways
+`Process.Kill` documents (the process already exited, access denied, a descendant that could not be ended, and
+similar) report false without throwing; a kill that succeeds reports true; any other failure propagates. This
+scenario is tested by `SessionStore_TryKill_ClassifiesGoneProcessFailuresFromUnexpectedOnes`.
 
 **SessionStore_KillProcess_NoSuchProcess_DoesNothing**: Killing a process id that no process uses throws nothing. This
 scenario is tested by `SessionStore_KillProcess_NoSuchProcess_DoesNothing`.
@@ -193,6 +223,21 @@ refused (not thrown) while the deletion is pending and succeeds once it complete
 `SessionStore_TryReserve_LockDeletionPending_IsRefusedWithoutErrorThenTakenOnceGone`; the test is skipped with a
 stated reason on other platforms.
 
+**SessionStore_TryReserve_StaleLockOpenElsewhere_IsHeldAndKept**: A reservation that names a dead owner is held open
+without sharing by another party. The reservation is refused without an error and the lock file is not removed,
+because that party may be writing it or removing it. This scenario is tested by
+`SessionStore_TryReserve_StaleLockOpenElsewhere_IsHeldAndKept`.
+
+**SessionStore_TryReserve_StaleLock_IsReplacedByTheNewLockOnly**: After a takeover of a stale reservation, the folder
+holds exactly one lock file and nothing renamed or left over. This scenario is tested by
+`SessionStore_TryReserve_StaleLock_IsReplacedByTheNewLockOnly`.
+
+**SessionStore_Release_LockTemporarilyOpenElsewhere_RetriesAndRemovesLock**: On Windows, the lock file is held open
+without delete sharing when the lock is released and the held handle is closed during the first wait. The release
+retries, the lock is gone, and the id can be reserved again. This scenario is tested by
+`SessionStore_Release_LockTemporarilyOpenElsewhere_RetriesAndRemovesLock`; the test is skipped with a stated reason
+on other platforms.
+
 **SessionStore_Write_UnixPlatform_CreatesOwnerOnlyDirectoryAndFile**: On Unix platforms, a session is written into
 a folder that did not exist; the folder has mode 0700 and the file mode 0600. The test is skipped with a stated
 reason on Windows, where the per-user temporary folder provides the isolation and no mode is set, so the requirement
@@ -202,3 +247,7 @@ uses a Linux source filter. This scenario is tested by
 **SessionStore_IsProcessAlive_CurrentProcess_TrueOnlyWithMatchingStartTime**: The check is true for the test
 process with its real start time and false with a start time one hour earlier. This scenario is tested by
 `SessionStore_IsProcessAlive_CurrentProcess_TrueOnlyWithMatchingStartTime`.
+
+**SessionStore_IsSameStartTime_MatchesOnlyWithinTolerance**: Start times a fraction of a second apart match in both
+directions and start times a minute apart do not, so a recycled id, which starts much later, is never accepted.
+This scenario is tested by `SessionStore_IsSameStartTime_MatchesOnlyWithinTolerance`.

@@ -117,7 +117,7 @@ internal enum DeleteOutcome
     Replaced,
 
     /// <summary>
-    ///     A <c>start</c> holds the start lock, or the file could not be read; nothing was deleted.
+    ///     A <c>start</c> holds the start lock, or the file could not be read or removed; nothing was deleted.
     /// </summary>
     Busy
 }
@@ -386,9 +386,9 @@ internal sealed class SessionStore
     ///     until it is older than the lock grace period. The holder must call <see cref="Release"/> when
     ///     its start has finished, whatever the outcome, and should look the session up again after taking
     ///     the lock, because another start may have completed between its first look and the lock.
-    ///     Taking over a stale lock is best effort: it is atomic against other takeovers of the same stale
-    ///     file, but two callers racing over one stale lock while a third takes it fresh can, in theory,
-    ///     both succeed; that needs a killed <c>start</c> and three simultaneous callers.
+    ///     Taking over a stale lock is decided and carried out through one open handle on the lock file (see
+    ///     <see cref="TryReclaimStaleLock"/>), so a caller can never delete a fresh lock that another caller
+    ///     created after the stale one was removed; a caller that finds the lock open elsewhere treats it as held.
     /// </remarks>
     /// <param name="sessionId">The session id to lock.</param>
     /// <returns><c>true</c> when this call took the lock; <c>false</c> when another start holds it.</returns>
@@ -420,12 +420,17 @@ internal sealed class SessionStore
     /// <summary>
     ///     Releases the start lock for a session id; does nothing when it is not held.
     /// </summary>
+    /// <remarks>
+    ///     On Windows a delete can be refused for a moment while another process still has the lock file open
+    ///     (for example a caller that is examining it for staleness), so the delete is retried briefly before
+    ///     it is given up. A lock that still cannot be removed is found stale later, once its owner has exited.
+    /// </remarks>
     /// <param name="sessionId">The session id.</param>
     public void Release(string sessionId)
     {
         try
         {
-            File.Delete(GetLockPath(sessionId));
+            DeleteWithRetry(GetLockPath(sessionId));
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
@@ -486,53 +491,69 @@ internal sealed class SessionStore
     /// <returns><c>true</c> when the lock is free to be taken again; <c>false</c> when a live start holds it.</returns>
     private bool TryReclaimStaleLock(string path)
     {
-        ProcessIdentity? owner = null;
+        // The owner is read, judged, and deleted through ONE open handle, never by looking at the path twice.
+        // Judging by path and then deleting by path would let a third caller, that took the lock fresh after
+        // another reclaimer removed the stale one, lose its live lock to this caller's delete. Windows ties the
+        // path to the opened file while the handle is open (a deletion is only pending until the last handle is
+        // closed, and the path cannot be re-created meanwhile); Unix has no such rule, but there the handle
+        // carries an exclusive advisory lock (FileShare.None) that refuses every other reclaimer, so nobody else
+        // removes the file between this caller's read and its delete
+        var share = OperatingSystem.IsWindows() ? FileShare.ReadWrite | FileShare.Delete : FileShare.None;
+        var removed = false;
         try
         {
-            owner = JsonSerializer.Deserialize<ProcessIdentity>(File.ReadAllText(path), JsonOptions);
-        }
-        catch (FileNotFoundException)
-        {
-            // Released in the meantime: free
-            return true;
-        }
-        catch (Exception ex) when (ex is JsonException or IOException or UnauthorizedAccessException)
-        {
-            // Not readable yet (the owner may still be writing it): decided by age below
-        }
+            using (var stream = new FileStream(path, FileMode.Open, FileAccess.Read, share))
+            {
+                if (!IsStaleLock(stream, path))
+                {
+                    return false;
+                }
 
-        bool stale;
-        if (owner is { ProcessId: > 0 } known)
-        {
-            stale = !_isProcessAlive(known.ProcessId, known.StartTimeUtc);
+                File.Delete(path);
+                removed = true;
+            }
         }
-        else
+        catch (Exception ex) when (ex is FileNotFoundException or DirectoryNotFoundException)
         {
-            stale = DateTime.UtcNow - File.GetLastWriteTimeUtc(path) > LockGracePeriod;
-        }
-
-        if (!stale)
-        {
-            return false;
-        }
-
-        // Rename rather than delete: of several callers that found the same stale file only one rename succeeds
-        var graveyard = path + "." + Guid.NewGuid().ToString("N") + ".stale";
-        try
-        {
-            File.Move(path, graveyard);
-            File.Delete(graveyard);
-            return true;
-        }
-        catch (FileNotFoundException)
-        {
-            // Someone else removed it first
+            // Released (or reclaimed by someone else) in the meantime: free
             return true;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
+            // Another caller has the lock open: its owner may still be writing it, or another reclaimer is
+            // removing it. Either way it is not this caller's to take now
             return false;
         }
+
+        // The handle is closed now, so a deletion that was pending on Windows has completed
+        return removed;
+    }
+
+    /// <summary>
+    ///     Decides, from an open lock file, whether the lock is stale: its owner is gone, or it cannot be read
+    ///     and is older than the grace period.
+    /// </summary>
+    /// <param name="stream">The open lock file.</param>
+    /// <param name="path">The lock file path, used for its age.</param>
+    /// <returns><c>true</c> when the lock may be taken over.</returns>
+    private bool IsStaleLock(FileStream stream, string path)
+    {
+        ProcessIdentity? owner = null;
+        try
+        {
+            owner = JsonSerializer.Deserialize<ProcessIdentity>(stream, JsonOptions);
+        }
+        catch (JsonException)
+        {
+            // Not readable yet (the owner may still be writing it): decided by age below
+        }
+
+        if (owner is { ProcessId: > 0 } known)
+        {
+            return !_isProcessAlive(known.ProcessId, known.StartTimeUtc);
+        }
+
+        return DateTime.UtcNow - File.GetLastWriteTimeUtc(path) > LockGracePeriod;
     }
 
     /// <summary>
@@ -661,7 +682,9 @@ internal sealed class SessionStore
     }
 
     /// <summary>
-    ///     Deletes a session file if it exists.
+    ///     Deletes a session file if it exists. Private on purpose: every caller outside the store must go
+    ///     through <see cref="DeleteIfSame"/>, because deleting a session file by id alone can remove a newer
+    ///     session that a concurrent <c>start</c> published after the caller looked.
     /// </summary>
     /// <remarks>
     ///     Several parties can delete the same file at about the same moment (the daemon finishing its
@@ -670,31 +693,82 @@ internal sealed class SessionStore
     ///     failure is retried briefly and is ignored once the file is gone.
     /// </remarks>
     /// <param name="sessionId">The session id.</param>
-    public void Delete(string sessionId)
+    private void Delete(string sessionId)
     {
-        var path = GetPath(sessionId);
-        for (var attempt = 1; attempt <= DeleteAttempts; attempt++)
-        {
-            if (!File.Exists(path))
-            {
-                return;
-            }
+        DeleteWithRetry(GetPath(sessionId));
+    }
 
+    /// <summary>
+    ///     Deletes a file, retrying a sharing or access failure briefly and succeeding once the file is gone.
+    /// </summary>
+    /// <param name="path">The file to delete.</param>
+    /// <exception cref="IOException">Thrown when the file is still there after the last attempt.</exception>
+    /// <exception cref="UnauthorizedAccessException">Thrown when the file is still there after the last attempt.</exception>
+    private void DeleteWithRetry(string path)
+    {
+        for (var attempt = 1; attempt < DeleteAttempts; attempt++)
+        {
             try
             {
+                // Deleting a file that does not exist is not an error
                 File.Delete(path);
                 return;
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
             {
-                if (attempt == DeleteAttempts)
+                // A concurrent delete that won the race leaves nothing to do
+                if (!File.Exists(path))
                 {
-                    throw;
+                    return;
                 }
 
-                Thread.Sleep(DeleteRetryDelay);
+                _sleep(DeleteRetryDelay);
             }
         }
+
+        // The last attempt: a failure propagates unless the file is gone anyway
+        try
+        {
+            File.Delete(path);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException && !File.Exists(path))
+        {
+            // A concurrent delete won the race
+        }
+    }
+
+    /// <summary>
+    ///     Writes a session record only while the file does not hold a different session: the daemon's
+    ///     way of publishing its progress without overwriting a session that replaced it.
+    /// </summary>
+    /// <remarks>
+    ///     A daemon keeps updating its record for a long time. If the daemon was declared dead and a new
+    ///     <c>start</c> published its own record under the same id, a blind write by the old daemon would
+    ///     overwrite the new session. The record is therefore replaced only when the file is missing, is
+    ///     corrupt, or still describes this same session (<see cref="IsSameSession"/>). Between that check
+    ///     and the replacement a window of microseconds remains; a replacement session can only exist once
+    ///     this daemon is already considered dead, and that daemon is being terminated at the same time.
+    /// </remarks>
+    /// <param name="info">The record to publish.</param>
+    /// <returns><c>true</c> when the record was written; <c>false</c> when another session holds the id.</returns>
+    /// <exception cref="PuppetException">Thrown when the current file stays unreadable, so ownership is unknown.</exception>
+    public bool WriteIfOwner(SessionInfo info)
+    {
+        ArgumentNullException.ThrowIfNull(info);
+        var (outcome, current) = ReadWithRetry(GetPath(info.SessionId));
+        if (outcome == ReadOutcome.Unavailable)
+        {
+            throw new PuppetException(
+                $"The session file for '{info.SessionId}' is unreadable, so it cannot be verified as this session's record.");
+        }
+
+        if (current is not null && !IsSameSession(current, info))
+        {
+            return false;
+        }
+
+        Write(info);
+        return true;
     }
 
     /// <summary>
@@ -749,7 +823,17 @@ internal sealed class SessionStore
                 return DeleteOutcome.Replaced;
             }
 
-            Delete(sessionId);
+            try
+            {
+                Delete(sessionId);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                // The file is still there after the retries (another process keeps it open): nothing was
+                // removed, so report that the deletion could not be done rather than failing the caller
+                return DeleteOutcome.Busy;
+            }
+
             return DeleteOutcome.Deleted;
         }
         finally
@@ -977,8 +1061,7 @@ internal sealed class SessionStore
     /// <returns><c>true</c> when the process has not exited and started within the tolerance of the recorded time.</returns>
     private static bool IsSameProcess(Process process, DateTime startTimeUtc)
     {
-        return !process.HasExited &&
-               (process.StartTime.ToUniversalTime() - startTimeUtc).Duration() < StartTimeTolerance;
+        return !process.HasExited && IsSameStartTime(process.StartTime.ToUniversalTime(), startTimeUtc);
     }
 
     /// <summary>
@@ -1004,13 +1087,51 @@ internal sealed class SessionStore
                 return;
             }
 
-            process.Kill(entireProcessTree: true);
+            TryKill(() => process.Kill(entireProcessTree: true));
         }
         catch (Exception ex) when (ex is ArgumentException or InvalidOperationException
                                        or System.ComponentModel.Win32Exception)
         {
             // Already gone or not ours to stop; nothing more to do
         }
+    }
+
+    /// <summary>
+    ///     Runs a process kill and absorbs the failures that only mean the process is already gone or not
+    ///     ours to stop.
+    /// </summary>
+    /// <remarks>
+    ///     <see cref="Process.Kill(bool)"/> with the process tree reports a partial failure (a descendant that
+    ///     exited or is not accessible) as an <see cref="AggregateException"/>, and a process that exits while
+    ///     it is being ended as an <see cref="InvalidOperationException"/> or a
+    ///     <see cref="System.ComponentModel.Win32Exception"/>. None of these means the cleanup should stop:
+    ///     the callers confirm the outcome by checking liveness afterwards and repeat the kill.
+    /// </remarks>
+    /// <param name="kill">The kill to run.</param>
+    /// <returns><c>true</c> when the kill ran without failure; <c>false</c> when it reported that the process was gone or inaccessible.</returns>
+    internal static bool TryKill(Action kill)
+    {
+        try
+        {
+            kill();
+            return true;
+        }
+        catch (Exception ex) when (ex is ArgumentException or InvalidOperationException or NotSupportedException
+                                       or AggregateException or System.ComponentModel.Win32Exception)
+        {
+            return false;
+        }
+    }
+
+    /// <summary>
+    ///     Decides whether a start time reported for a process is the recorded one, within the clock tolerance.
+    /// </summary>
+    /// <param name="first">One start time.</param>
+    /// <param name="second">The other start time.</param>
+    /// <returns><c>true</c> when the two times are within <see cref="StartTimeTolerance"/> of each other.</returns>
+    internal static bool IsSameStartTime(DateTime first, DateTime second)
+    {
+        return (first - second).Duration() < StartTimeTolerance;
     }
 
     /// <summary>

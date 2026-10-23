@@ -151,7 +151,8 @@ internal sealed class ServerProcessRunner : IServerRunner
 
         try
         {
-            await WaitUntilHealthyAsync(process, url, output, cancellationToken);
+            await WaitUntilHealthyAsync(
+                () => process.HasExited, () => process.ExitCode, url, output, HealthTimeout, cancellationToken);
             return server;
         }
         catch (Exception startFailure)
@@ -173,6 +174,14 @@ internal sealed class ServerProcessRunner : IServerRunner
     /// <summary>
     ///     Asks the operating system for a free loopback port.
     /// </summary>
+    /// <remarks>
+    ///     The port is free only at the moment of the call: it is released before the server binds it, so
+    ///     another process can take it in between (an inherent time-of-check to time-of-use gap; there is no
+    ///     portable way to hand a bound socket to a child that binds its own). The gap is closed on the
+    ///     other side: <see cref="WaitUntilHealthyAsync"/> accepts only the exact ReviewCenter health answer
+    ///     (never a redirect) and only while the server process it started is still running, so a foreign
+    ///     process on the port is reported as a failure and never driven.
+    /// </remarks>
     /// <returns>A port that was free at the time of the call.</returns>
     private static int GetFreePort()
     {
@@ -210,34 +219,41 @@ internal sealed class ServerProcessRunner : IServerRunner
     /// <summary>
     ///     Polls <c>/health</c> until it answers success, the process exits, or the time runs out.
     /// </summary>
-    /// <param name="process">The server process.</param>
+    /// <remarks>
+    ///     A healthy answer counts only while the server process that was started is still running. When the
+    ///     port was taken by another process between choosing it and the server binding it, the server fails to
+    ///     bind and exits while the other process may well answer the health request; without this check that
+    ///     answer would be taken for the server's own.
+    /// </remarks>
+    /// <param name="hasExited">Tells whether the server process has exited.</param>
+    /// <param name="exitCode">Gives the exit code of the exited server process.</param>
     /// <param name="url">The server base URL.</param>
     /// <param name="output">The captured output tail.</param>
+    /// <param name="timeout">How long the server may take to become healthy.</param>
     /// <param name="cancellationToken">Cancels the wait.</param>
     /// <returns>A task that completes when the server is healthy.</returns>
     /// <exception cref="PuppetException">Thrown when the server exits or does not become healthy in time.</exception>
-    private static async Task WaitUntilHealthyAsync(
-        Process process,
+    internal static async Task WaitUntilHealthyAsync(
+        Func<bool> hasExited,
+        Func<int> exitCode,
         string url,
         ConcurrentQueue<string> output,
+        TimeSpan timeout,
         CancellationToken cancellationToken)
     {
         using var http = CreateHealthClient();
-        var deadline = DateTime.UtcNow + HealthTimeout;
+        var deadline = DateTime.UtcNow + timeout;
         while (DateTime.UtcNow < deadline)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            if (process.HasExited)
-            {
-                throw new PuppetException(
-                    $"The ReviewCenter server exited with code {process.ExitCode} during start-up.{Environment.NewLine}" +
-                    string.Join(Environment.NewLine, output));
-            }
+            ThrowIfExited(hasExited, exitCode, output, "during start-up");
 
             var probe = await ProbeHealthAsync(http, url, cancellationToken);
             switch (probe.State)
             {
                 case HealthState.Healthy:
+                    // Whoever answered, the answer is the server's own only if the server is still running
+                    ThrowIfExited(hasExited, exitCode, output, "while another service answered its health check");
                     return;
                 case HealthState.Mismatch:
                     // Something answered, but not the ReviewCenter health endpoint (for example another process
@@ -251,8 +267,26 @@ internal sealed class ServerProcessRunner : IServerRunner
         }
 
         throw new PuppetException(
-            $"The ReviewCenter server at {url} did not become healthy within {HealthTimeout.TotalSeconds:0} seconds.{Environment.NewLine}" +
+            $"The ReviewCenter server at {url} did not become healthy within {timeout.TotalSeconds:0} seconds.{Environment.NewLine}" +
             string.Join(Environment.NewLine, output));
+    }
+
+    /// <summary>
+    ///     Fails when the server process has exited.
+    /// </summary>
+    /// <param name="hasExited">Tells whether the server process has exited.</param>
+    /// <param name="exitCode">Gives the exit code of the exited server process.</param>
+    /// <param name="output">The captured output tail.</param>
+    /// <param name="when">Describes the moment, for the message.</param>
+    /// <exception cref="PuppetException">Thrown when the process has exited.</exception>
+    private static void ThrowIfExited(Func<bool> hasExited, Func<int> exitCode, ConcurrentQueue<string> output, string when)
+    {
+        if (hasExited())
+        {
+            throw new PuppetException(
+                $"The ReviewCenter server exited with code {exitCode()} {when}.{Environment.NewLine}" +
+                string.Join(Environment.NewLine, output));
+        }
     }
 
     /// <summary>
@@ -410,14 +444,10 @@ internal sealed class ServerProcessRunner : IServerRunner
         /// </summary>
         private void KillTree()
         {
-            try
-            {
-                _process.Kill(entireProcessTree: true);
-            }
-            catch (Exception ex) when (ex is InvalidOperationException or System.ComponentModel.Win32Exception)
-            {
-                // Already gone, or refused; whether it worked is decided by waiting for the exit, not here
-            }
+            // The process object is our own child, so on every platform the kill addresses that child and
+            // never a process that later reuses its id. A refusal is absorbed here: whether the kill worked
+            // is decided by waiting for the exit, not by this call
+            SessionStore.TryKill(() => _process.Kill(entireProcessTree: true));
         }
     }
 

@@ -95,6 +95,185 @@ bounded by a timeout, after which `start` aborts the session as described above,
 itself. A caller that wants to give up early can end the `start` command, which terminates the daemon the same
 way.
 
+### Race Audit: Check-Then-Act Sites
+
+Puppet is a set of short-lived commands and long-lived daemons that share session files, lock files, and process
+identities, so every place that checks something and acts on the result later is a potential race. The code was audited
+once, systematically, for every deletion of a session or lock file, every process kill or termination (including
+every lookup of a process by id), every stale-session cleanup, every lock-file handling path, every file move or
+replace, and every readiness or health probe. Each site is listed below with the *check*, the *act*, the *window*
+between them, what happens when the record or process is replaced or reused in that window, and the *guard*. The
+entries use a list instead of a table because five wide columns do not fit the 120-character documentation limit.
+
+The guards that appear most often are:
+
+- **Delete-if-same**: a record is deleted only while it still describes the session that was examined
+  (`SessionStore.IsSameSession`: session id, daemon identity, and control token), under the start reservation. There is
+  no unconditional delete of a session record: `SessionStore.Delete` is private.
+- **Identity revalidation**: a process is ended only when its process id and its start time (within a two-second clock
+  tolerance) match the recorded identity, never by name. On Windows the check and the kill use one process handle.
+- **Lock held**: a decision that must not interleave with a `start` is taken while holding the start reservation.
+- **Ownership check**: a daemon publishes only into a file that is missing, corrupt, or its own (`WriteIfOwner`).
+- **Strict acceptance**: an answer from a loopback port is accepted only when it has the exact expected form.
+
+#### SessionStore
+
+1. **Write (replace the file)**. *Check*: none; the content is written to a temporary file first. *Act*: move the
+   temporary file over the target. *Window*: another process has the target open (Windows sharing violation).
+   *If replaced or reused*: the last complete write wins and readers see the old or the new file, never a partial one.
+   *Guard*: the move is retried about twenty times for `IOException` and `UnauthorizedAccessException` alike; when it
+   still fails, the temporary file (which holds the token) is deleted and the error propagates.
+2. **WriteIfOwner (daemon publishes a record)**. *Check*: read the current file and compare the session with
+   `IsSameSession`. *Act*: replace the file. *Window*: milliseconds between the read and the move. *If replaced or
+   reused*: a record of another session is never overwritten once seen, so a force-stopped daemon cannot clobber a new
+   session. *Guard*: ownership check; an unreadable file fails loudly instead of guessing. *Residual*: another session
+   publishing inside the read-to-move window; a new session can publish only after the old file was deleted, which the
+   old daemon's own supersede check normally precedes (see residual risks).
+3. **DeleteIfSame**. *Check*: take the start reservation, re-read the file, compare with the examined record. *Act*:
+   delete the file. *Window*: none against a `start` (it needs the reservation to publish); a daemon's own
+   `WriteIfOwner` of the same session may interleave, and deleting that file is the intent. *If replaced or reused*:
+   a different session returns `Replaced` and is kept; a held reservation returns `Busy`. *Guard*: delete-if-same under
+   the lock; a sharing or access error that outlasts the retries returns `Busy` instead of throwing, so the caller
+   keeps the record and can retry.
+4. **Delete (private; delete with retry)**. *Check*: after a failed delete, whether the file is gone. *Act*: delete.
+   *Window*: another party deleting the same file at the same moment. *If replaced or reused*: a file that vanished
+   counts as deleted. *Guard*: reachable only from `DeleteIfSame`; retries `IOException` and
+   `UnauthorizedAccessException`; the last attempt is outside the loop and succeeds when the file is gone.
+5. **Lookup (stale-session cleanup)**. *Check*: read the record and test its daemon. *Act*: end the recorded server and
+   browser, then `DeleteIfSame`. *Window*: the liveness test and the kills (hundreds of milliseconds). *If replaced or
+   reused*: the kills use the identities from the examined record, so a new session's processes are untouched; a
+   replaced file is re-examined, at most three times, then reported as an error. *Guard*: identity revalidation plus
+   delete-if-same. An unreadable file is never treated as stale.
+6. **TryReserve (create the lock)**. *Check/act*: one exclusive create (`CreateNew`), so there is no separate check.
+   *Window*: none. *Guard*: atomicity of the create; a create that fails because the file is pending deletion (Windows
+   access denied) counts as held.
+7. **TryReclaimStaleLock (take over a dead owner's lock)**. *Check*: read the owner's identity from the lock file.
+   *Act*: delete the lock, then create it. *Window*: previously the path was checked and then renamed and deleted
+   separately, so a second reclaimer could delete the first one's fresh lock. *If replaced or reused*: now the check
+   and the delete use one open handle (Windows: delete sharing, so the path stays bound to the file; Unix: exclusive
+   open), so only the file that was judged is deleted. *Guard*: lock held on the handle; a sharing or access error means
+   "held", a missing file means "free"; no renamed leftover is created.
+8. **Release (delete the own lock)**. *Check*: none (the owner deletes its own lock). *Act*: delete. *Window*: a
+   reclaimer has the file open. *If replaced or reused*: another caller can reclaim the lock only after this process
+   was judged dead, which identity makes impossible while it runs. *Guard*: retried for `IOException` and
+   `UnauthorizedAccessException`; a delete that still fails is swallowed because the next caller reclaims a lock whose
+   owner is gone, and an exception from `finally` must not hide the real result.
+9. **IsProcessAlive and KillProcess (process lookup by id)**. *Check*: look up the process id and compare the start
+   time. *Act*: kill the process tree. *Window*: between the comparison and the kill. *If replaced or reused*: on
+   Windows the process object holds one handle, so the process that was compared is the one killed. On Unix there is no
+   portable process descriptor in .NET, so the residual window below remains. *Guard*: identity revalidation on the same
+   `Process` object; the kill goes through `TryKill`.
+10. **TryKill (kill outcome)**. *Check*: none. *Act*: `Process.Kill(true)`. *Window*: the process or a descendant
+    exits meanwhile. *If replaced or reused*: `InvalidOperationException`, `Win32Exception`, `NotSupportedException`,
+    and the `AggregateException` of a partial tree kill mean "already gone or not accessible" and are absorbed; any
+    other exception propagates. *Guard*: callers confirm by re-checking liveness, never by trusting the kill.
+11. **Terminate, IsDaemonAlive, HasLiveProcesses**. These are advisory checks: they decide whether to keep waiting. The
+    kill itself revalidates the identity, so a stale answer cannot cause a wrong kill.
+12. **TryRead and the read retries**. *Check*: the file exists. *Act*: open and read it. *Window*: the file is deleted
+    or replaced between the two. *If replaced or reused*: a missing file reads as unknown; a file that stays locked is
+    "unavailable" and is never treated as stale. *Guard*: full sharing on read, bounded retries.
+13. **Directory creation and listing**. `CreateDirectory` is idempotent, and `ListIds` is a snapshot that every caller
+    re-validates through `Lookup`. A different user pre-creating the folder on Unix can only deny service.
+
+#### PuppetProgram
+
+1. **start**. *Check*: reserve the id, look the session up, launch. *Act*: launch the daemon and publish. *Window*: the
+   whole start. *Guard*: the reservation is held until the end of the command, and a stale record found under it is
+   deleted with `startLockHeld`.
+2. **Start abort (time-out, cancellation, dead daemon, failed daemon)**. *Check*: read the record, kill what it names,
+   confirm nothing is alive. *Act*: delete the record. *Window*: the daemon keeps running while it is killed and may
+   record a server or browser the abort has not seen. *If replaced or reused*: the abort re-reads the record after each
+   round and follows it (only the aborted daemon can have written it, because the abort holds the reservation); the
+   launched daemon is also killed by its own identity when the record does not name it. *Guard*: delete-if-same with
+   the last record examined, under the reservation; `Replaced` starts another round (at most three), `Busy` reports the
+   cleanup as unconfirmed with the file kept. The former unconditional delete was removed.
+3. **stop and ForceStop**. *Check*: the daemon accepted the stop and ended, or was killed, and all recorded processes are
+   gone. *Act*: delete the record. *Window*: the daemon's teardown, and the forced kills. *If replaced or reused*: the
+   record is re-read each round and followed only while it is the same session, so a server the same daemon recorded
+   late is ended too, but a replacement session's processes and file are never touched. *Guard*: identity
+   revalidation per process, delete-if-same with the original examined record, and a bounded confirmation: when a
+   process survives the file is kept and the exit code is 1.
+4. **List and session resolution**. *Check*: `Lookup` per id. *Act*: print, or clean up a stale session. *Window*: the
+   session ends or is replaced while listing. *If replaced or reused*: the output is a snapshot; any cleanup goes
+   through the guarded paths above. *Guard*: `Lookup` (entry 5 of SessionStore).
+5. **Client command**. *Check*: `Lookup` says the session is live. *Act*: connect to the recorded port with the
+   recorded token. *Window*: the daemon exits, or the session is replaced. *If replaced or reused*: the connection is
+   refused or the token is rejected; a foreign listener on the reused port sees only a dead daemon's token, and its
+   answer is rejected by the strict parser. A `stop` whose answer is rejected falls back to the forced stop by identity.
+   *Guard*: token authentication and strict response parsing (see ControlChannel).
+6. **Server assembly path check (`File.Exists`)**. Advisory: a missing file gives a clear message before launching, and
+   a file that disappears later fails the start in the daemon.
+
+#### DaemonHost and DaemonLauncher
+
+1. **Daemon records (`Starting`, `Ready`, `Failed`)**. *Check/act*: `WriteIfOwner` (SessionStore entry 2). *If replaced
+   or reused*: the daemon is superseded: it writes nothing more, tears down its own server and browser, leaves the other
+   session's file, and exits with 4. A failure record that cannot be written is absorbed, so it cannot skip the
+   teardown or hide the original failure.
+2. **Final delete of the record**. *Check*: the record is still the one this daemon published. *Act*: delete it.
+   *Guard*: `DeleteIfSame` under the reservation; if a `start` holds the reservation the record is left for it.
+3. **Control port**. *Check/act*: the listener binds port 0 and keeps the socket for the life of the daemon, so no other
+   process can take the port in between.
+4. **Launch identity (DaemonLauncher)**. *Check*: none. *Act*: the identity (id and start time) is read from the creation
+   handle (Windows) or from the `Process` object that started the child. *Window*: previously the id was looked up again
+   after the launch, so a daemon that exited at once could have its id recycled and be recorded with another process's
+   start time, which the abort would then trust. *Guard*: the identity belongs to the process that was created.
+
+#### ServerProcessRunner and PlaywrightBrowser
+
+1. **Free port selection**. *Check*: bind port 0 and read the port. *Act*: release it and start the server on it.
+   *Window*: another process can take the port before the server binds. *If replaced or reused*: the server fails to
+   bind and exits, while the other process may answer the probe. *Guard*: the probe accepts only status 200 with the
+   exact body `Healthy`, does not follow redirects, and requires the server process to be running both before the
+   probe and right after a healthy answer; otherwise the start fails with a clear message. The window cannot be
+   closed, because the server process must bind the port itself.
+2. **Readiness probe**. *Check*: the answer of `/health`. *Act*: treat the server as ready and drive the browser at it.
+   *Guard*: strict answer plus the exit check above (this was already strict about status and body; the exit check is
+   new).
+3. **Server stop**. *Check*: the process exited after the first kill. *Act*: kill the tree again, then fail loudly.
+   *Window*: none that matters: the runner holds its own `Process` object, so there is no pid reuse. *Guard*: `TryKill`
+   absorbs the already-gone failures.
+4. **Browser identity query (`QueryBrowserProcessAsync`)**. *Check*: the browser's process id from DevTools. *Act*:
+   look the process up and read its start time. *Window*: microseconds after the answer. *If replaced or reused*: the
+   browser would have to exit and its id be reused in that time; the recorded identity would then be of another process.
+   *Guard*: none beyond the short window (see residual risks); every failure to find the process records no identity.
+
+#### ControlChannel and CommandExecutor
+
+1. **ControlClient (loopback exchange)**. *Check*: the port and token come from the session record. *Act*: connect and
+   exchange one line. *Window*: the daemon dies and another listener takes the port. *If replaced or reused*: the
+   channel is a raw line protocol over TCP, not HTTP, so there are no redirects to follow. The client now accepts only
+   a JSON object with exactly `Ok` (boolean), `ExitCode` (integer), and `Message` (string), the same strictness as the
+   readiness probe, so an answer such as `{}` is an error naming the port instead of a failed command with no message.
+   The token that is sent belongs to the dead daemon.
+2. **ControlServer**. The token is compared in fixed time on every request, and the listener is held for the life of the
+   daemon (no check-then-bind).
+3. **Screenshot file (`CommandExecutor`)**. *Check*: none (the directory is created idempotently). *Act*: write the file,
+   replacing an existing one. *Window*: none that changes the outcome; the last writer wins, which is the documented
+   behavior of an output path chosen by the caller.
+
+#### Residual Risks
+
+These cannot be closed completely and are accepted:
+
+- **Process id reuse on Unix**. Between the start-time comparison and `kill()`, the operating system could in theory
+  recycle the id. .NET offers no portable process file descriptor on Unix, so the check and the kill are
+  adjacent operations on one `Process` object. The window is microseconds, the start time must also match within two
+  seconds, and an id is not normally reused that quickly. On Windows the process handle pins the process and the
+  window does not exist.
+- **Access denied reads as "not alive"**. `IsProcessAlive` cannot read the start time of a process that belongs to
+  another user or is elevated, so such a process is treated as not alive. This is the safe direction for kills (nothing
+  is killed) but can make a stale cleanup delete the record of a session whose daemon runs elevated.
+- **Browser identity from DevTools**. See the browser identity query above.
+- **Port reuse after a daemon dies**. See ControlClient above; the strict response parser is the mitigation.
+- **Free port selection**. See above; the strict probe and the exit check turn the outcome into a failed start.
+- **Interval in `WriteIfOwner`**. See SessionStore entry 2.
+- **Leftover temporary files**. A writer killed between creating the temporary file and moving it leaves an owner-only
+  `.tmp` file in the session folder. It is never read as a session.
+- **A daemon recording after the final abort read**. The last read of an abort cannot be followed by another round
+  if the daemon records a process in that exact moment; the kill of the daemon itself precedes the final read, so this
+  needs the daemon to survive the kill, in which case the cleanup is reported as unconfirmed and the record is kept.
+
 ## External Interfaces
 
 **Command-Line Interface**: The input interface used by developers and coding agents.
@@ -210,6 +389,9 @@ documented under Design Constraints.
   and no process is ever ended by name.
 - Exclusive start: the session id is reserved with an exclusive file create before a daemon is launched, so two
   simultaneous `start` commands for one id cannot both launch.
+- Conditional changes: a session record is deleted only when it still describes the session that was examined, and a
+  daemon writes a record only when the file is missing, corrupt, or its own, so a replaced session is never harmed by a
+  late cleanup. The checked sites and the accepted residual risks are listed in the race audit above.
 - No orphans: a start that times out, is cancelled, or fails ends the daemon it launched, and a failed server stop is
   escalated and reported instead of being ignored.
 - Bounded waiting: every browser wait and every control channel exchange has a timeout, and an unused session shuts

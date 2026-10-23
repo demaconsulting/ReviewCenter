@@ -130,6 +130,12 @@ internal static class PuppetProgram
     private static readonly TimeSpan StopPollInterval = TimeSpan.FromMilliseconds(100);
 
     /// <summary>
+    ///     How many times an aborted <c>start</c> re-examines a session record that changed while its processes
+    ///     were being ended, before it gives up and keeps the record.
+    /// </summary>
+    private const int AbortRounds = 3;
+
+    /// <summary>
     ///     Extra time the client allows a control exchange beyond the command's own timeout, covering the
     ///     connection, the request, and the response transfer (for example a large screenshot message).
     /// </summary>
@@ -440,14 +446,29 @@ internal static class PuppetProgram
     private static async Task<bool> AbortStartAsync(string sessionId, ProcessIdentity daemon, PuppetServices services)
     {
         var store = services.Store;
-        var recorded = store.TryRead(sessionId);
-        var confirmed = await TerminateAndConfirmAsync(recorded, daemon, services);
-        if (confirmed)
+
+        // The record can still change while the processes are being ended (the daemon may publish a server or
+        // browser it just started), so the file is removed only if it still is the record that was last
+        // examined. A record that appeared or changed since is examined, and its processes ended, in another round
+        for (var round = 0; round < AbortRounds; round++)
         {
-            store.Delete(sessionId);
+            var (confirmed, last) = await TerminateAndConfirmAsync(sessionId, store.TryRead(sessionId), daemon, acceptAnyRecord: true, services);
+            if (!confirmed)
+            {
+                return false;
+            }
+
+            switch (store.DeleteIfSame(sessionId, last, startLockHeld: true))
+            {
+                case DeleteOutcome.Deleted:
+                    return true;
+                case DeleteOutcome.Busy:
+                    // Unreadable or undeletable: the record is kept, which is the safe answer
+                    return false;
+            }
         }
 
-        return confirmed;
+        return false;
     }
 
     /// <summary>
@@ -455,44 +476,71 @@ internal static class PuppetProgram
     /// </summary>
     /// <remarks>
     ///     The kill is repeated on every poll, which is harmless because a process is only ever killed while
-    ///     it still has the recorded identity. The wait deliberately ignores caller cancellation: cleanup
-    ///     must finish (within the stop timeout) even when the caller has given up.
+    ///     it still has the recorded identity. The session record is read again on every round, because the
+    ///     daemon may record a server or browser after the first look; a record that is not accepted is never
+    ///     used to kill anything. Once nothing is alive the record is read one last time and, when it changed
+    ///     meanwhile, the new processes are ended too. The wait deliberately ignores caller cancellation:
+    ///     cleanup must finish (within the stop timeout) even when the caller has given up.
     /// </remarks>
-    /// <param name="recorded">The session record, when one was written.</param>
+    /// <param name="sessionId">The session id.</param>
+    /// <param name="recorded">The session record examined first, when one was written.</param>
     /// <param name="daemon">The identity of the daemon.</param>
+    /// <param name="acceptAnyRecord">
+    ///     <c>true</c> when the caller holds the start lock, so any record under the id was written by the
+    ///     daemon being aborted; <c>false</c> when only a record of the same session (same daemon and token as
+    ///     <paramref name="recorded"/>) may be followed, because a newer session can be published meanwhile.
+    /// </param>
     /// <param name="services">The collaborators.</param>
-    /// <returns><c>true</c> when no daemon, server, or browser of the session is alive any more.</returns>
-    private static async Task<bool> TerminateAndConfirmAsync(SessionInfo? recorded, ProcessIdentity daemon, PuppetServices services)
+    /// <returns>
+    ///     Whether no daemon, server, or browser of the session is alive any more, and the last record that
+    ///     was acted on (<c>null</c> when there was none).
+    /// </returns>
+    private static async Task<(bool Confirmed, SessionInfo? Last)> TerminateAndConfirmAsync(
+        string sessionId, SessionInfo? recorded, ProcessIdentity daemon, bool acceptAnyRecord, PuppetServices services)
     {
         var store = services.Store;
         var deadline = DateTime.UtcNow + (services.StopTimeout ?? DefaultStopTimeout);
+        var known = recorded;
         while (true)
         {
-            if (recorded is not null)
+            if (known is not null)
             {
-                store.Terminate(recorded);
+                store.Terminate(known);
             }
 
-            if (recorded is null || recorded.DaemonPid != daemon.ProcessId || recorded.DaemonStartTimeUtc != daemon.StartTimeUtc)
+            if (known is null || known.DaemonPid != daemon.ProcessId || !SessionStore.IsSameStartTime(known.DaemonStartTimeUtc, daemon.StartTimeUtc))
             {
                 // The record does not name this daemon (or there is no record): terminate it by its own identity
                 store.Terminate(daemon);
             }
-            var alive = store.IsAlive(daemon) || (recorded is not null && store.HasLiveProcesses(recorded));
+
+            var alive = store.IsAlive(daemon) || (known is not null && store.HasLiveProcesses(known));
+            var latest = store.TryRead(sessionId);
+            if (latest is not null && latest != known && (acceptAnyRecord || (known is not null && SessionStore.IsSameSession(latest, known))))
+            {
+                // The daemon recorded more processes (or changed the record) since it was last read: end those too
+                known = latest;
+                if (DateTime.UtcNow < deadline)
+                {
+                    continue;
+                }
+
+                alive = true;
+            }
+
             if (!alive)
             {
-                return true;
+                return (true, known);
             }
 
             if (DateTime.UtcNow >= deadline)
             {
-                return false;
+                return (false, known);
             }
 
             await Task.Delay(StopPollInterval, CancellationToken.None);
         }
     }
-
 
     /// <summary>
     ///     Runs the hidden <c>__daemon</c> verb: hosts the session until it is stopped.
@@ -749,7 +797,8 @@ internal static class PuppetProgram
         var store = services.Store;
         var current = store.TryRead(info.SessionId);
         var target = current is not null && SessionStore.IsSameSession(current, info) ? current : info;
-        var confirmed = await TerminateAndConfirmAsync(target, new ProcessIdentity(target.DaemonPid, target.DaemonStartTimeUtc), services);
+        var (confirmed, _) = await TerminateAndConfirmAsync(
+            info.SessionId, target, new ProcessIdentity(target.DaemonPid, target.DaemonStartTimeUtc), acceptAnyRecord: false, services);
         if (confirmed)
         {
             store.DeleteIfSame(info.SessionId, info);

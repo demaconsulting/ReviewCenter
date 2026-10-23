@@ -67,6 +67,80 @@ public class ControlChannelTests
     }
 
     /// <summary>
+    ///     Test that the client accepts exactly the response shape the daemon sends and rejects anything else
+    ///     (an unrelated service on a reused port can answer with anything).
+    /// </summary>
+    /// <param name="line">The line a service answered with.</param>
+    /// <param name="accepted">Whether the line is a genuine control response.</param>
+    [Theory]
+    [InlineData("{\"Ok\":true,\"ExitCode\":0,\"Message\":\"done\"}", true)]
+    [InlineData("{\"Ok\":false,\"ExitCode\":2,\"Message\":\"\"}", true)]
+    [InlineData("{}", false)]
+    [InlineData("[]", false)]
+    [InlineData("\"text\"", false)]
+    [InlineData("HTTP/1.1 200 OK", false)]
+    [InlineData("{\"Ok\":true,\"ExitCode\":0}", false)]
+    [InlineData("{\"Ok\":true,\"ExitCode\":0,\"Message\":\"x\",\"Extra\":1}", false)]
+    [InlineData("{\"Ok\":\"yes\",\"ExitCode\":0,\"Message\":\"x\"}", false)]
+    [InlineData("{\"Ok\":true,\"ExitCode\":\"0\",\"Message\":\"x\"}", false)]
+    [InlineData("{\"Ok\":true,\"ExitCode\":0,\"Message\":5}", false)]
+    public void ControlChannel_ParseResponse_AcceptsOnlyTheExactResponseShape(string line, bool accepted)
+    {
+        // Act: parse the line
+        var exception = Record.Exception(() => ControlProtocol.ParseResponse(line, 1234));
+
+        // Assert: genuine responses parse; everything else is a puppet error naming the port
+        if (accepted)
+        {
+            Assert.Null(exception);
+        }
+        else
+        {
+            Assert.IsType<PuppetException>(exception);
+            Assert.Contains("1234", exception.Message, StringComparison.Ordinal);
+        }
+    }
+
+    /// <summary>
+    ///     Test that a client talking to an unrelated service that answers with a well-formed but foreign JSON object
+    ///     fails instead of reporting a bogus command failure.
+    /// </summary>
+    [Fact]
+    public async Task ControlChannel_Send_ForeignServiceAnswersWithEmptyObject_ThrowsPuppetException()
+    {
+        // Arrange: a loopback listener that is not a daemon and answers every request with {}
+        var listener = new TcpListener(IPAddress.Loopback, 0);
+        listener.Start();
+        try
+        {
+            var port = ((IPEndPoint)listener.LocalEndpoint).Port;
+            var answering = Task.Run(
+                async () =>
+                {
+                    using var peer = await listener.AcceptTcpClientAsync(Xunit.TestContext.Current.CancellationToken);
+                    await using var stream = peer.GetStream();
+                    using var reader = new StreamReader(stream);
+                    await reader.ReadLineAsync(Xunit.TestContext.Current.CancellationToken);
+                    await stream.WriteAsync("{}\n"u8.ToArray(), Xunit.TestContext.Current.CancellationToken);
+                },
+                Xunit.TestContext.Current.CancellationToken);
+
+            // Act: send a request
+            var exception = await Record.ExceptionAsync(() => ControlClient.SendAsync(
+                port, CreateRequest("token"), TimeSpan.FromSeconds(10), Xunit.TestContext.Current.CancellationToken));
+            await answering;
+
+            // Assert: rejected as not being a Puppet daemon
+            Assert.IsType<PuppetException>(exception);
+            Assert.Contains("did not answer like a Puppet session daemon", exception.Message, StringComparison.Ordinal);
+        }
+        finally
+        {
+            listener.Stop();
+        }
+    }
+
+    /// <summary>
     ///     Test that a request with the wrong token is rejected without reaching the handler.
     /// </summary>
     [Fact]

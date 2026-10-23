@@ -131,6 +131,12 @@ internal sealed class DaemonHost
     private readonly TimeSpan _idleTimeout;
 
     /// <summary>
+    ///     Whether another session was found to own the session id; set by <see cref="Publish"/> and read only
+    ///     by the one run this instance performs.
+    /// </summary>
+    private bool _superseded;
+
+    /// <summary>
     ///     Initializes a new instance of the <see cref="DaemonHost"/> class.
     /// </summary>
     /// <param name="store">The session file store.</param>
@@ -160,7 +166,8 @@ internal sealed class DaemonHost
     ///     the session, in which case the session file is left behind with status
     ///     <see cref="SessionStatus.Failed"/> and the reason so the waiting <c>start</c> command (or the
     ///     next lookup, which finds the daemon gone and cleans up) can report it. The browser and the
-    ///     server are released on every path.
+    ///     server are released on every path. 4 is also returned when another session took over the id while this
+    ///     one was running; the file then belongs to that session and is left untouched.
     /// </returns>
     public async Task<int> RunAsync(string sessionId, string serverPath, CancellationToken cancellationToken)
     {
@@ -175,34 +182,41 @@ internal sealed class DaemonHost
         var info = new SessionInfo(
             sessionId, SessionStatus.Starting, control.Port, token, string.Empty, self.Id, daemonStart, 0,
             default, 0, default, null);
-        _store.Write(info);
 
         IRunningServer? server = null;
         IBrowserSession? browser = null;
         var exitCode = 0;
         try
         {
+            Publish(info);
+
             // Start the server first: the browser has nothing to look at until it answers
             server = await _serverRunner.StartAsync(serverPath, cancellationToken);
             info = info with { ServerUrl = server.Url, ServerPid = server.ProcessId, ServerStartTimeUtc = server.StartTimeUtc };
-            _store.Write(info);
+            Publish(info);
 
             browser = await _browserLauncher.LaunchAsync();
 
             // Record the browser process so a later cleanup can stop it even if this daemon dies abruptly
             info = info with { BrowserPid = browser.ProcessId, BrowserStartTimeUtc = browser.StartTimeUtc };
-            _store.Write(info);
+            Publish(info);
             executor = new CommandExecutor(browser.Page, server.Url, sessionId, _store.Directory);
 
             // Publish readiness only when every command can actually be served
             info = info with { Status = SessionStatus.Ready };
-            _store.Write(info);
+            Publish(info);
 
             await control.RunAsync(_idleTimeout, stopSource.Token);
         }
         catch (PuppetException ex)
         {
-            _store.Write(info with { Status = SessionStatus.Failed, Error = ex.Message });
+            // When another session owns the id the file is no longer this daemon's: stop serving and release
+            // what this daemon started, but write nothing (the failure record would overwrite that session)
+            if (!_superseded)
+            {
+                TryPublishFailure(info, ex.Message);
+            }
+
             exitCode = 4;
         }
         catch (OperationCanceledException)
@@ -212,7 +226,7 @@ internal sealed class DaemonHost
         catch (Exception ex) when (ex is not OutOfMemoryException)
         {
             // Anything unanticipated is still a failed session, never a silent crash
-            _store.Write(info with { Status = SessionStatus.Failed, Error = PuppetException.DescribeUnexpected(ex) });
+            TryPublishFailure(info, PuppetException.DescribeUnexpected(ex));
             exitCode = 4;
         }
         finally
@@ -230,13 +244,13 @@ internal sealed class DaemonHost
                 if (exitCode == 0)
                 {
                     var reason = ex is PuppetException ? ex.Message : PuppetException.DescribeUnexpected(ex);
-                    _store.Write(info with { Status = SessionStatus.Failed, Error = reason });
+                    TryPublishFailure(info, reason);
                     exitCode = 4;
                 }
             }
         }
 
-        if (exitCode == 0)
+        if (exitCode == 0 && !_superseded)
         {
             // Remove only the record this daemon published, and only while no start holds the lock. A
             // replacement session (a different daemon or token) is never deleted; when a start holds
@@ -246,6 +260,43 @@ internal sealed class DaemonHost
         }
 
         return exitCode;
+    }
+
+    /// <summary>
+    ///     Publishes this daemon's session record, unless the file already belongs to another session.
+    /// </summary>
+    /// <param name="info">The record to publish.</param>
+    /// <exception cref="PuppetException">Thrown when another session holds the id (and <c>_superseded</c> is set).</exception>
+    private void Publish(SessionInfo info)
+    {
+        if (!_store.WriteIfOwner(info))
+        {
+            _superseded = true;
+            throw new PuppetException($"Another session now owns the id '{info.SessionId}'; this daemon is stopping.");
+        }
+    }
+
+    /// <summary>
+    ///     Records a failure in the session file as well as possible, without ever failing the teardown.
+    /// </summary>
+    /// <remarks>
+    ///     The failure record is only a courtesy to the waiting <c>start</c> command. The server and the
+    ///     browser must be released and the exit code reported whether or not it can be written (the file may
+    ///     be locked or unwritable, or may belong to another session by now), so every failure to write it,
+    ///     including a file that another session owns, is absorbed.
+    /// </remarks>
+    /// <param name="info">The last record this daemon published.</param>
+    /// <param name="reason">The failure description.</param>
+    private void TryPublishFailure(SessionInfo info, string reason)
+    {
+        try
+        {
+            _store.WriteIfOwner(info with { Status = SessionStatus.Failed, Error = reason });
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or PuppetException)
+        {
+            // Best effort; the daemon is going away either way and the next lookup finds it gone
+        }
     }
 
     /// <summary>

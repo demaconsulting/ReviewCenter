@@ -38,7 +38,13 @@ refused connection means "not ready yet" and polling continues, while a success 
 the start at once with a `PuppetException` that names the answer and includes the captured output. The classification
 is done by `ProbeHealthAsync`. The readiness client does not follow redirects (`CreateHealthClient`), and a 3xx answer
 is a mismatch, so another process on the port cannot send the probe to a different endpoint that answers
-`200 Healthy`. The server runs as a separate
+`200 Healthy`. A healthy answer is also not trusted unless the server process is still running: the process is
+checked for an exit before each probe and again right after a healthy answer, because a server that lost the port
+race exits with an error while the other service on the port keeps answering. The free port is chosen by binding a
+listener to port 0 and releasing it, so another process can still take it before the server binds (documented in the
+audit table); the strict probe plus the exit check are what make that outcome a clear start failure instead of a
+session driving the wrong service. Killing the server tree goes through `SessionStore.TryKill`, which absorbs the
+"already gone" failures, including the `AggregateException` of a partial tree kill. The server runs as a separate
 process so that Puppet exercises exactly what ships: the real assembly, its real start-up, and its real health
 endpoint. The polling interval, the health request time-out, and the kill wait are named constants. Stopping the
 server is verified: after the kill, the runner waits for the process to exit; if it has not exited it ends the
@@ -71,10 +77,14 @@ messages that name the selector (where there is one) and the timeout.
 - *Parameters*: the session id, the server assembly path, and a cancellation token that stops the session from outside.
 - *Returns*: 0 after a stop or an idle shutdown, 4 when start-up failed or an unexpected failure ended the session.
 
-Sequence: create the control server with a new token; write the session file as `Starting` with the control port,
+Sequence: create the control server with a new token; publish the session file as `Starting` with the control port,
 token, and the daemon's process identity; start the server and record its URL and process identity; launch the
-browser, record its process identity, and create the `CommandExecutor`; write the session file as `Ready`; and serve
-the control channel until it ends. In a `finally` block that runs on every path, the browser is closed first and the
+browser, record its process identity, and create the `CommandExecutor`; publish the session file as `Ready`; and
+serve the control channel until it ends. Every record is published through `SessionStore.WriteIfOwner`, so the
+daemon writes only while the file is missing, corrupt, or its own. If a record of a different session is found (the
+id was force-stopped and reused while this daemon was still starting), the daemon is superseded: it writes nothing
+more, not even a failure record, tears down its own server and browser, leaves the other session's file alone,
+and returns 4. In a `finally` block that runs on every path, the browser is closed first and the
 server second. After a normal end the session file is deleted conditionally (`DeleteIfSame`, under the start lock):
 only the record this daemon published is removed, so a replacement session that another `start` published for the
 same id is never deleted. When a `start` holds the lock, the record is left for that start (or the next lookup, which
@@ -97,7 +107,9 @@ Cancellation during start-up behaves like a stop. The teardown runs in a `finall
 browser inside a try block and the server in its own finally block, so a failure to close the browser cannot leave
 the server running, and a failed teardown cannot replace the exit code of the original failure (when it is the only
 failure, the session file is kept as `Failed` with the reason of the teardown failure, for example a server process
-that could not be stopped, and the exit code is 4). The adapters convert process, Playwright, and
+that could not be stopped, and the exit code is 4). Writing the failure record is best effort: a failure to write it
+(the file is locked or unreadable, or another session owns it) is absorbed, so it can neither hide the original
+failure nor skip the teardown. The adapters convert process, Playwright, and
 timeout failures into `PuppetException`.
 
 ### Dependencies

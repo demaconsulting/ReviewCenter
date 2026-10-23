@@ -29,7 +29,9 @@ collection of the Puppet test project.
 - A start that times out, is cancelled, or whose daemon dies ends the launched daemon (identified by process id and
   start time, even when no session file exists), also ends the server and the browser a partial session file
   records, and removes the session state only once all of them are confirmed gone within a bounded wait (repeating
-  the kill meanwhile); when one survives, the record is kept and the error says so.
+  the kill meanwhile); when one survives, the record is kept and the error says so. Processes the daemon records
+  while it is being killed are ended as well, and the record is deleted only if it still holds what was last
+  examined.
 - Commands are forwarded to the daemon and its answer is printed; a failed command returns exit code 1, and `stop`
   ends the daemon and removes the session file once the processes are confirmed gone (otherwise it keeps the file and
   returns exit code 1), but never removes or ends the processes of a newer session that replaced it in the meantime.
@@ -111,6 +113,13 @@ present whenever a process still looked alive, every process was killed again af
 record is removed at the end. This scenario is tested by
 `PuppetProgram_Run_StartTimesOutAndProcessesDieSlowly_DeletesRecordOnceConfirmedGone`.
 
+**PuppetProgram_Run_StartAbandonedWhileDaemonRecordsServer_EndsLateRecordedServerAndDeletesRecord**: The daemon never
+becomes ready and records its server only while it is being killed (the record either existed before the abort or
+appears only then). The abort re-reads the record after each kill round, so it also ends the late-recorded server by
+its recorded identity, then deletes the record only if it still holds what it last examined. `start` exits with code
+4 without an "unconfirmed" note and no record remains. This scenario is tested by
+`PuppetProgram_Run_StartAbandonedWhileDaemonRecordsServer_EndsLateRecordedServerAndDeletesRecord`.
+
 **PuppetProgram_Run_StartMissingServerAssembly_ExitsFourWithHint**: `start --server` names a file that does not
 exist; the exit code is 4 and the message says the assembly was not found. This scenario is tested by
 `PuppetProgram_Run_StartMissingServerAssembly_ExitsFourWithHint`.
@@ -136,6 +145,11 @@ scenario is tested by `PuppetProgram_Run_StopAccepted_SessionReplacedAfterDaemon
 port refuses connections, and its processes cannot be killed. `stop` exits with code 1, says the stop could not be
 confirmed, and the session record is still there for a retry. This scenario is tested by
 `PuppetProgram_Run_StopForcedAndProcessSurvives_KeepsRecordAndExitsOne`.
+
+**PuppetProgram_Run_StopForced_DaemonRecordsServerMeanwhile_EndsItToo**: A stored session has no recorded server and
+its control port refuses connections. As the daemon is killed, the daemon of the same session records a server. The
+forced stop re-reads the record, ends the server by its recorded identity too, removes the record, and exits with
+code 0. This scenario is tested by `PuppetProgram_Run_StopForced_DaemonRecordsServerMeanwhile_EndsItToo`.
 
 **PuppetProgram_Run_ListWithNoSessions_ReportsNone**: `list` over an empty store exits with code 0 and prints "No
 active sessions." This scenario is tested by `PuppetProgram_Run_ListWithNoSessions_ReportsNone`.

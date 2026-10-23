@@ -82,6 +82,9 @@ sections:
           - ReviewCenterPuppet-SessionStore-GuardedDelete
           - ReviewCenterPuppet-SessionStore-ProcessIdentity
           - ReviewCenterPuppet-SessionStore-ProcessTermination
+          - ReviewCenterPuppet-SessionStore-ConditionalWrite
+          - ReviewCenterPuppet-DaemonHost-SessionOwnership
+          - ReviewCenterPuppet-DaemonLauncher-ProcessIdentity
           - ReviewCenterPuppet-DaemonHost-ServerStopFailure
           - ReviewCenterPuppet-DaemonHost-ProtocolSessionRelease
         tests:
@@ -178,6 +181,7 @@ sections:
           - ReviewCenterPuppet-ControlChannel-ResponseTimeout
           - ReviewCenterPuppet-ControlChannel-MalformedMessage
           - ReviewCenterPuppet-ControlChannel-UnexpectedFailure
+          - ReviewCenterPuppet-ControlChannel-ResponseStrictness
           - ReviewCenterPuppet-CommandExecutor-FailureReporting
           - ReviewCenterPuppet-DaemonHost-StartFailure
           - ReviewCenterPuppet-DaemonHost-ReadinessCheck

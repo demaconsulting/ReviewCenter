@@ -22,9 +22,13 @@ sent to the caller), and `CREATE_BREAKAWAY_FROM_JOB` (outside the job object of 
 
 ### Key Methods
 
-**Launch**: Builds the argument list and starts the daemon, using the Windows path on Windows and the portable path
-elsewhere. Returns the process identity (id and start time). A process that has already exited by the time its start
-time is read is reported as a start failure.
+**Launch**: Builds the argument list and starts the daemon through `LaunchProcess`, using the Windows path on Windows
+and the portable path elsewhere. Returns the process identity (id and start time) of the very process that was
+created: on Windows the creation time is read from the process handle that `CreateProcessW` returned, before it is
+closed; elsewhere it is read from the `Process` object that started the child. The identity is never looked up again
+by process id after the launch, because a daemon that exits at once could have its id recycled by then. A process
+that has already exited by the time its start time is read, or whose time cannot be read, is reported as a start
+failure.
 
 **BuildCommandLine**: Builds a Windows command line. The executable and every argument are enclosed in double quotes,
 so a path with spaces stays one argument. Inside the quotes, each double quote is escaped with a backslash and every
@@ -36,8 +40,8 @@ an option. These mechanics implement the requirement that every value arrives at
 **Windows launch**: Calls `CreateProcessW` through `NativeMethods` with the flags above and without handle
 inheritance, in the folder of the tool. An agent harness commonly wraps each command in a job object that ends all
 children on exit, so the breakaway flag is requested first. A job that forbids breakaway rejects the flag, and the
-launcher then retries without it. The process and thread handles are closed at once because only the process id is
-needed.
+launcher then retries without it. The creation time is read from the process handle with `GetProcessTimes` and then
+the process and thread handles are closed.
 
 **Portable launch**: Starts the process with the standard API, with no window, and closes the redirected standard
 streams so that the daemon never blocks on, or holds open, the pipes of the caller.
@@ -48,7 +52,8 @@ A failure to create the process, including a missing executable path, is raised 
 operating system's message. `PuppetProgram` reports it as a start failure.
 
 Only the command-line construction can be verified in isolation, including, on Windows, a round trip through the
-operating system's own command-line splitter. Starting a detached process, and the survival of
+operating system's own command-line splitter, and the reported identity of a real, harmless child process. Starting
+a detached daemon, and the survival of
 the daemon after the launching command has ended, are exercised by the real-browser end-to-end test and by a manual
 demonstration.
 
