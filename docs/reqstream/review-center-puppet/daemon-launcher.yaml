@@ -1,0 +1,26 @@
+---
+# DaemonLauncher Unit Requirements
+#
+# PURPOSE:
+# - Define requirements for the DaemonLauncher unit (tools/puppet/DaemonLauncher.cs)
+# - Only the command-line construction can be verified in isolation; starting a detached process
+#   is exercised by the real-browser end-to-end test and a manual demonstration
+
+sections:
+  - title: ReviewCenterPuppet Requirements
+    sections:
+      - title: DaemonLauncher Requirements
+        requirements:
+          - id: ReviewCenterPuppet-DaemonLauncher-ArgumentsPreserved
+            title: >-
+              The DaemonLauncher unit shall deliver the session id and the server path to the daemon
+              unchanged, including paths that contain spaces, quotes, or a trailing backslash.
+            justification: |
+              The daemon receives its session id and server path as arguments of the process that is
+              started for it, and install paths commonly contain spaces. A value that arrives altered, or
+              that splits into several arguments, would make every session fail to start or let a crafted
+              value inject an option.
+            tests:
+              - DaemonLauncher_BuildCommandLine_PathsWithSpaces_AreQuoted
+              - DaemonLauncher_BuildCommandLine_EmbeddedQuote_IsEscaped
+              - windows@DaemonLauncher_BuildCommandLine_SpecialArguments_RoundTripThroughWindowsParsing

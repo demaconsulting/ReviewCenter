@@ -1,0 +1,28 @@
+@* HomePage: the hello-world landing page at "/".
+
+   Presentation only; state and event handling live in HomePage.razor.cs. Every element a test or
+   the Puppet tool needs to find carries a stable data-testid, and the data-interactive marker on
+   the root element flips to "true" once the live server connection is established so that a
+   driver can wait for the page to be clickable instead of guessing with sleeps. *@
+@page "/"
+@rendermode InteractiveServer
+
+<PageTitle>ReviewCenter</PageTitle>
+
+<main data-testid="home-page" data-interactive="@InteractiveMarker">
+    <h1>ReviewCenter</h1>
+    <p>Web-based code review for regulated projects.</p>
+
+    <section>
+        <button type="button" data-testid="hello-button" @onclick="SayHello">Hello</button>
+        @if (Greeting is not null)
+        {
+            <p data-testid="hello-message">@Greeting</p>
+        }
+    </section>
+
+    <section>
+        <button type="button" data-testid="counter-button" @onclick="IncrementCounter">Count</button>
+        <p>Count: <span data-testid="counter-value">@Count</span></p>
+    </section>
+</main>

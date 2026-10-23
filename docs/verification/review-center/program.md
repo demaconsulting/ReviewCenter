@@ -17,6 +17,9 @@ N/A - standard test environment.
 - Exit code 0 is returned for all valid flag combinations.
 - Exit code 1 is returned when invalid arguments are supplied to `Program.Main`.
 - `Program.Version` returns a non-empty, non-null string.
+- The `serve` verb starts the server, which stops on cancellation with exit code 0; a start-up
+  failure is reported through exit code 1 and not an exception.
+- The help text lists the `serve` verb and the `--urls` option with its default value.
 
 ### Test Scenarios
 
@@ -58,3 +61,19 @@ tested by `Program_Run_WithShortHelpFlag_DisplaysUsage`.
 **Program_Run_WithQuestionMarkFlag_DisplaysUsage**: `Program.Run` is called with a context from
 `["-?"]`; the output contains "Usage:" and "Options:" and exit code is 0. This scenario is
 tested by `Program_Run_WithQuestionMarkFlag_DisplaysUsage`.
+
+**Program_Run_WithServeVerb_StartsServerAndStopsOnCancellation**: A silent context is created
+from `["serve", "--urls", "<loopback url>"]` using a free port, and `Program.RunWithCancellation`
+runs on a background task; the health endpoint answers `Healthy`, and after the cancellation
+token is cancelled the call returns. This scenario is tested by
+`Program_Run_WithServeVerb_StartsServerAndStopsOnCancellation`.
+
+**Program_Run_WithServeVerb_PortInUse_ReportsError**: A loopback port is occupied by a listener
+and `Program.Run` is called with a silent context for `serve` on that port; the exit code is 1
+and no exception escapes. This scenario is tested by
+`Program_Run_WithServeVerb_PortInUse_ReportsError`.
+
+**Program_Run_WithHelpFlag_ListsServeVerbAndUrlsOption**: `Program.Run` is called with a context
+from `["--help"]`; the output contains "serve", "--urls", and the default address
+`http://localhost:5000`. This scenario is tested by
+`Program_Run_WithHelpFlag_ListsServeVerbAndUrlsOption`.

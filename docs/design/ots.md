@@ -13,9 +13,12 @@ scope; only how this project integrates and uses each item is documented.
 
 The following OTS items have integration design documentation:
 
+- ASP.NET Core (_aspnetcore.md_) — web application platform and Blazor Server component framework
 - BuildMark (_buildmark.md_) — build-notes documentation tool
+- bUnit (_bunit.md_) — Blazor component testing library and in-memory test host
 - FileAssert (_fileassert.md_) — document assertion tool
 - Pandoc (_pandoc.md_) — Markdown-to-HTML conversion tool
+- Playwright (_playwright.md_) — browser automation library used by the Puppet developer tool
 - ReqStream (_reqstream.md_) — requirements traceability tool
 - ReviewMark (_reviewmark.md_) — file review enforcement tool
 - SarifMark (_sarifmark.md_) — SARIF report conversion tool

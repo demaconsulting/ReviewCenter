@@ -1,30 +1,40 @@
 # Introduction
 
 This document provides the detailed design for the ReviewCenter, a web-based formal code
-review service with a companion .NET command-line interface (currently the command-line
-scaffold). It covers local software items (systems, subsystems, and units) and the OTS
-software items they consume.
+review service with a companion .NET command-line interface. The service is an ASP.NET Core
+Blazor Server application started with the `serve` verb; the repository also holds a separate
+development tool, Puppet, that drives the web interface from the command line. This document
+covers local software items (systems, subsystems, and units) and the OTS software items they
+consume.
 
 ## Purpose
 
 The purpose of this document is to describe the internal design of each software unit that
-comprises the ReviewCenter. It captures data models, algorithms, key methods, and
-inter-unit interactions at a level of detail sufficient for formal code review, compliance
-verification, and future maintenance. A reviewer should be able to understand how each item
-satisfies its requirements without reading source code. The document does not restate
-requirements; it explains how they are realized.
+comprises the ReviewCenter and the Puppet development tool. It captures data models,
+algorithms, key methods, and inter-unit interactions at a level of detail sufficient for formal
+code review, compliance verification, and future maintenance. A reviewer should be able to
+understand how each item satisfies its requirements without reading source code. The document
+does not restate requirements; it explains how they are realized.
 
 ## Scope
 
 Local items:
 
-- **ReviewCenter**: system, subsystem, and unit design for all local components.
+- **ReviewCenter**: the distributed software system. It is divided into the Program unit and the
+  Cli, Hosting, Web, SelfTest, and Utilities subsystems.
+- **ReviewCenterPuppet**: a separate software system, a development tool that is built and reviewed
+  in this repository but is not part of the distributed ReviewCenter package. It has no
+  subsystems; its units are PuppetProgram, CommandLine, SelectorResolver, SessionStore,
+  ControlChannel, CommandExecutor, DaemonHost, and DaemonLauncher.
 
 OTS items:
 
+- **ASP.NET Core**: integration and usage design.
 - **BuildMark**: integration and usage design.
+- **bUnit**: integration and usage design.
 - **FileAssert**: integration and usage design.
 - **Pandoc**: integration and usage design.
+- **Playwright**: integration and usage design (used by ReviewCenterPuppet).
 - **ReqStream**: integration and usage design.
 - **ReviewMark**: integration and usage design.
 - **SarifMark**: integration and usage design.
@@ -37,6 +47,8 @@ OTS items:
 The following topics are out of scope:
 
 - Design documents are not produced for the test projects or build pipeline CI configuration
+- Subsystems of the target architecture that are not implemented yet (Api, Identity, Core, Storage,
+  ContentSources, Evidence, Messaging) have no design documents yet
 - The internal design of OTS software items is excluded; only integration and usage design is documented
 
 ## Software Structure
@@ -44,19 +56,45 @@ The following topics are out of scope:
 The software structure is modeled in SysML2 under `docs/sysml2/` and rendered to the diagram
 below by SysML2Tools as part of the build pipeline. AI agents should query the SysML2 model
 directly (see the `sysml2tools-query` skill) rather than parsing this diagram or the prose
-elsewhere in this document. The model captures the shipped system's runtime composition only;
-the OTS items listed in Scope above are build-time/pipeline tooling, documented separately
-(see `docs/design/ots.md`) rather than modeled as SysML2 parts.
+elsewhere in this document. The model captures the local software systems, subsystems, and
+units; the OTS items listed in Scope above are documented separately (see `docs/design/ots.md`)
+rather than modeled as SysML2 parts.
 
 ![Software Structure](SoftwareStructureView.svg)
+
+The ReviewCenter system is divided as follows:
+
+- **Program** (unit): entry point and execution orchestrator
+- **Cli** (subsystem): argument parsing and output; contains the Context unit
+- **Hosting** (subsystem): builds and runs the ASP.NET Core web host for the `serve` verb; contains the
+  ServerHost unit
+- **Web** (subsystem): the Blazor Server user interface; contains the App unit (HTML shell and router)
+  and the HomePage unit
+- **SelfTest** (subsystem): self-validation; contains the Validation unit
+- **Utilities** (subsystem): shared helpers; contains the PathHelpers unit
+
+The ReviewCenterPuppet system is a flat set of units that start a background session containing the
+ReviewCenter server and a headless browser, and then send commands to that session.
+
+The model is deliberately partial. It covers only the items that are implemented so far: the Program unit, the
+Cli, Hosting, Web, SelfTest, and Utilities subsystems, and the Puppet system. The Api, Identity, Core, Storage,
+ContentSources, Evidence, and Messaging subsystems of the target architecture (`architecture.md`) are planned and
+deferred; they will be added to the model, with their requirements and design documents, as they are implemented.
 
 ## Folder Layout
 
 - **src/** - source files and projects
   - **DemaConsulting.ReviewCenter/** - main application source
     - **Cli/** - command-line interface subsystem
+    - **Hosting/** - web host subsystem
+    - **Web/** - Blazor Server user interface subsystem (Razor components)
     - **SelfTest/** - self-validation subsystem
     - **Utilities/** - shared utilities subsystem
+- **tools/** - development tools that are not distributed
+  - **puppet/** - source of the ReviewCenterPuppet system
+- **test/** - test projects
+  - **DemaConsulting.ReviewCenter.Tests/** - tests of the ReviewCenter system
+  - **DemaConsulting.ReviewCenter.Puppet.Tests/** - tests of the ReviewCenterPuppet system
 
 ## Document Conventions
 
@@ -75,8 +113,11 @@ Local software items have corresponding artifacts in parallel directory trees:
 - Requirements: `docs/reqstream/{system}/.../{item}.yaml` (kebab-case)
 - Design docs: `docs/design/{system}/.../{item}.md` (kebab-case)
 - Verification design: `docs/verification/{system}/.../{item}.md` (kebab-case)
-- Source code: `src/{System}/.../{Item}.cs` (PascalCase for C#)
+- Source code: `src/{System}/.../{Item}.cs` (PascalCase for C#); the ReviewCenterPuppet system keeps
+  its source in `tools/puppet/`
 - Tests: `test/{System}.Tests/.../{Item}Tests.cs` (PascalCase for C#)
+
+The system folders are `review-center` and `review-center-puppet`.
 
 OTS items have integration/usage design documentation parallel to system folders:
 

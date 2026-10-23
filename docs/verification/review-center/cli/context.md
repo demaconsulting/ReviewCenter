@@ -18,6 +18,10 @@ N/A - standard test environment.
 - `ArgumentException` is thrown for all unknown or malformed arguments.
 - `ExitCode` is 1 after `WriteError` is called and 0 otherwise.
 - Silent mode suppresses console output but does not affect the log file.
+- `Serve` is true only when the `serve` verb is present, and `Urls` defaults to the default
+  listen address or holds the validated `--urls` value.
+- `--urls` without `serve`, without a value, or with a value that is not an absolute http or
+  https URL is rejected with an `ArgumentException`.
 
 #### Test Scenarios
 
@@ -135,3 +139,28 @@ scenario is tested by `Context_WriteError_WritesToLogFile`.
 `Context.Create` is called with `["--log", "/invalid/\x00path.log"]`; an
 `InvalidOperationException` is thrown because the log file cannot be opened. This
 scenario is tested by `Context_Create_LogFlag_InvalidPath_ThrowsInvalidOperationException`.
+
+**Context_Create_ServeVerb_SetsServe**: `Context.Create` is called with `["serve"]`; the `Serve`
+property is true and `Urls` equals the default listen address. This scenario is tested by
+`Context_Create_ServeVerb_SetsServe`.
+
+**Context_Create_NoServeVerb_SetsServeFalse**: `Context.Create` is called with an empty argument
+array; the `Serve` property is false. This scenario is tested by
+`Context_Create_NoServeVerb_SetsServeFalse`.
+
+**Context_Create_UrlsFlag_SetsUrls**: `Context.Create` is called with
+`["serve", "--urls", "http://127.0.0.1:6001"]`; `Urls` equals the supplied value. This scenario
+is tested by `Context_Create_UrlsFlag_SetsUrls`.
+
+**Context_Create_UrlsWithoutServe_ThrowsArgumentException**: `Context.Create` is called with
+`["--urls", "http://127.0.0.1:6001"]`; an `ArgumentException` whose message mentions `serve` is
+thrown. This scenario is tested by `Context_Create_UrlsWithoutServe_ThrowsArgumentException`.
+
+**Context_Create_UrlsFlag_WithoutValue_ThrowsArgumentException**: `Context.Create` is called
+with `["serve", "--urls"]` (value missing); an `ArgumentException` mentioning `--urls` is thrown.
+This scenario is tested by `Context_Create_UrlsFlag_WithoutValue_ThrowsArgumentException`.
+
+**Context_Create_InvalidUrls_ThrowsArgumentException**: `Context.Create` is called with
+`["serve", "--urls", value]` for values that are not absolute http or https URLs (`not-a-url`
+and `ftp://localhost:21`); an `ArgumentException` mentioning `--urls` is thrown for each. This
+scenario is tested by `Context_Create_InvalidUrls_ThrowsArgumentException`.

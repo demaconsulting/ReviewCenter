@@ -55,10 +55,13 @@ public class PathHelpersTests
         var basePath = "/home/user/project";
         var relativePath = "../etc/passwd";
 
-        // Act & Assert: attempt path traversal and verify ArgumentException is thrown with expected message
-        var exception = Assert.Throws<ArgumentException>(() =>
+        // Act: attempt path traversal
+        var exception = Record.Exception(() =>
             PathHelpers.SafePathCombine(basePath, relativePath));
-        Assert.Contains("Invalid path component", exception.Message);
+
+        // Assert: verify ArgumentException is thrown with expected message
+        var argumentException = Assert.IsType<ArgumentException>(exception);
+        Assert.Contains("Invalid path component", argumentException.Message);
     }
 
     /// <summary>
@@ -71,10 +74,13 @@ public class PathHelpersTests
         var basePath = "/home/user/project";
         var relativePath = "subfolder/../../../etc/passwd";
 
-        // Act & Assert: attempt path traversal in middle and verify ArgumentException is thrown
-        var exception = Assert.Throws<ArgumentException>(() =>
+        // Act: attempt path traversal in middle
+        var exception = Record.Exception(() =>
             PathHelpers.SafePathCombine(basePath, relativePath));
-        Assert.Contains("Invalid path component", exception.Message);
+
+        // Assert: verify ArgumentException is thrown
+        var argumentException = Assert.IsType<ArgumentException>(exception);
+        Assert.Contains("Invalid path component", argumentException.Message);
     }
 
     /// <summary>
@@ -83,21 +89,29 @@ public class PathHelpersTests
     [Fact]
     public void PathHelpers_SafePathCombine_AbsolutePath_ThrowsArgumentException()
     {
-        // Arrange & Act & Assert: test Unix absolute path rejection
+        // Arrange: setup Unix and Windows absolute path rejection inputs
         var unixBasePath = "/home/user/project";
         var unixRelativePath = "/etc/passwd";
-        var unixException = Assert.Throws<ArgumentException>(() =>
-            PathHelpers.SafePathCombine(unixBasePath, unixRelativePath));
-        Assert.Contains("Invalid path component", unixException.Message);
+        var windowsBasePath = "C:\\Users\\project";
+        var windowsRelativePath = "C:\\Windows\\System32\\file.txt";
 
-        // Arrange & Act & Assert: test Windows absolute path rejection (only on Windows)
+        // Act: attempt Unix absolute path rejection, and Windows rejection only on Windows
+        var unixException = Record.Exception(() =>
+            PathHelpers.SafePathCombine(unixBasePath, unixRelativePath));
+        Exception? windowsException = null;
         if (OperatingSystem.IsWindows())
         {
-            var windowsBasePath = "C:\\Users\\project";
-            var windowsRelativePath = "C:\\Windows\\System32\\file.txt";
-            var windowsException = Assert.Throws<ArgumentException>(() =>
+            windowsException = Record.Exception(() =>
                 PathHelpers.SafePathCombine(windowsBasePath, windowsRelativePath));
-            Assert.Contains("Invalid path component", windowsException.Message);
+        }
+
+        // Assert: both absolute paths are rejected with ArgumentException
+        var unixArgumentException = Assert.IsType<ArgumentException>(unixException);
+        Assert.Contains("Invalid path component", unixArgumentException.Message);
+        if (OperatingSystem.IsWindows())
+        {
+            var windowsArgumentException = Assert.IsType<ArgumentException>(windowsException);
+            Assert.Contains("Invalid path component", windowsArgumentException.Message);
         }
     }
 
@@ -175,9 +189,14 @@ public class PathHelpersTests
     [Fact]
     public void PathHelpers_SafePathCombine_NullBasePath_ThrowsArgumentNullException()
     {
-        // Arrange & Act & Assert: null basePath throws ArgumentNullException
-        Assert.Throws<ArgumentNullException>(() =>
+        // Arrange: no setup required; the null basePath is the input under test
+
+        // Act: combine with a null basePath
+        var exception = Record.Exception(() =>
             PathHelpers.SafePathCombine(null!, "file.txt"));
+
+        // Assert: ArgumentNullException is thrown
+        Assert.IsType<ArgumentNullException>(exception);
     }
 
     /// <summary>
@@ -186,9 +205,14 @@ public class PathHelpersTests
     [Fact]
     public void PathHelpers_SafePathCombine_NullRelativePath_ThrowsArgumentNullException()
     {
-        // Arrange & Act & Assert: null relativePath throws ArgumentNullException
-        Assert.Throws<ArgumentNullException>(() =>
+        // Arrange: no setup required; the null relativePath is the input under test
+
+        // Act: combine with a null relativePath
+        var exception = Record.Exception(() =>
             PathHelpers.SafePathCombine("/home/user", null!));
+
+        // Assert: ArgumentNullException is thrown
+        Assert.IsType<ArgumentNullException>(exception);
     }
 }
 

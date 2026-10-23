@@ -1,0 +1,87 @@
+---
+# CommandExecutor Unit Requirements
+#
+# PURPOSE:
+# - Define requirements for the CommandExecutor unit (tools/puppet/CommandExecutor.cs)
+# - CommandExecutor runs one browser command against an abstract page and turns the outcome
+#   into a control response; it is verified with a fake page so no browser is needed
+
+sections:
+  - title: ReviewCenterPuppet Requirements
+    sections:
+      - title: CommandExecutor Requirements
+        requirements:
+          - id: ReviewCenterPuppet-CommandExecutor-Goto
+            title: >-
+              The CommandExecutor unit shall resolve a rooted path against the server's base URL and navigate
+              the page there.
+            justification: |
+              Callers think in terms of pages of the ReviewCenter application, such as /health, and should
+              not need to know the random port the server was given.
+            tests:
+              - CommandExecutor_Execute_GotoRootedPath_NavigatesWithinServer
+
+          - id: ReviewCenterPuppet-CommandExecutor-GotoScope
+            title: The CommandExecutor unit shall refuse to navigate to a URL outside the session's server.
+            justification: |
+              The tool exists to drive the local ReviewCenter instance. Refusing foreign addresses keeps a
+              mistyped or injected command from sending the browser elsewhere.
+            tests:
+              - CommandExecutor_Execute_GotoForeignUrl_IsRefused
+
+          - id: ReviewCenterPuppet-CommandExecutor-Click
+            title: >-
+              The CommandExecutor unit shall click the element identified by the resolved selector, using
+              the command timeout.
+            justification: |
+              Clicking is the main way a driver operates the web interface, and a plain name must select the
+              element by test id.
+            tests:
+              - CommandExecutor_Execute_ClickPlainName_UsesDataTestIdSelector
+
+          - id: ReviewCenterPuppet-CommandExecutor-Fill
+            title: The CommandExecutor unit shall enter the given text into the element identified by the selector.
+            justification: |
+              Forms in the web interface are filled through this command.
+            tests:
+              - CommandExecutor_Execute_Fill_SendsTextToPage
+
+          - id: ReviewCenterPuppet-CommandExecutor-Text
+            title: The CommandExecutor unit shall return the text of the element identified by the selector.
+            justification: |
+              Reading text lets a script check what the page shows without inspecting an image.
+            tests:
+              - CommandExecutor_Execute_Text_ReturnsElementText
+
+          - id: ReviewCenterPuppet-CommandExecutor-Screenshot
+            title: >-
+              The CommandExecutor unit shall save a screenshot to the requested path, or to a default
+              location named after the session when no path is given, return the path written, and apply the
+              command's timeout to taking the screenshot.
+            justification: |
+              Screenshots let a person or a coding agent see the page, and the returned path tells the
+              caller where to find the image. A page that never settles must fail within the time the caller
+              asked for instead of waiting for the browser's own default limit.
+            tests:
+              - CommandExecutor_Execute_ScreenshotWithOut_WritesFileAndReturnsPath
+              - CommandExecutor_Execute_ScreenshotWithoutOut_UsesDefaultLocation
+              - CommandExecutor_Execute_Screenshot_PassesRequestTimeoutToPage
+
+          - id: ReviewCenterPuppet-CommandExecutor-Snapshot
+            title: The CommandExecutor unit shall return a text snapshot of the current page.
+            justification: |
+              A text snapshot gives a coding agent the structure of the page and the available test ids,
+              which it cannot get from an image.
+            tests:
+              - CommandExecutor_Execute_Snapshot_ReturnsSnapshotText
+
+          - id: ReviewCenterPuppet-CommandExecutor-FailureReporting
+            title: >-
+              The CommandExecutor unit shall report an element that cannot be found in time, an unknown
+              command, and a missing selector as a failed response with an explanatory message.
+            justification: |
+              Callers rely on the failure message and exit code to react, so expected failures must come
+              back as responses and not crash the daemon.
+            tests:
+              - CommandExecutor_Execute_MissingElement_ReturnsFailureMessage
+              - CommandExecutor_Execute_UnknownCommandOrMissingSelector_Fails

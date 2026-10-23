@@ -20,6 +20,7 @@
 
 using System.Reflection;
 using DemaConsulting.ReviewCenter.Cli;
+using DemaConsulting.ReviewCenter.Hosting;
 using DemaConsulting.ReviewCenter.SelfTest;
 
 namespace DemaConsulting.ReviewCenter;
@@ -97,14 +98,34 @@ internal static class Program
     }
 
     /// <summary>
-    ///     Runs the program logic based on the provided context.
+    ///     Runs the program logic based on the provided context, with no external stop request.
     /// </summary>
     /// <param name="context">The context containing command line arguments and program state.</param>
     /// <remarks>
-    ///     Dispatch is priority-ordered: version check first, then help, then self-validation,
-    ///     then main tool logic. Only the highest-priority matching action is executed per invocation.
+    ///     Convenience overload for callers that never need to stop a long-running action early
+    ///     (the process Main entry point stops the server with Ctrl+C instead).
     /// </remarks>
     public static void Run(Context context)
+    {
+        RunWithCancellation(context, CancellationToken.None);
+    }
+
+    /// <summary>
+    ///     Runs the program logic based on the provided context, allowing long-running work to be stopped.
+    /// </summary>
+    /// <param name="context">The context containing command line arguments and program state.</param>
+    /// <param name="cancellationToken">
+    ///     Requests a graceful stop of long-running work (the web server started by <c>serve</c>).
+    ///     Ignored by all other actions, which run to completion immediately.
+    /// </param>
+    /// <remarks>
+    ///     Dispatch is priority-ordered: version check first, then help, then self-validation,
+    ///     then the serve verb, then the default tool logic. Only the highest-priority matching
+    ///     action is executed per invocation. The <c>serve</c> action blocks until the server stops.
+    ///     A distinct method name (rather than an overload of <see cref="Run(Context)"/>) keeps
+    ///     the common call site simple.
+    /// </remarks>
+    public static void RunWithCancellation(Context context, CancellationToken cancellationToken)
     {
         // Priority 1: Version query
         if (context.Version)
@@ -130,7 +151,16 @@ internal static class Program
             return;
         }
 
-        // Priority 4: Main tool functionality
+        // Priority 4: Run the web server until it is stopped
+        if (context.Serve)
+        {
+            // A non-zero server result has already been reported through the context, which
+            // turns it into the process exit code
+            ServerHost.RunAsync(context, cancellationToken).GetAwaiter().GetResult();
+            return;
+        }
+
+        // Priority 5: Default tool functionality
         RunToolLogic(context);
     }
 
@@ -152,6 +182,10 @@ internal static class Program
     private static void PrintHelp(Context context)
     {
         context.WriteLine("Usage: reviewcenter [options]");
+        context.WriteLine("       reviewcenter serve [--urls <url>] [options]");
+        context.WriteLine("");
+        context.WriteLine("Verbs:");
+        context.WriteLine("  serve                      Run the ReviewCenter web server until stopped");
         context.WriteLine("");
         context.WriteLine("Options:");
         context.WriteLine("  -v, --version              Display version information");
@@ -161,17 +195,15 @@ internal static class Program
         context.WriteLine("  --results <file>           Write validation results to file (.trx or .xml)");
         context.WriteLine("  --depth <#>                Set heading depth for markdown output (default: 1)");
         context.WriteLine("  --log <file>               Write output to log file");
+        context.WriteLine("  --urls <url>               URL for 'serve' to listen on (default: http://localhost:5000)");
     }
 
     /// <summary>
-    ///     Runs the main tool logic.
+    ///     Runs the default tool logic used when no action was requested.
     /// </summary>
     /// <param name="context">The context containing command line arguments and program state.</param>
     private static void RunToolLogic(Context context)
     {
-        context.WriteLine("ReviewCenter - Demo Functionality");
-        context.WriteLine("ReviewCenter is under development; this release provides the command-line scaffold.");
-        context.WriteLine("");
-        context.WriteLine("The web service and review functionality are not yet implemented.");
+        context.WriteLine("Run 'reviewcenter serve' to start the ReviewCenter web server, or 'reviewcenter --help' for usage.");
     }
 }

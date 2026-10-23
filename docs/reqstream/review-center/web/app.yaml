@@ -1,0 +1,30 @@
+---
+# Software Unit Requirements for the App Unit
+#
+# The App unit is the HTML shell (App.razor) and the router (Routes.razor) that select the
+# page for a requested URL.
+
+sections:
+  - title: App Unit Requirements
+    requirements:
+      - id: ReviewCenter-App-Shell
+        title: >-
+          The App unit shall render every page inside an HTML document that sets the base
+          address, receives the page title, and loads the interactive client script.
+        justification: |
+          Pages need a common document around them so that relative links resolve, so that each
+          page can set the browser title, and so that the client script that makes a page
+          interactive is loaded exactly once.
+        tests:
+          - App_Render_ServedAtRoot_ContainsShellElements
+
+      - id: ReviewCenter-App-Routing
+        title: >-
+          The App unit shall show the home page for the root URL and a not-found message for a
+          URL that no page handles.
+        justification: |
+          Users must reach the home page at the root address and must be told clearly when an
+          address matches no page, instead of seeing a blank page.
+        tests:
+          - Routes_Render_RootUrl_RendersHomePage
+          - Routes_Render_UnknownUrl_ShowsNotFoundMessage

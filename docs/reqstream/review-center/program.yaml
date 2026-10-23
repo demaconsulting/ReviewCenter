@@ -41,3 +41,19 @@ sections:
           programmatically via the process exit code.
         tests:
           - Program_Main_WithInvalidArgs_ReturnsNonZeroExitCode
+
+      - id: ReviewCenter-Program-Serve
+        title: >-
+          The Program class shall run the web server until it is stopped when the serve verb is
+          provided, report an unusable listen address as an error, and list the serve verb and
+          the `--urls` option in the help text.
+        justification: |
+          Program is the single dispatcher for every action of the tool, so it must start the
+          web server on request, stop it cleanly when asked, and turn a start-up failure such
+          as a port that is already in use into an ordinary error with a non-zero exit code
+          instead of an unhandled exception. Operators discover the verb and option from the
+          help text.
+        tests:
+          - Program_Run_WithServeVerb_StartsServerAndStopsOnCancellation
+          - Program_Run_WithServeVerb_PortInUse_ReportsError
+          - Program_Run_WithHelpFlag_ListsServeVerbAndUrlsOption

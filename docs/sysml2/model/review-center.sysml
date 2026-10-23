@@ -3,7 +3,9 @@ package ReviewCenter {
     /*
      * ReviewCenter is an ASP.NET Core web service, with a companion .NET command-line
      * interface, for performing formal code reviews. The current implementation
-     * provides the command-line scaffold.
+     * serves a Blazor Server web interface and a health endpoint through the
+     * serve verb of the command-line interface, which also provides version, help,
+     * and self-validation actions.
      */
 
     part def ReviewCenterSystem {
@@ -18,5 +20,7 @@ package ReviewCenter {
         part cli : CliSubsystem;
         part selfTest : SelfTestSubsystem;
         part utilities : UtilitiesSubsystem;
+        part hosting : HostingSubsystem;
+        part web : WebSubsystem;
     }
 }

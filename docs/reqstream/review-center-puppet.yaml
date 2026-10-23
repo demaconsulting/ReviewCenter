@@ -1,0 +1,180 @@
+---
+# ReviewCenterPuppet System-Level Requirements
+#
+# PURPOSE:
+# - Define system-level requirements describing what developers and coding agents need the
+#   Puppet development tool to provide
+# - Puppet is a separate software system that is not part of the distributed ReviewCenter package
+# - System requirements are validated through tests that run the whole command pipeline
+#   (command line, session files, control channel, daemon, executor) with only the browser
+#   and the server process replaced by fakes, so they run on any machine without Chromium
+
+sections:
+  - title: ReviewCenterPuppet Requirements
+    requirements:
+      - id: ReviewCenterPuppet-System-Lifecycle
+        title: >-
+          The tool shall start a named local browser session as a background process, accept commands for
+          it, list the running sessions, and shut the session down completely when it is stopped or has
+          been idle for too long.
+        tags: [system]
+        justification: |
+          Browser state such as the loaded page or a half-filled form must survive between the
+          separate commands a developer or coding agent runs, so the tool keeps one session per
+          name in a background process that outlives the command that started it, even when the
+          install path contains spaces or quotes. Sessions must be started, listed, and stopped on
+          demand, and an abandoned session must end itself, because leftovers from earlier sessions
+          make later development runs unreliable and consume resources.
+        children:
+          - ReviewCenterPuppet-PuppetProgram-Start
+          - ReviewCenterPuppet-PuppetProgram-Stop
+          - ReviewCenterPuppet-PuppetProgram-List
+          - ReviewCenterPuppet-CommandLine-SessionId
+          - ReviewCenterPuppet-SessionStore-Persistence
+          - ReviewCenterPuppet-SessionStore-Lookup
+          - ReviewCenterPuppet-SessionStore-Listing
+          - ReviewCenterPuppet-SessionStore-Delete
+          - ReviewCenterPuppet-SessionStore-TransientRead
+          - ReviewCenterPuppet-ControlChannel-IdleTimeout
+          - ReviewCenterPuppet-ControlChannel-Cancellation
+          - ReviewCenterPuppet-DaemonHost-Ready
+          - ReviewCenterPuppet-DaemonHost-Stop
+          - ReviewCenterPuppet-DaemonHost-IdleShutdown
+          - ReviewCenterPuppet-DaemonLauncher-ArgumentsPreserved
+        tests:
+          - ReviewCenterPuppet_Session_StartDriveStop_RunsEveryCommandAndCleansUp
+
+      - id: ReviewCenterPuppet-System-ExclusiveStart
+        title: >-
+          The tool shall start at most one session for a session name when several start commands for that
+          name run at the same time, and shall fail the others with a clear error.
+        tags: [system]
+        justification: |
+          Scripts and coding agents can issue commands in parallel. Two sessions behind one name would fight
+          over the same state and leave a browser and a server that nobody can reach, so the second caller
+          must be told immediately that the session is already being started.
+        children:
+          - ReviewCenterPuppet-PuppetProgram-StartExclusive
+          - ReviewCenterPuppet-SessionStore-StartReservation
+        tests:
+          - ReviewCenterPuppet_Start_SimultaneousStartsOfSameSession_StartExactlyOneSession
+
+      - id: ReviewCenterPuppet-System-Cleanup
+        title: >-
+          The tool shall leave no session file, server process, browser process, or daemon process behind
+          when a session fails to start, takes too long to start, or loses its daemon without a clean
+          shutdown.
+        tags: [system]
+        justification: |
+          Development machines run Puppet many times a day, often from scripts that are interrupted. An
+          orphaned server or browser holds ports and memory, and a stale session file makes later commands
+          fail confusingly, so every failure path must end the processes it started, verified by process id
+          and start time so that an unrelated program is never ended.
+        children:
+          - ReviewCenterPuppet-PuppetProgram-StartAbort
+          - ReviewCenterPuppet-SessionStore-StaleCleanup
+          - ReviewCenterPuppet-SessionStore-GuardedDelete
+          - ReviewCenterPuppet-SessionStore-ProcessIdentity
+          - ReviewCenterPuppet-SessionStore-ProcessTermination
+          - ReviewCenterPuppet-DaemonHost-ServerStopFailure
+          - ReviewCenterPuppet-DaemonHost-ProtocolSessionRelease
+        tests:
+          - ReviewCenterPuppet_Start_NeverBecomesReady_TerminatesDaemonAndLeavesNothingBehind
+          - ReviewCenterPuppet_Start_ServerCannotStart_ReportsStartFailureAndLeavesNothingBehind
+          - ReviewCenterPuppet_Start_FailureWithFailedTeardown_TerminatesLeftoverServerAndLeavesNothingBehind
+          - ReviewCenterPuppet_Stop_DaemonTeardownFails_TerminatesRecordedServerAndRemovesSession
+          - ReviewCenterPuppet_Session_DaemonDiedWithoutCleanup_ReportsStaleAndEndsLeftoverProcesses
+
+      - id: ReviewCenterPuppet-System-Security
+        title: >-
+          The tool shall let only the user who started a session control it: commands must carry the
+          session's secret token, the control channel must be reachable only from the same machine, session
+          names must not reach outside the session folder, and the file that holds the token must not be
+          readable by other users.
+        tags: [system]
+        justification: |
+          A session drives a real browser and the application behind it. Anyone who could send a command to
+          it, or read its token, could act with the session owner's identity, so the channel and the file
+          that holds the credential must be restricted to the owner.
+        children:
+          - ReviewCenterPuppet-ControlChannel-TokenAuth
+          - ReviewCenterPuppet-ControlChannel-LoopbackOnly
+          - ReviewCenterPuppet-SessionStore-SafePaths
+          - ReviewCenterPuppet-SessionStore-PrivateFiles
+          - ReviewCenterPuppet-SessionStore-ReplacementCleanup
+        tests:
+          - ReviewCenterPuppet_Security_WrongTokenAndUnsafeSessionId_AreRejected
+          - ubuntu@ReviewCenterPuppet_Security_UnixPlatform_SessionFileIsOwnerOnly
+
+      - id: ReviewCenterPuppet-System-Commands
+        title: >-
+          The tool shall navigate, click, fill, read text, take screenshots, and take page snapshots
+          in the browser of a running session.
+        tags: [system]
+        justification: |
+          These commands are what let a developer or coding agent look at and drive the real
+          ReviewCenter web interface from the command line. Each command must act on the
+          session's browser page and report its result, so that scripts can check the outcome
+          without a person watching the browser.
+        children:
+          - ReviewCenterPuppet-PuppetProgram-ClientCommands
+          - ReviewCenterPuppet-CommandLine-OptionScope
+          - ReviewCenterPuppet-ControlChannel-Delivery
+          - ReviewCenterPuppet-CommandExecutor-Goto
+          - ReviewCenterPuppet-CommandExecutor-GotoScope
+          - ReviewCenterPuppet-CommandExecutor-Click
+          - ReviewCenterPuppet-CommandExecutor-Fill
+          - ReviewCenterPuppet-CommandExecutor-Text
+          - ReviewCenterPuppet-CommandExecutor-Screenshot
+          - ReviewCenterPuppet-CommandExecutor-Snapshot
+        tests:
+          - ReviewCenterPuppet_Session_StartDriveStop_RunsEveryCommandAndCleansUp
+
+      - id: ReviewCenterPuppet-System-Selectors
+        title: >-
+          The tool shall treat a plain selector name as a test id and pass any other selector text
+          to the browser unchanged.
+        tags: [system]
+        justification: |
+          The ReviewCenter web interface marks every element a driver needs with a stable test id,
+          so the common case must be as short as possible. Selectors that contain selector syntax
+          are still needed for elements without a test id, so they must reach the browser as typed.
+        children:
+          - ReviewCenterPuppet-SelectorResolver-TestId
+          - ReviewCenterPuppet-SelectorResolver-Passthrough
+          - ReviewCenterPuppet-SelectorResolver-BlankRejected
+        tests:
+          - ReviewCenterPuppet_Session_StartDriveStop_RunsEveryCommandAndCleansUp
+
+      - id: ReviewCenterPuppet-System-Errors
+        title: >-
+          The tool shall report invalid arguments, an unknown session, a stale session, a failed command such
+          as an element that does not appear within the command timeout, and a session that cannot be
+          started, with distinct non-zero exit codes and an explanation.
+        tags: [system]
+        justification: |
+          Puppet is run by scripts and coding agents that cannot ask a person what went wrong.
+          Stable, distinct exit codes and a plain message let them react to each failure,
+          for example by starting a session after an unknown-session result or by retrying after
+          a timeout. The command timeout bounds how long a command may wait, so a missing element
+          fails promptly instead of hanging the caller.
+        children:
+          - ReviewCenterPuppet-PuppetProgram-BadArguments
+          - ReviewCenterPuppet-PuppetProgram-UnknownSession
+          - ReviewCenterPuppet-PuppetProgram-StaleSession
+          - ReviewCenterPuppet-PuppetProgram-StartFailure
+          - ReviewCenterPuppet-CommandLine-Timeout
+          - ReviewCenterPuppet-CommandLine-InvalidTimeout
+          - ReviewCenterPuppet-CommandLine-StrictParsing
+          - ReviewCenterPuppet-ControlChannel-Unreachable
+          - ReviewCenterPuppet-ControlChannel-ResponseTimeout
+          - ReviewCenterPuppet-ControlChannel-MalformedMessage
+          - ReviewCenterPuppet-ControlChannel-UnexpectedFailure
+          - ReviewCenterPuppet-CommandExecutor-FailureReporting
+          - ReviewCenterPuppet-DaemonHost-StartFailure
+          - ReviewCenterPuppet-DaemonHost-ReadinessCheck
+          - ReviewCenterPuppet-DaemonHost-UnexpectedFailure
+        tests:
+          - ReviewCenterPuppet_Errors_UnknownSessionAndMissingElement_ReportDistinctExitCodes
+          - ReviewCenterPuppet_Start_ServerCannotStart_ReportsStartFailureAndLeavesNothingBehind
+          - ReviewCenterPuppet_Session_DaemonDiedWithoutCleanup_ReportsStaleAndEndsLeftoverProcesses

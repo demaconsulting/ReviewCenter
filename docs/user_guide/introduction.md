@@ -3,8 +3,10 @@
 ## Purpose
 
 ReviewCenter is a web-based formal code review service with a companion command-line
-interface. The web service is under development; the current release provides the
-command-line scaffold documented in this guide.
+interface. The service is an ASP.NET Core Blazor Server application started with the `serve`
+verb. The review features themselves are still under development; the current release provides
+the web host with a home page and a health endpoint, plus the command-line interface documented
+in this guide. A separate development tool, Puppet, is described near the end of this guide.
 
 ## Scope
 
@@ -12,7 +14,9 @@ This user guide covers:
 
 - Installation instructions
 - Usage examples for common tasks
+- Running the web server
 - Command-line options reference
+- The Puppet development tool
 - Practical examples for various scenarios
 
 # Continuous Compliance
@@ -32,11 +36,17 @@ compliance evidence is generated automatically on every CI run.
 
 # Installation
 
-Install the tool globally using the .NET CLI:
+ReviewCenter is under development and no release has been published yet. To run it, build it from source with the
+.NET 10 SDK (a .NET runtime that supports `net10.0` is required):
 
 ```bash
-dotnet tool install -g DemaConsulting.ReviewCenter
+dotnet build
+dotnet run --project src/DemaConsulting.ReviewCenter -- serve
 ```
+
+The planned distribution is self-contained executables for win-x64 and linux-x64, which will not need a separate
+.NET runtime. The examples in this guide use `reviewcenter`, the command name of the published executable; when
+running from source, replace `reviewcenter` with `dotnet run --project src/DemaConsulting.ReviewCenter --`.
 
 # Usage
 
@@ -63,6 +73,30 @@ Display usage information:
 ```bash
 reviewcenter --help
 ```
+
+## Run the Web Server
+
+The `serve` verb starts the ReviewCenter web server and keeps it running until it is stopped with Ctrl+C:
+
+```bash
+reviewcenter serve
+```
+
+By default the server listens on `http://localhost:5000`. Use `--urls <url>` to listen on another address or
+port; the value must be an absolute `http` or `https` URL:
+
+```bash
+reviewcenter serve --urls http://localhost:8080
+```
+
+The server provides these routes:
+
+- `/` - the ReviewCenter home page. It shows the title `ReviewCenter`, a Hello button that displays a greeting
+  when pressed, and a counter button that increments a displayed count.
+- `/health` - a health check that answers with status 200 and the text `Healthy` while the server is running.
+
+The `--urls` option is only valid together with `serve`; using it without `serve` is reported as an error.
+The `--silent` option suppresses the server's console log output.
 
 ## Self-Validation
 
@@ -165,6 +199,8 @@ The following command-line options are supported:
 
 | Option                                | Description                                                  |
 | ------------------------------------- | ------------------------------------------------------------ |
+| `serve`                               | Run the ReviewCenter web server until stopped                |
+| `--urls <url>`                        | Listen URL for `serve` (default: `http://localhost:5000`)    |
 | `-v`, `--version`                     | Display version information                                  |
 | `-?`, `-h`, `--help`                  | Display help message                                         |
 | `--silent`                            | Suppress console output                                      |
@@ -192,6 +228,89 @@ reviewcenter --validate --results validation-results.trx
 ```bash
 reviewcenter --silent --log tool-output.log
 ```
+
+## Example 4: Run the Web Server on a Custom Port
+
+```bash
+reviewcenter serve --urls http://localhost:8080
+```
+
+Then open `http://localhost:8080` in a browser, or check `http://localhost:8080/health`.
+
+# Puppet Development Tool
+
+Puppet is a developer tool, not part of the distributed ReviewCenter package. It lets a person, or a coding
+agent, look at and drive the ReviewCenter web interface from the command line. It starts the ReviewCenter server on
+a random local port, opens it in headless Chromium, and then accepts short commands such as `click`, `text`, and
+`screenshot`. Puppet is its own software system in this repository, with its own requirements, design, and
+verification documents.
+
+## Building and Setting Up Puppet
+
+Build Puppet from the repository root, then download Chromium once per machine with the Playwright script that the
+build places next to the Puppet executable:
+
+```bash
+dotnet build tools/puppet
+pwsh tools/puppet/bin/Debug/net10.0/playwright.ps1 install chromium
+```
+
+Replace `Debug` with `Release` if that configuration was built. If Chromium is missing, `start` fails with exit
+code 4 and prints the install command.
+
+## Puppet Commands
+
+Run Puppet with `dotnet tools/puppet/bin/Debug/net10.0/DemaConsulting.ReviewCenter.Puppet.dll <command>`:
+
+| Command                                   | What it does                                                   |
+| ----------------------------------------- | -------------------------------------------------------------- |
+| `start [--session <id>]`                  | Starts the server and browser; prints the session id and URL   |
+| `goto <path>`                             | Navigates inside the session's server, for example `goto /`    |
+| `click <selector>`                        | Clicks an element                                              |
+| `fill <selector> <text>`                  | Types text into an input                                       |
+| `text <selector>`                         | Prints the text of an element                                  |
+| `screenshot [--out <file>] [--full-page]` | Saves a PNG image and prints its absolute path                 |
+| `snapshot`                                | Prints an accessibility snapshot, title, URL, and test ids     |
+| `stop`                                    | Stops the session: browser, server, and background daemon      |
+| `list`                                    | Lists sessions and cleans up leftovers of dead sessions        |
+
+Every command except `start`, `stop`, and `list` accepts `--session <id>` to choose the session and
+`--timeout <seconds>` (1 to 600, default 10) to limit how long it waits for the page. When `--session` is omitted,
+Puppet uses the `REVIEWCENTER_PUPPET_SESSION` environment variable, or the only running session.
+
+A selector made only of letters, digits, hyphens, and underscores is a test id, so `hello-button` means the element
+whose `data-testid` is `hello-button`. Any other selector, such as `#main` or `text=Hello`, is passed to Playwright
+unchanged.
+
+## Puppet Example Workflow
+
+```powershell
+$puppet = "tools/puppet/bin/Debug/net10.0/DemaConsulting.ReviewCenter.Puppet.dll"
+dotnet $puppet start --session demo
+dotnet $puppet goto / --session demo
+dotnet $puppet click hello-button --session demo
+dotnet $puppet text hello-message --session demo
+dotnet $puppet click counter-button --session demo
+dotnet $puppet text counter-value --session demo
+dotnet $puppet screenshot --out demo.png --session demo
+dotnet $puppet stop --session demo
+```
+
+The `$puppet` variable holds only the path of the DLL; the example invokes it with `dotnet`, because PowerShell does
+not split a string such as `"dotnet <path>"` into a program and an argument when it is run with `&`.
+
+## Puppet Exit Codes
+
+| Code | Meaning                                                                                     |
+| ---- | ------------------------------------------------------------------------------------------- |
+| 0    | The command succeeded                                                                       |
+| 1    | Bad arguments, or the command failed (element not found, timeout, navigation refused)       |
+| 2    | The session does not exist                                                                  |
+| 3    | The session was stale (its daemon had died); leftovers were cleaned up                      |
+| 4    | The session could not be started (server did not start, or Chromium is not installed)       |
+
+Puppet only navigates inside the server that belongs to its session. See the `README.md` in `tools/puppet` for
+more detail on how sessions work.
 
 ## References
 

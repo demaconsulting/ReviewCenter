@@ -1,7 +1,9 @@
 # Introduction
 
 This document provides the verification design for the ReviewCenter, a web-based formal code
-review service with a companion .NET command-line interface (currently the command-line scaffold).
+review service with a companion .NET command-line interface. The service is an ASP.NET Core
+Blazor Server application started with the `serve` verb; the repository also holds a separate
+development tool, Puppet, that drives the web interface from the command line.
 
 ## Purpose
 
@@ -21,16 +23,33 @@ This document covers the verification design for the following software items:
   - **Program** — entry point and execution orchestrator
   - **Cli** subsystem
     - **Context** — argument parser and I/O owner
+  - **Hosting** subsystem
+    - **ServerHost** — web host builder and runner
+  - **Web** subsystem
+    - **App** — HTML shell and router
+    - **HomePage** — home page component
   - **SelfTest** subsystem
     - **Validation** — self-validation test runner
   - **Utilities** subsystem
     - **PathHelpers** — safe path combination utilities
+- **ReviewCenterPuppet** — a separate development-tool system with its own system and unit verification:
+  - **PuppetProgram** — entry point and command dispatcher
+  - **CommandLine** — command-line parser
+  - **SelectorResolver** — element selector translation
+  - **SessionStore** — session file storage
+  - **ControlChannel** — control protocol client and server
+  - **CommandExecutor** — browser command execution
+  - **DaemonHost** — background session host
+  - **DaemonLauncher** — detached daemon launcher
 
 **OTS items:**
 
+- **ASP.NET Core** — web application platform and Blazor Server component framework
 - **BuildMark** — build-notes documentation tool
+- **bUnit** — Blazor component testing library and in-memory test host
 - **FileAssert** — document assertion tool
 - **Pandoc** — Markdown-to-HTML conversion tool
+- **Playwright** — browser automation library used by the Puppet developer tool
 - **ReqStream** — requirements traceability tool
 - **ReviewMark** — file review enforcement tool
 - **SarifMark** — SARIF report conversion tool
@@ -54,7 +73,8 @@ The test folder structure mirrors the source subsystem breakdown:
 
 ```text
 test/
-└── DemaConsulting.ReviewCenter.Tests/  — unit and integration tests
+├── DemaConsulting.ReviewCenter.Tests/         — unit, subsystem, and integration tests of ReviewCenter
+└── DemaConsulting.ReviewCenter.Puppet.Tests/  — unit, system, and end-to-end tests of ReviewCenterPuppet
 ```
 
 ## Companion Artifact Structure
@@ -64,8 +84,11 @@ In-house items have corresponding artifacts in parallel directory trees:
 - Requirements: `docs/reqstream/{system}/.../{item}.yaml` (kebab-case)
 - Design docs: `docs/design/{system}/.../{item}.md` (kebab-case)
 - Verification design: `docs/verification/{system}/.../{item}.md` (kebab-case)
-- Source code: `src/{System}/.../{Item}.cs` (PascalCase for C#)
+- Source code: `src/{System}/.../{Item}.cs` (PascalCase for C#); the ReviewCenterPuppet system keeps
+  its source in `tools/puppet/`
 - Tests: `test/{System}.Tests/.../{Item}Tests.cs` (PascalCase for C#)
+
+The system folders are `review-center` and `review-center-puppet`.
 
 OTS items have parallel artifacts in:
 

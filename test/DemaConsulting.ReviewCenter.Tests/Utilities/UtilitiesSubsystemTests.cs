@@ -43,11 +43,17 @@ public class UtilitiesSubsystemTests
             "nested/dir/test.txt"
         };
 
-        // Act & Assert: combine each test path with base path and verify results are valid absolute paths
-        foreach (var testPath in testPaths)
+        // Act: combine each test path with base path
+        var fullBasePath = Path.GetFullPath(basePath);
+        var combinedPaths = testPaths
+            .Select(testPath => PathHelpers.SafePathCombine(basePath, testPath))
+            .ToList();
+
+        // Assert: verify results are valid absolute paths within the base directory
+        for (var i = 0; i < testPaths.Length; i++)
         {
-            var combinedPath = PathHelpers.SafePathCombine(basePath, testPath);
-            var fullBasePath = Path.GetFullPath(basePath);
+            var testPath = testPaths[i];
+            var combinedPath = combinedPaths[i];
             var fullCombinedPath = Path.GetFullPath(combinedPath);
             var relativePath = Path.GetRelativePath(fullBasePath, fullCombinedPath);
 
@@ -77,12 +83,15 @@ public class UtilitiesSubsystemTests
             "subdir/../../../escape.txt"
         };
 
-        // Act & Assert: attempt path traversal and verify exceptions are thrown
-        foreach (var dangerousPath in dangerousPaths)
-        {
-            Assert.Throws<ArgumentException>(() =>
-                PathHelpers.SafePathCombine(basePath, dangerousPath));
-        }
+        // Act: attempt path traversal
+        var exceptions = dangerousPaths
+            .Select(dangerousPath => Record.Exception(() =>
+                PathHelpers.SafePathCombine(basePath, dangerousPath)))
+            .ToList();
+
+        // Assert: verify exceptions are thrown
+        Assert.Equal(dangerousPaths.Length, exceptions.Count);
+        Assert.All(exceptions, exception => Assert.IsType<ArgumentException>(exception));
     }
 
     /// <summary>
@@ -99,12 +108,15 @@ public class UtilitiesSubsystemTests
             absolutePaths.Add(@"C:\Windows\System32\file.txt");
         }
 
-        // Act & Assert: attempt absolute path injection and verify exceptions are thrown
-        foreach (var absolutePath in absolutePaths)
-        {
-            Assert.Throws<ArgumentException>(() =>
-                PathHelpers.SafePathCombine(basePath, absolutePath));
-        }
+        // Act: attempt absolute path injection
+        var exceptions = absolutePaths
+            .Select(absolutePath => Record.Exception(() =>
+                PathHelpers.SafePathCombine(basePath, absolutePath)))
+            .ToList();
+
+        // Assert: verify exceptions are thrown
+        Assert.Equal(absolutePaths.Count, exceptions.Count);
+        Assert.All(exceptions, exception => Assert.IsType<ArgumentException>(exception));
     }
 
     /// <summary>
@@ -125,11 +137,15 @@ public class UtilitiesSubsystemTests
 
         try
         {
-            // Act & Assert: create directories and verify they exist
+            // Act: create directories
             foreach (var testDir in testDirs)
             {
                 Directory.CreateDirectory(testDir);
+            }
 
+            // Assert: verify they exist
+            foreach (var testDir in testDirs)
+            {
                 Assert.True(Directory.Exists(testDir),
                     $"Directory should be created successfully: {testDir}");
             }

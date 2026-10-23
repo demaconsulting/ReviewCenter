@@ -1,0 +1,46 @@
+### ServerHost
+
+#### Verification Approach
+
+`ServerHost` is verified with unit tests defined in `ServerHostTests.cs`. The tests call
+`ServerHost.CreateApplication` with a real `Context` created from controlled arguments and a
+`ServerHostOptions` that disables static asset mapping and selects an in-memory test server, so
+the production pipeline runs without binding a network port. A capturing logger provider records
+log entries, and the registered logger providers are inspected through the application services.
+No mocking is applied.
+
+#### Test Environment
+
+N/A - standard test environment.
+
+#### Acceptance Criteria
+
+- All unit tests pass with zero failures.
+- The health route answers HTTP status 200 with the body `Healthy`.
+- The start-up log entry exposes the listen URL as a named value.
+- The console logging provider is registered unless the context is silent.
+- A null context is rejected with an `ArgumentNullException`.
+
+#### Test Scenarios
+
+**ServerHost_CreateApplication_HealthRoute_Returns200Healthy**: The real pipeline is started on
+an in-memory server and the health route is requested; the response is 200 with the plain-text
+body `Healthy`. This scenario is tested by
+`ServerHost_CreateApplication_HealthRoute_Returns200Healthy`.
+
+**ServerHost_CreateApplication_StartupLogging_EmitsStructuredEntry**: The pipeline is started
+with an explicit URL; the captured start-up entry carries the URL as a named value that a log
+consumer can read separately from the message text. This scenario is tested by
+`ServerHost_CreateApplication_StartupLogging_EmitsStructuredEntry`.
+
+**ServerHost_CreateApplication_Silent_OmitsConsoleProvider**: The pipeline is started from a
+silent context; no console logger provider is registered. This scenario is tested by
+`ServerHost_CreateApplication_Silent_OmitsConsoleProvider`.
+
+**ServerHost_CreateApplication_NotSilent_IncludesConsoleProvider**: The pipeline is started from
+a context that is not silent; the console logger provider is registered. This scenario is tested
+by `ServerHost_CreateApplication_NotSilent_IncludesConsoleProvider`.
+
+**ServerHost_CreateApplication_NullContext_ThrowsArgumentNullException**: `CreateApplication` is
+called with a null context; an `ArgumentNullException` is thrown. This scenario is tested by
+`ServerHost_CreateApplication_NullContext_ThrowsArgumentNullException`.

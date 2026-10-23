@@ -1,0 +1,48 @@
+---
+# Software Unit Requirements for the HomePage Unit
+#
+# The HomePage unit is the hello-world landing page served at the root URL.
+
+sections:
+  - title: HomePage Unit Requirements
+    requirements:
+      - id: ReviewCenter-HomePage-Title
+        title: The HomePage unit shall display the product name ReviewCenter as its heading.
+        justification: |
+          Users must be able to tell at a glance which application they have reached.
+        tests:
+          - HomePage_Render_Default_ShowsTitle
+
+      - id: ReviewCenter-HomePage-Hello
+        title: >-
+          The HomePage unit shall show no greeting until the Hello button is clicked, and shall
+          then show a single greeting, Hello from ReviewCenter!, however often it is clicked.
+        justification: |
+          The Hello button demonstrates that user actions are handled by the server-side user
+          interface and change what the page shows. Showing the greeting once keeps the page
+          stable under repeated clicks.
+        tests:
+          - HomePage_Render_Default_ShowsNoGreeting
+          - HomePage_HelloButton_Clicked_ShowsGreeting
+          - HomePage_HelloButton_ClickedTwice_ShowsSingleGreeting
+
+      - id: ReviewCenter-HomePage-Counter
+        title: >-
+          The HomePage unit shall show a count that starts at zero and increases by one each
+          time the counter button is clicked.
+        justification: |
+          The counter demonstrates that the page keeps per-user state between interactions
+          without reloading, which later review features rely on.
+        tests:
+          - HomePage_Render_Default_CounterStartsAtZero
+          - HomePage_CounterButton_ClickedThreeTimes_ShowsCountThree
+
+      - id: ReviewCenter-HomePage-Interactive
+        title: >-
+          The HomePage unit shall report that it is interactive, through a marker on its root
+          element, once it has rendered on a live connection.
+        justification: |
+          Users, automated tests, and tooling need a reliable signal that the page now responds
+          to clicks, so that they do not act before the live connection exists.
+        tests:
+          - HomePage_AfterRender_Interactive_SetsMarker

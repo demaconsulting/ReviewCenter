@@ -1,0 +1,36 @@
+---
+# Playwright OTS Software Requirements
+#
+# Requirements for the Playwright browser automation functionality used by the Puppet developer tool.
+# These requirements belong to the ReviewCenterPuppet system, so their IDs use that prefix.
+#
+# The requirements describe only what can be proven in any environment, so they are linked to tests
+# that need no browser and always run. Driving a real Chromium is covered by a supplemental
+# end-to-end test that skips where Chromium is not installed; it is deliberately not linked to a
+# requirement, because ReqStream treats a skipped test as missing evidence.
+
+sections:
+  - title: OTS Software Requirements
+    sections:
+      - title: Playwright Requirements
+        requirements:
+          - id: ReviewCenterPuppet-OTS-Playwright-Driver
+            title: >-
+              Playwright shall deliver its driver and its browser installation script with the build output
+              so that Chromium can be installed once per machine.
+            justification: |
+              The Puppet developer tool depends on the Playwright driver to control a browser and on the
+              playwright.ps1 script to install Chromium. The missing-Chromium message tells the user to run
+              that script from next to the Puppet executable, so both must be present in the build output.
+            tags: [ots]
+            tests:
+              - PlaywrightOts_BuildOutput_Inspected_ContainsInstallScriptAndDriver
+          - id: ReviewCenterPuppet-OTS-Playwright-LaunchFailure
+            title: Playwright shall start its driver and report a failed browser launch as a PlaywrightException.
+            justification: |
+              Puppet translates a failed launch, such as a Chromium that is not installed, into a clear message
+              with the install command. That translation depends on Playwright starting its driver and
+              reporting the failure as a PlaywrightException instead of another exception type.
+            tags: [ots]
+            tests:
+              - PlaywrightOts_Chromium_MissingExecutable_ThrowsPlaywrightException

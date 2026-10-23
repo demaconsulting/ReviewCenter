@@ -66,9 +66,36 @@ internal sealed class Context : IDisposable
     public int HeadingDepth { get; private init; } = 1;
 
     /// <summary>
+    ///     Gets a value indicating whether the <c>serve</c> verb was specified.
+    /// </summary>
+    public bool Serve { get; private init; }
+
+    /// <summary>
+    ///     Gets the URL the web server listens on when <see cref="Serve"/> is <c>true</c>.
+    /// </summary>
+    /// <remarks>
+    ///     Defaults to <see cref="DefaultUrls"/> when <c>--urls</c> is not supplied. The value is
+    ///     always an absolute <c>http</c> or <c>https</c> URL because <see cref="Create"/> rejects
+    ///     anything else.
+    /// </remarks>
+    public string Urls { get; private init; } = DefaultUrls;
+
+    /// <summary>
     ///     Gets the proposed exit code for the application (0 for success, 1 for errors).
     /// </summary>
     public int ExitCode => _hasErrors ? 1 : 0;
+
+    /// <summary>
+    ///     The URL the web server listens on when <c>--urls</c> is not supplied.
+    /// </summary>
+    /// <remarks>
+    ///     Port 5000 on the loopback interface is the conventional ASP.NET Core development
+    ///     address, and binding to loopback by default keeps a freshly started server from being
+    ///     reachable from other machines unless the operator explicitly asks for that.
+    /// </remarks>
+#pragma warning disable S1075 // The default listen address is a deliberate, documented constant
+    public const string DefaultUrls = "http://localhost:5000";
+#pragma warning restore S1075
 
     /// <summary>
     ///     Private constructor - use Create factory method instead.
@@ -99,7 +126,9 @@ internal sealed class Context : IDisposable
             Silent = parser.Silent,
             Validate = parser.Validate,
             ResultsFile = parser.ResultsFile,
-            HeadingDepth = parser.HeadingDepth
+            HeadingDepth = parser.HeadingDepth,
+            Serve = parser.Serve,
+            Urls = parser.Urls ?? DefaultUrls
         };
 
         // Open log file if specified
@@ -173,9 +202,23 @@ internal sealed class Context : IDisposable
         public int HeadingDepth { get; private set; } = 1;
 
         /// <summary>
+        ///     Gets a value indicating whether the <c>serve</c> verb was specified.
+        /// </summary>
+        public bool Serve { get; private set; }
+
+        /// <summary>
+        ///     Gets the URL supplied with <c>--urls</c>, or <c>null</c> when the option was not given.
+        /// </summary>
+        public string? Urls { get; private set; }
+
+        /// <summary>
         ///     Parses command-line arguments
         /// </summary>
         /// <param name="args">Command-line arguments.</param>
+        /// <exception cref="ArgumentException">
+        ///     Thrown when an argument is unknown or malformed, or when <c>--urls</c> is given
+        ///     without the <c>serve</c> verb.
+        /// </exception>
         public void ParseArguments(string[] args)
         {
             // Validate input
@@ -186,6 +229,13 @@ internal sealed class Context : IDisposable
             {
                 var arg = args[i++];
                 i = ParseArgument(arg, args, i);
+            }
+
+            // --urls only has meaning for the serve verb; accepting it silently elsewhere would
+            // hide a likely typo (a forgotten verb) from the operator
+            if (Urls != null && !Serve)
+            {
+                throw new ArgumentException("--urls requires the serve verb", nameof(args));
             }
         }
 
@@ -232,6 +282,14 @@ internal sealed class Context : IDisposable
                     HeadingDepth = GetRequiredIntArgument(arg, args, index, "a heading depth argument", 1, 6);
                     return index + 1;
 
+                case "serve":
+                    Serve = true;
+                    return index;
+
+                case "--urls":
+                    Urls = GetRequiredUrlArgument(arg, args, index);
+                    return index + 1;
+
                 default:
                     throw new ArgumentException($"Unsupported argument '{arg}'", nameof(args));
             }
@@ -253,6 +311,32 @@ internal sealed class Context : IDisposable
             }
 
             return args[index];
+        }
+
+        /// <summary>
+        ///     Gets a required argument value that must be an absolute http or https URL
+        /// </summary>
+        /// <param name="arg">Argument name</param>
+        /// <param name="args">All arguments</param>
+        /// <param name="index">Current index</param>
+        /// <returns>The URL exactly as supplied by the user</returns>
+        /// <exception cref="ArgumentException">
+        ///     Thrown when the value is missing or is not an absolute http/https URL.
+        /// </exception>
+        private static string GetRequiredUrlArgument(string arg, string[] args, int index)
+        {
+            var value = GetRequiredStringArgument(arg, args, index, "a URL argument");
+
+            // The web host can only bind http/https endpoints, so anything else (relative paths,
+            // file:// URLs, bare host names) is rejected here with a clear message rather than
+            // failing later with a less helpful host start-up error
+            if (!Uri.TryCreate(value, UriKind.Absolute, out var uri) ||
+                (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps))
+            {
+                throw new ArgumentException($"{arg} requires an absolute http or https URL but was '{value}'", nameof(args));
+            }
+
+            return value;
         }
 
         /// <summary>

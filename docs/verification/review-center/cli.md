@@ -21,6 +21,8 @@ N/A - standard test environment.
 - Invalid arguments produce exit code 1 and an error message.
 - Log files and results files are created at the specified paths when the corresponding flags
   are used.
+- The `serve` verb and the `--urls` option flow from `Context.Create` through `Program.Run` to a
+  server that answers on the requested address, and `--urls` without `serve` is rejected.
 
 ### Test Scenarios
 
@@ -85,3 +87,14 @@ at the specified path and exit code is 0. This scenario is tested by
 are passed; the heading depth is set to 2 and exit code is 0, confirming the `--depth` flag is
 correctly parsed and propagated through `Context`. This scenario is tested by
 `CliSubsystem_DepthFlow_ContextAndProgram_AdjustsHeadingDepth`.
+
+**CliSubsystem_ServeFlow_ContextAndProgram_ServesOnRequestedUrlAndStops**: Arguments
+`["serve", "--urls", "<loopback url>", "--silent"]` are parsed by `Context.Create`, which records
+the verb and the URL; `Program.RunWithCancellation` then runs on a background task, the health
+endpoint answers on the requested URL, and the call returns after cancellation. This scenario is
+tested by `CliSubsystem_ServeFlow_ContextAndProgram_ServesOnRequestedUrlAndStops`.
+
+**CliSubsystem_UrlsWithoutServe_Context_RejectsArgumentCombination**: Arguments
+`["--urls", "http://127.0.0.1:6001"]` are passed to `Context.Create`; an `ArgumentException` is
+thrown because `--urls` requires the `serve` verb. This scenario is tested by
+`CliSubsystem_UrlsWithoutServe_Context_RejectsArgumentCombination`.

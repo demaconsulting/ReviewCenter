@@ -140,3 +140,27 @@ sections:
           prevents breakage when upgrading to newer tool versions.
         tests:
           - CliSubsystem_ResultAliasFlow_ContextAndProgram_WritesResultsFile
+
+      - id: ReviewCenter-Cli-Serve
+        title: The Cli subsystem shall support the serve verb to signal that the web server is to be run.
+        justification: |
+          Operators need a command-line verb that starts the ReviewCenter web service, and
+          the rest of the tool needs a single place to read that request from.
+        children:
+          - ReviewCenter-Context-Serve
+        tests:
+          - CliSubsystem_ServeFlow_ContextAndProgram_ServesOnRequestedUrlAndStops
+
+      - id: ReviewCenter-Cli-Urls
+        title: >-
+          The Cli subsystem shall support the `--urls` option to specify the URL the web server
+          listens on, and shall reject the option when the serve verb is not provided.
+        justification: |
+          Operators must choose the listen address of the service. The option only has meaning
+          for the serve verb, so accepting it elsewhere would hide a forgotten verb from the
+          operator.
+        children:
+          - ReviewCenter-Context-Urls
+        tests:
+          - CliSubsystem_ServeFlow_ContextAndProgram_ServesOnRequestedUrlAndStops
+          - CliSubsystem_UrlsWithoutServe_Context_RejectsArgumentCombination

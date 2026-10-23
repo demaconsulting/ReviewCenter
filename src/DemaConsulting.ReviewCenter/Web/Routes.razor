@@ -1,0 +1,12 @@
+@* Routes: maps the requested URL to a page component (part of the App unit).
+
+   Unknown URLs fall through to a plain "not found" message so that a mistyped address gives the
+   user a clear answer instead of a blank page. *@
+<Router AppAssembly="typeof(Routes).Assembly">
+    <Found Context="routeData">
+        <RouteView RouteData="routeData" />
+    </Found>
+    <NotFound>
+        <p>Page not found.</p>
+    </NotFound>
+</Router>

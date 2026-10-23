@@ -1,0 +1,39 @@
+---
+# Software Unit Requirements for the ServerHost Class
+#
+# The ServerHost class is the composition root of the web server: it builds, configures,
+# and runs the ASP.NET Core application behind the serve verb.
+
+sections:
+  - title: ServerHost Unit Requirements
+    requirements:
+      - id: ReviewCenter-ServerHost-Health
+        title: The ServerHost class shall map a /health route that answers HTTP status 200 with the text Healthy.
+        justification: |
+          Probes and test tooling need a trivial liveness check that does not depend on the
+          user interface or on authentication.
+        tests:
+          - ServerHost_CreateApplication_HealthRoute_Returns200Healthy
+
+      - id: ReviewCenter-ServerHost-Logging
+        title: >-
+          The ServerHost class shall write a start-up log entry that exposes the listen URL as a
+          named, machine-readable value when the server has started.
+        justification: |
+          A start-up entry confirms to operators that the server is accepting requests and
+          where. Exposing the URL as a named value, rather than only as text, lets log aggregation
+          tools filter and correlate entries.
+        tests:
+          - ServerHost_CreateApplication_StartupLogging_EmitsStructuredEntry
+
+      - id: ReviewCenter-ServerHost-SilentMode
+        title: >-
+          The ServerHost class shall omit console logging when the silent option is set and
+          shall include console logging otherwise.
+        justification: |
+          The silent option must hold for the long-running server just as it does for every
+          other action, so that automated environments do not receive unwanted console output,
+          while interactive operators see the server log by default.
+        tests:
+          - ServerHost_CreateApplication_Silent_OmitsConsoleProvider
+          - ServerHost_CreateApplication_NotSilent_IncludesConsoleProvider
