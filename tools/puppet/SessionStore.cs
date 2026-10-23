@@ -259,6 +259,11 @@ internal sealed class SessionStore
     private readonly Action<int, DateTime> _killProcess;
 
     /// <summary>
+    ///     Waits between two attempts of a read or a replacement that is transiently refused.
+    /// </summary>
+    private readonly Action<TimeSpan> _sleep;
+
+    /// <summary>
     ///     Initializes a new instance of the <see cref="SessionStore"/> class.
     /// </summary>
     /// <param name="directory">
@@ -267,14 +272,20 @@ internal sealed class SessionStore
     /// </param>
     /// <param name="isProcessAlive">Process liveness check; <c>null</c> uses <see cref="IsProcessAlive"/>.</param>
     /// <param name="killProcess">Process termination; <c>null</c> uses <see cref="KillProcess"/>.</param>
+    /// <param name="sleep">
+    ///     Wait between retry attempts of a read or a replacement; <c>null</c> sleeps the calling thread.
+    ///     Tests inject it to release a file lock deterministically instead of racing a timer.
+    /// </param>
     public SessionStore(
         string? directory = null,
         Func<int, DateTime, bool>? isProcessAlive = null,
-        Action<int, DateTime>? killProcess = null)
+        Action<int, DateTime>? killProcess = null,
+        Action<TimeSpan>? sleep = null)
     {
         Directory = directory ?? Path.Combine(Path.GetTempPath(), "reviewcenter-puppet");
         _isProcessAlive = isProcessAlive ?? IsProcessAlive;
         _killProcess = killProcess ?? KillProcess;
+        _sleep = sleep ?? Thread.Sleep;
     }
 
     /// <summary>
@@ -328,7 +339,7 @@ internal sealed class SessionStore
     /// </summary>
     /// <param name="temp">The temporary file.</param>
     /// <param name="path">The target path.</param>
-    private static void ReplaceWithRetry(string temp, string path)
+    private void ReplaceWithRetry(string temp, string path)
     {
         for (var attempt = 1; attempt < ReplaceAttempts; attempt++)
         {
@@ -339,7 +350,7 @@ internal sealed class SessionStore
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
             {
-                Thread.Sleep(ReplaceRetryDelay);
+                _sleep(ReplaceRetryDelay);
             }
         }
 
@@ -616,7 +627,7 @@ internal sealed class SessionStore
     /// </remarks>
     /// <param name="path">The session file path.</param>
     /// <returns>The outcome, and the session when the outcome is <see cref="ReadOutcome.Read"/>.</returns>
-    private static (ReadOutcome Outcome, SessionInfo? Info) ReadWithRetry(string path)
+    private (ReadOutcome Outcome, SessionInfo? Info) ReadWithRetry(string path)
     {
         for (var attempt = 1; attempt <= ReadAttempts; attempt++)
         {
@@ -641,7 +652,7 @@ internal sealed class SessionStore
                 // The file is being replaced right now or is locked: wait a moment and look again
                 if (attempt < ReadAttempts)
                 {
-                    Thread.Sleep(ReadRetryDelay);
+                    _sleep(ReadRetryDelay);
                 }
             }
         }

@@ -32,6 +32,7 @@ namespace DemaConsulting.ReviewCenter.Puppet.Tests;
 ///     real Chromium is covered separately by the end-to-end test, which CI runs with Chromium installed and which is
 ///     linked to the Puppet system requirements.
 /// </remarks>
+[Collection("Sequential")]
 public class PlaywrightOtsTests
 {
     /// <summary>

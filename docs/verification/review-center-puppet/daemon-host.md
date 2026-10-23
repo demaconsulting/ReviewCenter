@@ -20,7 +20,9 @@ fails it, rather than skipping it, when the browser cannot be launched.
 
 ### Test Environment
 
-The unit tests use the standard test environment and need permission to open loopback TCP ports. The end-to-end test
+The unit tests use the standard test environment and need permission to open loopback TCP ports. Because they bind
+ports, they run in the serial `Sequential` xUnit collection of the Puppet test project, one at a time and never beside
+another port-, process-, or timing-sensitive test. The end-to-end test
 additionally needs the built ReviewCenter server assembly and an installed Chromium; Chromium is installed once with
 the Playwright installation script (CI does this on every platform, with the browser cached). Setting
 `REVIEWCENTER_REQUIRE_CHROMIUM=true` makes a missing browser a failure; without it the test skips with a reason.

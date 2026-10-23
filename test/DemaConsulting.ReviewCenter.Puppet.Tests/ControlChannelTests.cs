@@ -27,6 +27,7 @@ namespace DemaConsulting.ReviewCenter.Puppet.Tests;
 ///     Unit tests for the control channel: <see cref="ControlServer"/>, <see cref="ControlClient"/>,
 ///     and <see cref="ControlProtocol"/>.
 /// </summary>
+[Collection("Sequential")]
 public class ControlChannelTests
 {
     /// <summary>

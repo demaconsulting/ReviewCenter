@@ -269,6 +269,7 @@ reviews:
       - "docs/verification/review-center-puppet.md"
       - "test/**/PuppetSystemTests.cs"
       - "test/**/PuppetEndToEndTests.cs"
+      - "test/**/SequentialCollection.cs"
       - "test/**/Fakes.cs"
 
   - id: ReviewCenterPuppet-Design

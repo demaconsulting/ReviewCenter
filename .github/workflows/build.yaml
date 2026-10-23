@@ -213,6 +213,8 @@ jobs:
           ./test/DemaConsulting.ReviewCenter.Puppet.Tests/bin/Release/net10.0/playwright.ps1
           install --with-deps chromium
 
+      # --max-parallel-test-modules 1 runs the two test assemblies one after the other: the serial xUnit
+      # collections isolate tests (loopback ports, processes, timing) only within one assembly.
       - name: Test
         env:
           # Makes the Puppet end-to-end test fail instead of skip when Chromium cannot be launched
@@ -222,6 +224,7 @@ jobs:
           --no-build
           --configuration Release
           --property:Version=${{ inputs.version }}
+          --max-parallel-test-modules 1
           --coverlet
           --coverlet-output-format opencover
           --report-trx
@@ -380,9 +383,9 @@ jobs:
           path: artifacts/
 
   # Performs integration testing on a matrix of operating systems, running the published
-  # self-contained executable (extracted from the release archive, with no .NET runtime
-  # available to it) through basic execution, self-validation, and a web server smoke test
-  # to ensure the distributed artifact works on every supported platform.
+  # self-contained executable (extracted from the release archive, with an empty .NET root so no
+  # installed runtime can be found by it) through basic execution, self-validation, and a web
+  # server smoke test to ensure the distributed artifact works on every supported platform.
   integration-test:
     name: Integration Test ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
@@ -476,14 +479,47 @@ jobs:
           echo "✓ Tool versions captured"
 
       # === RUN INTEGRATION TESTS ===
-      # This section runs the integration tests against the published executable. DOTNET_ROOT points to a
-      # folder that does not exist, so the steps fail if the executable depends on an installed runtime.
+      # This section runs the integration tests against the published executable. DOTNET_ROOT and
+      # DOTNET_ROOT_X64 (which takes precedence on x64) point to an existing, empty folder, so the steps fail
+      # if the executable depends on an installed runtime. The folder must exist: when DOTNET_ROOT points to
+      # a missing folder the apphost ignores it and falls back to the globally installed runtime, which would
+      # let a framework-dependent executable pass. DOTNET_MULTILEVEL_LOOKUP is deliberately not used: it has
+      # been ignored since .NET 7. The variables are set per step (not for the job) because the dotnet tool
+      # restore and VersionMark steps need the real SDK.
       # Downstream projects: Add any additional integration test steps here.
+
+      - name: Prepare empty .NET root
+        shell: bash
+        run: |
+          set -euo pipefail
+          EMPTY_ROOT="${RUNNER_TEMP}/empty-dotnet-root"
+          mkdir -p "${EMPTY_ROOT}"
+          if [ -n "$(ls -A "${EMPTY_ROOT}")" ]; then
+            echo "✗ ${EMPTY_ROOT} is not empty"; exit 1
+          fi
+          echo "EMPTY_DOTNET_ROOT=${EMPTY_ROOT}" >> "${GITHUB_ENV}"
+          echo "✓ Empty .NET root prepared at ${EMPTY_ROOT}"
+
+      # A framework-dependent single-file executable is a few hundred KiB while the self-contained one is
+      # about 100 MiB, so a size well between the two proves the runtime is bundled. Revisit the threshold if
+      # trimming or compression is ever enabled for the publish.
+      - name: Verify executable is self-contained
+        shell: bash
+        run: |
+          set -euo pipefail
+          SIZE=$(stat -c%s "$REVIEWCENTER_EXE")
+          MIN_SIZE=$((20 * 1024 * 1024))
+          echo "Executable size: ${SIZE} bytes (minimum for a self-contained executable: ${MIN_SIZE})"
+          if [ "${SIZE}" -lt "${MIN_SIZE}" ]; then
+            echo "✗ Executable is too small to bundle the .NET runtime"; exit 1
+          fi
+          echo "✓ Executable bundles the .NET runtime"
 
       - name: Test version display
         shell: bash
         env:
-          DOTNET_ROOT: /nonexistent-dotnet-root
+          DOTNET_ROOT: ${{ env.EMPTY_DOTNET_ROOT }}
+          DOTNET_ROOT_X64: ${{ env.EMPTY_DOTNET_ROOT }}
         run: |
           echo "Testing reviewcenter --version..."
           "$REVIEWCENTER_EXE" --version || { echo "✗ Version command failed"; exit 1; }
@@ -492,7 +528,8 @@ jobs:
       - name: Test help display
         shell: bash
         env:
-          DOTNET_ROOT: /nonexistent-dotnet-root
+          DOTNET_ROOT: ${{ env.EMPTY_DOTNET_ROOT }}
+          DOTNET_ROOT_X64: ${{ env.EMPTY_DOTNET_ROOT }}
         run: |
           echo "Testing reviewcenter --help..."
           "$REVIEWCENTER_EXE" --help || { echo "✗ Help command failed"; exit 1; }
@@ -501,7 +538,8 @@ jobs:
       - name: Run self-validation
         shell: bash
         env:
-          DOTNET_ROOT: /nonexistent-dotnet-root
+          DOTNET_ROOT: ${{ env.EMPTY_DOTNET_ROOT }}
+          DOTNET_ROOT_X64: ${{ env.EMPTY_DOTNET_ROOT }}
         run: |
           echo "Running self-validation..."
           # The file name carries the platform (windows/ubuntu) and runtime (net10.0) that the platform
@@ -514,7 +552,8 @@ jobs:
       - name: Test web server
         shell: bash
         env:
-          DOTNET_ROOT: /nonexistent-dotnet-root
+          DOTNET_ROOT: ${{ env.EMPTY_DOTNET_ROOT }}
+          DOTNET_ROOT_X64: ${{ env.EMPTY_DOTNET_ROOT }}
         run: |
           set -u
           URL="http://127.0.0.1:5189"

@@ -103,6 +103,7 @@ internal static class PlaywrightAvailability
 ///     <c>REVIEWCENTER_REQUIRE_CHROMIUM=true</c>, which turns a missing or broken browser into a failure so the
 ///     evidence can never be skipped silently.
 /// </remarks>
+[Collection("Sequential")]
 public class PuppetEndToEndTests
 {
     /// <summary>

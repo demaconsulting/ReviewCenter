@@ -5,11 +5,16 @@
 `SessionStore` is verified with unit tests defined in `SessionStoreTests.cs`. The store is created over a temporary
 folder, and the process liveness check and the kill action are injected as delegates, so stale and live sessions can
 be simulated without real processes and a recording delegate shows which process would have been stopped. The one
-exception is the static `IsProcessAlive` check, which is verified against the test process itself.
+exception is the static `IsProcessAlive` check, which is verified against the test process itself. The wait between
+two retry attempts of a read or a replacement is an injected delegate (the real thread sleep by default); the
+file-lock scenarios inject one that releases the lock on its first call, so they neither depend on timing nor can
+pass without a retry having happened.
 
 ### Test Environment
 
-N/A - standard test environment. Each test creates its own temporary folder with the `TempDirectory` helper.
+N/A - standard test environment. Each test creates its own temporary folder with the `TempDirectory` helper. The
+class runs in the serial `Sequential` xUnit collection of the Puppet test project because it starts child processes,
+uses many threads, and relies on Windows file-lock behavior that CPU contention from other tests must not disturb.
 
 ### Acceptance Criteria
 
@@ -104,7 +109,8 @@ are the same session; records that differ in daemon process id, daemon start tim
 scenario is tested by `SessionStore_IsSameSession_ComparesDaemonIdentityAndToken`.
 
 **SessionStore_Lookup_FileTemporarilyLocked_RetriesAndReportsLive**: The file of a live session is held exclusively
-for about 150 milliseconds while it is looked up; the lookup retries, returns `Live`, nothing is deleted, and no
+and released by the retry wait after the first refused read; the lookup retries (at least one wait happened),
+returns `Live`, nothing is deleted, and no
 process is stopped. This scenario is tested by `SessionStore_Lookup_FileTemporarilyLocked_RetriesAndReportsLive`.
 
 **SessionStore_Lookup_FileStaysLocked_ThrowsAndKeepsSession**: The file stays locked for the whole lookup, with a
@@ -117,9 +123,10 @@ times while another looks it up continuously; every lookup returns `Live`, nothi
 no temporary file is left. This scenario is tested by
 `SessionStore_WriteAndLookup_ConcurrentReplacement_NeverReportsStale`.
 
-**SessionStore_Write_TargetTemporarilyLocked_RetriesAndSucceeds**: The existing file is held exclusively for about
-150 milliseconds while a new record is written over it; the write retries, the new content is in place, and no
-temporary file remains. This scenario is tested by `SessionStore_Write_TargetTemporarilyLocked_RetriesAndSucceeds`.
+**SessionStore_Write_TargetTemporarilyLocked_RetriesAndSucceeds**: The existing file is held exclusively and released
+by the retry wait after the first refused replacement while a new record is written over it; the write retries (on
+Windows, where a replacement over a locked file is refused, at least one wait happened), the new content is in place,
+and no temporary file remains. This scenario is tested by `SessionStore_Write_TargetTemporarilyLocked_RetriesAndSucceeds`.
 
 **SessionStore_Write_ReplacementFails_RemovesTemporaryFile**: A folder occupies the place of the session file so the
 move can never succeed; the write fails with an I/O error and no temporary file remains. This scenario is tested by

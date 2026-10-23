@@ -23,6 +23,7 @@ namespace DemaConsulting.ReviewCenter.Puppet.Tests;
 /// <summary>
 ///     Unit tests for the <see cref="PuppetProgram"/> command dispatcher, using fakes for every collaborator.
 /// </summary>
+[Collection("Sequential")]
 public class PuppetProgramTests
 {
     /// <summary>

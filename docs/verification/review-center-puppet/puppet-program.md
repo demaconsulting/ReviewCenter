@@ -12,7 +12,9 @@ runs a real `DaemonHost` over fakes in the background, so that commands travel t
 ### Test Environment
 
 N/A - standard test environment. Each test creates its own temporary session folder with the `TempDirectory`
-helper, and the tests need permission to open loopback TCP ports for the one test that uses the control channel.
+helper, and the tests need permission to open loopback TCP ports for the one test that uses the control channel. The
+tests change process-wide environment variables and bind ports, so they run in the serial `Sequential` xUnit
+collection of the Puppet test project.
 
 ### Acceptance Criteria
 

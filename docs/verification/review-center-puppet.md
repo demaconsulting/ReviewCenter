@@ -26,9 +26,14 @@ that variable, as on a developer machine that has not installed Chromium, the te
 ## Test Environment
 
 The tests run on net10.0 on Windows and Linux. Each test creates its own temporary session folder with the
-`TempDirectory` helper and removes it afterwards, so tests do not share session files and can run in parallel. No
+`TempDirectory` helper and removes it afterwards, so tests do not share session files. No
 network access, browser, or installed ReviewCenter server is needed; the loopback control channel binds a random
-local port, so the environment must allow opening loopback TCP ports.
+local port, so the environment must allow opening loopback TCP ports. Test classes that bind loopback ports, start
+child processes or a browser, change process-wide environment variables, or are sensitive to timing (the control
+channel, daemon host, program, system, end-to-end, Playwright, and session store tests) belong to the serial
+`Sequential` xUnit collection, so they run one at a time; the remaining classes use only fakes and run in parallel.
+In CI the two test assemblies also run one after the other (`--max-parallel-test-modules 1`), because a serial
+collection isolates tests only within its own assembly.
 
 ## Acceptance Criteria
 
