@@ -264,12 +264,7 @@ internal static class PuppetProgram
                     outDirectory = ValueOf(args, ref i);
                     break;
                 case "--timeout":
-                    var text = ValueOf(args, ref i);
-                    if (!int.TryParse(text, out timeout) || timeout is < 1 or > MaxTimeoutSeconds)
-                    {
-                        throw new PuppetException($"--timeout must be a whole number of seconds from 1 to {MaxTimeoutSeconds}, not '{text}'.");
-                    }
-
+                    timeout = ParseTimeout(ValueOf(args, ref i));
                     break;
                 default:
                     if (args[i].StartsWith('-') || stepsPath is not null)
@@ -287,17 +282,48 @@ internal static class PuppetProgram
             throw new PuppetException("The steps file is missing. " + UsageLine);
         }
 
-        if (url is not null && serverDll is not null)
+        ValidateUrlOptions(url, serverDll);
+        return new Options(stepsPath, serverDll, url?.TrimEnd('/'), outDirectory, timeout);
+    }
+
+    /// <summary>
+    ///     Parses the <c>--timeout</c> value.
+    /// </summary>
+    /// <param name="text">The option value.</param>
+    /// <returns>The timeout in seconds.</returns>
+    /// <exception cref="PuppetException">Thrown when the value is not a whole number in range.</exception>
+    private static int ParseTimeout(string text)
+    {
+        if (!int.TryParse(text, out var timeout) || timeout is < 1 or > MaxTimeoutSeconds)
+        {
+            throw new PuppetException($"--timeout must be a whole number of seconds from 1 to {MaxTimeoutSeconds}, not '{text}'.");
+        }
+
+        return timeout;
+    }
+
+    /// <summary>
+    ///     Checks the <c>--url</c> and <c>--server-dll</c> options.
+    /// </summary>
+    /// <param name="url">The <c>--url</c> value, or <c>null</c>.</param>
+    /// <param name="serverDll">The <c>--server-dll</c> value, or <c>null</c>.</param>
+    /// <exception cref="PuppetException">Thrown when the combination is not valid.</exception>
+    private static void ValidateUrlOptions(string? url, string? serverDll)
+    {
+        if (url is null)
+        {
+            return;
+        }
+
+        if (serverDll is not null)
         {
             throw new PuppetException("--url and --server-dll cannot be used together.");
         }
 
-        if (url is not null && !(Uri.TryCreate(url, UriKind.Absolute, out var uri) && uri.Scheme is "http" or "https"))
+        if (!(Uri.TryCreate(url, UriKind.Absolute, out var uri) && uri.Scheme is "http" or "https"))
         {
             throw new PuppetException($"--url must be an absolute http or https URL, not '{url}'.");
         }
-
-        return new Options(stepsPath, serverDll, url?.TrimEnd('/'), outDirectory, timeout);
     }
 
     /// <summary>
