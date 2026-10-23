@@ -935,7 +935,16 @@ internal sealed class SessionStore
                 KillOrphans(read);
             }
 
-            if (DeleteIfSame(sessionId, read, startLockHeld) != DeleteOutcome.Replaced)
+            var deletion = DeleteIfSame(sessionId, read, startLockHeld);
+            if (deletion == DeleteOutcome.Busy && startLockHeld)
+            {
+                // A start that goes on would launch a daemon that finds the undeletable old record in place and
+                // refuses to publish over it: report the blocked cleanup instead, so the caller can try again
+                throw new PuppetException(
+                    $"The stale session file for '{sessionId}' cannot be removed right now; nothing was started. Try again.");
+            }
+
+            if (deletion != DeleteOutcome.Replaced)
             {
                 return SessionLookup.Stale;
             }

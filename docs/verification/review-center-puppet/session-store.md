@@ -92,6 +92,13 @@ start whose owner is alive. The lookup returns `Stale` but the file is not delet
 dead session. After three attempts the lookup throws a `PuppetException` and the latest file is still there. This
 scenario is tested by `SessionStore_Lookup_SessionKeepsBeingReplaced_ThrowsAndDeletesNothing`.
 
+**SessionStore_Lookup_StaleRecordCannotBeRemoved_FailsOnlyForTheStartThatHoldsTheLock**: On Windows, the file of a
+dead session is held open so that it cannot be deleted. A lookup made as the start that holds the reservation throws
+a `PuppetException` saying the record cannot be removed, while a lookup made by any other command returns `Stale`;
+the file stays in both cases. This scenario is tested by
+`SessionStore_Lookup_StaleRecordCannotBeRemoved_FailsOnlyForTheStartThatHoldsTheLock`; the test is skipped with a
+stated reason on other platforms, so the requirement uses a Windows source filter.
+
 **SessionStore_DeleteIfSame_SameSession_DeletesFileAndReleasesLock**: A stored session is deleted as the examined
 session; the outcome is `Deleted`, the file is gone, and the reservation can be taken again afterwards. This scenario
 is tested by `SessionStore_DeleteIfSame_SameSession_DeletesFileAndReleasesLock`.

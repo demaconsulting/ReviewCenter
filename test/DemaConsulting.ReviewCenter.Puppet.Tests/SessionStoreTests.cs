@@ -487,6 +487,31 @@ public class SessionStoreTests
     }
 
     /// <summary>
+    ///     Test that a start (which holds the start lock) is told when the stale record of a dead session cannot be
+    ///     removed, instead of being told the cleanup succeeded, while a caller without the lock still gets the
+    ///     stale result (a concurrent start may be the owner that replaces the record).
+    /// </summary>
+    [Fact]
+    public void SessionStore_Lookup_StaleRecordCannotBeRemoved_FailsOnlyForTheStartThatHoldsTheLock()
+    {
+        // Arrange: a dead session whose file cannot be deleted (held open without delete sharing, Windows only)
+        Assert.SkipUnless(OperatingSystem.IsWindows(), "Holding a file open to refuse deletion is a Windows behavior.");
+        using var temp = new TempDirectory();
+        var store = new SessionStore(temp.Path, (_, _) => false, (_, _) => { }, _ => { });
+        store.Write(CreateInfo("blocked"));
+        using var hold = new FileStream(store.GetPath("blocked"), FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+
+        // Act: look the session up as a start that holds the lock, and as any other command
+        var startError = Assert.Throws<PuppetException>(() => store.Lookup("blocked", out _, startLockHeld: true));
+        var other = store.Lookup("blocked", out _);
+
+        // Assert: the start is told to try again; the other command reports the session as stale; the file stays
+        Assert.Contains("cannot be removed", startError.Message);
+        Assert.Equal(SessionLookup.Stale, other);
+        Assert.True(File.Exists(store.GetPath("blocked")));
+    }
+
+    /// <summary>
     ///     Test that the real liveness check accepts this process and rejects a recycled process id.
     /// </summary>
     [Fact]

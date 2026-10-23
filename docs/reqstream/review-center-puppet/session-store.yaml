@@ -76,7 +76,8 @@ sections:
               as stale, stop a server and a browser the dead daemon left running, and delete the file only
               when it still holds the session that was examined and no start holds the reservation for its
               id; a session published by a concurrent start in the meantime shall be kept and examined
-              itself.
+              itself. A start that holds the reservation shall be told, and not proceed, when the stale file
+              cannot be removed.
             justification: |
               A crash, reboot, or killed terminal leaves a file whose daemon is gone. Without cleanup every
               later command would fail confusingly, and an orphaned server or browser would keep running and
@@ -87,6 +88,7 @@ sections:
               - SessionStore_Lookup_CorruptFile_CleansUpAndReportsStale
               - SessionStore_Lookup_SessionReplacedDuringCleanup_KeepsReplacementAndReportsItLive
               - SessionStore_Lookup_StartLockHeldByAnotherStart_LeavesFileAndReportsStale
+              - windows@SessionStore_Lookup_StaleRecordCannotBeRemoved_FailsOnlyForTheStartThatHoldsTheLock
               - SessionStore_Lookup_SessionKeepsBeingReplaced_ThrowsAndDeletesNothing
 
           - id: ReviewCenterPuppet-SessionStore-GuardedDelete

@@ -104,7 +104,10 @@ different session (a concurrent `start` replaced the stale one in between), noth
 examines the new file instead; this repeats at most three times before a `PuppetException` says the session kept
 changing. If a `start` holds the reservation for the id, the stale file is left for that `start` to replace or
 clean and the result is still `Stale`; the `start` command itself passes `startLockHeld` because it already owns
-the reservation. A file that stays locked or inaccessible after the
+the reservation. When the caller holds the reservation and the stale file still cannot be removed after the retries
+(it is held open elsewhere), `Lookup` throws a `PuppetException` ("cannot be removed right now; nothing was started")
+instead of reporting `Stale`, because a `start` that went on would launch a daemon that finds the old record in place
+and refuses to publish over it. A file that stays locked or inaccessible after the
 retries is neither: `Lookup` throws a `PuppetException` saying the session file is temporarily unreadable, and
 deletes nothing and stops no process, so a live session can never be removed because of a transient I/O error. A file
 that vanishes between the existence check and the read is reported as `Unknown`.

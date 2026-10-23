@@ -146,7 +146,8 @@ The guards that appear most often are:
    browser, then `DeleteIfSame`. *Window*: the liveness test and the kills (hundreds of milliseconds). *If replaced or
    reused*: the kills use the identities from the examined record, so a new session's processes are untouched; a
    replaced file is re-examined, at most three times, then reported as an error. *Guard*: identity revalidation plus
-   delete-if-same. An unreadable file is never treated as stale.
+   delete-if-same. An unreadable file is never treated as stale. A `start` (which holds the reservation) whose stale
+   record stays undeletable gets an error instead of launching a daemon into it.
 6. **TryReserve (create the lock)**. *Check/act*: one exclusive create (`CreateNew`), so there is no separate check.
    *Window*: none. *Guard*: atomicity of the create; a create that fails because the file is pending deletion (Windows
    access denied) counts as held.
@@ -275,7 +276,11 @@ These cannot be closed completely and are accepted:
   another user or is elevated, so such a process is treated as not alive. This is the safe direction for kills (nothing
   is killed) but can make a stale cleanup delete the record of a session whose daemon runs elevated.
 - **Browser identity from DevTools**. See the browser identity query above.
-- **Port reuse after a daemon dies**. See ControlClient above; the strict response parser is the mitigation.
+- **Port reuse after a daemon dies**. See ControlClient above. The strict response parser rejects a foreign service
+  that answers in another shape, but a listener that copies the exact shape after reading the dead daemon's token could
+  be believed for a single command. Binding responses to the request would need a challenge-response protocol (the
+  token would have to stop being sent in the request); the exposure is a window of milliseconds after a daemon died, for
+  a same-machine listener that must win the port, and the token it reads belongs to a session that no longer exists.
 - **Free port selection**. See above; the strict probe and the exit check turn the outcome into a failed start.
 - **Interval in `WriteIfOwner`**. See SessionStore entry 2; accepted because of the invariant stated there.
 - **Release and the Unix advisory lock**. See SessionStore entry 7; the two paths are separated by lock ownership, not
