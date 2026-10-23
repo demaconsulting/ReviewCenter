@@ -139,8 +139,16 @@ internal sealed class ServerProcess : IRunningServer
         }
         catch
         {
-            // Never leave a half-started server behind
-            await server.DisposeAsync();
+            // Never leave a half-started server behind; a failed stop must not hide the start-up error
+            try
+            {
+                await server.DisposeAsync();
+            }
+            catch (TimeoutException)
+            {
+                // Best effort
+            }
+
             throw;
         }
     }

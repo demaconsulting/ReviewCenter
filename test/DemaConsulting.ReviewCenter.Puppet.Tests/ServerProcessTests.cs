@@ -38,8 +38,15 @@ public class ServerProcessTests
 
         // Act: start it and ask for its health
         var server = await ServerProcess.StartAsync(serverPath, TestContext.Current.CancellationToken);
-        var healthy = await http.GetStringAsync($"{server.Url}/health", TestContext.Current.CancellationToken);
-        await server.DisposeAsync();
+        string healthy;
+        try
+        {
+            healthy = await http.GetStringAsync($"{server.Url}/health", TestContext.Current.CancellationToken);
+        }
+        finally
+        {
+            await server.DisposeAsync();
+        }
 
         // Assert: it answered while running and no longer answers once disposed
         Assert.Equal("Healthy", healthy);
