@@ -194,7 +194,7 @@ documented under Design Constraints.
 
 ## Design Constraints
 
-- Platform: targets net10.0 on Windows, Linux, and macOS. Detaching the daemon uses operating system specific
+- Platform: targets net10.0 on Windows and Linux. Detaching the daemon uses operating system specific
   process creation on Windows and the standard process API elsewhere.
 - Distribution: Puppet is not packed, published, or shipped with ReviewCenter and must not be referenced by it.
 - Network exposure: the control channel and the server listen only on the loopback interface, on ports chosen by the

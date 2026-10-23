@@ -26,7 +26,7 @@ The current release provides:
 - **Standardized Command-Line Interface**: Context class handling common arguments
   (`serve`, `--urls`, `--version`, `--help`, `--silent`, `--validate`, `--results`, `--depth`, `--log`)
 - **Self-Validation**: Built-in validation tests with TRX/JUnit output
-- **Multi-Platform Support**: Builds and runs on Windows, Linux, and macOS
+- **Multi-Platform Support**: Builds and runs on Windows and Linux
 - **Modern .NET**: Targets .NET 10 (`net10.0`)
 - **Puppet Developer Tool**: A separate in-repository tool that drives the web interface in headless Chromium
   from the command line (see `tools/puppet/README.md`); it is not part of the distributed package

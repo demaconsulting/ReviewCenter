@@ -105,7 +105,6 @@ sections:
         tests:
           - ReviewCenterPuppet_Security_WrongTokenAndUnsafeSessionId_AreRejected
           - ubuntu@ReviewCenterPuppet_Security_UnixPlatform_SessionFileIsOwnerOnly
-          - macos@ReviewCenterPuppet_Security_UnixPlatform_SessionFileIsOwnerOnly
 
       - id: ReviewCenterPuppet-System-Commands
         title: >-

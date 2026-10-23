@@ -189,7 +189,7 @@ stated reason on other platforms.
 **SessionStore_Write_UnixPlatform_CreatesOwnerOnlyDirectoryAndFile**: On Unix platforms, a session is written into
 a folder that did not exist; the folder has mode 0700 and the file mode 0600. The test is skipped with a stated
 reason on Windows, where the per-user temporary folder provides the isolation and no mode is set, so the requirement
-uses Linux and macOS source filters. This scenario is tested by
+uses a Linux source filter. This scenario is tested by
 `SessionStore_Write_UnixPlatform_CreatesOwnerOnlyDirectoryAndFile`.
 
 **SessionStore_IsProcessAlive_CurrentProcess_TrueOnlyWithMatchingStartTime**: The check is true for the test

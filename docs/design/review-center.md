@@ -159,7 +159,7 @@ through `Context.WriteError` and returns 1, which makes `Context.ExitCode` 1.
 
 ## Design Constraints
 
-- Platform: targets net10.0 only, on Windows, Linux, and macOS.
+- Platform: targets net10.0 only, on Windows and Linux.
 - Threading: the command-line actions are single-threaded. The web server handles requests on
   the ASP.NET Core thread pool; each browser connection has its own page state, and all
   handlers of one connection run on a single synchronization context, so no shared mutable

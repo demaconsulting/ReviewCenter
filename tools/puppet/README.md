@@ -99,7 +99,7 @@ the answer, and exits.
 
 Session files live in `%TEMP%\reviewcenter-puppet\<id>.json` (the system temp folder on other platforms). They hold the
 control port, the token, the server URL, and the process ids and start times of the daemon, the server, and the
-browser; they are deleted on `stop`. On Linux and macOS the folder and the files are readable by their owner only; on
+browser; they are deleted on `stop`. On Linux the folder and the files are readable by their owner only; on
 Windows the per-user temp folder already restricts them to your account. Screenshots without `--out` are saved in the
 same folder as `<id>-<timestamp>.png`.
 

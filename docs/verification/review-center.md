@@ -20,7 +20,7 @@ against the combined output.
 
 ## Test Environment
 
-Integration tests run on net10.0 across Windows, Linux, and macOS. All scenarios are expected to
+Integration tests run on net10.0 on Windows and Linux. All scenarios are expected to
 produce identical results on all supported platforms, with one exception: the graceful-stop scenario
 sends a termination signal to a child process, which Windows cannot do, so it is skipped there with a
 reason. Temporary files and directories are
@@ -36,7 +36,7 @@ loopback TCP ports.
 - Silent mode (`--silent`) produces empty combined output.
 - The `serve` verb starts a web server that answers `/health` with 200 and `Healthy` and serves
   the home page at `/`.
-- The running server writes a start-up log entry that names its listen address, and on Linux and macOS it exits
+- The running server writes a start-up log entry that names its listen address, and on Linux it exits
   with code 0 when asked to terminate.
 - The `--urls` option controls the listen address, is rejected without `serve`, and a port that
   is already in use produces an error and a non-zero exit code.
@@ -115,7 +115,7 @@ tested by `ReviewCenter_ServeVerb_Started_LogsStartupEntryWithListenUrl`.
 `serve` verb and the test waits until the server answers. The test then sends the termination signal that a process
 supervisor or container runtime sends, and the server exits by itself within the time limit with exit code 0. A
 graceful stop signal cannot be sent to a child process on Windows, so the test is skipped there with a reason and is
-linked to the requirement for Linux and macOS only. This scenario is tested by
+linked to the requirement for Linux only. This scenario is tested by
 `ubuntu@ReviewCenter_ServeVerb_TerminationRequested_StopsGracefullyWithExitCodeZero`.
 
 **ReviewCenter_ServeWithUrls_PortSpecified_ListensOnRequestedPort**: The tool is started with

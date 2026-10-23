@@ -11,7 +11,6 @@
 # Source filter prefixes:
 #   windows@TestName      - proves the test passed on a Windows platform
 #   ubuntu@TestName       - proves the test passed on a Linux (Ubuntu) platform
-#   macos@TestName        - proves the test passed on a macOS platform
 #   dotnet10.x@TestName   - proves the self-validation test ran with .NET 10.x runtime
 
 sections:
@@ -36,16 +35,6 @@ sections:
           # Tests link to "ubuntu" to ensure results come from Linux platform
           - "ubuntu@ReviewCenter_VersionDisplay"
           - "ubuntu@ReviewCenter_HelpDisplay"
-
-      - id: ReviewCenter-Platform-MacOS
-        title: The tool shall execute successfully on macOS platforms.
-        tags: [system]
-        justification: |
-          DEMA Consulting tools must support macOS for developers using Apple platforms.
-        tests:
-          # Tests link to "macos" to ensure results come from macOS platform
-          - "macos@ReviewCenter_VersionDisplay"
-          - "macos@ReviewCenter_HelpDisplay"
 
       - id: ReviewCenter-Platform-Net10
         title: The tool shall support .NET 10 runtime.

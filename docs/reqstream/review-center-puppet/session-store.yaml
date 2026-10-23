@@ -153,7 +153,6 @@ sections:
               are created so that there is no moment at which they are readable by others.
             tests:
               - ubuntu@SessionStore_Write_UnixPlatform_CreatesOwnerOnlyDirectoryAndFile
-              - macos@SessionStore_Write_UnixPlatform_CreatesOwnerOnlyDirectoryAndFile
 
           - id: ReviewCenterPuppet-SessionStore-Listing
             title: >-

@@ -92,7 +92,7 @@ body:
     attributes:
       label: Operating System
       description: What operating system are you using?
-      placeholder: e.g., Windows 11, Ubuntu 22.04, macOS 14.0
+      placeholder: e.g., Windows 11, Ubuntu 22.04
 
   - type: textarea
     id: additional-context

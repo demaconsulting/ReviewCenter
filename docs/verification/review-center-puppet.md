@@ -23,7 +23,7 @@ linked to a requirement, so that a machine without Chromium does not fail the re
 
 ## Test Environment
 
-The tests run on net10.0 on Windows, Linux, and macOS. Each test creates its own temporary session folder with the
+The tests run on net10.0 on Windows and Linux. Each test creates its own temporary session folder with the
 `TempDirectory` helper and removes it afterwards, so tests do not share session files and can run in parallel. No
 network access, browser, or installed ReviewCenter server is needed; the loopback control channel binds a random
 local port, so the environment must allow opening loopback TCP ports.
@@ -31,7 +31,7 @@ local port, so the environment must allow opening loopback TCP ports.
 ## Acceptance Criteria
 
 - All system tests pass with zero failures on all supported platforms; the owner-only file test runs on Linux and
-  macOS and is skipped with a reason on Windows.
+  is skipped with a reason on Windows.
 - Starting a session, running every command, and stopping it all return exit code 0, and the fake page receives the
   commands in order with plain selector names resolved to test ids.
 - After `stop`, the daemon has ended with exit code 0 and `list` reports that no sessions are active.
@@ -46,7 +46,7 @@ local port, so the environment must allow opening loopback TCP ports.
 - A command for a session whose daemon died returns exit code 3, ends the leftover server and browser that the
   session file records, and removes the session.
 - A command with the wrong token is refused and never reaches the page, an unsafe session name is rejected, and on
-  Linux and macOS the session folder and file are accessible only by their owner.
+  Linux the session folder and file are accessible only by their owner.
 - The documented requirements that are decomposed into unit requirements are verified at the unit level, as
   described in the unit verification documents.
 
@@ -109,11 +109,10 @@ name that would leave the session folder is rejected with exit code 1. The owner
 correct token still succeeds. This scenario is tested by
 `ReviewCenterPuppet_Security_WrongTokenAndUnsafeSessionId_AreRejected`.
 
-**ReviewCenterPuppet_Security_UnixPlatform_SessionFileIsOwnerOnly**: On Linux and macOS, a session is started and the
+**ReviewCenterPuppet_Security_UnixPlatform_SessionFileIsOwnerOnly**: On Linux, a session is started and the
 modes of the session folder and the session file are read; only the owner has access (0700 and 0600). On Windows
 the test is skipped with a reason, because the session folder is in the per-user temporary folder, which only the
-user can access. This scenario is tested by `ubuntu@ReviewCenterPuppet_Security_UnixPlatform_SessionFileIsOwnerOnly`
-and `macos@ReviewCenterPuppet_Security_UnixPlatform_SessionFileIsOwnerOnly`.
+user can access. This scenario is tested by `ubuntu@ReviewCenterPuppet_Security_UnixPlatform_SessionFileIsOwnerOnly`.
 
 **Unit-level coverage**: The timeout default and override, the loopback binding, idle shutdown, the start
 reservation mechanics, the Windows argument quoting of the daemon launch, the browser and server stop escalation,
