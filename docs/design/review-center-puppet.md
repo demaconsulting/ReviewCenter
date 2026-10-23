@@ -169,7 +169,9 @@ The guards that appear most often are:
    time. *Act*: kill the process tree. *Window*: between the comparison and the kill. *If replaced or reused*: on
    Windows the process object holds one handle, so the process that was compared is the one killed. On Unix there is no
    portable process descriptor in .NET, so the residual window below remains. *Guard*: identity revalidation on the same
-   `Process` object; the kill goes through `TryKill`.
+   `Process` object; the kill goes through `TryKill`. *Residual*: the confirmation looks only at the recorded root
+   processes, so a descendant that the tree kill could not end (an `AggregateException`, typically an inaccessible
+   process) is not seen; retrying cannot end it either, and the server runner reports that case (see its entry 3).
 10. **TryKill (kill outcome)**. *Check*: none. *Act*: `Process.Kill(true)`. *Window*: the process or a descendant
     exits meanwhile. *If replaced or reused*: `InvalidOperationException`, `Win32Exception`, `NotSupportedException`,
     and the `AggregateException` of a partial tree kill mean "already gone or not accessible" and are absorbed; any
@@ -242,8 +244,9 @@ The guards that appear most often are:
    is an arbitrary application whose only contract is the health endpoint, so no authenticated handshake exists to
    verify (see residual risks).
 3. **Server stop**. *Check*: the process exited after the first kill. *Act*: kill the tree again, then fail loudly.
-   *Window*: none that matters: the runner holds its own `Process` object, so there is no pid reuse. *Guard*: `TryKill`
-   absorbs the already-gone failures.
+   *Window*: none that matters: the runner holds its own `Process` object, so there is no pid reuse. *Guard*:
+   already-gone failures are absorbed; a partial tree kill (`AggregateException`) is reported as a failed stop even
+   when the root exited, unless the last attempt ended the whole tree.
 4. **Browser identity query (`QueryBrowserProcessAsync`)**. *Check*: the browser's process id from DevTools. *Act*:
    look the process up and read its start time. *Window*: microseconds after the answer. *If replaced or reused*: the
    browser would have to exit and its id be reused in that time; the recorded identity would then be of another process.

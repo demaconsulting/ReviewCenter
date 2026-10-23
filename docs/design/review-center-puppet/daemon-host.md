@@ -43,8 +43,10 @@ checked for an exit before each probe and again right after a healthy answer, be
 race exits with an error while the other service on the port keeps answering. The free port is chosen by binding a
 listener to port 0 and releasing it, so another process can still take it before the server binds (documented in the
 audit table); the strict probe plus the exit check are what make that outcome a clear start failure instead of a
-session driving the wrong service. Killing the server tree goes through `SessionStore.TryKill`, which absorbs the
-"already gone" failures, including the `AggregateException` of a partial tree kill. The server runs as a separate
+session driving the wrong service. Killing the server tree goes through `StopTreeAsync`, which absorbs "already gone"
+or refused kills (decided by waiting for the exit) but treats the `AggregateException` of a partial tree kill as a
+failure: when the root exits while a descendant could not be ended, the stop is reported with a `PuppetException`
+instead of a clean stop, unless a later kill attempt ended the whole tree. The server runs as a separate
 process so that Puppet exercises exactly what ships: the real assembly, its real start-up, and its real health
 endpoint. The polling interval, the health request time-out, and the kill wait are named constants. Stopping the
 server is verified: after the kill, the runner waits for the process to exit; if it has not exited it ends the

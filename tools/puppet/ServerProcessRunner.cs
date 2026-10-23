@@ -399,9 +399,9 @@ internal sealed class ServerProcessRunner : IServerRunner
             {
                 if (!HasExited())
                 {
-                    await StopAsync(
+                    await StopTreeAsync(
                         $"The ReviewCenter server process {ProcessId}",
-                        KillTree,
+                        () => _process.Kill(entireProcessTree: true),
                         async wait =>
                         {
                             try
@@ -438,16 +438,54 @@ internal sealed class ServerProcessRunner : IServerRunner
                 return true;
             }
         }
+    }
 
-        /// <summary>
-        ///     Asks the operating system to kill the process and its children.
-        /// </summary>
-        private void KillTree()
+    /// <summary>
+    ///     Stops a server process tree and reports a tree that could only be partly ended.
+    /// </summary>
+    /// <remarks>
+    ///     <see cref="Process.Kill(bool)"/> with the process tree reports descendants that could not be ended as
+    ///     an <see cref="AggregateException"/> after it has ended the root. The root's exit then looks like a
+    ///     clean stop while a child may still run and hold the server's resources, so the stop is only reported
+    ///     as complete when the last kill attempt ended the whole tree. Other refusals (the process is already
+    ///     gone or not accessible) are decided by waiting for the exit, as in <see cref="StopAsync"/>.
+    /// </remarks>
+    /// <param name="description">Names the process in the failure message.</param>
+    /// <param name="kill">Kills the process and its descendants; may throw the exceptions of <see cref="Process.Kill(bool)"/>.</param>
+    /// <param name="waitForExit">Waits up to the given time and returns whether the process exited.</param>
+    /// <returns>A task that completes when the process has exited and its whole tree was ended.</returns>
+    /// <exception cref="PuppetException">
+    ///     Thrown when the process did not exit, or exited while some of its descendants could not be ended.
+    /// </exception>
+    internal static async Task StopTreeAsync(string description, Action kill, Func<TimeSpan, Task<bool>> waitForExit)
+    {
+        var partial = false;
+        await StopAsync(
+            description,
+            () =>
+            {
+                // Only the latest attempt counts: a later attempt that succeeds ends what an earlier one missed
+                partial = false;
+                try
+                {
+                    kill();
+                }
+                catch (AggregateException)
+                {
+                    partial = true;
+                }
+                catch (Exception ex) when (ex is ArgumentException or InvalidOperationException or NotSupportedException
+                                               or System.ComponentModel.Win32Exception)
+                {
+                    // Already gone, or refused; whether it worked is decided by waiting for the exit
+                }
+            },
+            waitForExit);
+
+        if (partial)
         {
-            // The process object is our own child, so on every platform the kill addresses that child and
-            // never a process that later reuses its id. A refusal is absorbed here: whether the kill worked
-            // is decided by waiting for the exit, not by this call
-            SessionStore.TryKill(() => _process.Kill(entireProcessTree: true));
+            throw new PuppetException(
+                $"{description} exited, but some of its child processes could not be ended and may still be running; stop them manually.");
         }
     }
 

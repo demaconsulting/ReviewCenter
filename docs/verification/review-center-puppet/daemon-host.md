@@ -87,6 +87,12 @@ routine kills the process tree a second time and the process then exits, so it s
 routine throws a `PuppetException` that names the process. This scenario is tested by
 `DaemonHost_ServerStop_NeverExits_ThrowsPuppetException`.
 
+**DaemonHost_ServerStopTree_PartialTreeKill_IsReportedUnlessALaterAttemptEndsTheTree**: A kill reports a partial tree
+failure (`AggregateException`) although the root exits: the stop throws a `PuppetException` that names the server and
+its child processes. When the first attempt is partial and the second ends the whole tree, nothing is reported, and a
+kill refused because the process is already gone is decided by the exit as before. This scenario is tested by
+`DaemonHost_ServerStopTree_PartialTreeKill_IsReportedUnlessALaterAttemptEndsTheTree`.
+
 **DaemonHost_Run_ServerCannotBeStopped_ReportsFailureAndReturnsFour**: Disposing the fake server fails; the host
 still closes the browser, records a failed session with the reason, and returns 4. This scenario is tested by
 `DaemonHost_Run_ServerCannotBeStopped_ReportsFailureAndReturnsFour`.

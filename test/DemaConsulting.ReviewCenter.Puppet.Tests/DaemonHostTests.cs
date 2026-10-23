@@ -273,6 +273,42 @@ public class DaemonHostTests
     }
 
     /// <summary>
+    ///     Test that a root that exits while a descendant could not be ended is not reported as a clean stop, that a
+    ///     later attempt which ends the whole tree clears the report, and that a kill refused because the process is
+    ///     already gone is decided by the exit as before.
+    /// </summary>
+    [Fact]
+    public async Task DaemonHost_ServerStopTree_PartialTreeKill_IsReportedUnlessALaterAttemptEndsTheTree()
+    {
+        // Arrange: kills that report a partial tree failure, then success, then "already gone"
+        var partialKill = new Action(() => throw new AggregateException(new InvalidOperationException("child kept running")));
+        var attempts = 0;
+
+        // Act: the root exits after one partial kill; the root survives one partial kill and the second is clean;
+        // the process is already gone when it is killed
+        var partial = await Record.ExceptionAsync(
+            () => ServerProcessRunner.StopTreeAsync("server 1", partialKill, _ => Task.FromResult(true)));
+        await ServerProcessRunner.StopTreeAsync(
+            "server 2",
+            () =>
+            {
+                if (++attempts == 1)
+                {
+                    partialKill();
+                }
+            },
+            _ => Task.FromResult(attempts >= 2));
+        await ServerProcessRunner.StopTreeAsync(
+            "server 3", () => throw new InvalidOperationException("gone"), _ => Task.FromResult(true));
+
+        // Assert: only the first stop is reported, and it names the server and the surviving children
+        Assert.IsType<PuppetException>(partial);
+        Assert.Contains("server 1", partial.Message, StringComparison.Ordinal);
+        Assert.Contains("child processes", partial.Message, StringComparison.Ordinal);
+        Assert.Equal(2, attempts);
+    }
+
+    /// <summary>
     ///     Answers a single HTTP request on a loopback port with a canned response, for the health probe tests.
     /// </summary>
     /// <param name="status">The status line text, such as <c>200 OK</c>.</param>

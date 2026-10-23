@@ -48,6 +48,7 @@ sections:
               - DaemonHost_ServerStop_ExitsAfterFirstKill_KillsOnce
               - DaemonHost_ServerStop_ExitsAfterEscalation_KillsTwice
               - DaemonHost_ServerStop_NeverExits_ThrowsPuppetException
+              - DaemonHost_ServerStopTree_PartialTreeKill_IsReportedUnlessALaterAttemptEndsTheTree
               - DaemonHost_Run_ServerCannotBeStopped_ReportsFailureAndReturnsFour
 
           - id: ReviewCenterPuppet-DaemonHost-IdleShutdown
