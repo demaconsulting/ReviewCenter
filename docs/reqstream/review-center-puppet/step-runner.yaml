@@ -1,0 +1,36 @@
+---
+# StepRunner Unit Requirements
+#
+# PURPOSE:
+# - Define requirements for the StepRunner unit (tools/puppet/StepFile.cs and tools/puppet/StepRunner.cs)
+# - StepFile reads and validates the steps file; StepRunner executes the steps against a page
+
+sections:
+  - title: ReviewCenterPuppet Requirements
+    sections:
+      - title: StepRunner Requirements
+        requirements:
+          - id: ReviewCenterPuppet-StepRunner-Parse
+            title: >-
+              The StepRunner unit shall read a steps file of goto, click, fill, text, and screenshot steps and
+              reject invalid JSON, unknown step kinds, unknown properties, and missing or malformed values
+              with a message that names the step and the problem.
+            justification: |
+              A typo in a steps file must be reported before any server or browser is started, and in words
+              that tell the author what to change.
+            tests:
+              - StepFile_Parse_AllStepKinds_ReturnsSteps
+              - StepFile_Parse_InvalidJson_ThrowsPuppetException
+              - StepFile_Parse_InvalidSteps_ThrowsPuppetExceptionNamingTheProblem
+
+          - id: ReviewCenterPuppet-StepRunner-Execute
+            title: >-
+              The StepRunner unit shall execute the steps in order against a page, report one result per
+              step, and on the first failing step stop, report the error, and save a failure screenshot when
+              it can.
+            justification: |
+              Later steps depend on earlier ones, so continuing after a failure only produces misleading
+              results. The failure screenshot shows the agent what the page looked like.
+            tests:
+              - StepRunner_Run_AllStepKinds_ExecutesInOrderAndReportsResults
+              - StepRunner_Run_StepFails_StopsAndCapturesFailureScreenshot

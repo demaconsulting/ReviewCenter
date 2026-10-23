@@ -18,10 +18,6 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-using System.Diagnostics;
-using System.Reflection;
-using Microsoft.Playwright;
-
 namespace DemaConsulting.ReviewCenter.Puppet.Tests;
 
 /// <summary>
@@ -40,19 +36,14 @@ internal sealed class FakeBrowserPage : IBrowserPage
     public string TextResult { get; set; } = "fake text";
 
     /// <summary>
-    ///     Gets or sets an exception thrown by element commands, to simulate a missing element or timeout.
+    ///     Gets or sets a selector fragment; a click on a selector containing it fails like a missing element.
     /// </summary>
-    public PuppetException? Failure { get; set; }
+    public string? FailClickOn { get; set; }
 
     /// <summary>
-    ///     Gets or sets an exception thrown by <see cref="ScreenshotAsync"/>, to simulate an unexpected failure such as a crashed browser.
+    ///     Gets the number of times the page was disposed.
     /// </summary>
-    public Exception? UnexpectedFailure { get; set; }
-
-    /// <summary>
-    ///     Gets the timeouts, in milliseconds, passed to <see cref="ScreenshotAsync"/> so far.
-    /// </summary>
-    public List<int> ScreenshotTimeoutsMs { get; } = [];
+    public int DisposeCount { get; private set; }
 
     /// <inheritdoc />
     public Task GotoAsync(string url, int timeoutMs)
@@ -65,7 +56,9 @@ internal sealed class FakeBrowserPage : IBrowserPage
     public Task ClickAsync(string selector, int timeoutMs)
     {
         Calls.Add($"click {selector}");
-        return Failure is null ? Task.CompletedTask : Task.FromException(Failure);
+        return FailClickOn is not null && selector.Contains(FailClickOn, StringComparison.Ordinal)
+            ? Task.FromException(new PuppetException($"No element matching {selector}."))
+            : Task.CompletedTask;
     }
 
     /// <inheritdoc />
@@ -86,253 +79,35 @@ internal sealed class FakeBrowserPage : IBrowserPage
     public Task<byte[]> ScreenshotAsync(bool fullPage, int timeoutMs)
     {
         Calls.Add($"screenshot fullPage={fullPage}");
-        ScreenshotTimeoutsMs.Add(timeoutMs);
-        if (UnexpectedFailure is not null)
-        {
-            return Task.FromException<byte[]>(UnexpectedFailure);
-        }
-
         return Task.FromResult(new byte[] { 0x89, 0x50, 0x4E, 0x47 });
     }
 
     /// <inheritdoc />
-    public Task<string> SnapshotAsync(int timeoutMs)
+    public ValueTask DisposeAsync()
     {
-        Calls.Add("snapshot");
-        return Task.FromResult("fake snapshot");
+        DisposeCount++;
+        return ValueTask.CompletedTask;
     }
 }
 
 /// <summary>
-///     A server runner that reports a fixed URL instead of starting a process.
+///     A server that has a fixed URL and counts how often it was stopped.
 /// </summary>
-internal sealed class FakeServerRunner : IServerRunner
+internal sealed class FakeRunningServer : IRunningServer
 {
-    /// <summary>
-    ///     Gets or sets an exception to throw from <see cref="StartAsync"/>.
-    /// </summary>
-    public Exception? Failure { get; set; }
+    /// <inheritdoc />
+    public string Url => "http://fake-server:1234";
 
     /// <summary>
-    ///     Gets or sets a value indicating whether <see cref="StartAsync"/> never completes until it is cancelled,
-    ///     to simulate a server that is too slow to become healthy.
+    ///     Gets the number of times the server was disposed (stopped).
     /// </summary>
-    public bool BlockUntilCancelled { get; set; }
-
-    /// <summary>
-    ///     Gets or sets an exception thrown when a started server is disposed, to simulate a server process that cannot be stopped.
-    /// </summary>
-    public Exception? DisposeFailure { get; set; }
-
-    /// <summary>
-    ///     Gets or sets an action run while a started server is disposed, to simulate something happening
-    ///     during the shutdown of a session (for example a new <c>start</c> publishing a replacement).
-    /// </summary>
-    public Action? OnDispose { get; set; }
-
-    /// <summary>
-    ///     Gets the number of servers disposed so far.
-    /// </summary>
-    public int DisposedCount { get; private set; }
+    public int DisposeCount { get; private set; }
 
     /// <inheritdoc />
-    public async Task<IRunningServer> StartAsync(string serverPath, CancellationToken cancellationToken)
+    public ValueTask DisposeAsync()
     {
-        if (BlockUntilCancelled)
-        {
-            await Task.Delay(Timeout.Infinite, cancellationToken);
-        }
-
-        if (Failure is not null)
-        {
-            throw Failure;
-        }
-
-        using var self = Process.GetCurrentProcess();
-        return new FakeRunningServer(this, self.Id, self.StartTime.ToUniversalTime());
-    }
-
-    /// <summary>
-    ///     A running server that only counts its disposal.
-    /// </summary>
-    /// <param name="owner">The runner that created the server.</param>
-    /// <param name="processId">The process id to report.</param>
-    /// <param name="startTimeUtc">The start time to report.</param>
-    private sealed class FakeRunningServer(FakeServerRunner owner, int processId, DateTime startTimeUtc) : IRunningServer
-    {
-        /// <inheritdoc />
-        public string Url => "http://127.0.0.1:5999";
-
-        /// <inheritdoc />
-        public int ProcessId => processId;
-
-        /// <inheritdoc />
-        public DateTime StartTimeUtc => startTimeUtc;
-
-        /// <inheritdoc />
-        public ValueTask DisposeAsync()
-        {
-            owner.DisposedCount++;
-            owner.OnDispose?.Invoke();
-            return owner.DisposeFailure is null ? ValueTask.CompletedTask : ValueTask.FromException(owner.DisposeFailure);
-        }
-    }
-}
-
-/// <summary>
-///     A browser launcher that hands out a <see cref="FakeBrowserPage"/>.
-/// </summary>
-internal sealed class FakeBrowserLauncher : IBrowserLauncher
-{
-    /// <summary>
-    ///     Gets the page the launched browser exposes.
-    /// </summary>
-    public FakeBrowserPage Page { get; } = new();
-
-    /// <summary>
-    ///     Gets or sets an exception to throw from <see cref="LaunchAsync"/>, such as a missing-Chromium error.
-    /// </summary>
-    public Exception? Failure { get; set; }
-
-    /// <summary>
-    ///     Gets or sets the browser process id the launched session reports; 0 means unknown.
-    /// </summary>
-    public int ReportedProcessId { get; set; }
-
-    /// <summary>
-    ///     Gets or sets the browser start time the launched session reports.
-    /// </summary>
-    public DateTime ReportedStartTimeUtc { get; set; }
-
-    /// <summary>
-    ///     Gets the number of browsers disposed so far.
-    /// </summary>
-    public int DisposedCount { get; private set; }
-
-    /// <inheritdoc />
-    public Task<IBrowserSession> LaunchAsync()
-    {
-        return Failure is null
-            ? Task.FromResult<IBrowserSession>(new FakeBrowserSession(this))
-            : Task.FromException<IBrowserSession>(Failure);
-    }
-
-    /// <summary>
-    ///     A browser session that only counts its disposal.
-    /// </summary>
-    /// <param name="owner">The launcher that created the session.</param>
-    private sealed class FakeBrowserSession(FakeBrowserLauncher owner) : IBrowserSession
-    {
-        /// <inheritdoc />
-        public IBrowserPage Page => owner.Page;
-
-        /// <inheritdoc />
-        public int ProcessId => owner.ReportedProcessId;
-
-        /// <inheritdoc />
-        public DateTime StartTimeUtc => owner.ReportedStartTimeUtc;
-
-        /// <inheritdoc />
-        public ValueTask DisposeAsync()
-        {
-            owner.DisposedCount++;
-            return ValueTask.CompletedTask;
-        }
-    }
-}
-
-/// <summary>
-///     A Playwright <see cref="IPage"/> whose screenshot always fails, built with a dispatch proxy so the
-///     large interface does not have to be implemented by hand.
-/// </summary>
-public class FailingScreenshotPage : DispatchProxy
-{
-    /// <summary>
-    ///     Gets or sets the exception the screenshot task faults with.
-    /// </summary>
-    public Exception? ScreenshotFailure { get; set; }
-
-    /// <summary>
-    ///     Gets the options the screenshot was requested with, or <c>null</c> if none was requested.
-    /// </summary>
-    public PageScreenshotOptions? RequestedOptions { get; private set; }
-
-    /// <summary>
-    ///     Creates a page whose screenshot faults with the given exception.
-    /// </summary>
-    /// <param name="failure">The exception the screenshot task faults with.</param>
-    /// <returns>The page.</returns>
-    public static IPage Create(Exception failure)
-    {
-        var page = Create<IPage, FailingScreenshotPage>();
-        ((FailingScreenshotPage)(object)page).ScreenshotFailure = failure;
-        return page;
-    }
-
-    /// <summary>
-    ///     Gets the proxy behind a page created by <see cref="Create(Exception)"/>, to inspect what it received.
-    /// </summary>
-    /// <param name="page">The page created by <see cref="Create(Exception)"/>.</param>
-    /// <returns>The proxy.</returns>
-    public static FailingScreenshotPage From(IPage page)
-    {
-        return (FailingScreenshotPage)(object)page;
-    }
-
-    /// <inheritdoc />
-    protected override object? Invoke(MethodInfo? targetMethod, object?[]? args)
-    {
-        if (targetMethod?.Name == nameof(IPage.ScreenshotAsync))
-        {
-            RequestedOptions = args?.OfType<PageScreenshotOptions>().FirstOrDefault();
-            return Task.FromException<byte[]>(ScreenshotFailure ?? new InvalidOperationException("No failure configured."));
-        }
-
-        throw new NotSupportedException($"The test page does not support {targetMethod?.Name}.");
-    }
-}
-
-/// <summary>
-///     A daemon launcher that records requests instead of starting a process.
-/// </summary>
-internal sealed class FakeDaemonLauncher : IDaemonLauncher
-{
-    /// <summary>
-    ///     Gets or sets the action run when <see cref="Launch"/> is called, to simulate the daemon's session-file updates.
-    /// </summary>
-    public Action<string, string>? OnLaunch { get; set; }
-
-    /// <summary>
-    ///     Gets or sets an exception thrown by <see cref="Launch"/>, to simulate a process that cannot be created.
-    /// </summary>
-    public Exception? Failure { get; set; }
-
-    /// <summary>
-    ///     Gets or sets the process id reported for the "daemon".
-    /// </summary>
-    public int ReportedPid { get; set; } = Environment.ProcessId;
-
-    /// <summary>
-    ///     Gets or sets the start time reported for the "daemon".
-    /// </summary>
-    public DateTime ReportedStartTimeUtc { get; set; } = DateTime.UtcNow;
-
-    /// <summary>
-    ///     Gets the session ids launched so far.
-    /// </summary>
-    public List<string> Launched { get; } = [];
-
-    /// <inheritdoc />
-    public ProcessIdentity Launch(string sessionId, string serverPath)
-    {
-        if (Failure is not null)
-        {
-            throw Failure;
-        }
-
-        Launched.Add(sessionId);
-        OnLaunch?.Invoke(sessionId, serverPath);
-        return new ProcessIdentity(ReportedPid, ReportedStartTimeUtc);
+        DisposeCount++;
+        return ValueTask.CompletedTask;
     }
 }
 
@@ -346,8 +121,7 @@ internal sealed class TempDirectory : IDisposable
     /// </summary>
     public TempDirectory()
     {
-        Path = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "rc-puppet-tests-" + Guid.NewGuid().ToString("N"));
-        Directory.CreateDirectory(Path);
+        Path = Directory.CreateTempSubdirectory("puppet-tests-").FullName;
     }
 
     /// <summary>
@@ -355,16 +129,22 @@ internal sealed class TempDirectory : IDisposable
     /// </summary>
     public string Path { get; }
 
+    /// <summary>
+    ///     Writes a file into the directory.
+    /// </summary>
+    /// <param name="name">The file name.</param>
+    /// <param name="content">The file text.</param>
+    /// <returns>The full path of the file.</returns>
+    public string WriteFile(string name, string content)
+    {
+        var file = System.IO.Path.Combine(Path, name);
+        File.WriteAllText(file, content);
+        return file;
+    }
+
     /// <inheritdoc />
     public void Dispose()
     {
-        try
-        {
-            Directory.Delete(Path, recursive: true);
-        }
-        catch (IOException)
-        {
-            // Best effort: a leftover temp folder must not fail a test
-        }
+        Directory.Delete(Path, recursive: true);
     }
 }

@@ -8,7 +8,7 @@ ReviewCenter is a web-based formal code review service with a companion .NET com
 interface. The service is an ASP.NET Core Blazor Server application started with the `serve`
 verb; the command-line interface provides argument parsing, self-validation, and comprehensive
 documentation generation. The repository also contains Puppet, a separate development tool that
-drives the web interface from the command line; it is specified as its own system, ReviewCenterPuppet.
+runs steps files against the web interface; it is specified as its own system, ReviewCenterPuppet.
 
 ## Scope
 

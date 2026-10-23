@@ -1,6 +1,6 @@
 package ReviewCenterPuppet {
     part def PuppetProgram {
-        doc /* Entry point and command dispatcher of the Puppet tool; maps every outcome to a stable exit code. */
+        doc /* Entry point of the Puppet tool; parses arguments, runs the steps, tears down, and maps the outcome to an exit code. */
 
         comment sourceRef /* Source: tools/puppet/PuppetProgram.cs */
         comment testRef /* Test: test/DemaConsulting.ReviewCenter.Puppet.Tests/PuppetProgramTests.cs */

@@ -33,6 +33,12 @@
     └── puppet/
 ```
 
+# Puppet (Agents Working on `tools/puppet`)
+
+The Puppet is a minimal helper that lets an AI drive and screenshot the UI. Keep it as small and simple as possible:
+no production-grade hardening, no process-identity/race engineering, best-effort cleanup only, few tests. Do not grow
+it beyond what an agent needs to run steps and see screenshots. See `tools/puppet/README.md`.
+
 # Language and Spelling (ALL Agents)
 
 Always use **US English** spelling in all output (code, comments, documentation,

@@ -27,8 +27,8 @@ The current release provides:
 - **Self-Validation**: Built-in validation tests with TRX/JUnit output
 - **Multi-Platform Support**: Self-contained single-file executables for Windows (win-x64) and Linux (linux-x64)
 - **Modern .NET**: Built on .NET 10 (`net10.0`); the runtime is bundled, so no installation is needed
-- **Puppet Developer Tool**: A separate in-repository tool that drives the web interface in headless Chromium
-  from the command line (see `tools/puppet/README.md`); it is not part of the distributed executables
+- **Puppet Developer Tool**: A small in-repository helper for AI agents that runs a steps file against the web
+  interface and takes screenshots (see `tools/puppet/README.md`); not part of the distributed executables
 - **Comprehensive CI/CD**: GitHub Actions workflows with quality checks, builds, and
   integration tests of the published executables
 - **Linting Enforcement**: markdownlint, cspell, and yamllint enforced on every CI run
@@ -174,23 +174,10 @@ See the [User Guide][link-guide] for more details on the self-validation tests.
 
 On validation failure the tool will exit with a non-zero exit code.
 
-## Developer Tools
+## For AI Agents
 
-The `tools/puppet` folder contains **Puppet**, a developer tool that starts the ReviewCenter server, opens it in
-headless Chromium, and lets a person or a coding agent look at and drive the web interface with short commands
-such as `click`, `text`, and `screenshot`. Puppet is not part of the distributed executables. To use it, build it and
-download Chromium once:
-
-```bash
-dotnet build tools/puppet
-pwsh tools/puppet/bin/Debug/net10.0/playwright.ps1 install chromium
-```
-
-CI installs Chromium (cached per operating system) on every run and runs the Puppet end-to-end test with
-`REVIEWCENTER_REQUIRE_CHROMIUM=true`, so a missing browser fails the build instead of skipping the test; on a
-developer machine without Chromium the test skips with a message.
-
-See `tools/puppet/README.md` for the commands, exit codes, and an example session.
+`tools/puppet` holds **Puppet**, a small helper that lets an AI agent drive the web interface and take screenshots
+(not part of the distributed executables). See `tools/puppet/README.md`.
 
 ## Documentation
 

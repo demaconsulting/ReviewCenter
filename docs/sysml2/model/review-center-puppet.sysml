@@ -1,11 +1,10 @@
 package ReviewCenterPuppet {
     doc
     /*
-     * ReviewCenterPuppet is the Puppet development tool: a command-line program that lets a
-     * developer or coding agent start the ReviewCenter web application in a headless browser
-     * and drive it with short commands (start, goto, click, fill, text, screenshot, snapshot,
-     * stop, list). It is built, tested, and reviewed in this repository but is not part of the
-     * distributed ReviewCenter software package.
+     * ReviewCenterPuppet is the Puppet development tool: a small command-line program that runs a
+     * steps file (go to a page, click, fill, read text, screenshot) against the ReviewCenter web
+     * application in a headless browser, so a coding agent can see the UI. It is built, tested, and
+     * reviewed in this repository but is not part of the distributed ReviewCenter software package.
      */
 
     part def ReviewCenterPuppetSystem {
@@ -17,12 +16,9 @@ package ReviewCenterPuppet {
         comment reqRef /* Requirements: docs/reqstream/review-center-puppet.yaml */
 
         part puppetProgram : PuppetProgram;
-        part commandLine : CommandLine;
+        part stepRunner : StepRunner;
         part selectorResolver : SelectorResolver;
-        part sessionStore : SessionStore;
-        part controlChannel : ControlChannel;
-        part commandExecutor : CommandExecutor;
-        part daemonHost : DaemonHost;
-        part daemonLauncher : DaemonLauncher;
+        part serverProcess : ServerProcess;
+        part playwrightBrowser : PlaywrightBrowser;
     }
 }

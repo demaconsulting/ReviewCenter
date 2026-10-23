@@ -12,9 +12,6 @@
     <IsTestProject>true</IsTestProject>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
 
-    <!-- Required by the source-generated platform invocation used to check Windows command-line parsing -->
-    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
-
     <!-- Code Quality Configuration -->
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>

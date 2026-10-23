@@ -3,7 +3,7 @@
 This document provides the detailed design for the ReviewCenter, a web-based formal code
 review service with a companion .NET command-line interface. The service is an ASP.NET Core
 Blazor Server application started with the `serve` verb; the repository also holds a separate
-development tool, Puppet, that drives the web interface from the command line. This document
+development tool, Puppet, that runs steps files against the web interface. This document
 covers local software items (systems, subsystems, and units) and the OTS software items they
 consume.
 
@@ -24,8 +24,8 @@ Local items:
   Cli, Hosting, Web, SelfTest, and Utilities subsystems.
 - **ReviewCenterPuppet**: a separate software system, a development tool that is built and reviewed
   in this repository but is not part of the distributed ReviewCenter package. It has no
-  subsystems; its units are PuppetProgram, CommandLine, SelectorResolver, SessionStore,
-  ControlChannel, CommandExecutor, DaemonHost, and DaemonLauncher.
+  subsystems; its units are PuppetProgram, StepRunner, SelectorResolver, ServerProcess, and
+  PlaywrightBrowser.
 
 OTS items:
 
@@ -73,8 +73,8 @@ The ReviewCenter system is divided as follows:
 - **SelfTest** (subsystem): self-validation; contains the Validation unit
 - **Utilities** (subsystem): shared helpers; contains the PathHelpers unit
 
-The ReviewCenterPuppet system is a flat set of units that start a background session containing the
-ReviewCenter server and a headless browser, and then send commands to that session.
+The ReviewCenterPuppet system is a flat set of units that run a steps file against the ReviewCenter server in a
+headless browser and write screenshots.
 
 The model is deliberately partial. It covers only the items that are implemented so far: the Program unit, the
 Cli, Hosting, Web, SelfTest, and Utilities subsystems, and the Puppet system. The Api, Identity, Core, Storage,

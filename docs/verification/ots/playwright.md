@@ -1,57 +1,38 @@
 ## Playwright Verification
 
-This document provides the verification evidence for the Playwright OTS software item. Requirements for this OTS item
-are defined in the Playwright OTS Software Requirements document and belong to the ReviewCenterPuppet system.
+This document provides the verification evidence for the Playwright OTS software item. Its requirement belongs to
+the ReviewCenterPuppet system.
 
 ### Required Functionality
 
-Playwright for .NET with its Chromium build is the browser automation library used by the Puppet developer tool. What
-the project needs of it, and can prove in every environment without a browser, is that the package delivers its driver
-and its `playwright.ps1` installation script with the build output, and that the driver starts and reports a failed
-browser launch as a `PlaywrightException`. Puppet's missing-Chromium message, with its install command, depends on
-both.
+Playwright for .NET with its Chromium build is the browser automation library used by the Puppet developer tool. The
+project needs it to drive a headless Chromium: load pages, click, fill, read text, and capture screenshots.
 
 ### Verification Approach
 
-Playwright is verified by two browser-free tests defined in `PlaywrightOtsTests.cs`; they never skip and run in every
-environment, including pipelines without Chromium. The first inspects the test output folder for the installation
-script and the driver. The second starts the Playwright driver and asks it to launch Chromium from an executable
-path that cannot exist, which must fail with a `PlaywrightException` whether or not a browser is installed.
+Playwright is verified by the real-browser end-to-end test of the Puppet system, which runs a steps file against the
+real ReviewCenter server in headless Chromium.
 
 ### Test Environment
 
-Standard test environment. No Chromium installation is needed. The driver is started as a child process, which needs
-permission to run the bundled Node.js executable.
+Chromium must be installed with the Playwright installation script. The CI pipeline installs it (cached per
+operating system and Playwright version) and sets `REVIEWCENTER_REQUIRE_CHROMIUM=true`, so the test fails instead of
+skipping when the browser cannot be launched. Locally the test skips with a reason when Chromium is not installed.
 
 ### Acceptance Criteria
 
-- The build output contains `playwright.ps1` and a non-empty `.playwright/node` driver folder.
-- Launching Chromium from a missing executable path throws a `PlaywrightException`.
+- The end-to-end test passes on Windows and Linux in CI.
 
 ### Test Scenarios
 
-#### PlaywrightOts_BuildOutput_Inspected_ContainsInstallScriptAndDriver
+#### PuppetEndToEnd_StepsFile_HelloAndCounter_WritesScreenshotAndReportsText
 
-**Scenario**: The folder the tests run from is inspected for `playwright.ps1` and for the `.playwright/node` folder.
+**Scenario**: A steps file navigates to the home page, clicks both buttons, reads the texts, and takes a screenshot.
 
-**Expected**: The script exists and the driver folder contains files.
+**Expected**: Every step succeeds, the texts are "Hello from ReviewCenter!" and "2", and the screenshot is a PNG.
 
-**Requirement coverage**: `ReviewCenterPuppet-OTS-Playwright-Driver`.
-
-#### PlaywrightOts_Chromium_MissingExecutable_ThrowsPlaywrightException
-
-**Scenario**: Playwright is created and asked to launch headless Chromium from a path inside a temporary folder where
-no executable exists.
-
-**Expected**: The launch fails with a `PlaywrightException`.
-
-**Requirement coverage**: `ReviewCenterPuppet-OTS-Playwright-LaunchFailure`.
+**Requirement coverage**: `ReviewCenterPuppet-OTS-Playwright-Chromium`.
 
 ### Limitations
 
-Launching a real Chromium, loading pages, clicking, reading text, and taking screenshots are not evidence for the OTS
-requirements of this item, which stay browser-free. Those behaviors are exercised by the end-to-end test
-`PuppetEndToEnd_HelloAndCounter_DrivenThroughCommands_ShowGreetingAndCount`, which is linked to the Puppet system
-requirements. The CI pipeline installs Chromium (cached per operating system and Playwright version) and makes the
-test fail instead of skip when the browser cannot be launched; locally the test skips when Chromium is not installed.
-Every other Puppet test replaces Playwright with fakes.
+None beyond the Chromium installation requirement above.

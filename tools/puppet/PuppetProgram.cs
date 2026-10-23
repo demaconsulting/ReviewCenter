@@ -23,117 +23,100 @@ using System.Reflection;
 namespace DemaConsulting.ReviewCenter.Puppet;
 
 /// <summary>
-///     The collaborators the Puppet commands use; replaced by fakes in tests.
+///     A failure the user should be told about as a plain message, without a stack trace.
 /// </summary>
-/// <param name="Store">The session file store.</param>
-/// <param name="DaemonLauncher">Starts the detached session daemon.</param>
-/// <param name="ServerRunner">Starts the ReviewCenter server (used inside the daemon).</param>
-/// <param name="BrowserLauncher">Launches the browser (used inside the daemon).</param>
-/// <param name="StartTimeout">
-///     How long <c>start</c> waits for the session to become ready; <c>null</c> selects
-///     <see cref="PuppetProgram.DefaultStartTimeout"/>. Tests shorten it.
-/// </param>
-/// <param name="StopTimeout">
-///     How long <c>start</c> and <c>stop</c> wait for a daemon to finish its teardown before it is killed;
-///     <c>null</c> selects <see cref="PuppetProgram.DefaultStopTimeout"/>. Tests shorten it.
-/// </param>
-internal sealed record PuppetServices(
-    SessionStore Store,
-    IDaemonLauncher DaemonLauncher,
-    IServerRunner ServerRunner,
-    IBrowserLauncher BrowserLauncher,
-    TimeSpan? StartTimeout = null,
-    TimeSpan? StopTimeout = null)
+/// <remarks>
+///     Used for every anticipated operational problem: a bad argument, an invalid steps file, a missing
+///     element, a timeout, a server or browser that cannot start. Unexpected programming errors use other
+///     exception types so they are not hidden behind a friendly message.
+/// </remarks>
+public sealed class PuppetException : Exception
 {
     /// <summary>
-    ///     Gets the production collaborators.
+    ///     Initializes a new instance of the <see cref="PuppetException"/> class.
     /// </summary>
-    /// <returns>Services backed by the real file system, processes, and Playwright.</returns>
-    public static PuppetServices CreateDefault()
+    /// <param name="message">The message shown to the user.</param>
+    public PuppetException(string message)
+        : base(message)
     {
-        return new PuppetServices(
-            new SessionStore(),
-            new DaemonLauncher(),
-            new ServerProcessRunner(),
-            new PlaywrightBrowserLauncher());
+    }
+
+    /// <summary>
+    ///     Initializes a new instance of the <see cref="PuppetException"/> class with an inner exception.
+    /// </summary>
+    /// <param name="message">The message shown to the user.</param>
+    /// <param name="innerException">The underlying cause.</param>
+    public PuppetException(string message, Exception innerException)
+        : base(message, innerException)
+    {
     }
 }
 
 /// <summary>
-///     Entry point and command dispatcher of the Puppet tool.
+///     The collaborators a run uses to reach the outside world; replaced by fakes in tests.
+/// </summary>
+/// <param name="StartServer">Starts the ReviewCenter server from the given assembly path.</param>
+/// <param name="LaunchBrowser">Launches the browser and returns its page.</param>
+internal sealed record PuppetServices(
+    Func<string, CancellationToken, Task<IRunningServer>> StartServer,
+    Func<Task<IBrowserPage>> LaunchBrowser)
+{
+    /// <summary>
+    ///     Gets the production collaborators.
+    /// </summary>
+    /// <returns>Services backed by a real server process and headless Chromium.</returns>
+    public static PuppetServices CreateDefault()
+    {
+        return new PuppetServices(ServerProcess.StartAsync, PlaywrightBrowserLauncher.LaunchAsync);
+    }
+}
+
+/// <summary>
+///     Entry point of the Puppet tool: runs a steps file against the ReviewCenter web UI.
 /// </summary>
 /// <remarks>
-///     Puppet lets a developer (or a coding agent) look at and drive the ReviewCenter web UI from
-///     the command line: <c>start</c> a session, then <c>goto</c>, <c>click</c>, <c>fill</c>, <c>text</c>,
-///     <c>screenshot</c>, and <c>snapshot</c> against it, then <c>stop</c>. Each command is a separate short
-///     process that talks to a long-lived daemon holding the server and browser (see
-///     <see cref="DaemonHost"/>). Exit codes are stable so scripts can react to them.
+///     The Puppet is a minimal helper that lets an AI drive and screenshot the UI. It has one verb,
+///     <c>run</c>: start the server (unless <c>--url</c> is given), launch headless Chromium, execute the
+///     steps in order, and stop both again in a <c>finally</c> block. Cleanup is best effort.
+///     Exit codes: 0 every step succeeded, 1 a step failed, 2 the run could not be performed.
 /// </remarks>
 internal static class PuppetProgram
 {
     /// <summary>
-    ///     Exit code: the command succeeded.
+    ///     Exit code: every step succeeded.
     /// </summary>
     public const int ExitOk = 0;
 
     /// <summary>
-    ///     Exit code: bad arguments, or the command failed (missing element, timeout, ...).
+    ///     Exit code: a step failed.
     /// </summary>
-    public const int ExitFailed = 1;
+    public const int ExitStepFailed = 1;
 
     /// <summary>
-    ///     Exit code: the named session does not exist.
+    ///     Exit code: the run could not be performed (bad arguments, invalid steps file, server or browser problem).
     /// </summary>
-    public const int ExitUnknownSession = 2;
+    public const int ExitCannotRun = 2;
 
     /// <summary>
-    ///     Exit code: the session existed but its daemon had died; it was cleaned up.
+    ///     The one-line usage text.
     /// </summary>
-    public const int ExitStaleSession = 3;
+    private const string UsageLine =
+        "Usage: puppet run <steps.json> [--server-dll <path> | --url <base-url>] [--out <dir>] [--timeout <seconds>]";
 
     /// <summary>
-    ///     Exit code: the session could not be started (server, browser, or Chromium missing).
+    ///     The default folder for screenshots, relative to the current directory (git-ignored in this repository).
     /// </summary>
-    public const int ExitStartFailed = 4;
+    private const string DefaultOutDirectory = "artifacts/puppet";
 
     /// <summary>
-    ///     The environment variable that overrides the server assembly path.
+    ///     The default per-wait timeout in seconds.
     /// </summary>
-    public const string ServerEnvironmentVariable = "REVIEWCENTER_SERVER_DLL";
+    private const int DefaultTimeoutSeconds = 10;
 
     /// <summary>
-    ///     The number of characters in a generated session id (the start of a GUID in "N" format); short
-    ///     enough to type, long enough that two sessions practically never collide.
+    ///     The largest accepted per-wait timeout in seconds.
     /// </summary>
-    private const int SessionIdLength = 8;
-
-    /// <summary>
-    ///     The default for how long <c>start</c> waits for the daemon to report that the session is ready;
-    ///     covers starting the server (up to its own health timeout) plus launching Chromium.
-    /// </summary>
-    internal static readonly TimeSpan DefaultStartTimeout = TimeSpan.FromSeconds(90);
-
-    /// <summary>
-    ///     The default for how long <c>start</c> and <c>stop</c> wait for the daemon to finish its teardown before it is killed.
-    /// </summary>
-    internal static readonly TimeSpan DefaultStopTimeout = TimeSpan.FromSeconds(30);
-
-    /// <summary>
-    ///     How often <c>start</c> re-reads the session file while waiting for the daemon; short enough to
-    ///     feel immediate, long enough not to spin.
-    /// </summary>
-    private static readonly TimeSpan StartPollInterval = TimeSpan.FromMilliseconds(200);
-
-    /// <summary>
-    ///     How often <c>stop</c> checks whether the daemon has exited.
-    /// </summary>
-    private static readonly TimeSpan StopPollInterval = TimeSpan.FromMilliseconds(100);
-
-    /// <summary>
-    ///     Extra time the client allows a control exchange beyond the command's own timeout, covering the
-    ///     connection, the request, and the response transfer (for example a large screenshot message).
-    /// </summary>
-    private static readonly TimeSpan ControlExchangeGrace = TimeSpan.FromSeconds(15);
+    private const int MaxTimeoutSeconds = 600;
 
     /// <summary>
     ///     The process entry point.
@@ -142,17 +125,25 @@ internal static class PuppetProgram
     /// <returns>The process exit code.</returns>
     public static async Task<int> Main(string[] args)
     {
-        return await RunAsync(args, Console.Out, Console.Error, PuppetServices.CreateDefault(), CancellationToken.None);
+        // Ctrl+C cancels instead of killing the process, so the browser and server are still stopped
+        using var cancellation = new CancellationTokenSource();
+        Console.CancelKeyPress += (_, e) =>
+        {
+            e.Cancel = true;
+            cancellation.Cancel();
+        };
+
+        return await RunAsync(args, Console.Out, Console.Error, PuppetServices.CreateDefault(), cancellation.Token);
     }
 
     /// <summary>
     ///     Runs one Puppet invocation.
     /// </summary>
     /// <param name="args">The command-line arguments.</param>
-    /// <param name="output">Receives normal output.</param>
-    /// <param name="error">Receives error messages.</param>
+    /// <param name="output">Receives one result line per executed step.</param>
+    /// <param name="error">Receives error messages and warnings.</param>
     /// <param name="services">The collaborators to use.</param>
-    /// <param name="cancellationToken">Cancels long waits.</param>
+    /// <param name="cancellationToken">Cancels the run.</param>
     /// <returns>The exit code (see the <c>Exit*</c> constants).</returns>
     public static async Task<int> RunAsync(
         string[] args,
@@ -167,92 +158,66 @@ internal static class PuppetProgram
             return ExitOk;
         }
 
-        CommandLine command;
+        IRunningServer? server = null;
+        IBrowserPage? page = null;
         try
         {
-            command = CommandLine.Parse(args);
-        }
-        catch (ArgumentException ex)
-        {
-            WriteLine(error, ex.Message);
-            return ExitFailed;
-        }
+            var options = ParseOptions(args);
+            var steps = StepFile.Parse(ReadSteps(options.StepsPath), options.StepsPath);
 
-        try
-        {
-            return command.Verb switch
+            // Use the given server, or start our own
+            var baseUrl = options.Url;
+            if (baseUrl is null)
             {
-                CommandLine.StartVerb => await StartAsync(command, output, error, services, cancellationToken),
-                CommandLine.DaemonVerb => await RunDaemonAsync(command, error, services, cancellationToken),
-                "list" => await ListAsync(output, services),
-                _ => await RunClientCommandAsync(command, output, error, services, cancellationToken)
-            };
+                server = await services.StartServer(ResolveServerPath(options.ServerDll), cancellationToken);
+                baseUrl = server.Url;
+            }
+
+            page = await services.LaunchBrowser();
+            var allOk = await StepRunner.RunAsync(
+                steps,
+                page,
+                baseUrl,
+                Path.GetFullPath(options.OutDirectory),
+                options.TimeoutSeconds * 1000,
+                result => output.WriteLine(result.ToJson()),
+                cancellationToken);
+            return allOk ? ExitOk : ExitStepFailed;
         }
         catch (PuppetException ex)
         {
             WriteLine(error, ex.Message);
-            return ExitFailed;
+            return ExitCannotRun;
         }
-    }
-
-    /// <summary>
-    ///     Writes one line of text.
-    /// </summary>
-    /// <remarks>
-    ///     The console writers are synchronous in practice; one helper keeps every call site free of
-    ///     the sync-versus-async writer debate.
-    /// </remarks>
-    /// <param name="writer">Where to write.</param>
-    /// <param name="message">The text of the line.</param>
-    private static void WriteLine(TextWriter writer, string message)
-    {
-        writer.WriteLine(message);
-    }
-
-    /// <summary>
-    ///     Prints the usage text.
-    /// </summary>
-    /// <param name="output">Where to print.</param>
-    private static void PrintUsage(TextWriter output)
-    {
-        output.WriteLine("Puppet - drive the ReviewCenter web UI in a headless browser");
-        output.WriteLine();
-        output.WriteLine("Usage: puppet <command> [arguments] [options]");
-        output.WriteLine();
-        output.WriteLine("Commands:");
-        output.WriteLine("  start [--session <id>]      Start the server and browser; prints the session id");
-        output.WriteLine("  goto <path>                 Navigate (for example: goto /)");
-        output.WriteLine("  click <selector>            Click an element");
-        output.WriteLine("  fill <selector> <text>      Type text into an input");
-        output.WriteLine("  text <selector>             Print an element's text");
-        output.WriteLine("  screenshot [--out <file>] [--full-page]   Save a PNG and print its path");
-        output.WriteLine("  snapshot                    Print an accessibility snapshot of the page");
-        output.WriteLine("  stop                        Stop the session (server and browser)");
-        output.WriteLine("  list                        List sessions; stale ones are cleaned up");
-        output.WriteLine();
-        output.WriteLine("Selectors: a plain name such as hello-button means data-testid=\"hello-button\";");
-        output.WriteLine("anything else (for example '#id', 'text=Hello') is passed to Playwright unchanged.");
-        output.WriteLine();
-        output.WriteLine("Options:");
-        output.WriteLine("  --session <id>              Session to use (default: $REVIEWCENTER_PUPPET_SESSION or the only session)");
-        output.WriteLine("  --timeout <seconds>         Per-command timeout, 1-600 (default: 10)");
-        output.WriteLine("  --server <dll>              (start) ReviewCenter server assembly to run");
-        output.WriteLine();
-        output.WriteLine("Exit codes: 0 ok, 1 failed/bad arguments, 2 unknown session, 3 stale session, 4 start failed");
-        output.WriteLine("First-time setup: pwsh <output folder>/playwright.ps1 install chromium");
+        catch (OperationCanceledException)
+        {
+            WriteLine(error, "Cancelled.");
+            return ExitCannotRun;
+        }
+        catch (Exception ex) when (ex is IOException or ArgumentException or NotSupportedException or UnauthorizedAccessException)
+        {
+            // For example an unusable --out path
+            WriteLine(error, ex.Message);
+            return ExitCannotRun;
+        }
+        finally
+        {
+            // Best effort: a failed cleanup is reported but never changes the exit code
+            await DisposeQuietlyAsync(page, error);
+            await DisposeQuietlyAsync(server, error);
+        }
     }
 
     /// <summary>
     ///     Finds the server assembly to run.
     /// </summary>
-    /// <param name="explicitPath">The <c>--server</c> value, or <c>null</c>.</param>
+    /// <param name="explicitPath">The <c>--server-dll</c> value, or <c>null</c>.</param>
     /// <returns>The path of an existing server assembly.</returns>
     /// <exception cref="PuppetException">Thrown when no server assembly can be found.</exception>
     internal static string ResolveServerPath(string? explicitPath)
     {
-        // Precedence: explicit option, then environment, then the path recorded at build time
+        // The path recorded at build time is the default, so a built checkout needs no arguments
         var path = explicitPath
-                   ?? Environment.GetEnvironmentVariable(ServerEnvironmentVariable)
                    ?? typeof(PuppetProgram).Assembly.GetCustomAttributes<AssemblyMetadataAttribute>()
                        .FirstOrDefault(a => a.Key == "ServerDllPath")?.Value;
 
@@ -260,501 +225,174 @@ internal static class PuppetProgram
         {
             throw new PuppetException(
                 $"The ReviewCenter server assembly was not found ({path ?? "no path configured"}). " +
-                "Build the solution first, or pass --server <path to DemaConsulting.ReviewCenter.dll>.");
+                "Build the solution first, or pass --server-dll <path to DemaConsulting.ReviewCenter.dll>.");
         }
 
         return Path.GetFullPath(path);
     }
 
     /// <summary>
-    ///     Executes <c>start</c>: launches the daemon and waits until the session is ready.
+    ///     Parses the command line.
     /// </summary>
-    /// <param name="command">The parsed command.</param>
-    /// <param name="output">Normal output.</param>
-    /// <param name="error">Error output.</param>
-    /// <param name="services">The collaborators.</param>
-    /// <param name="cancellationToken">Cancels the wait.</param>
-    /// <returns>The exit code.</returns>
-    private static async Task<int> StartAsync(
-        CommandLine command,
-        TextWriter output,
-        TextWriter error,
-        PuppetServices services,
-        CancellationToken cancellationToken)
+    /// <param name="args">The arguments.</param>
+    /// <returns>The options.</returns>
+    /// <exception cref="PuppetException">Thrown when the arguments are not valid.</exception>
+    private static Options ParseOptions(string[] args)
     {
-        var sessionId = command.SessionId ?? Guid.NewGuid().ToString("N")[..SessionIdLength];
-        string serverPath;
-        try
+        if (args.Length == 0 || args[0] != "run")
         {
-            serverPath = ResolveServerPath(command.ServerPath);
-        }
-        catch (PuppetException ex)
-        {
-            WriteLine(error, ex.Message);
-            return ExitStartFailed;
+            throw new PuppetException("Expected the verb 'run'. " + UsageLine);
         }
 
-        // Take the start lock first: of several simultaneous 'start' commands for one id, only one gets past here
-        if (!services.Store.TryReserve(sessionId))
-        {
-            WriteLine(error, $"Session '{sessionId}' is already being started by another 'start' command.");
-            return ExitFailed;
-        }
+        string? stepsPath = null;
+        string? serverDll = null;
+        string? url = null;
+        var outDirectory = DefaultOutDirectory;
+        var timeout = DefaultTimeoutSeconds;
 
-        try
+        for (var i = 1; i < args.Length; i++)
         {
-            // Look under the lock: another start may have finished since the lock was last free. Refuse to
-            // clobber a running session; quietly replace the leftovers of a dead one
-            var existing = services.Store.Lookup(sessionId, out _, startLockHeld: true);
-            if (existing == SessionLookup.Live)
+            switch (args[i])
             {
-                WriteLine(error, $"Session '{sessionId}' is already running. Use 'stop --session {sessionId}' first.");
-                return ExitFailed;
-            }
-
-            if (existing == SessionLookup.Stale)
-            {
-                WriteLine(output, $"Cleaned up a stale session file for '{sessionId}'.");
-            }
-
-            // A failure to launch leaves nothing behind: no session file exists yet and the lock is released below
-            var daemon = services.DaemonLauncher.Launch(sessionId, serverPath);
-            return await WaitUntilReadyAsync(sessionId, daemon, output, error, services, cancellationToken);
-        }
-        finally
-        {
-            services.Store.Release(sessionId);
-        }
-    }
-
-    /// <summary>
-    ///     Waits for a launched daemon to publish a ready session, cleaning up everything on any other outcome.
-    /// </summary>
-    /// <remarks>
-    ///     The launched daemon's identity is known from the moment it is created, so a timeout, a
-    ///     cancellation, or a daemon that died can stop the daemon (and any server or browser it
-    ///     already recorded) even though no session file may have been written yet.
-    /// </remarks>
-    /// <param name="sessionId">The session id.</param>
-    /// <param name="daemon">The identity of the launched daemon.</param>
-    /// <param name="output">Normal output.</param>
-    /// <param name="error">Error output.</param>
-    /// <param name="services">The collaborators.</param>
-    /// <param name="cancellationToken">Cancels the wait; the daemon is stopped before the cancellation propagates.</param>
-    /// <returns>The exit code.</returns>
-    private static async Task<int> WaitUntilReadyAsync(
-        string sessionId,
-        ProcessIdentity daemon,
-        TextWriter output,
-        TextWriter error,
-        PuppetServices services,
-        CancellationToken cancellationToken)
-    {
-        var timeout = services.StartTimeout ?? DefaultStartTimeout;
-        var deadline = DateTime.UtcNow + timeout;
-        try
-        {
-            while (DateTime.UtcNow < deadline)
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                var info = services.Store.TryRead(sessionId);
-                if (info is { Status: SessionStatus.Ready })
-                {
-                    WriteLine(output, $"Session: {sessionId}");
-                    WriteLine(output, $"Server: {info.ServerUrl}");
-                    return ExitOk;
-                }
-
-                if (info is { Status: SessionStatus.Failed })
-                {
-                    // The daemon publishes Failed before it tears the browser and server down: let it finish
-                    // (or stop it), then remove the session while this start still holds the start lock
-                    await WaitUntilGoneAsync(() => services.Store.IsAlive(daemon), services, cancellationToken);
-                    var cleaned = await AbortStartAsync(sessionId, daemon, services);
-                    WriteLine(error, $"Could not start the session: {info.Error}{UnconfirmedNote(cleaned, sessionId)}");
-                    return ExitStartFailed;
-                }
-
-                if (!services.Store.IsAlive(daemon))
-                {
-                    // One last look: the daemon may have published its result just before exiting
-                    info = services.Store.TryRead(sessionId);
-                    var cleaned = await AbortStartAsync(sessionId, daemon, services);
-                    WriteLine(
-                        error,
-                        $"The session daemon exited unexpectedly during start-up{(info?.Error is null ? "." : ": " + info.Error)}{UnconfirmedNote(cleaned, sessionId)}");
-                    return ExitStartFailed;
-                }
-
-                await Task.Delay(StartPollInterval, cancellationToken);
-            }
-        }
-        catch (OperationCanceledException)
-        {
-            // Do not leave a half-started daemon behind when the caller gives up
-            var cleaned = await AbortStartAsync(sessionId, daemon, services);
-            if (!cleaned)
-            {
-                WriteLine(error, UnconfirmedNote(false, sessionId).TrimStart());
-            }
-
-            throw;
-        }
-
-        // Do not leave a half-started daemon behind
-        var abandoned = await AbortStartAsync(sessionId, daemon, services);
-        WriteLine(
-            error,
-            $"The session did not become ready within {timeout.TotalSeconds:0} seconds.{UnconfirmedNote(abandoned, sessionId)}");
-        return ExitStartFailed;
-    }
-
-    /// <summary>
-    ///     Describes a cleanup that could not be confirmed.
-    /// </summary>
-    /// <param name="confirmed">Whether every process was confirmed stopped.</param>
-    /// <param name="sessionId">The session id.</param>
-    /// <returns>An empty string when confirmed; otherwise a sentence to append to the message.</returns>
-    private static string UnconfirmedNote(bool confirmed, string sessionId)
-    {
-        return confirmed
-            ? string.Empty
-            : $" Some processes of session '{sessionId}' could not be confirmed stopped; its record was kept so that a later command can finish the cleanup.";
-    }
-
-    /// <summary>
-    ///     Abandons a start: stops the launched daemon and whatever it recorded, and removes the session file
-    ///     once everything is confirmed stopped.
-    /// </summary>
-    /// <remarks>
-    ///     Processes are always identified by id and start time, never by name. The launched daemon is
-    ///     known even when it never wrote a session file; when it did, the file also lists the server and
-    ///     browser it started. Termination is asynchronous, so the processes are polled (and the kill
-    ///     repeated) for up to the stop timeout. The session file is the only record that lets a later
-    ///     command find a survivor, so it is deleted only when no recorded process is left.
-    /// </remarks>
-    /// <param name="sessionId">The session id.</param>
-    /// <param name="daemon">The identity of the launched daemon.</param>
-    /// <param name="services">The collaborators.</param>
-    /// <returns><c>true</c> when everything was confirmed stopped and the record removed.</returns>
-    private static async Task<bool> AbortStartAsync(string sessionId, ProcessIdentity daemon, PuppetServices services)
-    {
-        var store = services.Store;
-        var recorded = store.TryRead(sessionId);
-        var confirmed = await TerminateAndConfirmAsync(recorded, daemon, services);
-        if (confirmed)
-        {
-            store.Delete(sessionId);
-        }
-
-        return confirmed;
-    }
-
-    /// <summary>
-    ///     Terminates a daemon and the processes a session recorded, and waits (bounded) until they are gone.
-    /// </summary>
-    /// <remarks>
-    ///     The kill is repeated on every poll, which is harmless because a process is only ever killed while
-    ///     it still has the recorded identity. The wait deliberately ignores caller cancellation: cleanup
-    ///     must finish (within the stop timeout) even when the caller has given up.
-    /// </remarks>
-    /// <param name="recorded">The session record, when one was written.</param>
-    /// <param name="daemon">The identity of the daemon.</param>
-    /// <param name="services">The collaborators.</param>
-    /// <returns><c>true</c> when no daemon, server, or browser of the session is alive any more.</returns>
-    private static async Task<bool> TerminateAndConfirmAsync(SessionInfo? recorded, ProcessIdentity daemon, PuppetServices services)
-    {
-        var store = services.Store;
-        var deadline = DateTime.UtcNow + (services.StopTimeout ?? DefaultStopTimeout);
-        while (true)
-        {
-            if (recorded is not null)
-            {
-                store.Terminate(recorded);
-            }
-
-            if (recorded is null || recorded.DaemonPid != daemon.ProcessId || recorded.DaemonStartTimeUtc != daemon.StartTimeUtc)
-            {
-                // The record does not name this daemon (or there is no record): terminate it by its own identity
-                store.Terminate(daemon);
-            }
-            var alive = store.IsAlive(daemon) || (recorded is not null && store.HasLiveProcesses(recorded));
-            if (!alive)
-            {
-                return true;
-            }
-
-            if (DateTime.UtcNow >= deadline)
-            {
-                return false;
-            }
-
-            await Task.Delay(StopPollInterval, CancellationToken.None);
-        }
-    }
-
-
-    /// <summary>
-    ///     Runs the hidden <c>__daemon</c> verb: hosts the session until it is stopped.
-    /// </summary>
-    /// <param name="command">The parsed command; carries the session id and server path.</param>
-    /// <param name="error">Error output (normally unobserved: the daemon has no console).</param>
-    /// <param name="services">The collaborators.</param>
-    /// <param name="cancellationToken">Stops the daemon.</param>
-    /// <returns>The daemon exit code.</returns>
-    private static async Task<int> RunDaemonAsync(
-        CommandLine command,
-        TextWriter error,
-        PuppetServices services,
-        CancellationToken cancellationToken)
-    {
-        if (command.SessionId is null || command.ServerPath is null)
-        {
-            WriteLine(error, "__daemon requires --session and --server.");
-            return ExitFailed;
-        }
-
-        var host = new DaemonHost(services.Store, services.ServerRunner, services.BrowserLauncher);
-        return await host.RunAsync(command.SessionId, command.ServerPath, cancellationToken);
-    }
-
-    /// <summary>
-    ///     Executes <c>list</c>.
-    /// </summary>
-    /// <param name="output">Normal output.</param>
-    /// <param name="services">The collaborators.</param>
-    /// <returns>The exit code (always success).</returns>
-    private static Task<int> ListAsync(TextWriter output, PuppetServices services)
-    {
-        var printed = 0;
-        foreach (var id in services.Store.ListIds())
-        {
-            var lookup = services.Store.Lookup(id, out var info);
-            switch (lookup)
-            {
-                case SessionLookup.Live:
-                    WriteLine(output, $"{id}  {info!.Status.ToString().ToLowerInvariant()}  {info.ServerUrl}  daemon pid {info.DaemonPid}");
-                    printed++;
+                case "--server-dll":
+                    serverDll = ValueOf(args, ref i);
                     break;
-                case SessionLookup.Stale:
-                    WriteLine(output, $"{id}  stale (daemon not running; cleaned up)");
-                    printed++;
+                case "--url":
+                    url = ValueOf(args, ref i);
                     break;
-                case SessionLookup.Unknown:
-                    // The file vanished between listing and lookup; nothing to report
+                case "--out":
+                    outDirectory = ValueOf(args, ref i);
+                    break;
+                case "--timeout":
+                    var text = ValueOf(args, ref i);
+                    if (!int.TryParse(text, out timeout) || timeout is < 1 or > MaxTimeoutSeconds)
+                    {
+                        throw new PuppetException($"--timeout must be a whole number of seconds from 1 to {MaxTimeoutSeconds}, not '{text}'.");
+                    }
+
+                    break;
+                default:
+                    if (args[i].StartsWith('-') || stepsPath is not null)
+                    {
+                        throw new PuppetException($"Unexpected argument '{args[i]}'. {UsageLine}");
+                    }
+
+                    stepsPath = args[i];
                     break;
             }
         }
 
-        if (printed == 0)
+        if (stepsPath is null)
         {
-            WriteLine(output, "No active sessions.");
+            throw new PuppetException("The steps file is missing. " + UsageLine);
         }
 
-        return Task.FromResult(ExitOk);
+        if (url is not null && serverDll is not null)
+        {
+            throw new PuppetException("--url and --server-dll cannot be used together.");
+        }
+
+        if (url is not null && !(Uri.TryCreate(url, UriKind.Absolute, out var uri) && uri.Scheme is "http" or "https"))
+        {
+            throw new PuppetException($"--url must be an absolute http or https URL, not '{url}'.");
+        }
+
+        return new Options(stepsPath, serverDll, url?.TrimEnd('/'), outDirectory, timeout);
     }
 
     /// <summary>
-    ///     Executes a command that is forwarded to the session daemon (everything except start/list).
+    ///     Gets the value that follows an option.
     /// </summary>
-    /// <param name="command">The parsed command.</param>
-    /// <param name="output">Normal output.</param>
-    /// <param name="error">Error output.</param>
-    /// <param name="services">The collaborators.</param>
-    /// <param name="cancellationToken">Cancels the exchange.</param>
-    /// <returns>The exit code.</returns>
-    private static async Task<int> RunClientCommandAsync(
-        CommandLine command,
-        TextWriter output,
-        TextWriter error,
-        PuppetServices services,
-        CancellationToken cancellationToken)
+    /// <param name="args">The arguments.</param>
+    /// <param name="index">The index of the option; advanced to the value.</param>
+    /// <returns>The value.</returns>
+    /// <exception cref="PuppetException">Thrown when the option has no value.</exception>
+    private static string ValueOf(string[] args, ref int index)
     {
-        var (sessionId, problem, problemCode) = ResolveSession(command, services.Store);
-        if (sessionId is null)
+        if (index + 1 >= args.Length)
         {
-            WriteLine(error, problem);
-            return problemCode;
+            throw new PuppetException($"The option {args[index]} needs a value.");
         }
 
-        var lookup = services.Store.Lookup(sessionId, out var info);
-        if (lookup == SessionLookup.Unknown)
-        {
-            WriteLine(error, $"Unknown session '{sessionId}'. Run 'list' to see sessions or 'start' to create one.");
-            return ExitUnknownSession;
-        }
+        index++;
+        return args[index];
+    }
 
-        if (lookup == SessionLookup.Stale)
-        {
-            WriteLine(
-                error,
-                $"Session '{sessionId}' is stale: its daemon is no longer running. The leftovers were cleaned up; run 'start --session {sessionId}' to begin again.");
-            return ExitStaleSession;
-        }
-
-        if (info!.Status != SessionStatus.Ready)
-        {
-            WriteLine(error, $"Session '{sessionId}' is not ready (status: {info.Status}).");
-            return ExitFailed;
-        }
-
-        var request = BuildRequest(command, info);
-        ControlResponse response;
+    /// <summary>
+    ///     Reads the steps file.
+    /// </summary>
+    /// <param name="path">The file path.</param>
+    /// <returns>The file text.</returns>
+    /// <exception cref="PuppetException">Thrown when the file cannot be read.</exception>
+    private static string ReadSteps(string path)
+    {
         try
         {
-            response = await ControlClient.SendAsync(
-                info.ControlPort, request, TimeSpan.FromMilliseconds(command.TimeoutMilliseconds) + ControlExchangeGrace, cancellationToken);
+            return File.ReadAllText(path);
         }
-        catch (PuppetException) when (command.Verb == "stop")
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
-            // A daemon that cannot be asked to stop is stopped by force
-            return ReportStop(sessionId, await ForceStopAsync(info, services), forced: true, output, error);
-        }
-
-        if (command.Verb == "stop" && response.Ok)
-        {
-            return ReportStop(sessionId, await StopSessionAsync(info, services, cancellationToken), forced: false, output, error);
-        }
-
-        if (response.Ok)
-        {
-            WriteLine(output, response.Message);
-            return ExitOk;
-        }
-
-        WriteLine(error, response.Message);
-        return response.ExitCode == 0 ? ExitFailed : response.ExitCode;
-    }
-
-    /// <summary>
-    ///     Chooses the session a command applies to.
-    /// </summary>
-    /// <param name="command">The parsed command.</param>
-    /// <param name="store">The session store.</param>
-    /// <returns>
-    ///     The session id; or, when none can be chosen, <c>null</c> with an explanation and exit code.
-    /// </returns>
-    private static (string? SessionId, string Problem, int ExitCode) ResolveSession(CommandLine command, SessionStore store)
-    {
-        var chosen = command.SessionId ?? Environment.GetEnvironmentVariable(CommandLine.SessionEnvironmentVariable);
-        if (!string.IsNullOrWhiteSpace(chosen))
-        {
-            return CommandLine.IsValidSessionId(chosen)
-                ? (chosen, string.Empty, ExitOk)
-                : (null, $"'{chosen}' is not a valid session id.", ExitFailed);
-        }
-
-        // No explicit choice: use the only live session, if there is exactly one
-        var live = store.ListIds().Where(id => store.Lookup(id, out _) == SessionLookup.Live).ToList();
-        return live.Count switch
-        {
-            1 => (live[0], string.Empty, ExitOk),
-            0 => (null, "No session is running. Start one with 'start'.", ExitUnknownSession),
-            _ => (null, $"Several sessions are running ({string.Join(", ", live)}); choose one with --session.", ExitFailed)
-        };
-    }
-
-    /// <summary>
-    ///     Builds the control request for a command.
-    /// </summary>
-    /// <param name="command">The parsed command.</param>
-    /// <param name="info">The live session.</param>
-    /// <returns>The request to send to the daemon.</returns>
-    private static ControlRequest BuildRequest(CommandLine command, SessionInfo info)
-    {
-        var args = command.Positionals;
-        return new ControlRequest(
-            info.ControlToken,
-            command.Verb,
-            Selector: command.Verb is "click" or "fill" or "text" ? args[0] : null,
-            Text: command.Verb switch { "goto" => args[0], "fill" => args[1], _ => null },
-            // The daemon's working directory differs from the caller's, so relative paths are made absolute here
-            OutputPath: command.OutputPath is null ? null : Path.GetFullPath(command.OutputPath),
-            FullPage: command.FullPage,
-            TimeoutMs: command.TimeoutMilliseconds);
-    }
-
-    /// <summary>
-    ///     Reports the outcome of a stop.
-    /// </summary>
-    /// <param name="sessionId">The session id.</param>
-    /// <param name="confirmed">Whether every process of the session was confirmed stopped.</param>
-    /// <param name="forced">Whether the daemon had to be stopped by force.</param>
-    /// <param name="output">Normal output.</param>
-    /// <param name="error">Error output.</param>
-    /// <returns>The exit code.</returns>
-    private static int ReportStop(string sessionId, bool confirmed, bool forced, TextWriter output, TextWriter error)
-    {
-        if (confirmed)
-        {
-            WriteLine(output, $"Session '{sessionId}' stopped{(forced ? " (forced)" : string.Empty)}.");
-            return ExitOk;
-        }
-
-        WriteLine(
-            error,
-            $"Session '{sessionId}' could not be confirmed stopped; its record was kept. Run 'stop --session {sessionId}' again.");
-        return ExitFailed;
-    }
-
-    /// <summary>
-    ///     Waits for the daemon to finish its teardown after a stop request, then releases everything the
-    ///     session recorded and removes its file, unless a newer session has replaced it.
-    /// </summary>
-    /// <param name="info">The session being stopped.</param>
-    /// <param name="services">The collaborators.</param>
-    /// <param name="cancellationToken">Cancels the wait.</param>
-    /// <returns><c>true</c> when everything was confirmed stopped.</returns>
-    private static async Task<bool> StopSessionAsync(SessionInfo info, PuppetServices services, CancellationToken cancellationToken)
-    {
-        await WaitUntilGoneAsync(() => services.Store.IsDaemonAlive(info), services, cancellationToken);
-
-        // A daemon that ignored the request for too long is killed here; one whose teardown failed may have
-        // left a server or browser behind, which its session file still records
-        return await ForceStopAsync(info, services);
-    }
-
-    /// <summary>
-    ///     Polls until a process is gone or the stop timeout has passed.
-    /// </summary>
-    /// <param name="isAlive">Tells whether the process is still running.</param>
-    /// <param name="services">The collaborators (carry the timeout).</param>
-    /// <param name="cancellationToken">Cancels the wait.</param>
-    /// <returns>A task that completes when the process is gone or the timeout passed.</returns>
-    private static async Task WaitUntilGoneAsync(Func<bool> isAlive, PuppetServices services, CancellationToken cancellationToken)
-    {
-        var deadline = DateTime.UtcNow + (services.StopTimeout ?? DefaultStopTimeout);
-        while (DateTime.UtcNow < deadline && isAlive())
-        {
-            await Task.Delay(StopPollInterval, cancellationToken);
+            throw new PuppetException($"Cannot read the steps file '{path}': {ex.Message}", ex);
         }
     }
 
     /// <summary>
-    ///     Kills the daemon, server, and browser of a session, and deletes its file once they are confirmed
-    ///     gone, unless a newer session has taken its place.
+    ///     Disposes an object during teardown, reporting (not throwing) a failure.
     /// </summary>
-    /// <remarks>
-    ///     The session file is re-read first: the daemon may have recorded more processes, or marked the
-    ///     session failed, since <paramref name="info"/> was read. Termination is confirmed (bounded) before
-    ///     anything is deleted; if a process survives, the file is kept so a later command can still
-    ///     identify it. The file is then deleted only if it still describes the same daemon, so a
-    ///     <c>start</c> that published a replacement in the meantime keeps its session.
-    /// </remarks>
-    /// <param name="info">The session.</param>
-    /// <param name="services">The collaborators.</param>
-    /// <returns><c>true</c> when every process of the session was confirmed stopped.</returns>
-    private static async Task<bool> ForceStopAsync(SessionInfo info, PuppetServices services)
+    /// <param name="resource">The object to dispose; may be <c>null</c>.</param>
+    /// <param name="error">Receives the warning.</param>
+    /// <returns>A task that completes when the disposal attempt has finished.</returns>
+    private static async Task DisposeQuietlyAsync(IAsyncDisposable? resource, TextWriter error)
     {
-        var store = services.Store;
-        var current = store.TryRead(info.SessionId);
-        var target = current is not null && SessionStore.IsSameSession(current, info) ? current : info;
-        var confirmed = await TerminateAndConfirmAsync(target, new ProcessIdentity(target.DaemonPid, target.DaemonStartTimeUtc), services);
-        if (confirmed)
+        if (resource is null)
         {
-            store.DeleteIfSame(info.SessionId, info);
+            return;
         }
 
-        return confirmed;
+        try
+        {
+            await resource.DisposeAsync();
+        }
+        catch (Exception ex)
+        {
+            WriteLine(error, $"warning: cleanup failed, a server or browser may still be running: {ex.Message}");
+        }
     }
+
+    /// <summary>
+    ///     Writes one line of text; synchronous because the console writers are.
+    /// </summary>
+    /// <param name="writer">The writer.</param>
+    /// <param name="text">The text.</param>
+    private static void WriteLine(TextWriter writer, string text)
+    {
+        writer.WriteLine(text);
+    }
+
+    /// <summary>
+    ///     Prints the usage text.
+    /// </summary>
+    /// <param name="output">Receives the text.</param>
+    private static void PrintUsage(TextWriter output)
+    {
+        output.WriteLine(UsageLine);
+        output.WriteLine();
+        output.WriteLine("  --server-dll <path>   ReviewCenter server assembly to start (default: the one built next to this tool)");
+        output.WriteLine("  --url <base-url>      Drive an already running server instead of starting one");
+        output.WriteLine($"  --out <dir>           Screenshot folder (default: {DefaultOutDirectory})");
+        output.WriteLine($"  --timeout <seconds>   Wait limit for each step, 1-{MaxTimeoutSeconds} (default: {DefaultTimeoutSeconds})");
+        output.WriteLine();
+        output.WriteLine("Exit codes: 0 every step succeeded, 1 a step failed, 2 the run could not be performed");
+        output.WriteLine("First-time setup: pwsh <output folder>/playwright.ps1 install chromium");
+    }
+
+    /// <summary>
+    ///     The parsed command line.
+    /// </summary>
+    /// <param name="StepsPath">The steps file.</param>
+    /// <param name="ServerDll">The server assembly given with <c>--server-dll</c>, or <c>null</c>.</param>
+    /// <param name="Url">The base URL given with <c>--url</c>, or <c>null</c>.</param>
+    /// <param name="OutDirectory">The screenshot folder.</param>
+    /// <param name="TimeoutSeconds">The per-wait timeout in seconds.</param>
+    private sealed record Options(string StepsPath, string? ServerDll, string? Url, string OutDirectory, int TimeoutSeconds);
 }

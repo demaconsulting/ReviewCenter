@@ -29,13 +29,10 @@ input-files:
   - docs/design/review-center/web/home-page.md
   - docs/design/review-center-puppet.md
   - docs/design/review-center-puppet/puppet-program.md
-  - docs/design/review-center-puppet/command-line.md
+  - docs/design/review-center-puppet/step-runner.md
   - docs/design/review-center-puppet/selector-resolver.md
-  - docs/design/review-center-puppet/session-store.md
-  - docs/design/review-center-puppet/control-channel.md
-  - docs/design/review-center-puppet/command-executor.md
-  - docs/design/review-center-puppet/daemon-host.md
-  - docs/design/review-center-puppet/daemon-launcher.md
+  - docs/design/review-center-puppet/server-process.md
+  - docs/design/review-center-puppet/playwright-browser.md
   - docs/design/ots.md
   - docs/design/ots/aspnetcore.md
   - docs/design/ots/buildmark.md

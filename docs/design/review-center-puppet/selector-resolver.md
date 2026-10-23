@@ -18,16 +18,14 @@ None - `SelectorResolver` is a static class without state.
 
 - *Parameters*: `string selector` - the text typed by the user.
 - *Returns*: `string` - the selector for the browser.
-- *Preconditions*: None.
 - *Postconditions*: A plain name made only of letters, digits, hyphens, and underscores is returned as the attribute
   selector `[data-testid="name"]`. Text containing any other character, such as `#`, `.`, a space, `=`, `>`, or `:`,
   is returned exactly as given.
 
 ### Error Handling
 
-`Resolve` throws `ArgumentException` when the selector is null, empty, or only white space. `CommandExecutor` checks
-for a missing selector first and reports it as a failed command, so a caller sees the failure message of the
-command instead.
+`Resolve` throws `ArgumentException` when the selector is null, empty, or only white space. `StepFile` rejects a
+missing selector first, so a user sees the step-file message.
 
 ### Dependencies
 
@@ -35,4 +33,4 @@ None - `SelectorResolver` uses only the .NET base class library.
 
 ### Callers
 
-- **CommandExecutor**: resolves the selector of the `click`, `fill`, and `text` commands.
+- **StepRunner**: resolves the selector of the `click`, `fill`, and `text` steps.

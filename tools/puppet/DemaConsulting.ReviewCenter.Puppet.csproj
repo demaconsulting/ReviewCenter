@@ -14,9 +14,6 @@
     <!-- Developer tool only: never packed as a NuGet package -->
     <IsPackable>false</IsPackable>
 
-    <!-- Required by the source-generated P/Invoke used to start the detached daemon on Windows -->
-    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
-
     <!-- Code Quality Configuration -->
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
@@ -51,14 +48,14 @@
     </PackageReference>
   </ItemGroup>
 
-  <!-- The server is started by the Puppet daemon as a separate process. Referencing the project with
+  <!-- The server is started by the Puppet as a separate process. Referencing the project with
        ReferenceOutputAssembly=false makes sure the server is built first without linking its assembly. -->
   <ItemGroup>
     <ProjectReference Include="..\..\src\DemaConsulting.ReviewCenter\DemaConsulting.ReviewCenter.csproj"
                       ReferenceOutputAssembly="false" />
   </ItemGroup>
 
-  <!-- Record where the freshly built server assembly lives so 'start' works without extra arguments -->
+  <!-- Record where the freshly built server assembly lives so 'run' works without extra arguments -->
   <ItemGroup>
     <AssemblyMetadata Include="ServerDllPath"
                       Value="$([MSBuild]::NormalizePath('$(MSBuildThisFileDirectory)', '..', '..', 'src', 'DemaConsulting.ReviewCenter', 'bin', '$(Configuration)', '$(TargetFramework)', 'DemaConsulting.ReviewCenter.dll'))" />

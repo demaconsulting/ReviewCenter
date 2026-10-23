@@ -1,0 +1,22 @@
+---
+# PlaywrightBrowser Unit Requirements
+#
+# PURPOSE:
+# - Define requirements for the PlaywrightBrowser unit (tools/puppet/PlaywrightBrowser.cs)
+# - PlaywrightBrowser drives headless Chromium through Playwright
+# - Driving a real Chromium is proven by the end-to-end test linked to the system requirements
+
+sections:
+  - title: ReviewCenterPuppet Requirements
+    sections:
+      - title: PlaywrightBrowser Requirements
+        requirements:
+          - id: ReviewCenterPuppet-PlaywrightBrowser-LaunchFailure
+            title: >-
+              The PlaywrightBrowser unit shall report a browser launch failure with the command that installs
+              Chromium when the browser is missing, and with the first line of the error otherwise.
+            justification: |
+              A missing Chromium is the most common first-run problem, and the fix is one command that the
+              message can name.
+            tests:
+              - PlaywrightBrowser_DescribeLaunchFailure_ChromiumMissingOrOtherFailure_NamesFixOrFirstLine

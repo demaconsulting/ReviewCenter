@@ -1,123 +1,85 @@
 # Puppet
 
-Puppet is a developer tool that lets a person, or a coding agent, look at and drive the ReviewCenter web UI from the
-command line. It starts the ReviewCenter server on a random local port, opens it in headless Chromium, and then
-accepts short commands such as `click`, `text`, and `screenshot` against that browser.
+> The Puppet is a minimal helper that lets an AI drive and screenshot the UI. Keep it as small and simple as
+> possible: no production-grade hardening, no process-identity/race engineering, best-effort cleanup only, few
+> tests. Do not grow it beyond what an agent needs to run steps and see screenshots.
 
-Puppet is **not part of the distributed ReviewCenter package**. It lives in the repository as its own software
-system (`ReviewCenterPuppet`) so that its behavior, tests, and reviews stay separate from the product.
+Puppet runs a list of steps (go to a page, click, fill, read text, screenshot) against the ReviewCenter web UI in
+headless Chromium. It is **not part of the distributed ReviewCenter package**; it is the `ReviewCenterPuppet` software
+system of this repository.
+
+## Agent workflow
+
+1. Write a `steps.json` file.
+2. Run `dotnet tools/puppet/bin/Debug/net10.0/DemaConsulting.ReviewCenter.Puppet.dll run steps.json` (see Usage).
+   It starts the server on a free port, runs the steps, and stops the server and browser.
+3. Read the JSON result lines on standard output and view the PNG files it wrote.
 
 ## One-time setup
 
-Puppet uses Playwright, which needs a Chromium build that is downloaded once per machine. Build the solution, then run
-the `playwright.ps1` script that the build copies next to the Puppet executable:
+Puppet uses Playwright, which needs a Chromium build that is downloaded once per machine. Build Puppet, then run the
+`playwright.ps1` script that the build copies next to the executable:
 
 ```powershell
 dotnet build tools/puppet
 pwsh tools/puppet/bin/Debug/net10.0/playwright.ps1 install chromium
 ```
 
-If Chromium is missing, `start` fails with exit code 4 and prints this same command.
+If Chromium is missing, `run` fails with exit code 2 and prints this same command. CI installs Chromium and sets
+`REVIEWCENTER_REQUIRE_CHROMIUM=true`, so the end-to-end test fails instead of skipping when the browser is missing.
 
 ## Usage
 
-Run Puppet from the repository root (replace `Debug` with `Release` if you built that configuration):
-
 ```powershell
-$puppet = "tools/puppet/bin/Debug/net10.0/DemaConsulting.ReviewCenter.Puppet.dll"
+dotnet tools/puppet/bin/Debug/net10.0/DemaConsulting.ReviewCenter.Puppet.dll run steps.json
 ```
 
-In the examples below, run Puppet as `dotnet $puppet <command>`. The `$puppet` variable holds only the path of the
-DLL: PowerShell does not split a string such as `"dotnet <path>"` into a program and its argument when it is invoked
-with `&`, so the program name stays outside the variable.
+| Option                | Meaning                                                                           |
+|-----------------------|-----------------------------------------------------------------------------------|
+| `--server-dll <path>` | ReviewCenter server assembly to start (default: the one built next to the Puppet) |
+| `--url <base-url>`    | Drive an already running server instead of starting one                           |
+| `--out <dir>`         | Folder for screenshots (default `artifacts/puppet`)                               |
+| `--timeout <seconds>` | Wait limit for each step, 1 to 600 (default 10)                                   |
 
-| Command                                  | What it does                                                    |
-|------------------------------------------|-----------------------------------------------------------------|
-| `start [--session <id>]`                 | Starts the server and browser; prints the session id and URL    |
-| `goto <path>`                            | Navigates inside the session's server, for example `goto /`     |
-| `click <selector>`                       | Clicks an element                                               |
-| `fill <selector> <text>`                 | Types text into an input                                        |
-| `text <selector>`                        | Prints the text of an element                                   |
-| `screenshot [--out <file>] [--full-page]`| Saves a PNG and prints its absolute path                        |
-| `snapshot`                               | Prints an accessibility snapshot, title, URL, and test ids      |
-| `stop`                                   | Stops the session: browser, server, and background daemon       |
-| `list`                                   | Lists sessions; leftovers of dead sessions are cleaned up       |
+## Steps file
 
-Options that apply to every command except `start`, `stop`, and `list` are `--session <id>` and
-`--timeout <seconds>` (1 to 600, default 10). `start` also accepts `--server <path>` to run a specific
-`DemaConsulting.ReviewCenter.dll` instead of the one built next to the Puppet project.
+A JSON array of steps, run in order. Comments and trailing commas are allowed; unknown properties are errors.
 
-### Selectors
-
-A selector made only of letters, digits, hyphens, and underscores is a **test id**: `hello-button` means
-`[data-testid="hello-button"]`. Anything else, such as `#main`, `text=Hello`, or `button >> nth=0`, is passed to
-Playwright unchanged.
-
-### Sessions
-
-The session to use is chosen in this order: `--session`, the `REVIEWCENTER_PUPPET_SESSION` environment variable, or the
-only running session. A session id is 1 to 32 letters, digits, hyphens, or underscores; `start` generates one when you do
-not give it.
-
-### Example
-
-```powershell
-dotnet $puppet start --session demo
-dotnet $puppet goto / --session demo
-dotnet $puppet screenshot --out demo-before.png --session demo
-dotnet $puppet click hello-button --session demo
-dotnet $puppet text hello-message --session demo
-dotnet $puppet click counter-button --session demo
-dotnet $puppet text counter-value --session demo
-dotnet $puppet stop --session demo
+```json
+[
+  { "kind": "goto", "url": "/" },
+  { "kind": "click", "selector": "hello-button" },
+  { "kind": "text", "selector": "hello-message" },
+  { "kind": "click", "selector": "counter-button" },
+  { "kind": "text", "selector": "counter-value" },
+  { "kind": "screenshot", "file": "after-click" }
+]
 ```
 
-## Exit codes
+| Kind         | Properties                                                                           |
+|--------------|--------------------------------------------------------------------------------------|
+| `goto`       | `url`: a path starting with `/`                                                      |
+| `click`      | `selector`                                                                           |
+| `fill`       | `selector`, `value`                                                                  |
+| `text`       | `selector`: prints the element text                                                  |
+| `screenshot` | `file`: optional plain name (`.png` is added; default `step-N`), `fullPage`: boolean |
 
-| Code | Meaning                                                                                          |
-|------|--------------------------------------------------------------------------------------------------|
-| 0    | The command succeeded                                                                            |
-| 1    | Bad arguments, or the command failed (element not found, timeout, navigation outside the server) |
-| 2    | The session does not exist                                                                       |
-| 3    | The session was stale (its daemon had died); leftovers were cleaned up                           |
-| 4    | The session could not be started (server did not start, or Chromium is not installed)            |
+A selector made only of letters, digits, hyphens, and underscores is a `data-testid`, so `hello-button` means
+`[data-testid="hello-button"]`. Any other selector, such as `#main` or `text=Hello`, is passed to Playwright unchanged.
 
-## How it works
+## Output and exit codes
 
-`start` does not stay running. It launches a detached background **daemon** (the same executable with a hidden
-`__daemon` verb) and waits until the daemon reports that the server and browser are ready. The daemon:
+One JSON line per step on standard output, for example `{"step":4,"kind":"text","ok":true,"text":"Hello!"}`. A
+screenshot step reports the absolute `file` path. On the first failing step the run stops, the line has
+`"ok":false` and an `error`, and a `failure-step-N.png` screenshot is saved when possible.
 
-- starts the ReviewCenter server with `dotnet DemaConsulting.ReviewCenter.dll serve --urls http://127.0.0.1:<port>`
-  on a free port and waits for its `/health` endpoint to answer `200` with the exact body `Healthy` (any other
-  successful answer means another service took the port, and the start fails);
-- launches headless Chromium and opens one page;
-- listens for commands on a free port of the loopback interface, protected by a random token;
-- shuts everything down on `stop`, or after 30 minutes without a command.
+| Code | Meaning                                                                                       |
+|------|-----------------------------------------------------------------------------------------------|
+| 0    | Every step succeeded                                                                          |
+| 1    | A step failed                                                                                 |
+| 2    | The run could not start (bad arguments or steps file, no Chromium, server did not start)      |
 
-Every other command is a separate short process: it reads the session file, sends one request to the daemon, prints
-the answer, and exits.
+## Known limitation
 
-Session files live in `%TEMP%\reviewcenter-puppet\<id>.json` (the system temp folder on other platforms). They hold the
-control port, the token, the server URL, and the process ids and start times of the daemon, the server, and the
-browser; they are deleted on `stop`. On Linux the folder and the files are readable by their owner only; on
-Windows the per-user temp folder already restricts them to your account. Screenshots without `--out` are saved in the
-same folder as `<id>-<timestamp>.png`.
-
-Only one `start` can win for a session id: simultaneous starts of the same id fail with exit code 1. A `start` that
-times out or is cancelled ends the daemon it launched, and a stale session or `stop` also ends the server and browser
-it recorded. A process is only ended when its id and start time both match what the session recorded, so a recycled
-process id is never ended.
-
-## Known limitations
-
-- `puppet stop` cannot interrupt a slow `start`. The control loop only runs commands once startup has finished, so
-  a `stop` sent while `start` is still waiting for the server or the browser is answered with "The session is still
-  starting; try again shortly." and does not stop anything. Startup is bounded by a timeout, after which `start` ends
-  the daemon and cleans up. To abandon a slow start sooner, cancel the `start` command itself (for example with
-  Ctrl+C), which also ends the daemon it launched.
-
-## Design notes
-
-- Puppet only navigates inside the server that belongs to the session; `goto` to another site is refused.
-- The control port accepts connections from the local machine only and rejects requests without the session token.
-- Documentation of the requirements, design, and verification of Puppet is in `docs/` under `review-center-puppet`.
+The server and browser are stopped in a `finally` block, best effort. If the Puppet process itself is hard-killed,
+a server or Chromium process may linger. This is accepted and not engineered around.
