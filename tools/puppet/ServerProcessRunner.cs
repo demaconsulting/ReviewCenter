@@ -464,11 +464,12 @@ internal sealed class ServerProcessRunner : IServerRunner
             description,
             () =>
             {
-                // Only the latest attempt counts: a later attempt that succeeds ends what an earlier one missed
-                partial = false;
+                // A partial result stays until a later attempt returns successfully: an attempt that fails because
+                // the root has meanwhile gone says nothing about the descendants that the earlier one missed
                 try
                 {
                     kill();
+                    partial = false;
                 }
                 catch (AggregateException)
                 {

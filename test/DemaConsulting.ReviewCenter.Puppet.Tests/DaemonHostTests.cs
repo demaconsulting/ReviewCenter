@@ -306,6 +306,28 @@ public class DaemonHostTests
         Assert.Contains("server 1", partial.Message, StringComparison.Ordinal);
         Assert.Contains("child processes", partial.Message, StringComparison.Ordinal);
         Assert.Equal(2, attempts);
+
+        // Act again: the first attempt is partial, the root exits only after the first wait, and the second
+        // attempt fails because the root is already gone
+        var calls = 0;
+        var boundary = await Record.ExceptionAsync(() => ServerProcessRunner.StopTreeAsync(
+            "server 4",
+            () =>
+            {
+                if (++calls == 1)
+                {
+                    partialKill();
+                }
+                else
+                {
+                    throw new InvalidOperationException("gone");
+                }
+            },
+            _ => Task.FromResult(calls >= 2)));
+
+        // Assert: a failed second attempt does not clear the partial result of the first
+        Assert.IsType<PuppetException>(boundary);
+        Assert.Contains("server 4", boundary.Message, StringComparison.Ordinal);
     }
 
     /// <summary>
