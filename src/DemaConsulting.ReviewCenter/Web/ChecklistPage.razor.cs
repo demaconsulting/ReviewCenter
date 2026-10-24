@@ -237,7 +237,7 @@ public partial class ChecklistPage : ComponentBase
     /// </summary>
     private void GoToNextUnanswered()
     {
-        var itemId = State?.NextUnansweredItemId();
+        var itemId = State?.NextUnansweredItemId(PendingNotApplicable);
         if (itemId is null)
         {
             return;

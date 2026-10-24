@@ -83,9 +83,8 @@ domain types, and the limits) and on the ASP.NET Core Blazor components framewor
 
 `ProjectsPage`, `ProjectPage`, `ReviewPage`, and `ChecklistPage` follow the pattern of `HomePage`: a Razor
 presentation file and a code-behind file, interactive server rendering, and the `data-interactive`
-marker. They obtain `ProjectService`, `ReviewService`, and (`ReviewPage`, `ChecklistPage`) `ThreadService` and
-`ChecklistService` from the service
-container and call them
+marker. They obtain `ProjectService`, `ReviewService`, and the other Core services they need (`ReviewPage`:
+`ThreadService` and `ChecklistService`; `ChecklistPage`: `ChecklistService`) from the service container and call them
 from their handlers. Each page loads its data when it is created, so a connection that is
 established after the server-rendered snapshot shows current data. A rule violation reported by
 Core as a `DomainRuleException` is shown as an error message next to the form, with the entered

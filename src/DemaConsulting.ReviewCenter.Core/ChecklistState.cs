@@ -150,11 +150,14 @@ public sealed class ChecklistState
     /// <summary>
     ///     Gets the first unanswered check of the sections that apply, in checklist order.
     /// </summary>
+    /// <param name="skipSectionIds">
+    ///     Sections to skip as well, for example those just switched off but not yet saved; <c>null</c> skips none.
+    /// </param>
     /// <returns>The item identifier, or <c>null</c> when the checklist is complete.</returns>
-    public string? NextUnansweredItemId()
+    public string? NextUnansweredItemId(IReadOnlySet<string>? skipSectionIds = null)
     {
         return Definition.Sections
-            .Where(section => IsApplicable(section.Id))
+            .Where(section => IsApplicable(section.Id) && skipSectionIds?.Contains(section.Id) != true)
             .SelectMany(section => section.Items)
             .FirstOrDefault(item => !_answers.ContainsKey(item.Id))?.Id;
     }

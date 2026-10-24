@@ -615,14 +615,9 @@ a.action {
     margin: 0.75rem 0 0;
 }
 
-/* A chevron shows that a section heading opens and closes its checks */
-.section-title::before {
-    content: "\25B8";
+/* The chevron (real markup, hidden from screen readers) shows that a section heading opens and closes its checks */
+.section-chevron {
     margin-right: 0.5rem;
-}
-
-.section-toggle[aria-expanded="true"] .section-title::before {
-    content: "\25BE";
 }
 
 .required {

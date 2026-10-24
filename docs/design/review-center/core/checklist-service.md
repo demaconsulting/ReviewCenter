@@ -39,7 +39,8 @@ is stored as text.
 **ChecklistState**: the frozen definition together with the section states and the answers of one review. It
 derives, without any storage access: `SectionProgress(sectionId)` and `Overall`, the `IsComplete` flag, the
 number of sections that do not apply, the applicability and reason of a section, the answer to a check,
-`FirstIncompleteSectionId`, and `NextUnansweredItemId`. The progress rules are: a failed check is answered (the
+`FirstIncompleteSectionId`, and `NextUnansweredItemId` (which can skip further sections, for example those a page has
+just switched off but not yet saved). The progress rules are: a failed check is answered (the
 review found a problem, which is an answer); a section that does not apply counts as done, contributes no checks to
 the totals, and any answers kept for it are ignored; the checklist is complete when every check of every
 applicable section is answered, so a checklist whose sections all do not apply is complete.
@@ -91,7 +92,8 @@ when identity is added (slice 4).
 
 The rules are checked in this order, and the first violation is reported: the name (`ChecklistAnsweredByInvalid`);
 that the review has a checklist (`ChecklistNotFound`); that the section or check is in the frozen checklist
-(`ChecklistItemNotFound`); and the justification or reason (`ChecklistJustificationInvalid`).
+(`ChecklistItemNotFound`); and the justification or reason (`ChecklistJustificationInvalid`). An outcome that is not
+a defined value is a programming error and throws `ArgumentOutOfRangeException` before any rule is checked.
 
 #### Error Handling
 

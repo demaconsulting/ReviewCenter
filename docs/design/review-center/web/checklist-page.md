@@ -9,7 +9,8 @@ reviewer work through the checklist of one review and always see what is left to
 breadcrumb, the title of the review, a status line ("15 checks unanswered."), the overall progress ("37 of 52 checks
 answered - 6 sections not applicable"), a "Next unanswered check" button while checks are unanswered (a link back
 to the review once the checklist is complete), the "Your name" field, and the list of sections. Each section is a
-heading with a chevron and its progress ("3 of 8", "Done", or "Not applicable"); only one section is open at a time,
+heading with a decorative chevron (hidden from screen readers) and its progress ("3 of 8", "Done", or
+"Not applicable"); only one section is open at a time,
 and the page opens the first section with unanswered checks. A finished section that is open ends with the next
 action, so the reviewer does not have to scroll back: the same "Next unanswered check" button, or, when the whole
 checklist is complete, a link back to the review. A Fail is shown in a different color than a Pass. It
@@ -57,7 +58,8 @@ another review never shows the previous one.
 
 **ToggleSection**: Opens a section and closes the open one; choosing the open section closes it.
 
-**GoToNextUnanswered**: Opens the section of the first unanswered check and scrolls to that check. It is used by the
+**GoToNextUnanswered**: Opens the section of the first unanswered check and scrolls to that check; sections just
+switched off and not yet saved are skipped. It is used by the
 button at the top and by the button at the end of a finished section.
 
 **ChooseAsync**: Handles a click on Pass, Fail, or N/A. Pass is stored at once and needs no justification. Fail and

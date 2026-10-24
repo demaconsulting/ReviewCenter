@@ -150,6 +150,7 @@ public sealed class ChecklistService
     /// </param>
     /// <param name="cancellationToken">Cancels the operation.</param>
     /// <returns>A task that completes when the answer is stored.</returns>
+    /// <exception cref="ArgumentOutOfRangeException">Thrown when <paramref name="outcome"/> is not a defined value.</exception>
     /// <exception cref="DomainRuleException">Thrown when a rule is violated (see <see cref="DomainRule"/>); nothing is stored then.</exception>
     public async Task SetAnswerAsync(
         int projectId,
@@ -160,6 +161,11 @@ public sealed class ChecklistService
         string? answeredBy,
         CancellationToken cancellationToken = default)
     {
+        if (!Enum.IsDefined(outcome))
+        {
+            throw new ArgumentOutOfRangeException(nameof(outcome), outcome, "The outcome is not a known value.");
+        }
+
         var name = ValidateName(answeredBy);
         var definition = await GetDefinitionAsync(projectId, reviewId, cancellationToken);
         if (!definition.Sections.SelectMany(section => section.Items).Any(item => item.Id == itemId))
@@ -201,7 +207,9 @@ public sealed class ChecklistService
     {
         var checklist = await _store.GetChecklistAsync(projectId, reviewId, cancellationToken);
         return checklist?.Parse()
-               ?? throw new DomainRuleException(DomainRule.ChecklistNotFound, "This review has no checklist.");
+               ?? throw new DomainRuleException(
+                   DomainRule.ChecklistNotFound,
+                   $"Review '{reviewId}' does not exist or has no checklist.");
     }
 
     /// <summary>

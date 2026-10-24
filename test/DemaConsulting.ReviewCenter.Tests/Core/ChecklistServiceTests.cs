@@ -343,8 +343,27 @@ public class ChecklistServiceTests
             () => service.SetAnswerAsync(
                 projectId, "other", "REQ-01", ChecklistOutcome.Pass, null, "Ann", TestContext.Current.CancellationToken));
 
-        // Assert: the rule is named
+        // Assert: the rule is named, and the message names the review
         Assert.Equal(DomainRule.ChecklistNotFound, exception.Rule);
+        Assert.Contains("other", exception.Message);
+    }
+
+    /// <summary>
+    ///     Test that an outcome that is not a defined value is refused and nothing is stored.
+    /// </summary>
+    [Fact]
+    public async Task ChecklistService_SetAnswer_UndefinedOutcome_Throws()
+    {
+        // Arrange: a review
+        var (_, service, projectId) = await CreateAsync();
+
+        // Act: answer with an outcome value that is not defined
+        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(
+            () => service.SetAnswerAsync(
+                projectId, "rev-1", "REQ-01", (ChecklistOutcome)99, "Because", "Ann", TestContext.Current.CancellationToken));
+
+        // Assert: nothing is stored
+        Assert.Null((await service.GetAsync(projectId, "rev-1", TestContext.Current.CancellationToken))!.AnswerFor("REQ-01"));
     }
 
     /// <summary>

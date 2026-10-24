@@ -83,6 +83,10 @@ This scenario is tested by `ChecklistService_SetAnswer_UnknownItem_ThrowsCheckli
 **ChecklistService_SetAnswer_UnknownReview_ThrowsChecklistNotFound**: An answer for an unknown review is refused.
 This scenario is tested by `ChecklistService_SetAnswer_UnknownReview_ThrowsChecklistNotFound`.
 
+**ChecklistService_SetAnswer_UndefinedOutcome_Throws**: An answer with an outcome value that is not defined is
+refused with an `ArgumentOutOfRangeException`, and nothing is stored. This scenario is tested by
+`ChecklistService_SetAnswer_UndefinedOutcome_Throws`.
+
 **ChecklistService_SetAnswer_ReanswerWithPaddedJustification_OverwritesAndTrims**: A check is answered twice, the
 second time with a padded justification; one answer remains, with the trimmed text. This scenario is tested by
 `ChecklistService_SetAnswer_ReanswerWithPaddedJustification_OverwritesAndTrims`.

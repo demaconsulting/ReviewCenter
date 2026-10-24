@@ -57,13 +57,15 @@ sections:
       - id: ReviewCenter-ChecklistPage-NextUnanswered
         title: >-
           The ChecklistPage unit shall offer, while checks are unanswered, a Next unanswered check button that
-          opens the section of the first unanswered check and scrolls to that check, offer the same button at the
+          opens the section of the first unanswered check and scrolls to that check (skipping sections that are being
+          switched off), offer the same button at the
           end of a finished section, and, once the checklist is complete, offer a link back to the review instead.
         justification: |
           The page tells the reviewer what to do next, so that they do not have to look for the one check that
           is left, or scroll back to the top when a section is done.
         tests:
           - ChecklistPage_NextUnanswered_Click_OpensSectionOfFirstUnansweredCheck
+          - ChecklistPage_NextUnanswered_PendingNotApplicableSection_SkipsIt
           - ChecklistPage_Render_AllAnswered_ShowsCompleteAndNoNextAction
           - ChecklistPage_FinishedSection_OffersNextActionAtItsEnd
 

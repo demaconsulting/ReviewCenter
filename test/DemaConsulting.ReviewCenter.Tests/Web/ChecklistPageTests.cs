@@ -382,6 +382,28 @@ public class ChecklistPageTests : PageTestBase
     }
 
     /// <summary>
+    ///     Test that the next-unanswered action skips a section that was just switched off but not yet saved.
+    /// </summary>
+    [Fact]
+    public async Task ChecklistPage_NextUnanswered_PendingNotApplicableSection_SkipsIt()
+    {
+        // Arrange: the first section is answered, so the second one is open; switch it off without saving
+        var projectId = await CreateReviewAsync();
+        await PassSectionsAsync(projectId, "REQ");
+        var cut = RenderPage(projectId);
+        await cut.Find("[data-testid='section-des-applicable']").ChangeAsync(new ChangeEventArgs { Value = false });
+
+        // Act: ask for the next unanswered check
+        await cut.Find("[data-testid='next-unanswered-button']").ClickAsync();
+
+        // Assert: the section after the switched-off one is open, with its first check as the scroll target
+        Assert.Equal("true", cut.Find("[data-testid='section-doc-toggle']").GetAttribute("aria-expanded"));
+        Assert.NotNull(cut.Find("[data-testid='check-doc-01']"));
+        await cut.WaitForAssertionAsync(() =>
+            Assert.Equal(["check-doc-01", "center"], JSInterop.Invocations["reviewCenter.scrollToTestId"][^1].Arguments));
+    }
+
+    /// <summary>
     ///     Test that a complete checklist says so and offers no next action.
     /// </summary>
     [Fact]

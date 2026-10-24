@@ -71,7 +71,7 @@
                 <li class="checklist-section" data-testid="section-@sid">
                     <button type="button" class="section-toggle" aria-expanded="@(isOpen ? "true" : "false")"
                             data-testid="section-@sid-toggle" @onclick="() => ToggleSection(sectionId)">
-                        <span class="section-title">@section.Title</span>
+                        <span class="section-title"><span class="section-chevron" aria-hidden="true">@(isOpen ? "\u25BE" : "\u25B8")</span>@section.Title</span>
                         <span class="badge @(State.IsApplicable(section.Id) && progress.IsDone ? "resolved" : null)"
                               data-testid="section-@sid-progress">@SectionProgressLabel(section.Id)</span>
                     </button>
