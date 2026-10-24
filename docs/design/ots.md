@@ -17,6 +17,7 @@ The following OTS items have integration design documentation:
 - BuildMark (_buildmark.md_) — build-notes documentation tool
 - bUnit (_bunit.md_) — Blazor component testing library and in-memory test host
 - FileAssert (_fileassert.md_) — document assertion tool
+- Entity Framework Core (_efcore.md_) — object-relational mapper and SQLite provider used for persistence
 - Pandoc (_pandoc.md_) — Markdown-to-HTML conversion tool
 - Playwright (_playwright.md_) — browser automation library used by the Puppet developer tool
 - ReqStream (_reqstream.md_) — requirements traceability tool

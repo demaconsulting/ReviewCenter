@@ -230,3 +230,80 @@ sections:
           - ReviewCenter-Hosting-Health
         tests:
           - ReviewCenter_ServeVerb_Started_HealthEndpointReturnsHealthy
+
+      - id: ReviewCenter-System-Projects
+        title: >-
+          The tool shall serve a projects page at /projects that lists the projects and offers a form to create
+          a project, and a page for each project that shows its reviews.
+        tags: [system]
+        justification: |
+          Reviews are organized in projects, so users need to create projects and find them again before they
+          can review anything. The page must work against the database of the running server, not only in
+          isolation.
+        children:
+          - ReviewCenter-Web-Projects
+          - ReviewCenter-Core-Projects
+        tests:
+          - ReviewCenter_ServeVerb_Started_ServesProjectsPageAndCreatesDatabase
+
+      - id: ReviewCenter-System-Reviews
+        title: >-
+          The tool shall let a user create a draft review in a project from uploaded files, keeping every file
+          byte for byte within defined upload limits, and shall show the review with its content fingerprint,
+          its files, and the content of a selected file.
+        tags: [system]
+        justification: |
+          Formal review starts from a fixed snapshot of the files under review. The fingerprint, calculated like
+          the ReviewMark fingerprint, identifies that snapshot and lets reviewers show that the content they
+          reviewed is the content that was submitted. Upload limits keep the service responsive.
+        children:
+          - ReviewCenter-Web-Reviews
+          - ReviewCenter-Core-Reviews
+          - ReviewCenter-Core-Fingerprint
+          - ReviewCenter-Core-Rules
+        tests:
+          - WebSubsystem_CreatedProjectAndReview_ArePresentedByThePages
+
+      - id: ReviewCenter-System-Persistence
+        title: >-
+          The tool shall keep projects and reviews in the database named by the Database settings, creating the
+          database on first start, so that the data is still there after the server is restarted.
+        tags: [system]
+        justification: |
+          Review records must outlive the server process. Operators must be able to choose where the data lives,
+          and a new installation must work without manual database setup.
+        children:
+          - ReviewCenter-Hosting-Database
+          - ReviewCenter-Storage-Persistence
+          - ReviewCenter-Storage-Integrity
+          - ReviewCenter-Storage-Configuration
+        tests:
+          - ReviewCenter_ServeVerb_Started_ServesProjectsPageAndCreatesDatabase
+          - HostingSubsystem_Startup_DatabaseConfigured_ServesStoredProjectsAfterRestart
+
+      - id: ReviewCenter-System-DatabaseFailure
+        title: >-
+          The tool shall report an error and return a non-zero exit code, without serving requests, when the
+          Database settings cannot be used.
+        tags: [system]
+        justification: |
+          Starting with a database that cannot be used would fail on the first request. Failing at start-up with
+          a clear message lets the operator correct the setting.
+        children:
+          - ReviewCenter-Hosting-DatabaseFailure
+        tests:
+          - HostingSubsystem_Startup_UnsupportedDatabaseProvider_FailsWithExitCodeOne
+
+      - id: ReviewCenter-System-TestIds
+        title: >-
+          The tool shall give every interactive element of its web pages a stable data-testid attribute, so that
+          automated tests and the Puppet tool can address it.
+        tags: [system]
+        justification: |
+          The web interface is verified and driven by automation. Addressing elements by stable identifiers,
+          rather than by text or layout, keeps that automation working as the pages evolve.
+        children:
+          - ReviewCenter-Web-TestIds
+        tests:
+          - ReviewCenter_ServeVerb_Started_HomePageContainsTitleAndControls
+          - WebSubsystem_AllPages_EveryInteractiveElementHasTestId

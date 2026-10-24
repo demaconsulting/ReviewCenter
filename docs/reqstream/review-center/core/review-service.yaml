@@ -1,0 +1,103 @@
+---
+# Software Unit Requirements for the ReviewService Class
+#
+# The ReviewService class creates draft reviews from uploaded files, enforces the review and upload rules,
+# and reads reviews back.
+
+sections:
+  - title: ReviewService Unit Requirements
+    requirements:
+      - id: ReviewCenter-ReviewService-Draft
+        title: >-
+          The ReviewService class shall create a review in the Draft state with the creation time and the title
+          without surrounding white space, and shall keep every uploaded file byte for byte together with its
+          size and SHA-256 hash.
+        justification: |
+          A review is a snapshot of the submitted files. Binary content, Windows line endings, and empty files
+          are valid review content and must come back exactly as they went in.
+        tests:
+          - ReviewService_CreateDraftAsync_ValidInput_StoresDraftWithFingerprint
+          - ReviewService_CreateDraftAsync_BinaryAndCrLfContent_KeepsBytesVerbatim
+
+      - id: ReviewCenter-ReviewService-Fingerprint
+        title: >-
+          The ReviewService class shall set the content fingerprint of a review to the fingerprint of the
+          contents of its files, regardless of their names and order.
+        justification: |
+          The fingerprint identifies the content under review. The same files submitted under other names or in
+          another order are the same content and must give the same fingerprint.
+        tests:
+          - ReviewService_CreateDraftAsync_ValidInput_StoresDraftWithFingerprint
+          - ReviewService_CreateDraftAsync_SameBytesDifferentPathsAndOrder_GivesSameFingerprint
+
+      - id: ReviewCenter-ReviewService-Id
+        title: >-
+          The ReviewService class shall accept a review identifier only when it has 1 to 100 characters, starts
+          with an ASCII letter or digit, and otherwise contains only ASCII letters, digits, dots, underscores,
+          and hyphens, and shall refuse an identifier already used by another review of the same project while
+          allowing the same identifier in a different project.
+        justification: |
+          The identifier appears in page addresses and later in reports, so it must be short, stable, and safe
+          to use in a URL. Uniqueness is per project, because each project keeps its own numbering.
+        tests:
+          - ReviewService_CreateDraftAsync_InvalidId_ThrowsReviewIdInvalid
+          - ReviewService_CreateDraftAsync_IdLength_LimitIsInclusive
+          - ReviewService_CreateDraftAsync_DuplicateIdInSameProject_ThrowsReviewIdDuplicate
+          - ReviewService_CreateDraftAsync_SameIdInOtherProject_IsAllowed
+
+      - id: ReviewCenter-ReviewService-Title
+        title: >-
+          The ReviewService class shall reject a review whose title is blank or longer than 200 characters.
+        justification: |
+          A title is how people recognize a review in lists, so it must exist and must stay displayable.
+        tests:
+          - ReviewService_CreateDraftAsync_BlankTitle_ThrowsReviewTitleInvalid
+          - ReviewService_CreateDraftAsync_TitleTooLong_ThrowsReviewTitleInvalid
+
+      - id: ReviewCenter-ReviewService-Project
+        title: The ReviewService class shall reject a review for a project that does not exist.
+        justification: |
+          A review that belongs to no project could never be found again and would break the project hierarchy.
+        tests:
+          - ReviewService_CreateDraftAsync_UnknownProject_ThrowsProjectNotFound
+
+      - id: ReviewCenter-ReviewService-Files
+        title: >-
+          The ReviewService class shall reject a review that has no files, a file path that is blank or longer
+          than 400 characters, or two files with the same path, comparing paths exactly so that paths differing
+          only in letter case are different.
+        justification: |
+          A review without files has nothing to review. A path must be present to identify a file, and two files
+          under one path would be ambiguous. Paths on some systems are case-sensitive, so they are compared
+          exactly.
+        tests:
+          - ReviewService_CreateDraftAsync_NoFiles_ThrowsNoFiles
+          - ReviewService_CreateDraftAsync_DuplicatePaths_ThrowsDuplicatePath
+          - ReviewService_CreateDraftAsync_PathsDifferingInCase_AreDistinct
+          - ReviewService_CreateDraftAsync_BlankPath_ThrowsPathInvalid
+          - ReviewService_CreateDraftAsync_PathTooLong_ThrowsPathInvalid
+
+      - id: ReviewCenter-ReviewService-Limits
+        title: >-
+          The ReviewService class shall reject a review with a file larger than 2 MiB, more than 200 files, or
+          more than 20 MiB of file content in total, accepting the limit values themselves.
+        justification: |
+          Review content is stored in the database and held in memory while it is saved, so it must be bounded
+          to keep the service responsive and the database a reasonable size.
+        tests:
+          - ReviewService_CreateDraftAsync_FileSize_LimitIsInclusive
+          - ReviewService_CreateDraftAsync_TooManyFiles_ThrowsTooManyFiles
+          - ReviewService_CreateDraftAsync_TotalTooLarge_ThrowsTotalSizeExceeded
+
+      - id: ReviewCenter-ReviewService-Read
+        title: >-
+          The ReviewService class shall return a review of a project with its file list, list the reviews of a
+          project, and return the content of one file of a review, or nothing when the review or the file does
+          not exist.
+        justification: |
+          Pages show a review and its files without loading all file content, and load the content of one file
+          only when a reviewer asks for it. A stored link to a review or file that is gone must lead to a clear
+          answer rather than to a failure.
+        tests:
+          - ReviewService_GetAsync_CreatedReview_ReturnsReviewListAndContent
+          - ReviewService_GetFileContentAsync_MissingFileOrReview_ReturnsNull

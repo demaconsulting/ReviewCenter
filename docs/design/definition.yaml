@@ -7,6 +7,8 @@ resource-path:
   - docs/design/review-center/utilities
   - docs/design/review-center/hosting
   - docs/design/review-center/web
+  - docs/design/review-center/core
+  - docs/design/review-center/storage
   - docs/design/review-center-puppet
   - docs/design/ots
   - docs/template
@@ -27,6 +29,17 @@ input-files:
   - docs/design/review-center/web.md
   - docs/design/review-center/web/app.md
   - docs/design/review-center/web/home-page.md
+  - docs/design/review-center/web/projects-page.md
+  - docs/design/review-center/web/project-page.md
+  - docs/design/review-center/web/review-page.md
+  - docs/design/review-center/core.md
+  - docs/design/review-center/core/fingerprint.md
+  - docs/design/review-center/core/project-service.md
+  - docs/design/review-center/core/review-service.md
+  - docs/design/review-center/storage.md
+  - docs/design/review-center/storage/review-center-db-context.md
+  - docs/design/review-center/storage/review-store.md
+  - docs/design/review-center/storage/database-setup.md
   - docs/design/review-center-puppet.md
   - docs/design/review-center-puppet/puppet-program.md
   - docs/design/review-center-puppet/control-channel.md
@@ -37,6 +50,7 @@ input-files:
   - docs/design/ots/aspnetcore.md
   - docs/design/ots/buildmark.md
   - docs/design/ots/bunit.md
+  - docs/design/ots/efcore.md
   - docs/design/ots/fileassert.md
   - docs/design/ots/pandoc.md
   - docs/design/ots/playwright.md

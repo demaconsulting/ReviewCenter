@@ -19,8 +19,11 @@
 // SOFTWARE.
 
 using DemaConsulting.ReviewCenter.Cli;
+using DemaConsulting.ReviewCenter.Core;
 using DemaConsulting.ReviewCenter.Hosting;
+using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.TestHost;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -117,5 +120,158 @@ public class ServerHostTests
 
         // Assert: an ArgumentNullException is thrown
         Assert.IsType<ArgumentNullException>(exception);
+    }
+
+    /// <summary>
+    ///     Test that a database configured through the <c>Database</c> section is created and usable:
+    ///     the file and its folder appear, and the domain services work against it.
+    /// </summary>
+    [Fact]
+    public async Task ServerHost_CreateApplication_DatabaseConfigured_CreatesFileAndServesDomainServices()
+    {
+        // Arrange: a connection string whose folder does not exist yet
+        var folder = Path.Combine(Path.GetTempPath(), "ReviewCenterTests-" + Guid.NewGuid().ToString("N"));
+        var file = Path.Combine(folder, "nested", "configured.db");
+        var logs = new CapturingLoggerProvider();
+
+        try
+        {
+            // Act: start the pipeline against that database and create a project through the registered service
+            await using (var app = await TestWebApp.StartAsync(logs, $"Data Source={file};Pooling=False", ["serve", "--silent"]))
+            {
+                var project = await app.Services.GetRequiredService<ProjectService>()
+                    .CreateAsync("Apollo", null, TestContext.Current.CancellationToken);
+
+                // Assert: the database file exists and the project was stored in it
+                Assert.True(File.Exists(file));
+                Assert.True(project.Id > 0);
+            }
+        }
+        finally
+        {
+            Directory.Delete(folder, recursive: true);
+        }
+    }
+
+    /// <summary>
+    ///     Test that data survives a restart: a project created before the application is stopped is found by
+    ///     a new application instance that uses the same database file.
+    /// </summary>
+    [Fact]
+    public async Task ServerHost_CreateApplication_RestartedOnSameDatabase_KeepsData()
+    {
+        // Arrange: a database file shared by two application instances
+        var connectionString = TestDatabase.NewConnectionString();
+        var logs = new CapturingLoggerProvider();
+        int projectId;
+        await using (var first = await TestWebApp.StartAsync(logs, connectionString, ["serve", "--silent"]))
+        {
+            var project = await first.Services.GetRequiredService<ProjectService>()
+                .CreateAsync("Apollo", null, TestContext.Current.CancellationToken);
+            projectId = project.Id;
+        }
+
+        // Act: start a second instance on the same database
+        await using var second = await TestWebApp.StartAsync(logs, connectionString, ["serve", "--silent"]);
+        var found = await second.Services.GetRequiredService<ProjectService>()
+            .GetAsync(projectId, TestContext.Current.CancellationToken);
+
+        // Assert: the project is still there
+        Assert.Equal("Apollo", found?.Name);
+    }
+
+    /// <summary>
+    ///     Test that an unsupported database provider stops the build with an error naming the provider.
+    /// </summary>
+    [Fact]
+    public void ServerHost_CreateApplication_UnsupportedProvider_ThrowsClearError()
+    {
+        // Arrange: configuration that selects a provider the product does not implement
+        using var context = Context.Create(["serve", "--silent"]);
+        var options = UnsupportedProviderOptions();
+
+        // Act: create the application
+        var exception = Assert.Throws<InvalidOperationException>(() => ServerHost.CreateApplication(context, options));
+
+        // Assert: the message says what is wrong
+        Assert.Contains("Failed to prepare the database", exception.Message, StringComparison.Ordinal);
+        Assert.Contains("Oracle", exception.Message, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    ///     Test that a database failure at start-up is reported as an error with exit code 1 instead of an
+    ///     unhandled exception. No port is bound, because the failure happens before the server starts.
+    /// </summary>
+    [Fact]
+    public async Task ServerHost_RunAsync_UnsupportedProvider_ReturnsExitCodeOne()
+    {
+        // Arrange: configuration that selects an unsupported provider
+        using var context = Context.Create(["serve", "--silent"]);
+
+        // Act: run the server
+        var exitCode = await ServerHost.RunAsync(context, TestContext.Current.CancellationToken, UnsupportedProviderOptions());
+
+        // Assert: exit code 1, and the context recorded the error
+        Assert.Equal(1, exitCode);
+        Assert.Equal(1, context.ExitCode);
+    }
+
+    /// <summary>
+    ///     Test that an unusable database location (the file path is an existing folder) is reported as an
+    ///     error with exit code 1.
+    /// </summary>
+    [Fact]
+    public async Task ServerHost_RunAsync_UnusableDatabaseLocation_ReturnsExitCodeOne()
+    {
+        // Arrange: a database path that is an existing directory
+        var folder = Path.Combine(Path.GetTempPath(), "ReviewCenterTests-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(folder);
+        using var context = Context.Create(["serve", "--silent"]);
+        var options = new ServerHostOptions
+        {
+            MapStaticAssets = false,
+            ConfigureBuilder = builder =>
+            {
+                builder.WebHost.UseTestServer();
+                builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
+                {
+                    ["Database:ConnectionString"] = $"Data Source={folder};Pooling=False"
+                });
+            }
+        };
+
+        try
+        {
+            // Act: run the server
+            var exitCode = await ServerHost.RunAsync(context, TestContext.Current.CancellationToken, options);
+
+            // Assert: exit code 1 rather than an unhandled exception
+            Assert.Equal(1, exitCode);
+        }
+        finally
+        {
+            Directory.Delete(folder, recursive: true);
+        }
+    }
+
+    /// <summary>
+    ///     Creates host options that select an unsupported database provider and a throwaway database.
+    /// </summary>
+    /// <returns>The options.</returns>
+    private static ServerHostOptions UnsupportedProviderOptions()
+    {
+        return new ServerHostOptions
+        {
+            MapStaticAssets = false,
+            ConfigureBuilder = builder =>
+            {
+                builder.WebHost.UseTestServer();
+                builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
+                {
+                    ["Database:Provider"] = "Oracle",
+                    ["Database:ConnectionString"] = TestDatabase.NewConnectionString()
+                });
+            }
+        };
     }
 }

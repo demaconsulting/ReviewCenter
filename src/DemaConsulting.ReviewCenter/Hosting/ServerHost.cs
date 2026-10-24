@@ -18,8 +18,13 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
+using System.Data.Common;
 using DemaConsulting.ReviewCenter.Cli;
+using DemaConsulting.ReviewCenter.Core;
+using DemaConsulting.ReviewCenter.Storage;
 using DemaConsulting.ReviewCenter.Web;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 
 namespace DemaConsulting.ReviewCenter.Hosting;
 
@@ -58,10 +63,13 @@ internal static class ServerHost
     /// </param>
     /// <returns>A configured, not yet started <see cref="WebApplication"/>. The caller owns and must dispose it.</returns>
     /// <exception cref="ArgumentNullException">Thrown when <paramref name="context"/> is null.</exception>
+    /// <exception cref="InvalidOperationException">
+    ///     Thrown when the configured database cannot be prepared (see <see cref="InitializeDatabase"/>).
+    /// </exception>
     /// <remarks>
     ///     Building is separated from running so tests can start the application against an
-    ///     in-memory server. Building has no side effects outside the returned application: nothing
-    ///     is bound to a network port until the application is started.
+    ///     in-memory server. Building creates the database (folder, file and schema) when it does
+    ///     not exist yet; nothing is bound to a network port until the application is started.
     /// </remarks>
     public static WebApplication CreateApplication(Context context, ServerHostOptions? options = null)
     {
@@ -91,6 +99,17 @@ internal static class ServerHost
         // Blazor Server: server-side Razor components rendered over an interactive circuit
         builder.Services.AddRazorComponents().AddInteractiveServerComponents();
 
+        // Persistence: the database is chosen by the 'Database' configuration section (appsettings.json or
+        // environment variables). Options are read lazily so that callers adjusting the configuration in
+        // ConfigureBuilder take effect, and the Core services are shared by all browser sessions
+        builder.Services.AddOptions<DatabaseOptions>().Bind(builder.Configuration.GetSection(DatabaseSetup.SectionName));
+        builder.Services.AddDbContextFactory<ReviewCenterDbContext>((services, dbOptions) =>
+            DatabaseSetup.Configure(dbOptions, services.GetRequiredService<IOptions<DatabaseOptions>>().Value));
+        builder.Services.AddSingleton(TimeProvider.System);
+        builder.Services.AddSingleton<IReviewStore, ReviewStore>();
+        builder.Services.AddSingleton<ProjectService>();
+        builder.Services.AddSingleton<ReviewService>();
+
         // Allow the caller (tests) to replace the server or add logger providers
         options.ConfigureBuilder?.Invoke(builder);
 
@@ -103,6 +122,10 @@ internal static class ServerHost
         }
 
         var app = builder.Build();
+
+        // Create the database folder and schema now, so that a configuration or file system problem stops the
+        // start-up with a clear message instead of failing on the first page request
+        InitializeDatabase(app);
 
         // Antiforgery must run before the Razor component endpoints it protects
         app.UseAntiforgery();
@@ -135,23 +158,42 @@ internal static class ServerHost
     /// <param name="cancellationToken">
     ///     Requests a graceful shutdown when cancelled; Ctrl+C / SIGTERM also stop the server.
     /// </param>
+    /// <param name="options">
+    ///     Optional build adjustments passed to <see cref="CreateApplication"/>; <c>null</c> selects the
+    ///     production defaults. Tests use it to point the server at a temporary database.
+    /// </param>
     /// <returns>
     ///     0 when the server ran and shut down cleanly; 1 when it could not start (for example
-    ///     because the port is already in use), in which case the reason was reported through
-    ///     <see cref="Context.WriteError"/>.
+    ///     because the port is already in use or the database could not be prepared), in which case
+    ///     the reason was reported through <see cref="Context.WriteError"/>.
     /// </returns>
     /// <exception cref="ArgumentNullException">Thrown when <paramref name="context"/> is null.</exception>
     /// <remarks>
-    ///     Start-up failures caused by the environment (an address that is in use or not bindable)
-    ///     are expected operator errors and are reported in the same way as bad arguments, instead
-    ///     of surfacing as an unhandled exception with a stack trace. Side effects: binds a network
-    ///     port and writes log entries for the lifetime of the call.
+    ///     Start-up failures caused by the environment (an address that is in use or not bindable, an
+    ///     unsupported or unusable database) are expected operator errors and are reported in the same
+    ///     way as bad arguments, instead of surfacing as an unhandled exception with a stack trace.
+    ///     Side effects: creates the database when it does not exist, binds a network port and writes
+    ///     log entries for the lifetime of the call.
     /// </remarks>
-    public static async Task<int> RunAsync(Context context, CancellationToken cancellationToken = default)
+    public static async Task<int> RunAsync(
+        Context context,
+        CancellationToken cancellationToken = default,
+        ServerHostOptions? options = null)
     {
         ArgumentNullException.ThrowIfNull(context);
 
-        var app = CreateApplication(context);
+        // Building includes database preparation, whose failures are reported as InvalidOperationException
+        WebApplication app;
+        try
+        {
+            app = CreateApplication(context, options);
+        }
+        catch (InvalidOperationException ex)
+        {
+            context.WriteError(ex.Message);
+            return 1;
+        }
+
         try
         {
             await app.RunAsync(cancellationToken);
@@ -171,6 +213,37 @@ internal static class ServerHost
         finally
         {
             await app.DisposeAsync();
+        }
+    }
+
+    /// <summary>
+    ///     Creates the database folder and schema for a built application.
+    /// </summary>
+    /// <param name="app">The built application whose services provide the database settings.</param>
+    /// <exception cref="InvalidOperationException">
+    ///     Thrown when the database cannot be prepared (unsupported provider, invalid connection string,
+    ///     unwritable location, or a database error); the application is disposed before the exception
+    ///     is thrown and the original failure is the inner exception.
+    /// </exception>
+    private static void InitializeDatabase(WebApplication app)
+    {
+        try
+        {
+            var options = app.Services.GetRequiredService<IOptions<DatabaseOptions>>().Value;
+            var factory = app.Services.GetRequiredService<IDbContextFactory<ReviewCenterDbContext>>();
+            DatabaseSetup.EnsureCreated(factory, options);
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or DbException or IOException
+                                       or UnauthorizedAccessException or ArgumentException
+                                       or DllNotFoundException or TypeInitializationException)
+        {
+            // The application will never run, so release what building it acquired
+            ((IDisposable)app).Dispose();
+
+            // A missing native SQLite library surfaces as a type-initializer failure whose own message is
+            // unhelpful; report the root cause (the library that could not be loaded) instead
+            var detail = ex is TypeInitializationException ? ex.GetBaseException().Message : ex.Message;
+            throw new InvalidOperationException($"Failed to prepare the database: {detail}", ex);
         }
     }
 

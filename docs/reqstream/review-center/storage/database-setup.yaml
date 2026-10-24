@@ -1,0 +1,56 @@
+---
+# Software Unit Requirements for the DatabaseSetup Class
+#
+# The DatabaseSetup class turns the database settings into a provider and connection, and creates the database
+# on first use.
+
+sections:
+  - title: DatabaseSetup Unit Requirements
+    requirements:
+      - id: ReviewCenter-DatabaseSetup-Location
+        title: >-
+          The DatabaseSetup class shall default the database file to reviewcenter.db in a ReviewCenter folder of
+          the per-user application data folder, or in a data folder beside the application when the system has
+          no application data folder.
+        justification: |
+          A new installation must store its data in a predictable place that the user can write to, without any
+          configuration. Some service accounts have no home folder, so a fallback is needed.
+        tests:
+          - DatabaseSetup_GetDefaultDatabasePath_WithDataFolder_UsesAppDataSubfolder
+          - DatabaseSetup_GetDefaultDatabasePath_WithoutDataFolder_FallsBackToBaseDirectory
+
+      - id: ReviewCenter-DatabaseSetup-Connection
+        title: >-
+          The DatabaseSetup class shall use the default database file when no connection string is configured,
+          shall treat a configured value without an equals sign as a database file path, shall use any
+          other configured value as the full connection string, and shall reject an in-memory database with an
+          error that asks for a file path.
+        justification: |
+          Operators need the simplest setting for the common case, a file path, and the full connection string
+          for options such as pooling. An in-memory SQLite database gives every connection its own empty
+          database, so accepting it would start a server that cannot serve any data.
+        tests:
+          - DatabaseSetup_ResolveConnectionString_Empty_UsesDefaultFile
+          - DatabaseSetup_ResolveConnectionString_PlainPath_BecomesDataSource
+          - DatabaseSetup_ResolveConnectionString_FullConnectionString_IsUsedAsIs
+          - DatabaseSetup_ResolveConnectionString_InMemory_ThrowsClearError
+
+      - id: ReviewCenter-DatabaseSetup-Provider
+        title: >-
+          The DatabaseSetup class shall accept the provider name Sqlite in any letter case and shall reject any
+          other provider with an error that names it and lists the supported providers.
+        justification: |
+          SQLite is the only implemented provider. Failing clearly for any other name prevents data from going
+          to a database the operator did not intend, and leaves one place to extend for other providers.
+        tests:
+          - DatabaseSetup_Configure_UnsupportedProvider_ThrowsClearError
+          - DatabaseSetup_Configure_ProviderInOtherCase_IsAccepted
+          - DatabaseSetup_EnsureCreated_UnsupportedProvider_ThrowsAndCreatesNothing
+
+      - id: ReviewCenter-DatabaseSetup-Create
+        title: >-
+          The DatabaseSetup class shall create the database folder, file, and tables when they do not exist.
+        justification: |
+          A new installation must work on first start without manual database setup.
+        tests:
+          - DatabaseSetup_EnsureCreated_MissingFolder_CreatesFolderFileAndTables

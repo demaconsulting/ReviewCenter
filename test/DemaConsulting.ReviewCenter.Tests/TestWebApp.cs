@@ -24,6 +24,7 @@ using DemaConsulting.ReviewCenter.Hosting;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.TestHost;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 
 namespace DemaConsulting.ReviewCenter.Tests;
@@ -140,6 +141,24 @@ internal static class TestWebApp
     /// <returns>The started application; the caller disposes it.</returns>
     public static async Task<WebApplication> StartAsync(CapturingLoggerProvider logs, params string[] arguments)
     {
+        return await StartAsync(logs, connectionString: null, arguments);
+    }
+
+    /// <summary>
+    ///     Builds and starts the application like <see cref="StartAsync(CapturingLoggerProvider, string[])"/>
+    ///     but against a specific database.
+    /// </summary>
+    /// <param name="logs">Receives the capturing provider attached to the application.</param>
+    /// <param name="connectionString">
+    ///     Database connection string, or <c>null</c> to use a new temporary database for this application.
+    /// </param>
+    /// <param name="arguments">Command-line arguments used to create the context.</param>
+    /// <returns>The started application; the caller disposes it.</returns>
+    public static async Task<WebApplication> StartAsync(
+        CapturingLoggerProvider logs,
+        string? connectionString,
+        string[] arguments)
+    {
         using var context = Context.Create(arguments);
         var app = ServerHost.CreateApplication(context, new ServerHostOptions
         {
@@ -149,6 +168,11 @@ internal static class TestWebApp
             {
                 builder.WebHost.UseTestServer();
                 builder.Logging.AddProvider(logs);
+                builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
+                {
+                    // Every in-memory application gets its own database so parallel tests never share a file
+                    ["Database:ConnectionString"] = connectionString ?? TestDatabase.NewConnectionString()
+                });
             }
         });
         await app.StartAsync();

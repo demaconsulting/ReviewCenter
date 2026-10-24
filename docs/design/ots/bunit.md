@@ -12,8 +12,9 @@ distributed ReviewCenter package.
 ### Features Used
 
 - Rendering of Razor components in a test context, with markup assertions
-- Simulated user interaction such as clicking buttons, followed by re-rendering
-- Rendering of the router for a given URL through the test navigation manager
+- Simulated user interaction such as clicking buttons, submitting forms, and selecting files for a file input,
+  followed by re-rendering
+- Rendering of the router for a given URL through the test navigation manager, and observing navigation
 - `Microsoft.AspNetCore.TestHost` in-memory server and HTTP client for request/response tests of the hosted
   application
 

@@ -18,8 +18,12 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
+using DemaConsulting.ReviewCenter.Cli;
+using DemaConsulting.ReviewCenter.Core;
 using DemaConsulting.ReviewCenter.Hosting;
 using Microsoft.AspNetCore.TestHost;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
 namespace DemaConsulting.ReviewCenter.Tests.Hosting;
@@ -86,5 +90,62 @@ public class HostingSubsystemTests
         // Assert: both answer 200
         Assert.Equal(System.Net.HttpStatusCode.OK, home.StatusCode);
         Assert.Equal(System.Net.HttpStatusCode.OK, health.StatusCode);
+    }
+
+    /// <summary>
+    ///     Test that the host creates the configured database at start-up, serves pages from it, and that the
+    ///     data is still served after the host is stopped and started again on the same database.
+    /// </summary>
+    [Fact]
+    public async Task HostingSubsystem_Startup_DatabaseConfigured_ServesStoredProjectsAfterRestart()
+    {
+        // Arrange: a new database file, and a project stored through the first host
+        var connectionString = TestDatabase.NewConnectionString();
+        var logs = new CapturingLoggerProvider();
+        await using (var first = await TestWebApp.StartAsync(logs, connectionString, ["serve", "--silent"]))
+        {
+            await first.Services.GetRequiredService<ProjectService>()
+                .CreateAsync("Apollo", "Moon landing", TestContext.Current.CancellationToken);
+        }
+
+        // Act: start a second host on the same database and request the projects page
+        await using var second = await TestWebApp.StartAsync(logs, connectionString, ["serve", "--silent"]);
+        using var client = second.GetTestClient();
+        var html = await client.GetStringAsync("/projects", TestContext.Current.CancellationToken);
+
+        // Assert: the stored project is listed
+        Assert.Contains("Apollo", html, StringComparison.Ordinal);
+        Assert.Contains("Moon landing", html, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    ///     Test that a database setting the host cannot honor ends the run with exit code 1 and an error on the
+    ///     context, instead of an unhandled exception.
+    /// </summary>
+    [Fact]
+    public async Task HostingSubsystem_Startup_UnsupportedDatabaseProvider_FailsWithExitCodeOne()
+    {
+        // Arrange: configuration that selects a provider that is not implemented
+        using var context = Context.Create(["serve", "--silent"]);
+        var options = new ServerHostOptions
+        {
+            MapStaticAssets = false,
+            ConfigureBuilder = builder =>
+            {
+                builder.WebHost.UseTestServer();
+                builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
+                {
+                    ["Database:Provider"] = "Oracle",
+                    ["Database:ConnectionString"] = TestDatabase.NewConnectionString()
+                });
+            }
+        };
+
+        // Act: run the server
+        var exitCode = await ServerHost.RunAsync(context, TestContext.Current.CancellationToken, options);
+
+        // Assert: the run failed with exit code 1 and the context holds the failure
+        Assert.Equal(1, exitCode);
+        Assert.Equal(1, context.ExitCode);
     }
 }

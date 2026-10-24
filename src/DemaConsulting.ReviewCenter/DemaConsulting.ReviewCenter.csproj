@@ -37,6 +37,15 @@
   <!-- Runtime Dependencies -->
   <ItemGroup>
     <PackageReference Include="DemaConsulting.TestResults" Version="1.10.0" />
+    <!-- Entity Framework Core with the SQLite provider stores projects and reviews. The native SQLite library
+         (e_sqlite3 / libe_sqlite3.so) is published as a side file next to the single-file executable. -->
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="10.0.13" />
+  </ItemGroup>
+
+  <!-- Project References -->
+  <ItemGroup>
+    <!-- Core holds the framework-free domain; it is bundled into the executable when publishing -->
+    <ProjectReference Include="..\DemaConsulting.ReviewCenter.Core\DemaConsulting.ReviewCenter.Core.csproj" />
   </ItemGroup>
 
   <!-- Build Tool Dependencies -->

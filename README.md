@@ -13,8 +13,9 @@ for performing formal code reviews of file sets against earlier revisions. It su
 comments on code blocks and files, project-specific pass/fail/N/A checklists, primary and alternate
 reviewers, and re-authenticated electronic sign-off.
 
-The `serve` verb runs ReviewCenter as an ASP.NET Core Blazor Server web application with a home page and a
-health endpoint. The review features themselves are still under development.
+The `serve` verb runs ReviewCenter as an ASP.NET Core Blazor Server web application with a home page, a health
+endpoint, and the first review features: projects, and draft reviews made from uploaded files. Review comments,
+checklists, reviewers, and sign-off are still under development.
 
 ## Features
 
@@ -22,6 +23,13 @@ The current release provides:
 
 - **Blazor Server Web Application**: `reviewcenter serve` hosts the web interface (home page at `/`) and a
   `/health` endpoint, listening on `http://localhost:5000` by default or on the address given with `--urls`
+- **Projects**: create projects and list them at `/projects`; each project has its own page at `/projects/{id}`
+- **Draft Reviews**: create a review in a project by uploading a set of files; the review page shows the files, the
+  SHA-256 hash of each file, and a content fingerprint that is calculated exactly as the
+  [ReviewMark][link-reviewmark] tool calculates it, and lets you read each file's content
+- **Persistent Storage**: projects, reviews, and the uploaded file contents are kept in a SQLite database file
+  (default `reviewcenter.db` in the per-user application data folder, see
+  [Data Location](#data-location-and-database-settings))
 - **Standardized Command-Line Interface**: Context class handling common arguments
   (`serve`, `--urls`, `--version`, `--help`, `--silent`, `--validate`, `--results`, `--depth`, `--log`)
 - **Self-Validation**: Built-in validation tests with TRX/JUnit output
@@ -64,7 +72,9 @@ Expand-Archive reviewcenter-<version>-win-x64.zip -DestinationPath .
 .\reviewcenter-<version>-win-x64\reviewcenter.exe serve
 ```
 
-Keep the files of the archive together: the executable serves the web assets that sit beside it. No release has been
+Keep the files of the archive together: the executable serves the web assets that sit beside it, and the native
+SQLite library (`e_sqlite3.dll` on Windows, `libe_sqlite3.so` on Linux) is a separate file that must stay in the
+same folder as the executable, so do not copy the executable on its own. No release has been
 published yet; until one is, build from source with the .NET 10 SDK:
 
 ```bash
@@ -88,7 +98,7 @@ reviewcenter --version
 # Display help
 reviewcenter --help
 
-# Run the web server (default http://localhost:5000; home page at /, health check at /health)
+# Run the web server (default http://localhost:5000; home page at /, projects at /projects, health at /health)
 reviewcenter serve
 
 # Run the web server on another address
@@ -121,6 +131,41 @@ reviewcenter --silent --log output.log
 | `--results <file>`, `--result <file>` | Write results to `.trx` (TRX) or `.xml` (JUnit XML) file.    |
 | `--depth <#>`                         | Set heading depth for markdown output (default: 1)           |
 | `--log <file>`                        | Write output to log file                                     |
+
+## Data Location and Database Settings
+
+ReviewCenter keeps its data in one SQLite database file, which is created (with its folder and tables) on first
+start. The default file is `reviewcenter.db` in a `ReviewCenter` folder of the per-user application data folder
+(`%LOCALAPPDATA%\ReviewCenter` on Windows, `~/.local/share/ReviewCenter` on Linux). If the account has no such
+folder, a `data` folder beside the executable is used instead. Back up the data by copying that file while the
+server is stopped.
+
+The database is configured in the `Database` section of `appsettings.json` beside the executable, or with
+environment variables, which take precedence:
+
+| Setting                     | Environment variable         | Meaning                                         |
+| --------------------------- | ---------------------------- | ----------------------------------------------- |
+| `Database:Provider`         | `Database__Provider`         | Database provider; only `Sqlite` is supported   |
+| `Database:ConnectionString` | `Database__ConnectionString` | Database file path or SQLite connection string  |
+
+```powershell
+# Windows: keep the data in another file
+$env:Database__ConnectionString = "D:\reviews\reviewcenter.db"
+.\reviewcenter.exe serve
+```
+
+If the database cannot be opened or the provider is not supported, the server prints an error and exits with a
+non-zero exit code.
+
+## Current Limitations
+
+- **No authentication**: this release has a single anonymous operator. Anyone who can reach the server can create
+  and read projects and reviews. Run it only on `localhost` or on a trusted network until user authentication is
+  added.
+- **Upload limits**: at most 200 files per review, 2 MiB per file, and 20 MiB per review. Only the file name of each
+  uploaded file is kept, so two files with the same name cannot be in one review.
+- **No database migrations**: the database tables are created when the database file is new; a later release that
+  changes the tables will need a migration step.
 
 ## Error Handling
 
@@ -194,8 +239,11 @@ Generated documentation includes:
 
 Planned but not yet implemented:
 
-- The review features of the ReviewCenter web service (the current web application is a starting point)
-- EF Core database migrations with an explicit `migrate` command
+- The remaining review features of the ReviewCenter web service: review comments, checklists, reviewers, sign-off,
+  and review states beyond Draft
+- User authentication
+- EF Core database migrations with an explicit `migrate` command, and further database providers
+  (PostgreSQL, SQL Server)
 - PDF/A evidence export of review records
 - AI-assisted review (planned to use an Azure OpenAI Service account)
 
@@ -228,5 +276,6 @@ By contributing to this project, you agree that your contributions will be licen
 [link-quality]: https://sonarcloud.io/dashboard?id=demaconsulting_ReviewCenter
 [link-security]: https://sonarcloud.io/dashboard?id=demaconsulting_ReviewCenter
 [link-releases]: https://github.com/demaconsulting/ReviewCenter/releases
+[link-reviewmark]: https://github.com/demaconsulting/ReviewMark
 [link-guide]: https://github.com/demaconsulting/ReviewCenter/blob/main/docs/user_guide/introduction.md
 [link-continuous-compliance]: https://github.com/demaconsulting/ContinuousCompliance

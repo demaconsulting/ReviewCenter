@@ -1,0 +1,78 @@
+@* ReviewPage: the read-only view of one review at "/projects/{id}/reviews/{reviewId}".
+
+   Presentation only; state and event handling live in ReviewPage.razor.cs. It shows the review id, title,
+   state and content fingerprint, the list of files with size and per-file SHA-256 hash, and the raw text of
+   the selected file (or a notice for binary files). Every interactive element and every key value carries a
+   stable kebab-case data-testid (file rows carry the list index), and the data-interactive marker on the
+   root flips to "true" once the live circuit is connected. *@
+@page "/projects/{ProjectId:int}/reviews/{ReviewId}"
+@rendermode InteractiveServer
+
+<PageTitle>@(Review?.Id ?? "Review") - ReviewCenter</PageTitle>
+
+<main class="page" data-testid="review-page" data-interactive="@InteractiveMarker">
+    <nav class="breadcrumb">
+        <a href="/" data-testid="home-link">ReviewCenter</a>
+        <span aria-hidden="true">/</span>
+        <a href="/projects" data-testid="projects-link">Projects</a>
+        <span aria-hidden="true">/</span>
+        <a href="/projects/@ProjectId" data-testid="project-link">@(ProjectName ?? $"Project {ProjectId}")</a>
+    </nav>
+
+    @if (!Loaded)
+    {
+        <p class="muted" data-testid="review-loading">Loading...</p>
+    }
+    else if (Review is null)
+    {
+        <p class="error" role="alert" data-testid="review-not-found">Review '@ReviewId' does not exist in project @ProjectId.</p>
+    }
+    else
+    {
+        <h1 data-testid="review-title">@Review.Title</h1>
+
+        <section class="card">
+            <dl class="details">
+                <dt>Review id</dt>
+                <dd data-testid="review-id">@Review.Id</dd>
+                <dt>State</dt>
+                <dd><span class="badge" data-testid="review-state">@Review.State</span></dd>
+                <dt>Fingerprint</dt>
+                <dd class="hash" data-testid="review-fingerprint">@Review.ContentFingerprint</dd>
+            </dl>
+        </section>
+
+        <section class="card">
+            <h2>Files</h2>
+            <ul class="item-list" data-testid="files-list">
+                @for (var index = 0; index < Review.Files.Count; index++)
+                {
+                    var file = Review.Files[index];
+                    var fileIndex = index;
+                    <li class="file-row @(file.Path == SelectedPath ? "selected" : null)" data-testid="file-row-@index">
+                        <div class="path" data-testid="file-path-@index">@file.Path</div>
+                        <div class="muted file-size"><span data-testid="file-size-@index">@file.Size</span> bytes</div>
+                        <div class="hash muted" data-testid="file-hash-@index">@file.Sha256</div>
+                        <button type="button" data-testid="file-select-@index" aria-label="View @file.Path" @onclick="() => SelectFileAsync(fileIndex)">View</button>
+                    </li>
+                }
+            </ul>
+        </section>
+
+        @if (SelectedPath is not null)
+        {
+            <section class="card">
+                <h2>File content</h2>
+                <p class="path" data-testid="selected-file-path">@SelectedPath</p>
+                @if (SelectedText is null)
+                {
+                    <p class="notice" data-testid="file-binary-notice">This is a binary file; its content is not shown.</p>
+                }
+                else
+                {
+                    <pre data-testid="file-content">@SelectedText</pre>
+                }
+            </section>
+        }
+    }
+</main>

@@ -3,8 +3,12 @@
 #
 # PURPOSE:
 # - Define requirements for the ReviewCenter Web subsystem
-# - The Web subsystem spans the App (App.razor, Routes.razor) and HomePage (HomePage.razor) units
+# - The Web subsystem spans the App (App.razor, Routes.razor), HomePage, ProjectsPage, ProjectPage, and
+#   ReviewPage units
 # - Subsystem requirements describe the externally visible behavior of the web user interface
+# - The subsystem tests run over plain HTTP, so they verify what the server renders: the pages, the read path from
+#   the database, and the initial not-yet-interactive marker. Behavior that needs a live connection (forms,
+#   uploads, the switch of the marker to interactive) is verified by the component tests of the child units.
 
 sections:
   - title: Web Subsystem Requirements
@@ -33,8 +37,64 @@ sections:
         justification: |
           Clicks made before the live server connection exists are lost. A marker on the page
           lets users, automated tests, and tooling wait until the page can respond instead of
-          guessing with fixed delays.
+          guessing with fixed delays. The subsystem test covers the initial server-rendered marker; the switch
+          to interactive needs a live connection and is verified by the component tests of the page units.
         children:
           - ReviewCenter-HomePage-Interactive
         tests:
           - WebSubsystem_HomeRoute_InitialResponse_IsNotYetInteractive
+
+      - id: ReviewCenter-Web-Projects
+        title: >-
+          The Web subsystem shall serve a projects page at /projects that lists the projects and offers a form
+          to create one, a page for each project at /projects/{project} that shows its reviews, and a link from
+          the home page to the projects page.
+        justification: |
+          Projects are the entry point to the review features. Pages reached through plain addresses can be
+          bookmarked and shared, and the home page must lead to them.
+        children:
+          - ReviewCenter-HomePage-ProjectsLink
+          - ReviewCenter-ProjectsPage-List
+          - ReviewCenter-ProjectsPage-Create
+          - ReviewCenter-ProjectsPage-Error
+          - ReviewCenter-ProjectsPage-Interactive
+          - ReviewCenter-ProjectPage-Show
+          - ReviewCenter-ProjectPage-Reviews
+        tests:
+          - WebSubsystem_CreatedProjectAndReview_ArePresentedByThePages
+
+      - id: ReviewCenter-Web-Reviews
+        title: >-
+          The Web subsystem shall let a user create a review of selected files on the project page, within the
+          upload limits, and shall serve a page for each review at /projects/{project}/reviews/{review} that
+          shows its fingerprint, its files with size and hash, and the content of a selected file.
+        justification: |
+          Creating a review from files, and seeing the fingerprint and the exact content again, is the first
+          review capability of the product. Showing the user the reason for every refusal makes the upload
+          limits usable. The subsystem test covers the served review and project pages; creating a review (form
+          and upload) needs a live connection and is verified by the component tests of the page units.
+        children:
+          - ReviewCenter-ProjectPage-Selection
+          - ReviewCenter-ProjectPage-Create
+          - ReviewCenter-ProjectPage-Error
+          - ReviewCenter-ProjectPage-Limits
+          - ReviewCenter-ProjectPage-Interactive
+          - ReviewCenter-ReviewPage-Show
+          - ReviewCenter-ReviewPage-Files
+          - ReviewCenter-ReviewPage-Content
+          - ReviewCenter-ReviewPage-Binary
+          - ReviewCenter-ReviewPage-Interactive
+        tests:
+          - WebSubsystem_CreatedProjectAndReview_ArePresentedByThePages
+
+      - id: ReviewCenter-Web-TestIds
+        title: >-
+          The Web subsystem shall give every interactive element (link, button, input, select, and text area) of
+          every page a stable, lowercase hyphenated data-testid attribute, so that automated tests and the
+          Puppet tool can address it without depending on its text or layout.
+        justification: |
+          Tests that locate elements by visible text or position break whenever wording or layout changes. A
+          stable identifier on every interactive element keeps the automated tests and the Puppet tool working
+          as the pages evolve.
+        tests:
+          - WebSubsystem_AllPages_EveryInteractiveElementHasTestId

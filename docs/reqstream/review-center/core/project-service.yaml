@@ -1,0 +1,53 @@
+---
+# Software Unit Requirements for the ProjectService Class
+#
+# The ProjectService class creates, lists, and reads projects and enforces the project rules.
+
+sections:
+  - title: ProjectService Unit Requirements
+    requirements:
+      - id: ReviewCenter-ProjectService-Create
+        title: >-
+          The ProjectService class shall create a project from a name and an optional description, storing the
+          name and description without surrounding white space (an absent description as empty text) together
+          with the creation time.
+        justification: |
+          Surrounding white space is never meaningful in a name and would make visually identical projects look
+          different. An empty description is simpler for every caller than an absent one.
+        tests:
+          - ProjectService_CreateAsync_ValidInput_StoresTrimmedProject
+          - ProjectService_CreateAsync_NullDescription_StoresEmptyDescription
+
+      - id: ReviewCenter-ProjectService-Validation
+        title: >-
+          The ProjectService class shall reject a project whose name is blank or longer than 100 characters, or
+          whose description is longer than 1000 characters, with a domain rule exception that names the rule,
+          and shall store nothing.
+        justification: |
+          A project needs a visible name, and limits keep names and descriptions displayable and within what the
+          database stores. The limits are inclusive, so a name of exactly 100 characters is accepted.
+        tests:
+          - ProjectService_CreateAsync_BlankName_ThrowsProjectNameInvalid
+          - ProjectService_CreateAsync_NameLength_LimitIsInclusive
+          - ProjectService_CreateAsync_DescriptionTooLong_ThrowsDescriptionTooLong
+          - ProjectService_CreateAsync_Rejected_StoresNothing
+
+      - id: ReviewCenter-ProjectService-List
+        title: >-
+          The ProjectService class shall list all projects ordered by name and, for projects with the same name,
+          by identifier.
+        justification: |
+          Pages that show all projects need a stable, predictable order, and project names are not required to
+          be unique, so the identifier decides between projects with the same name.
+        tests:
+          - ProjectService_ListAsync_SeveralProjects_ReturnsOrderedByNameThenId
+
+      - id: ReviewCenter-ProjectService-Read
+        title: >-
+          The ProjectService class shall return a project by its identifier, and nothing when no project has
+          that identifier.
+        justification: |
+          Pages reached by a stored link must be able to tell a missing project from an existing one, and must
+          not fail when a project is not found.
+        tests:
+          - ProjectService_GetAsync_ExistingAndUnknown_ReturnsProjectOrNull

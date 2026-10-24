@@ -260,25 +260,41 @@ It is a minimal helper and is kept as small and simple as possible; see
 
 ## Implementation Status
 
-The architecture above is the target design. Only a first slice is implemented so far:
+The architecture above is the target design. Only the first two slices are implemented so far:
 
-- **Implemented**: Hosting (the ASP.NET Core server host and its logging), Web (the Blazor Server hello-world home
-  page with a health endpoint), the command-line interface (`serve`, `--urls`, and the template options), and the
-  Puppet developer tool (`tools/puppet`), a minimal helper that drives the web interface through one persistent
+- **Implemented, slice 1 (platform)**: Hosting (the ASP.NET Core server host and its logging), Web (the Blazor Server
+  home page with a health endpoint), the command-line interface (`serve`, `--urls`, and the template options), and
+  the Puppet developer tool (`tools/puppet`), a minimal helper that drives the web interface through one persistent
   headless Chromium, one command per invocation.
-- **Planned and deferred**: Api, Identity, Core, Storage, ContentSources, Evidence, and Messaging. They have no code,
-  requirements, design documents, or verification documents yet, so the SysML2 model and the design documentation
-  describe the implemented items only and are deliberately partial.
+- **Implemented, slice 2 (projects and reviews)**: Core (`Fingerprint`, `ProjectService`, `ReviewService`) in its own
+  assembly, `DemaConsulting.ReviewCenter.Core`, with no dependency on the web or the database; Storage (EF Core
+  with SQLite, `ReviewStore`, `DatabaseSetup`, schema created with `EnsureCreated`, no migrations; SQLite only, with
+  the provider chosen by `Database:Provider` as the seam for PostgreSQL and SQL Server); and three Web pages
+  (`/projects`, `/projects/{id}`, `/projects/{id}/reviews/{id}`). A review is created from uploaded files, is in the
+  `Draft` state only, and has a ReviewMark-compatible content fingerprint (known answers verified against the
+  ReviewMark `--elaborate` output). Upload limits are 2 MiB per file, 200 files and 20 MiB per review, and only the
+  file name of an uploaded file is kept. Every interactive element has a `data-testid`, so tests and the Puppet can
+  address it. The files are documented in `docs/design`, `docs/verification`, `docs/reqstream` and `docs/sysml2`.
+- **Temporary limitation**: there is no authentication; the server has a single anonymous operator. Identity (decisions
+  on roles and sign-off) comes in a later slice, and the server must only be exposed on `localhost` or a trusted
+  network until then.
+- **Planned and deferred**: Api, Identity, ContentSources, Evidence, Messaging, the review lifecycle beyond `Draft`,
+  and the rest of Core and Storage (comments, checklists, reviewers, audit trail). They have no code, requirements,
+  design documents, or verification documents yet, so the SysML2 model and the design documentation describe the
+  implemented items only and are deliberately partial.
 - **Pipeline**: the CI/release pipeline builds net10.0 only and publishes the self-contained win-x64 and linux-x64
-  executables (see decision 21). CI installs Chromium so the Puppet end-to-end test runs and is linked to the Puppet
-  requirements. The release workflow attaches the archives and checksums to the GitHub release.
+  executables (see decision 21). The Core assembly is bundled into the single-file executable; the native SQLite
+  library (`e_sqlite3.dll` or `libe_sqlite3.so`) stays a separate file beside the executable, next to the web assets,
+  so the archive must be kept together. CI installs Chromium so the Puppet end-to-end test runs and is linked to the
+  Puppet requirements. The release workflow attaches the archives and checksums to the GitHub release.
 
 ## Open Concerns
 
 1. 🟡 **MEDIUM** PDF evidence library: the choice is deferred. Needs a non-commercial-license library that can write
    the Keywords metadata and eventually PDF/A.
 2. 🟡 **MEDIUM** Database migrations: deferred, so there is no upgrade path until implemented. Schema changes before
-   then require recreating the database.
+   then require recreating the database. `EnsureCreated` also has a known race if two server instances start on a new
+   database at the same time; run a single instance (decision 20).
 3. 🟡 **MEDIUM** GitSource fidelity: verify early that the git CLI filter approach reproduces the CI checkout bytes,
    including LFS and binary files.
 4. 🟢 **LOW** ReviewMark `file` field: confirm ReviewMark's url evidence source accepts a non-PDF report URL in

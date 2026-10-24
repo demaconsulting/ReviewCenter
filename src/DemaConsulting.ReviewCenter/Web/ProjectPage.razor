@@ -1,0 +1,92 @@
+@* ProjectPage: one project with its reviews and the form that creates a new review, at "/projects/{id}".
+
+   Presentation only; state and event handling live in ProjectPage.razor.cs. Every interactive element and
+   every key value carries a stable kebab-case data-testid (row-level ids carry the review id or the list
+   index), and the data-interactive marker on the root flips to "true" once the live circuit is connected. *@
+@page "/projects/{ProjectId:int}"
+@rendermode InteractiveServer
+
+<PageTitle>@(Project?.Name ?? "Project") - ReviewCenter</PageTitle>
+
+<main class="page" data-testid="project-page" data-interactive="@InteractiveMarker">
+    <nav class="breadcrumb">
+        <a href="/" data-testid="home-link">ReviewCenter</a>
+        <span aria-hidden="true">/</span>
+        <a href="/projects" data-testid="projects-link">Projects</a>
+    </nav>
+
+    @if (!Loaded)
+    {
+        <p class="muted" data-testid="project-loading">Loading...</p>
+    }
+    else if (Project is null)
+    {
+        <p class="error" role="alert" data-testid="project-not-found">Project @ProjectId does not exist.</p>
+    }
+    else
+    {
+        <h1 data-testid="project-name">@Project.Name</h1>
+        @if (Project.Description.Length > 0)
+        {
+            <p class="muted" data-testid="project-description">@Project.Description</p>
+        }
+
+        <section class="card">
+            <h2>Reviews</h2>
+            @if (Reviews.Count == 0)
+            {
+                <p class="muted" data-testid="reviews-empty">This project has no reviews yet.</p>
+            }
+            else
+            {
+                <ul class="item-list" data-testid="reviews-list">
+                    @foreach (var review in Reviews)
+                    {
+                        <li data-testid="review-row-@review.Id">
+                            <a href="/projects/@ProjectId/reviews/@review.Id" data-testid="review-link-@review.Id">@review.Id</a>
+                            <span data-testid="review-title-@review.Id">@review.Title</span>
+                            <span class="badge" data-testid="review-state-@review.Id">@review.State</span>
+                        </li>
+                    }
+                </ul>
+            }
+        </section>
+
+        <section class="card">
+            <h2>New review</h2>
+            <form data-testid="new-review-form" @onsubmit="CreateReviewAsync">
+                <div class="field">
+                    <label for="review-id">Review id</label>
+                    <input id="review-id" type="text" maxlength="@ReviewLimits.MaxReviewIdLength"
+                           data-testid="review-id-input" @bind="ReviewId" @bind:event="oninput" />
+                </div>
+                <div class="field">
+                    <label for="review-title">Title</label>
+                    <input id="review-title" type="text" maxlength="@ReviewLimits.MaxReviewTitleLength"
+                           data-testid="review-title-input" @bind="ReviewTitle" @bind:event="oninput" />
+                </div>
+                <div class="field">
+                    <label for="review-files">Files</label>
+                    <InputFile id="review-files" multiple OnChange="OnFilesSelectedAsync" data-testid="review-files-input" />
+                </div>
+                @if (SelectedFiles.Count > 0)
+                {
+                    <ul class="item-list" data-testid="selected-files-list">
+                        @for (var index = 0; index < SelectedFiles.Count; index++)
+                        {
+                            <li data-testid="selected-file-@index">
+                                <span class="path" data-testid="selected-file-path-@index">@SelectedFiles[index].Path</span>
+                                <span class="muted" data-testid="selected-file-size-@index">@SelectedFiles[index].Content.Length bytes</span>
+                            </li>
+                        }
+                    </ul>
+                }
+                @if (ErrorMessage is not null)
+                {
+                    <p class="error" role="alert" data-testid="review-error">@ErrorMessage</p>
+                }
+                <button type="submit" data-testid="create-review-button">Create review</button>
+            </form>
+        </section>
+    }
+</main>

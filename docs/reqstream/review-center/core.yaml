@@ -1,0 +1,75 @@
+---
+# Core Subsystem Requirements
+#
+# PURPOSE:
+# - Define requirements for the ReviewCenter Core subsystem
+# - The Core subsystem spans the Fingerprint, ProjectService, and ReviewService units, with the domain types
+#   they share (project, review, review file, upload, limits, rule exception, and store interface)
+# - Subsystem requirements describe the externally visible behavior of the domain model and its rules
+
+sections:
+  - title: Core Subsystem Requirements
+    requirements:
+      - id: ReviewCenter-Core-Projects
+        title: >-
+          The Core subsystem shall create projects from a name and an optional description, and shall list
+          and read them back.
+        justification: |
+          Projects group the reviews of one body of work. The rest of the system can only manage reviews once
+          projects can be created and found again.
+        children:
+          - ReviewCenter-ProjectService-Create
+          - ReviewCenter-ProjectService-List
+          - ReviewCenter-ProjectService-Read
+        tests:
+          - CoreSubsystem_ProjectAndReviewWorkflow_ValidInput_StoresFingerprintsAndReadsBack
+
+      - id: ReviewCenter-Core-Reviews
+        title: >-
+          The Core subsystem shall create a draft review in a project from a set of uploaded files, keep every
+          file byte for byte with its size and SHA-256 hash, and read the review, its list, and its file
+          content back.
+        justification: |
+          A review is a fixed snapshot of the files to be reviewed. Keeping the exact bytes, and showing them
+          again unchanged, is what lets a reviewer trust that the content seen is the content that was
+          submitted, including binary files and files with Windows line endings.
+        children:
+          - ReviewCenter-ReviewService-Draft
+          - ReviewCenter-ReviewService-Read
+        tests:
+          - CoreSubsystem_ProjectAndReviewWorkflow_ValidInput_StoresFingerprintsAndReadsBack
+
+      - id: ReviewCenter-Core-Fingerprint
+        title: >-
+          The Core subsystem shall give every review a content fingerprint that is calculated from the bytes of
+          its files exactly as ReviewMark calculates it, independent of file names and order.
+        justification: |
+          The fingerprint identifies the exact content under review and later allows a review to be matched to
+          the evidence ReviewMark produces for the same files. Only the same algorithm gives the same value, so
+          a deviation would silently break that match.
+        children:
+          - ReviewCenter-Fingerprint-FileHash
+          - ReviewCenter-Fingerprint-SetHash
+          - ReviewCenter-Fingerprint-Duplicates
+          - ReviewCenter-ReviewService-Fingerprint
+        tests:
+          - CoreSubsystem_ProjectAndReviewWorkflow_ValidInput_StoresFingerprintsAndReadsBack
+          - CoreSubsystem_Fingerprint_SameContentOtherNamesAndOrder_GivesSameFingerprint
+
+      - id: ReviewCenter-Core-Rules
+        title: >-
+          The Core subsystem shall enforce the project, review identity, and upload rules, and shall report each
+          violation as a domain rule exception that names the rule, without storing anything.
+        justification: |
+          Rules that protect the integrity of the review record must hold no matter which user interface or
+          store is used. Naming the violated rule lets a caller tell the user what to correct, and storing
+          nothing on a violation keeps the record free of partial reviews.
+        children:
+          - ReviewCenter-ProjectService-Validation
+          - ReviewCenter-ReviewService-Id
+          - ReviewCenter-ReviewService-Title
+          - ReviewCenter-ReviewService-Project
+          - ReviewCenter-ReviewService-Files
+          - ReviewCenter-ReviewService-Limits
+        tests:
+          - CoreSubsystem_RuleViolation_IsReportedAsDomainRuleAndStoresNothing

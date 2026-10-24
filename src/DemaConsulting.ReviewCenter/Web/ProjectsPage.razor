@@ -1,0 +1,61 @@
+@* ProjectsPage: the list of projects and the form that creates a new one, at "/projects".
+
+   Presentation only; state and event handling live in ProjectsPage.razor.cs. Every interactive element and
+   every key value carries a stable kebab-case data-testid (row-level ids carry the project id), and the
+   data-interactive marker on the root flips to "true" once the live circuit is connected. *@
+@page "/projects"
+@rendermode InteractiveServer
+
+<PageTitle>Projects - ReviewCenter</PageTitle>
+
+<main class="page" data-testid="projects-page" data-interactive="@InteractiveMarker">
+    <nav class="breadcrumb">
+        <a href="/" data-testid="home-link">ReviewCenter</a>
+    </nav>
+
+    <h1>Projects</h1>
+
+    <section class="card">
+        <h2>All projects</h2>
+        @if (Projects.Count == 0)
+        {
+            <p class="muted" data-testid="projects-empty">There are no projects yet.</p>
+        }
+        else
+        {
+            <ul class="item-list" data-testid="projects-list">
+                @foreach (var project in Projects)
+                {
+                    <li data-testid="project-row-@project.Id">
+                        <a href="/projects/@project.Id" data-testid="project-link-@project.Id">@project.Name</a>
+                        @if (project.Description.Length > 0)
+                        {
+                            <p class="muted" data-testid="project-description-@project.Id">@project.Description</p>
+                        }
+                    </li>
+                }
+            </ul>
+        }
+    </section>
+
+    <section class="card">
+        <h2>New project</h2>
+        <form data-testid="new-project-form" @onsubmit="CreateProjectAsync">
+            <div class="field">
+                <label for="project-name">Name</label>
+                <input id="project-name" type="text" maxlength="@ReviewLimits.MaxProjectNameLength"
+                       data-testid="project-name-input" @bind="NewName" @bind:event="oninput" />
+            </div>
+            <div class="field">
+                <label for="project-description">Description</label>
+                <textarea id="project-description" rows="3" maxlength="@ReviewLimits.MaxProjectDescriptionLength"
+                          data-testid="project-description-input" @bind="NewDescription" @bind:event="oninput"></textarea>
+            </div>
+            @if (ErrorMessage is not null)
+            {
+                <p class="error" role="alert" data-testid="project-error">@ErrorMessage</p>
+            }
+            <button type="submit" data-testid="create-project-button">Create project</button>
+        </form>
+    </section>
+</main>

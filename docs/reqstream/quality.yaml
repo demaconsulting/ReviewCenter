@@ -114,6 +114,18 @@ sections:
           - ReviewCenter-OTS-AspNetCore-Host
           - ReviewCenter-OTS-AspNetCore-Components
 
+      - id: Quality-DataStorage
+        title: The repository shall rely on Entity Framework Core with SQLite to store projects and reviews.
+        tags: [quality]
+        justification: |
+          The Storage subsystem keeps projects and reviews in a SQLite database through
+          Entity Framework Core. This grouping requirement links the EF Core OTS
+          requirements to the quality root so they participate in orphan detection
+          without being falsely reported as disconnected from tool functionality.
+        children:
+          - ReviewCenter-OTS-EfCore-Mapping
+          - ReviewCenter-OTS-EfCore-Sqlite
+
       - id: Quality-ComponentTesting
         title: The repository shall rely on bUnit and the ASP.NET Core test host to verify the web interface in memory.
         tags: [quality]

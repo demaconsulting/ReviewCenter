@@ -127,6 +127,21 @@ public class HomePageTests : BunitContext
     }
 
     /// <summary>
+    ///     Test that the page links to the projects page.
+    /// </summary>
+    [Fact]
+    public void HomePage_Render_Default_LinksToProjects()
+    {
+        // Arrange: no setup required; the component renders with default parameters
+
+        // Act: render the page
+        var cut = Render<HomePage>();
+
+        // Assert: the projects link points at the projects page
+        Assert.Equal("/projects", cut.Find("[data-testid='projects-link']").GetAttribute("href"));
+    }
+
+    /// <summary>
     ///     Test that the interactive marker is set once the component has rendered on a live circuit.
     /// </summary>
     [Fact]

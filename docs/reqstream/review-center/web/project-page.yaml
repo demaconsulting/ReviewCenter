@@ -1,0 +1,88 @@
+---
+# Software Unit Requirements for the ProjectPage Unit
+#
+# The ProjectPage unit is the page at /projects/{project} that shows one project with its reviews and offers a
+# form to create a review from uploaded files.
+
+sections:
+  - title: ProjectPage Unit Requirements
+    requirements:
+      - id: ReviewCenter-ProjectPage-Show
+        title: >-
+          The ProjectPage unit shall show the name and description of the project, or a not-found message when
+          the project does not exist.
+        justification: |
+          A stored or mistyped link must lead to a clear answer rather than to an error page.
+        tests:
+          - ProjectPage_Render_UnknownProject_ShowsNotFound
+          - ProjectPage_Render_ProjectWithoutReviews_ShowsNameAndEmptyMessage
+
+      - id: ReviewCenter-ProjectPage-Reviews
+        title: >-
+          The ProjectPage unit shall list the reviews of the project with a link to each review, its title, and
+          its state.
+        justification: |
+          The project page is how users reach their reviews and see where each one stands.
+        tests:
+          - ProjectPage_Render_ProjectWithReview_ListsReviewWithLinkTitleAndState
+
+      - id: ReviewCenter-ProjectPage-Selection
+        title: >-
+          The ProjectPage unit shall list the name and size of each file the user selects for a new review, and
+          a new selection shall replace the previous one. When the page is reused for another project, it shall
+          show that project and discard the previous form values and selection.
+        justification: |
+          Users must see exactly which files they are about to submit before they submit them, and must be able
+          to correct a wrong selection. Files chosen for one project must never be submitted into another.
+        tests:
+          - ProjectPage_FileInput_FilesSelected_ListsNamesAndSizes
+          - ProjectPage_FileInput_SecondSelection_ReplacesFirst
+          - ProjectPage_ParametersChange_OtherProject_ClearsFormAndSelection
+
+      - id: ReviewCenter-ProjectPage-Create
+        title: >-
+          The ProjectPage unit shall offer a form with a review identifier, a title, and selected files that
+          creates a review from the file names and contents, and then shows the review page.
+        justification: |
+          Creating a review from files is the central action of the product. Only the file name is used as the
+          path, because a browser does not reveal the folder a file came from.
+        tests:
+          - ProjectPage_CreateForm_ValidInput_CreatesReviewAndNavigatesToIt
+
+      - id: ReviewCenter-ProjectPage-Error
+        title: >-
+          The ProjectPage unit shall show the reason when a review cannot be created, naming the identifier for
+          a duplicate identifier, and shall create nothing, including when no files are selected or two selected
+          files have the same name.
+        justification: |
+          A rejected form must tell users what to correct, and must not leave a partial review.
+        tests:
+          - ProjectPage_CreateForm_NoFiles_ShowsErrorAndCreatesNothing
+          - ProjectPage_CreateForm_DuplicateReviewId_ShowsErrorNamingTheId
+          - ProjectPage_CreateForm_DuplicateFileNames_ShowsDuplicatePathError
+
+      - id: ReviewCenter-ProjectPage-Limits
+        title: >-
+          The ProjectPage unit shall refuse a selection that has more files than the review file-count limit,
+          a file larger than the per-file size limit, or files that together are larger than the total size
+          limit, with an error message, before reading any content, and shall keep no selection from that
+          attempt and create no review.
+        justification: |
+          Files are uploaded over the live connection into server memory. Refusing a selection by its reported
+          count and sizes protects the server before any content is transferred, and refusing it as a whole
+          ensures a partly read file set is never submitted.
+        tests:
+          - ProjectPage_FileInput_FileTooLarge_ShowsErrorAndKeepsNothing
+          - ProjectPage_FileInput_TooManyFiles_ShowsErrorAndKeepsNothing
+          - ProjectPage_FileInput_TotalSizeTooLarge_ShowsErrorAndKeepsNothing
+          - ProjectPage_FileInput_DeclaredSizesUnderstated_RejectsOnReceivedBytes
+
+      - id: ReviewCenter-ProjectPage-Interactive
+        title: >-
+          The ProjectPage unit shall report that it is interactive, through a marker on its root element, once
+          it has rendered on a live connection.
+        justification: |
+          Users, automated tests, and tooling need a reliable signal that the page now responds, so that they do
+          not act before the live connection exists.
+        tests:
+          - ProjectPage_AfterRender_Interactive_SetsMarker

@@ -1,0 +1,59 @@
+---
+# Storage Subsystem Requirements
+#
+# PURPOSE:
+# - Define requirements for the ReviewCenter Storage subsystem
+# - The Storage subsystem spans the ReviewCenterDbContext, ReviewStore, and DatabaseSetup units
+# - Subsystem requirements describe the externally visible behavior of the persistence of projects and reviews
+
+sections:
+  - title: Storage Subsystem Requirements
+    requirements:
+      - id: ReviewCenter-Storage-Persistence
+        title: >-
+          The Storage subsystem shall keep projects, reviews, and the exact bytes of review files in a database
+          file, so that they are all still there, unchanged, when the database is opened again.
+        justification: |
+          Review records are evidence and must outlive the process that created them. Keeping the exact bytes
+          means the fingerprint of a stored review can always be reproduced from what is stored.
+        children:
+          - ReviewCenter-ReviewStore-Projects
+          - ReviewCenter-ReviewStore-Reviews
+          - ReviewCenter-ReviewStore-Metadata
+          - ReviewCenter-DbContext-Schema
+          - ReviewCenter-DbContext-Content
+        tests:
+          - StorageSubsystem_ServicesOverDatabase_ReopenedDatabase_KeepsProjectAndReview
+
+      - id: ReviewCenter-Storage-Integrity
+        title: >-
+          The Storage subsystem shall refuse a second review with the same identifier in a project, and a
+          review for a project that does not exist, leaving the stored data unchanged.
+        justification: |
+          The database is the last line of defense for the review record: two requests made at the same moment
+          can both pass a check made before saving, so the database itself must enforce uniqueness and the
+          project relationship.
+        children:
+          - ReviewCenter-ReviewStore-Duplicate
+          - ReviewCenter-DbContext-Integrity
+        tests:
+          - StorageSubsystem_ServicesOverDatabase_DuplicateReviewId_IsRefusedAndKeepsOriginal
+          - StorageSubsystem_ServicesOverDatabase_UnknownProject_IsRefusedAndKeepsData
+
+      - id: ReviewCenter-Storage-Configuration
+        title: >-
+          The Storage subsystem shall open the database named by its provider and connection settings, create
+          the database and its tables on first use, and refuse an unsupported provider with an error that names
+          it, without creating a database.
+        justification: |
+          Operators choose where the data lives. A new installation must work without manual database setup,
+          while a mistyped or not yet supported provider must fail loudly instead of quietly using something
+          else.
+        children:
+          - ReviewCenter-DatabaseSetup-Location
+          - ReviewCenter-DatabaseSetup-Connection
+          - ReviewCenter-DatabaseSetup-Provider
+          - ReviewCenter-DatabaseSetup-Create
+        tests:
+          - StorageSubsystem_ServicesOverDatabase_ReopenedDatabase_KeepsProjectAndReview
+          - StorageSubsystem_UnsupportedProvider_Opening_FailsWithClearErrorAndCreatesNothing

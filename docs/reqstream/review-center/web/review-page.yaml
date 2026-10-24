@@ -1,0 +1,68 @@
+---
+# Software Unit Requirements for the ReviewPage Unit
+#
+# The ReviewPage unit is the page at /projects/{project}/reviews/{review} that shows one review with its
+# fingerprint and files, and displays the content of a selected file.
+
+sections:
+  - title: ReviewPage Unit Requirements
+    requirements:
+      - id: ReviewCenter-ReviewPage-Show
+        title: >-
+          The ReviewPage unit shall show the identifier, title, state, and content fingerprint of the review, a
+          link back to the owning project labeled with the project name, or a not-found message when the review
+          does not exist.
+        justification: |
+          The fingerprint identifies the exact content under review, so it must be visible. A mistyped link must
+          lead to a clear answer, and the reviewer must see which project the review belongs to.
+        tests:
+          - ReviewPage_Render_UnknownReview_ShowsNotFound
+          - ReviewPage_Render_ExistingReview_ShowsIdTitleStateAndFingerprint
+          - ReviewPage_Render_FileSelected_ShowsProjectNameAndHighlightsRow
+          - ReviewPage_ParametersChange_OtherReview_ShowsNewReviewAndClearsSelection
+
+      - id: ReviewCenter-ReviewPage-Files
+        title: >-
+          The ReviewPage unit shall list the files of the review with the path, size, and SHA-256 hash of each,
+          and give each file's View button an accessible name that identifies the file.
+        justification: |
+          Reviewers need to see what the review contains, and the per-file hashes let them verify a file
+          independently of the product.
+        tests:
+          - ReviewPage_Render_ExistingReview_ListsFilesWithPathSizeAndHash
+          - ReviewPage_Render_ExistingReview_FileButtonsNameTheirFile
+
+      - id: ReviewCenter-ReviewPage-Content
+        title: >-
+          The ReviewPage unit shall show no file content until a file is selected, show the content of the
+          selected file exactly as stored, as plain text, when it is valid UTF-8 text without NUL bytes
+          (including an empty file), and show the content of another file when that file is selected.
+        justification: |
+          Reviewers must see the true content of a file. Displaying it as plain text, never as markup, shows
+          every character and cannot execute anything in the file.
+        tests:
+          - ReviewPage_Render_NoFileSelected_ShowsNoContent
+          - ReviewPage_FileSelect_TextFile_ShowsRawTextInPre
+          - ReviewPage_FileSelect_EmptyFile_ShowsEmptyContent
+          - ReviewPage_FileSelect_SecondFile_ReplacesContent
+
+      - id: ReviewCenter-ReviewPage-Binary
+        title: >-
+          The ReviewPage unit shall show a notice instead of content for a selected file that contains a NUL
+          byte or is not valid UTF-8.
+        justification: |
+          Binary content cannot be shown meaningfully as text, and rendering it would produce unreadable
+          output. The notice tells the reviewer why nothing is shown.
+        tests:
+          - ReviewPage_FileSelect_BinaryFile_ShowsBinaryNoticeAndNoContent
+          - ReviewPage_FileSelect_InvalidUtf8_ShowsBinaryNotice
+
+      - id: ReviewCenter-ReviewPage-Interactive
+        title: >-
+          The ReviewPage unit shall report that it is interactive, through a marker on its root element, once it
+          has rendered on a live connection.
+        justification: |
+          Users, automated tests, and tooling need a reliable signal that the page now responds, so that they do
+          not act before the live connection exists.
+        tests:
+          - ReviewPage_AfterRender_Interactive_SetsMarker

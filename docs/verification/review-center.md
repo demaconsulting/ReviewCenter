@@ -56,6 +56,10 @@ loopback TCP ports.
   with code 0 when asked to terminate.
 - The `--urls` option controls the listen address, is rejected without `serve`, and a port that
   is already in use produces an error and a non-zero exit code.
+- The running server serves the projects page and has created its database; stored data is served again
+  after a restart of the server.
+- A database setting that cannot be used stops the server with an error and a non-zero exit code.
+- Every interactive element of the home page carries a `data-testid`, and the same holds for every other page.
 
 ## Test Scenarios
 
@@ -152,3 +156,29 @@ the `serve` verb; a request to `/` returns an HTML document titled "ReviewCenter
 the Hello button and the counter button, and the Blazor client script is served at
 `/_framework/blazor.web.js`. This scenario is tested by
 `ReviewCenter_ServeVerb_Started_HomePageContainsTitleAndControls`.
+
+**ReviewCenter_ServeVerb_Started_ServesProjectsPageAndCreatesDatabase**: The tool is started with the `serve` verb
+as a real process; the test process points its `Database` settings at a temporary file that does not yet exist. A
+request to `/projects` returns the page with the creation form, and the database file now exists, showing that the
+server created the database at start-up and that the projects page works against it. This scenario is tested by
+`ReviewCenter_ServeVerb_Started_ServesProjectsPageAndCreatesDatabase`.
+
+The system requirements for reviews, restart persistence, and database failure are verified at subsystem level,
+where the same production pipeline can be exercised with real databases more precisely than through a child
+process: creating a review needs a live browser connection for the file upload, which the in-memory component
+tests provide. The following scenarios belong to the system verification through the subsystem tests.
+
+**Review creation and display**: A project and a review are created through the domain services over a real
+database, and the review and project pages are requested over HTTP; the pages show the fingerprint, the files,
+and the project. This scenario is tested by `WebSubsystem_CreatedProjectAndReview_ArePresentedByThePages`.
+
+**Persistence across restart**: A project is stored, the server is stopped and started again on the same
+database file, and the projects page still lists the project. This scenario is tested by
+`HostingSubsystem_Startup_DatabaseConfigured_ServesStoredProjectsAfterRestart`.
+
+**Database failure**: The server is run with an unsupported database provider; it reports an error and returns
+exit code 1 without serving. This scenario is tested by
+`HostingSubsystem_Startup_UnsupportedDatabaseProvider_FailsWithExitCodeOne`.
+
+**Test identifiers on every page**: Every interactive element of every page carries a `data-testid`. This
+scenario is tested by `WebSubsystem_AllPages_EveryInteractiveElementHasTestId`.

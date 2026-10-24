@@ -1,6 +1,6 @@
 package ReviewCenter {
     part def ServerHost {
-        doc /* Composition root that builds and runs the ASP.NET Core web application behind the serve verb. */
+        doc /* Composition root that builds and runs the ASP.NET Core web application behind the serve verb, including the database and domain services. */
 
         comment sourceRef /* Source: src/DemaConsulting.ReviewCenter/Hosting/ServerHost.cs */
         comment testRef /* Test: test/DemaConsulting.ReviewCenter.Tests/Hosting/ServerHostTests.cs */

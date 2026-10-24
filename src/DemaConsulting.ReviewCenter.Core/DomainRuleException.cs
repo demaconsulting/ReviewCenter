@@ -1,0 +1,94 @@
+// Copyright (c) DEMA Consulting
+// 
+// Permission is hereby granted, free of charge, to any person obtaining a copy
+// of this software and associated documentation files (the "Software"), to deal
+// in the Software without restriction, including without limitation the rights
+// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the Software is
+// furnished to do so, subject to the following conditions:
+// 
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
+// 
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+// SOFTWARE.
+
+namespace DemaConsulting.ReviewCenter.Core;
+
+/// <summary>
+///     The domain rules that can be violated, carried by <see cref="DomainRuleException"/>.
+/// </summary>
+/// <remarks>
+///     A machine-readable rule lets callers (and tests) tell violations apart without parsing
+///     message text.
+/// </remarks>
+public enum DomainRule
+{
+    /// <summary>The project name is empty or too long.</summary>
+    ProjectNameInvalid,
+
+    /// <summary>The project description is too long.</summary>
+    ProjectDescriptionTooLong,
+
+    /// <summary>The referenced project does not exist.</summary>
+    ProjectNotFound,
+
+    /// <summary>The review id is empty, too long, or contains characters that are not allowed.</summary>
+    ReviewIdInvalid,
+
+    /// <summary>A review with the same id already exists in the project.</summary>
+    ReviewIdDuplicate,
+
+    /// <summary>The review title is empty or too long.</summary>
+    ReviewTitleInvalid,
+
+    /// <summary>The review has no files.</summary>
+    NoFiles,
+
+    /// <summary>Two files of the review have the same path.</summary>
+    DuplicatePath,
+
+    /// <summary>A file path is empty or too long.</summary>
+    PathInvalid,
+
+    /// <summary>A file is larger than <see cref="ReviewLimits.MaxFileSizeBytes"/>.</summary>
+    FileTooLarge,
+
+    /// <summary>The review has more than <see cref="ReviewLimits.MaxFileCount"/> files.</summary>
+    TooManyFiles,
+
+    /// <summary>The files together are larger than <see cref="ReviewLimits.MaxTotalSizeBytes"/>.</summary>
+    TotalSizeExceeded
+}
+
+/// <summary>
+///     The exception raised when a request violates a domain rule.
+/// </summary>
+/// <remarks>
+///     Rule violations are expected user errors, not faults: the message is written for the
+///     operator and may be shown as it is, while <see cref="Rule"/> identifies the violation for
+///     code. The exception is immutable and thread-safe.
+/// </remarks>
+public sealed class DomainRuleException : Exception
+{
+    /// <summary>
+    ///     Initializes a new instance of the <see cref="DomainRuleException"/> class.
+    /// </summary>
+    /// <param name="rule">The rule that was violated.</param>
+    /// <param name="message">An operator-readable explanation of the violation.</param>
+    public DomainRuleException(DomainRule rule, string message)
+        : base(message)
+    {
+        Rule = rule;
+    }
+
+    /// <summary>
+    ///     Gets the rule that was violated.
+    /// </summary>
+    public DomainRule Rule { get; }
+}
