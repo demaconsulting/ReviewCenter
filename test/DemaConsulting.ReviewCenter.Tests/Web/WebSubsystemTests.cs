@@ -144,10 +144,54 @@ public partial class WebSubsystemTests
 
         // Assert: the next step, the index row of the open thread (activity read back from the database) and
         // the collapsed details
-        Assert.Equal("1 open thread to resolve.", page.QuerySelector("[data-testid='next-step']")?.TextContent);
+        Assert.Equal(
+            "58 checklist checks unanswered, 1 open thread to resolve.",
+            page.QuerySelector("[data-testid='next-step']")?.TextContent);
         Assert.Single(page.QuerySelectorAll("[data-testid='thread-index-list'] > li"));
         Assert.False(string.IsNullOrWhiteSpace(page.QuerySelector("[data-testid^='index-activity-']")?.TextContent));
         Assert.False(page.QuerySelector("[data-testid='review-details']")?.HasAttribute("open"));
+    }
+
+    /// <summary>
+    ///     Test that checks answered through the domain service are presented by the checklist page and the
+    ///     review page through the real pipeline, and are still there when the pages are requested again.
+    /// </summary>
+    [Fact]
+    public async Task WebSubsystem_ChecklistPage_AnsweredChecksSurviveReload()
+    {
+        // Arrange: start the real pipeline, create a review and answer two of its checks
+        var logs = new CapturingLoggerProvider();
+        await using var app = await TestWebApp.StartAsync(logs, "serve", "--silent");
+        using var client = app.GetTestClient();
+        var project = await app.Services.GetRequiredService<ProjectService>()
+            .CreateAsync("Apollo", null, TestContext.Current.CancellationToken);
+        await app.Services.GetRequiredService<ReviewService>().CreateDraftAsync(
+            project.Id, "rev-1", "First review", [new("a.txt", TestContent.A)], TestContext.Current.CancellationToken);
+        var checklists = app.Services.GetRequiredService<ChecklistService>();
+        await checklists.SetAnswerAsync(
+            project.Id, "rev-1", "REQ-01", ChecklistOutcome.Pass, null, "Ann", TestContext.Current.CancellationToken);
+        await checklists.SetAnswerAsync(
+            project.Id, "rev-1", "REQ-02", ChecklistOutcome.Fail, "Broken", "Ann", TestContext.Current.CancellationToken);
+
+        // Act: request the checklist page twice, and the review page
+        var route = $"/projects/{project.Id}/reviews/rev-1/checklist";
+        var first = await ParseAsync(client, route);
+        var reloaded = await ParseAsync(client, route);
+        var reviewPage = await ParseAsync(client, $"/projects/{project.Id}/reviews/rev-1");
+
+        // Assert: both loads show the answers; the Fail keeps its justification
+        foreach (var page in new[] { first, reloaded })
+        {
+            Assert.Equal("56 checks unanswered.", page.QuerySelector("[data-testid='checklist-status']")?.TextContent);
+            Assert.Equal("2 of 8", page.QuerySelector("[data-testid='section-req-progress']")?.TextContent);
+            Assert.Equal("true", page.QuerySelector("[data-testid='check-pass-req-01']")?.GetAttribute("aria-pressed"));
+            Assert.Equal("Broken", page.QuerySelector("[data-testid='check-justification-req-02']")?.TextContent);
+        }
+
+        // Assert: the review page links the checklist and names the unanswered checks as the next step
+        Assert.Equal("2 of 58 checks answered", reviewPage.QuerySelector("[data-testid='checklist-progress-summary']")?.TextContent);
+        Assert.Equal(route, reviewPage.QuerySelector("[data-testid='checklist-link']")?.GetAttribute("href"));
+        Assert.Equal("56 checklist checks unanswered.", reviewPage.QuerySelector("[data-testid='next-step']")?.TextContent);
     }
 
     /// <summary>
@@ -172,6 +216,7 @@ public partial class WebSubsystemTests
             $"/projects/{project.Id}",
             "/projects/9999",
             $"/projects/{project.Id}/reviews/rev-1",
+            $"/projects/{project.Id}/reviews/rev-1/checklist",
             $"/projects/{project.Id}/reviews/missing"
         ];
 

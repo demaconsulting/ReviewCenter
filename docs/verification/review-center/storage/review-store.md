@@ -26,8 +26,32 @@ be loadable on the test platform.
   forth; and an unknown thread, or a thread of another review, is reported as not found.
 - Threads are listed only for their own review, in creation order, and the database refuses a thread for a file
   that is not in the review.
+- A checklist snapshot is stored with its review and read back with its version; a review without one, and an
+  unknown review, have none.
+- Answering a check again, or setting a section's applicability again, replaces the earlier row, so there is one
+  row per check and per section; outcome, name, and time are read back as saved, and only for their own review.
 
 #### Test Scenarios
+
+**ReviewStore_AddReview_WithChecklist_StoresSnapshotAtomically**: A review carrying a checklist snapshot is stored
+and the snapshot is read back with the default version and a definition that parses to the default checklist. This
+scenario is tested by `ReviewStore_AddReview_WithChecklist_StoresSnapshotAtomically`.
+
+**ReviewStore_GetChecklist_ReviewWithoutSnapshot_ReturnsNull**: A review stored without a snapshot, and an unknown
+review, both give no checklist. This scenario is tested by
+`ReviewStore_GetChecklist_ReviewWithoutSnapshot_ReturnsNull`.
+
+**ReviewStore_SetChecklistAnswer_UpsertsSingleRowPerItem**: A check is answered Pass and then Fail with a
+justification, and another check is answered N/A; two answers are listed and the first holds the latest outcome and
+justification. This scenario is tested by `ReviewStore_SetChecklistAnswer_UpsertsSingleRowPerItem`.
+
+**ReviewStore_SetChecklistSectionState_UpsertsSingleRowPerSection**: A section is stored as not applicable with a
+reason and then as applicable; one row is listed each time and holds the latest state. This scenario is tested by
+`ReviewStore_SetChecklistSectionState_UpsertsSingleRowPerSection`.
+
+**ReviewStore_ChecklistRows_RoundTripOutcomeAndTimestamps**: A check of one review is answered N/A; the outcome,
+name, and time are read back as saved, and the other review has no answers. This scenario is tested by
+`ReviewStore_ChecklistRows_RoundTripOutcomeAndTimestamps`.
 
 **ReviewStore_AddProjectAsync_ValidProject_RoundTrips**: A project is stored; it is read back with the same
 values and a generated identity. This scenario is tested by `ReviewStore_AddProjectAsync_ValidProject_RoundTrips`.

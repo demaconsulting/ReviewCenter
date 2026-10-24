@@ -544,4 +544,171 @@ public class ReviewStoreTests
         // Assert: no thread exists afterwards
         Assert.Empty(await db.Store.ListThreadsAsync(projectId, "REV-1", TestContext.Current.CancellationToken));
     }
+
+    /// <summary>
+    ///     Builds a checklist snapshot for a review.
+    /// </summary>
+    /// <param name="projectId">The owning project.</param>
+    /// <param name="reviewId">The review id.</param>
+    /// <returns>The snapshot of the default checklist.</returns>
+    private static ReviewChecklist NewChecklist(int projectId, string reviewId)
+    {
+        return new ReviewChecklist
+        {
+            ProjectId = projectId,
+            ReviewId = reviewId,
+            Version = DefaultChecklist.Version,
+            Definition = DefaultChecklist.Current.ToJson()
+        };
+    }
+
+    /// <summary>
+    ///     Builds a checklist answer.
+    /// </summary>
+    /// <param name="projectId">The owning project.</param>
+    /// <param name="itemId">The check identifier.</param>
+    /// <param name="outcome">The outcome.</param>
+    /// <param name="justification">The justification, if any.</param>
+    /// <returns>The answer.</returns>
+    private static ChecklistAnswer NewAnswer(int projectId, string itemId, ChecklistOutcome outcome, string? justification)
+    {
+        return new ChecklistAnswer
+        {
+            ProjectId = projectId,
+            ReviewId = "REV-1",
+            ItemId = itemId,
+            Outcome = outcome,
+            Justification = justification,
+            AnsweredBy = "Ann",
+            AnsweredAt = _created
+        };
+    }
+
+    /// <summary>
+    ///     Test that a review added with a checklist snapshot stores the snapshot together with it.
+    /// </summary>
+    [Fact]
+    public async Task ReviewStore_AddReview_WithChecklist_StoresSnapshotAtomically()
+    {
+        // Arrange: a project and a review that carries a checklist snapshot
+        using var db = new TestStore();
+        var project = await db.Store.AddProjectAsync(new Project { Name = "P", Created = _created }, TestContext.Current.CancellationToken);
+        var review = NewReview(project.Id, "REV-1", ("a.txt", TestContent.A));
+        review = new Review
+        {
+            ProjectId = review.ProjectId,
+            Id = review.Id,
+            Title = review.Title,
+            State = review.State,
+            Created = review.Created,
+            ContentFingerprint = review.ContentFingerprint,
+            Files = review.Files,
+            Checklist = NewChecklist(project.Id, "REV-1")
+        };
+
+        // Act: add the review and read the snapshot back
+        await db.Store.AddReviewAsync(review, TestContext.Current.CancellationToken);
+        var checklist = await db.Store.GetChecklistAsync(project.Id, "REV-1", TestContext.Current.CancellationToken);
+
+        // Assert: the snapshot and its version are stored, and parse to the default checklist
+        Assert.NotNull(checklist);
+        Assert.Equal(DefaultChecklist.Version, checklist.Version);
+        Assert.Equal(58, checklist.Parse().Sections.Sum(section => section.Items.Count));
+    }
+
+    /// <summary>
+    ///     Test that a review stored without a snapshot, and an unknown review, have no checklist.
+    /// </summary>
+    [Fact]
+    public async Task ReviewStore_GetChecklist_ReviewWithoutSnapshot_ReturnsNull()
+    {
+        // Arrange: a review without a snapshot
+        using var db = new TestStore();
+        var projectId = await AddReviewAsync(db);
+
+        // Act, Assert: neither the review nor an unknown one has a checklist
+        Assert.Null(await db.Store.GetChecklistAsync(projectId, "REV-1", TestContext.Current.CancellationToken));
+        Assert.Null(await db.Store.GetChecklistAsync(projectId, "nope", TestContext.Current.CancellationToken));
+    }
+
+    /// <summary>
+    ///     Test that answering a check again replaces the answer instead of adding a second row.
+    /// </summary>
+    [Fact]
+    public async Task ReviewStore_SetChecklistAnswer_UpsertsSingleRowPerItem()
+    {
+        // Arrange: a review
+        using var db = new TestStore();
+        var projectId = await AddReviewAsync(db);
+
+        // Act: answer a check, answer it again, and answer another one
+        await db.Store.SetChecklistAnswerAsync(NewAnswer(projectId, "REQ-01", ChecklistOutcome.Pass, null), TestContext.Current.CancellationToken);
+        await db.Store.SetChecklistAnswerAsync(NewAnswer(projectId, "REQ-01", ChecklistOutcome.Fail, "Broken"), TestContext.Current.CancellationToken);
+        await db.Store.SetChecklistAnswerAsync(NewAnswer(projectId, "REQ-02", ChecklistOutcome.NotApplicable, "None"), TestContext.Current.CancellationToken);
+        var answers = await db.Store.ListChecklistAnswersAsync(projectId, "REV-1", TestContext.Current.CancellationToken);
+
+        // Assert: one row per check, the first one holding the latest answer
+        Assert.Equal(2, answers.Count);
+        var first = answers.Single(a => a.ItemId == "REQ-01");
+        Assert.Equal(ChecklistOutcome.Fail, first.Outcome);
+        Assert.Equal("Broken", first.Justification);
+    }
+
+    /// <summary>
+    ///     Test that setting the applicability of a section again replaces the state instead of adding a row.
+    /// </summary>
+    [Fact]
+    public async Task ReviewStore_SetChecklistSectionState_UpsertsSingleRowPerSection()
+    {
+        // Arrange: a review
+        using var db = new TestStore();
+        var projectId = await AddReviewAsync(db);
+        ChecklistSectionState State(bool applicable, string? reason) => new()
+        {
+            ProjectId = projectId,
+            ReviewId = "REV-1",
+            SectionId = "DES",
+            Applicable = applicable,
+            Reason = reason,
+            SetBy = "Ann",
+            SetAt = _created
+        };
+
+        // Act: mark the section as not applicable, then as applicable again
+        await db.Store.SetChecklistSectionStateAsync(State(false, "No design"), TestContext.Current.CancellationToken);
+        var notApplicable = await db.Store.ListChecklistSectionStatesAsync(projectId, "REV-1", TestContext.Current.CancellationToken);
+        await db.Store.SetChecklistSectionStateAsync(State(true, null), TestContext.Current.CancellationToken);
+        var applicable = await db.Store.ListChecklistSectionStatesAsync(projectId, "REV-1", TestContext.Current.CancellationToken);
+
+        // Assert: one row each time, holding the latest state
+        Assert.Equal("No design", Assert.Single(notApplicable).Reason);
+        var stored = Assert.Single(applicable);
+        Assert.True(stored.Applicable);
+        Assert.Null(stored.Reason);
+    }
+
+    /// <summary>
+    ///     Test that the outcome and the times of checklist rows round-trip, and that rows are kept per review.
+    /// </summary>
+    [Fact]
+    public async Task ReviewStore_ChecklistRows_RoundTripOutcomeAndTimestamps()
+    {
+        // Arrange: two reviews in one project
+        using var db = new TestStore();
+        var projectId = await AddReviewAsync(db);
+        await db.Store.AddReviewAsync(NewReview(projectId, "REV-2", ("a.txt", TestContent.A)), TestContext.Current.CancellationToken);
+
+        // Act: answer a check of the first review with a time that has an offset of zero
+        await db.Store.SetChecklistAnswerAsync(
+            NewAnswer(projectId, "REQ-01", ChecklistOutcome.NotApplicable, "Not relevant"), TestContext.Current.CancellationToken);
+        var first = await db.Store.ListChecklistAnswersAsync(projectId, "REV-1", TestContext.Current.CancellationToken);
+        var second = await db.Store.ListChecklistAnswersAsync(projectId, "REV-2", TestContext.Current.CancellationToken);
+
+        // Assert: outcome, name and time survived, and the other review has no answers
+        var answer = Assert.Single(first);
+        Assert.Equal(ChecklistOutcome.NotApplicable, answer.Outcome);
+        Assert.Equal("Ann", answer.AnsweredBy);
+        Assert.Equal(_created, answer.AnsweredAt);
+        Assert.Empty(second);
+    }
 }

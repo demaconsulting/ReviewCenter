@@ -88,6 +88,25 @@ public class ReviewServiceTests
     }
 
     /// <summary>
+    ///     Test that a new review carries the default checklist as a snapshot with its version.
+    /// </summary>
+    [Fact]
+    public async Task ReviewService_CreateDraftAsync_ValidInput_AttachesDefaultChecklistSnapshot()
+    {
+        // Arrange: a project
+        var (store, service, projectId) = await CreateWithProjectAsync();
+
+        // Act: create a draft
+        await service.CreateDraftAsync(projectId, "REV-1", "First", One("a.txt", TestContent.A), TestContext.Current.CancellationToken);
+
+        // Assert: the stored review has the default checklist, parsed back to the same definition
+        var checklist = store.Reviews.Single().Checklist;
+        Assert.NotNull(checklist);
+        Assert.Equal(DefaultChecklist.Version, checklist.Version);
+        Assert.Equal(58, checklist.Parse().Sections.Sum(section => section.Items.Count));
+    }
+
+    /// <summary>
     ///     Test that each file keeps its bytes verbatim and carries its size and hash.
     /// </summary>
     [Fact]

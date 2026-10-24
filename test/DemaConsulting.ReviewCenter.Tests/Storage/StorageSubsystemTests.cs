@@ -139,6 +139,48 @@ public class StorageSubsystemTests
     }
 
     /// <summary>
+    ///     Test that the checklist snapshot, the answers and the section applicability written through the
+    ///     services are still there after the database is closed and opened again.
+    /// </summary>
+    [Fact]
+    public async Task StorageSubsystem_Checklist_PersistsSnapshotAnswersAndSectionsAcrossReopen()
+    {
+        // Arrange: a new database file
+        var options = new DatabaseOptions { ConnectionString = TestDatabase.NewConnectionString() };
+        int projectId;
+
+        // Act: create a review, answer one check, mark one section as not applicable, then close the database
+        var first = Open(options);
+        using (first.Provider)
+        {
+            var project = await first.Projects.CreateAsync("Apollo", null, TestContext.Current.CancellationToken);
+            projectId = project.Id;
+            await first.Reviews.CreateDraftAsync(
+                projectId, "rev-1", "First", [new("a.txt", TestContent.A)], TestContext.Current.CancellationToken);
+            var checklists = new ChecklistService(first.Store, new FixedTimeProvider(_now));
+            await checklists.SetAnswerAsync(
+                projectId, "rev-1", "REQ-01", ChecklistOutcome.Fail, "Broken", "Ann", TestContext.Current.CancellationToken);
+            await checklists.SetSectionApplicabilityAsync(
+                projectId, "rev-1", "DES", false, "No design", "Ann", TestContext.Current.CancellationToken);
+        }
+
+        // Act: open the same database again and read the checklist
+        var second = Open(options);
+        using (second.Provider)
+        {
+            var state = await new ChecklistService(second.Store, new FixedTimeProvider(_now))
+                .GetAsync(projectId, "rev-1", TestContext.Current.CancellationToken);
+
+            // Assert: the snapshot, the answer and the applicability survived
+            Assert.NotNull(state);
+            Assert.Equal(DefaultChecklist.Version, state.Definition.Version);
+            Assert.Equal("Broken", state.AnswerFor("REQ-01")!.Justification);
+            Assert.Equal("No design", state.ReasonFor("DES"));
+            Assert.Equal(new ChecklistProgress(1, 53), state.Overall);
+        }
+    }
+
+    /// <summary>
     ///     Test that opening a database for a provider that is not supported fails with an error that names the
     ///     provider, and that no database file is created.
     /// </summary>

@@ -30,7 +30,8 @@ namespace DemaConsulting.ReviewCenter.Storage;
 /// <remarks>
 ///     Each operation uses its own short-lived context from the factory, so the store is safe for
 ///     concurrent use by all browser sessions. Read operations are untracked, and listing a review
-///     never loads file bytes. A uniqueness violation on the review key is translated to a
+///     never loads file bytes. The checklist snapshot is stored in the same transaction as its review.
+///     Answers and section states are replaced in place (one row per check or section). A uniqueness violation on the review key is translated to a
 ///     <see cref="DomainRuleException"/> so callers see the same error as for the service pre-check.
 /// </remarks>
 /// <param name="factory">The factory that creates a context per operation.</param>
@@ -250,6 +251,138 @@ internal sealed class ReviewStore(IDbContextFactory<ReviewCenterDbContext> facto
             .Include(t => t.Comments.OrderBy(c => c.Id))
             .OrderBy(t => t.Id)
             .ToListAsync(cancellationToken);
+    }
+
+    /// <inheritdoc />
+    public async Task<ReviewChecklist?> GetChecklistAsync(
+        int projectId,
+        string reviewId,
+        CancellationToken cancellationToken = default)
+    {
+        await using var context = await factory.CreateDbContextAsync(cancellationToken);
+        return await context.ReviewChecklists.AsNoTracking()
+            .FirstOrDefaultAsync(c => c.ProjectId == projectId && c.ReviewId == reviewId, cancellationToken);
+    }
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<ChecklistSectionState>> ListChecklistSectionStatesAsync(
+        int projectId,
+        string reviewId,
+        CancellationToken cancellationToken = default)
+    {
+        await using var context = await factory.CreateDbContextAsync(cancellationToken);
+        return await context.ChecklistSectionStates.AsNoTracking()
+            .Where(s => s.ProjectId == projectId && s.ReviewId == reviewId)
+            .ToListAsync(cancellationToken);
+    }
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<ChecklistAnswer>> ListChecklistAnswersAsync(
+        int projectId,
+        string reviewId,
+        CancellationToken cancellationToken = default)
+    {
+        await using var context = await factory.CreateDbContextAsync(cancellationToken);
+        return await context.ChecklistAnswers.AsNoTracking()
+            .Where(a => a.ProjectId == projectId && a.ReviewId == reviewId)
+            .ToListAsync(cancellationToken);
+    }
+
+    /// <inheritdoc />
+    public async Task SetChecklistSectionStateAsync(
+        ChecklistSectionState state,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(state);
+
+        await using var context = await factory.CreateDbContextAsync(cancellationToken);
+
+        // Replace the row when there is one; otherwise insert it. Two requests can both find no row, so the
+        // loser of the insert race updates the row the winner created
+        if (await UpdateSectionStateAsync(context, state, cancellationToken) > 0)
+        {
+            return;
+        }
+
+        context.ChecklistSectionStates.Add(state);
+        try
+        {
+            await context.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException ex) when (IsDuplicateKey(ex))
+        {
+            context.ChangeTracker.Clear();
+            await UpdateSectionStateAsync(context, state, cancellationToken);
+        }
+    }
+
+    /// <inheritdoc />
+    public async Task SetChecklistAnswerAsync(ChecklistAnswer answer, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(answer);
+
+        await using var context = await factory.CreateDbContextAsync(cancellationToken);
+
+        // Same replace-or-insert approach as for the section state
+        if (await UpdateAnswerAsync(context, answer, cancellationToken) > 0)
+        {
+            return;
+        }
+
+        context.ChecklistAnswers.Add(answer);
+        try
+        {
+            await context.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException ex) when (IsDuplicateKey(ex))
+        {
+            context.ChangeTracker.Clear();
+            await UpdateAnswerAsync(context, answer, cancellationToken);
+        }
+    }
+
+    /// <summary>
+    ///     Overwrites the stored row of a section state.
+    /// </summary>
+    /// <param name="context">The context to use.</param>
+    /// <param name="state">The state to store.</param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <returns>The number of rows updated: 1 when the row exists, otherwise 0.</returns>
+    private static Task<int> UpdateSectionStateAsync(
+        ReviewCenterDbContext context,
+        ChecklistSectionState state,
+        CancellationToken cancellationToken)
+    {
+        return context.ChecklistSectionStates
+            .Where(s => s.ProjectId == state.ProjectId && s.ReviewId == state.ReviewId && s.SectionId == state.SectionId)
+            .ExecuteUpdateAsync(
+                s => s.SetProperty(x => x.Applicable, state.Applicable)
+                    .SetProperty(x => x.Reason, state.Reason)
+                    .SetProperty(x => x.SetBy, state.SetBy)
+                    .SetProperty(x => x.SetAt, state.SetAt),
+                cancellationToken);
+    }
+
+    /// <summary>
+    ///     Overwrites the stored row of an answer.
+    /// </summary>
+    /// <param name="context">The context to use.</param>
+    /// <param name="answer">The answer to store.</param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <returns>The number of rows updated: 1 when the row exists, otherwise 0.</returns>
+    private static Task<int> UpdateAnswerAsync(
+        ReviewCenterDbContext context,
+        ChecklistAnswer answer,
+        CancellationToken cancellationToken)
+    {
+        return context.ChecklistAnswers
+            .Where(a => a.ProjectId == answer.ProjectId && a.ReviewId == answer.ReviewId && a.ItemId == answer.ItemId)
+            .ExecuteUpdateAsync(
+                s => s.SetProperty(x => x.Outcome, answer.Outcome)
+                    .SetProperty(x => x.Justification, answer.Justification)
+                    .SetProperty(x => x.AnsweredBy, answer.AnsweredBy)
+                    .SetProperty(x => x.AnsweredAt, answer.AnsweredAt),
+                cancellationToken);
     }
 
     /// <summary>

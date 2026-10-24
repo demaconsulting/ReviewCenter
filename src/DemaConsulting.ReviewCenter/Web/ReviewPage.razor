@@ -1,7 +1,8 @@
 @* ReviewPage: the view of one review at "/projects/{id}/reviews/{reviewId}", with its comment threads.
 
    Presentation only; state and event handling live in ReviewPage.razor.cs. From the top it shows the title, a
-   one-sentence next step, the list of files with size and open-thread count, the thread index of all files
+   one-sentence next step (checklist and threads), the checklist progress with a link to the checklist page, the
+   list of files with size and open-thread count, the thread index of all files
    (filter All/Open/Resolved, default Open; choosing a row selects the file and highlights the lines), and for
    the selected file: the text as numbered lines (or a notice for binary files), a form that starts a thread,
    and the threads of that file (a resolved thread is a one-line header until expanded). The review id, state,
@@ -35,7 +36,16 @@
     {
         <h1 data-testid="review-title">@Review.Title</h1>
 
-        <p class="status" data-testid="next-step">@ThreadService.NextStep(Threads)</p>
+        <p class="status" data-testid="next-step">@ThreadService.NextStep(Threads, Checklist?.Overall)</p>
+
+        @if (Checklist is not null)
+        {
+            <section class="card" data-testid="checklist-card">
+                <h2>Checklist</h2>
+                <p data-testid="checklist-progress-summary">@ChecklistSummary()</p>
+                <a class="action" href="/projects/@ProjectId/reviews/@ReviewId/checklist" data-testid="checklist-link">Open checklist</a>
+            </section>
+        }
 
         <section class="card">
             <h2>Files</h2>

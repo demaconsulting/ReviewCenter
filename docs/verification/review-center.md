@@ -60,6 +60,8 @@ loopback TCP ports.
   after a restart of the server.
 - Review comments (threads, replies, and resolve state) are presented by the review page and are kept after the
   database is reopened.
+- The review checklist (answers, applicability, and the frozen snapshot) is presented by the checklist and review
+  pages and is kept after the database is reopened.
 - A database setting that cannot be used stops the server with an error and a non-zero exit code.
 - Every interactive element of the home page carries a `data-testid`, and the same holds for every other page.
 
@@ -181,6 +183,15 @@ the open-thread count of the file. This scenario is tested by
 file, replied to, and resolved; the database is then closed and opened again, and the thread keeps its anchor, its
 resolved state, and both comments in posting order. This scenario is tested by
 `StorageSubsystem_ServicesOverDatabase_ReopenedDatabase_KeepsThreadsAndComments`.
+
+**Review checklist**: Two checks of a new review are answered through the domain service over the real pipeline, one
+Pass and one Fail with a justification; the checklist page, requested twice, shows the progress, the pressed Pass
+button, and the justification, and the review page shows the progress summary, the link to the checklist page, and
+the unanswered checks as the next step. This scenario is tested by
+`WebSubsystem_ChecklistPage_AnsweredChecksSurviveReload`. In a second scenario the snapshot, the answers, and the
+applicability of a section are stored over a real database; the database is closed and opened again, and all of it
+is read back. This scenario is tested by
+`StorageSubsystem_Checklist_PersistsSnapshotAnswersAndSectionsAcrossReopen`.
 
 **Persistence across restart**: A project is stored, the server is stopped and started again on the same
 database file, and the projects page still lists the project. This scenario is tested by

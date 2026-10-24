@@ -169,7 +169,8 @@ network until authentication is added in a later release.
 
 Select a file on the review page to read it as numbered lines and to discuss it in comment threads. The line at the
 top of the page says what is left to do: start a discussion, how many open threads are to be resolved, or that all
-are resolved. The file list shows the number of open threads of each file.
+are resolved (it also counts the unanswered checks of the [Review Checklist](#review-checklist)). The file list shows
+the number of open threads of each file.
 
 The thread index lists the threads of all files with the file, the lines, the state, the number of comments, the
 author of the first comment, and the time of the last activity, newest first. Use the All, Open, and Resolved
@@ -199,9 +200,41 @@ Posted comments cannot be edited or deleted, so the record of the discussion sta
 changes. Comments posted by other people appear when you reload the page or take an action on it. Comment text is
 always shown as plain text; any markup in it is displayed as typed.
 
+## Review Checklist
+
+Every new review gets a checklist: a copy of the default checklist, taken from the Continuous Compliance review
+template, with 14 sections and 58 checks. The review page shows a Checklist card with a summary such as "37 of 58
+checks answered" and a link to the checklist page; the review page's next-step line also counts the unanswered
+checks (for example "12 checklist checks unanswered, 1 open thread to resolve.") and says "Checklist complete and
+all threads resolved." when nothing is left.
+
+The checklist page tells you what to do next at its top: how many checks are unanswered, the overall progress, and
+a "Next unanswered check" button that opens the section of the first unanswered check and brings it into view.
+Below that, every section is listed with its progress (for example "3 of 8"); only one section is open at a time,
+and the first section with unanswered checks is open when you arrive.
+
+1. Enter your name in the "Your name" field (1 to 100 characters). It is stored with each answer, together with the
+   UTC time, and shown as "Answered by".
+2. Open a section and choose Pass, Fail, or N/A for each check. A Pass is saved at once. For Fail and N/A a
+   justification (up to 2000 characters) is required: type it in the box that appears and press Save. A missing
+   justification is reported next to the box, and nothing is saved until it is given. You can change an answer at any
+   time.
+3. If a section does not apply to the review, clear its "This section applies to the review" switch, give the reason
+   (required), and press Save reason. A section that does not apply counts as done and its checks leave the totals.
+   Switch it on again to answer its checks; the reason is then cleared.
+
+The checklist is complete when every check of every applicable section is answered. A Fail is a valid answer: it
+counts as answered, and its justification records the finding.
+
+The checklist of a review is fixed when the review is created: a later release with a different default checklist
+does not change reviews that already exist. The name in "Your name" is free text and is not verified; this is
+temporary until user authentication is added. Checklist answers are not linked to comment threads. The checklist
+page is made for narrow screens too.
+
 ## Database
 
-ReviewCenter keeps projects, reviews, file contents, and comment threads in a SQLite database file. On first start
+ReviewCenter keeps projects, reviews, file contents, comment threads, and checklists in a SQLite database file. On
+first start
 it creates the
 folder, the file, and the tables. The default file is `reviewcenter.db` in the `ReviewCenter` folder of the
 per-user application data folder (`%LOCALAPPDATA%\ReviewCenter` on Windows, `~/.local/share/ReviewCenter` on
@@ -226,8 +259,9 @@ Database__ConnectionString=/srv/reviewcenter/reviews.db reviewcenter serve
 
 If the database cannot be prepared (for example the provider is not supported or the location cannot be used), the
 server writes an error message and exits with a non-zero exit code. Database migrations are not provided in this
-release: the tables are created only when the database is new. A database file created before review comments
-existed does not have the comment tables, and the review page cannot work with it; delete the file (or point
+release: the tables are created only when the database is new. A database file created before review comments or
+checklists existed does not have the tables and columns that are needed, and the pages cannot work with it; delete
+the file (or point
 `Database:ConnectionString` at a new one) to start again. Do this only with development data.
 
 ## Self-Validation

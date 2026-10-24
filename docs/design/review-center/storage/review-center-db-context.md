@@ -10,7 +10,7 @@ conversions. It contains no queries; those belong to `ReviewStore`.
 
 #### Data Model
 
-The context exposes five sets and maps the Core types directly, without separate persistence classes.
+The context exposes eight sets and maps the Core types directly, without separate persistence classes.
 
 - **Projects** (`Project`): key `Id`, assigned by the database. `Name` is required, at most 100 characters;
   `Description` is required (may be empty), at most 1000; `Created`.
@@ -26,6 +26,15 @@ The context exposes five sets and maps the Core types directly, without separate
 - **Comments** (`ReviewComment`): key `Id`, assigned by the database, so it grows with the posting order.
   `ThreadId` relates the comment to its thread, and a comment is deleted with its thread. `Author` is required, at
   most 100 characters; `Text` is required, at most 4000; `Created`.
+- **ReviewChecklists** (`ReviewChecklist`): key `ProjectId` plus `ReviewId`, one frozen snapshot per review.
+  `Version` is required, at most 64; `Definition` is required text (the JSON of the checklist). It belongs to its
+  review (a one-to-one relationship, so the snapshot is saved with the review) and is deleted with it.
+- **ChecklistSectionStates** (`ChecklistSectionState`): key `ProjectId`, `ReviewId`, and `SectionId` (at most 32),
+  so a review has at most one state per section. `Applicable`; `Reason` at most 2000; `SetBy` is required, at most
+  100; `SetAt`. It belongs to a review and is deleted with it.
+- **ChecklistAnswers** (`ChecklistAnswer`): key `ProjectId`, `ReviewId`, and `ItemId` (at most 32), so a check has at
+  most one answer. `Outcome` is stored as text, at most 32; `Justification` at most 2000; `AnsweredBy` is
+  required, at most 100; `AnsweredAt`. It belongs to a review and is deleted with it.
 
 The limits of project, review, path, author, and comment columns use the constants of `ReviewLimits`, so the schema
 and the rules cannot drift apart. The widths that are a property of the storage representation rather than of a
@@ -36,7 +45,10 @@ allows the same identifier in two projects. The composite key of a file makes it
 These keys are what enforces uniqueness in the database even when two requests race; no separate unique index
 exists. The state is stored by name, so adding states later does not change the meaning of stored rows. The
 tables of threads and comments are new: a database created before they existed does not have them and is not
-altered, so it must be deleted and created again (see the `Storage` design).
+altered, so it must be deleted and created again (see the `Storage` design). The same holds for the three
+checklist tables. The checklist keys are what makes "one answer per check" a rule of the database. The section and
+check identifiers are not related to a table of their own: they name entries inside the snapshot, and the service
+checks them.
 
 #### Key Methods
 
@@ -55,7 +67,8 @@ mapped constraints surface as database update exceptions to `ReviewStore`.
 #### Dependencies
 
 - **Core domain types** — `Project`, `Review`, `ReviewFile`, `ReviewState`, `ReviewThread`, `ReviewComment`,
-  `ReviewThreadState`, and `ReviewLimits`.
+  `ReviewThreadState`, `ReviewChecklist`, `ChecklistSectionState`, `ChecklistAnswer`, `ChecklistOutcome`, and
+  `ReviewLimits`.
 - **Entity Framework Core** — the context base class and the model configuration API.
 
 #### Callers

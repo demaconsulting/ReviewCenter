@@ -67,4 +67,10 @@ public sealed class Review
     ///     Gets the files of the review.
     /// </summary>
     public List<ReviewFile> Files { get; init; } = [];
+
+    /// <summary>
+    ///     Gets the frozen checklist, set only when the review is created; reviews read back from the store do not
+    ///     carry it (read it with <see cref="ChecklistService"/>).
+    /// </summary>
+    public ReviewChecklist? Checklist { get; init; }
 }

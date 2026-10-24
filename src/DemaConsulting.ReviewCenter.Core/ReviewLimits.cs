@@ -80,4 +80,9 @@ public static class ReviewLimits
     ///     The longest accepted comment text, in characters.
     /// </summary>
     public const int MaxCommentLength = 4000;
+
+    /// <summary>
+    ///     The longest accepted checklist justification or not-applicable reason, in characters.
+    /// </summary>
+    public const int MaxJustificationLength = 2000;
 }

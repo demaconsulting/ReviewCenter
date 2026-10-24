@@ -545,6 +545,36 @@ public class ThreadServiceTests
     }
 
     /// <summary>
+    ///     Test that the next step combines the unanswered checklist checks with the open threads.
+    /// </summary>
+    /// <param name="unanswered">The number of unanswered checks.</param>
+    /// <param name="open">The number of open threads.</param>
+    /// <param name="resolved">The number of resolved threads.</param>
+    /// <param name="expected">The expected sentence.</param>
+    [Theory]
+    [InlineData(12, 0, 0, "12 checklist checks unanswered.")]
+    [InlineData(1, 0, 0, "1 checklist check unanswered.")]
+    [InlineData(12, 2, 0, "12 checklist checks unanswered, 2 open threads to resolve.")]
+    [InlineData(5, 1, 3, "5 checklist checks unanswered, 1 open thread to resolve.")]
+    [InlineData(0, 3, 0, "Checklist complete; 3 open threads to resolve.")]
+    [InlineData(0, 0, 2, "Checklist complete and all threads resolved.")]
+    [InlineData(0, 0, 0, "Checklist complete.")]
+    public void ThreadService_NextStep_WithChecklist_CombinesChecksAndThreads(
+        int unanswered, int open, int resolved, string expected)
+    {
+        // Arrange: the requested mix of threads and a checklist with the requested unanswered checks
+        var threads = Enumerable.Range(0, open).Select(i => MakeThread(i, ReviewThreadState.Open, 0))
+            .Concat(Enumerable.Range(100, resolved).Select(i => MakeThread(i, ReviewThreadState.Resolved, 0)))
+            .ToList();
+
+        // Act: word the next step
+        var sentence = ThreadService.NextStep(threads, new ChecklistProgress(58 - unanswered, 58));
+
+        // Assert: one short sentence names the next action
+        Assert.Equal(expected, sentence);
+    }
+
+    /// <summary>
     ///     Test that the constructor refuses a missing store or clock.
     /// </summary>
     [Fact]

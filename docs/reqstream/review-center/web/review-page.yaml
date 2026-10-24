@@ -35,12 +35,26 @@ sections:
 
       - id: ReviewCenter-ReviewPage-NextStep
         title: >-
-          The ReviewPage unit shall show one short sentence at the top of the page, derived from the threads,
-          that tells the reader what to do next, and keep it current after every change.
+          The ReviewPage unit shall show one short sentence at the top of the page, derived from the threads and
+          the progress of the review's checklist, that tells the reader what to do next, and keep it current
+          after every change.
         justification: |
           The reader should see what is expected of them without working it out from counts.
         tests:
           - ReviewPage_Render_NextStep_FollowsThreadState
+          - ReviewPage_Render_NextStep_IncludesChecklistProgress
+
+      - id: ReviewCenter-ReviewPage-Checklist
+        title: >-
+          The ReviewPage unit shall show the progress of the review's checklist as a summary (for example "37 of
+          58 checks answered") with a link to the checklist page, and shall show neither when the review has no
+          checklist.
+        justification: |
+          The checklist is part of the work of the review, so its progress belongs where the reviewer starts,
+          one click from the checklist itself.
+        tests:
+          - ReviewPage_Render_NewReview_ShowsChecklistProgressAndLink
+          - ReviewPage_Render_ReviewWithoutChecklist_HidesChecklistCard
 
       - id: ReviewCenter-ReviewPage-Files
         title: >-

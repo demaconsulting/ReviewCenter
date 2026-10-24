@@ -5,9 +5,9 @@
 ### Overview
 
 The `Web` subsystem is the Blazor Server user interface of ReviewCenter. It owns what a browser
-shows and how it responds to user actions. It contains five units: `App`, the HTML shell and
+shows and how it responds to user actions. It contains six units: `App`, the HTML shell and
 URL router; `HomePage`, the interactive landing page served at the root URL; and `ProjectsPage`,
-`ProjectPage`, and `ReviewPage`, the pages for projects and reviews. The subsystem
+`ProjectPage`, `ReviewPage`, and `ChecklistPage`, the pages for projects, reviews, and review checklists. The subsystem
 does not start or configure the server; the `Hosting` subsystem maps `App` as the root
 component of the server and supplies the endpoints around it. The pages use the `Core` subsystem for
 all domain behavior and never access the database.
@@ -24,14 +24,16 @@ all domain behavior and never access the database.
 - *Constraints*: The document carries a `data-interactive` marker that is `false` in the
   server-rendered response and `true` once the live connection is established.
 
-**Project routes** (`GET /projects`, `GET /projects/{id}`, `GET /projects/{id}/reviews/{reviewId}`): The
-pages for projects and reviews.
+**Project routes** (`GET /projects`, `GET /projects/{id}`, `GET /projects/{id}/reviews/{reviewId}`,
+`GET /projects/{id}/reviews/{reviewId}/checklist`): The
+pages for projects, reviews, and review checklists.
 
 - *Type*: HTTP `GET`, followed by a live Blazor connection for interactivity.
 - *Role*: Provider.
 - *Contract*: `/projects` lists the projects and has a form to create one; `/projects/{id}` shows a
   project with its reviews and a form that creates a review from selected files; the review route shows
-  the review, its fingerprint, its files, and the content of a selected file. A project or review that
+  the review, its fingerprint, its files, the content of a selected file, and the progress of its checklist;
+  the checklist route shows the checklist, where each check is answered. A project or review that
   does not exist is reported on the page itself.
 - *Constraints*: Every page carries the same `data-interactive` marker as the home page. There is no
   authentication: every visitor is the same single anonymous operator (a temporary limitation).
@@ -79,9 +81,10 @@ domain types, and the limits) and on the ASP.NET Core Blazor components framewor
 
 #### Pages and domain access
 
-`ProjectsPage`, `ProjectPage`, and `ReviewPage` follow the pattern of `HomePage`: a Razor
+`ProjectsPage`, `ProjectPage`, `ReviewPage`, and `ChecklistPage` follow the pattern of `HomePage`: a Razor
 presentation file and a code-behind file, interactive server rendering, and the `data-interactive`
-marker. They obtain `ProjectService`, `ReviewService`, and (`ReviewPage`) `ThreadService` from the service
+marker. They obtain `ProjectService`, `ReviewService`, and (`ReviewPage`, `ChecklistPage`) `ThreadService` and
+`ChecklistService` from the service
 container and call them
 from their handlers. Each page loads its data when it is created, so a connection that is
 established after the server-rendered snapshot shows current data. A rule violation reported by

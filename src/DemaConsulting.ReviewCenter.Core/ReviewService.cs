@@ -131,7 +131,16 @@ public sealed class ReviewService
             State = ReviewState.Draft,
             Created = _timeProvider.GetUtcNow(),
             ContentFingerprint = Fingerprint.Compute(reviewFiles.Select(file => file.Sha256)),
-            Files = reviewFiles
+            Files = reviewFiles,
+
+            // The checklist is frozen now: later changes of the default never alter this review's checks
+            Checklist = new ReviewChecklist
+            {
+                ProjectId = projectId,
+                ReviewId = id!,
+                Version = DefaultChecklist.Version,
+                Definition = DefaultChecklist.Current.ToJson()
+            }
         };
 
         await _store.AddReviewAsync(review, cancellationToken);

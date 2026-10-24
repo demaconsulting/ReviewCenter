@@ -21,6 +21,8 @@ be loadable on the test platform.
 - A duplicate review key and a review of an unknown project are refused by the database.
 - The tables for comment threads and comments are created, and a thread for a file that is not in the review is
   refused by the database.
+- The tables for the checklist snapshot, section states, and answers are keyed so that a review has one state per
+  section and one answer per check.
 
 #### Test Scenarios
 
@@ -51,3 +53,11 @@ refused by the database (the foreign key is enforced) and nothing is stored. Thi
 **ReviewStore_AddThreadAsync_WholeFileAndRange_RoundTripsWithComments**: Threads with and without a line range are
 stored with their comments and read back unchanged, which verifies the thread and comment tables. This scenario is
 tested by `ReviewStore_AddThreadAsync_WholeFileAndRange_RoundTripsWithComments`.
+
+**ReviewStore_SetChecklistAnswer_UpsertsSingleRowPerItem**: A check is answered twice and another check once; the
+database holds one row per check, the first with the latest answer. This scenario is tested by
+`ReviewStore_SetChecklistAnswer_UpsertsSingleRowPerItem`.
+
+**ReviewStore_SetChecklistSectionState_UpsertsSingleRowPerSection**: A section state is set twice; the database
+holds one row for the section with the latest state. This scenario is tested by
+`ReviewStore_SetChecklistSectionState_UpsertsSingleRowPerSection`.

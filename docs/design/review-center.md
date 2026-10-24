@@ -29,12 +29,14 @@ flowchart TD
         ProjectsPage
         ProjectPage
         ReviewPage
+        ChecklistPage
     end
     subgraph Core
         Fingerprint
         ProjectService
         ReviewService
         ThreadService
+        ChecklistService
     end
     subgraph Storage
         ReviewCenterDbContext
@@ -53,19 +55,25 @@ flowchart TD
     ServerHost --> ProjectService
     ServerHost --> ReviewService
     ServerHost --> ThreadService
+    ServerHost --> ChecklistService
     App --> HomePage
     App --> ProjectsPage
     App --> ProjectPage
     App --> ReviewPage
+    App --> ChecklistPage
     ProjectsPage --> ProjectService
     ProjectPage --> ProjectService
     ProjectPage --> ReviewService
     ReviewPage --> ReviewService
     ReviewPage --> ThreadService
+    ReviewPage --> ChecklistService
+    ChecklistPage --> ReviewService
+    ChecklistPage --> ChecklistService
     ReviewService --> Fingerprint
     ProjectService --> ReviewStore
     ReviewService --> ReviewStore
     ThreadService --> ReviewStore
+    ChecklistService --> ReviewStore
     ReviewStore --> ReviewCenterDbContext
     DatabaseSetup --> ReviewCenterDbContext
 ```
@@ -81,7 +89,8 @@ the silent option from `Context`, configures structured logging, maps the `/heal
 maps the user interface defined by the `Web` subsystem, and connects the pages to the database.
 The `Web` subsystem is a Blazor Server user interface: `App` is the HTML shell and router,
 `HomePage` is the interactive page served at the root URL, and `ProjectsPage`, `ProjectPage`,
-and `ReviewPage` are the pages for projects and reviews. A browser connects to the server,
+`ReviewPage`, and `ChecklistPage` are the pages for projects, reviews, and review checklists. A browser connects to
+the server,
 receives a server-rendered page, and then upgrades to a live connection over which user
 actions are handled on the server.
 
@@ -97,8 +106,10 @@ The system is a single process with one database; there is no separate service t
 limitations of the current slice are deliberate and temporary: there is no authentication, so
 every visitor acts as the same single anonymous operator, and a review can only be created (in
 the Draft state) from uploaded files. Review comments are implemented (threads anchored to a file or line range, with
-replies, resolve, and reopen), but the comment author is unverified free text; there is no diff view, checklist, or
-sign-off workflow yet.
+replies, resolve, and reopen), and every review has a checklist of checks (Pass, Fail, or N/A, with a justification
+where required) that is frozen when the review is created. The comment author and the name saved with a checklist
+answer are unverified free text, and the checklist has no thread links; there is no diff view or sign-off workflow
+yet.
 
 ## External Interfaces
 
@@ -231,7 +242,8 @@ work the same way but call `ProjectService` and `ReviewService` in the handlers:
 review form carries its files to `ReviewService`, which validates them, computes the
 fingerprint with `Fingerprint`, and stores the review through `ReviewStore`. `ReviewPage` calls `ThreadService`
 to start, answer, resolve, and reopen comment threads on a file; `ThreadService` applies the comment rules and
-stores the threads through `ReviewStore`. When the server is
+stores the threads through `ReviewStore`. `ReviewPage` and `ChecklistPage` call `ChecklistService`, which applies
+the checklist rules and stores answers through `ReviewStore`. When the server is
 stopped, `ServerHost.RunAsync` returns 0; if the server cannot start, including because the
 database cannot be used, it reports the reason
 through `Context.WriteError` and returns 1, which makes `Context.ExitCode` 1.

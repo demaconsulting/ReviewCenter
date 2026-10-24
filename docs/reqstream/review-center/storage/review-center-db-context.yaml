@@ -2,7 +2,7 @@
 # Software Unit Requirements for the ReviewCenterDbContext Class
 #
 # The ReviewCenterDbContext class is the Entity Framework Core model that maps projects, reviews, review
-# files, threads, and comments to database tables.
+# files, threads, comments, and checklists to database tables.
 
 sections:
   - title: ReviewCenterDbContext Unit Requirements
@@ -51,3 +51,16 @@ sections:
         tests:
           - DatabaseSetup_EnsureCreated_MissingFolder_CreatesFolderFileAndTables
           - ReviewStore_AddThreadAsync_UnknownFile_IsRefusedByDatabase
+
+      - id: ReviewCenter-DbContext-Checklist
+        title: >-
+          The ReviewCenterDbContext class shall map the checklist snapshot, the section states, and the check
+          answers to tables in which a review has at most one state per section and one answer per check, and
+          in which the rows belong to the review, so that the database refuses a second row for the same
+          section or check.
+        justification: |
+          A check has one current answer. Having the database enforce that keeps the record consistent even when
+          two requests overlap.
+        tests:
+          - ReviewStore_SetChecklistAnswer_UpsertsSingleRowPerItem
+          - ReviewStore_SetChecklistSectionState_UpsertsSingleRowPerSection

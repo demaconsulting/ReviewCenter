@@ -11,7 +11,9 @@ types: `Review`, `ReviewFile`, `ReviewState`, and `UploadedFile`.
 #### Data Model
 
 **Review**: a data class (init-only properties) of `ProjectId`, `Id` (the review identifier, unique within its project),
-`Title`, `State`, `Created`, `ContentFingerprint`, and `Files` (a list of `ReviewFile`).
+`Title`, `State`, `Created`, `ContentFingerprint`, `Files` (a list of `ReviewFile`), and `Checklist` (the frozen
+checklist copy of the review, see `ChecklistService`; set when the review is created and not loaded by reads of
+the review).
 
 **ReviewFile**: a data class (init-only properties) of `ProjectId`, `ReviewId`, `Path`, `Content` (the bytes), `Size`, and
 `Sha256`. Lists read back from storage carry the metadata but not the bytes.
@@ -35,7 +37,8 @@ constants are in `ReviewLimits`; see `ProjectService`).
 - *Returns*: `Task<Review>` — the stored review with its fingerprint and the hash and size of each file.
 - *Preconditions*: `files` is not null.
 - *Postconditions*: The review is stored in the `Draft` state with the creation time from the clock; the bytes
-  are stored exactly as given. Nothing is stored when a rule fails.
+  are stored exactly as given, together with a copy of `DefaultChecklist.Current` as the review's checklist, in
+  the same transaction. Nothing is stored when a rule fails.
 
 The rules are checked in this order, and the first violation is reported: the identifier (`ReviewIdInvalid`);
 the title (`ReviewTitleInvalid`); the files (`NoFiles`, `TooManyFiles`, `PathInvalid`, `DuplicatePath`,

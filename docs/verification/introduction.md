@@ -31,11 +31,13 @@ This document covers the verification design for the following software items:
     - **ProjectsPage** — projects list and creation page
     - **ProjectPage** — project page with review creation from uploaded files
     - **ReviewPage** — review, fingerprint, files, file content, and comment threads page
+    - **ChecklistPage** — review checklist page
   - **Core** subsystem
     - **Fingerprint** — ReviewMark-compatible content fingerprint
     - **ProjectService** — project rules
     - **ReviewService** — review rules
     - **ThreadService** — review comment rules
+    - **ChecklistService** — review checklist rules, default checklist, and progress
   - **Storage** subsystem
     - **ReviewCenterDbContext** — database schema mapping
     - **ReviewStore** — database implementation of the store interface

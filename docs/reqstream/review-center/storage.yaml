@@ -71,3 +71,17 @@ sections:
           - ReviewCenter-DbContext-Threads
         tests:
           - StorageSubsystem_ServicesOverDatabase_ReopenedDatabase_KeepsThreadsAndComments
+
+      - id: ReviewCenter-Storage-Checklist
+        title: >-
+          The Storage subsystem shall keep the checklist snapshot of each review, the applicability of its
+          sections, and the answers to its checks in the database file, so that they are all still there,
+          unchanged, when the database is opened again.
+        justification: |
+          The checklist is part of the review record and must outlive the process that created it. The snapshot
+          is stored with the review so that the questions never change under the answers.
+        children:
+          - ReviewCenter-ReviewStore-Checklist
+          - ReviewCenter-DbContext-Checklist
+        tests:
+          - StorageSubsystem_Checklist_PersistsSnapshotAnswersAndSectionsAcrossReopen

@@ -72,3 +72,19 @@ sections:
           - ReviewStore_AddCommentAsync_UnknownOrOtherReviewThread_ReturnsNull
           - ReviewStore_SetThreadStateAsync_ExistingAndUnknown_ChangesStateOrReturnsFalse
           - ReviewStore_ListThreadsAsync_TwoReviews_ReturnsOnlyOwnThreadsInOrder
+
+      - id: ReviewCenter-ReviewStore-Checklist
+        title: >-
+          The ReviewStore class shall save the checklist snapshot of a review together with the review, return
+          it, or nothing when the review has none, save the applicability of a section and the answer to a
+          check by replacing any earlier one so that each section and check has one row, and list them back
+          with their names and times unchanged.
+        justification: |
+          The snapshot must exist exactly when the review exists, and a check has one current answer. Names and
+          times are part of the record and must come back as saved.
+        tests:
+          - ReviewStore_AddReview_WithChecklist_StoresSnapshotAtomically
+          - ReviewStore_GetChecklist_ReviewWithoutSnapshot_ReturnsNull
+          - ReviewStore_SetChecklistAnswer_UpsertsSingleRowPerItem
+          - ReviewStore_SetChecklistSectionState_UpsertsSingleRowPerSection
+          - ReviewStore_ChecklistRows_RoundTripOutcomeAndTimestamps

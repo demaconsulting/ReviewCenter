@@ -14,8 +14,9 @@ comments on code blocks and files, project-specific pass/fail/N/A checklists, pr
 reviewers, and re-authenticated electronic sign-off.
 
 The `serve` verb runs ReviewCenter as an ASP.NET Core Blazor Server web application with a home page, a health
-endpoint, projects, draft reviews made from uploaded files, and threaded review comments on those files.
-Checklists, reviewers, and sign-off are still under development.
+endpoint, projects, draft reviews made from uploaded files, threaded review comments on those files, and a
+checklist for each review.
+Reviewers and sign-off are still under development.
 
 ## Features
 
@@ -32,8 +33,14 @@ The current release provides:
   and mark it resolved or reopen it; a next-step line says what is left to do, a thread index of all files (open by
   default, or all, or resolved) jumps to the thread's lines, resolved threads are collapsed to one line, and the
   file list shows the open threads per file
-- **Persistent Storage**: projects, reviews, the uploaded file contents, and the comment threads are kept in a
-  SQLite database file
+- **Review Checklist**: every new review gets a checklist of 14 sections and 58 checks, taken from the
+  [Continuous Compliance review template][link-review-template]; a checklist page (linked from the review page,
+  with a summary such as "37 of 58 checks answered") shows the sections with their progress, one section open at a
+  time, and a Pass, Fail, or N/A choice for each check; a Fail or N/A needs a justification, a section can be marked
+  not applicable with a reason, and a "next unanswered check" button leads you on; the review page's next-step line
+  counts the unanswered checks together with the open threads
+- **Persistent Storage**: projects, reviews, the uploaded file contents, the comment threads, and the checklists
+  are kept in a SQLite database file
   (default `reviewcenter.db` in the per-user application data folder, see
   [Data Location](#data-location-and-database-settings))
 - **Standardized Command-Line Interface**: Context class handling common arguments
@@ -168,8 +175,12 @@ non-zero exit code.
 - **No authentication**: this release has a single anonymous operator. Anyone who can reach the server can create
   and read projects and reviews. Run it only on `localhost` or on a trusted network until user authentication is
   added.
-- **Comment authors are free text**: because there is no sign-in yet, the author of a comment is a name that the
-  reader types, and it is not verified. This is temporary until user authentication is added.
+- **Comment authors and checklist answerers are free text**: because there is no sign-in yet, the author of a
+  comment and the "Answered by" name of a checklist answer are names that the reader types, and they are not
+  verified. This is temporary until user authentication is added.
+- **Checklists are fixed per review**: every review gets a copy of the default checklist when it is created and
+  keeps it; there is no project-level checklist editor or import yet. Checklist answers are not linked to comment
+  threads.
 - **Comments cannot be edited or deleted**: a posted comment is permanent; only the thread state (open or resolved)
   can be changed.
 - **Comments are not live**: comments posted by other people appear when you reload the page or take an action on it.
@@ -177,7 +188,8 @@ non-zero exit code.
   uploaded file is kept, so two files with the same name cannot be in one review.
 - **No database migrations**: the database tables are created when the database file is new; a later release that
   changes the tables will need a migration step. A database file created by an earlier version, before comments
-  existed, does not have the comment tables, so delete it and start again (development databases only).
+  or checklists existed, does not have the tables or columns that are needed, so delete it and start again
+  (development databases only).
 
 ## Error Handling
 
@@ -291,3 +303,4 @@ By contributing to this project, you agree that your contributions will be licen
 [link-reviewmark]: https://github.com/demaconsulting/ReviewMark
 [link-guide]: https://github.com/demaconsulting/ReviewCenter/blob/main/docs/user_guide/introduction.md
 [link-continuous-compliance]: https://github.com/demaconsulting/ContinuousCompliance
+[link-review-template]: https://github.com/demaconsulting/ContinuousCompliance/blob/main/docs/review-template/review-template.md

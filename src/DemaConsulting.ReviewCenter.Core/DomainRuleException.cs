@@ -78,7 +78,22 @@ public enum DomainRule
     ThreadAnchorInvalid,
 
     /// <summary>The referenced thread does not exist in the review.</summary>
-    ThreadNotFound
+    ThreadNotFound,
+
+    /// <summary>The review does not exist or has no checklist.</summary>
+    ChecklistNotFound,
+
+    /// <summary>The section or check is not part of the review's checklist.</summary>
+    ChecklistItemNotFound,
+
+    /// <summary>
+    ///     A justification or reason is missing where it is required (a failed or not-applicable check, a section
+    ///     that does not apply) or is longer than <see cref="ReviewLimits.MaxJustificationLength"/>.
+    /// </summary>
+    ChecklistJustificationInvalid,
+
+    /// <summary>The name of the person answering a check is empty or too long.</summary>
+    ChecklistAnsweredByInvalid
 }
 
 /// <summary>
