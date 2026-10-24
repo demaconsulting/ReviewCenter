@@ -44,10 +44,12 @@ without file bytes, so that showing a review with large files does not load them
 
 **AddThreadAsync**: Stores a thread together with its first comment in one save, which is one transaction. Fresh
 entities are copied from the argument, so identities supplied by the caller are ignored and the database assigns
-them. A thread for a file that does not exist in the review is refused by the relationship constraint of the
+them; the comment keeps the display name and the user name of its author. A thread for a file that does not exist in
+the review is refused by the relationship constraint of the
 database.
 
-**AddCommentAsync**: Appends a comment to a thread. It first checks that the thread belongs to the stated project
+**AddCommentAsync**: Appends a comment to a thread, with the display name and the user name of its author. It first
+checks that the thread belongs to the stated project
 and review and returns null when it does not, so a thread identity from another review cannot be commented on.
 
 **SetThreadStateAsync**: Sets the state of a thread of the stated review with a single update statement and
@@ -64,10 +66,11 @@ returns or zero bytes.
 **GetChecklistAsync**: Reads the checklist snapshot of a review; null when the review has none.
 
 **ListChecklistSectionStatesAsync** and **ListChecklistAnswersAsync**: List the stored section states and the
-answers of a review, with names and UTC times as saved.
+answers of a review, with display names, user names, and UTC times as saved.
 
 **SetChecklistSectionStateAsync** and **SetChecklistAnswerAsync**: Replace the state of a section or the answer to
-a check. Each first tries to overwrite the existing row with one update statement and adds a row only when there
+a check, including the display name and the user name of the person who made the change. Each first tries to
+overwrite the existing row with one update statement and adds a row only when there
 was none; if two requests add the same row at the same moment, the loser of the race overwrites instead, so
 there is always exactly one row and neither request fails.
 

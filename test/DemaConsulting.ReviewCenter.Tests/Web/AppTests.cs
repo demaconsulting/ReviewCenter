@@ -19,6 +19,7 @@
 // SOFTWARE.
 
 using Bunit;
+using DemaConsulting.ReviewCenter.Core;
 using DemaConsulting.ReviewCenter.Web;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
@@ -28,7 +29,7 @@ namespace DemaConsulting.ReviewCenter.Tests.Web;
 /// <summary>
 ///     Unit tests for the App unit: the HTML shell (<c>App.razor</c>) and the router (<c>Routes.razor</c>).
 /// </summary>
-public class AppTests : BunitContext
+public class AppTests : PageTestBase
 {
     /// <summary>
     ///     Test that the HTML shell declares a base href, the head outlet output, and the Blazor client script.
@@ -80,5 +81,47 @@ public class AppTests : BunitContext
 
         // Assert: the not-found message is shown
         Assert.Contains("Page not found.", cut.Markup);
+    }
+
+    /// <summary>
+    ///     Test that the header shows the display name of the signed-in user with the account and logout
+    ///     controls, and the Users link only for an administrator.
+    /// </summary>
+    [Fact]
+    public void MainLayout_Render_SignedInUser_ShowsNameAccountAndLogout()
+    {
+        // Arrange: a reviewer is signed in
+        SignInAs("bea", "Bea");
+
+        // Act: render the layout, then again as an administrator
+        var reviewer = Render<MainLayout>();
+        SignInAs("root", "Root", UserRole.Admin);
+        var admin = Render<MainLayout>();
+
+        // Assert: the name, the account link and the logout button are shown, but the Users link only to the administrator
+        Assert.Equal("Bea", reviewer.Find("[data-testid='current-user']").TextContent);
+        Assert.NotNull(reviewer.Find("[data-testid='account-link']"));
+        Assert.NotNull(reviewer.Find("[data-testid='logout-button']"));
+        Assert.Empty(reviewer.FindAll("[data-testid='users-link']"));
+        Assert.Empty(reviewer.FindAll("[data-testid='signin-link']"));
+        Assert.NotNull(admin.Find("[data-testid='users-link']"));
+    }
+
+    /// <summary>
+    ///     Test that the header offers a sign-in link, and no account controls, when nobody is signed in.
+    /// </summary>
+    [Fact]
+    public void MainLayout_Render_NobodySignedIn_ShowsSignInLink()
+    {
+        // Arrange: nobody is signed in
+        SignOut();
+
+        // Act: render the layout
+        var cut = Render<MainLayout>();
+
+        // Assert: only the sign-in link is shown
+        Assert.Equal("/login", cut.Find("[data-testid='signin-link']").GetAttribute("href"));
+        Assert.Empty(cut.FindAll("[data-testid='current-user']"));
+        Assert.Empty(cut.FindAll("[data-testid='logout-button']"));
     }
 }

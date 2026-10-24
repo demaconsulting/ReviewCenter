@@ -20,7 +20,9 @@
 
 using System.Globalization;
 using DemaConsulting.ReviewCenter.Core;
+using DemaConsulting.ReviewCenter.Identity;
 using Microsoft.AspNetCore.Components;
+using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.JSInterop;
 
 namespace DemaConsulting.ReviewCenter.Web;
@@ -36,9 +38,9 @@ namespace DemaConsulting.ReviewCenter.Web;
 ///     caused it. File bytes are loaded one file at a time when the operator selects it, never with the file
 ///     list. A file is shown as numbered lines only when it is valid UTF-8 without NUL bytes (see
 ///     <see cref="FileText"/>); anything else is reported as a binary file rather than rendered as garbage.
-///     All text from the files and the comments is rendered as plain text, never as markup. There is no
-///     sign-in yet, so the author name of a comment is a free-text label that the operator types once and that
-///     is not verified. Threads are read when the page loads and after each change made here; comments posted
+///     All text from the files and the comments is rendered as plain text, never as markup. The author of a
+///     comment is the signed-in user (an <see cref="Actor"/> read from the authentication state), never
+///     something typed on the page. Threads are read when the page loads and after each change made here; comments posted
 ///     in other browsers appear on the next load or change. Each browser connection (circuit) gets its own
 ///     page instance, so the state here is per-user and needs no synchronization. The thread index lists
 ///     the threads of every file through <see cref="ThreadService.BuildIndex"/>; choosing a row selects its
@@ -105,6 +107,12 @@ public partial class ReviewPage : ComponentBase
     private IJSRuntime JS { get; set; } = null!;
 
     /// <summary>
+    ///     Gets or sets the authentication state of the current user, supplied by dependency injection.
+    /// </summary>
+    [Inject]
+    private AuthenticationStateProvider AuthenticationState { get; set; } = null!;
+
+    /// <summary>
     ///     Gets the name of the owning project shown in the breadcrumb, or <c>null</c> when it is unknown.
     /// </summary>
     private string? ProjectName { get; set; }
@@ -138,11 +146,6 @@ public partial class ReviewPage : ComponentBase
     ///     Gets the checklist state of the review, or <c>null</c> when the review has no checklist.
     /// </summary>
     private ChecklistState? Checklist { get; set; }
-
-    /// <summary>
-    ///     Gets or sets the author name typed by the operator; used for new threads and replies.
-    /// </summary>
-    private string AuthorName { get; set; } = string.Empty;
 
     /// <summary>
     ///     Gets or sets the text of the first line field of the new-thread form (blank for the whole file).
@@ -271,8 +274,7 @@ public partial class ReviewPage : ComponentBase
     /// <remarks>
     ///     An index outside the list is ignored. A file that cannot be found in the store (removed since the
     ///     page was loaded) is treated as an empty file, so the empty-file notice is shown rather than failing
-    ///     the circuit. Selecting a file reloads the threads and clears the new-thread form but keeps the
-    ///     author name.
+    ///     the circuit. Selecting a file reloads the threads and clears the new-thread form.
     /// </remarks>
     private async Task SelectFileAsync(int index)
     {
@@ -387,7 +389,7 @@ public partial class ReviewPage : ComponentBase
         try
         {
             await ThreadService.StartThreadAsync(
-                ProjectId, ReviewId, SelectedPath, start, end ?? start, AuthorName, NewText);
+                ProjectId, ReviewId, SelectedPath, start, end ?? start, await AuthenticationState.GetActorAsync(), NewText);
         }
         catch (DomainRuleException ex)
         {
@@ -412,14 +414,12 @@ public partial class ReviewPage : ComponentBase
         try
         {
             await ThreadService.ReplyAsync(
-                ProjectId, ReviewId, threadId, AuthorName, ReplyTexts.GetValueOrDefault(threadId));
+                ProjectId, ReviewId, threadId, await AuthenticationState.GetActorAsync(),
+                ReplyTexts.GetValueOrDefault(threadId));
         }
         catch (DomainRuleException ex)
         {
-            // The name field is far from the thread, so say where to fix a missing name
-            ReplyErrors[threadId] = ex.Rule == DomainRule.CommentAuthorInvalid
-                ? $"{ex.Message} Enter it in the 'Your name' field."
-                : ex.Message;
+            ReplyErrors[threadId] = ex.Message;
             return;
         }
 
@@ -587,7 +587,7 @@ public partial class ReviewPage : ComponentBase
     }
 
     /// <summary>
-    ///     Empties the new-thread form fields and its message; the author name is kept.
+    ///     Empties the new-thread form fields and its message.
     /// </summary>
     private void ClearNewThreadForm()
     {

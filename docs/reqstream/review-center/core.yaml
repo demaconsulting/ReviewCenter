@@ -3,9 +3,9 @@
 #
 # PURPOSE:
 # - Define requirements for the ReviewCenter Core subsystem
-# - The Core subsystem spans the Fingerprint, ProjectService, ReviewService, ThreadService, and
-#   ChecklistService units, with the domain types they share (project, review, review file, thread, comment,
-#   checklist, upload, limits, rule exception, and store interface)
+# - The Core subsystem spans the Fingerprint, ProjectService, ReviewService, ThreadService, ChecklistService, and
+#   UserService units, with the domain types they share (project, review, review file, thread, comment,
+#   checklist, user, role, actor, upload, limits, rule exception, and store interfaces)
 # - Subsystem requirements describe the externally visible behavior of the domain model and its rules
 
 sections:
@@ -114,3 +114,28 @@ sections:
           - ReviewCenter-ChecklistService-Progress
         tests:
           - CoreSubsystem_Checklist_FrozenAtCreationAnswerAndProgress
+
+      - id: ReviewCenter-Core-Users
+        title: >-
+          The Core subsystem shall create users with a user name, a display name, a role, and a password, keeping
+          only a hash of the password, check a sign-in with a lockout after repeated failures, enable and
+          disable users, set roles, change and set passwords, and never leave the system without an enabled
+          administrator.
+        justification: |
+          Accountability in a review needs verified users. The rules must hold whichever user interface or store
+          is used, and keeping only a hash of the password protects the passwords if the database is copied.
+        children:
+          - ReviewCenter-UserService-Username
+          - ReviewCenter-UserService-DisplayName
+          - ReviewCenter-UserService-Password
+          - ReviewCenter-UserService-Create
+          - ReviewCenter-UserService-Authenticate
+          - ReviewCenter-UserService-Lockout
+          - ReviewCenter-UserService-Enabled
+          - ReviewCenter-UserService-LastAdmin
+          - ReviewCenter-UserService-ChangePassword
+          - ReviewCenter-UserService-SetPassword
+          - ReviewCenter-UserService-SetRole
+          - ReviewCenter-UserService-NotFound
+        tests:
+          - CoreSubsystem_UsersWorkflow_CreateSignInLockoutAndLastAdmin

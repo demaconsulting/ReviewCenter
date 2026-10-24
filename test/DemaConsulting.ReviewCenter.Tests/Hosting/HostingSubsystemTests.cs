@@ -108,10 +108,10 @@ public class HostingSubsystemTests
                 .CreateAsync("Apollo", "Moon landing", TestContext.Current.CancellationToken);
         }
 
-        // Act: start a second host on the same database and request the projects page
+        // Act: start a second host on the same database, sign in as a new user and request the projects page
         await using var second = await TestWebApp.StartAsync(logs, connectionString, ["serve", "--silent"]);
-        using var client = second.GetTestClient();
-        var html = await client.GetStringAsync("/projects", TestContext.Current.CancellationToken);
+        using var browser = await TestBrowser.SignedInAsync(second, "ann");
+        var html = await browser.Client.GetStringAsync("/projects", TestContext.Current.CancellationToken);
 
         // Assert: the stored project is listed
         Assert.Contains("Apollo", html, StringComparison.Ordinal);

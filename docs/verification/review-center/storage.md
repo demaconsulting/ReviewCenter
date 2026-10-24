@@ -3,14 +3,17 @@
 ### Verification Approach
 
 The `Storage` subsystem is verified by subsystem tests defined in `StorageSubsystemTests.cs`. The tests build the
-real `DatabaseSetup`, `ReviewCenterDbContext`, and `ReviewStore` over a real SQLite database file, and run the real
-`ProjectService`, `ReviewService`, `ThreadService`, and `ChecklistService` of the `Core` subsystem over them, so that
+real `DatabaseSetup`, `ReviewCenterDbContext`, `ReviewStore`, and `UserStore` over a real SQLite database file, and
+run the real
+`ProjectService`, `ReviewService`, `ThreadService`, `ChecklistService`, and `UserService` of the `Core` subsystem over
+them, so that
 the subsystem is
 verified in the way
 the application uses it. Each test uses a new database file in a private temporary folder, supplied by the test
 helper `TestDatabase`. The units are verified in detail by their own unit tests, which also use real SQLite
 databases; no database substitute is used anywhere, because the behavior of the database (keys, constraints,
-ordering, and binary content) is part of what is verified.
+ordering, and binary content) is part of what is verified. The only substitute is the fast test password hasher of
+the user scenario, because the strength of the real hasher is not what the subsystem proves.
 
 ### Test Environment
 
@@ -24,7 +27,9 @@ The native SQLite library must be loadable on the test platform (it is supplied 
   database is closed and opened again.
 - A duplicate review identifier is refused and the original review is unchanged.
 - Comment threads, their comments (in posting order), their anchors, and their state, written through the services,
-  are still present after the database is closed and opened again.
+  are still present after the database is closed and opened again, and each comment keeps the user name of its author.
+- Users written through the user service, and a changed password, are still present after the database is closed and
+  opened again; the user signs in with the changed password only.
 - The checklist snapshot of a review, its answers, and its section decisions, written through the services, are
   still present after the database is closed and opened again.
 - A review for a project that does not exist is refused, by the services and by the database itself, and the stored
@@ -40,8 +45,14 @@ scenario is tested by `StorageSubsystem_ServicesOverDatabase_ReopenedDatabase_Ke
 
 **StorageSubsystem_ServicesOverDatabase_ReopenedDatabase_KeepsThreadsAndComments**: A review is created through the
 services over a new database; a thread on line 1 is started, answered, and resolved through `ThreadService`; the
-database is closed and opened again. The anchor, the state "Resolved", and both comments in posting order are read
+database is closed and opened again. The anchor, the state "Resolved", and both comments in posting order, each with
+the user name of its author, are read
 back. This scenario is tested by `StorageSubsystem_ServicesOverDatabase_ReopenedDatabase_KeepsThreadsAndComments`.
+
+**StorageSubsystem_Users_PersistAcrossReopen**: An administrator is created through `UserService` over a new
+database and its password is changed; the database is closed and opened again. The user signs in in another case of
+the user name with the new password and has the Admin role, and the old password is refused. This scenario is
+tested by `StorageSubsystem_Users_PersistAcrossReopen`.
 
 **StorageSubsystem_Checklist_PersistsSnapshotAnswersAndSectionsAcrossReopen**: A review is created through the
 services over a new database, one check is answered Fail with a justification, and one section is marked as not

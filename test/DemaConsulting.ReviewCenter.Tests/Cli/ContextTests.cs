@@ -19,6 +19,7 @@
 // SOFTWARE.
 
 using DemaConsulting.ReviewCenter.Cli;
+using DemaConsulting.ReviewCenter.Core;
 
 namespace DemaConsulting.ReviewCenter.Tests;
 
@@ -234,6 +235,76 @@ public class ContextTests
 
         // Assert: the URL is recorded
         Assert.Equal("http://127.0.0.1:6001", context.Urls);
+    }
+
+    /// <summary>
+    ///     Test that the user add verb records the user name, display name and role.
+    /// </summary>
+    [Fact]
+    public void Context_Create_UserAddVerb_SetsUserAddAndOptions()
+    {
+        // Act: parse the verb with every option
+        using var context = Context.Create(["user", "add", "--username", "ann", "--display-name", "Ann Example", "--role", "admin"]);
+
+        // Assert: the verb and the options are recorded; the role is not case sensitive
+        Assert.True(context.UserAdd);
+        Assert.Equal("ann", context.Username);
+        Assert.Equal("Ann Example", context.DisplayName);
+        Assert.Equal(UserRole.Admin, context.Role);
+    }
+
+    /// <summary>
+    ///     Test that the role of the user add verb defaults to reviewer, and that without the verb it is off.
+    /// </summary>
+    [Fact]
+    public void Context_Create_UserAddWithoutRole_DefaultsToReviewer()
+    {
+        // Act: parse the verb without a role, and a context with no verb
+        using var context = Context.Create(["user", "add", "--username", "ann", "--display-name", "Ann"]);
+        using var other = Context.Create([]);
+
+        // Assert: the default role applies and the verb is off when not given
+        Assert.Equal(UserRole.Reviewer, context.Role);
+        Assert.False(other.UserAdd);
+    }
+
+    /// <summary>
+    ///     Test that incorrect use of the user add verb and its options is rejected with a message.
+    /// </summary>
+    /// <param name="arguments">The arguments, joined by a space.</param>
+    /// <param name="expected">The text the message must contain.</param>
+    [Theory]
+    [InlineData("user", "add action")]
+    [InlineData("user remove", "add action")]
+    [InlineData("user add --display-name Ann", "requires --username and --display-name")]
+    [InlineData("user add --username ann", "requires --username and --display-name")]
+    [InlineData("user add --username ann --display-name Ann --role Boss", "Admin or Reviewer")]
+    [InlineData("user add --username ann --display-name Ann --role", "--role requires")]
+    [InlineData("--username ann", "require the user add verb")]
+    [InlineData("--role Admin", "require the user add verb")]
+    public void Context_Create_UserAddMisuse_ThrowsArgumentException(string arguments, string expected)
+    {
+        // Act: parse the arguments
+        var exception = Record.Exception(() => Context.Create(arguments.Split(' ')));
+
+        // Assert: refused with a message that says what is wrong
+        var argumentException = Assert.IsType<ArgumentException>(exception);
+        Assert.Contains(expected, argumentException.Message, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    ///     Test that a password cannot be given on the command line.
+    /// </summary>
+    [Fact]
+    public void Context_Create_PasswordOption_IsNotSupported()
+    {
+        // Act: parse a user add with a password option
+        var exception = Record.Exception(() =>
+            Context.Create(["user", "add", "--username", "ann", "--display-name", "Ann", "--password", "secret"]));
+
+        // Assert: the option is unknown
+        var argumentException = Assert.IsType<ArgumentException>(exception);
+        Assert.Contains("Unsupported argument", argumentException.Message, StringComparison.Ordinal);
     }
 
     /// <summary>

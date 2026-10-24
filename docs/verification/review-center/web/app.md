@@ -4,8 +4,9 @@
 
 `App` is verified with tests defined in `AppTests.cs`. The shell is verified by starting the real
 server pipeline on an in-memory server and requesting the root document. The router (`Routes`)
-is verified with component tests that set the navigation address and render the component in a
-test context. No mocking is applied.
+and the layout (`MainLayout`) are verified with component tests that set the navigation address and the signed-in
+user (through the test authentication state of `PageTestBase`) and render the component in a test context. No
+mocking is applied.
 
 #### Test Environment
 
@@ -18,6 +19,9 @@ N/A - standard test environment.
   the client script reference.
 - The router renders the home page for the root URL.
 - The router renders the not-found message for a URL that no page handles.
+- The layout header shows the display name of the signed-in user with the links to the account page and the logout
+  button, and the link to the users page only for an administrator; for nobody signed in it shows only the link to
+  the login page.
 
 #### Test Scenarios
 
@@ -32,3 +36,12 @@ root document is requested; the response contains the shell elements. This scena
 **Routes_Render_UnknownUrl_ShowsNotFoundMessage**: The navigation address is set to a URL that
 no page handles and `Routes` is rendered; the not-found message is shown. This scenario is
 tested by `Routes_Render_UnknownUrl_ShowsNotFoundMessage`.
+
+**MainLayout_Render_SignedInUser_ShowsNameAccountAndLogout**: `MainLayout` is rendered for a signed-in reviewer; the
+header shows the display name, the link to the account page, and the logout button, and no link to the users page
+and no sign-in link. After the user signs in as an administrator, the link to the users page appears. This scenario
+is tested by `MainLayout_Render_SignedInUser_ShowsNameAccountAndLogout`.
+
+**MainLayout_Render_NobodySignedIn_ShowsSignInLink**: `MainLayout` is rendered with nobody signed in; the header
+shows the sign-in link to `/login` and no user name and no logout button. This scenario is tested by
+`MainLayout_Render_NobodySignedIn_ShowsSignInLink`.

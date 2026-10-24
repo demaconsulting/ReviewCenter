@@ -4,7 +4,8 @@
 
 The `Web` subsystem is verified by integration tests defined in `WebSubsystemTests.cs`. Each
 test starts the real server pipeline on an in-memory test server, with a temporary database, through
-`ServerHost.CreateApplication` and requests routes over HTTP, so the `App` and the page units run together with
+`ServerHost.CreateApplication` and requests routes over HTTP (the pages behind the sign-in are requested by a user
+signed in through the test helper `TestBrowser`), so the `App` and the page units run together with
 the Core services and the Storage database exactly as they do in production. Tests assert on the returned
 HTML. Behavior that needs a live browser connection (typing, selecting files, submitting forms, and the switch of
 the `data-interactive` marker from `false` to `true`) is outside what plain HTTP requests can exercise. It is
@@ -29,6 +30,8 @@ N/A - standard test environment (temporary SQLite databases are created by the t
   the summary, and the per-file open count are correct, and the Details section is collapsed.
 - The review page links the checklist page and shows its progress; the checklist page presents the answers stored
   through the Core service, also when requested again.
+- The `Web` subsystem's pages are presented to a signed-in user; the sign-in itself is verified in the `Identity`
+  subsystem.
 - Every interactive element of every page has a `data-testid`.
 
 ### Test Scenarios
@@ -64,7 +67,8 @@ section progress "2 of 8", the pressed Pass button, and the saved justification;
 checks answered", a link to the checklist page, and "56 checklist checks unanswered." as the next step. This
 scenario is tested by `WebSubsystem_ChecklistPage_AnsweredChecksSurviveReload`.
 
-**WebSubsystem_AllPages_EveryInteractiveElementHasTestId**: Every route (home, projects, a project, a missing
-project, a review, a missing review, a checklist) is requested over the in-memory server; every link, button, input, select,
-and text area in each response has a `data-testid` in kebab-case. This scenario is tested by
+**WebSubsystem_AllPages_EveryInteractiveElementHasTestId**: A user with the Admin role is signed in, and every route
+(home, login, account, users, projects, a project, a missing project, a review, a missing review, a checklist) is
+requested over the in-memory server; every link, button, visible input, select, and text area in each response has a
+`data-testid` in kebab-case. This scenario is tested by
 `WebSubsystem_AllPages_EveryInteractiveElementHasTestId`.

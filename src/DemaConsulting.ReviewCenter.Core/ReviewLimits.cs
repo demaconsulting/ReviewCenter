@@ -21,7 +21,7 @@
 namespace DemaConsulting.ReviewCenter.Core;
 
 /// <summary>
-///     The size and length limits the domain enforces on projects, reviews and comments.
+///     The size and length limits the domain enforces on projects, reviews, comments and users.
 /// </summary>
 /// <remarks>
 ///     The limits are named constants in one place so the services, the database mapping and the
@@ -72,7 +72,7 @@ public static class ReviewLimits
     public const int MaxReviewTitleLength = 200;
 
     /// <summary>
-    ///     The longest accepted comment author name, in characters.
+    ///     The longest stored comment author name (the display name at the time), in characters.
     /// </summary>
     public const int MaxAuthorLength = 100;
 
@@ -85,4 +85,29 @@ public static class ReviewLimits
     ///     The longest accepted checklist justification or not-applicable reason, in characters.
     /// </summary>
     public const int MaxJustificationLength = 2000;
+
+    /// <summary>
+    ///     The shortest accepted user name, in characters.
+    /// </summary>
+    public const int MinUsernameLength = 3;
+
+    /// <summary>
+    ///     The longest accepted user name, in characters.
+    /// </summary>
+    public const int MaxUsernameLength = 50;
+
+    /// <summary>
+    ///     The longest accepted user display name, in characters.
+    /// </summary>
+    public const int MaxDisplayNameLength = 100;
+
+    /// <summary>
+    ///     The shortest accepted password, in characters.
+    /// </summary>
+    public const int MinPasswordLength = 12;
+
+    /// <summary>
+    ///     The longest accepted password, in characters; the limit keeps hashing time bounded.
+    /// </summary>
+    public const int MaxPasswordLength = 128;
 }

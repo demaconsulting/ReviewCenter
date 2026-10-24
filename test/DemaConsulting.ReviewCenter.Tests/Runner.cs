@@ -37,14 +37,39 @@ internal static class Runner
     /// <exception cref="InvalidOperationException">Thrown when process fails to start.</exception>
     public static int Run(out string output, string program, params string[] arguments)
     {
+        return RunWithEnvironment(out output, new Dictionary<string, string>(), program, arguments);
+    }
+
+    /// <summary>
+    ///     Runs the specified program with extra environment variables and captures its output.
+    /// </summary>
+    /// <param name="output">Program output (stdout and stderr combined).</param>
+    /// <param name="environment">Environment variables to set for the program, added to the inherited ones.</param>
+    /// <param name="program">Program name or path.</param>
+    /// <param name="arguments">Program arguments.</param>
+    /// <returns>Program exit code.</returns>
+    /// <exception cref="InvalidOperationException">Thrown when process fails to start.</exception>
+    public static int RunWithEnvironment(
+        out string output,
+        IReadOnlyDictionary<string, string> environment,
+        string program,
+        params string[] arguments)
+    {
         // Construct the start information
         var startInfo = new ProcessStartInfo(program)
         {
             RedirectStandardOutput = true,
             RedirectStandardError = true,
+            RedirectStandardInput = true,
             UseShellExecute = false,
             CreateNoWindow = true
         };
+
+        // Add the environment variables
+        foreach (var (name, value) in environment)
+        {
+            startInfo.Environment[name] = value;
+        }
 
         // Add the arguments
         foreach (var argument in arguments)
@@ -55,6 +80,9 @@ internal static class Runner
         // Start the process
         using var process = Process.Start(startInfo) ??
                             throw new InvalidOperationException("Failed to start process");
+
+        // Nothing is ever typed into the program: a prompt would see the end of input instead of waiting forever
+        process.StandardInput.Close();
 
         // Read output asynchronously to avoid buffer overflow
         var outputTask = process.StandardOutput.ReadToEndAsync();

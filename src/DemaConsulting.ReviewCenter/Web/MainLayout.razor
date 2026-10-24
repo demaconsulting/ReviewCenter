@@ -1,0 +1,29 @@
+@* MainLayout: the frame around every page (part of the App unit).
+
+   It is static server-side rendered markup, so it never needs a live connection. The header shows who is
+   signed in (display name, an Account link, a Users link for administrators and a Logout button) or a Sign in
+   link when nobody is. Logout is a form that posts to /auth/logout with an antiforgery token, because signing
+   out changes state and must not be triggered by a plain link. *@
+@inherits LayoutComponentBase
+
+<header class="app-header">
+    @if (Actor is null)
+    {
+        <a href="/login" data-testid="signin-link">Sign in</a>
+    }
+    else
+    {
+        <span data-testid="current-user">@Actor.DisplayName</span>
+        <a href="/account" data-testid="account-link">Account</a>
+        @if (IsAdmin)
+        {
+            <a href="/users" data-testid="users-link">Users</a>
+        }
+        <form method="post" action="/auth/logout">
+            <AntiforgeryToken />
+            <button type="submit" data-testid="logout-button">Logout</button>
+        </form>
+    }
+</header>
+
+@Body

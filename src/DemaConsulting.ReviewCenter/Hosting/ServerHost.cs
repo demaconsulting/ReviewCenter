@@ -21,6 +21,7 @@
 using System.Data.Common;
 using DemaConsulting.ReviewCenter.Cli;
 using DemaConsulting.ReviewCenter.Core;
+using DemaConsulting.ReviewCenter.Identity;
 using DemaConsulting.ReviewCenter.Storage;
 using DemaConsulting.ReviewCenter.Web;
 using Microsoft.EntityFrameworkCore;
@@ -99,18 +100,11 @@ internal static class ServerHost
         // Blazor Server: server-side Razor components rendered over an interactive circuit
         builder.Services.AddRazorComponents().AddInteractiveServerComponents();
 
-        // Persistence: the database is chosen by the 'Database' configuration section (appsettings.json or
-        // environment variables). Options are read lazily so that callers adjusting the configuration in
-        // ConfigureBuilder take effect, and the Core services are shared by all browser sessions
-        builder.Services.AddOptions<DatabaseOptions>().Bind(builder.Configuration.GetSection(DatabaseSetup.SectionName));
-        builder.Services.AddDbContextFactory<ReviewCenterDbContext>((services, dbOptions) =>
-            DatabaseSetup.Configure(dbOptions, services.GetRequiredService<IOptions<DatabaseOptions>>().Value));
-        builder.Services.AddSingleton(TimeProvider.System);
-        builder.Services.AddSingleton<IReviewStore, ReviewStore>();
-        builder.Services.AddSingleton<ProjectService>();
-        builder.Services.AddSingleton<ReviewService>();
-        builder.Services.AddSingleton<ThreadService>();
-        builder.Services.AddSingleton<ChecklistService>();
+        // Persistence and the Core services, shared with the user command
+        AddServices(builder.Services, builder.Configuration);
+
+        // Cookie sign-in and authorization (web only)
+        builder.Services.AddSignIn(builder.Configuration);
 
         // Allow the caller (tests) to replace the server or add logger providers
         options.ConfigureBuilder?.Invoke(builder);
@@ -128,8 +122,12 @@ internal static class ServerHost
         // Create the database folder and schema now, so that a configuration or file system problem stops the
         // start-up with a clear message instead of failing on the first page request
         InitializeDatabase(app);
+        ValidateAuthOptions(app);
 
-        // Antiforgery must run before the Razor component endpoints it protects
+        // Authentication and authorization must run before the endpoints they protect, and antiforgery
+        // after them and before the Razor component and form endpoints it protects
+        app.UseAuthentication();
+        app.UseAuthorization();
         app.UseAntiforgery();
 
         // Serve the Blazor client script and other static web assets; skipped only when the host
@@ -142,6 +140,9 @@ internal static class ServerHost
         // Liveness endpoint: plain-text 200 so that it is trivial for any probe to consume
         app.MapGet(HealthPath, () => Results.Text(HealthyText));
 
+        // Login and logout
+        app.MapSignIn();
+
         // The UI: every page lives under the App root component
         app.MapRazorComponents<App>().AddInteractiveServerRenderMode();
 
@@ -151,6 +152,36 @@ internal static class ServerHost
         app.Lifetime.ApplicationStarted.Register(() => LogStarted(logger, urls));
 
         return app;
+    }
+
+    /// <summary>
+    ///     Registers the persistence and the Core services that both the web server and the user command use.
+    /// </summary>
+    /// <param name="services">The service collection to add to. Must not be null.</param>
+    /// <param name="configuration">The configuration that holds the <c>Database</c> section. Must not be null.</param>
+    /// <remarks>
+    ///     The database is chosen by the <c>Database</c> configuration section (appsettings.json or environment
+    ///     variables). Options are read lazily so that callers adjusting the configuration afterwards take
+    ///     effect, and the Core services are shared by all browser sessions. <see cref="UserService"/> must stay
+    ///     a single instance because it serializes the changes to users.
+    /// </remarks>
+    public static void AddServices(IServiceCollection services, IConfiguration configuration)
+    {
+        ArgumentNullException.ThrowIfNull(services);
+        ArgumentNullException.ThrowIfNull(configuration);
+
+        services.AddOptions<DatabaseOptions>().Bind(configuration.GetSection(DatabaseSetup.SectionName));
+        services.AddDbContextFactory<ReviewCenterDbContext>((provider, dbOptions) =>
+            DatabaseSetup.Configure(dbOptions, provider.GetRequiredService<IOptions<DatabaseOptions>>().Value));
+        services.AddSingleton(TimeProvider.System);
+        services.AddSingleton<IReviewStore, ReviewStore>();
+        services.AddSingleton<IUserStore, UserStore>();
+        services.AddSingleton<IPasswordHasher, PasswordHasher>();
+        services.AddSingleton<ProjectService>();
+        services.AddSingleton<ReviewService>();
+        services.AddSingleton<ThreadService>();
+        services.AddSingleton<ChecklistService>();
+        services.AddSingleton<UserService>();
     }
 
     /// <summary>
@@ -246,6 +277,26 @@ internal static class ServerHost
             // unhelpful; report the root cause (the library that could not be loaded) instead
             var detail = ex is TypeInitializationException ? ex.GetBaseException().Message : ex.Message;
             throw new InvalidOperationException($"Failed to prepare the database: {detail}", ex);
+        }
+    }
+
+    /// <summary>
+    ///     Reads the sign-in options once so an invalid value stops the start-up with a clear message.
+    /// </summary>
+    /// <param name="app">The built application whose services provide the options.</param>
+    /// <exception cref="InvalidOperationException">
+    ///     Thrown when the <c>Auth</c> settings are invalid; the application is disposed before the exception is thrown.
+    /// </exception>
+    private static void ValidateAuthOptions(WebApplication app)
+    {
+        try
+        {
+            _ = app.Services.GetRequiredService<IOptions<AuthOptions>>().Value;
+        }
+        catch (OptionsValidationException ex)
+        {
+            ((IDisposable)app).Dispose();
+            throw new InvalidOperationException($"Invalid sign-in settings: {ex.Message}", ex);
         }
     }
 

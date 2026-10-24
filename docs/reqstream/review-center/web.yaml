@@ -3,8 +3,8 @@
 #
 # PURPOSE:
 # - Define requirements for the ReviewCenter Web subsystem
-# - The Web subsystem spans the App (App.razor, Routes.razor), HomePage, ProjectsPage, ProjectPage, ReviewPage,
-#   and ChecklistPage units
+# - The Web subsystem spans the App (App.razor, Routes.razor, MainLayout.razor), HomePage, ProjectsPage, ProjectPage,
+#   ReviewPage, ChecklistPage, LoginPage, AccountPage, and UsersPage units
 # - Subsystem requirements describe the externally visible behavior of the web user interface
 # - The subsystem tests run over plain HTTP, so they verify what the server renders: the pages, the read path from
 #   the database, and the initial not-yet-interactive marker. Behavior that needs a live connection (forms,
@@ -91,9 +91,10 @@ sections:
 
       - id: ReviewCenter-Web-Comments
         title: >-
-          The Web subsystem shall let a user, on the review page, start comment threads on the selected file,
-          reply to them, resolve and reopen them, and shall show the next step, an index of the threads of all
-          files, the threads with their comments (resolved ones collapsed), and the open and resolved counts.
+          The Web subsystem shall let a signed-in user, on the review page, start comment threads on the selected
+          file, reply to them, resolve and reopen them, with the signed-in user as the author, and shall show the
+          next step, an index of the threads of all files, the threads with their comments (resolved ones
+          collapsed), and the open and resolved counts.
         justification: |
           Comments are written and read next to the code on the review page. The subsystem test covers the
           counts served from the database; starting, replying, and resolving need a live connection and are
@@ -113,7 +114,8 @@ sections:
         title: >-
           The Web subsystem shall show on the review page the progress of the review's checklist with a link to
           a checklist page at /projects/{project}/reviews/{review}/checklist, where a user can see what is left
-          to do, answer each check, mark sections as not applicable, and be led to the next unanswered check.
+          to do, answer each check as the signed-in user, mark sections as not applicable, and be led to the next
+          unanswered check.
         justification: |
           The checklist is worked through on its own page, and the review page shows how far it has got. The
           subsystem test covers the pages served from the database; answering needs a live connection and is
@@ -127,6 +129,34 @@ sections:
           - ReviewCenter-ChecklistPage-Interactive
         tests:
           - WebSubsystem_ChecklistPage_AnsweredChecksSurviveReload
+
+      - id: ReviewCenter-Web-SignIn
+        title: >-
+          The Web subsystem shall show in the page header the name of the signed-in user with a link to the
+          account page and a logout button, or a sign-in link when nobody is signed in, serve a login page at
+          /login with a user name and a password field that shows a failed sign-in without revealing its reason,
+          serve an account page at /account where a signed-in user changes the own password, and serve a users
+          page at /users where an administrator creates users, enables and disables them, changes roles, and sets
+          passwords.
+        justification: |
+          Users must be able to sign in, see who they are signed in as, and sign out from every page. Account and
+          user management are done in the web interface so that no command line is needed after the first
+          administrator exists. The subsystem tests cover the pages served over HTTP; the forms need a live
+          connection and are verified by the component tests of the page units.
+        children:
+          - ReviewCenter-App-Header
+          - ReviewCenter-LoginPage-Form
+          - ReviewCenter-LoginPage-Error
+          - ReviewCenter-AccountPage-Show
+          - ReviewCenter-AccountPage-ChangePassword
+          - ReviewCenter-UsersPage-List
+          - ReviewCenter-UsersPage-Create
+          - ReviewCenter-UsersPage-Update
+          - ReviewCenter-UsersPage-LastAdmin
+          - ReviewCenter-UsersPage-AdminCheck
+        tests:
+          - IdentitySubsystem_SignInJourney_LoginUseAndLogout_WorksEndToEnd
+          - WebSubsystem_AllPages_EveryInteractiveElementHasTestId
 
       - id: ReviewCenter-Web-TestIds
         title: >-

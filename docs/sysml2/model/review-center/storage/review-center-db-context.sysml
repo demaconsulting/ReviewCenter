@@ -1,6 +1,6 @@
 package ReviewCenter {
     part def ReviewCenterDbContext {
-        doc /* Entity Framework Core model that maps projects, reviews, review files, threads, comments, and checklist snapshots, section states, and answers to database tables, keys, and relationships. */
+        doc /* Entity Framework Core model that maps users, projects, reviews, review files, threads, comments, and checklist snapshots, section states, and answers to database tables, keys, and relationships. */
 
         comment sourceRef /* Source: src/DemaConsulting.ReviewCenter/Storage/ReviewCenterDbContext.cs */
         comment testRef /* Test: test/DemaConsulting.ReviewCenter.Tests/Storage/ReviewStoreTests.cs and DatabaseSetupTests.cs */

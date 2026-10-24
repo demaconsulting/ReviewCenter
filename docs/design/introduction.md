@@ -21,7 +21,7 @@ does not restate requirements; it explains how they are realized.
 Local items:
 
 - **ReviewCenter**: the distributed software system. It is divided into the Program unit and the
-  Cli, Hosting, Web, Core, Storage, SelfTest, and Utilities subsystems.
+  Cli, Hosting, Identity, Web, Core, Storage, SelfTest, and Utilities subsystems.
 - **ReviewCenterPuppet**: a separate software system, a development tool that is built and reviewed
   in this repository but is not part of the distributed ReviewCenter package. It has no
   subsystems; its units are PuppetProgram, ControlChannel, BrowserDaemon, SelectorResolver, and
@@ -29,7 +29,7 @@ Local items:
 
 OTS items:
 
-- **ASP.NET Core**: integration and usage design.
+- **ASP.NET Core**: integration and usage design (including cookie authentication and the Identity password hasher).
 - **BuildMark**: integration and usage design.
 - **bUnit**: integration and usage design.
 - **Entity Framework Core**: integration and usage design (including its SQLite provider).
@@ -48,8 +48,8 @@ OTS items:
 The following topics are out of scope:
 
 - Design documents are not produced for the test projects or build pipeline CI configuration
-- Subsystems of the target architecture that are not implemented yet (Api, Identity, ContentSources,
-  Evidence, Messaging) have no design documents yet
+- Subsystems of the target architecture that are not implemented yet (Api, ContentSources, Evidence,
+  Messaging) have no design documents yet
 - The internal design of OTS software items is excluded; only integration and usage design is documented
 
 ## Software Structure
@@ -67,17 +67,20 @@ The ReviewCenter system is divided as follows:
 
 - **Program** (unit): entry point and execution orchestrator
 - **Cli** (subsystem): argument parsing and output; contains the Context unit
-- **Hosting** (subsystem): builds and runs the ASP.NET Core web host for the `serve` verb; contains the
-  ServerHost unit
+- **Hosting** (subsystem): builds and runs the ASP.NET Core web host for the `serve` verb and creates users for the
+  `user add` verb; contains the ServerHost and UserCommand units
+- **Identity** (subsystem): the web side of local accounts, cookie sign-in and authorization; contains the
+  PasswordHasher and SignIn units
 - **Web** (subsystem): the Blazor Server user interface; contains the App unit (HTML shell and router),
-  the HomePage unit, and the ProjectsPage, ProjectPage, ReviewPage, and ChecklistPage units
-- **Core** (subsystem): the domain model and rules for projects, reviews, review comments, and review checklists,
-  free of web and
-  database technology; contains the Fingerprint, ProjectService, ReviewService, ThreadService, and ChecklistService
-  units
-- **Storage** (subsystem): persistence of projects, reviews, comment threads, and checklists in a database through
-  Entity
-  Framework Core; contains the ReviewCenterDbContext, ReviewStore, and DatabaseSetup units
+  the HomePage unit, the ProjectsPage, ProjectPage, ReviewPage, and ChecklistPage units, and the LoginPage,
+  AccountPage, and UsersPage units
+- **Core** (subsystem): the domain model and rules for projects, reviews, review comments, review checklists, and
+  users, free of web and
+  database technology; contains the Fingerprint, ProjectService, ReviewService, ThreadService, ChecklistService, and
+  UserService units
+- **Storage** (subsystem): persistence of projects, reviews, comment threads, checklists, and users in a database
+  through Entity
+  Framework Core; contains the ReviewCenterDbContext, ReviewStore, UserStore, and DatabaseSetup units
 - **SelfTest** (subsystem): self-validation; contains the Validation unit
 - **Utilities** (subsystem): shared helpers; contains the PathHelpers unit
 
@@ -85,7 +88,7 @@ The ReviewCenterPuppet system is a flat set of units that drive one persistent h
 invocation, against a ReviewCenter server and write screenshots.
 
 The model is deliberately partial. It covers only the items that are implemented so far: the Program unit, the
-Cli, Hosting, Web, Core, Storage, SelfTest, and Utilities subsystems, and the Puppet system. The Api, Identity,
+Cli, Hosting, Identity, Web, Core, Storage, SelfTest, and Utilities subsystems, and the Puppet system. The Api,
 ContentSources, Evidence, and Messaging subsystems of the target architecture (`architecture.md`) are planned and
 deferred; they will be added to the model, with their requirements and design documents, as they are implemented.
 
@@ -95,6 +98,7 @@ deferred; they will be added to the model, with their requirements and design do
   - **DemaConsulting.ReviewCenter/** - main application source
     - **Cli/** - command-line interface subsystem
     - **Hosting/** - web host subsystem
+    - **Identity/** - local accounts, cookie sign-in, and authorization subsystem
     - **Web/** - Blazor Server user interface subsystem (Razor components)
     - **Storage/** - database persistence subsystem
     - **SelfTest/** - self-validation subsystem

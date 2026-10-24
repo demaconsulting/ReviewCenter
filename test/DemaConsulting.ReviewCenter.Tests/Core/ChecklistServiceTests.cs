@@ -177,7 +177,7 @@ public class ChecklistServiceTests
         // Act: mark a section as not applicable without a reason
         var exception = await Assert.ThrowsAsync<DomainRuleException>(
             () => service.SetSectionApplicabilityAsync(
-                projectId, "rev-1", "DES", false, reason, "Ann", TestContext.Current.CancellationToken));
+                projectId, "rev-1", "DES", false, reason, TestActors.Ann, TestContext.Current.CancellationToken));
 
         // Assert: the rule is named and the section still applies
         Assert.Equal(DomainRule.ChecklistJustificationInvalid, exception.Rule);
@@ -196,7 +196,7 @@ public class ChecklistServiceTests
 
         // Act: mark a section as not applicable
         await service.SetSectionApplicabilityAsync(
-            projectId, "rev-1", "DES", false, "  No design files  ", "Ann", TestContext.Current.CancellationToken);
+            projectId, "rev-1", "DES", false, "  No design files  ", TestActors.Ann, TestContext.Current.CancellationToken);
         var state = await service.GetAsync(projectId, "rev-1", TestContext.Current.CancellationToken);
 
         // Assert: not applicable with the trimmed reason
@@ -214,11 +214,11 @@ public class ChecklistServiceTests
         // Arrange: a section marked as not applicable
         var (_, service, projectId) = await CreateAsync();
         await service.SetSectionApplicabilityAsync(
-            projectId, "rev-1", "DES", false, "No design files", "Ann", TestContext.Current.CancellationToken);
+            projectId, "rev-1", "DES", false, "No design files", TestActors.Ann, TestContext.Current.CancellationToken);
 
         // Act: mark it as applicable again, with a stray reason
         await service.SetSectionApplicabilityAsync(
-            projectId, "rev-1", "DES", true, "ignored", "Ann", TestContext.Current.CancellationToken);
+            projectId, "rev-1", "DES", true, "ignored", TestActors.Ann, TestContext.Current.CancellationToken);
         var state = await service.GetAsync(projectId, "rev-1", TestContext.Current.CancellationToken);
 
         // Assert: applicable, with no reason
@@ -238,7 +238,7 @@ public class ChecklistServiceTests
         // Act: use an unknown section id
         var exception = await Assert.ThrowsAsync<DomainRuleException>(
             () => service.SetSectionApplicabilityAsync(
-                projectId, "rev-1", "NOPE", false, "Reason", "Ann", TestContext.Current.CancellationToken));
+                projectId, "rev-1", "NOPE", false, "Reason", TestActors.Ann, TestContext.Current.CancellationToken));
 
         // Assert: the rule is named
         Assert.Equal(DomainRule.ChecklistItemNotFound, exception.Rule);
@@ -255,7 +255,7 @@ public class ChecklistServiceTests
 
         // Act: pass a check with white space as justification
         await service.SetAnswerAsync(
-            projectId, "rev-1", "REQ-01", ChecklistOutcome.Pass, "  ", "Ann", TestContext.Current.CancellationToken);
+            projectId, "rev-1", "REQ-01", ChecklistOutcome.Pass, "  ", TestActors.Ann, TestContext.Current.CancellationToken);
         var answer = (await service.GetAsync(projectId, "rev-1", TestContext.Current.CancellationToken))!.AnswerFor("REQ-01");
 
         // Assert: stored as a pass with no justification
@@ -279,7 +279,7 @@ public class ChecklistServiceTests
         // Act: answer without a justification
         var exception = await Assert.ThrowsAsync<DomainRuleException>(
             () => service.SetAnswerAsync(
-                projectId, "rev-1", "REQ-01", outcome, " ", "Ann", TestContext.Current.CancellationToken));
+                projectId, "rev-1", "REQ-01", outcome, " ", TestActors.Ann, TestContext.Current.CancellationToken));
 
         // Assert: the rule is named and the check is still unanswered
         Assert.Equal(DomainRule.ChecklistJustificationInvalid, exception.Rule);
@@ -298,11 +298,11 @@ public class ChecklistServiceTests
         // Act: answer with a justification of exactly the limit, then one more character
         await service.SetAnswerAsync(
             projectId, "rev-1", "REQ-01", ChecklistOutcome.Fail,
-            new string('j', ReviewLimits.MaxJustificationLength), "Ann", TestContext.Current.CancellationToken);
+            new string('j', ReviewLimits.MaxJustificationLength), TestActors.Ann, TestContext.Current.CancellationToken);
         var exception = await Assert.ThrowsAsync<DomainRuleException>(
             () => service.SetAnswerAsync(
                 projectId, "rev-1", "REQ-02", ChecklistOutcome.Fail,
-                new string('j', ReviewLimits.MaxJustificationLength + 1), "Ann", TestContext.Current.CancellationToken));
+                new string('j', ReviewLimits.MaxJustificationLength + 1), TestActors.Ann, TestContext.Current.CancellationToken));
 
         // Assert: the limit is accepted, one more is refused
         Assert.Equal(DomainRule.ChecklistJustificationInvalid, exception.Rule);
@@ -323,7 +323,7 @@ public class ChecklistServiceTests
         // Act: answer an unknown check
         var exception = await Assert.ThrowsAsync<DomainRuleException>(
             () => service.SetAnswerAsync(
-                projectId, "rev-1", "NOPE-01", ChecklistOutcome.Pass, null, "Ann", TestContext.Current.CancellationToken));
+                projectId, "rev-1", "NOPE-01", ChecklistOutcome.Pass, null, TestActors.Ann, TestContext.Current.CancellationToken));
 
         // Assert: the rule is named
         Assert.Equal(DomainRule.ChecklistItemNotFound, exception.Rule);
@@ -341,7 +341,7 @@ public class ChecklistServiceTests
         // Act: answer a check of another review
         var exception = await Assert.ThrowsAsync<DomainRuleException>(
             () => service.SetAnswerAsync(
-                projectId, "other", "REQ-01", ChecklistOutcome.Pass, null, "Ann", TestContext.Current.CancellationToken));
+                projectId, "other", "REQ-01", ChecklistOutcome.Pass, null, TestActors.Ann, TestContext.Current.CancellationToken));
 
         // Assert: the rule is named, and the message names the review
         Assert.Equal(DomainRule.ChecklistNotFound, exception.Rule);
@@ -360,7 +360,7 @@ public class ChecklistServiceTests
         // Act: answer with an outcome value that is not defined
         await Assert.ThrowsAsync<ArgumentOutOfRangeException>(
             () => service.SetAnswerAsync(
-                projectId, "rev-1", "REQ-01", (ChecklistOutcome)99, "Because", "Ann", TestContext.Current.CancellationToken));
+                projectId, "rev-1", "REQ-01", (ChecklistOutcome)99, "Because", TestActors.Ann, TestContext.Current.CancellationToken));
 
         // Assert: nothing is stored
         Assert.Null((await service.GetAsync(projectId, "rev-1", TestContext.Current.CancellationToken))!.AnswerFor("REQ-01"));
@@ -375,11 +375,11 @@ public class ChecklistServiceTests
         // Arrange: a check passed once
         var (_, service, projectId) = await CreateAsync();
         await service.SetAnswerAsync(
-            projectId, "rev-1", "REQ-01", ChecklistOutcome.Pass, null, "Ann", TestContext.Current.CancellationToken);
+            projectId, "rev-1", "REQ-01", ChecklistOutcome.Pass, null, TestActors.Ann, TestContext.Current.CancellationToken);
 
         // Act: answer it again as failed, with padding around the justification
         await service.SetAnswerAsync(
-            projectId, "rev-1", "REQ-01", ChecklistOutcome.Fail, "  Not traceable  ", "Bob", TestContext.Current.CancellationToken);
+            projectId, "rev-1", "REQ-01", ChecklistOutcome.Fail, "  Not traceable  ", TestActors.Bob, TestContext.Current.CancellationToken);
         var state = await service.GetAsync(projectId, "rev-1", TestContext.Current.CancellationToken);
 
         // Assert: only the new answer counts
@@ -391,48 +391,45 @@ public class ChecklistServiceTests
     }
 
     /// <summary>
-    ///     Test that the name of the person answering is required and limited.
-    /// </summary>
-    /// <param name="name">The invalid name.</param>
-    [Theory]
-    [InlineData(null)]
-    [InlineData("   ")]
-    [InlineData("TooLong")]
-    public async Task ChecklistService_SetAnswer_BlankOrTooLongName_ThrowsAnsweredByInvalid(string? name)
-    {
-        // Arrange: a review; the "too long" case is replaced by a name over the limit
-        var (_, service, projectId) = await CreateAsync();
-        var candidate = name == "TooLong" ? new string('n', ReviewLimits.MaxAuthorLength + 1) : name;
-
-        // Act: answer and set a section with the invalid name
-        var answerException = await Assert.ThrowsAsync<DomainRuleException>(
-            () => service.SetAnswerAsync(
-                projectId, "rev-1", "REQ-01", ChecklistOutcome.Pass, null, candidate, TestContext.Current.CancellationToken));
-        var sectionException = await Assert.ThrowsAsync<DomainRuleException>(
-            () => service.SetSectionApplicabilityAsync(
-                projectId, "rev-1", "DES", false, "Reason", candidate, TestContext.Current.CancellationToken));
-
-        // Assert: the rule is named for both
-        Assert.Equal(DomainRule.ChecklistAnsweredByInvalid, answerException.Rule);
-        Assert.Equal(DomainRule.ChecklistAnsweredByInvalid, sectionException.Rule);
-    }
-
-    /// <summary>
-    ///     Test that the answer carries the trimmed name and the UTC time of the clock.
+    ///     Test that a missing actor is refused for both an answer and a section change, and nothing is stored.
     /// </summary>
     [Fact]
-    public async Task ChecklistService_SetAnswer_StoresNameAndUtcTime()
+    public async Task ChecklistService_SetAnswer_NullActor_Throws()
     {
         // Arrange: a review
         var (_, service, projectId) = await CreateAsync();
 
-        // Act: answer with a padded name
+        // Act: answer and set a section without an actor
+        await Assert.ThrowsAsync<ArgumentNullException>(
+            () => service.SetAnswerAsync(
+                projectId, "rev-1", "REQ-01", ChecklistOutcome.Pass, null, null!, TestContext.Current.CancellationToken));
+        await Assert.ThrowsAsync<ArgumentNullException>(
+            () => service.SetSectionApplicabilityAsync(
+                projectId, "rev-1", "DES", false, "Reason", null!, TestContext.Current.CancellationToken));
+
+        // Assert: nothing is stored
+        var state = await service.GetAsync(projectId, "rev-1", TestContext.Current.CancellationToken);
+        Assert.Null(state!.AnswerFor("REQ-01"));
+        Assert.True(state.IsApplicable("DES"));
+    }
+
+    /// <summary>
+    ///     Test that the answer carries the user name and display name of the actor and the UTC time of the clock.
+    /// </summary>
+    [Fact]
+    public async Task ChecklistService_SetAnswer_StoresActorAndUtcTime()
+    {
+        // Arrange: a review
+        var (_, service, projectId) = await CreateAsync();
+
+        // Act: answer as an actor
         await service.SetAnswerAsync(
-            projectId, "rev-1", "REQ-01", ChecklistOutcome.Pass, null, " Ann ", TestContext.Current.CancellationToken);
+            projectId, "rev-1", "REQ-01", ChecklistOutcome.Pass, null, TestActors.Ann, TestContext.Current.CancellationToken);
         var answer = (await service.GetAsync(projectId, "rev-1", TestContext.Current.CancellationToken))!.AnswerFor("REQ-01")!;
 
-        // Assert: trimmed name and clock time
+        // Assert: both names and the clock time
         Assert.Equal("Ann", answer.AnsweredBy);
+        Assert.Equal("ann", answer.AnsweredByUsername);
         Assert.Equal(_now, answer.AnsweredAt);
         Assert.Equal(TimeSpan.Zero, answer.AnsweredAt.Offset);
     }

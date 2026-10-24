@@ -4,7 +4,7 @@
    user a clear answer instead of a blank page. *@
 <Router AppAssembly="typeof(Routes).Assembly">
     <Found Context="routeData">
-        <RouteView RouteData="routeData" />
+        <RouteView RouteData="routeData" DefaultLayout="typeof(MainLayout)" />
     </Found>
     <NotFound>
         <p>Page not found.</p>

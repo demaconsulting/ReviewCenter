@@ -9,6 +9,9 @@ root-tags: [system, quality]
 includes:
   - docs/reqstream/quality.yaml
   - docs/reqstream/review-center.yaml
+  - docs/reqstream/review-center/identity.yaml
+  - docs/reqstream/review-center/identity/password-hasher.yaml
+  - docs/reqstream/review-center/identity/sign-in.yaml
   - docs/reqstream/review-center/program.yaml
   - docs/reqstream/review-center/cli.yaml
   - docs/reqstream/review-center/cli/context.yaml
@@ -18,6 +21,7 @@ includes:
   - docs/reqstream/review-center/utilities/path-helpers.yaml
   - docs/reqstream/review-center/hosting.yaml
   - docs/reqstream/review-center/hosting/server-host.yaml
+  - docs/reqstream/review-center/hosting/user-command.yaml
   - docs/reqstream/review-center/web.yaml
   - docs/reqstream/review-center/web/app.yaml
   - docs/reqstream/review-center/web/home-page.yaml
@@ -25,15 +29,20 @@ includes:
   - docs/reqstream/review-center/web/project-page.yaml
   - docs/reqstream/review-center/web/review-page.yaml
   - docs/reqstream/review-center/web/checklist-page.yaml
+  - docs/reqstream/review-center/web/login-page.yaml
+  - docs/reqstream/review-center/web/account-page.yaml
+  - docs/reqstream/review-center/web/users-page.yaml
   - docs/reqstream/review-center/core.yaml
   - docs/reqstream/review-center/core/fingerprint.yaml
   - docs/reqstream/review-center/core/project-service.yaml
   - docs/reqstream/review-center/core/review-service.yaml
   - docs/reqstream/review-center/core/thread-service.yaml
   - docs/reqstream/review-center/core/checklist-service.yaml
+  - docs/reqstream/review-center/core/user-service.yaml
   - docs/reqstream/review-center/storage.yaml
   - docs/reqstream/review-center/storage/review-center-db-context.yaml
   - docs/reqstream/review-center/storage/review-store.yaml
+  - docs/reqstream/review-center/storage/user-store.yaml
   - docs/reqstream/review-center/storage/database-setup.yaml
   - docs/reqstream/review-center/platform-requirements.yaml
   - docs/reqstream/review-center-puppet.yaml

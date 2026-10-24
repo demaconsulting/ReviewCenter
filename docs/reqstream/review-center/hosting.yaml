@@ -3,7 +3,8 @@
 #
 # PURPOSE:
 # - Define requirements for the ReviewCenter Hosting subsystem
-# - The Hosting subsystem spans ServerHost.cs (web server composition, endpoints, and logging)
+# - The Hosting subsystem spans ServerHost.cs (web server composition, authentication, endpoints, and logging) and
+#   UserCommand.cs (the user add verb)
 # - Subsystem requirements describe the externally visible behavior of the running web server
 
 sections:
@@ -12,7 +13,7 @@ sections:
       - id: ReviewCenter-Hosting-Health
         title: >-
           The Hosting subsystem shall answer requests for the /health URL with HTTP status 200
-          and the text Healthy while the server is running, alongside the user interface routes.
+          and the text Healthy while the server is running, without sign-in, alongside the user interface routes.
         justification: |
           Reverse proxies, container orchestrators, monitoring tools, and test tooling need a
           simple, unauthenticated way to find out whether the service is up. The health route
@@ -41,9 +42,9 @@ sections:
 
       - id: ReviewCenter-Hosting-Database
         title: >-
-          The Hosting subsystem shall create the configured database when the server starts and make the project
-          and review services available to the pages through it, so that stored data is served again after the
-          server is restarted.
+          The Hosting subsystem shall create the configured database when the server starts and make the project,
+          review, and user services available to the pages through it, so that stored data is served again after
+          the server is restarted.
         justification: |
           The pages are only useful if what users create is kept. Opening the database at start-up, rather than
           on first use, makes a configuration problem visible immediately, and a restart must not lose data.
@@ -51,6 +52,36 @@ sections:
           - ReviewCenter-ServerHost-Database
         tests:
           - HostingSubsystem_Startup_DatabaseConfigured_ServesStoredProjectsAfterRestart
+
+      - id: ReviewCenter-Hosting-Authentication
+        title: >-
+          The Hosting subsystem shall set up cookie sign-in for the pages with a configurable session length,
+          requiring a signed-in user for every page except the home page and the login page, while the /health
+          URL stays open to everyone.
+        justification: |
+          Review data must only be reached by identified users, but probes and the login page must work without
+          signing in. Closing every other page by default means a new page cannot be left open by mistake.
+        children:
+          - ReviewCenter-ServerHost-Authentication
+        tests:
+          - HostingSubsystem_Startup_DatabaseConfigured_ServesStoredProjectsAfterRestart
+          - ServerHost_CreateApplication_NonPositiveSessionHours_ThrowsClearError
+
+      - id: ReviewCenter-Hosting-UserAdd
+        title: >-
+          The Hosting subsystem shall create a user in the configured database when the user add verb is run,
+          reading the password from the environment, from redirected standard input, or from a prompt, and
+          shall report the outcome without ever printing the password.
+        justification: |
+          The first administrator must exist before anybody can sign in, and creating it from the command line
+          needs no web page that would itself need an administrator.
+        children:
+          - ReviewCenter-UserCommand-Create
+          - ReviewCenter-UserCommand-Password
+          - ReviewCenter-UserCommand-Errors
+        tests:
+          - ReviewCenter_UserAddVerb_PasswordFromEnvironment_CreatesUserThenRejectsDuplicate
+          - ReviewCenter_UserAddVerb_NoPassword_ReturnsError
 
       - id: ReviewCenter-Hosting-DatabaseFailure
         title: >-

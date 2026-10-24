@@ -30,8 +30,7 @@ namespace DemaConsulting.ReviewCenter.Web;
 ///     The page talks to the domain only through <see cref="ProjectService"/>, which owns the rules; a rule
 ///     violation is shown to the operator next to the form instead of being thrown. Each browser connection
 ///     (circuit) gets its own page instance, so the state here is per-user and needs no synchronization.
-///     There is no authentication yet: every visitor is the same anonymous operator (a documented
-///     temporary limitation).
+///     The page requires a signed-in user.
 /// </remarks>
 public partial class ProjectsPage : ComponentBase
 {

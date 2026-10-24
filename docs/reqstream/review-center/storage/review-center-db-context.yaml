@@ -2,7 +2,7 @@
 # Software Unit Requirements for the ReviewCenterDbContext Class
 #
 # The ReviewCenterDbContext class is the Entity Framework Core model that maps projects, reviews, review
-# files, threads, comments, and checklists to database tables.
+# files, threads, comments, checklists, and users to database tables.
 
 sections:
   - title: ReviewCenterDbContext Unit Requirements
@@ -64,3 +64,17 @@ sections:
         tests:
           - ReviewStore_SetChecklistAnswer_UpsertsSingleRowPerItem
           - ReviewStore_SetChecklistSectionState_UpsertsSingleRowPerSection
+
+      - id: ReviewCenter-DbContext-Users
+        title: >-
+          The ReviewCenterDbContext class shall map users to a table in which the user name is unique regardless
+          of letter case and the role is stored by its name, and shall map the user name of the author of a
+          comment, of the person who answered a check, and of the person who set a section next to the display
+          name, so that the database refuses a second user whose name differs only in letter case.
+        justification: |
+          The database is the last line of defense against two users with the same name, and a role stored by
+          name stays readable and stays valid if the list of roles is reordered. The user name beside the display
+          name keeps the record identifiable when the display name changes.
+        tests:
+          - UserStore_AddAsync_UsernameOtherCase_ThrowsUserNameTakenAndLookupIgnoresCase
+          - UserStore_AddAsync_User_RoundTripsEveryField

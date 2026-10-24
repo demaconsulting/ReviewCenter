@@ -27,8 +27,8 @@ namespace DemaConsulting.ReviewCenter.Core;
 ///     The service is the single place where checklist rules live. The checklist itself is the frozen copy
 ///     stored with the review (see <see cref="ReviewChecklist"/>); the service only records which sections
 ///     apply and the answer to each check. A section that does not apply needs a reason; a failed or
-///     not-applicable check needs a justification. There is no sign-in yet, so the name of the person
-///     answering is unverified text; that is TEMPORARY until the signed-in user replaces it in slice 4.
+///     not-applicable check needs a justification. The person answering is the signed-in <see cref="Actor"/>,
+///     never free text.
 ///     The service holds no state of its own and is safe for concurrent use as long as the injected
 ///     <see cref="IReviewStore"/> is.
 /// </remarks>
@@ -93,9 +93,10 @@ public sealed class ChecklistService
     ///     <paramref name="applicable"/> is <c>false</c>, at most <see cref="ReviewLimits.MaxJustificationLength"/>
     ///     characters; ignored (and cleared) when the section applies.
     /// </param>
-    /// <param name="setBy">The name of the person; same rules as the answer name (see <see cref="SetAnswerAsync"/>).</param>
+    /// <param name="actor">The signed-in user who sets the applicability. Must not be null.</param>
     /// <param name="cancellationToken">Cancels the operation.</param>
     /// <returns>A task that completes when the applicability is stored.</returns>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="actor"/> is null.</exception>
     /// <exception cref="DomainRuleException">Thrown when a rule is violated (see <see cref="DomainRule"/>); nothing is stored then.</exception>
     public async Task SetSectionApplicabilityAsync(
         int projectId,
@@ -103,10 +104,10 @@ public sealed class ChecklistService
         string sectionId,
         bool applicable,
         string? reason,
-        string? setBy,
+        Actor actor,
         CancellationToken cancellationToken = default)
     {
-        var name = ValidateName(setBy);
+        ArgumentNullException.ThrowIfNull(actor);
         var definition = await GetDefinitionAsync(projectId, reviewId, cancellationToken);
         if (!definition.Sections.Any(section => section.Id == sectionId))
         {
@@ -126,7 +127,8 @@ public sealed class ChecklistService
                 SectionId = sectionId,
                 Applicable = applicable,
                 Reason = trimmedReason,
-                SetBy = name,
+                SetBy = actor.DisplayName,
+                SetByUsername = actor.Username,
                 SetAt = _timeProvider.GetUtcNow()
             },
             cancellationToken);
@@ -144,12 +146,10 @@ public sealed class ChecklistService
     ///     <see cref="ChecklistOutcome.Fail"/> and <see cref="ChecklistOutcome.NotApplicable"/>, optional for a
     ///     pass (an empty one is stored as none), at most <see cref="ReviewLimits.MaxJustificationLength"/> characters.
     /// </param>
-    /// <param name="answeredBy">
-    ///     The name of the person answering; leading and trailing white space is removed. Must not be empty and
-    ///     must not exceed <see cref="ReviewLimits.MaxAuthorLength"/> characters. TEMPORARY free text until sign-in exists.
-    /// </param>
+    /// <param name="actor">The signed-in user who answers. Must not be null.</param>
     /// <param name="cancellationToken">Cancels the operation.</param>
     /// <returns>A task that completes when the answer is stored.</returns>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="actor"/> is null.</exception>
     /// <exception cref="ArgumentOutOfRangeException">Thrown when <paramref name="outcome"/> is not a defined value.</exception>
     /// <exception cref="DomainRuleException">Thrown when a rule is violated (see <see cref="DomainRule"/>); nothing is stored then.</exception>
     public async Task SetAnswerAsync(
@@ -158,15 +158,15 @@ public sealed class ChecklistService
         string itemId,
         ChecklistOutcome outcome,
         string? justification,
-        string? answeredBy,
+        Actor actor,
         CancellationToken cancellationToken = default)
     {
+        ArgumentNullException.ThrowIfNull(actor);
         if (!Enum.IsDefined(outcome))
         {
             throw new ArgumentOutOfRangeException(nameof(outcome), outcome, "The outcome is not a known value.");
         }
 
-        var name = ValidateName(answeredBy);
         var definition = await GetDefinitionAsync(projectId, reviewId, cancellationToken);
         if (!definition.Sections.SelectMany(section => section.Items).Any(item => item.Id == itemId))
         {
@@ -186,7 +186,8 @@ public sealed class ChecklistService
                 ItemId = itemId,
                 Outcome = outcome,
                 Justification = trimmed,
-                AnsweredBy = name,
+                AnsweredBy = actor.DisplayName,
+                AnsweredByUsername = actor.Username,
                 AnsweredAt = _timeProvider.GetUtcNow()
             },
             cancellationToken);
@@ -210,30 +211,6 @@ public sealed class ChecklistService
                ?? throw new DomainRuleException(
                    DomainRule.ChecklistNotFound,
                    $"Review '{reviewId}' does not exist or has no checklist.");
-    }
-
-    /// <summary>
-    ///     Checks and normalizes the name of the person answering.
-    /// </summary>
-    /// <param name="name">The candidate name.</param>
-    /// <returns>The name without leading and trailing white space.</returns>
-    /// <exception cref="DomainRuleException">Thrown with <see cref="DomainRule.ChecklistAnsweredByInvalid"/> when the name is empty or too long.</exception>
-    private static string ValidateName(string? name)
-    {
-        var trimmed = name?.Trim() ?? string.Empty;
-        if (trimmed.Length == 0)
-        {
-            throw new DomainRuleException(DomainRule.ChecklistAnsweredByInvalid, "Your name is required.");
-        }
-
-        if (trimmed.Length > ReviewLimits.MaxAuthorLength)
-        {
-            throw new DomainRuleException(
-                DomainRule.ChecklistAnsweredByInvalid,
-                $"Your name must not be longer than {ReviewLimits.MaxAuthorLength} characters.");
-        }
-
-        return trimmed;
     }
 
     /// <summary>

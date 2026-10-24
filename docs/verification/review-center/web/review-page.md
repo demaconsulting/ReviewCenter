@@ -4,6 +4,8 @@
 
 `ReviewPage` is verified with component tests defined in `ReviewPageTests.cs`, which use the bUnit test context to
 render the real component over real Core services and an in-memory fake store holding a review of known files.
+The signed-in user is supplied by a test authentication state in `PageTestBase`: the user `ann` (display name "Ann")
+unless a test signs in as someone else.
 Tests locate elements by their `data-testid` attributes (the page units share the helper `PageTestBase`) and
 compare the shown values with the known hashes and fingerprint. The real database is covered by the `Storage`
 subsystem and the integration tests of the `Web` subsystem.
@@ -29,11 +31,10 @@ N/A - standard test environment.
   the anchored-line markers, and the comments of the selected file are shown, and an empty-state message appears
   for a file without threads.
 - The line Comment button fills the line fields; starting a thread anchors the whole file, a line range, or one
-  line, shows the thread and clears the text; every rule violation (missing author, missing text, line outside the
-  file, line that is not a number, line range on a binary file) shows a message next to the form and keeps what was
-  typed.
-- A reply is added to a thread; a blank reply or a missing author shows a message in that thread, and the missing
-  author message points to the name field.
+  line, shows the thread under the signed-in user and clears the text; every rule violation (missing text, line
+  outside the file, line that is not a number, line range on a binary file) shows a message next to the form and
+  keeps what was typed. The page has no field for an author.
+- A reply is added to a thread under the signed-in user; a blank reply shows a message in that thread.
 - Resolve and reopen change the thread state and the summary; the next-step line follows the threads and the
   unanswered checks of the checklist.
 - A review with a checklist shows a card with its progress and a link to the checklist page; a review without one
@@ -150,14 +151,15 @@ that line and the target text names it. This scenario is tested by
 `ReviewPage_LineCommentButton_Click_FillsStartAndEndLine`.
 
 **ReviewPage_StartThread_WholeFile_CreatesThreadAndClearsText**: A thread with blank line fields is anchored to the
-whole file, is shown, and the text is cleared. This scenario is tested by
+whole file and created by the signed-in user with the text only, with no author field on the page; it is shown, and
+the text is cleared. This scenario is tested by
 `ReviewPage_StartThread_WholeFile_CreatesThreadAndClearsText`.
 
 **ReviewPage_StartThread_LineRangeAndSingleLine_AnchorLines**: A range and a single line are stored with the
 entered anchors and shown with the matching labels. This scenario is tested by
 `ReviewPage_StartThread_LineRangeAndSingleLine_AnchorLines`.
 
-**ReviewPage_StartThread_InvalidInput_ShowsErrorAndKeepsValues**: A missing author, missing text, line outside the
+**ReviewPage_StartThread_InvalidInput_ShowsErrorAndKeepsValues**: Missing text, a line outside the
 file, and a line that is not a number each show a message next to the form, create no thread, and keep what was
 typed. This scenario is tested by `ReviewPage_StartThread_InvalidInput_ShowsErrorAndKeepsValues`.
 
@@ -165,12 +167,15 @@ typed. This scenario is tested by `ReviewPage_StartThread_InvalidInput_ShowsErro
 accepted and a line range is refused. This scenario is tested by
 `ReviewPage_StartThread_BinaryFile_WholeFileAllowedAndRangeRefused`.
 
-**ReviewPage_Reply_ValidAndBlank_AppendsCommentOrShowsErrorInThread**: A valid reply is appended to the thread; a
+**ReviewPage_Reply_ValidAndBlank_AppendsCommentOrShowsErrorInThread**: A valid reply is appended to the thread under
+the signed-in user, whose user name is stored with it; a
 blank reply shows a message in the thread. This scenario is tested by
 `ReviewPage_Reply_ValidAndBlank_AppendsCommentOrShowsErrorInThread`.
 
-**ReviewPage_Reply_NoAuthor_ShowsErrorPointingToNameField**: A reply with no author shows a message that points to
-the name field. This scenario is tested by `ReviewPage_Reply_NoAuthor_ShowsErrorPointingToNameField`.
+**ReviewPage_Reply_NoAuthorField_AuthorCannotBeChosen**: With another user ("bob") signed in, a reply is posted to a
+thread of someone else; the page has no field for a name and no "Your name" text, and the new comment is shown with
+the display name of the signed-in user. This scenario is tested by
+`ReviewPage_Reply_NoAuthorField_AuthorCannotBeChosen`.
 
 **ReviewPage_ResolveAndReopen_Toggle_ChangesStateAndSummary**: Resolving an open thread (which collapses it) and,
 after expanding it, reopening it changes the state label, the button label, and the summary counts. This scenario is

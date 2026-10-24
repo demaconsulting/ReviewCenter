@@ -22,7 +22,8 @@ N/A - standard test environment.
   reason; an unknown section is refused.
 - A Pass is stored without a justification; a Fail or N/A needs one; a justification is trimmed and limited to 2000
   characters; an unknown review or item is refused; answering again replaces the earlier answer.
-- The "Answered by" name must be non-blank and at most 100 characters; it is stored with the UTC time.
+- The answer carries the user name and the display name of the actor, with the UTC time; a missing actor is refused
+  for an answer and for a section change.
 - Progress is counted per section and overall; a not-applicable section counts as done and leaves the totals; the
   checklist is complete when every applicable check is answered; the next unanswered check and the first incomplete
   section are found.
@@ -91,11 +92,13 @@ refused with an `ArgumentOutOfRangeException`, and nothing is stored. This scena
 second time with a padded justification; one answer remains, with the trimmed text. This scenario is tested by
 `ChecklistService_SetAnswer_ReanswerWithPaddedJustification_OverwritesAndTrims`.
 
-**ChecklistService_SetAnswer_BlankOrTooLongName_ThrowsAnsweredByInvalid**: An answer with a missing, blank or too
-long name is refused. This scenario is tested by `ChecklistService_SetAnswer_BlankOrTooLongName_ThrowsAnsweredByInvalid`.
+**ChecklistService_SetAnswer_NullActor_Throws**: An answer and a section change are made without an actor; both are
+refused with an `ArgumentNullException` and nothing is stored. This scenario is tested by
+`ChecklistService_SetAnswer_NullActor_Throws`.
 
-**ChecklistService_SetAnswer_StoresNameAndUtcTime**: An answer is stored; it holds the trimmed name and the UTC time
-of the clock. This scenario is tested by `ChecklistService_SetAnswer_StoresNameAndUtcTime`.
+**ChecklistService_SetAnswer_StoresActorAndUtcTime**: An answer is stored as an actor; it holds the display name and
+the user name of the actor and the UTC time of the clock. This scenario is tested by
+`ChecklistService_SetAnswer_StoresActorAndUtcTime`.
 
 **ChecklistService_Constructor_NullArguments_Throws**: The service is created with a missing argument; the
 constructor throws. This scenario is tested by `ChecklistService_Constructor_NullArguments_Throws`.

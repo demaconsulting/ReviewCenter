@@ -40,8 +40,8 @@ sections:
 
       - id: ReviewCenter-ServerHost-Database
         title: >-
-          The ServerHost class shall read the Database settings, register the database store and the project
-          and review services for the pages, and create the database when the application is built.
+          The ServerHost class shall read the Database settings, register the database store and the project,
+          review, and user services for the pages, and create the database when the application is built.
         justification: |
           The composition root is the one place that connects the pages to the database. Creating the database
           while building the application means a ready database exists before the first request and a failure
@@ -49,6 +49,24 @@ sections:
         tests:
           - ServerHost_CreateApplication_DatabaseConfigured_CreatesFileAndServesDomainServices
           - ServerHost_CreateApplication_RestartedOnSameDatabase_KeepsData
+          - ServerHost_AddServices_Configured_RegistersUserService
+
+      - id: ReviewCenter-ServerHost-Authentication
+        title: >-
+          The ServerHost class shall set up cookie sign-in with a session cookie that is HttpOnly, SameSite Lax,
+          and Secure when the request is over HTTPS, lasting the number of hours set in Auth:SessionHours (8 by
+          default), shall fail with an error that names Auth:SessionHours when that value is not a positive
+          number, shall require a signed-in user for all pages except the home page and the login page, and shall
+          map the sign-in and sign-out endpoints, keeping the /health route open to everyone.
+        justification: |
+          The composition root is the one place where authentication is connected to the pages. A wrong session
+          length must stop the server at start-up with a clear message, and the pages must be closed by default so
+          that a new page cannot be left open by mistake.
+        tests:
+          - ServerHost_CreateApplication_NonPositiveSessionHours_ThrowsClearError
+          - ServerHost_CreateApplication_HealthRoute_Returns200Healthy
+          - SignIn_PublicPage_Anonymous_IsServed
+          - SignIn_ProtectedPage_Anonymous_RedirectsToLogin
 
       - id: ReviewCenter-ServerHost-DatabaseFailure
         title: >-

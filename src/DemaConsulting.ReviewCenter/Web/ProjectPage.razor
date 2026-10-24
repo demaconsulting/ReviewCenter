@@ -5,6 +5,7 @@
    index), and the data-interactive marker on the root flips to "true" once the live circuit is connected. *@
 @page "/projects/{ProjectId:int}"
 @rendermode InteractiveServer
+@attribute [Authorize]
 
 <PageTitle>@(Project?.Name ?? "Project") - ReviewCenter</PageTitle>
 

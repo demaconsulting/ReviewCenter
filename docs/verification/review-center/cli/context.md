@@ -22,6 +22,10 @@ N/A - standard test environment.
   listen address or holds the validated `--urls` value.
 - `--urls` without `serve`, without a value, or with a value that is not an absolute http or
   https URL is rejected with an `ArgumentException`.
+- `UserAdd` is true only for the `user add` verb, which records `--username`, `--display-name`, and `--role`
+  (not case sensitive, `Reviewer` when omitted).
+- `user add` without the add action, without both names, or with a role other than `Admin` or `Reviewer`, and the
+  options without the verb, are rejected with an `ArgumentException`; there is no password option.
 
 #### Test Scenarios
 
@@ -164,3 +168,21 @@ This scenario is tested by `Context_Create_UrlsFlag_WithoutValue_ThrowsArgumentE
 `["serve", "--urls", value]` for values that are not absolute http or https URLs (`not-a-url`
 and `ftp://localhost:21`); an `ArgumentException` mentioning `--urls` is thrown for each. This
 scenario is tested by `Context_Create_InvalidUrls_ThrowsArgumentException`.
+
+**Context_Create_UserAddVerb_SetsUserAddAndOptions**: `Context.Create` is called with `["user", "add",
+"--username", "ann", "--display-name", "Ann Example", "--role", "admin"]`; `UserAdd` is true, the user name and display
+name are recorded, and the role is `Admin` although it was given in lower case. This scenario is tested by
+`Context_Create_UserAddVerb_SetsUserAddAndOptions`.
+
+**Context_Create_UserAddWithoutRole_DefaultsToReviewer**: `Context.Create` is called with `user add` and both names
+but no role; the role is `Reviewer`. A context created without arguments has `UserAdd` false. This scenario is
+tested by `Context_Create_UserAddWithoutRole_DefaultsToReviewer`.
+
+**Context_Create_UserAddMisuse_ThrowsArgumentException**: A theory over incorrect use: `user` and `user remove`
+(no add action), `user add` with only one of the two names, a role that is not `Admin` or `Reviewer`, `--role`
+without a value, and `--username` or `--role` without the verb; an `ArgumentException` whose message says what is
+wrong is thrown for each. This scenario is tested by `Context_Create_UserAddMisuse_ThrowsArgumentException`.
+
+**Context_Create_PasswordOption_IsNotSupported**: `Context.Create` is called with `user add` and a `--password`
+option; an `ArgumentException` containing "Unsupported argument" is thrown, so a password cannot be given on the
+command line. This scenario is tested by `Context_Create_PasswordOption_IsNotSupported`.

@@ -57,7 +57,7 @@ public class ChecklistPageTests : PageTestBase
         foreach (var item in DefaultChecklist.Current.Sections.Where(s => sectionIds.Contains(s.Id)).SelectMany(s => s.Items))
         {
             await Checklists.SetAnswerAsync(
-                projectId, "REV-1", item.Id, ChecklistOutcome.Pass, null, "Ann", TestContext.Current.CancellationToken);
+                projectId, "REV-1", item.Id, ChecklistOutcome.Pass, null, TestActors.Ann, TestContext.Current.CancellationToken);
         }
     }
 
@@ -212,10 +212,9 @@ public class ChecklistPageTests : PageTestBase
     [Fact]
     public async Task ChecklistPage_Answer_Pass_SavesImmediately()
     {
-        // Arrange: a new review, with the reviewer's name entered
+        // Arrange: a new review, with the reviewer signed in as Ann
         var projectId = await CreateReviewAsync();
         var cut = RenderPage(projectId);
-        await cut.Find("[data-testid='checklist-author-input']").InputAsync("Ann");
 
         // Act: pass the first check
         await cut.Find("[data-testid='check-pass-req-01']").ClickAsync();
@@ -238,10 +237,9 @@ public class ChecklistPageTests : PageTestBase
     [Fact]
     public async Task ChecklistPage_Answer_Fail_ShowsJustificationBoxAndRequiresText()
     {
-        // Arrange: a new review, with the reviewer's name entered
+        // Arrange: a new review, with the reviewer signed in as Ann
         var projectId = await CreateReviewAsync();
         var cut = RenderPage(projectId);
-        await cut.Find("[data-testid='checklist-author-input']").InputAsync("Ann");
         Assert.Empty(cut.FindAll("[data-testid='check-justification-req-01']"));
 
         // Act: choose Fail, then save without a justification
@@ -262,10 +260,9 @@ public class ChecklistPageTests : PageTestBase
     [Fact]
     public async Task ChecklistPage_Answer_FailWithJustification_SavesAndShowsAnsweredBy()
     {
-        // Arrange: a new review, with the reviewer's name entered
+        // Arrange: a new review, with the reviewer signed in as Ann
         var projectId = await CreateReviewAsync();
         var cut = RenderPage(projectId);
-        await cut.Find("[data-testid='checklist-author-input']").InputAsync("Ann");
 
         // Act: choose Fail, type a justification and save
         await cut.Find("[data-testid='check-fail-req-01']").ClickAsync();
@@ -282,24 +279,25 @@ public class ChecklistPageTests : PageTestBase
     }
 
     /// <summary>
-    ///     Test that answering without a name shows an error that says where to enter it.
+    ///     Test that the answer is recorded under the signed-in user, whatever the page is asked to show, and
+    ///     that the page has no field for a name.
     /// </summary>
     [Fact]
-    public async Task ChecklistPage_Answer_NoName_ShowsNameError()
+    public async Task ChecklistPage_Answer_SignedInUser_IsRecordedAsAnsweredBy()
     {
-        // Arrange: a new review and no name entered
+        // Arrange: a new review, with the reviewer signed in as Bea
+        SignInAs("bea", "Bea");
         var projectId = await CreateReviewAsync();
         var cut = RenderPage(projectId);
 
         // Act: pass the first check
         await cut.Find("[data-testid='check-pass-req-01']").ClickAsync();
 
-        // Assert: the error is next to the check and points to the name field; nothing was stored
-        var error = cut.Find("[data-testid='check-error-req-01']").TextContent;
-        Assert.Contains("Your name is required.", error, StringComparison.Ordinal);
-        Assert.Contains("'Your name' field", error, StringComparison.Ordinal);
-        var state = await Checklists.GetAsync(projectId, "REV-1", TestContext.Current.CancellationToken);
-        Assert.Null(state!.AnswerFor("REQ-01"));
+        // Assert: no name field, and the answer carries the user name and display name of the signed-in user
+        Assert.Empty(cut.FindAll("[data-testid='checklist-author-input']"));
+        Assert.Contains("Answered by Bea", cut.Find("[data-testid='check-answered-by-req-01']").TextContent, StringComparison.Ordinal);
+        var answer = (await Checklists.GetAsync(projectId, "REV-1", TestContext.Current.CancellationToken))!.AnswerFor("REQ-01")!;
+        Assert.Equal(("bea", "Bea"), (answer.AnsweredByUsername, answer.AnsweredBy));
     }
 
     /// <summary>
@@ -308,10 +306,9 @@ public class ChecklistPageTests : PageTestBase
     [Fact]
     public async Task ChecklistPage_Applicability_NotApplicableWithoutReason_ShowsError()
     {
-        // Arrange: the design section is open and the reviewer's name entered
+        // Arrange: the design section is open and the reviewer is signed in
         var projectId = await CreateReviewAsync();
         var cut = RenderPage(projectId);
-        await cut.Find("[data-testid='checklist-author-input']").InputAsync("Ann");
         await cut.Find("[data-testid='section-des-toggle']").ClickAsync();
 
         // Act: switch the section off and save without a reason
@@ -330,10 +327,9 @@ public class ChecklistPageTests : PageTestBase
     [Fact]
     public async Task ChecklistPage_Applicability_NotApplicableWithReason_CountsAsDoneAndHidesChecks()
     {
-        // Arrange: the design section is open and the reviewer's name entered
+        // Arrange: the design section is open and the reviewer is signed in
         var projectId = await CreateReviewAsync();
         var cut = RenderPage(projectId);
-        await cut.Find("[data-testid='checklist-author-input']").InputAsync("Ann");
         await cut.Find("[data-testid='section-des-toggle']").ClickAsync();
 
         // Act: switch the section off, give a reason and save
@@ -368,7 +364,7 @@ public class ChecklistPageTests : PageTestBase
         foreach (var item in DefaultChecklist.Current.Sections[0].Items.Take(7))
         {
             await Checklists.SetAnswerAsync(
-                projectId, "REV-1", item.Id, ChecklistOutcome.Pass, null, "Ann", TestContext.Current.CancellationToken);
+                projectId, "REV-1", item.Id, ChecklistOutcome.Pass, null, TestActors.Ann, TestContext.Current.CancellationToken);
         }
 
         var cut = RenderPage(projectId);

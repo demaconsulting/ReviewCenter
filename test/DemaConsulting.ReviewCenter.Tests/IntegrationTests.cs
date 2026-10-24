@@ -451,29 +451,82 @@ public class IntegrationTests
     }
 
     /// <summary>
-    ///     Test that the running server serves the projects page backed by the (temporary) database, and that
-    ///     the database file named by the configuration is created at start-up.
+    ///     Test that the running server sends an anonymous request for the projects page to the login page, and
+    ///     that the database file named by the configuration is created at start-up.
     /// </summary>
     [Fact]
-    public async Task ReviewCenter_ServeVerb_Started_ServesProjectsPageAndCreatesDatabase()
+    public async Task ReviewCenter_ServeVerb_Started_RedirectsAnonymousProjectsRequestToLoginAndCreatesDatabase()
     {
         // Arrange: start the server; the test process points it at a temporary database
         using var server = ServerProcess.Start();
         var healthy = await server.WaitUntilHealthyAsync(TimeSpan.FromSeconds(30));
         Assert.True(healthy, "Server did not become healthy in time");
 
-        // Act: request the projects page
-        using var client = new HttpClient();
-        var html = await client.GetStringAsync($"{server.BaseUrl}/projects", TestContext.Current.CancellationToken);
+        // Act: request the projects page without signing in, and the login page
+        using var handler = new HttpClientHandler { AllowAutoRedirect = false };
+        using var client = new HttpClient(handler);
+        var projects = await client.GetAsync($"{server.BaseUrl}/projects", TestContext.Current.CancellationToken);
+        var login = await client.GetStringAsync($"{server.BaseUrl}/login", TestContext.Current.CancellationToken);
 
-        // Assert: the empty list and the creation form are served, and the database file exists
-        Assert.Contains("data-testid=\"projects-page\"", html);
-        Assert.Contains("data-testid=\"new-project-form\"", html);
-        Assert.Contains("data-testid=\"create-project-button\"", html);
+        // Assert: the projects page redirects to the login page, which serves the form, and the database file exists
+        Assert.Equal(System.Net.HttpStatusCode.Redirect, projects.StatusCode);
+        Assert.Contains("/login?ReturnUrl=", projects.Headers.Location?.ToString(), StringComparison.Ordinal);
+        Assert.Contains("data-testid=\"login-form\"", login);
         var connectionString = Environment.GetEnvironmentVariable("Database__ConnectionString");
         Assert.NotNull(connectionString);
         var file = connectionString.Split(';')[0].Replace("Data Source=", string.Empty, StringComparison.OrdinalIgnoreCase);
         Assert.True(File.Exists(file), $"Database file '{file}' was not created");
+    }
+
+    /// <summary>
+    ///     Test that the user add verb creates a user with the password from the environment variable, never
+    ///     prints the password, and refuses a second user with the same name.
+    /// </summary>
+    [Fact]
+    public void ReviewCenter_UserAddVerb_PasswordFromEnvironment_CreatesUserThenRejectsDuplicate()
+    {
+        // Arrange: a new database and the password in the environment, not on the command line
+        const string password = "correct horse battery";
+        var environment = new Dictionary<string, string>
+        {
+            [TestDatabase.ConnectionStringVariable] = TestDatabase.NewConnectionString(),
+            ["REVIEWCENTER_PASSWORD"] = password
+        };
+
+        // Act: add the same user twice
+        var first = Runner.RunWithEnvironment(
+            out var firstOutput, environment, "dotnet", _dllPath, "user", "add", "--username", "root", "--display-name", "Root", "--role", "Admin");
+        var second = Runner.RunWithEnvironment(
+            out var secondOutput, environment, "dotnet", _dllPath, "user", "add", "--username", "root", "--display-name", "Root", "--role", "Admin");
+
+        // Assert: the first succeeds, the second fails, and the password is never printed
+        Assert.Equal(0, first);
+        Assert.Contains("Created user 'root' with the role Admin.", firstOutput);
+        Assert.Equal(1, second);
+        Assert.Contains("already exists", secondOutput);
+        Assert.DoesNotContain(password, firstOutput + secondOutput);
+    }
+
+    /// <summary>
+    ///     Test that the user add verb without any password source fails with a clear message instead of hanging.
+    /// </summary>
+    [Fact]
+    public void ReviewCenter_UserAddVerb_NoPassword_ReturnsError()
+    {
+        // Arrange: no password in the environment, and standard input that is closed
+        var environment = new Dictionary<string, string>
+        {
+            [TestDatabase.ConnectionStringVariable] = TestDatabase.NewConnectionString(),
+            ["REVIEWCENTER_PASSWORD"] = string.Empty
+        };
+
+        // Act: add a user
+        var exitCode = Runner.RunWithEnvironment(
+            out var output, environment, "dotnet", _dllPath, "user", "add", "--username", "root", "--display-name", "Root");
+
+        // Assert: a clear error and a non-zero exit code
+        Assert.Equal(1, exitCode);
+        Assert.Contains("No password was provided.", output);
     }
 
     /// <summary>

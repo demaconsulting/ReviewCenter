@@ -1,0 +1,143 @@
+---
+# Software Unit Requirements for the UserService Class
+#
+# The UserService class creates users and checks their sign-in: it enforces the user name, display name, and password
+# rules, keeps only a password hash, authenticates with a lockout after repeated failures, enables and disables users,
+# sets roles, changes passwords, and protects the last enabled administrator.
+
+sections:
+  - title: UserService Unit Requirements
+    requirements:
+      - id: ReviewCenter-UserService-Username
+        title: >-
+          The UserService class shall accept as a user name 3 to 50 characters made only of letters, digits,
+          full stops, underscores, and hyphens, and shall reject any other user name, and a user name that is
+          already taken in any letter case, storing nothing.
+        justification: |
+          A user name is typed at every sign-in and shown in the record. A restricted alphabet keeps names
+          readable and unambiguous, and treating letter case as insignificant stops two people from holding names
+          that look alike.
+        tests:
+          - UserService_CreateAsync_ValidUsername_Creates
+          - UserService_CreateAsync_InvalidUsername_ThrowsUserNameInvalid
+          - UserService_CreateAsync_DuplicateUsernameOtherCase_ThrowsUserNameTaken
+
+      - id: ReviewCenter-UserService-DisplayName
+        title: >-
+          The UserService class shall require a display name of 1 to 100 characters after trimming and shall
+          store it trimmed.
+        justification: |
+          The display name is the human-readable name shown next to comments and answers, so it must not be
+          blank, and stray white space has no meaning in it.
+        tests:
+          - UserService_CreateAsync_DisplayName_IsTrimmedAndLimited
+
+      - id: ReviewCenter-UserService-Password
+        title: >-
+          The UserService class shall require a password of 12 to 128 characters, without composition rules and
+          without trimming it, and shall reject any other password, storing nothing.
+        justification: |
+          Length is what makes a password hard to guess, and the upper limit keeps the cost of hashing bounded.
+          A password with spaces at its ends is a different password, so it must not be altered.
+        tests:
+          - UserService_CreateAsync_PasswordLength_FollowsPolicy
+          - UserService_CreateAsync_MissingPasswordOrWhiteSpacePadding_FollowsLengthRule
+
+      - id: ReviewCenter-UserService-Create
+        title: >-
+          The UserService class shall create an enabled user with the given role, storing a hash of the password
+          and never the password itself, and shall reject a role that is not defined.
+        justification: |
+          A copy of the database must not reveal the passwords, and a role outside the defined ones would give
+          unintended rights.
+        tests:
+          - UserService_CreateAsync_StoresHashNotPassword
+          - UserService_CreateAsync_UndefinedRole_Throws
+          - UserService_Constructor_NullArguments_Throws
+
+      - id: ReviewCenter-UserService-Authenticate
+        title: >-
+          The UserService class shall return the user, found by user name in any letter case, when the password
+          is right and the user is enabled, and nothing in every other case, taking about the same effort for an
+          unknown user name.
+        justification: |
+          Sign-in must not tell an attacker which part was wrong, so one answer covers an unknown user, a wrong
+          password, and a disabled user, and checking a password hash even for an unknown name keeps the time
+          taken from revealing which names exist.
+        tests:
+          - UserService_AuthenticateAsync_RightWrongAndUnknown_OnlyRightSucceeds
+          - UserService_AuthenticateAsync_DisabledUser_ReturnsNullUntilEnabled
+
+      - id: ReviewCenter-UserService-Lockout
+        title: >-
+          The UserService class shall lock a user out for 5 minutes after 5 failed sign-ins in a row, refusing
+          even the right password while the lockout lasts without counting that attempt, and shall reset the count
+          of failures after a successful sign-in.
+        justification: |
+          A lockout limits how many passwords can be tried against one account. A success between failures shows
+          that the real user is present, so it starts the count again.
+        tests:
+          - UserService_AuthenticateAsync_FiveFailures_LockForFiveMinutes
+          - UserService_AuthenticateAsync_SuccessBetweenFailures_ResetsCounter
+
+      - id: ReviewCenter-UserService-Enabled
+        title: >-
+          The UserService class shall let a user be disabled and enabled again, and shall not let a disabled user
+          sign in.
+        justification: |
+          Disabling takes access away from a person who has left or is not trusted, without deleting the user
+          and so without losing the record of what the user did.
+        tests:
+          - UserService_AuthenticateAsync_DisabledUser_ReturnsNullUntilEnabled
+          - UserService_SetEnabledAsync_SetRoleAsync_LastAdmin_IsProtected
+
+      - id: ReviewCenter-UserService-LastAdmin
+        title: >-
+          The UserService class shall refuse to disable or demote the last enabled administrator, while allowing
+          it when another enabled administrator remains.
+        justification: |
+          Without an enabled administrator nobody could manage users, and the only way out would be to edit the
+          database.
+        tests:
+          - UserService_SetEnabledAsync_SetRoleAsync_LastAdmin_IsProtected
+          - UserService_SetEnabledAsync_OtherAdminDisabled_StillProtectsLastEnabledAdmin
+
+      - id: ReviewCenter-UserService-ChangePassword
+        title: >-
+          The UserService class shall change the password of a user only when the current password is given
+          correctly and the new password follows the password rules, counting a wrong current password as a
+          failed sign-in for the lockout.
+        justification: |
+          Whoever sits at a signed-in session must not be able to take over the account without knowing the
+          password, and the change must not be a free way to guess it.
+        tests:
+          - UserService_ChangeOwnPasswordAsync_NeedsCurrentPasswordAndPolicy
+          - UserService_ChangeOwnPasswordAsync_RepeatedWrongPassword_LocksOut
+
+      - id: ReviewCenter-UserService-SetPassword
+        title: >-
+          The UserService class shall set a new password for a user, without knowing the old one, when the new
+          password follows the password rules, and shall end a lockout of that user.
+        justification: |
+          An administrator must be able to help a user who forgot the password, and a new password is a fresh
+          start for the account.
+        tests:
+          - UserService_SetPasswordAsync_NewPassword_WorksAndEndsLockout
+
+      - id: ReviewCenter-UserService-SetRole
+        title: >-
+          The UserService class shall change the role of a user to a defined role and shall reject a role that is
+          not defined.
+        justification: |
+          Roles decide what a user may do, so a change must only ever lead to a role the system knows.
+        tests:
+          - UserService_SetRoleAsync_ValidAndUndefinedRole_ChangesOrThrows
+
+      - id: ReviewCenter-UserService-NotFound
+        title: >-
+          The UserService class shall report a change of a user that does not exist as a user not found rule
+          violation.
+        justification: |
+          A request that names nobody must fail visibly instead of appearing to succeed.
+        tests:
+          - UserService_Changes_UnknownUser_ThrowUserNotFound

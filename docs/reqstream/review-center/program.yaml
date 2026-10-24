@@ -57,3 +57,16 @@ sections:
           - Program_Run_WithServeVerb_StartsServerAndStopsOnCancellation
           - Program_Run_WithServeVerb_PortInUse_ReportsError
           - Program_Run_WithHelpFlag_ListsServeVerbAndUrlsOption
+
+      - id: ReviewCenter-Program-UserAdd
+        title: >-
+          The Program class shall create a user in the configured database when the user add verb is provided,
+          report any failure as an error with a non-zero exit code, and list the user add verb and its options in
+          the help text.
+        justification: |
+          Program is the single dispatcher for every action of the tool, so it must run the command that creates
+          a user and turn a failure into an ordinary error. Operators discover the verb and its options from the
+          help text.
+        tests:
+          - Program_Run_WithHelpFlag_ListsUserAddVerbAndOptions
+          - ReviewCenter_UserAddVerb_PasswordFromEnvironment_CreatesUserThenRejectsDuplicate

@@ -122,3 +122,27 @@ sections:
           - Context_Create_UrlsWithoutServe_ThrowsArgumentException
           - Context_Create_UrlsFlag_WithoutValue_ThrowsArgumentException
           - Context_Create_InvalidUrls_ThrowsArgumentException
+
+      - id: ReviewCenter-Context-UserAdd
+        title: >-
+          The Context class shall record whether the user add verb was specified, together with the user name, the
+          display name, and the role, defaulting the role to Reviewer.
+        justification: |
+          The command that creates a user must only run when the operator asked for it, and it needs the details
+          of the user. Reviewer is the safe default, because a role with more rights must be asked for.
+        tests:
+          - Context_Create_UserAddVerb_SetsUserAddAndOptions
+          - Context_Create_UserAddWithoutRole_DefaultsToReviewer
+
+      - id: ReviewCenter-Context-UserAddMisuse
+        title: >-
+          The Context class shall reject with a descriptive error a user add verb without a user name or display
+          name, a role that is not Admin or Reviewer, the user add options without the verb, and any option for
+          giving the password on the command line.
+        justification: |
+          A mistake must be found when the arguments are parsed, with a clear message. A password option is not
+          offered, because a password on the command line is visible to other processes and kept in shell
+          history.
+        tests:
+          - Context_Create_UserAddMisuse_ThrowsArgumentException
+          - Context_Create_PasswordOption_IsNotSupported

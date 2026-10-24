@@ -70,3 +70,5 @@ turns them into one start-up error. Null arguments raise `ArgumentNullException`
 #### Callers
 
 - **ServerHost** — configures the context factory and calls `EnsureCreated` while building the application.
+- **UserCommand** — calls `EnsureCreated` before it creates a user, so the first administrator can be created in a
+  new database.

@@ -1,6 +1,6 @@
 package ReviewCenter {
     part def WebSubsystem {
-        doc /* Blazor Server user interface: the HTML shell, URL routing, the home page, and the project, review, and checklist pages, including review comments. */
+        doc /* Blazor Server user interface: the HTML shell and header, URL routing, the home page, the sign-in, account, and user administration pages, and the project, review, and checklist pages, including review comments. */
 
         comment testRef /* Test: test/DemaConsulting.ReviewCenter.Tests/Web/WebSubsystemTests.cs */
         comment designRef /* Design: docs/design/review-center/web.md */
@@ -13,5 +13,8 @@ package ReviewCenter {
         part projectPage : ProjectPage;
         part reviewPage : ReviewPage;
         part checklistPage : ChecklistPage;
+        part loginPage : LoginPage;
+        part accountPage : AccountPage;
+        part usersPage : UsersPage;
     }
 }

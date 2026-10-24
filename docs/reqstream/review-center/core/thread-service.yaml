@@ -39,17 +39,20 @@ sections:
 
       - id: ReviewCenter-ThreadService-Comment
         title: >-
-          The ThreadService class shall require an author of at most 100 characters and a text of at most 4000
-          characters that are not blank after trimming, shall store both trimmed, for a new thread and for a
-          reply, and shall store nothing when a rule is violated.
+          The ThreadService class shall take the author of a thread or reply as the signed-in actor (user name and
+          display name), store both with the comment, require a text of at most 4000 characters that is not blank
+          after trimming and store it trimmed, for a new thread and for a reply, and shall store nothing when a rule
+          is violated.
         justification: |
-          A comment without an author or text carries no information, and unbounded text would make the
-          review record and its pages unwieldy. Trimmed values keep stray white space out of the record.
+          A comment without text carries no information, and unbounded text would make the review record and its
+          pages unwieldy. The author comes from the signed-in user, so it needs no check and cannot be chosen by
+          the person who writes the comment; storing the user name keeps the author identifiable if the display
+          name changes later.
         tests:
-          - ThreadService_StartThreadAsync_BlankOrLongAuthor_ThrowsCommentAuthorInvalid
+          - ThreadService_StartThreadAsync_Actor_RecordsUsernameAndDisplayName
           - ThreadService_StartThreadAsync_BlankOrLongText_ThrowsCommentTextInvalid
-          - ThreadService_StartThreadAsync_PaddedAuthorAndText_AreTrimmed
-          - ThreadService_ReplyAsync_InvalidAuthorOrText_ThrowsAndStoresNothing
+          - ThreadService_StartThreadAsync_PaddedText_IsTrimmed
+          - ThreadService_ReplyAsync_InvalidText_ThrowsAndStoresNothing
 
       - id: ReviewCenter-ThreadService-Reply
         title: >-

@@ -234,7 +234,8 @@ sections:
       - id: ReviewCenter-System-Projects
         title: >-
           The tool shall serve a projects page at /projects that lists the projects and offers a form to create
-          a project, and a page for each project that shows its reviews.
+          a project, and a page for each project that shows its reviews, to a signed-in user, and shall send a
+          request without a signed-in user to the login page.
         tags: [system]
         justification: |
           Reviews are organized in projects, so users need to create projects and find them again before they
@@ -244,7 +245,7 @@ sections:
           - ReviewCenter-Web-Projects
           - ReviewCenter-Core-Projects
         tests:
-          - ReviewCenter_ServeVerb_Started_ServesProjectsPageAndCreatesDatabase
+          - ReviewCenter_ServeVerb_Started_RedirectsAnonymousProjectsRequestToLoginAndCreatesDatabase
 
       - id: ReviewCenter-System-Reviews
         title: >-
@@ -278,21 +279,21 @@ sections:
           - ReviewCenter-Storage-Integrity
           - ReviewCenter-Storage-Configuration
         tests:
-          - ReviewCenter_ServeVerb_Started_ServesProjectsPageAndCreatesDatabase
+          - ReviewCenter_ServeVerb_Started_RedirectsAnonymousProjectsRequestToLoginAndCreatesDatabase
           - HostingSubsystem_Startup_DatabaseConfigured_ServesStoredProjectsAfterRestart
 
       - id: ReviewCenter-System-Comments
         title: >-
           The tool shall let a user start a comment thread on a file of a review, anchored to the whole file or
-          to a range of lines, with an author name and a text, let anyone reply to a thread, resolve and reopen
+          to a range of lines, with a text, let a signed-in user reply to a thread, resolve and reopen
           it, and show the number of open and resolved threads of the review and of open threads per file,
-          keeping every thread and comment in the database across restarts without ever changing or deleting a
-          posted comment.
+          keeping every thread and comment, with the user who wrote it, in the database across restarts without
+          ever changing or deleting a posted comment.
         tags: [system]
         justification: |
           Review comments are the substance of a review. Comments that cannot be edited or deleted make the
-          discussion a trustworthy record. There is no sign-in yet, so the author name is free text that is not
-          verified, in the same way the operator is anonymous, until user identity is added.
+          discussion a trustworthy record, and the author of each comment is the signed-in user, so it is known
+          who said what.
         children:
           - ReviewCenter-Web-Comments
           - ReviewCenter-Core-Threads
@@ -310,14 +311,101 @@ sections:
         tags: [system]
         justification: |
           The checklist is how a formal review shows what was examined. A reviewer must see at a glance what is
-          unanswered and be led to the next check. There is no sign-in yet, so the name saved with an answer is
-          free text that is not verified, until user identity is added.
+          unanswered and be led to the next check. Each answer is saved with the signed-in user who gave it.
         children:
           - ReviewCenter-Web-Checklist
           - ReviewCenter-Core-Checklist
           - ReviewCenter-Storage-Checklist
         tests:
           - WebSubsystem_ChecklistPage_AnsweredChecksSurviveReload
+          - StorageSubsystem_Checklist_PersistsSnapshotAnswersAndSectionsAcrossReopen
+
+      - id: ReviewCenter-System-Login
+        title: >-
+          The tool shall let a user sign in at /login with the user name and password of a local account that is
+          enabled, keep the user signed in with a session cookie for the configured number of hours, let the
+          user sign out, and answer every failed sign-in with the same message, so that it does not reveal
+          whether the account exists.
+        tags: [system]
+        justification: |
+          Review actions are only trustworthy when they are attributable, which needs a verified identity. A
+          local account with a password needs no external service, and one answer for every failure does not
+          help someone who is guessing user names.
+        children:
+          - ReviewCenter-Identity-Login
+          - ReviewCenter-Identity-Session
+          - ReviewCenter-Web-SignIn
+        tests:
+          - IdentitySubsystem_SignInJourney_LoginUseAndLogout_WorksEndToEnd
+
+      - id: ReviewCenter-System-Authorization
+        title: >-
+          The tool shall send a request without a signed-in user for a project, review, checklist, account, or
+          user page to the login page, refuse the user administration page to a user who is not an
+          administrator, and keep the home page, the login page, and the /health URL open to everyone.
+        tags: [system]
+        justification: |
+          Review data must only be read and changed by identified people, while the health probe and the login
+          page must work without signing in. Only administrators may manage users.
+        children:
+          - ReviewCenter-Identity-Authorization
+          - ReviewCenter-Hosting-Authentication
+        tests:
+          - ReviewCenter_ServeVerb_Started_RedirectsAnonymousProjectsRequestToLoginAndCreatesDatabase
+          - IdentitySubsystem_SignInJourney_LoginUseAndLogout_WorksEndToEnd
+
+      - id: ReviewCenter-System-Users
+        title: >-
+          The tool shall let an administrator list the users and create a user with a role of Admin or Reviewer,
+          enable and disable a user, change the role, and set a password, let every user change the own
+          password, require a password of 12 to 128 characters, lock a user out for 5 minutes after 5 failed
+          sign-ins in a row, never disable or demote the last enabled administrator, and keep the users, with
+          only a hash of the password, in the database across restarts.
+        tags: [system]
+        justification: |
+          Users are the accountable parties of a review. A password policy and a lockout make guessing hard,
+          the rule for the last administrator keeps the system manageable, and a password hash means a copy of
+          the database does not reveal the passwords.
+        children:
+          - ReviewCenter-Core-Users
+          - ReviewCenter-Storage-Users
+          - ReviewCenter-Web-SignIn
+        tests:
+          - CoreSubsystem_UsersWorkflow_CreateSignInLockoutAndLastAdmin
+          - StorageSubsystem_Users_PersistAcrossReopen
+
+      - id: ReviewCenter-System-UserAdd
+        title: >-
+          The tool shall create a user in the database when the user add verb is provided with a user name, a
+          display name, and an optional role (Reviewer by default), taking the password from the
+          REVIEWCENTER_PASSWORD environment variable, the first line of redirected standard input, or a prompt,
+          never from the command line, and shall report an error with a non-zero exit code when the user cannot
+          be created.
+        tags: [system]
+        justification: |
+          The first administrator must exist before anybody can sign in. A password on the command line would
+          be visible to other processes and kept in shell history, so it is never accepted there.
+        children:
+          - ReviewCenter-Program-UserAdd
+          - ReviewCenter-Cli-UserAdd
+          - ReviewCenter-Hosting-UserAdd
+        tests:
+          - ReviewCenter_UserAddVerb_PasswordFromEnvironment_CreatesUserThenRejectsDuplicate
+          - ReviewCenter_UserAddVerb_NoPassword_ReturnsError
+
+      - id: ReviewCenter-System-Author
+        title: >-
+          The tool shall record the signed-in user, by user name and display name, as the author of every
+          comment, the person of every checklist answer, and the person of every change of section
+          applicability, without letting a user enter or change that name.
+        tags: [system]
+        justification: |
+          A review record is only evidence when it says who did what. Taking the name from the signed-in user,
+          and never from a form field, means nobody can act in the name of somebody else.
+        children:
+          - ReviewCenter-Identity-Actor
+        tests:
+          - StorageSubsystem_ServicesOverDatabase_ReopenedDatabase_KeepsThreadsAndComments
           - StorageSubsystem_Checklist_PersistsSnapshotAnswersAndSectionsAcrossReopen
 
       - id: ReviewCenter-System-DatabaseFailure

@@ -1,0 +1,36 @@
+@* LoginPage: the sign-in form at "/login".
+
+   Static server-side rendered on purpose: it is an ordinary HTML form that posts to /auth/login (with an
+   antiforgery token), so signing in works without a live connection and the endpoint can set the cookie.
+   The return address travels in a hidden field and is checked again by the endpoint. A failed attempt comes
+   back here with "error=1"; the message is the same whatever went wrong, so it never reveals whether a user
+   name exists. *@
+@page "/login"
+
+<PageTitle>Sign in - ReviewCenter</PageTitle>
+
+<main class="page" data-testid="login-page">
+    <h1>Sign in</h1>
+
+    <section class="card">
+        <form method="post" action="/auth/login" data-testid="login-form">
+            <AntiforgeryToken />
+            <input type="hidden" name="returnUrl" value="@SafeReturnUrl" />
+            <div class="field">
+                <label for="login-username">User name</label>
+                <input id="login-username" name="username" type="text" autocomplete="username"
+                       data-testid="login-username-input" />
+            </div>
+            <div class="field">
+                <label for="login-password">Password</label>
+                <input id="login-password" name="password" type="password" autocomplete="current-password"
+                       data-testid="login-password-input" />
+            </div>
+            @if (Failed)
+            {
+                <p class="error" role="alert" data-testid="login-error">Invalid user name or password.</p>
+            }
+            <button type="submit" data-testid="login-button">Sign in</button>
+        </form>
+    </section>
+</main>

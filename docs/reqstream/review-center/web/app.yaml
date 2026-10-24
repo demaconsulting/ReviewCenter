@@ -28,3 +28,14 @@ sections:
         tests:
           - Routes_Render_RootUrl_RendersHomePage
           - Routes_Render_UnknownUrl_ShowsNotFoundMessage
+
+      - id: ReviewCenter-App-Header
+        title: >-
+          The App unit shall show in the header of every page the display name of the signed-in user, a link
+          to the account page, and a logout button, or a sign-in link when nobody is signed in.
+        justification: |
+          Users need to see who they are signed in as, and to sign in or out from wherever they are, without
+          searching for a page.
+        tests:
+          - MainLayout_Render_SignedInUser_ShowsNameAccountAndLogout
+          - MainLayout_Render_NobodySignedIn_ShowsSignInLink

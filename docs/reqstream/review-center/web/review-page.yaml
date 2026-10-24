@@ -131,14 +131,15 @@ sections:
 
       - id: ReviewCenter-ReviewPage-ThreadStart
         title: >-
-          The ReviewPage unit shall let a reader start a thread on the selected file with an author name, an
-          optional start and end line, and a text, offer a Comment button on every line that fills in the line
-          range, show a violated rule or an unreadable line number as a message next to the form while keeping
-          the entered values, and on success clear the text and show the new thread.
+          The ReviewPage unit shall let a reader start a thread on the selected file with an optional start and
+          end line and a text, with the signed-in user as the author and no field to enter an author, offer a
+          Comment button on every line that fills in the line range, show a violated rule or an unreadable line
+          number as a message next to the form while keeping the entered values, and on success clear the text
+          and show the new thread.
         justification: |
           Comments are only useful when they are easy to start and a mistake is easy to correct. Keeping what
-          was typed saves the reader from typing it again. The author is plain text for now, because there is
-          no sign-in yet.
+          was typed saves the reader from typing it again. The author is the signed-in user, so it cannot be
+          chosen or faked.
         tests:
           - ReviewPage_LineCommentButton_Click_FillsStartAndEndLine
           - ReviewPage_StartThread_WholeFile_CreatesThreadAndClearsText
@@ -161,14 +162,15 @@ sections:
 
       - id: ReviewCenter-ReviewPage-ThreadUpdate
         title: >-
-          The ReviewPage unit shall let a reader reply to a thread, showing a violated rule inside that thread,
-          and resolve and reopen a thread, updating the thread and the counts.
+          The ReviewPage unit shall let a reader reply to a thread as the signed-in user, without a field to
+          enter an author, showing a violated rule inside that thread, and resolve and reopen a thread, updating
+          the thread and the counts.
         justification: |
           Replying, resolving, and reopening are how a discussion moves forward and how reviewers track what
           is settled.
         tests:
           - ReviewPage_Reply_ValidAndBlank_AppendsCommentOrShowsErrorInThread
-          - ReviewPage_Reply_NoAuthor_ShowsErrorPointingToNameField
+          - ReviewPage_Reply_NoAuthorField_AuthorCannotBeChosen
           - ReviewPage_ResolveAndReopen_Toggle_ChangesStateAndSummary
 
       - id: ReviewCenter-ReviewPage-Interactive

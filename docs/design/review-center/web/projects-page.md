@@ -5,7 +5,8 @@
 #### Purpose
 
 `ProjectsPage` is the page at `/projects`. Its responsibilities are to list the projects, to offer a form that
-creates a project, and to report when the page is interactive. It is a Razor component split into presentation
+creates a project, and to report when the page is interactive. It requires a signed-in user. It is a Razor component
+split into presentation
 (`ProjectsPage.razor`) and behavior (`ProjectsPage.razor.cs`).
 
 #### Data Model
@@ -45,8 +46,9 @@ handled by the page. The inputs carry the maximum lengths as a convenience; the 
 #### Dependencies
 
 - **ProjectService** — creates and lists projects.
-- **ASP.NET Core Blazor components** — the component base class, events, and the interactive server render mode.
+- **ASP.NET Core Blazor components** — the component base class, events, the authorization attribute, and the
+  interactive server render mode.
 
 #### Callers
 
-- **App** — the router renders the page for `/projects`.
+- **App** — the router renders the page for `/projects`; an anonymous visitor is sent to the login page first.

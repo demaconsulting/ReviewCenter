@@ -10,7 +10,7 @@ conversions. It contains no queries; those belong to `ReviewStore`.
 
 #### Data Model
 
-The context exposes eight sets and maps the Core types directly, without separate persistence classes.
+The context exposes nine sets and maps the Core types directly, without separate persistence classes.
 
 - **Projects** (`Project`): key `Id`, assigned by the database. `Name` is required, at most 100 characters;
   `Description` is required (may be empty), at most 1000; `Created`.
@@ -24,29 +24,42 @@ The context exposes eight sets and maps the Core types directly, without separat
   that does not exist, and a thread is deleted with its file. `StartLine` and `EndLine` are null for a thread on
   the whole file. `State` is stored as text, at most 32; `Created`.
 - **Comments** (`ReviewComment`): key `Id`, assigned by the database, so it grows with the posting order.
-  `ThreadId` relates the comment to its thread, and a comment is deleted with its thread. `Author` is required, at
-  most 100 characters; `Text` is required, at most 4000; `Created`.
+  `ThreadId` relates the comment to its thread, and a comment is deleted with its thread. `Author` (the display name
+  at the time) is required, at most 100 characters; `AuthorUsername` (the user name) is required, at most 50;
+  `Text` is required, at most 4000; `Created`.
 - **ReviewChecklists** (`ReviewChecklist`): key `ProjectId` plus `ReviewId`, one frozen snapshot per review.
   `Version` is required, at most 64; `Definition` is required text (the JSON of the checklist). It belongs to its
   review (a one-to-one relationship, so the snapshot is saved with the review) and is deleted with it.
 - **ChecklistSectionStates** (`ChecklistSectionState`): key `ProjectId`, `ReviewId`, and `SectionId` (at most 32),
-  so a review has at most one state per section. `Applicable`; `Reason` at most 2000; `SetBy` is required, at most
-  100; `SetAt`. It belongs to a review and is deleted with it.
+  so a review has at most one state per section. `Applicable`; `Reason` at most 2000; `SetBy` (the display name) is
+  required, at most 100; `SetByUsername` is required, at most 50; `SetAt`. It belongs to a review and is deleted
+  with it.
 - **ChecklistAnswers** (`ChecklistAnswer`): key `ProjectId`, `ReviewId`, and `ItemId` (at most 32), so a check has at
-  most one answer. `Outcome` is stored as text, at most 32; `Justification` at most 2000; `AnsweredBy` is
-  required, at most 100; `AnsweredAt`. It belongs to a review and is deleted with it.
+  most one answer. `Outcome` is stored as text, at most 32; `Justification` at most 2000; `AnsweredBy` (the display
+  name) is required, at most 100; `AnsweredByUsername` is required, at most 50; `AnsweredAt`. It belongs to a review
+  and is deleted with it.
+- **Users** (`User`): key `Id`, assigned by the database. `Username` is required, at most 50, with the
+  case-insensitive collation of SQLite and a unique index, so a user name is unique without regard to case and a
+  lookup by user name
+  ignores case; `DisplayName` is required, at most 100; `Role` is stored as text, at most 32; `Enabled`;
+  `PasswordHash` is required; `FailedLoginCount`; `LockoutUntil` (null when the user is not locked out); `Created`.
 
-The limits of project, review, path, author, and comment columns use the constants of `ReviewLimits`, so the schema
+The limits of project, review, path, author, user name, display name, and comment columns use the constants of
+`ReviewLimits`, so the schema
 and the rules cannot drift apart. The widths that are a property of the storage representation rather than of a
-rule - the state name (32) and a SHA-256 value written in hexadecimal (64) - are named constants of the unit.
+rule - the state name and the role name (32) and a SHA-256 value written in hexadecimal (64) - are named constants of
+the unit.
 The
 composite key of a review (project and review identifier) makes the review identifier unique within a project and
 allows the same identifier in two projects. The composite key of a file makes its path unique within a review.
-These keys are what enforces uniqueness in the database even when two requests race; no separate unique index
-exists. The state is stored by name, so adding states later does not change the meaning of stored rows. The
+These keys are what enforces uniqueness in the database even when two requests race; the only separate unique index
+is the one on the user name. The state is stored by name, so adding states later does not change the meaning of
+stored rows. The
 tables of threads and comments are new: a database created before they existed does not have them and is not
 altered, so it must be deleted and created again (see the `Storage` design). The same holds for the three
-checklist tables. The checklist keys are what makes "one answer per check" a rule of the database. The section and
+checklist tables, and for the users table and the user name columns of comments, answers, and section decisions: a
+database created before the identity slice must be deleted and created again, and its data is not migrated. The
+checklist keys are what makes "one answer per check" a rule of the database. The section and
 check identifiers are not related to a table of their own: they name entries inside the snapshot, and the service
 checks them.
 
@@ -67,11 +80,11 @@ mapped constraints surface as database update exceptions to `ReviewStore`.
 #### Dependencies
 
 - **Core domain types** — `Project`, `Review`, `ReviewFile`, `ReviewState`, `ReviewThread`, `ReviewComment`,
-  `ReviewThreadState`, `ReviewChecklist`, `ChecklistSectionState`, `ChecklistAnswer`, `ChecklistOutcome`, and
-  `ReviewLimits`.
+  `ReviewThreadState`, `ReviewChecklist`, `ChecklistSectionState`, `ChecklistAnswer`, `ChecklistOutcome`, `User`,
+  `UserRole`, and `ReviewLimits`.
 - **Entity Framework Core** — the context base class and the model configuration API.
 
 #### Callers
 
-- **ReviewStore** — opens a context for each operation.
+- **ReviewStore** and **UserStore** — open a context for each operation.
 - **DatabaseSetup** — configures the context options and creates the schema.

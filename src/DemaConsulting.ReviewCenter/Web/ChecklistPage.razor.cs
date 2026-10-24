@@ -20,7 +20,9 @@
 
 using System.Globalization;
 using DemaConsulting.ReviewCenter.Core;
+using DemaConsulting.ReviewCenter.Identity;
 using Microsoft.AspNetCore.Components;
+using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.JSInterop;
 
 namespace DemaConsulting.ReviewCenter.Web;
@@ -35,9 +37,9 @@ namespace DemaConsulting.ReviewCenter.Web;
 ///     that caused it. One section is open at a time. A Pass is saved as soon as it is chosen; Fail and N/A
 ///     need a justification, so the choice is kept here, unsaved, until the reviewer saves it. A section is
 ///     only stored as not applicable together with its reason, so unchecking the switch likewise stays
-///     unsaved until the reason is saved. There is no sign-in yet, so the name saved with each answer is a
-///     free-text label that the reviewer types once and that is not verified; it is TEMPORARY until the
-///     signed-in user replaces it in slice 4. Each browser connection (circuit) gets its own page instance,
+///     unsaved until the reason is saved. The person recorded with each answer is the signed-in user (an
+///     <see cref="Actor"/> read from the authentication state), never something typed on the page. Each browser
+///     connection (circuit) gets its own page instance,
 ///     so the state here is per-user and needs no synchronization.
 /// </remarks>
 public partial class ChecklistPage : ComponentBase
@@ -90,6 +92,12 @@ public partial class ChecklistPage : ComponentBase
     private IJSRuntime JS { get; set; } = null!;
 
     /// <summary>
+    ///     Gets or sets the authentication state of the current user, supplied by dependency injection.
+    /// </summary>
+    [Inject]
+    private AuthenticationStateProvider AuthenticationState { get; set; } = null!;
+
+    /// <summary>
     ///     Gets the name of the owning project shown in the breadcrumb, or <c>null</c> when it is unknown.
     /// </summary>
     private string? ProjectName { get; set; }
@@ -108,11 +116,6 @@ public partial class ChecklistPage : ComponentBase
     ///     Gets the checklist state, or <c>null</c> when the review does not exist or has no checklist.
     /// </summary>
     private ChecklistState? State { get; set; }
-
-    /// <summary>
-    ///     Gets or sets the reviewer name typed by the operator; saved with each answer.
-    /// </summary>
-    private string AuthorName { get; set; } = string.Empty;
 
     /// <summary>
     ///     Gets the identifier of the open section, or <c>null</c> when none is open.
@@ -340,7 +343,7 @@ public partial class ChecklistPage : ComponentBase
     }
 
     /// <summary>
-    ///     Stores an answer with the typed name and shows a rule violation next to the check.
+    ///     Stores an answer for the signed-in user and shows a rule violation next to the check.
     /// </summary>
     /// <param name="itemId">The check identifier.</param>
     /// <param name="outcome">The outcome to store.</param>
@@ -350,11 +353,12 @@ public partial class ChecklistPage : ComponentBase
     {
         try
         {
-            await ChecklistService.SetAnswerAsync(ProjectId, ReviewId, itemId, outcome, justification, AuthorName);
+            await ChecklistService.SetAnswerAsync(
+                ProjectId, ReviewId, itemId, outcome, justification, await AuthenticationState.GetActorAsync());
         }
         catch (DomainRuleException ex)
         {
-            ItemErrors[itemId] = ErrorMessage(ex);
+            ItemErrors[itemId] = ex.Message;
             return;
         }
 
@@ -365,7 +369,7 @@ public partial class ChecklistPage : ComponentBase
     }
 
     /// <summary>
-    ///     Stores the applicability of a section with the typed name and shows a rule violation in the section.
+    ///     Stores the applicability of a section for the signed-in user and shows a rule violation in the section.
     /// </summary>
     /// <param name="sectionId">The section identifier.</param>
     /// <param name="applicable">Whether the section applies.</param>
@@ -376,30 +380,17 @@ public partial class ChecklistPage : ComponentBase
         try
         {
             await ChecklistService.SetSectionApplicabilityAsync(
-                ProjectId, ReviewId, sectionId, applicable, reason, AuthorName);
+                ProjectId, ReviewId, sectionId, applicable, reason, await AuthenticationState.GetActorAsync());
         }
         catch (DomainRuleException ex)
         {
-            SectionErrors[sectionId] = ErrorMessage(ex);
+            SectionErrors[sectionId] = ex.Message;
             return false;
         }
 
         SectionErrors.Remove(sectionId);
         State = await ChecklistService.GetAsync(ProjectId, ReviewId);
         return true;
-    }
-
-    /// <summary>
-    ///     Words a rule violation for display, saying where to fix a missing name.
-    /// </summary>
-    /// <param name="exception">The violation.</param>
-    /// <returns>The message to show.</returns>
-    private static string ErrorMessage(DomainRuleException exception)
-    {
-        // The name field is at the top of the page, far from the check, so say where to fix it
-        return exception.Rule == DomainRule.ChecklistAnsweredByInvalid
-            ? $"{exception.Message} Enter it in the 'Your name' field at the top."
-            : exception.Message;
     }
 
     /// <summary>

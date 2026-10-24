@@ -368,5 +368,36 @@ public class ProgramTests
             Console.SetOut(originalOut);
         }
     }
+
+    /// <summary>
+    ///     Test that the help text documents the user add verb, its options, and where the password comes from.
+    /// </summary>
+    [Fact]
+    public void Program_Run_WithHelpFlag_ListsUserAddVerbAndOptions()
+    {
+        // Arrange: capture console output
+        var originalOut = Console.Out;
+        try
+        {
+            using var outWriter = new StringWriter();
+            Console.SetOut(outWriter);
+            using var context = Context.Create(["--help"]);
+
+            // Act: print help
+            Program.Run(context);
+
+            // Assert: the verb, the options and the password sources are documented
+            var output = outWriter.ToString();
+            Assert.Contains("user add", output);
+            Assert.Contains("--username", output);
+            Assert.Contains("--display-name", output);
+            Assert.Contains("--role", output);
+            Assert.Contains("REVIEWCENTER_PASSWORD", output);
+        }
+        finally
+        {
+            Console.SetOut(originalOut);
+        }
+    }
 }
 

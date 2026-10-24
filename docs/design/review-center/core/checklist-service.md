@@ -26,10 +26,12 @@ affected (see Frozen copy below).
 (the JSON text of the definition). `Parse` returns the definition.
 
 **ChecklistSectionState**: whether a section applies to a review: `ProjectId`, `ReviewId`, `SectionId`,
-`Applicable`, `Reason`, `SetBy`, and `SetAt` (UTC). A section without a row applies.
+`Applicable`, `Reason`, `SetBy` (the display name of the person at that time), `SetByUsername` (the user name), and
+`SetAt` (UTC). A section without a row applies.
 
 **ChecklistAnswer**: the answer to one check: `ProjectId`, `ReviewId`, `ItemId`, `Outcome`, `Justification`,
-`AnsweredBy`, and `AnsweredAt` (UTC). A check has at most one answer; answering again replaces it.
+`AnsweredBy` (the display name of the person at that time), `AnsweredByUsername` (the user name), and `AnsweredAt`
+(UTC). A check has at most one answer; answering again replaces it.
 
 **ChecklistOutcome**: a closed enumeration with the values `Pass`, `Fail`, and `NotApplicable` (shown as N/A). It
 is stored as text.
@@ -47,9 +49,7 @@ applicable section is answered, so a checklist whose sections all do not apply i
 
 Rules for the input: a justification (for Fail and N/A) or a reason (for a section that does not apply) is not empty
 after trimming and has at most 2000 characters (`ReviewLimits.MaxJustificationLength`); it is stored trimmed. A
-Pass needs no justification and any text given is stored trimmed, or not stored when empty. The name of the person
-is not empty after trimming and has at most 100 characters (the same limit as a comment author); it is stored
-trimmed.
+Pass needs no justification and any text given is stored trimmed, or not stored when empty.
 
 **Frozen copy**: `ReviewService` gives every review a `ReviewChecklist` made from `DefaultChecklist.Current` when
 the review is created, and the store saves it in the same transaction as the review. Every later read of the
@@ -62,9 +62,11 @@ recreated.
 **Thread linking**: an earlier plan let a check be linked to a comment thread. It was dropped to keep the checklist
 simple; the checklist and the threads are independent, and the review page shows both counts side by side.
 
-**Temporary identity**: there is no sign-in yet, so the name saved with an answer or a section decision is free text
-that is not verified. It is in the same position as a comment author, and is to be replaced by the signed-in user
-when identity is added (slice 4).
+**Person**: the person who answers a check or decides on a section is the signed-in user, passed as an `Actor` by
+the page, never typed text. The display name at that time and the user name are stored with the answer or the
+decision, as for a comment author (see `ThreadService`). A null actor is a programming error and raises
+`ArgumentNullException`; there is no rule about the name, because the display name of a user was validated when the
+user was created.
 
 #### Key Methods
 
@@ -77,7 +79,7 @@ when identity is added (slice 4).
 **SetSectionApplicabilityAsync**: Records whether a section applies.
 
 - *Parameters*: `int projectId`, `string reviewId`, `string sectionId`, `bool applicable`, `string? reason`,
-  `string? setBy`, and a cancellation token.
+  `Actor actor`, and a cancellation token.
 - *Returns*: `Task`.
 - *Postconditions*: The section has one state; the reason is stored (trimmed) when the section does not apply and
   cleared when it applies. Nothing is stored when a rule fails.
@@ -85,20 +87,21 @@ when identity is added (slice 4).
 **SetAnswerAsync**: Records the answer to one check.
 
 - *Parameters*: `int projectId`, `string reviewId`, `string itemId`, `ChecklistOutcome outcome`,
-  `string? justification`, `string? answeredBy`, and a cancellation token.
+  `string? justification`, `Actor actor`, and a cancellation token.
 - *Returns*: `Task`.
-- *Postconditions*: The check has exactly one answer, with the trimmed name and the UTC time from the clock; an
+- *Postconditions*: The check has exactly one answer, with the display name and user name of the actor and the UTC
+  time from the clock; an
   earlier answer is replaced. Nothing is stored when a rule fails.
 
-The rules are checked in this order, and the first violation is reported: the name (`ChecklistAnsweredByInvalid`);
-that the review has a checklist (`ChecklistNotFound`); that the section or check is in the frozen checklist
+The rules are checked in this order, and the first violation is reported: that the review has a checklist
+(`ChecklistNotFound`); that the section or check is in the frozen checklist
 (`ChecklistItemNotFound`); and the justification or reason (`ChecklistJustificationInvalid`). An outcome that is not
 a defined value is a programming error and throws `ArgumentOutOfRangeException` before any rule is checked.
 
 #### Error Handling
 
-Rule violations raise `DomainRuleException` with the matching `DomainRule`. A null store or clock at construction
-raises `ArgumentNullException`. Store failures propagate unchanged.
+Rule violations raise `DomainRuleException` with the matching `DomainRule`. A null store or clock at construction,
+or a null actor, raises `ArgumentNullException`. Store failures propagate unchanged.
 
 #### Dependencies
 

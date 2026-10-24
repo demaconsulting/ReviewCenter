@@ -1,7 +1,7 @@
 @* ChecklistPage: the checklist of one review at "/projects/{id}/reviews/{reviewId}/checklist".
 
    Presentation only; state and event handling live in ChecklistPage.razor.cs. From the top it shows what is left
-   to do (status line, progress, a "Next unanswered check" button) and the reviewer's name, then the sections of the
+   to do (status line, progress, a "Next unanswered check" button), then the sections of the
    checklist with their progress. One section is open at a time (the first with unanswered checks to begin with);
    it offers the "applies to this review" switch (with a required reason when it does not) and one row per check
    with Pass / Fail / N/A buttons. Fail and N/A ask for a justification next to the buttons. Every interactive
@@ -10,6 +10,7 @@
    circuit is connected. *@
 @page "/projects/{ProjectId:int}/reviews/{ReviewId}/checklist"
 @rendermode InteractiveServer
+@attribute [Authorize]
 
 <PageTitle>Checklist - @(Review?.Id ?? "Review") - ReviewCenter</PageTitle>
 
@@ -52,12 +53,6 @@
             {
                 <a class="action" href="/projects/@ProjectId/reviews/@ReviewId" data-testid="back-to-review-link">Back to the review</a>
             }
-            <div class="field name-field">
-                <label for="checklist-author">Your name</label>
-                <input id="checklist-author" type="text" maxlength="@ReviewLimits.MaxAuthorLength"
-                       data-testid="checklist-author-input" @bind="AuthorName" @bind:event="oninput" />
-                <p class="muted hint">There is no sign-in yet, so the name is not verified.</p>
-            </div>
         </section>
 
         <ul class="checklist-sections">

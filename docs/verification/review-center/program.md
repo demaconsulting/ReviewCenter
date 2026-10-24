@@ -20,6 +20,7 @@ N/A - standard test environment.
 - The `serve` verb starts the server, which stops on cancellation with exit code 0; a start-up
   failure is reported through exit code 1 and not an exception.
 - The help text lists the `serve` verb and the `--urls` option with its default value.
+- The help text lists the `user add` verb, its options, and the password sources.
 
 ### Test Scenarios
 
@@ -77,3 +78,7 @@ and no exception escapes. This scenario is tested by
 from `["--help"]`; the output contains "serve", "--urls", and the default address
 `http://localhost:5000`. This scenario is tested by
 `Program_Run_WithHelpFlag_ListsServeVerbAndUrlsOption`.
+
+**Program_Run_WithHelpFlag_ListsUserAddVerbAndOptions**: `Program.Run` is called with a context from `["--help"]`;
+the output contains "user add", "--username", "--display-name", "--role", and the password variable
+`REVIEWCENTER_PASSWORD`. This scenario is tested by `Program_Run_WithHelpFlag_ListsUserAddVerbAndOptions`.

@@ -2,7 +2,8 @@
 
 #### Verification Approach
 
-`ReviewCenterDbContext` is verified with the unit tests of `ReviewStoreTests.cs` and `DatabaseSetupTests.cs`, which
+`ReviewCenterDbContext` is verified with the unit tests of `ReviewStoreTests.cs`, `UserStoreTests.cs`, and
+`DatabaseSetupTests.cs`, which
 exercise the context through the units that use it. The context has no behavior that can be reached without a
 database, and its job is to produce the right schema, so the tests run against real SQLite database files in a
 private temporary folder. No mocking or in-memory substitute is applied. Each test uses its own database file.
@@ -23,6 +24,8 @@ be loadable on the test platform.
   refused by the database.
 - The tables for the checklist snapshot, section states, and answers are keyed so that a review has one state per
   section and one answer per check.
+- The comments, answers, and section states keep the user name of the person who made them next to the display name.
+- The table for users stores every field of a user, and its unique index on the user name ignores case.
 
 #### Test Scenarios
 
@@ -51,7 +54,8 @@ refused by the database (the foreign key is enforced) and nothing is stored. Thi
 `ReviewStore_AddThreadAsync_UnknownFile_IsRefusedByDatabase`.
 
 **ReviewStore_AddThreadAsync_WholeFileAndRange_RoundTripsWithComments**: Threads with and without a line range are
-stored with their comments and read back unchanged, which verifies the thread and comment tables. This scenario is
+stored with their comments and read back unchanged, including the display name and user name of the comment author,
+which verifies the thread and comment tables. This scenario is
 tested by `ReviewStore_AddThreadAsync_WholeFileAndRange_RoundTripsWithComments`.
 
 **ReviewStore_SetChecklistAnswer_UpsertsSingleRowPerItem**: A check is answered twice and another check once; the
@@ -61,3 +65,12 @@ database holds one row per check, the first with the latest answer. This scenari
 **ReviewStore_SetChecklistSectionState_UpsertsSingleRowPerSection**: A section state is set twice; the database
 holds one row for the section with the latest state. This scenario is tested by
 `ReviewStore_SetChecklistSectionState_UpsertsSingleRowPerSection`.
+
+**UserStore_AddAsync_User_RoundTripsEveryField**: A user is stored with every field set and a supplied identity;
+the database assigns its own identity and every value is read back, which verifies the users table. This scenario is
+tested by `UserStore_AddAsync_User_RoundTripsEveryField`.
+
+**UserStore_AddAsync_UsernameOtherCase_ThrowsUserNameTakenAndLookupIgnoresCase**: A user name that differs from an
+existing one only in case is refused by the unique index and reported as taken, and a lookup in another case finds
+the original user. This scenario is tested by
+`UserStore_AddAsync_UsernameOtherCase_ThrowsUserNameTakenAndLookupIgnoresCase`.

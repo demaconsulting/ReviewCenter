@@ -113,6 +113,7 @@ sections:
         children:
           - ReviewCenter-OTS-AspNetCore-Host
           - ReviewCenter-OTS-AspNetCore-Components
+          - ReviewCenter-OTS-AspNetCore-Authentication
 
       - id: Quality-DataStorage
         title: The repository shall rely on Entity Framework Core with SQLite to store projects and reviews.

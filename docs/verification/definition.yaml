@@ -6,6 +6,7 @@ resource-path:
   - docs/verification/review-center/self-test
   - docs/verification/review-center/utilities
   - docs/verification/review-center/hosting
+  - docs/verification/review-center/identity
   - docs/verification/review-center/web
   - docs/verification/review-center/core
   - docs/verification/review-center/storage
@@ -26,6 +27,10 @@ input-files:
   - docs/verification/review-center/utilities/path-helpers.md
   - docs/verification/review-center/hosting.md
   - docs/verification/review-center/hosting/server-host.md
+  - docs/verification/review-center/hosting/user-command.md
+  - docs/verification/review-center/identity.md
+  - docs/verification/review-center/identity/password-hasher.md
+  - docs/verification/review-center/identity/sign-in.md
   - docs/verification/review-center/web.md
   - docs/verification/review-center/web/app.md
   - docs/verification/review-center/web/home-page.md
@@ -33,15 +38,20 @@ input-files:
   - docs/verification/review-center/web/project-page.md
   - docs/verification/review-center/web/review-page.md
   - docs/verification/review-center/web/checklist-page.md
+  - docs/verification/review-center/web/login-page.md
+  - docs/verification/review-center/web/account-page.md
+  - docs/verification/review-center/web/users-page.md
   - docs/verification/review-center/core.md
   - docs/verification/review-center/core/fingerprint.md
   - docs/verification/review-center/core/project-service.md
   - docs/verification/review-center/core/review-service.md
   - docs/verification/review-center/core/thread-service.md
   - docs/verification/review-center/core/checklist-service.md
+  - docs/verification/review-center/core/user-service.md
   - docs/verification/review-center/storage.md
   - docs/verification/review-center/storage/review-center-db-context.md
   - docs/verification/review-center/storage/review-store.md
+  - docs/verification/review-center/storage/user-store.md
   - docs/verification/review-center/storage/database-setup.md
   - docs/verification/review-center-puppet.md
   - docs/verification/review-center-puppet/puppet-program.md

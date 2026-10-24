@@ -21,7 +21,7 @@ N/A - standard test environment.
 - Start-up writes a structured log entry with a named property, and framework logging reaches
   the same logger providers.
 - The database is created for a configured location, the stored data is served again by a second host on the
-  same database, and an unsupported database provider ends the run with exit code 1.
+  same database (to a signed-in user), and an unsupported database provider ends the run with exit code 1.
 
 ### Test Scenarios
 
@@ -40,7 +40,8 @@ by `HostingSubsystem_Routes_BothRegistered_HomeAndHealthAnswer`.
 
 **HostingSubsystem_Startup_DatabaseConfigured_ServesStoredProjectsAfterRestart**: A host is started on a new
 database file and a project is stored through its services; the host is stopped and a second host is started on
-the same file. A request to `/projects` lists the stored project. This scenario is tested by
+the same file. A user signed in to the second host requests `/projects`, which lists the stored project. This scenario
+is tested by
 `HostingSubsystem_Startup_DatabaseConfigured_ServesStoredProjectsAfterRestart`.
 
 **HostingSubsystem_Startup_UnsupportedDatabaseProvider_FailsWithExitCodeOne**: The server is run through

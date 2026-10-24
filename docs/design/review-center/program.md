@@ -40,7 +40,8 @@ Inspects flags in priority order: (1) if `context.Version` is true, calls
 `context.WriteLine(Version)` and returns; (2) calls `PrintBanner`; (3) if `context.Help` is
 true, calls `PrintHelp` and returns; (4) if `context.Validate` is true, calls
 `Validation.Run(context)`; (5) if `context.Serve` is true, runs the web server through
-`ServerHost.RunAsync` and blocks until it stops; (6) otherwise calls `RunToolLogic(context)`.
+`ServerHost.RunAsync` and blocks until it stops; (6) if `context.UserAdd` is true, calls `UserCommand.Run(context)`;
+(7) otherwise calls `RunToolLogic(context)`.
 `Run` supplies no stop request; the process stops the server with Ctrl+C or a termination
 signal.
 
@@ -64,8 +65,9 @@ deterministically.
 - *Parameters*: `Context context` — output target.
 - *Returns*: `void`.
 
-**PrintHelp**: Writes the usage synopsis, the `serve` verb, and the options table (including
-`--urls`) to `context`.
+**PrintHelp**: Writes the usage synopsis, the `serve` and `user add` verbs, and the options table (including
+`--urls`, `--username`, `--display-name`, and `--role`) to `context`. The help text says that the password of
+`user add` is read from the environment variable `REVIEWCENTER_PASSWORD`, from standard input, or from a prompt.
 
 - *Parameters*: `Context context` — output target.
 - *Returns*: `void`.
@@ -96,6 +98,8 @@ error that yields exit code 1 rather than an unhandled exception.
   set.
 - **ServerHost** — `Program.RunWithCancellation` calls `ServerHost.RunAsync(context,
   cancellationToken)` when the `serve` verb is present.
+- **UserCommand** — `Program.RunWithCancellation` calls `UserCommand.Run(context)` when the `user add` verb is
+  present.
 
 ### Callers
 

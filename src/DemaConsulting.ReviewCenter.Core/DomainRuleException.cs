@@ -65,9 +65,6 @@ public enum DomainRule
     /// <summary>The files together are larger than <see cref="ReviewLimits.MaxTotalSizeBytes"/>.</summary>
     TotalSizeExceeded,
 
-    /// <summary>The comment author is empty or too long.</summary>
-    CommentAuthorInvalid,
-
     /// <summary>The comment text is empty or too long.</summary>
     CommentTextInvalid,
 
@@ -92,8 +89,26 @@ public enum DomainRule
     /// </summary>
     ChecklistJustificationInvalid,
 
-    /// <summary>The name of the person answering a check is empty or too long.</summary>
-    ChecklistAnsweredByInvalid
+    /// <summary>The user name is too short, too long, or contains characters that are not allowed.</summary>
+    UserNameInvalid,
+
+    /// <summary>A user with the same user name (compared without regard to case) already exists.</summary>
+    UserNameTaken,
+
+    /// <summary>The display name is empty or too long.</summary>
+    DisplayNameInvalid,
+
+    /// <summary>The password is shorter or longer than the policy allows.</summary>
+    PasswordInvalid,
+
+    /// <summary>The current password given when changing the own password is wrong.</summary>
+    CurrentPasswordIncorrect,
+
+    /// <summary>The referenced user does not exist.</summary>
+    UserNotFound,
+
+    /// <summary>The change would leave the system without an enabled administrator.</summary>
+    LastAdmin
 }
 
 /// <summary>

@@ -12,6 +12,7 @@
    id), and the data-interactive marker on the root flips to "true" once the live circuit is connected. *@
 @page "/projects/{ProjectId:int}/reviews/{ReviewId}"
 @rendermode InteractiveServer
+@attribute [Authorize]
 
 <PageTitle>@(Review?.Id ?? "Review") - ReviewCenter</PageTitle>
 
@@ -228,12 +229,6 @@
             <section class="card">
                 <h2>New thread</h2>
                 <form data-testid="new-thread-form" novalidate @onsubmit="StartThreadAsync">
-                    <div class="field">
-                        <label for="comment-author">Your name</label>
-                        <input id="comment-author" type="text" maxlength="@ReviewLimits.MaxAuthorLength"
-                               data-testid="comment-author-input" @bind="AuthorName" @bind:event="oninput" />
-                        <p class="muted hint">There is no sign-in yet, so the name is not verified.</p>
-                    </div>
                     <div class="line-fields">
                         <div class="field">
                             <label for="thread-start-line">Start line (optional)</label>

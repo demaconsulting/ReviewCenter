@@ -1,0 +1,60 @@
+---
+# Software Unit Requirements for the UsersPage Unit
+#
+# The UsersPage unit is the Users.razor page at /users where an administrator manages the users.
+
+sections:
+  - title: UsersPage Unit Requirements
+    requirements:
+      - id: ReviewCenter-UsersPage-List
+        title: >-
+          The UsersPage unit shall serve at /users, to an administrator only, the list of users with their user
+          name, display name, role, and enabled state, and the controls to change them.
+        justification: |
+          Administrators need an overview of who has access. Other users must not see or change the accounts of
+          others.
+        tests:
+          - UsersPage_Render_ExistingUsers_ListsThemWithControls
+
+      - id: ReviewCenter-UsersPage-Create
+        title: >-
+          The UsersPage unit shall create a user from a form with a user name, a display name, a role, and a
+          password, clearing the form on success, and shall show a violated rule as a message, creating nothing.
+        justification: |
+          After the first administrator exists, users are added in the web interface rather than on the command
+          line. The form is cleared so that no password stays on the page.
+        tests:
+          - UsersPage_CreateForm_ValidInput_CreatesUserAndClearsForm
+          - UsersPage_CreateForm_TooShortPassword_ShowsErrorAndCreatesNothing
+
+      - id: ReviewCenter-UsersPage-Update
+        title: >-
+          The UsersPage unit shall let an administrator disable and enable a user, change the role of a user,
+          and set a new password for a user, clearing the password field afterwards.
+        justification: |
+          Disabling takes access away without losing the record of what the user did, and a new password lets an
+          administrator help a user who forgot the password.
+        tests:
+          - UsersPage_ToggleEnabled_User_DisablesAndEnablesAgain
+          - UsersPage_SetRole_ChosenRole_IsStored
+          - UsersPage_SetPassword_ValidPassword_ChangesPasswordAndClearsField
+
+      - id: ReviewCenter-UsersPage-LastAdmin
+        title: >-
+          The UsersPage unit shall show an error and change nothing when an administrator tries to disable or
+          demote the last enabled administrator.
+        justification: |
+          Without an enabled administrator nobody could manage users, so the refusal must be shown to the
+          administrator instead of failing silently.
+        tests:
+          - UsersPage_LastAdmin_DisableOrDemote_IsRefusedWithError
+
+      - id: ReviewCenter-UsersPage-AdminCheck
+        title: >-
+          The UsersPage unit shall refuse every create or change action, showing an error and changing nothing,
+          when the signed-in user is no longer an enabled administrator in the user store.
+        justification: |
+          An open page keeps the sign-in state it started with, so a user who was demoted or disabled after
+          opening the page must not be able to go on managing users.
+        tests:
+          - UsersPage_Action_SignedInAdminLaterDemoted_IsRefusedWithError

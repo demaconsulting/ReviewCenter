@@ -3,8 +3,8 @@
 #
 # PURPOSE:
 # - Define requirements for the ReviewCenter Storage subsystem
-# - The Storage subsystem spans the ReviewCenterDbContext, ReviewStore, and DatabaseSetup units
-# - Subsystem requirements describe the externally visible behavior of the persistence of projects and reviews
+# - The Storage subsystem spans the ReviewCenterDbContext, ReviewStore, UserStore, and DatabaseSetup units
+# - Subsystem requirements describe the externally visible behavior of the persistence of users, projects, and reviews
 
 sections:
   - title: Storage Subsystem Requirements
@@ -71,6 +71,21 @@ sections:
           - ReviewCenter-DbContext-Threads
         tests:
           - StorageSubsystem_ServicesOverDatabase_ReopenedDatabase_KeepsThreadsAndComments
+
+      - id: ReviewCenter-Storage-Users
+        title: >-
+          The Storage subsystem shall keep users, with their roles, enabled states, password hashes, and lockout
+          state, in the database file, so that they are all still there, unchanged, when the database is opened
+          again, and shall keep user names unique regardless of letter case.
+        justification: |
+          Users must survive a restart, or nobody could sign in again. The lockout state is kept with the user so
+          that a restart does not give an attacker a fresh set of tries.
+        children:
+          - ReviewCenter-UserStore-Persist
+          - ReviewCenter-UserStore-Unique
+          - ReviewCenter-DbContext-Users
+        tests:
+          - StorageSubsystem_Users_PersistAcrossReopen
 
       - id: ReviewCenter-Storage-Checklist
         title: >-

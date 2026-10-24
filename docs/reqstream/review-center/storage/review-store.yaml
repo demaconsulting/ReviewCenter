@@ -62,10 +62,12 @@ sections:
           The ReviewStore class shall save a thread with its first comment and assign their identifiers, append
           a comment to a thread of a review, change the state of a thread, list the threads of one review with
           their comments in creation order while keeping the threads of different reviews apart, and report a
-          thread that does not exist as nothing or false.
+          thread that does not exist as nothing or false. Each comment keeps the user name and the display name of
+          its author.
         justification: |
           Pages show the threads of exactly one review in a stable order, and a thread must be saved together
-          with its first comment or not at all. Identifiers belong to the database alone.
+          with its first comment or not at all. Identifiers belong to the database alone, and the user name
+          keeps an author identifiable when the display name later changes.
         tests:
           - ReviewStore_AddThreadAsync_WholeFileAndRange_RoundTripsWithComments
           - ReviewStore_AddCommentAsync_ExistingThread_AppendsInOrder
@@ -78,10 +80,10 @@ sections:
           The ReviewStore class shall save the checklist snapshot of a review together with the review, return
           it, or nothing when the review has none, save the applicability of a section and the answer to a
           check by replacing any earlier one so that each section and check has one row, and list them back
-          with their names and times unchanged.
+          with their user names, display names, and times unchanged.
         justification: |
-          The snapshot must exist exactly when the review exists, and a check has one current answer. Names and
-          times are part of the record and must come back as saved.
+          The snapshot must exist exactly when the review exists, and a check has one current answer. User names,
+          display names, and times are part of the record and must come back as saved.
         tests:
           - ReviewStore_AddReview_WithChecklist_StoresSnapshotAtomically
           - ReviewStore_GetChecklist_ReviewWithoutSnapshot_ReturnsNull

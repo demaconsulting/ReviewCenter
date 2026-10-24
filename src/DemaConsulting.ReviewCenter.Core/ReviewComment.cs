@@ -42,10 +42,15 @@ public sealed class ReviewComment
     public int ThreadId { get; init; }
 
     /// <summary>
-    ///     Gets the author name as typed (trimmed, 1 to <see cref="ReviewLimits.MaxAuthorLength"/> characters).
-    ///     There is no sign-in yet, so the name is an unverified label.
+    ///     Gets the display name of the author at the time of posting (1 to
+    ///     <see cref="ReviewLimits.MaxAuthorLength"/> characters).
     /// </summary>
     public string Author { get; init; } = string.Empty;
+
+    /// <summary>
+    ///     Gets the user name of the signed-in author (at most <see cref="ReviewLimits.MaxUsernameLength"/> characters).
+    /// </summary>
+    public string AuthorUsername { get; init; } = string.Empty;
 
     /// <summary>
     ///     Gets the comment text (trimmed, 1 to <see cref="ReviewLimits.MaxCommentLength"/> characters;
