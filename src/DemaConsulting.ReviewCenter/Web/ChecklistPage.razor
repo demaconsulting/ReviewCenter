@@ -69,12 +69,14 @@
                 var progress = State.SectionProgress(section.Id);
                 var applicable = IsApplicableInPage(section.Id);
                 <li class="checklist-section" data-testid="section-@sid">
-                    <button type="button" class="section-toggle" aria-expanded="@(isOpen ? "true" : "false")"
-                            data-testid="section-@sid-toggle" @onclick="() => ToggleSection(sectionId)">
-                        <span class="section-title"><span class="section-chevron" aria-hidden="true">@(isOpen ? "\u25BE" : "\u25B8")</span>@section.Title</span>
-                        <span class="badge @(State.IsApplicable(section.Id) && progress.IsDone ? "resolved" : null)"
-                              data-testid="section-@sid-progress">@SectionProgressLabel(section.Id)</span>
-                    </button>
+                    <h2 class="section-heading">
+                        <button type="button" class="section-toggle" aria-expanded="@(isOpen ? "true" : "false")"
+                                data-testid="section-@sid-toggle" @onclick="() => ToggleSection(sectionId)">
+                            <span class="section-title"><span class="section-chevron" aria-hidden="true">@(isOpen ? "\u25BE" : "\u25B8")</span>@section.Title</span>
+                            <span class="badge @(State.IsApplicable(section.Id) && progress.IsDone ? "resolved" : null)"
+                                  data-testid="section-@sid-progress">@SectionProgressLabel(section.Id)</span>
+                        </button>
+                    </h2>
 
                     @if (isOpen)
                     {
@@ -116,8 +118,8 @@
                                         var shown = ShownOutcome(item.Id);
                                         var needsJustification = shown is ChecklistOutcome.Fail or ChecklistOutcome.NotApplicable;
                                         <li class="check-row @(answer is null ? "unanswered" : null)" data-testid="check-@iid">
-                                            <p class="check-text"><span class="check-id">@item.Id</span> @item.Text</p>
-                                            <div class="segmented" role="group" aria-label="Outcome of @item.Id">
+                                            <p class="check-text" id="check-text-@iid"><span class="check-id">@item.Id</span> @item.Text</p>
+                                            <div class="segmented" role="group" aria-labelledby="check-text-@iid">
                                                 <button type="button" class="secondary" aria-pressed="@PressedValue(shown, ChecklistOutcome.Pass)"
                                                         data-testid="check-pass-@iid" @onclick="() => ChooseAsync(itemId, ChecklistOutcome.Pass)">Pass</button>
                                                 <button type="button" class="secondary fail" aria-pressed="@PressedValue(shown, ChecklistOutcome.Fail)"

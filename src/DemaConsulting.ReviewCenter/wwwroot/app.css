@@ -525,6 +525,13 @@ a.action {
     min-width: 0;
 }
 
+/* The section toggle sits in a heading so screen reader users can move by heading; keep the toggle's own look */
+.section-heading {
+    margin: 0;
+    font-size: 1rem;
+    font-weight: normal;
+}
+
 .section-toggle {
     display: flex;
     align-items: center;

@@ -37,7 +37,8 @@ N/A - standard test environment.
 #### Test Scenarios
 
 **ChecklistPage_Render_NewReview_ShowsProgressAndOpensFirstSection**: The page is rendered for a new review; the
-status line, the overall progress, all 14 sections with their progress, and exactly one open section are shown.
+status line, the overall progress, all 14 sections with their progress, and exactly one open section are shown, and
+each check's outcome group is named by its check text.
 This scenario is tested by `ChecklistPage_Render_NewReview_ShowsProgressAndOpensFirstSection`.
 
 **ChecklistPage_Render_UnknownReview_ShowsNotFound**: The page is rendered for an unknown review; the not-found
@@ -88,6 +89,11 @@ last check is shown, and the browser is asked to scroll to that check. This scen
 section is switched off without saving and the next-unanswered button is clicked; the section after it is open and
 the browser is asked to scroll to its first check. This scenario is tested by
 `ChecklistPage_NextUnanswered_PendingNotApplicableSection_SkipsIt`.
+
+**ChecklistPage_NextUnanswered_OnlyPendingNotApplicableSectionLeft_OpensItsReasonField**: With every section but one
+answered, that section is switched off without saving and closed, and the next-unanswered button is clicked; the
+section is open with its reason field and the browser is asked to scroll to the reason field. This scenario is tested
+by `ChecklistPage_NextUnanswered_OnlyPendingNotApplicableSectionLeft_OpensItsReasonField`.
 
 **ChecklistPage_Render_AllAnswered_ShowsCompleteAndNoNextAction**: Every check is answered; the status line says
 "Checklist complete.", the next-unanswered button is absent, and a link back to the review is shown. This scenario

@@ -59,8 +59,9 @@ another review never shows the previous one.
 **ToggleSection**: Opens a section and closes the open one; choosing the open section closes it.
 
 **GoToNextUnanswered**: Opens the section of the first unanswered check and scrolls to that check; sections just
-switched off and not yet saved are skipped. It is used by the
-button at the top and by the button at the end of a finished section.
+switched off and not yet saved are skipped, unless they are all that is left, in which case the first of them is
+opened and the page scrolls to its reason field. It is used by the button at the top and by the button at the end of
+a finished section.
 
 **ChooseAsync**: Handles a click on Pass, Fail, or N/A. Pass is stored at once and needs no justification. Fail and
 N/A show a justification box marked as required and wait for Save, so the reviewer is never asked for a reason
@@ -76,7 +77,8 @@ A violated rule is shown in an alert next to the check (`check-error-{item}`) or
 (`section-{id}-error`) and everything typed stays. A missing name is reported in the same place, and the message says
 to fill in the "Your name" field at the top, because that field is far from the check. An answered check shows
 "Answered by {name}, {UTC time}". The status line and the numbers come from `ChecklistState`, so the page holds no
-counting rules of its own. The outcome buttons are a group of toggle buttons (`aria-pressed`), at least 44 pixels
+counting rules of its own. The outcome buttons are a group of toggle buttons (`aria-pressed`), named by the wording of
+the check (`aria-labelledby`), at least 44 pixels
 high on a phone, and an unanswered check has a visible marker, so state does not depend on color alone.
 
 **OnAfterRenderAsync**: Marks the page interactive after the first render on a live connection and, when a scroll

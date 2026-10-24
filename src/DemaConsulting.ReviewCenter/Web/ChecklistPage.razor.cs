@@ -233,13 +233,22 @@ public partial class ChecklistPage : ComponentBase
     }
 
     /// <summary>
-    ///     Opens the section of the first unanswered check and scrolls to that check.
+    ///     Opens the section of the first unanswered check and scrolls to that check; when only sections being
+    ///     switched off are left, opens the first of them and scrolls to its reason field.
     /// </summary>
     private void GoToNextUnanswered()
     {
         var itemId = State?.NextUnansweredItemId(PendingNotApplicable);
         if (itemId is null)
         {
+            // Only sections being switched off are left: show the first one's reason field so it can be saved
+            var pending = State?.Definition.Sections.FirstOrDefault(section => PendingNotApplicable.Contains(section.Id));
+            if (pending is not null)
+            {
+                OpenSectionId = pending.Id;
+                _scrollTarget = $"section-{TestId(pending.Id)}-reason";
+            }
+
             return;
         }
 

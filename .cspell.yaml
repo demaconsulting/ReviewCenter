@@ -20,6 +20,7 @@ words:
   - wwwroot
   - aspnetcore
   - icdp
+  - labelledby
   - bunit
   - Antiforgery
   - apphost

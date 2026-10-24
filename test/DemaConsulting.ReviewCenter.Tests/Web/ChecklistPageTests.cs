@@ -117,6 +117,10 @@ public class ChecklistPageTests : PageTestBase
         Assert.Equal("false", cut.Find("[data-testid='section-des-toggle']").GetAttribute("aria-expanded"));
         Assert.Equal(8, cut.FindAll("[data-testid^='check-req-']").Count);
         Assert.Empty(cut.FindAll("[data-testid^='check-des-']"));
+
+        // Assert: each check's outcome group is named by the check text
+        Assert.Equal("check-text-req-01", cut.Find("[data-testid='check-req-01'] [role='group']").GetAttribute("aria-labelledby"));
+        Assert.Contains("REQ-01", cut.Find("#check-text-req-01").TextContent, StringComparison.Ordinal);
     }
 
     /// <summary>
@@ -401,6 +405,31 @@ public class ChecklistPageTests : PageTestBase
         Assert.NotNull(cut.Find("[data-testid='check-doc-01']"));
         await cut.WaitForAssertionAsync(() =>
             Assert.Equal(["check-doc-01", "center"], JSInterop.Invocations["reviewCenter.scrollToTestId"][^1].Arguments));
+    }
+
+    /// <summary>
+    ///     Test that the next-unanswered action opens the reason field of a section that was just switched off
+    ///     but not yet saved, when that section is all that is left.
+    /// </summary>
+    [Fact]
+    public async Task ChecklistPage_NextUnanswered_OnlyPendingNotApplicableSectionLeft_OpensItsReasonField()
+    {
+        // Arrange: every section but one is answered; switch the last one off without saving, then close it
+        var projectId = await CreateReviewAsync();
+        await PassSectionsAsync(projectId, [.. DefaultChecklist.Current.Sections.Select(s => s.Id).Where(id => id != "DES")]);
+        var cut = RenderPage(projectId);
+        await cut.Find("[data-testid='section-des-applicable']").ChangeAsync(new ChangeEventArgs { Value = false });
+        await cut.Find("[data-testid='section-des-toggle']").ClickAsync();
+        Assert.Equal("false", cut.Find("[data-testid='section-des-toggle']").GetAttribute("aria-expanded"));
+
+        // Act: ask for the next unanswered check
+        await cut.Find("[data-testid='next-unanswered-button']").ClickAsync();
+
+        // Assert: the section is open with its reason field, and the browser is asked to scroll to it
+        Assert.Equal("true", cut.Find("[data-testid='section-des-toggle']").GetAttribute("aria-expanded"));
+        Assert.NotNull(cut.Find("[data-testid='section-des-reason']"));
+        await cut.WaitForAssertionAsync(() =>
+            Assert.Equal(["section-des-reason", "center"], JSInterop.Invocations["reviewCenter.scrollToTestId"][^1].Arguments));
     }
 
     /// <summary>
