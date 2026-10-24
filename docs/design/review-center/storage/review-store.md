@@ -54,7 +54,8 @@ returns whether a thread was found.
 
 **ListThreadsAsync**: Lists the threads of one review, for every file, with their comments. Threads and comments
 are ordered by identity, which grows with the order of creation; the creation time is not used for ordering because
-SQLite cannot order by a `DateTimeOffset`.
+SQLite cannot order by a `DateTimeOffset`. All threads and comments of the review are read at once: there is no cap
+on their number and no pagination, which is deferred until real volumes are known.
 
 The bytes of files are stored and returned verbatim, including empty files and files containing carriage
 returns or zero bytes.

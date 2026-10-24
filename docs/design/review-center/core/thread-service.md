@@ -23,7 +23,8 @@ and `Created` (UTC).
 **FileText**: a static class with `TryDecode`, which returns the text of file bytes or null when the bytes contain a
 NUL byte or are not valid UTF-8 (a binary file), and `SplitLines`, which splits text into lines. Lines end at `\n`
 and one `\r` before it is dropped, so Windows and Unix line endings count alike. A final line ending does not add a
-line, an empty file has no lines, and a lone `\r` inside a line is kept. The review page shows the lines
+line, an empty file has no lines, and a lone `\r` not followed by `\n` (inside a line or at the very end of the
+file) is kept. The review page shows the lines
 and `ThreadService` validates ranges against them, so both use this one definition.
 
 Rules for the input: the author is not empty after trimming and has at most 100 characters; the text is not empty

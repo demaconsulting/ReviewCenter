@@ -202,8 +202,9 @@ public partial class ReviewPage : ComponentBase
     /// <returns>A task that completes when the content is loaded.</returns>
     /// <remarks>
     ///     An index outside the list is ignored. A file that cannot be found in the store (removed since the
-    ///     page was loaded) is shown as empty text rather than failing the circuit. Selecting a file clears the
-    ///     new-thread form but keeps the author name.
+    ///     page was loaded) is treated as an empty file, so the empty-file notice is shown rather than failing
+    ///     the circuit. Selecting a file reloads the threads and clears the new-thread form but keeps the
+    ///     author name.
     /// </remarks>
     private async Task SelectFileAsync(int index)
     {
@@ -221,6 +222,7 @@ public partial class ReviewPage : ComponentBase
         SelectedPath = path;
         SelectedLines = text is null ? null : FileText.SplitLines(text);
         ClearNewThreadForm();
+        Threads = await ThreadService.ListAsync(ProjectId, ReviewId);
     }
 
     /// <summary>

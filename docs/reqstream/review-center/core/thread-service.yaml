@@ -22,7 +22,7 @@ sections:
       - id: ReviewCenter-ThreadService-Anchor
         title: >-
           The ThreadService class shall reject a thread on a review or file that does not exist, a range with
-          only one line given, a start line below 1, an end line before the start line, an end line beyond the
+          only one endpoint given, a start line below 1, an end line before the start line, an end line beyond the
           last line of the file, or a range on a binary or empty file, and shall accept a thread on the whole
           of any file and a range that ends exactly at the last line, counting lines so that Windows and Unix
           line endings count the same and a final line ending adds no line.

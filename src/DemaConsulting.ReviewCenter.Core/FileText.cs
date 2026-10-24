@@ -69,7 +69,8 @@ public static class FileText
     /// <returns>
     ///     The lines without their terminators. Lines end at <c>\n</c> and one <c>\r</c> just before it is
     ///     dropped, so CRLF and LF files count alike; a final line terminator does not start another line;
-    ///     empty text has no lines; a lone <c>\r</c> inside a line is kept.
+    ///     empty text has no lines; a lone <c>\r</c> not followed by <c>\n</c> (inside a line or at the very
+    ///     end of the text) is kept.
     /// </returns>
     public static IReadOnlyList<string> SplitLines(string text)
     {
@@ -82,12 +83,14 @@ public static class FileText
 
         var lines = text.Split('\n').ToList();
 
-        // The text after a final terminator is not a line
+        // The text after a final terminator is not a line; every other segment up to the last was ended by '\n'
+        var terminated = lines.Count - 1;
         if (lines[^1].Length == 0)
         {
             lines.RemoveAt(lines.Count - 1);
         }
 
-        return lines.Select(line => line.EndsWith('\r') ? line[..^1] : line).ToList();
+        // A '\r' belongs to a CRLF terminator only when '\n' follows it, so the last segment keeps its own
+        return lines.Select((line, index) => index < terminated && line.EndsWith('\r') ? line[..^1] : line).ToList();
     }
 }

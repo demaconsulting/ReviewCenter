@@ -361,6 +361,7 @@ public class ReviewStoreTests
     {
         return new ReviewThread
         {
+            Id = 9001, // supplied identities must be ignored; the store assigns its own
             ProjectId = projectId,
             ReviewId = reviewId,
             FilePath = filePath,
@@ -368,7 +369,7 @@ public class ReviewStoreTests
             EndLine = end,
             State = ReviewThreadState.Open,
             Created = _created,
-            Comments = [new ReviewComment { Author = "Ann", Text = text, Created = _created }]
+            Comments = [new ReviewComment { Id = 9002, ThreadId = 9003, Author = "Ann", Text = text, Created = _created }]
         };
     }
 
@@ -407,6 +408,7 @@ public class ReviewStoreTests
         // Assert: identities are assigned and growing, and every value survived
         Assert.True(whole.Id > 0);
         Assert.True(range.Id > whole.Id);
+        Assert.DoesNotContain(9001, new[] { whole.Id, range.Id });
         Assert.Equal([whole.Id, range.Id], listed.Select(t => t.Id));
         Assert.Null(listed[0].StartLine);
         Assert.Null(listed[0].EndLine);
@@ -416,6 +418,7 @@ public class ReviewStoreTests
         Assert.Equal(_created, listed[1].Created);
         var comment = Assert.Single(listed[1].Comments);
         Assert.True(comment.Id > 0);
+        Assert.NotEqual(9002, comment.Id);
         Assert.Equal(range.Id, comment.ThreadId);
         Assert.Equal(("Ann", "Range", _created), (comment.Author, comment.Text, comment.Created));
     }

@@ -18,9 +18,9 @@ N/A - standard test environment.
 - All unit tests pass with zero failures.
 - A thread on the whole file and a thread on a line range are stored in the Open state with the creation time and
   the first comment.
-- A range ending exactly at the last line is accepted, and a range beyond it, a range with one line, a start below 1,
-  an end before the start, a range on a binary or empty file, and a thread on an unknown file or review are
-  rejected with `ThreadAnchorInvalid`.
+- A range ending exactly at the last line is accepted, and a range beyond it, a range with one endpoint missing,
+  a start below 1, an end before the start, a range on a binary or empty file, and a thread on an unknown file or
+  review are rejected with `ThreadAnchorInvalid`.
 - Blank or too long authors and texts are rejected, and padded values are stored trimmed.
 - A reply is appended after the earlier comments without changing them or the state.
 - Resolving and reopening change only the state and are idempotent.
@@ -41,8 +41,8 @@ the start and end lines are stored as given. This scenario is tested by
 line endings, with and without a final line ending, a range ending at the last line is accepted and one line more is
 rejected. This scenario is tested by `ThreadService_StartThreadAsync_RangeLimits_AreInclusiveAndCountLinesBySeparator`.
 
-**ThreadService_StartThreadAsync_InvalidRange_ThrowsThreadAnchorInvalid**: A range with only one line, a start of 0
-or below, and an end before the start are rejected with `ThreadAnchorInvalid`. This scenario is tested by
+**ThreadService_StartThreadAsync_InvalidRange_ThrowsThreadAnchorInvalid**: A range with only one endpoint given, a
+start of 0 or below, and an end before the start are rejected with `ThreadAnchorInvalid`. This scenario is tested by
 `ThreadService_StartThreadAsync_InvalidRange_ThrowsThreadAnchorInvalid`.
 
 **ThreadService_StartThreadAsync_RangeOnBinaryOrEmptyFile_ThrowsThreadAnchorInvalid**: A line range on a binary file

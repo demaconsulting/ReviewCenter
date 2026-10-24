@@ -96,7 +96,9 @@ services reach it through the Core store interface, which `ReviewStore` implemen
 The system is a single process with one database; there is no separate service tier. The
 limitations of the current slice are deliberate and temporary: there is no authentication, so
 every visitor acts as the same single anonymous operator, and a review can only be created (in
-the Draft state) from uploaded files; there is no comment or sign-off workflow yet.
+the Draft state) from uploaded files. Review comments are implemented (threads anchored to a file or line range, with
+replies, resolve, and reopen), but the comment author is unverified free text; there is no diff view, checklist, or
+sign-off workflow yet.
 
 ## External Interfaces
 

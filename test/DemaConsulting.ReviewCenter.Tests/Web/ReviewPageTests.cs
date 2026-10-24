@@ -183,6 +183,25 @@ public class ReviewPageTests : PageTestBase
     }
 
     /// <summary>
+    ///     Test that a carriage return is dropped only as part of a CRLF terminator, not at the very end of the file.
+    /// </summary>
+    [Fact]
+    public async Task ReviewPage_FileSelect_TrailingLoneCarriageReturn_IsKept()
+    {
+        // Arrange: a file whose last line ends in a lone carriage return rather than a terminator
+        var projectId = await CreateReviewAsync(new UploadedFile("a.txt", Encoding.UTF8.GetBytes("one\r\ntwo\r")));
+        var cut = RenderPage(projectId);
+
+        // Act: select the file
+        await cut.Find("[data-testid='file-select-0']").ClickAsync();
+
+        // Assert: the CRLF line is clean and the unterminated last line keeps its carriage return
+        // (the HTML parser of the test renderer reports a kept carriage return as a line feed)
+        Assert.Equal("one", cut.Find("[data-testid='line-text-1']").TextContent);
+        Assert.Equal("two\n", cut.Find("[data-testid='line-text-2']").TextContent);
+    }
+
+    /// <summary>
     ///     Test that selecting a binary file shows the binary notice instead of content.
     /// </summary>
     [Fact]
