@@ -13,10 +13,14 @@ for performing formal code reviews of file sets against earlier revisions. It su
 comments on code blocks and files, project-specific pass/fail/N/A checklists, primary and alternate
 reviewers, and re-authenticated electronic sign-off.
 
-The `serve` verb runs ReviewCenter as an ASP.NET Core Blazor Server web application with a home page, a health
-endpoint, projects, draft reviews made from uploaded files, threaded review comments on those files, and a
-checklist for each review.
+The `serve` verb runs ReviewCenter as an ASP.NET Core Blazor Server web application with sign-in, a home page, a
+health endpoint, projects, draft reviews made from uploaded files, threaded review comments on those files, and a
+checklist for each review. Every comment and checklist answer is recorded under the signed-in user.
 Reviewers and sign-off are still under development.
+
+> **Warning: databases created by an earlier build must be recreated.** The user accounts add tables and columns
+> that an earlier development database does not have, and the database is created by `EnsureCreated` without
+> migrations. Delete the old database file before starting this version (development databases only).
 
 ## Features
 
@@ -24,27 +28,32 @@ The current release provides:
 
 - **Blazor Server Web Application**: `reviewcenter serve` hosts the web interface (home page at `/`) and a
   `/health` endpoint, listening on `http://localhost:5000` by default or on the address given with `--urls`
+- **Sign-in and Users**: local accounts with a user name and a password; every page except the home page, the
+  login page, and `/health` needs a signed-in user; the roles are **Admin** (manages users) and **Reviewer**; users
+  sign in at `/login`, sign out from the page header, and change their own password at `/account`; an administrator
+  creates users, enables and disables them, changes roles, and sets passwords at `/users`; the first administrator
+  is created with the `user add` command (see [Users and Sign-in](#users-and-sign-in))
 - **Projects**: create projects and list them at `/projects`; each project has its own page at `/projects/{id}`
 - **Draft Reviews**: create a review in a project by uploading a set of files; the review page shows the files and
   lets you read each file's content as numbered lines; a collapsed Details section holds the review id, state, the
   SHA-256 hash of each file, and a content fingerprint that is calculated exactly as the
   [ReviewMark][link-reviewmark] tool calculates it
 - **Review Comments**: on the review page, start a comment thread on a whole file or on a line range, reply to it,
-  and mark it resolved or reopen it; a next-step line says what is left to do, a thread index of all files (open by
-  default, or all, or resolved) jumps to the thread's lines, resolved threads are collapsed to one line, and the
-  file list shows the open threads per file
+  and mark it resolved or reopen it; the author is the signed-in user; a next-step line says what is left to do, a
+  thread index of all files (open by default, or all, or resolved) jumps to the thread's lines, resolved threads are
+  collapsed to one line, and the file list shows the open threads per file
 - **Review Checklist**: every new review gets a checklist of 14 sections and 58 checks, taken from the
   [Continuous Compliance review template][link-review-template]; a checklist page (linked from the review page,
   with a summary such as "37 of 58 checks answered") shows the sections with their progress, one section open at a
-  time, and a Pass, Fail, or N/A choice for each check; a Fail or N/A needs a justification, a section can be marked
-  not applicable with a reason, and a "next unanswered check" button leads you on; the review page's next-step line
-  counts the unanswered checks together with the open threads
-- **Persistent Storage**: projects, reviews, the uploaded file contents, the comment threads, and the checklists
-  are kept in a SQLite database file
+  time, and a Pass, Fail, or N/A choice for each check, recorded under the signed-in user; a Fail or N/A needs a
+  justification, a section can be marked not applicable with a reason, and a "next unanswered check" button leads
+  you on; the review page's next-step line counts the unanswered checks together with the open threads
+- **Persistent Storage**: users, projects, reviews, the uploaded file contents, the comment threads, and the
+  checklists are kept in a SQLite database file
   (default `reviewcenter.db` in the per-user application data folder, see
   [Data Location](#data-location-and-database-settings))
 - **Standardized Command-Line Interface**: Context class handling common arguments
-  (`serve`, `--urls`, `--version`, `--help`, `--silent`, `--validate`, `--results`, `--depth`, `--log`)
+  (`serve`, `user add`, `--urls`, `--version`, `--help`, `--silent`, `--validate`, `--results`, `--depth`, `--log`)
 - **Self-Validation**: Built-in validation tests with TRX/JUnit output
 - **Multi-Platform Support**: Self-contained single-file executables for Windows (win-x64) and Linux (linux-x64)
 - **Modern .NET**: Built on .NET 10 (`net10.0`); the runtime is bundled, so no installation is needed
@@ -117,6 +126,9 @@ reviewcenter serve
 # Run the web server on another address
 reviewcenter serve --urls http://localhost:8080
 
+# Create the first administrator (the password is read from REVIEWCENTER_PASSWORD, from standard input, or prompted)
+reviewcenter user add --username admin --display-name "Ada Admin" --role Admin
+
 # Run self-validation
 reviewcenter --validate
 
@@ -137,6 +149,10 @@ reviewcenter --silent --log output.log
 | ------------------------------------- | ------------------------------------------------------------ |
 | `serve`                               | Run the ReviewCenter web server until stopped                |
 | `--urls <url>`                        | Listen URL for `serve` (default: `http://localhost:5000`)    |
+| `user add`                            | Create a user; see Users and Sign-in below                   |
+| `--username <name>`                   | User name for `user add` (3-50 characters)                   |
+| `--display-name <text>`               | Display name for `user add`                                  |
+| `--role <Admin\|Reviewer>`            | Role for `user add` (default: `Reviewer`)                    |
 | `-v`, `--version`                     | Display version information                                  |
 | `-?`, `-h`, `--help`                  | Display help message                                         |
 | `--silent`                            | Suppress console output                                      |
@@ -144,6 +160,52 @@ reviewcenter --silent --log output.log
 | `--results <file>`, `--result <file>` | Write results to `.trx` (TRX) or `.xml` (JUnit XML) file.    |
 | `--depth <#>`                         | Set heading depth for markdown output (default: 1)           |
 | `--log <file>`                        | Write output to log file                                     |
+
+## Users and Sign-in
+
+Users are local accounts stored in the database. A password is stored only as a salted hash. The two roles are
+**Admin**, who can also manage users at `/users`, and **Reviewer**. The home page, the login page, and `/health` are
+open to everyone; every other page sends a user who is not signed in to the login page and back again after sign-in.
+
+A new database has no users, so create the first administrator with the `user add` command, which writes directly to
+the database (the server may be running). The password is never taken from a command-line option. It is
+read from the first source that has it:
+
+1. the `REVIEWCENTER_PASSWORD` environment variable,
+2. the first line of standard input, when input is redirected,
+3. an interactive prompt (masked, asked twice).
+
+```bash
+# Linux: from the environment
+REVIEWCENTER_PASSWORD='a long passphrase' reviewcenter user add --username admin --display-name "Ada Admin" --role Admin
+
+# Windows PowerShell: from standard input
+"a long passphrase" | .\reviewcenter.exe user add --username admin --display-name "Ada Admin" --role Admin
+
+# Prompted (any platform, interactive)
+reviewcenter user add --username admin --display-name "Ada Admin" --role Admin
+```
+
+The command prints `Created user 'admin' with the role Admin.` or an error and a non-zero exit code, for example
+when the user name already exists. After that the administrator creates the other users at `/users`.
+
+Rules:
+
+- **User name**: 3 to 50 letters, digits, `.`, `_`, or `-`; unique regardless of letter case.
+- **Password**: 12 to 128 characters, no other composition rules.
+- **Lockout**: after 5 failed sign-ins in a row a user name is locked for 5 minutes; a successful sign-in resets the
+  count.
+- **Last administrator**: the last enabled administrator cannot be disabled or demoted.
+- **Sign-in session**: a session cookie that lasts 8 hours of activity by default; change it with the `Auth` setting
+  below.
+
+| Setting             | Environment variable | Meaning                                                  |
+| ------------------- | -------------------- | -------------------------------------------------------- |
+| `Auth:SessionHours` | `Auth__SessionHours` | Hours of sign-in session (default 8; must be above 0)    |
+
+The sign-in cookie is marked Secure when the request arrives over HTTPS. Behind a reverse proxy that ends TLS, set
+`ASPNETCORE_FORWARDEDHEADERS_ENABLED=true` so that the server sees the original HTTPS scheme and marks the cookie
+Secure.
 
 ## Data Location and Database Settings
 
@@ -172,12 +234,15 @@ non-zero exit code.
 
 ## Current Limitations
 
-- **No authentication**: this release has a single anonymous operator. Anyone who can reach the server can create
-  and read projects and reviews. Run it only on `localhost` or on a trusted network until user authentication is
-  added.
-- **Comment authors and checklist answerers are free text**: because there is no sign-in yet, the author of a
-  comment and the "Answered by" name of a checklist answer are names that the reader types, and they are not
-  verified. This is temporary until user authentication is added.
+- **Basic local accounts only**: there is no password reset, no email, no multi-factor sign-in, and no external
+  identity provider. An administrator sets a new password for a user who forgot it. Serve over HTTPS (for example
+  behind a reverse proxy) when the server is reachable from other machines.
+- **Lockout is per user name**: repeated failed sign-ins lock the user name, not the source address, so someone who
+  guesses wrongly on purpose can keep a user locked out for 5 minutes at a time.
+- **Sessions are not cut short at once**: a page that is already open keeps its sign-in state until it is reloaded,
+  and changing a password does not end the user's other sessions. Disabling a user or changing a role takes effect
+  on the next page load. The exception is user administration: every action there is re-checked and refused for a
+  user who is no longer an enabled administrator.
 - **Checklists are fixed per review**: every review gets a copy of the default checklist when it is created and
   keeps it; there is no project-level checklist editor or import yet. Checklist answers are not linked to comment
   threads.
@@ -187,9 +252,9 @@ non-zero exit code.
 - **Upload limits**: at most 200 files per review, 2 MiB per file, and 20 MiB per review. Only the file name of each
   uploaded file is kept, so two files with the same name cannot be in one review.
 - **No database migrations**: the database tables are created when the database file is new; a later release that
-  changes the tables will need a migration step. A database file created by an earlier version, before comments
-  or checklists existed, does not have the tables or columns that are needed, so delete it and start again
-  (development databases only).
+  changes the tables will need a migration step. A database file created by an earlier version, before users,
+  comments, or checklists existed, does not have the tables or columns that are needed, so **delete it and start
+  again** (development databases only).
 
 ## Error Handling
 
@@ -263,9 +328,9 @@ Generated documentation includes:
 
 Planned but not yet implemented:
 
-- The remaining review features of the ReviewCenter web service: checklists, reviewers, sign-off,
+- The remaining review features of the ReviewCenter web service: reviewers, sign-off,
   and review states beyond Draft
-- User authentication
+- Password reset, multi-factor sign-in, and external identity providers
 - EF Core database migrations with an explicit `migrate` command, and further database providers
   (PostgreSQL, SQL Server)
 - PDF/A evidence export of review records

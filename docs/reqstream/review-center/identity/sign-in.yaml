@@ -1,0 +1,112 @@
+---
+# Software Unit Requirements for the SignIn Unit
+#
+# The SignIn unit is the cookie sign-in code: the login and logout endpoints, the authorization policy for pages, the
+# validation of the session, and the actor of the signed-in user.
+
+sections:
+  - title: SignIn Unit Requirements
+    requirements:
+      - id: ReviewCenter-SignIn-Login
+        title: >-
+          The SignIn unit shall, on a sign-in request with the user name and password of an enabled account, sign
+          the user in with a session cookie and redirect to the requested local address or to the home page.
+        justification: |
+          Signing in must lead the user back to where they were going, and nowhere else.
+        tests:
+          - SignIn_Login_ValidCredentials_SetsSafeSessionCookieAndRedirects
+          - SignIn_Login_OverHttps_CookieIsSecure
+
+      - id: ReviewCenter-SignIn-LoginFailure
+        title: >-
+          The SignIn unit shall answer a failed sign-in, whether the user name is unknown, the password is wrong,
+          the account is disabled, or it is locked out, with the same redirect to the login page and set no
+          cookie.
+        justification: |
+          A different answer per reason would tell an attacker which user names exist and which accounts are
+          disabled.
+        tests:
+          - SignIn_Login_EveryKindOfFailure_GivesTheSameAnswerAndNoCookie
+          - SignIn_Login_WrongPasswordWithReturnUrl_KeepsReturnUrlOnLoginPage
+
+      - id: ReviewCenter-SignIn-ReturnUrl
+        title: >-
+          The SignIn unit shall use a return address only when it is a local path, and shall use the home page for
+          any other value, including addresses of other sites and addresses that only look local.
+        justification: |
+          A return address that could lead to another site would let an attacker use the login page to send
+          users to a look-alike site after they sign in.
+        tests:
+          - SignIn_SafeReturnUrl_AnyInput_KeepsOnlyLocalPaths
+          - SignIn_Login_HostileReturnUrl_RedirectsToHomePage
+
+      - id: ReviewCenter-SignIn-Cookie
+        title: >-
+          The SignIn unit shall keep the session in a cookie that scripts cannot read, that is not sent with
+          requests from other sites, that is a session cookie, and that is marked Secure when the request is over
+          HTTPS, and shall reject missing arguments when it is set up.
+        justification: |
+          The session cookie is the key to the account, so it must be protected against theft by scripts and
+          against use from other sites.
+        tests:
+          - SignIn_Login_ValidCredentials_SetsSafeSessionCookieAndRedirects
+          - SignIn_Login_OverHttps_CookieIsSecure
+          - SignIn_AddSignIn_NullArguments_Throw
+
+      - id: ReviewCenter-SignIn-Antiforgery
+        title: >-
+          The SignIn unit shall refuse a sign-in or sign-out request without a valid antiforgery token and shall
+          sign nobody in because of it.
+        justification: |
+          Without the token another site could make a browser sign a user in to an account chosen by an
+          attacker, or sign the user out.
+        tests:
+          - SignIn_PostWithoutAntiforgeryToken_IsRefusedAndSignsNobodyIn
+
+      - id: ReviewCenter-SignIn-Logout
+        title: >-
+          The SignIn unit shall end the session of the signed-in user on a sign-out request and redirect to the
+          home page.
+        justification: |
+          Users on a shared computer must be able to end their session.
+        tests:
+          - SignIn_Logout_SignedInUser_EndsTheSession
+
+      - id: ReviewCenter-SignIn-Protected
+        title: >-
+          The SignIn unit shall redirect a request without a signed-in user to the login page, with the requested
+          address as the return address, for every page except the home page and the login page, which stay open.
+        justification: |
+          Review data must only be reached by identified users, while the home page and the login page must work
+          without signing in.
+        tests:
+          - SignIn_ProtectedPage_Anonymous_RedirectsToLogin
+          - SignIn_PublicPage_Anonymous_IsServed
+
+      - id: ReviewCenter-SignIn-AdminOnly
+        title: >-
+          The SignIn unit shall allow the user administration page only to a user with the Admin role.
+        justification: |
+          Managing users is limited to administrators, because it controls who may sign in.
+        tests:
+          - SignIn_UsersPage_ReviewerAndAdmin_OnlyAdminIsAllowed
+
+      - id: ReviewCenter-SignIn-SessionValidation
+        title: >-
+          The SignIn unit shall reject the session cookie of a user who was disabled or whose role changed after
+          the sign-in.
+        justification: |
+          Disabling a user or changing a role must take effect at once, not when the cookie runs out.
+        tests:
+          - SignIn_Session_UserDisabledAfterLogin_IsRejected
+          - SignIn_Session_RoleChangedAfterLogin_IsRejected
+
+      - id: ReviewCenter-SignIn-Actor
+        title: >-
+          The SignIn unit shall provide the signed-in user as an actor, with user name and display name, and shall
+          fail when nobody is signed in.
+        justification: |
+          The services that record who acted take the person from the sign-in, so nobody can act in the name of
+          somebody else.
+        tests:
+          - SignIn_GetActorAsync_SignedInAndAnonymous_ReturnsActorOrThrows

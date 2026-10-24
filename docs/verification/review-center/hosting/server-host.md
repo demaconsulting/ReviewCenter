@@ -20,8 +20,9 @@ N/A - standard test environment.
 - The start-up log entry exposes the listen URL as a named value.
 - The console logging provider is registered unless the context is silent.
 - A null context is rejected with an `ArgumentNullException`.
-- The configured database is created and the Core services work against it; data survives a second application
-  instance on the same file.
+- The configured database is created and the Core services (including the user service) work against it; data
+  survives a second application instance on the same file.
+- A session length that is not positive is reported with an error that names the `Auth:SessionHours` setting.
 - An unsupported database provider and an unusable database location are reported as the error "Failed to prepare
   the database", and `RunAsync` returns exit code 1 for each.
 
@@ -70,3 +71,11 @@ provider; it returns 1, and the context holds the error. This scenario is tested
 **ServerHost_RunAsync_UnusableDatabaseLocation_ReturnsExitCodeOne**: `RunAsync` is called with a database path that
 is an existing folder; it returns 1, and the context holds the error. This scenario is tested by
 `ServerHost_RunAsync_UnusableDatabaseLocation_ReturnsExitCodeOne`.
+
+**ServerHost_CreateApplication_NonPositiveSessionHours_ThrowsClearError**: The pipeline is built with the setting
+`Auth:SessionHours` set to 0; an `InvalidOperationException` whose message names the setting is thrown. This scenario
+is tested by `ServerHost_CreateApplication_NonPositiveSessionHours_ThrowsClearError`.
+
+**ServerHost_AddServices_Configured_RegistersUserService**: The real pipeline is started on an in-memory server and
+a user is created through the `UserService` taken from the application services; the user is stored with a database
+identity. This scenario is tested by `ServerHost_AddServices_Configured_RegistersUserService`.

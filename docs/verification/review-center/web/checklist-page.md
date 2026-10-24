@@ -4,8 +4,10 @@
 
 `ChecklistPage` is verified with component tests defined in `ChecklistPageTests.cs`, which use the bUnit test context
 to render the real component over real Core services and an in-memory fake store holding a review with the default
-checklist. Tests locate elements by their `data-testid` attributes (the page units share the helper `PageTestBase`),
-click the buttons, and compare the shown values with the progress counts of the default checklist. The browser
+checklist. The signed-in user is supplied by a test authentication state in `PageTestBase`: the user `ann` (display
+name "Ann") unless a test signs in as someone else. Tests locate elements by their `data-testid` attributes (the page
+units share the helper `PageTestBase`), click the buttons, and compare the shown values with the progress counts of
+the default checklist. The browser
 function that scrolls is replaced by bUnit's JavaScript interop mock, which records the call. The real database is
 covered by the `Storage` subsystem and the integration tests of the `Web` subsystem.
 
@@ -20,10 +22,11 @@ N/A - standard test environment.
 - A new review shows the status line "58 checks unanswered.", the overall progress, every section with its
   progress, and only the first section open; a partly answered review opens the first section with unanswered
   checks; opening a section closes the one that was open.
-- A Pass is stored at once with the name and time, and the progress follows.
+- A Pass is stored at once with the signed-in user and the time, and the progress follows.
 - A Fail or N/A shows a justification box marked as required; saving it empty shows an error next to the box and
   stores nothing; saving it with text stores the answer and shows who answered it and when.
-- Answering without a name shows an error that names the "Your name" field and stores nothing.
+- The page has no field for a name; an answer is recorded under the user name and display name of the signed-in
+  user.
 - A section marked as not applicable without a reason shows an error and changes nothing; with a reason it counts as
   done, shows no checks, and leaves the totals.
 - The next-unanswered button opens the section of the first unanswered check and asks the browser to scroll to
@@ -55,8 +58,8 @@ the second section is the one that is open. This scenario is tested by
 **ChecklistPage_Render_OpeningSection_ClosesOthers**: A section heading is clicked; that section is open and the
 previously open one is closed. This scenario is tested by `ChecklistPage_Render_OpeningSection_ClosesOthers`.
 
-**ChecklistPage_Answer_Pass_SavesImmediately**: A name is entered and Pass is clicked; the answer is stored with the
-name and the clock time, the button is pressed, and the progress counts it. This scenario is tested by
+**ChecklistPage_Answer_Pass_SavesImmediately**: Pass is clicked; the answer is stored with the signed-in user and the
+clock time, the button is pressed, and the progress counts it. This scenario is tested by
 `ChecklistPage_Answer_Pass_SavesImmediately`.
 
 **ChecklistPage_Answer_Fail_ShowsJustificationBoxAndRequiresText**: Fail is clicked; the justification box appears
@@ -64,12 +67,12 @@ with its required marker, saving it empty shows an error next to it, and nothing
 by `ChecklistPage_Answer_Fail_ShowsJustificationBoxAndRequiresText`.
 
 **ChecklistPage_Answer_FailWithJustification_SavesAndShowsAnsweredBy**: Fail is clicked and a justification is
-saved; the answer is stored, the text stays in the box, and "Answered by" shows the name and the UTC time. This
-scenario is tested by `ChecklistPage_Answer_FailWithJustification_SavesAndShowsAnsweredBy`.
+saved; the answer is stored, the text stays in the box, and "Answered by" shows the display name and the UTC time.
+This scenario is tested by `ChecklistPage_Answer_FailWithJustification_SavesAndShowsAnsweredBy`.
 
-**ChecklistPage_Answer_NoName_ShowsNameError**: Pass is clicked without a name; the error next to the check says to
-use the "Your name" field and nothing is stored. This scenario is tested by
-`ChecklistPage_Answer_NoName_ShowsNameError`.
+**ChecklistPage_Answer_SignedInUser_IsRecordedAsAnsweredBy**: Another user ("bea") is signed in and Pass is clicked;
+the page has no name field, "Answered by" shows the display name of that user, and the stored answer carries the
+user name and display name of that user. This scenario is tested by `ChecklistPage_Answer_SignedInUser_IsRecordedAsAnsweredBy`.
 
 **ChecklistPage_Applicability_NotApplicableWithoutReason_ShowsError**: A section is switched to not applicable and
 saved without a reason; an error is shown and the section is still applicable in the store. This scenario is tested

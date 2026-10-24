@@ -72,15 +72,15 @@ sections:
 
       - id: ReviewCenter-ChecklistService-AnsweredBy
         title: >-
-          The ChecklistService class shall require the name of the person for each answer and for each change
-          of section applicability, at most 100 characters and not blank after trimming, and shall store the
-          trimmed name with the UTC time of the change, until sign-in supplies a verified identity.
+          The ChecklistService class shall take the person of each answer and of each change of section
+          applicability as the signed-in actor (user name and display name), reject a missing actor, and store
+          both names with the UTC time of the change.
         justification: |
-          Every answer must be attributable and dated. There is no sign-in yet, so the name is free text that is
-          not verified; this is temporary and is replaced by the signed-in user when user identity is added.
+          Every answer must be attributable and dated. The person is the signed-in user, who needs no check, and
+          storing the user name keeps the person identifiable if the display name changes later.
         tests:
-          - ChecklistService_SetAnswer_BlankOrTooLongName_ThrowsAnsweredByInvalid
-          - ChecklistService_SetAnswer_StoresNameAndUtcTime
+          - ChecklistService_SetAnswer_NullActor_Throws
+          - ChecklistService_SetAnswer_StoresActorAndUtcTime
 
       - id: ReviewCenter-ChecklistService-Progress
         title: >-

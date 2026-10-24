@@ -369,7 +369,7 @@ public class ReviewStoreTests
             EndLine = end,
             State = ReviewThreadState.Open,
             Created = _created,
-            Comments = [new ReviewComment { Id = 9002, ThreadId = 9003, Author = "Ann", Text = text, Created = _created }]
+            Comments = [new ReviewComment { Id = 9002, ThreadId = 9003, Author = "Ann", AuthorUsername = "ann", Text = text, Created = _created }]
         };
     }
 
@@ -420,7 +420,7 @@ public class ReviewStoreTests
         Assert.True(comment.Id > 0);
         Assert.NotEqual(9002, comment.Id);
         Assert.Equal(range.Id, comment.ThreadId);
-        Assert.Equal(("Ann", "Range", _created), (comment.Author, comment.Text, comment.Created));
+        Assert.Equal(("Ann", "ann", "Range", _created), (comment.Author, comment.AuthorUsername, comment.Text, comment.Created));
     }
 
     /// <summary>
@@ -580,6 +580,7 @@ public class ReviewStoreTests
             Outcome = outcome,
             Justification = justification,
             AnsweredBy = "Ann",
+            AnsweredByUsername = "ann",
             AnsweredAt = _created
         };
     }
@@ -671,6 +672,7 @@ public class ReviewStoreTests
             Applicable = applicable,
             Reason = reason,
             SetBy = "Ann",
+            SetByUsername = "ann",
             SetAt = _created
         };
 
@@ -684,6 +686,7 @@ public class ReviewStoreTests
         Assert.Equal("No design", Assert.Single(notApplicable).Reason);
         var stored = Assert.Single(applicable);
         Assert.True(stored.Applicable);
+        Assert.Equal(("Ann", "ann"), (stored.SetBy, stored.SetByUsername));
         Assert.Null(stored.Reason);
     }
 
@@ -708,6 +711,7 @@ public class ReviewStoreTests
         var answer = Assert.Single(first);
         Assert.Equal(ChecklistOutcome.NotApplicable, answer.Outcome);
         Assert.Equal("Ann", answer.AnsweredBy);
+        Assert.Equal("ann", answer.AnsweredByUsername);
         Assert.Equal(_created, answer.AnsweredAt);
         Assert.Empty(second);
     }

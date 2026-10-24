@@ -17,8 +17,9 @@ line are.
 file, otherwise an inclusive 1-based range), `State`, `Created`, `Comments` (a list of `ReviewComment`), and the
 derived, not stored, `LastActivity`.
 
-**ReviewComment**: a data class (init-only properties) of `Id` (assigned by the store), `ThreadId`, `Author`, `Text`,
-and `Created` (UTC).
+**ReviewComment**: a data class (init-only properties) of `Id` (assigned by the store), `ThreadId`, `Author` (the
+display name of the person at the time of writing), `AuthorUsername` (the user name of the person), `Text`, and
+`Created` (UTC).
 
 **ReviewThreadState**: a closed enumeration with the values `Open` and `Resolved`.
 
@@ -29,8 +30,8 @@ line, an empty file has no lines, and a lone `\r` not followed by `\n` (inside a
 file) is kept. The review page shows the lines
 and `ThreadService` validates ranges against them, so both use this one definition.
 
-Rules for the input: the author is not empty after trimming and has at most 100 characters; the text is not empty
-after trimming and has at most 4000 characters (the constants are in `ReviewLimits`); both are stored trimmed. A
+Rules for the input: the text is not empty
+after trimming and has at most 4000 characters (the constants are in `ReviewLimits`); it is stored trimmed. A
 thread is anchored either to the whole file (no lines given) or to a range in which both lines are given, the start
 line is at least 1, the end line is not before the start line, and the end line is not beyond the last line of the
 file. A binary file and an empty file have no lines, so they can be commented only as a whole.
@@ -39,29 +40,31 @@ file. A binary file and an empty file have no lines, so they can be commented on
 edit or delete a comment or a thread. The only change to an existing thread is its state, which is not attributed
 to anyone or timestamped yet.
 
-**Temporary identity**: there is no sign-in yet, so the author is free text that is not verified and can be any
-name. It is in the same position as the single anonymous operator of the rest of the product, and is to be replaced
-by the signed-in user when identity is added.
+**Author**: the author of a comment is the signed-in user, passed as an `Actor` by the page, never typed text. The
+comment stores the display name of the user at that time (`Author`) and the user name (`AuthorUsername`), so a later
+change of the display name does not rewrite the record, and the author can still be told from another user with the
+same display name. A null actor is a programming error and raises `ArgumentNullException`; there is no rule about the
+author, because the display name of a user was validated when the user was created.
 
 #### Key Methods
 
 **StartThreadAsync**: Starts a thread with its first comment.
 
 - *Parameters*: `int projectId`, `string reviewId`, `string filePath`, `int? startLine`, `int? endLine`,
-  `string? author`, `string? text`, and a cancellation token.
+  `Actor actor`, `string? text`, and a cancellation token.
 - *Returns*: `Task<ReviewThread>` — the stored thread in the `Open` state with its first comment and the creation
   time from the clock.
 - *Postconditions*: Nothing is stored when a rule fails.
 
-The rules are checked in this order, and the first violation is reported: the author (`CommentAuthorInvalid`); the
-text (`CommentTextInvalid`); the shape of the anchor, that is both lines or neither, start at least 1, and end not
+The rules are checked in this order, and the first violation is reported: the text (`CommentTextInvalid`); the shape
+of the anchor, that is both lines or neither, start at least 1, and end not
 before start (`ThreadAnchorInvalid`); that the review and the file exist (`ThreadAnchorInvalid`); and, only when a
 range is given, that the file is text and the end line is within its line count (`ThreadAnchorInvalid`). Checks that
 need no I/O come first so that a bad request fails cheaply, and file content is read only when a range needs it.
 
 **ReplyAsync**: Appends a comment to an existing thread of the review.
 
-- *Parameters*: `int projectId`, `string reviewId`, `int threadId`, `string? author`, `string? text`, and a
+- *Parameters*: `int projectId`, `string reviewId`, `int threadId`, `Actor actor`, `string? text`, and a
   cancellation token.
 - *Returns*: `Task<ReviewComment>` — the stored comment.
 - *Postconditions*: Earlier comments are unchanged and the state of the thread does not change, so a resolved thread
@@ -97,8 +100,8 @@ thread's `Created` when it has none). It is not stored, so the database is uncha
 
 #### Error Handling
 
-Rule violations raise `DomainRuleException` with the matching `DomainRule`. A null store or clock at construction
-raises `ArgumentNullException`. Store failures propagate unchanged.
+Rule violations raise `DomainRuleException` with the matching `DomainRule`. A null store or clock at construction,
+or a null actor, raises `ArgumentNullException`. Store failures propagate unchanged.
 
 #### Dependencies
 

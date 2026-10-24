@@ -1,0 +1,28 @@
+---
+# Software Unit Requirements for the AccountPage Unit
+#
+# The AccountPage unit is the Account.razor page at /account where a signed-in user sees the account and changes the
+# own password.
+
+sections:
+  - title: AccountPage Unit Requirements
+    requirements:
+      - id: ReviewCenter-AccountPage-Show
+        title: >-
+          The AccountPage unit shall serve at /account, to a signed-in user, a form for changing the password.
+        justification: |
+          Users must be able to change the password without asking an administrator.
+        tests:
+          - AccountPage_Render_SignedIn_ShowsFormControls
+
+      - id: ReviewCenter-AccountPage-ChangePassword
+        title: >-
+          The AccountPage unit shall change the password of the signed-in user when the current password is given
+          correctly and the new password follows the password rules, clearing the password fields afterwards, and
+          shall show a violated rule as a message, changing nothing.
+        justification: |
+          The current password is required so that somebody at an unattended session cannot take over the
+          account, and the fields are cleared so that no password stays on the page.
+        tests:
+          - AccountPage_ChangePassword_ValidInput_ChangesOwnPasswordAndClearsFields
+          - AccountPage_ChangePassword_InvalidInput_ShowsErrorAndChangesNothing

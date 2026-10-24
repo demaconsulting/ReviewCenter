@@ -199,6 +199,53 @@ public class ServerHostTests
     }
 
     /// <summary>
+    ///     Test that a session length that is not positive stops the build with an error naming the setting.
+    /// </summary>
+    [Fact]
+    public void ServerHost_CreateApplication_NonPositiveSessionHours_ThrowsClearError()
+    {
+        // Arrange: configuration with a session length of zero hours
+        using var context = Context.Create(["serve", "--silent"]);
+        var options = new ServerHostOptions
+        {
+            MapStaticAssets = false,
+            ConfigureBuilder = builder =>
+            {
+                builder.WebHost.UseTestServer();
+                builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
+                {
+                    ["Database:ConnectionString"] = TestDatabase.NewConnectionString(),
+                    ["Auth:SessionHours"] = "0"
+                });
+            }
+        };
+
+        // Act: create the application
+        var exception = Assert.Throws<InvalidOperationException>(() => ServerHost.CreateApplication(context, options));
+
+        // Assert: the message names the setting
+        Assert.Contains("Auth:SessionHours", exception.Message, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    ///     Test that the host registers the user service next to the other domain services.
+    /// </summary>
+    [Fact]
+    public async Task ServerHost_AddServices_Configured_RegistersUserService()
+    {
+        // Arrange: start the real pipeline on an in-memory server
+        var logs = new CapturingLoggerProvider();
+        await using var app = await TestWebApp.StartAsync(logs, "serve", "--silent");
+
+        // Act: create a user through the registered service
+        var user = await app.Services.GetRequiredService<UserService>()
+            .CreateAsync("ann", "Ann", UserRole.Reviewer, "correct horse battery", TestContext.Current.CancellationToken);
+
+        // Assert: the user was stored
+        Assert.True(user.Id > 0);
+    }
+
+    /// <summary>
     ///     Test that a database failure at start-up is reported as an error with exit code 1 instead of an
     ///     unhandled exception. No port is bound, because the failure happens before the server starts.
     /// </summary>

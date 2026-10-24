@@ -56,10 +56,15 @@ loopback TCP ports.
   with code 0 when asked to terminate.
 - The `--urls` option controls the listen address, is rejected without `serve`, and a port that
   is already in use produces an error and a non-zero exit code.
-- The running server serves the projects page and has created its database; stored data is served again
-  after a restart of the server.
+- The running server serves the login page to a visitor who is not signed in and sends such a visitor who requests
+  the projects page to the login page; it has created its database; stored data is served again after a restart of
+  the server to a signed-in user.
+- A user created with the `user add` verb takes the password from the environment variable, never prints it, and a
+  second user with the same user name is refused; a missing password gives an error and exit code 1.
+- A user signs in with the user name and password, uses the protected pages as that user, and signs out; only
+  signed-in users reach the protected pages, and only administrators reach the users page.
 - Review comments (threads, replies, and resolve state) are presented by the review page and are kept after the
-  database is reopened.
+  database is reopened; each is attributed to the signed-in user.
 - The review checklist (answers, applicability, and the frozen snapshot) is presented by the checklist and review
   pages and is kept after the database is reopened.
 - A database setting that cannot be used stops the server with an error and a non-zero exit code.
@@ -161,11 +166,23 @@ the Hello button and the counter button, and the Blazor client script is served 
 `/_framework/blazor.web.js`. This scenario is tested by
 `ReviewCenter_ServeVerb_Started_HomePageContainsTitleAndControls`.
 
-**ReviewCenter_ServeVerb_Started_ServesProjectsPageAndCreatesDatabase**: The tool is started with the `serve` verb
-as a real process; the test process points its `Database` settings at a temporary file that does not yet exist. A
-request to `/projects` returns the page with the creation form, and the database file now exists, showing that the
-server created the database at start-up and that the projects page works against it. This scenario is tested by
-`ReviewCenter_ServeVerb_Started_ServesProjectsPageAndCreatesDatabase`.
+**ReviewCenter_ServeVerb_Started_RedirectsAnonymousProjectsRequestToLoginAndCreatesDatabase**: The tool is started
+with the `serve` verb as a real process; the test process points its `Database` settings at a temporary file that
+does not yet exist. A request to `/projects` without signing in is redirected to the login page with the return URL,
+the login page contains the sign-in form, and the database file now exists, showing that the server created the
+database at start-up and that the protected pages need a sign-in. This scenario is tested by
+`ReviewCenter_ServeVerb_Started_RedirectsAnonymousProjectsRequestToLoginAndCreatesDatabase`.
+
+**ReviewCenter_UserAddVerb_PasswordFromEnvironment_CreatesUserThenRejectsDuplicate**: The tool is run with `user
+add`, a user name, a display name, and the role Admin, on a new temporary database, with the password in the
+environment variable `REVIEWCENTER_PASSWORD` and not on the command line. The first run exits with code 0 and
+reports "Created user 'root' with the role Admin."; the second run with the same user name exits with code 1 and
+reports that the user already exists; the password appears in neither output. This scenario is tested by
+`ReviewCenter_UserAddVerb_PasswordFromEnvironment_CreatesUserThenRejectsDuplicate`.
+
+**ReviewCenter_UserAddVerb_NoPassword_ReturnsError**: The tool is run with `user add` and no password in the
+environment while standard input is closed; it exits with code 1 and reports "No password was provided." instead of
+waiting for input. This scenario is tested by `ReviewCenter_UserAddVerb_NoPassword_ReturnsError`.
 
 The system requirements for reviews, restart persistence, and database failure are verified at subsystem level,
 where the same production pipeline can be exercised with real databases more precisely than through a child
@@ -184,6 +201,19 @@ file, replied to, and resolved; the database is then closed and opened again, an
 resolved state, and both comments in posting order. This scenario is tested by
 `StorageSubsystem_ServicesOverDatabase_ReopenedDatabase_KeepsThreadsAndComments`.
 
+**Sign-in journey**: A user is created through the user service over the real pipeline; a request for the projects
+page is refused and redirected to the login page, the user signs in with the return URL and reaches the page, the
+page shows the display name of the user, and after signing out the page is refused again. This scenario is tested
+by `IdentitySubsystem_SignInJourney_LoginUseAndLogout_WorksEndToEnd`. In a second scenario every protected page
+redirects an anonymous request to the login page, and the users page is refused to a reviewer and served to an
+administrator. These scenarios are tested by `SignIn_ProtectedPage_Anonymous_RedirectsToLogin` and
+`SignIn_UsersPage_ReviewerAndAdmin_OnlyAdminIsAllowed`.
+
+**Users and passwords**: Users are created, signed in with in any case of the user name, locked after repeated
+failures, and protected against the loss of the last administrator through the domain service, and users and
+password changes are kept after the database is reopened. These scenarios are tested by
+`CoreSubsystem_UsersWorkflow_CreateSignInLockoutAndLastAdmin` and `StorageSubsystem_Users_PersistAcrossReopen`.
+
 **Review checklist**: Two checks of a new review are answered through the domain service over the real pipeline, one
 Pass and one Fail with a justification; the checklist page, requested twice, shows the progress, the pressed Pass
 button, and the justification, and the review page shows the progress summary, the link to the checklist page, and
@@ -194,7 +224,7 @@ is read back. This scenario is tested by
 `StorageSubsystem_Checklist_PersistsSnapshotAnswersAndSectionsAcrossReopen`.
 
 **Persistence across restart**: A project is stored, the server is stopped and started again on the same
-database file, and the projects page still lists the project. This scenario is tested by
+database file, and a signed-in user sees the project on the projects page. This scenario is tested by
 `HostingSubsystem_Startup_DatabaseConfigured_ServesStoredProjectsAfterRestart`.
 
 **Database failure**: The server is run with an unsupported database provider; it reports an error and returns

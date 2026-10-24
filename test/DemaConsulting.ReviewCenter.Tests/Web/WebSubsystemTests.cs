@@ -85,7 +85,8 @@ public partial class WebSubsystemTests
         // Arrange: start the real pipeline and create a project with a review of three files
         var logs = new CapturingLoggerProvider();
         await using var app = await TestWebApp.StartAsync(logs, "serve", "--silent");
-        using var client = app.GetTestClient();
+        using var browser = await TestBrowser.SignedInAsync(app, "ann");
+        var client = browser.Client;
         var project = await app.Services.GetRequiredService<ProjectService>()
             .CreateAsync("Apollo", "Moon landing", TestContext.Current.CancellationToken);
         await app.Services.GetRequiredService<ReviewService>().CreateDraftAsync(
@@ -124,14 +125,15 @@ public partial class WebSubsystemTests
         // Arrange: start the real pipeline, create a review and an open and a resolved thread on its file
         var logs = new CapturingLoggerProvider();
         await using var app = await TestWebApp.StartAsync(logs, "serve", "--silent");
-        using var client = app.GetTestClient();
+        using var browser = await TestBrowser.SignedInAsync(app, "ann");
+        var client = browser.Client;
         var project = await app.Services.GetRequiredService<ProjectService>()
             .CreateAsync("Apollo", null, TestContext.Current.CancellationToken);
         await app.Services.GetRequiredService<ReviewService>().CreateDraftAsync(
             project.Id, "rev-1", "First review", [new("a.txt", TestContent.A)], TestContext.Current.CancellationToken);
         var threads = app.Services.GetRequiredService<ThreadService>();
-        await threads.StartThreadAsync(project.Id, "rev-1", "a.txt", null, null, "Ann", "Open", TestContext.Current.CancellationToken);
-        var resolved = await threads.StartThreadAsync(project.Id, "rev-1", "a.txt", 1, 1, "Bob", "Done", TestContext.Current.CancellationToken);
+        await threads.StartThreadAsync(project.Id, "rev-1", "a.txt", null, null, TestActors.Ann, "Open", TestContext.Current.CancellationToken);
+        var resolved = await threads.StartThreadAsync(project.Id, "rev-1", "a.txt", 1, 1, TestActors.Bob, "Done", TestContext.Current.CancellationToken);
         await threads.ResolveAsync(project.Id, "rev-1", resolved.Id, TestContext.Current.CancellationToken);
 
         // Act: request the review page
@@ -162,16 +164,17 @@ public partial class WebSubsystemTests
         // Arrange: start the real pipeline, create a review and answer two of its checks
         var logs = new CapturingLoggerProvider();
         await using var app = await TestWebApp.StartAsync(logs, "serve", "--silent");
-        using var client = app.GetTestClient();
+        using var browser = await TestBrowser.SignedInAsync(app, "ann");
+        var client = browser.Client;
         var project = await app.Services.GetRequiredService<ProjectService>()
             .CreateAsync("Apollo", null, TestContext.Current.CancellationToken);
         await app.Services.GetRequiredService<ReviewService>().CreateDraftAsync(
             project.Id, "rev-1", "First review", [new("a.txt", TestContent.A)], TestContext.Current.CancellationToken);
         var checklists = app.Services.GetRequiredService<ChecklistService>();
         await checklists.SetAnswerAsync(
-            project.Id, "rev-1", "REQ-01", ChecklistOutcome.Pass, null, "Ann", TestContext.Current.CancellationToken);
+            project.Id, "rev-1", "REQ-01", ChecklistOutcome.Pass, null, TestActors.Ann, TestContext.Current.CancellationToken);
         await checklists.SetAnswerAsync(
-            project.Id, "rev-1", "REQ-02", ChecklistOutcome.Fail, "Broken", "Ann", TestContext.Current.CancellationToken);
+            project.Id, "rev-1", "REQ-02", ChecklistOutcome.Fail, "Broken", TestActors.Ann, TestContext.Current.CancellationToken);
 
         // Act: request the checklist page twice, and the review page
         var route = $"/projects/{project.Id}/reviews/rev-1/checklist";
@@ -204,7 +207,8 @@ public partial class WebSubsystemTests
         // Arrange: start the real pipeline with data, so list rows and forms are all rendered
         var logs = new CapturingLoggerProvider();
         await using var app = await TestWebApp.StartAsync(logs, "serve", "--silent");
-        using var client = app.GetTestClient();
+        using var browser = await TestBrowser.SignedInAsync(app, "root", UserRole.Admin);
+        var client = browser.Client;
         var project = await app.Services.GetRequiredService<ProjectService>()
             .CreateAsync("Apollo", "Moon landing", TestContext.Current.CancellationToken);
         await app.Services.GetRequiredService<ReviewService>().CreateDraftAsync(
@@ -212,6 +216,9 @@ public partial class WebSubsystemTests
         string[] routes =
         [
             "/",
+            "/login",
+            "/account",
+            "/users",
             "/projects",
             $"/projects/{project.Id}",
             "/projects/9999",
@@ -222,9 +229,9 @@ public partial class WebSubsystemTests
 
         foreach (var route in routes)
         {
-            // Act: render the page and collect its interactive elements
+            // Act: render the page and collect its interactive elements (a hidden field is not interactive)
             var document = await ParseAsync(client, route);
-            var elements = document.QuerySelectorAll("a, button, input, select, textarea");
+            var elements = document.QuerySelectorAll("a, button, input:not([type='hidden']), select, textarea");
 
             // Assert: the page has interactive elements and each has a kebab-case test id
             Assert.NotEmpty(elements);

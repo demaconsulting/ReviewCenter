@@ -24,10 +24,9 @@ namespace DemaConsulting.ReviewCenter.Core;
 ///     The recorded answer to one check of a review's checklist.
 /// </summary>
 /// <remarks>
-///     There is at most one answer per check; answering again replaces it. <see cref="AnsweredBy"/> is a
-///     free-text name with no sign-in behind it yet; it is TEMPORARY and is replaced by the signed-in user
-///     in slice 4. Instances are created by <see cref="ChecklistService"/>, which enforces the rules.
-///     The type is not thread-safe.
+///     There is at most one answer per check; answering again replaces it. The person who answered comes
+///     from the signed-in user (see <see cref="Actor"/>). Instances are created by
+///     <see cref="ChecklistService"/>, which enforces the rules. The type is not thread-safe.
 /// </remarks>
 public sealed class ChecklistAnswer
 {
@@ -59,9 +58,14 @@ public sealed class ChecklistAnswer
     public string? Justification { get; init; }
 
     /// <summary>
-    ///     Gets the name of the person who answered, as typed (unverified).
+    ///     Gets the display name of the person who answered, at the time of answering.
     /// </summary>
     public string AnsweredBy { get; init; } = string.Empty;
+
+    /// <summary>
+    ///     Gets the user name of the signed-in person who answered.
+    /// </summary>
+    public string AnsweredByUsername { get; init; } = string.Empty;
 
     /// <summary>
     ///     Gets the moment the check was answered (UTC).

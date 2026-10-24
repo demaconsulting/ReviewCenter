@@ -18,6 +18,8 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
+using DemaConsulting.ReviewCenter.Core;
+
 namespace DemaConsulting.ReviewCenter.Cli;
 
 /// <summary>
@@ -81,6 +83,26 @@ internal sealed class Context : IDisposable
     public string Urls { get; private init; } = DefaultUrls;
 
     /// <summary>
+    ///     Gets a value indicating whether the <c>user add</c> verb was specified.
+    /// </summary>
+    public bool UserAdd { get; private init; }
+
+    /// <summary>
+    ///     Gets the user name given with <c>--username</c>; set whenever <see cref="UserAdd"/> is <c>true</c>.
+    /// </summary>
+    public string? Username { get; private init; }
+
+    /// <summary>
+    ///     Gets the display name given with <c>--display-name</c>; set whenever <see cref="UserAdd"/> is <c>true</c>.
+    /// </summary>
+    public string? DisplayName { get; private init; }
+
+    /// <summary>
+    ///     Gets the role given with <c>--role</c>; <see cref="UserRole.Reviewer"/> when the option is not given.
+    /// </summary>
+    public UserRole Role { get; private init; } = UserRole.Reviewer;
+
+    /// <summary>
     ///     Gets the proposed exit code for the application (0 for success, 1 for errors).
     /// </summary>
     public int ExitCode => _hasErrors ? 1 : 0;
@@ -128,7 +150,11 @@ internal sealed class Context : IDisposable
             ResultsFile = parser.ResultsFile,
             HeadingDepth = parser.HeadingDepth,
             Serve = parser.Serve,
-            Urls = parser.Urls ?? DefaultUrls
+            Urls = parser.Urls ?? DefaultUrls,
+            UserAdd = parser.UserAdd,
+            Username = parser.Username,
+            DisplayName = parser.DisplayName,
+            Role = parser.Role ?? UserRole.Reviewer
         };
 
         // Open log file if specified
@@ -212,12 +238,32 @@ internal sealed class Context : IDisposable
         public string? Urls { get; private set; }
 
         /// <summary>
+        ///     Gets a value indicating whether the <c>user add</c> verb was specified.
+        /// </summary>
+        public bool UserAdd { get; private set; }
+
+        /// <summary>
+        ///     Gets the value of <c>--username</c>, or <c>null</c> when the option was not given.
+        /// </summary>
+        public string? Username { get; private set; }
+
+        /// <summary>
+        ///     Gets the value of <c>--display-name</c>, or <c>null</c> when the option was not given.
+        /// </summary>
+        public string? DisplayName { get; private set; }
+
+        /// <summary>
+        ///     Gets the value of <c>--role</c>, or <c>null</c> when the option was not given.
+        /// </summary>
+        public UserRole? Role { get; private set; }
+
+        /// <summary>
         ///     Parses command-line arguments
         /// </summary>
         /// <param name="args">Command-line arguments.</param>
         /// <exception cref="ArgumentException">
-        ///     Thrown when an argument is unknown or malformed, or when <c>--urls</c> is given
-        ///     without the <c>serve</c> verb.
+        ///     Thrown when an argument is unknown or malformed, when <c>--urls</c> is given
+        ///     without the <c>serve</c> verb, or when the <c>user add</c> options and the verb do not match.
         /// </exception>
         public void ParseArguments(string[] args)
         {
@@ -236,6 +282,18 @@ internal sealed class Context : IDisposable
             if (Urls != null && !Serve)
             {
                 throw new ArgumentException("--urls requires the serve verb", nameof(args));
+            }
+
+            // The user options belong to 'user add' for the same reason, and 'user add' cannot work without
+            // the two names that identify the account
+            if (!UserAdd && (Username != null || DisplayName != null || Role != null))
+            {
+                throw new ArgumentException("--username, --display-name and --role require the user add verb", nameof(args));
+            }
+
+            if (UserAdd && (Username == null || DisplayName == null))
+            {
+                throw new ArgumentException("user add requires --username and --display-name", nameof(args));
             }
         }
 
@@ -290,6 +348,28 @@ internal sealed class Context : IDisposable
                     Urls = GetRequiredUrlArgument(arg, args, index);
                     return index + 1;
 
+                case "user":
+                    // 'add' is the only action; it must follow directly
+                    if (index >= args.Length || args[index] != "add")
+                    {
+                        throw new ArgumentException("user requires the add action", nameof(args));
+                    }
+
+                    UserAdd = true;
+                    return index + 1;
+
+                case "--username":
+                    Username = GetRequiredStringArgument(arg, args, index, "a user name argument");
+                    return index + 1;
+
+                case "--display-name":
+                    DisplayName = GetRequiredStringArgument(arg, args, index, "a display name argument");
+                    return index + 1;
+
+                case "--role":
+                    Role = GetRequiredRoleArgument(arg, args, index);
+                    return index + 1;
+
                 default:
                     throw new ArgumentException($"Unsupported argument '{arg}'", nameof(args));
             }
@@ -337,6 +417,27 @@ internal sealed class Context : IDisposable
             }
 
             return value;
+        }
+
+        /// <summary>
+        ///     Gets a required argument value that must name a user role
+        /// </summary>
+        /// <param name="arg">Argument name</param>
+        /// <param name="args">All arguments</param>
+        /// <param name="index">Current index</param>
+        /// <returns>The role</returns>
+        /// <exception cref="ArgumentException">Thrown when the value is missing or is not <c>Admin</c> or <c>Reviewer</c>.</exception>
+        private static UserRole GetRequiredRoleArgument(string arg, string[] args, int index)
+        {
+            var value = GetRequiredStringArgument(arg, args, index, "a role argument");
+
+            // Enum.TryParse would also accept numbers; only the two names are valid
+            if (!Enum.GetNames<UserRole>().Contains(value, StringComparer.OrdinalIgnoreCase))
+            {
+                throw new ArgumentException($"{arg} requires Admin or Reviewer but was '{value}'", nameof(args));
+            }
+
+            return Enum.Parse<UserRole>(value, ignoreCase: true);
         }
 
         /// <summary>

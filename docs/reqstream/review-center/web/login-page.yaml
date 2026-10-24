@@ -1,0 +1,29 @@
+---
+# Software Unit Requirements for the LoginPage Unit
+#
+# The LoginPage unit is the Login.razor page at /login with the sign-in form.
+
+sections:
+  - title: LoginPage Unit Requirements
+    requirements:
+      - id: ReviewCenter-LoginPage-Form
+        title: >-
+          The LoginPage unit shall serve at /login, without sign-in, a form with a user name field, a password
+          field, and a Sign in button that posts to the sign-in endpoint with an antiforgery token.
+        justification: |
+          Users need a page to sign in from, and it must be reachable without being signed in. The antiforgery
+          token stops another site from signing a user in to an account chosen by an attacker.
+        tests:
+          - SignIn_PublicPage_Anonymous_IsServed
+          - SignIn_LoginPage_ErrorAndReturnUrl_AreShownSafely
+
+      - id: ReviewCenter-LoginPage-Error
+        title: >-
+          The LoginPage unit shall show one message for a failed sign-in, whatever the reason, and shall keep a
+          local return address through a failed sign-in while ignoring one that leads to another site.
+        justification: |
+          A message that differed by reason would tell an attacker which user names exist, and a return address
+          that could lead to another site would turn the login page into a way to send users elsewhere.
+        tests:
+          - SignIn_Login_WrongPasswordWithReturnUrl_KeepsReturnUrlOnLoginPage
+          - SignIn_LoginPage_ErrorAndReturnUrl_AreShownSafely

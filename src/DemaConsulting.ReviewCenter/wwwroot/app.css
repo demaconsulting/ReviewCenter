@@ -115,6 +115,8 @@ a {
 }
 
 input[type="text"],
+input[type="password"],
+select,
 textarea {
     display: block;
     width: 100%;
@@ -633,8 +635,59 @@ a.action {
     font-weight: 400;
 }
 
-.name-field {
-    margin: 0.75rem 0 0;
+.app-header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 0.5rem 1rem;
+    max-width: 52rem;
+    margin: 0 auto;
+    padding: 0.5rem 1rem 0;
+    font-size: 0.9rem;
+}
+
+.app-header form {
+    margin: 0;
+}
+
+.inline-form {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    align-items: center;
+}
+
+.inline-form input {
+    flex: 1 1 10rem;
+}
+
+/* A user row: name and badges on the first line, the controls for the row on one wrapping line below */
+.item-list .row-action {
+    margin: 0 0 0 0.5rem;
+    padding: 0.15rem 0.6rem;
+}
+
+.user-controls {
+    margin-top: 0.5rem;
+}
+
+.card > .notice,
+.card form .notice {
+    margin-bottom: 0.75rem;
+}
+
+.item-list .user-controls button {
+    margin-top: 0;
+}
+
+.user-controls select {
+    flex: 0 0 auto;
+    width: auto;
+}
+
+.user-controls input {
+    flex: 1 1 14rem;
 }
 
 @media (min-width: 40rem) {
@@ -663,7 +716,7 @@ a.action {
 
     .item-list button.index-row {
         display: grid;
-        grid-template-columns: minmax(0, 1.6fr) 6.5rem 4.5rem 5.5rem minmax(0, 0.6fr) 11.5rem;
+        grid-template-columns: minmax(0, 1.4fr) 6.5rem 4.5rem 5.5rem minmax(0, 1fr) 11.5rem;
         gap: 0 0.75rem;
     }
 

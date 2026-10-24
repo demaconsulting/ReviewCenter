@@ -25,9 +25,8 @@ namespace DemaConsulting.ReviewCenter.Core;
 /// </summary>
 /// <remarks>
 ///     A row exists only once a reviewer has set the applicability; until then the section applies.
-///     <see cref="SetBy"/> is a free-text name with no sign-in behind it yet; it is TEMPORARY and is
-///     replaced by the signed-in user in slice 4. Instances are created by <see cref="ChecklistService"/>,
-///     which enforces the rules. The type is not thread-safe.
+///     The person who set it comes from the signed-in user (see <see cref="Actor"/>). Instances are created
+///     by <see cref="ChecklistService"/>, which enforces the rules. The type is not thread-safe.
 /// </remarks>
 public sealed class ChecklistSectionState
 {
@@ -58,9 +57,14 @@ public sealed class ChecklistSectionState
     public string? Reason { get; init; }
 
     /// <summary>
-    ///     Gets the name of the person who set the applicability, as typed (unverified).
+    ///     Gets the display name of the person who set the applicability, at the time it was set.
     /// </summary>
     public string SetBy { get; init; } = string.Empty;
+
+    /// <summary>
+    ///     Gets the user name of the signed-in person who set the applicability.
+    /// </summary>
+    public string SetByUsername { get; init; } = string.Empty;
 
     /// <summary>
     ///     Gets the moment the applicability was set (UTC).

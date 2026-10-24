@@ -118,8 +118,8 @@ public class StorageSubsystemTests
                 projectId, "rev-1", "First", [new("a.txt", TestContent.A)], TestContext.Current.CancellationToken);
             var threads = new ThreadService(first.Store, new FixedTimeProvider(_now));
             var thread = await threads.StartThreadAsync(
-                projectId, "rev-1", "a.txt", 1, 1, "Ann", "First", TestContext.Current.CancellationToken);
-            await threads.ReplyAsync(projectId, "rev-1", thread.Id, "Bob", "Second", TestContext.Current.CancellationToken);
+                projectId, "rev-1", "a.txt", 1, 1, TestActors.Ann, "First", TestContext.Current.CancellationToken);
+            await threads.ReplyAsync(projectId, "rev-1", thread.Id, TestActors.Bob, "Second", TestContext.Current.CancellationToken);
             await threads.ResolveAsync(projectId, "rev-1", thread.Id, TestContext.Current.CancellationToken);
         }
 
@@ -134,6 +134,7 @@ public class StorageSubsystemTests
             Assert.Equal((1, 1), (listed.StartLine, listed.EndLine));
             Assert.Equal(ReviewThreadState.Resolved, listed.State);
             Assert.Equal(["Ann", "Bob"], listed.Comments.Select(c => c.Author));
+            Assert.Equal(["ann", "bob"], listed.Comments.Select(c => c.AuthorUsername));
             Assert.Equal(["First", "Second"], listed.Comments.Select(c => c.Text));
         }
     }
@@ -159,9 +160,9 @@ public class StorageSubsystemTests
                 projectId, "rev-1", "First", [new("a.txt", TestContent.A)], TestContext.Current.CancellationToken);
             var checklists = new ChecklistService(first.Store, new FixedTimeProvider(_now));
             await checklists.SetAnswerAsync(
-                projectId, "rev-1", "REQ-01", ChecklistOutcome.Fail, "Broken", "Ann", TestContext.Current.CancellationToken);
+                projectId, "rev-1", "REQ-01", ChecklistOutcome.Fail, "Broken", TestActors.Ann, TestContext.Current.CancellationToken);
             await checklists.SetSectionApplicabilityAsync(
-                projectId, "rev-1", "DES", false, "No design", "Ann", TestContext.Current.CancellationToken);
+                projectId, "rev-1", "DES", false, "No design", TestActors.Ann, TestContext.Current.CancellationToken);
         }
 
         // Act: open the same database again and read the checklist
@@ -178,6 +179,51 @@ public class StorageSubsystemTests
             Assert.Equal("No design", state.ReasonFor("DES"));
             Assert.Equal(new ChecklistProgress(1, 53), state.Overall);
         }
+    }
+
+    /// <summary>
+    ///     Test that a user created through the service, and the change of its password, are still there after
+    ///     the database is closed and opened again, and that the user signs in with the changed password.
+    /// </summary>
+    [Fact]
+    public async Task StorageSubsystem_Users_PersistAcrossReopen()
+    {
+        // Arrange: a new database file
+        var options = new DatabaseOptions { ConnectionString = TestDatabase.NewConnectionString() };
+
+        // Act: create an administrator and change a password, then close the database
+        var first = Open(options);
+        using (first.Provider)
+        {
+            var users = NewUserService(first.Provider);
+            await users.CreateAsync("Root", "Root", UserRole.Admin, "correct horse battery", TestContext.Current.CancellationToken);
+            await users.ChangeOwnPasswordAsync(
+                "root", "correct horse battery", "another long password", TestContext.Current.CancellationToken);
+        }
+
+        // Act: open the same database again and sign in
+        var second = Open(options);
+        using (second.Provider)
+        {
+            var users = NewUserService(second.Provider);
+            var signedIn = await users.AuthenticateAsync("ROOT", "another long password", TestContext.Current.CancellationToken);
+            var oldPassword = await users.AuthenticateAsync("root", "correct horse battery", TestContext.Current.CancellationToken);
+
+            // Assert: the user, with its role, survived and only the changed password works
+            Assert.Equal(("Root", UserRole.Admin), (signedIn?.Username, signedIn?.Role));
+            Assert.Null(oldPassword);
+        }
+    }
+
+    /// <summary>
+    ///     Builds a user service over the database of a provider.
+    /// </summary>
+    /// <param name="provider">The provider that owns the database factory.</param>
+    /// <returns>The service, over the real user store and a fast test hasher.</returns>
+    private static UserService NewUserService(ServiceProvider provider)
+    {
+        var factory = provider.GetRequiredService<IDbContextFactory<ReviewCenterDbContext>>();
+        return new UserService(new UserStore(factory), new FakePasswordHasher(), new FixedTimeProvider(_now));
     }
 
     /// <summary>

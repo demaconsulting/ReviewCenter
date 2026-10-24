@@ -1,6 +1,6 @@
 package ReviewCenter {
     part def ChecklistService {
-        doc /* Provides the review checklist: the default checklist (sections of checks, taken from the Continuous Compliance review template), the frozen copy a review keeps from its creation, and the answers. Marks sections as applicable or not (a reason is required when not), records Pass, Fail, or N/A for each check (a justification is required for Fail and N/A) with the name of the person and the UTC time, enforces these rules, and derives the progress per section and overall, completeness, and the first unanswered check. The name is free text until sign-in exists. */
+        doc /* Provides the review checklist: the default checklist (sections of checks, taken from the Continuous Compliance review template), the frozen copy a review keeps from its creation, and the answers. Marks sections as applicable or not (a reason is required when not), records Pass, Fail, or N/A for each check (a justification is required for Fail and N/A) with the signed-in user (user name and display name) and the UTC time, enforces these rules, and derives the progress per section and overall, completeness, and the first unanswered check. */
 
         comment sourceRef /* Source: src/DemaConsulting.ReviewCenter.Core/ChecklistService.cs, ChecklistState.cs, ChecklistDefinition.cs, DefaultChecklist.cs, ReviewChecklist.cs, ChecklistAnswer.cs, ChecklistSectionState.cs, ChecklistProgress.cs, and ChecklistOutcome.cs */
         comment testRef /* Test: test/DemaConsulting.ReviewCenter.Tests/Core/ChecklistServiceTests.cs */

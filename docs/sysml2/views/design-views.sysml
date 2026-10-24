@@ -24,6 +24,10 @@ package ReviewCenter {
         expose WebSubsystem;
     }
 
+    view IdentityView {
+        expose IdentitySubsystem;
+    }
+
     view CoreView {
         expose CoreSubsystem;
     }

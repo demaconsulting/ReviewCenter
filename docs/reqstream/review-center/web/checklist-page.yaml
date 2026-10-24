@@ -28,18 +28,18 @@ sections:
         title: >-
           The ChecklistPage unit shall offer Pass, Fail, and N/A buttons for each check of the open section, store
           a Pass at once, ask for a justification, marked as required, only for Fail and N/A and store those when
-          the reviewer saves, show the name and UTC time of the answer, take the reviewer's name from one field at
-          the top, and show a violated rule as a message next to the check, pointing to the name field when the
-          name is missing.
+          the reviewer saves, show the display name and UTC time of the answer, record the signed-in user as the
+          person who answered without any field for a name, and show a violated rule as a message next to the
+          check.
         justification: |
           One click per check keeps the work fast, and the justification is only asked for where it is needed.
-          A message beside the check tells the reviewer exactly what to fix. There is no sign-in yet, so the
-          name is typed once and is not verified, until user identity is added.
+          A message beside the check tells the reviewer exactly what to fix. The person is the signed-in user, so
+          it cannot be chosen or faked.
         tests:
           - ChecklistPage_Answer_Pass_SavesImmediately
           - ChecklistPage_Answer_Fail_ShowsJustificationBoxAndRequiresText
           - ChecklistPage_Answer_FailWithJustification_SavesAndShowsAnsweredBy
-          - ChecklistPage_Answer_NoName_ShowsNameError
+          - ChecklistPage_Answer_SignedInUser_IsRecordedAsAnsweredBy
 
       - id: ReviewCenter-ChecklistPage-Applicability
         title: >-

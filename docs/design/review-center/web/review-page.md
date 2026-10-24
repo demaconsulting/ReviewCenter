@@ -14,7 +14,8 @@ until expanded), and the form that starts a new thread. Last, in a native `<deta
 default, it shows the review's
 identifier, state, content fingerprint, and the hash of each file. It is a Razor component split into presentation
 (`ReviewPage.razor`) and behavior (`ReviewPage.razor.cs`). It reads reviews through `ReviewService` and works with
-threads only through `ThreadService`, so every comment rule is applied there.
+threads only through `ThreadService`, so every comment rule is applied there. It requires a signed-in user, and every
+comment is posted on behalf of that user.
 
 #### Data Model
 
@@ -37,9 +38,6 @@ calculated from this list, and the selected file's threads are the ones with its
 **Checklist**: the `ChecklistState` of the review, or `null` when it has none. The page only reads it for the summary
 and the next-step line; the answers are made on `ChecklistPage`.
 
-**AuthorName**: the author typed once in the "Your name" field and used for new threads and replies. There is no
-sign-in yet, so it is free text that is not verified.
-
 **NewStartLine**, **NewEndLine**, **NewText**, **NewThreadError**: the new-thread form fields and its message.
 **ReplyTexts**, **ReplyErrors**: the reply text and the message of each thread, by thread identity.
 
@@ -59,7 +57,7 @@ Test identifiers: `review-page` (root), `home-link`, `projects-link`, `project-l
 `index-row-{id}`, `index-file-{id}`, `index-anchor-{id}`, `index-state-{id}`, `index-count-{id}`,
 `index-author-{id}`, `index-activity-{id}`, `files-list`, `file-row-{index}`, `file-path-{index}`,
 `file-size-{index}`, `file-open-threads-{index}`, `file-select-{index}`,
-`selected-file-path`, `file-binary-notice`, `file-empty-notice`, `new-thread-form`, `comment-author-input`,
+`selected-file-path`, `file-binary-notice`, `file-empty-notice`, `new-thread-form`,
 `thread-start-line-input`, `thread-end-line-input`, `thread-target`, `thread-text-input`, `thread-error`,
 `start-thread-button`, `file-content`, `code-line-{n}`, `line-comment-{n}`, `line-no-{n}`, `line-marker-{n}`,
 `line-text-{n}` (all by 1-based line number), `threads-empty`, `threads-list`, `thread-{id}`,
@@ -81,7 +79,7 @@ the previous review, its file content, or a half-typed comment. Each file's `Vie
 
 - *Parameters*: `int index` — the position in the displayed list; an index outside the list is ignored.
 - *Postconditions*: `SelectedPath` is the file's path, only that file's content has been loaded, the
-  new-thread form is empty (the author name is kept), and the top of the file's code is the scroll target.
+  new-thread form is empty, and the top of the file's code is the scroll target.
 
 Only the selected file is loaded, so that opening a review with many or large files does not read them all. If the
 bytes contain no zero byte and are valid UTF-8, they are shown as numbered lines (`FileText.TryDecode` and
@@ -97,14 +95,15 @@ lines).
 **CommentOnLine**: Fills the start and end line of the new-thread form with one line number, and makes the form the
 scroll target, because the form sits below the code and the threads.
 
-**StartThreadAsync**: Starts a thread on the selected file from the form. Both line fields blank anchor the whole
+**StartThreadAsync**: Starts a thread on the selected file from the form, on behalf of the signed-in user, who comes
+from the authentication state (`SignIn.GetActorAsync`). Both line fields blank anchor the whole
 file, only a start line anchors that line, and both anchor the range. A line field that is not a whole number is
 reported as "Line numbers must be whole numbers." A violated comment rule is shown in `thread-error` next to the
-form and everything typed stays. Success clears the text and line fields, keeps the author, and reloads the
+form and everything typed stays. Success clears the text and line fields and reloads the
 threads.
 
-**ReplyAsync**: Adds the typed reply to a thread. A violated rule is shown inside that thread; for a missing author
-the message also says which field to fill in (the 'Your name' field), because that field is far from the thread.
+**ReplyAsync**: Adds the typed reply to a thread on behalf of the signed-in user. A violated rule is shown inside that
+thread.
 
 **ToggleThreadAsync**: Resolves an open thread or reopens a resolved one, then reloads the threads. Resolving also
 collapses the thread. A thread that no longer exists is reported inside the thread.
@@ -145,6 +144,7 @@ own.
   next-step line.
 - **ChecklistService** — reads the checklist progress for the summary and the next-step line.
 - **FileText** — decides whether a file is text and splits it into lines.
+- **SignIn** — `GetActorAsync` supplies the signed-in user from the authentication state.
 - **ProjectService** — reads the name of the owning project for the breadcrumb.
 - **ASP.NET Core Blazor components** — the component base class, events, JavaScript interop, and the interactive
   server render mode.

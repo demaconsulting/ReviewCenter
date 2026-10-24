@@ -4,9 +4,10 @@
 
 ReviewCenter is a web-based formal code review service with a companion command-line
 interface. The service is an ASP.NET Core Blazor Server application started with the `serve`
-verb. The current release lets you create projects and draft reviews made from uploaded files, shows the
-content fingerprint of each review, and lets you discuss the files in threaded comments; the remaining review
-features (checklists, reviewers, sign-off) are still under development. The command-line interface is documented in
+verb. The current release lets you sign in, create projects and draft reviews made from uploaded files, shows the
+content fingerprint of each review, lets you discuss the files in threaded comments, and gives each review a
+checklist, with every action recorded under the signed-in user; the remaining review
+features (reviewers, sign-off) are still under development. The command-line interface is documented in
 this guide. A separate development tool,
 Puppet, is described near the end of this guide.
 
@@ -16,7 +17,8 @@ This user guide covers:
 
 - Installation instructions
 - Usage examples for common tasks
-- Running the web server, creating projects and reviews, and configuring the database
+- Running the web server, creating the first user, signing in, creating projects and reviews, and configuring the
+  database
 - Command-line options reference
 - The Puppet development tool
 - Practical examples for various scenarios
@@ -118,14 +120,110 @@ reviewcenter serve --urls http://localhost:8080
 The server provides these routes:
 
 - `/` - the ReviewCenter home page. It shows the title `ReviewCenter`, a Hello button that displays a greeting
-  when pressed, a counter button that increments a displayed count, and a link to the projects page.
+  when pressed, a counter button that increments a displayed count, and a link to the projects page. It is open to
+  everyone.
+- `/login` - the sign-in page (open to everyone).
+- `/account` - your account, with a form to change your password.
+- `/users` - the user administration page (administrators only).
 - `/projects` - the list of projects, with a form to create a new project.
 - `/projects/{id}` - one project, with its reviews and a form to create a review.
 - `/projects/{id}/reviews/{reviewId}` - one review, with its files, their content, and comment threads.
-- `/health` - a health check that answers with status 200 and the text `Healthy` while the server is running.
+- `/projects/{id}/reviews/{reviewId}/checklist` - the checklist of a review.
+- `/health` - a health check that answers with status 200 and the text `Healthy` while the server is running (open
+  to everyone).
+
+Every page except `/`, `/login`, and `/health` needs a signed-in user; see [Users and Sign-in](#users-and-sign-in).
 
 The `--urls` option is only valid together with `serve`; using it without `serve` is reported as an error.
 The `--silent` option suppresses the server's console log output.
+
+## Users and Sign-in
+
+ReviewCenter has local user accounts. Each user has a user name, a display name (shown next to comments and
+answers), a role, and a password, of which only a salted hash is stored. The role **Admin** may also manage users;
+the role **Reviewer** may do everything else. Every comment, checklist answer, and change of section applicability is
+recorded under the signed-in user, who cannot be chosen or typed in.
+
+### Create the First Administrator
+
+A new database has no users, so nobody can sign in yet. Create the first administrator on the command line, with the
+server stopped or running:
+
+```bash
+reviewcenter user add --username admin --display-name "Ada Admin" --role Admin
+```
+
+The options are `--username` (3 to 50 letters, digits, `.`, `_`, or `-`; unique regardless of letter case),
+`--display-name` (1 to 100 characters), and `--role` (`Admin` or `Reviewer`; `Reviewer` when omitted). The user is
+created in the configured database (see [Database](#database)). The password is never given as an option, because a
+command line is visible to other processes and is kept in shell history. It is read from the first of these that is
+available:
+
+1. The `REVIEWCENTER_PASSWORD` environment variable.
+2. The first line of standard input, when input is redirected.
+3. An interactive prompt that does not show what you type and asks twice.
+
+```bash
+# Linux: from the environment
+REVIEWCENTER_PASSWORD='a long passphrase' reviewcenter user add --username admin --display-name "Ada Admin" --role Admin
+```
+
+```powershell
+# Windows PowerShell: from standard input
+"a long passphrase" | .\reviewcenter.exe user add --username admin --display-name "Ada Admin" --role Admin
+```
+
+The command prints `Created user 'admin' with the role Admin.` and never prints the password. When the user cannot
+be created (the user name is taken, the password is too short, no password was provided, or the database cannot be
+used) it prints an error and exits with a non-zero exit code.
+
+### Sign In and Out
+
+Open any page, or `/login`, enter your user name and password, and press Sign in. After signing in you are taken to
+the page you asked for. A failed sign-in always shows the same message, whatever the reason (unknown user name, wrong
+password, disabled account, or locked account), so the message does not reveal which user names exist. The page header
+shows your display name, an Account link, and a Logout button; when nobody is signed in it shows a Sign in link
+instead.
+
+The sign-in is kept in a session cookie that lasts 8 hours of activity by default and is gone when the browser is
+closed. Change the length with the `Auth:SessionHours` setting (environment variable `Auth__SessionHours`), a number
+of hours above 0; the server does not start when the value is not valid. Disabling a user or changing the role of a
+user takes effect the next time that user loads a page.
+
+### Password Rules and Lockout
+
+- A password has 12 to 128 characters. There are no other composition rules, so a long phrase is a good password.
+  Spaces are part of the password.
+- After 5 failed sign-ins in a row for a user name, that user name is locked for 5 minutes, even for the right
+  password. A successful sign-in before that resets the count.
+
+### Account
+
+Open `/account` (the Account link in the header) to change your password: enter the current password and the new
+password, and press the change button. A wrong current password counts as a failed sign-in for the lockout. The
+fields are cleared afterwards.
+
+### Manage Users (Administrators)
+
+Open `/users`; a user who is not an administrator is refused with an "Access denied" page that links back to the
+projects. The page lists the users with their user name, display
+name, role, and state. An administrator can:
+
+1. Create a user with a user name, display name, role, and password.
+2. Disable a user, which stops the user from signing in without deleting the record of what the user did, and enable
+   the user again.
+3. Change the role of a user.
+4. Set a new password for a user, for example when the user has forgotten it. This also ends a lockout.
+
+The last enabled administrator cannot be disabled or demoted; the page shows an error instead. If you are no longer
+an enabled administrator, the page shows an error for every action.
+
+### Secure Cookie Behind a Reverse Proxy
+
+The sign-in cookie is marked Secure when the request reaches the server over HTTPS. When a reverse proxy ends TLS and
+forwards plain HTTP to ReviewCenter, set the environment variable `ASPNETCORE_FORWARDEDHEADERS_ENABLED=true` for the
+server, so that it trusts the forwarded scheme of the proxy and still marks the cookie Secure. Use HTTPS whenever the
+server can be reached from other machines.
 
 ## Projects and Reviews
 
@@ -158,12 +256,17 @@ on the page, and nothing is created.
 - Only the file name of each chosen file is kept (not its folder), so two files with the same name cannot be in the
   same review; the page reports this when you submit.
 
-### Limitation: No Authentication
+### Limitations of Sign-in
 
-This release has a single anonymous operator: there are no user accounts or permissions, and anyone who can reach
-the server can create and read all projects and reviews, and add comments to them. The author of a comment is a name
-that you type; it is not verified, so anyone can use any name. Run the server only on `localhost` or on a trusted
-network until authentication is added in a later release.
+- There is no password reset, no email, no multi-factor sign-in, and no external identity provider. An administrator
+  sets a new password for a user who forgot it.
+- The lockout counts failures per user name, not per source address, so someone can keep a user name locked by
+  guessing wrongly on purpose.
+- A page that is already open keeps its sign-in state until it is reloaded (the user management page is the
+  exception: it refuses every action once you are no longer an enabled administrator, although an action that was
+  already in progress at that moment can still finish), and changing a password does not end the user's other
+  sessions. Opening a page that needs a role from an already open page is checked against the role you had when
+  the page was opened.
 
 ## Review Comments
 
@@ -177,23 +280,21 @@ author of the first comment, and the time of the last activity, newest first. Us
 buttons (which show the totals) to filter it; it starts with Open. Press a row to show that thread: its file is
 selected, its lines are highlighted, and the page scrolls to them.
 
-1. Enter your name in the "Your name" field (1 to 100 characters). It is used for every comment you post and stays
-   filled in while you work on the page.
-2. To start a thread, either press the Comment button of a line, which fills in that line, or type a first and a last
+1. To start a thread, either press the Comment button of a line, which fills in that line, or type a first and a last
    line number yourself (a first line without a last line means that one line), or leave both line fields empty to
    comment on the whole file. The form shows where the comment will go. Enter the comment text (1 to 4000
-   characters) and press the start button.
-3. A thread is listed below the file's code with the lines it covers (the whole file, a line, or a range of lines)
+   characters) and press the start button. The author of the comment is you, the signed-in user.
+2. A thread is listed below the file's code with the lines it covers (the whole file, a line, or a range of lines)
    and its comments in the order they were posted; the form to start a new thread follows it. Lines that have a
    thread are marked.
-4. Anyone can reply to a thread. Press the resolve button to mark a thread resolved, and the reopen button to open
-   it again. A resolved thread is shown as one line (lines, state, and number of comments); press its expand
-   button to read it, reply, or reopen it, and the collapse button to fold it again.
+3. Any signed-in user can reply to a thread. Press the resolve button to mark a thread resolved, and the reopen
+   button to open it again. A resolved thread is shown as one line (lines, state, and number of comments); press its
+   expand button to read it, reply, or reopen it, and the collapse button to fold it again.
 
 Lines are numbered from 1. Windows (CRLF) and Unix (LF) line endings count the same, a line ending at the very end
 of a file does not add a line, and an empty file has no lines. A binary file, or a file that is not valid UTF-8, and
 an empty file can be commented on as a whole only. A line number must be a whole number inside the file, and the
-first line must not be after the last line. Leading and trailing spaces of the name and the text are removed. A
+first line must not be after the last line. Leading and trailing spaces of the text are removed. A
 problem is shown as a message next to the form (or inside the thread for a reply) and nothing you typed is lost.
 
 Posted comments cannot be edited or deleted, so the record of the discussion stays complete; only a thread's state
@@ -213,13 +314,12 @@ a "Next unanswered check" button that opens the section of the first unanswered 
 Below that, every section is listed with its progress (for example "3 of 8"); only one section is open at a time,
 and the first section with unanswered checks is open when you arrive.
 
-1. Enter your name in the "Your name" field (1 to 100 characters). It is stored with each answer, together with the
-   UTC time, and shown as "Answered by".
-2. Open a section and choose Pass, Fail, or N/A for each check. A Pass is saved at once. For Fail and N/A a
+1. Open a section and choose Pass, Fail, or N/A for each check. A Pass is saved at once. For Fail and N/A a
    justification (up to 2000 characters) is required: type it in the box that appears and press Save. A missing
    justification is reported next to the box, and nothing is saved until it is given. You can change an answer at any
-   time.
-3. If a section does not apply to the review, clear its "This section applies to the review" switch, give the reason
+   time. Each answer is stored under your user, together with the UTC time, and shown as "Answered by" with your
+   display name.
+2. If a section does not apply to the review, clear its "This section applies to the review" switch, give the reason
    (required), and press Save reason. A section that does not apply counts as done and its checks leave the totals.
    Switch it on again to answer its checks; the reason is then cleared.
 
@@ -227,14 +327,13 @@ The checklist is complete when every check of every applicable section is answer
 counts as answered, and its justification records the finding.
 
 The checklist of a review is fixed when the review is created: a later release with a different default checklist
-does not change reviews that already exist. The name in "Your name" is free text and is not verified; this is
-temporary until user authentication is added. Checklist answers are not linked to comment threads. The checklist
+does not change reviews that already exist. Checklist answers are not linked to comment threads. The checklist
 page is made for narrow screens too.
 
 ## Database
 
-ReviewCenter keeps projects, reviews, file contents, comment threads, and checklists in a SQLite database file. On
-first start
+ReviewCenter keeps users, projects, reviews, file contents, comment threads, and checklists in a SQLite database
+file. On first start
 it creates the
 folder, the file, and the tables. The default file is `reviewcenter.db` in the `ReviewCenter` folder of the
 per-user application data folder (`%LOCALAPPDATA%\ReviewCenter` on Windows, `~/.local/share/ReviewCenter` on
@@ -259,10 +358,10 @@ Database__ConnectionString=/srv/reviewcenter/reviews.db reviewcenter serve
 
 If the database cannot be prepared (for example the provider is not supported or the location cannot be used), the
 server writes an error message and exits with a non-zero exit code. Database migrations are not provided in this
-release: the tables are created only when the database is new. A database file created before review comments or
-checklists existed does not have the tables and columns that are needed, and the pages cannot work with it; delete
-the file (or point
-`Database:ConnectionString` at a new one) to start again. Do this only with development data.
+release: the tables are created only when the database is new. **A database file created by an earlier build, before
+user accounts existed, does not have the tables and columns that are needed, and the pages cannot work with it:
+delete the file (or point `Database:ConnectionString` at a new one) and start again, then create the first
+administrator.** Do this only with development data.
 
 ## Self-Validation
 
@@ -367,6 +466,10 @@ The following command-line options are supported:
 | ------------------------------------- | ------------------------------------------------------------ |
 | `serve`                               | Run the ReviewCenter web server until stopped                |
 | `--urls <url>`                        | Listen URL for `serve` (default: `http://localhost:5000`)    |
+| `user add`                            | Create a user; password from environment, stdin, or prompt   |
+| `--username <name>`                   | User name for `user add`                                     |
+| `--display-name <text>`               | Display name for `user add`                                  |
+| `--role <Admin\|Reviewer>`            | Role for `user add` (default: `Reviewer`)                    |
 | `-v`, `--version`                     | Display version information                                  |
 | `-?`, `-h`, `--help`                  | Display help message                                         |
 | `--silent`                            | Suppress console output                                      |

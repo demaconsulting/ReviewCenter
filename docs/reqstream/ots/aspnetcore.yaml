@@ -32,3 +32,20 @@ sections:
               - ReviewCenter_ServeVerb_Started_HomePageContainsTitleAndControls
               - WebSubsystem_HomeRoute_Requested_RendersTitleAndControls
               - HomePage_HelloButton_Clicked_ShowsGreeting
+          - id: ReviewCenter-OTS-AspNetCore-Authentication
+            title: >-
+              ASP.NET Core shall provide cookie sign-in and sign-out with a redirect for requests without a signed-in
+              user, antiforgery protection of form posts, and a salted password hasher that accepts a right password
+              and rejects a wrong one.
+            justification: |
+              Signing in with a local account and a session cookie is built on the cookie authentication, the
+              authorization, the antiforgery, and the password hasher of the framework, which is part of the same
+              shared framework as the web platform. The service depends on them to issue a safe session cookie, to
+              send anonymous users to the login page, to refuse forged form posts, and to store passwords only as
+              hashes. Passing tests of the sign-in code confirm that the framework does so.
+            tags: [ots]
+            tests:
+              - SignIn_Login_ValidCredentials_SetsSafeSessionCookieAndRedirects
+              - SignIn_ProtectedPage_Anonymous_RedirectsToLogin
+              - SignIn_PostWithoutAntiforgeryToken_IsRefusedAndSignsNobodyIn
+              - PasswordHasher_Verify_RightAndWrongPassword_OnlyRightSucceeds

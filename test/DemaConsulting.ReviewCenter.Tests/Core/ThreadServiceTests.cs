@@ -68,7 +68,7 @@ public class ThreadServiceTests
 
         // Act: start a whole-file thread
         var thread = await service.StartThreadAsync(
-            projectId, "rev-1", "a.txt", null, null, "Ann", "Looks odd", TestContext.Current.CancellationToken);
+            projectId, "rev-1", "a.txt", null, null, TestActors.Ann, "Looks odd", TestContext.Current.CancellationToken);
 
         // Assert: open, whole file, one comment, clock time, stored
         Assert.Equal("a.txt", thread.FilePath);
@@ -96,7 +96,7 @@ public class ThreadServiceTests
 
         // Act: start a thread on the range
         var thread = await service.StartThreadAsync(
-            projectId, "rev-1", "a.txt", start, end, "Ann", "Text", TestContext.Current.CancellationToken);
+            projectId, "rev-1", "a.txt", start, end, TestActors.Ann, "Text", TestContext.Current.CancellationToken);
 
         // Assert: the range is kept
         Assert.Equal(start, thread.StartLine);
@@ -125,9 +125,9 @@ public class ThreadServiceTests
 
         // Act: anchor to the last line, then one line beyond it
         var accepted = await service.StartThreadAsync(
-            project.Id, "rev-1", "f.txt", lines, lines, "Ann", "Text", TestContext.Current.CancellationToken);
+            project.Id, "rev-1", "f.txt", lines, lines, TestActors.Ann, "Text", TestContext.Current.CancellationToken);
         var exception = await Assert.ThrowsAsync<DomainRuleException>(() => service.StartThreadAsync(
-            project.Id, "rev-1", "f.txt", lines, lines + 1, "Ann", "Text", TestContext.Current.CancellationToken));
+            project.Id, "rev-1", "f.txt", lines, lines + 1, TestActors.Ann, "Text", TestContext.Current.CancellationToken));
 
         // Assert: the last line is inclusive, the next is refused
         Assert.Equal(lines, accepted.EndLine);
@@ -153,7 +153,7 @@ public class ThreadServiceTests
 
         // Act: start a thread with the invalid range
         var exception = await Assert.ThrowsAsync<DomainRuleException>(() => service.StartThreadAsync(
-            projectId, "rev-1", "a.txt", start, end, "Ann", "Text", TestContext.Current.CancellationToken));
+            projectId, "rev-1", "a.txt", start, end, TestActors.Ann, "Text", TestContext.Current.CancellationToken));
 
         // Assert: refused for the anchor and nothing stored
         Assert.Equal(DomainRule.ThreadAnchorInvalid, exception.Rule);
@@ -174,7 +174,7 @@ public class ThreadServiceTests
 
         // Act: start a thread on line 1 of the file
         var exception = await Assert.ThrowsAsync<DomainRuleException>(() => service.StartThreadAsync(
-            projectId, "rev-1", path, 1, 1, "Ann", "Text", TestContext.Current.CancellationToken));
+            projectId, "rev-1", path, 1, 1, TestActors.Ann, "Text", TestContext.Current.CancellationToken));
 
         // Assert: refused for the anchor and nothing stored
         Assert.Equal(DomainRule.ThreadAnchorInvalid, exception.Rule);
@@ -192,9 +192,9 @@ public class ThreadServiceTests
 
         // Act: start a whole-file thread on each
         var binary = await service.StartThreadAsync(
-            projectId, "rev-1", "bin.dat", null, null, "Ann", "Text", TestContext.Current.CancellationToken);
+            projectId, "rev-1", "bin.dat", null, null, TestActors.Ann, "Text", TestContext.Current.CancellationToken);
         var empty = await service.StartThreadAsync(
-            projectId, "rev-1", "empty.txt", null, null, "Ann", "Text", TestContext.Current.CancellationToken);
+            projectId, "rev-1", "empty.txt", null, null, TestActors.Ann, "Text", TestContext.Current.CancellationToken);
 
         // Assert: both are stored
         Assert.Equal("bin.dat", binary.FilePath);
@@ -212,11 +212,11 @@ public class ThreadServiceTests
 
         // Act: start threads on an unknown file, with a wrong case, and on an unknown review
         var unknownFile = await Assert.ThrowsAsync<DomainRuleException>(() => service.StartThreadAsync(
-            projectId, "rev-1", "nope.txt", null, null, "Ann", "Text", TestContext.Current.CancellationToken));
+            projectId, "rev-1", "nope.txt", null, null, TestActors.Ann, "Text", TestContext.Current.CancellationToken));
         var otherCase = await Assert.ThrowsAsync<DomainRuleException>(() => service.StartThreadAsync(
-            projectId, "rev-1", "A.TXT", null, null, "Ann", "Text", TestContext.Current.CancellationToken));
+            projectId, "rev-1", "A.TXT", null, null, TestActors.Ann, "Text", TestContext.Current.CancellationToken));
         var unknownReview = await Assert.ThrowsAsync<DomainRuleException>(() => service.StartThreadAsync(
-            projectId, "rev-9", "a.txt", null, null, "Ann", "Text", TestContext.Current.CancellationToken));
+            projectId, "rev-9", "a.txt", null, null, TestActors.Ann, "Text", TestContext.Current.CancellationToken));
 
         // Assert: all refused for the anchor and nothing stored
         Assert.Equal(DomainRule.ThreadAnchorInvalid, unknownFile.Rule);
@@ -226,29 +226,25 @@ public class ThreadServiceTests
     }
 
     /// <summary>
-    ///     Test that a blank or too long author is refused and the longest allowed one is accepted.
+    ///     Test that the comment records the user name and display name of the actor, and that a missing actor
+    ///     is refused.
     /// </summary>
     [Fact]
-    public async Task ThreadService_StartThreadAsync_BlankOrLongAuthor_ThrowsCommentAuthorInvalid()
+    public async Task ThreadService_StartThreadAsync_Actor_RecordsUsernameAndDisplayName()
     {
         // Arrange: a review with files
         var (store, service, projectId) = await CreateAsync();
 
-        // Act: start threads with a missing, blank and too long author, and one with the longest allowed
-        var missing = await Assert.ThrowsAsync<DomainRuleException>(() => service.StartThreadAsync(
-            projectId, "rev-1", "a.txt", null, null, null, "Text", TestContext.Current.CancellationToken));
-        var blank = await Assert.ThrowsAsync<DomainRuleException>(() => service.StartThreadAsync(
-            projectId, "rev-1", "a.txt", null, null, "   ", "Text", TestContext.Current.CancellationToken));
-        var tooLong = await Assert.ThrowsAsync<DomainRuleException>(() => service.StartThreadAsync(
-            projectId, "rev-1", "a.txt", null, null, new string('n', ReviewLimits.MaxAuthorLength + 1), "Text", TestContext.Current.CancellationToken));
-        var longest = await service.StartThreadAsync(
-            projectId, "rev-1", "a.txt", null, null, new string('n', ReviewLimits.MaxAuthorLength), "Text", TestContext.Current.CancellationToken);
+        // Act: start a thread as an actor, and without one
+        var thread = await service.StartThreadAsync(
+            projectId, "rev-1", "a.txt", null, null, TestActors.Ann, "Text", TestContext.Current.CancellationToken);
+        await Assert.ThrowsAsync<ArgumentNullException>(() => service.StartThreadAsync(
+            projectId, "rev-1", "a.txt", null, null, null!, "Text", TestContext.Current.CancellationToken));
 
-        // Assert: only the longest allowed author is stored
-        Assert.Equal(DomainRule.CommentAuthorInvalid, missing.Rule);
-        Assert.Equal(DomainRule.CommentAuthorInvalid, blank.Rule);
-        Assert.Equal(DomainRule.CommentAuthorInvalid, tooLong.Rule);
-        Assert.Equal(ReviewLimits.MaxAuthorLength, longest.Comments.Single().Author.Length);
+        // Assert: both names are stored and the refused call stored nothing
+        var comment = Assert.Single(thread.Comments);
+        Assert.Equal("ann", comment.AuthorUsername);
+        Assert.Equal("Ann", comment.Author);
         Assert.Single(store.Threads);
     }
 
@@ -263,13 +259,13 @@ public class ThreadServiceTests
 
         // Act: start threads with a missing, blank and too long text, and one with the longest allowed
         var missing = await Assert.ThrowsAsync<DomainRuleException>(() => service.StartThreadAsync(
-            projectId, "rev-1", "a.txt", null, null, "Ann", null, TestContext.Current.CancellationToken));
+            projectId, "rev-1", "a.txt", null, null, TestActors.Ann, null, TestContext.Current.CancellationToken));
         var blank = await Assert.ThrowsAsync<DomainRuleException>(() => service.StartThreadAsync(
-            projectId, "rev-1", "a.txt", null, null, "Ann", " \n ", TestContext.Current.CancellationToken));
+            projectId, "rev-1", "a.txt", null, null, TestActors.Ann, " \n ", TestContext.Current.CancellationToken));
         var tooLong = await Assert.ThrowsAsync<DomainRuleException>(() => service.StartThreadAsync(
-            projectId, "rev-1", "a.txt", null, null, "Ann", new string('t', ReviewLimits.MaxCommentLength + 1), TestContext.Current.CancellationToken));
+            projectId, "rev-1", "a.txt", null, null, TestActors.Ann, new string('t', ReviewLimits.MaxCommentLength + 1), TestContext.Current.CancellationToken));
         var longest = await service.StartThreadAsync(
-            projectId, "rev-1", "a.txt", null, null, "Ann", new string('t', ReviewLimits.MaxCommentLength), TestContext.Current.CancellationToken);
+            projectId, "rev-1", "a.txt", null, null, TestActors.Ann, new string('t', ReviewLimits.MaxCommentLength), TestContext.Current.CancellationToken);
 
         // Assert: only the longest allowed text is stored
         Assert.Equal(DomainRule.CommentTextInvalid, missing.Rule);
@@ -280,17 +276,17 @@ public class ThreadServiceTests
     }
 
     /// <summary>
-    ///     Test that author and text are stored without surrounding white space, keeping inner line breaks.
+    ///     Test that the text is stored without surrounding white space, keeping inner line breaks.
     /// </summary>
     [Fact]
-    public async Task ThreadService_StartThreadAsync_PaddedAuthorAndText_AreTrimmed()
+    public async Task ThreadService_StartThreadAsync_PaddedText_IsTrimmed()
     {
         // Arrange: a review with files
         var (_, service, projectId) = await CreateAsync();
 
-        // Act: start a thread with padded author and a multi-line text
+        // Act: start a thread with a multi-line text padded with white space
         var thread = await service.StartThreadAsync(
-            projectId, "rev-1", "a.txt", null, null, "  Ann  ", "\n  line one\nline two \n", TestContext.Current.CancellationToken);
+            projectId, "rev-1", "a.txt", null, null, TestActors.Ann, "\n  line one\nline two \n", TestContext.Current.CancellationToken);
 
         // Assert: trimmed at the ends only
         var comment = Assert.Single(thread.Comments);
@@ -308,15 +304,16 @@ public class ThreadServiceTests
         // Arrange: a resolved thread with its first comment
         var (store, service, projectId) = await CreateAsync();
         var thread = await service.StartThreadAsync(
-            projectId, "rev-1", "a.txt", null, null, "Ann", "First", TestContext.Current.CancellationToken);
+            projectId, "rev-1", "a.txt", null, null, TestActors.Ann, "First", TestContext.Current.CancellationToken);
         await service.ResolveAsync(projectId, "rev-1", thread.Id, TestContext.Current.CancellationToken);
 
         // Act: reply twice
-        var first = await service.ReplyAsync(projectId, "rev-1", thread.Id, " Bob ", " Second ", TestContext.Current.CancellationToken);
-        await service.ReplyAsync(projectId, "rev-1", thread.Id, "Cy", "Third", TestContext.Current.CancellationToken);
+        var first = await service.ReplyAsync(projectId, "rev-1", thread.Id, TestActors.Bob, " Second ", TestContext.Current.CancellationToken);
+        await service.ReplyAsync(projectId, "rev-1", thread.Id, TestActors.Cy, "Third", TestContext.Current.CancellationToken);
 
-        // Assert: the reply is trimmed and timed, the comments are in order, the state is unchanged
+        // Assert: the reply is trimmed, timed and attributed, the comments are in order, the state is unchanged
         Assert.Equal("Bob", first.Author);
+        Assert.Equal("bob", first.AuthorUsername);
         Assert.Equal("Second", first.Text);
         Assert.Equal(_now, first.Created);
         var stored = Assert.Single(store.Threads);
@@ -328,21 +325,20 @@ public class ThreadServiceTests
     ///     Test that an invalid reply is refused and adds nothing.
     /// </summary>
     [Fact]
-    public async Task ThreadService_ReplyAsync_InvalidAuthorOrText_ThrowsAndStoresNothing()
+    public async Task ThreadService_ReplyAsync_InvalidText_ThrowsAndStoresNothing()
     {
         // Arrange: a thread with its first comment
         var (store, service, projectId) = await CreateAsync();
         var thread = await service.StartThreadAsync(
-            projectId, "rev-1", "a.txt", null, null, "Ann", "First", TestContext.Current.CancellationToken);
+            projectId, "rev-1", "a.txt", null, null, TestActors.Ann, "First", TestContext.Current.CancellationToken);
 
-        // Act: reply with a blank author and with a blank text
-        var author = await Assert.ThrowsAsync<DomainRuleException>(
-            () => service.ReplyAsync(projectId, "rev-1", thread.Id, " ", "Text", TestContext.Current.CancellationToken));
+        // Act: reply with a blank text and without an actor
         var text = await Assert.ThrowsAsync<DomainRuleException>(
-            () => service.ReplyAsync(projectId, "rev-1", thread.Id, "Bob", " ", TestContext.Current.CancellationToken));
+            () => service.ReplyAsync(projectId, "rev-1", thread.Id, TestActors.Bob, " ", TestContext.Current.CancellationToken));
+        await Assert.ThrowsAsync<ArgumentNullException>(
+            () => service.ReplyAsync(projectId, "rev-1", thread.Id, null!, "Text", TestContext.Current.CancellationToken));
 
-        // Assert: the rules are named and the thread still has one comment
-        Assert.Equal(DomainRule.CommentAuthorInvalid, author.Rule);
+        // Assert: the rule is named and the thread still has one comment
         Assert.Equal(DomainRule.CommentTextInvalid, text.Rule);
         Assert.Single(Assert.Single(store.Threads).Comments);
     }
@@ -358,13 +354,13 @@ public class ThreadServiceTests
         await new ReviewService(store, new FixedTimeProvider(_now)).CreateDraftAsync(
             projectId, "rev-2", "Second", [new("a.txt", TestContent.A)], TestContext.Current.CancellationToken);
         var thread = await service.StartThreadAsync(
-            projectId, "rev-1", "a.txt", null, null, "Ann", "First", TestContext.Current.CancellationToken);
+            projectId, "rev-1", "a.txt", null, null, TestActors.Ann, "First", TestContext.Current.CancellationToken);
 
         // Act: reply to an unknown thread, and to the thread through the other review
         var unknown = await Assert.ThrowsAsync<DomainRuleException>(
-            () => service.ReplyAsync(projectId, "rev-1", 99, "Bob", "Text", TestContext.Current.CancellationToken));
+            () => service.ReplyAsync(projectId, "rev-1", 99, TestActors.Bob, "Text", TestContext.Current.CancellationToken));
         var otherReview = await Assert.ThrowsAsync<DomainRuleException>(
-            () => service.ReplyAsync(projectId, "rev-2", thread.Id, "Bob", "Text", TestContext.Current.CancellationToken));
+            () => service.ReplyAsync(projectId, "rev-2", thread.Id, TestActors.Bob, "Text", TestContext.Current.CancellationToken));
 
         // Assert: both refused and the thread is unchanged
         Assert.Equal(DomainRule.ThreadNotFound, unknown.Rule);
@@ -381,8 +377,8 @@ public class ThreadServiceTests
         // Arrange: a thread with a reply
         var (store, service, projectId) = await CreateAsync();
         var thread = await service.StartThreadAsync(
-            projectId, "rev-1", "a.txt", null, null, "Ann", "First", TestContext.Current.CancellationToken);
-        await service.ReplyAsync(projectId, "rev-1", thread.Id, "Bob", "Second", TestContext.Current.CancellationToken);
+            projectId, "rev-1", "a.txt", null, null, TestActors.Ann, "First", TestContext.Current.CancellationToken);
+        await service.ReplyAsync(projectId, "rev-1", thread.Id, TestActors.Bob, "Second", TestContext.Current.CancellationToken);
 
         // Act: resolve twice, then reopen twice
         await service.ResolveAsync(projectId, "rev-1", thread.Id, TestContext.Current.CancellationToken);
@@ -427,10 +423,10 @@ public class ThreadServiceTests
         // Arrange: threads on two files, one with a reply
         var (_, service, projectId) = await CreateAsync();
         var first = await service.StartThreadAsync(
-            projectId, "rev-1", "a.txt", 1, 1, "Ann", "One", TestContext.Current.CancellationToken);
+            projectId, "rev-1", "a.txt", 1, 1, TestActors.Ann, "One", TestContext.Current.CancellationToken);
         await service.StartThreadAsync(
-            projectId, "rev-1", "bin.dat", null, null, "Bob", "Two", TestContext.Current.CancellationToken);
-        await service.ReplyAsync(projectId, "rev-1", first.Id, "Cy", "Reply", TestContext.Current.CancellationToken);
+            projectId, "rev-1", "bin.dat", null, null, TestActors.Bob, "Two", TestContext.Current.CancellationToken);
+        await service.ReplyAsync(projectId, "rev-1", first.Id, TestActors.Cy, "Reply", TestContext.Current.CancellationToken);
 
         // Act: list the threads
         var threads = await service.ListAsync(projectId, "rev-1", TestContext.Current.CancellationToken);

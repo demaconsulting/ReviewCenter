@@ -22,14 +22,16 @@ be loadable on the test platform.
 - Review metadata is returned without file content, and an unknown review or file gives nothing.
 - A duplicate review key is reported as a duplicate review identifier.
 - A thread is stored with its anchor (whole file or line range), first comment, and state, and identities are
-  assigned by the database; comments are appended and read in posting order; the state can be changed back and
+  assigned by the database; comments are appended and read in posting order; each comment keeps the display name and
+  the user name of its author; the state can be changed back and
   forth; and an unknown thread, or a thread of another review, is reported as not found.
 - Threads are listed only for their own review, in creation order, and the database refuses a thread for a file
   that is not in the review.
 - A checklist snapshot is stored with its review and read back with its version; a review without one, and an
   unknown review, have none.
 - Answering a check again, or setting a section's applicability again, replaces the earlier row, so there is one
-  row per check and per section; outcome, name, and time are read back as saved, and only for their own review.
+  row per check and per section; outcome, display name, user name, and time are read back as saved, and only for
+  their own review.
 
 #### Test Scenarios
 
@@ -46,11 +48,13 @@ justification, and another check is answered N/A; two answers are listed and the
 justification. This scenario is tested by `ReviewStore_SetChecklistAnswer_UpsertsSingleRowPerItem`.
 
 **ReviewStore_SetChecklistSectionState_UpsertsSingleRowPerSection**: A section is stored as not applicable with a
-reason and then as applicable; one row is listed each time and holds the latest state. This scenario is tested by
+reason and then as applicable; one row is listed each time and holds the latest state, and the display name and
+user name of who set it. This scenario is tested by
 `ReviewStore_SetChecklistSectionState_UpsertsSingleRowPerSection`.
 
 **ReviewStore_ChecklistRows_RoundTripOutcomeAndTimestamps**: A check of one review is answered N/A; the outcome,
-name, and time are read back as saved, and the other review has no answers. This scenario is tested by
+display name, user name, and time are read back as saved, and the other review has no answers. This scenario is
+tested by
 `ReviewStore_ChecklistRows_RoundTripOutcomeAndTimestamps`.
 
 **ReviewStore_AddProjectAsync_ValidProject_RoundTrips**: A project is stored; it is read back with the same
@@ -92,7 +96,8 @@ review, return null. This scenario is tested by `ReviewStore_GetReviewAsync_Unkn
 
 **ReviewStore_AddThreadAsync_WholeFileAndRange_RoundTripsWithComments**: A whole-file thread and a range thread
 (each carrying an identity that must be ignored) are stored and listed; identities are assigned and growing, and
-the anchors, file path, state "Open", creation time, and first comment come back unchanged. This scenario is
+the anchors, file path, state "Open", creation time, and first comment (with the display name and user name of its
+author) come back unchanged. This scenario is
 tested by `ReviewStore_AddThreadAsync_WholeFileAndRange_RoundTripsWithComments`.
 
 **ReviewStore_AddCommentAsync_ExistingThread_AppendsInOrder**: Two comments are added to a thread; the stored

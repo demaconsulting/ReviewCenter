@@ -1,0 +1,115 @@
+@* UsersPage: user administration for administrators, at "/users".
+
+   Presentation only; state and event handling live in UsersPage.razor.cs. A list of all users with, per user,
+   the controls to disable or enable the account, to set the role and to set a new password, followed by the
+   form that creates a user. Access is limited to the Admin role by the attribute below. Every interactive
+   element and every key value carries a stable kebab-case data-testid (row-level ids carry the user id), and
+   the data-interactive marker on the root flips to "true" once the live circuit is connected. *@
+@page "/users"
+@using DemaConsulting.ReviewCenter.Identity
+@rendermode InteractiveServer
+@attribute [Authorize(Roles = SignIn.AdminRole)]
+
+<PageTitle>Users - ReviewCenter</PageTitle>
+
+<main class="page" data-testid="users-page" data-interactive="@InteractiveMarker">
+    <nav class="breadcrumb">
+        <a href="/" data-testid="home-link">ReviewCenter</a>
+    </nav>
+
+    <h1>Users</h1>
+
+    <section class="card">
+        <h2>All users</h2>
+        <ul class="item-list" data-testid="users-list">
+            @foreach (var user in Users)
+            {
+                var userId = user.Id;
+                var username = user.Username;
+                <li data-testid="user-row-@userId">
+                    <strong data-testid="user-username-@userId">@user.Username</strong>
+                    <span class="muted" data-testid="user-display-name-@userId">@user.DisplayName</span>
+                    <span class="badge" data-testid="user-role-@userId">@user.Role</span>
+                    <span class="badge" data-testid="user-enabled-@userId">@(user.Enabled ? "Enabled" : "Disabled")</span>
+                    <button type="button" class="row-action" data-testid="user-toggle-enabled-@userId"
+                            @onclick="() => ToggleEnabledAsync(user)">@(user.Enabled ? "Disable" : "Enable")</button>
+                    <div class="inline-form user-controls">
+                        <select aria-label="Role of @username" data-testid="user-role-select-@userId"
+                                @bind:get="RoleChoice(user)" @bind:set="value => RoleChoices[userId] = value">
+                            @foreach (var role in Enum.GetValues<UserRole>())
+                            {
+                                <option value="@role">@role</option>
+                            }
+                        </select>
+                        <button type="button" data-testid="user-set-role-@userId"
+                                @onclick="() => SetRoleAsync(user)">Set role</button>
+                        <input type="password" autocomplete="new-password" aria-label="New password for @username"
+                               placeholder="New password (at least @ReviewLimits.MinPasswordLength characters)"
+                               maxlength="@ReviewLimits.MaxPasswordLength"
+                               data-testid="user-password-input-@userId"
+                               @bind:get="PasswordChoice(userId)" @bind:set="value => SetPasswordChoice(userId, value)"
+                               @bind:event="oninput" />
+                        <button type="button" data-testid="user-set-password-@userId"
+                                @onclick="() => SetPasswordAsync(user)">Set password</button>
+                    </div>
+                    @if (MessageUserId == userId)
+                    {
+                        if (ErrorMessage is not null)
+                        {
+                            <p class="error" role="alert" data-testid="users-error">@ErrorMessage</p>
+                        }
+                        if (StatusMessage is not null)
+                        {
+                            <p class="notice" role="status" data-testid="users-status">@StatusMessage</p>
+                        }
+                    }
+                </li>
+            }
+        </ul>
+    </section>
+
+    <section class="card">
+        <h2>New user</h2>
+        @if (MessageUserId is null)
+        {
+            if (ErrorMessage is not null)
+            {
+                <p class="error" role="alert" data-testid="users-error">@ErrorMessage</p>
+            }
+            if (StatusMessage is not null)
+            {
+                <p class="notice" role="status" data-testid="users-status">@StatusMessage</p>
+            }
+        }
+        <form data-testid="new-user-form" @onsubmit="CreateUserAsync">
+            <div class="field">
+                <label for="new-user-username">User name</label>
+                <input id="new-user-username" type="text" maxlength="@ReviewLimits.MaxUsernameLength"
+                       autocomplete="off"
+                       data-testid="new-user-username-input" @bind="NewUsername" @bind:event="oninput" />
+            </div>
+            <div class="field">
+                <label for="new-user-display-name">Display name</label>
+                <input id="new-user-display-name" type="text" maxlength="@ReviewLimits.MaxDisplayNameLength"
+                       data-testid="new-user-display-name-input" @bind="NewDisplayName" @bind:event="oninput" />
+            </div>
+            <div class="field">
+                <label for="new-user-role">Role</label>
+                <select id="new-user-role" data-testid="new-user-role-select" @bind="NewRole">
+                    @foreach (var role in Enum.GetValues<UserRole>())
+                    {
+                        <option value="@role">@role</option>
+                    }
+                </select>
+            </div>
+            <div class="field">
+                <label for="new-user-password">Initial password</label>
+                <input id="new-user-password" type="password" autocomplete="new-password"
+                       maxlength="@ReviewLimits.MaxPasswordLength"
+                       data-testid="new-user-password-input" @bind="NewPassword" @bind:event="oninput" />
+                <p class="muted hint">At least @ReviewLimits.MinPasswordLength characters.</p>
+            </div>
+            <button type="submit" data-testid="create-user-button">Create user</button>
+        </form>
+    </section>
+</main>

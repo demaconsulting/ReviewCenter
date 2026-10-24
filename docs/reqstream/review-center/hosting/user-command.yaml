@@ -1,0 +1,46 @@
+---
+# Software Unit Requirements for the UserCommand Class
+#
+# The UserCommand class runs the user add verb: it creates a user in the configured database, with the password
+# taken from the environment, from redirected standard input, or from a prompt, and reports the outcome.
+
+sections:
+  - title: UserCommand Unit Requirements
+    requirements:
+      - id: ReviewCenter-UserCommand-Create
+        title: >-
+          The UserCommand class shall create a user with the given user name, display name, and role, using
+          Reviewer when no role is given, in the configured database, and shall report the created user name and
+          role without printing the password.
+        justification: |
+          Creating the first administrator is the way into a new installation, and a message that echoed the
+          password would put it in logs and terminal history.
+        tests:
+          - UserCommand_Run_ValidUser_CreatesUserAndReportsItWithoutPassword
+          - UserCommand_Run_NoRole_CreatesReviewer
+          - UserCommand_Run_NullContext_ThrowsArgumentNullException
+
+      - id: ReviewCenter-UserCommand-Password
+        title: >-
+          The UserCommand class shall take the password from the REVIEWCENTER_PASSWORD environment variable, or
+          else from the first line of redirected standard input, or else from a prompt that is asked twice, never
+          from a command line option, and shall report an error with exit code 1 when no password is obtained.
+        justification: |
+          A password on the command line is visible to other processes and is kept in shell history. An
+          environment variable and standard input suit scripts, and a prompt suits a person.
+        tests:
+          - UserCommand_Run_NoPassword_ReportsErrorWithExitCodeOne
+          - ReviewCenter_UserAddVerb_PasswordFromEnvironment_CreatesUserThenRejectsDuplicate
+          - ReviewCenter_UserAddVerb_NoPassword_ReturnsError
+          - Context_Create_PasswordOption_IsNotSupported
+
+      - id: ReviewCenter-UserCommand-Errors
+        title: >-
+          The UserCommand class shall report a user name that is taken, a password that is too short, or any other
+          rule violation as an error with exit code 1, creating nothing.
+        justification: |
+          Scripts rely on the exit code to notice that the user was not created, and the message must tell the
+          operator what to change.
+        tests:
+          - UserCommand_Run_UserNameTaken_ReportsErrorWithExitCodeOne
+          - UserCommand_Run_PasswordTooShort_ReportsErrorAndCreatesNothing

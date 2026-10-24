@@ -1,0 +1,71 @@
+---
+# Identity Subsystem Requirements
+#
+# PURPOSE:
+# - Define requirements for the ReviewCenter Identity subsystem
+# - The Identity subsystem spans PasswordHasher.cs (the password hash adapter) and the sign-in code (cookie
+#   sign-in, the login and logout endpoints, the authorization policy, and the actor of the signed-in user)
+# - Subsystem requirements describe the externally visible behavior of signing in, authorization, and the
+#   identity of the person who acts
+
+sections:
+  - title: Identity Subsystem Requirements
+    requirements:
+      - id: ReviewCenter-Identity-Login
+        title: >-
+          The Identity subsystem shall let a user sign in with the user name and password of an enabled account,
+          answer every failed sign-in alike, keep the user signed in with a safe session cookie, protect the
+          sign-in and sign-out requests against forgery, let the user sign out, and keep a return address only
+          when it is local.
+        justification: |
+          Signing in is the basis of attributable review actions. One answer for every failure does not help
+          somebody guessing user names, a cookie that scripts cannot read and other sites cannot send limits
+          theft and forgery of the session, and a local-only return address stops the login page from sending
+          users to another site.
+        children:
+          - ReviewCenter-SignIn-Login
+          - ReviewCenter-SignIn-LoginFailure
+          - ReviewCenter-SignIn-ReturnUrl
+          - ReviewCenter-SignIn-Cookie
+          - ReviewCenter-SignIn-Antiforgery
+          - ReviewCenter-SignIn-Logout
+          - ReviewCenter-PasswordHasher-HashVerify
+        tests:
+          - IdentitySubsystem_SignInJourney_LoginUseAndLogout_WorksEndToEnd
+
+      - id: ReviewCenter-Identity-Authorization
+        title: >-
+          The Identity subsystem shall send a request without a signed-in user to the login page for every page
+          except the home page and the login page, and shall refuse the user administration page to a user who
+          is not an administrator.
+        justification: |
+          Review data must only be reached by identified users, and managing users is limited to
+          administrators. Closing pages by default means a new page cannot be left open by mistake.
+        children:
+          - ReviewCenter-SignIn-Protected
+          - ReviewCenter-SignIn-AdminOnly
+        tests:
+          - IdentitySubsystem_SignInJourney_LoginUseAndLogout_WorksEndToEnd
+
+      - id: ReviewCenter-Identity-Session
+        title: >-
+          The Identity subsystem shall check on every request that the user of the session cookie still exists, is
+          enabled, and has the same role as at sign-in, and shall treat the session as ended when that is not so.
+        justification: |
+          Disabling a user or changing the role must take effect at once, not when the session cookie runs out.
+        children:
+          - ReviewCenter-SignIn-SessionValidation
+        tests:
+          - IdentitySubsystem_SignInJourney_LoginUseAndLogout_WorksEndToEnd
+
+      - id: ReviewCenter-Identity-Actor
+        title: >-
+          The Identity subsystem shall provide the signed-in user as the actor, with user name and display name,
+          for the services that record who acted, and shall fail when nobody is signed in.
+        justification: |
+          Taking the person who acts from the sign-in, and never from a form field, means nobody can act in the
+          name of somebody else, and an action without a user cannot be recorded by mistake.
+        children:
+          - ReviewCenter-SignIn-Actor
+        tests:
+          - IdentitySubsystem_SignInJourney_LoginUseAndLogout_WorksEndToEnd

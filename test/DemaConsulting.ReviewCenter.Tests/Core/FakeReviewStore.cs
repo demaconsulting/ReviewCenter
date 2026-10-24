@@ -310,6 +310,7 @@ internal sealed class FakeReviewStore : IReviewStore
             Id = _nextCommentId++,
             ThreadId = threadId,
             Author = comment.Author,
+            AuthorUsername = comment.AuthorUsername,
             Text = comment.Text,
             Created = comment.Created
         };

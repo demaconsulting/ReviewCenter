@@ -212,6 +212,64 @@ reviews:
       - "src/**/Hosting/ServerHostOptions.cs"
       - "test/**/Hosting/ServerHostTests.cs"
 
+  - id: ReviewCenter-Hosting-UserCommand
+    title: Review of ReviewCenter UserCommand unit implementation
+    context:
+      - docs/design/review-center.md
+      - docs/reqstream/review-center.yaml
+      - docs/design/review-center/hosting.md
+      - docs/reqstream/review-center/hosting.yaml
+    paths:
+      - "docs/reqstream/review-center/hosting/user-command.yaml"
+      - "docs/design/review-center/hosting/user-command.md"
+      - "docs/verification/review-center/hosting/user-command.md"
+      - "src/**/Hosting/UserCommand.cs"
+      - "test/**/Hosting/UserCommandTests.cs"
+
+  # ReviewCenter - Identity
+  - id: ReviewCenter-Identity
+    title: Review of ReviewCenter Identity subsystem architecture and interfaces
+    context:
+      - docs/design/review-center.md
+      - docs/reqstream/review-center.yaml
+    paths:
+      - "docs/reqstream/review-center/identity.yaml"
+      - "docs/design/review-center/identity.md"
+      - "docs/verification/review-center/identity.md"
+      - "test/**/Identity/IdentitySubsystemTests.cs"
+      - "test/**/TestBrowser.cs"
+      - "test/**/TestWebApp.cs"
+      - "test/**/TestDatabase.cs"
+
+  - id: ReviewCenter-Identity-PasswordHasher
+    title: Review of ReviewCenter PasswordHasher unit implementation
+    context:
+      - docs/design/review-center.md
+      - docs/reqstream/review-center.yaml
+      - docs/design/review-center/identity.md
+      - docs/reqstream/review-center/identity.yaml
+    paths:
+      - "docs/reqstream/review-center/identity/password-hasher.yaml"
+      - "docs/design/review-center/identity/password-hasher.md"
+      - "docs/verification/review-center/identity/password-hasher.md"
+      - "src/**/Identity/PasswordHasher.cs"
+      - "test/**/Identity/PasswordHasherTests.cs"
+
+  - id: ReviewCenter-Identity-SignIn
+    title: Review of ReviewCenter SignIn unit implementation
+    context:
+      - docs/design/review-center.md
+      - docs/reqstream/review-center.yaml
+      - docs/design/review-center/identity.md
+      - docs/reqstream/review-center/identity.yaml
+    paths:
+      - "docs/reqstream/review-center/identity/sign-in.yaml"
+      - "docs/design/review-center/identity/sign-in.md"
+      - "docs/verification/review-center/identity/sign-in.md"
+      - "src/**/Identity/SignIn.cs"
+      - "src/**/Identity/AuthOptions.cs"
+      - "test/**/Identity/SignInTests.cs"
+
   # ReviewCenter - Web
   - id: ReviewCenter-Web
     title: Review of ReviewCenter Web subsystem architecture and interfaces
@@ -239,6 +297,8 @@ reviews:
       - "src/**/Web/App.razor"
       - "src/**/Web/Routes.razor"
       - "src/**/Web/_Imports.razor"
+      - "src/**/Web/MainLayout.razor"
+      - "src/**/Web/MainLayout.razor.cs"
       - "test/**/Web/AppTests.cs"
 
   - id: ReviewCenter-Web-HomePage
@@ -317,6 +377,50 @@ reviews:
       - "src/**/Web/ChecklistPage.razor.cs"
       - "test/**/Web/ChecklistPageTests.cs"
 
+  - id: ReviewCenter-Web-LoginPage
+    title: Review of ReviewCenter LoginPage unit implementation
+    context:
+      - docs/design/review-center.md
+      - docs/reqstream/review-center.yaml
+      - docs/design/review-center/web.md
+      - docs/reqstream/review-center/web.yaml
+    paths:
+      - "docs/reqstream/review-center/web/login-page.yaml"
+      - "docs/design/review-center/web/login-page.md"
+      - "docs/verification/review-center/web/login-page.md"
+      - "src/**/Web/LoginPage.razor"
+      - "src/**/Web/LoginPage.razor.cs"
+
+  - id: ReviewCenter-Web-AccountPage
+    title: Review of ReviewCenter AccountPage unit implementation
+    context:
+      - docs/design/review-center.md
+      - docs/reqstream/review-center.yaml
+      - docs/design/review-center/web.md
+      - docs/reqstream/review-center/web.yaml
+    paths:
+      - "docs/reqstream/review-center/web/account-page.yaml"
+      - "docs/design/review-center/web/account-page.md"
+      - "docs/verification/review-center/web/account-page.md"
+      - "src/**/Web/AccountPage.razor"
+      - "src/**/Web/AccountPage.razor.cs"
+      - "test/**/Web/AccountPageTests.cs"
+
+  - id: ReviewCenter-Web-UsersPage
+    title: Review of ReviewCenter UsersPage unit implementation
+    context:
+      - docs/design/review-center.md
+      - docs/reqstream/review-center.yaml
+      - docs/design/review-center/web.md
+      - docs/reqstream/review-center/web.yaml
+    paths:
+      - "docs/reqstream/review-center/web/users-page.yaml"
+      - "docs/design/review-center/web/users-page.md"
+      - "docs/verification/review-center/web/users-page.md"
+      - "src/**/Web/UsersPage.razor"
+      - "src/**/Web/UsersPage.razor.cs"
+      - "test/**/Web/UsersPageTests.cs"
+
   # ReviewCenter - Core
   - id: ReviewCenter-Core
     title: Review of ReviewCenter Core subsystem architecture and interfaces
@@ -329,6 +433,7 @@ reviews:
       - "docs/verification/review-center/core.md"
       - "test/**/Core/CoreSubsystemTests.cs"
       - "test/**/Core/FakeReviewStore.cs"
+      - "test/**/Core/FakeUserStore.cs"
       - "test/**/Core/TestContent.cs"
 
   - id: ReviewCenter-Core-Fingerprint
@@ -421,6 +526,25 @@ reviews:
       - "src/DemaConsulting.ReviewCenter.Core/ChecklistProgress.cs"
       - "test/**/Core/ChecklistServiceTests.cs"
 
+  - id: ReviewCenter-Core-UserService
+    title: Review of ReviewCenter UserService unit implementation
+    context:
+      - docs/design/review-center.md
+      - docs/reqstream/review-center.yaml
+      - docs/design/review-center/core.md
+      - docs/reqstream/review-center/core.yaml
+    paths:
+      - "docs/reqstream/review-center/core/user-service.yaml"
+      - "docs/design/review-center/core/user-service.md"
+      - "docs/verification/review-center/core/user-service.md"
+      - "src/DemaConsulting.ReviewCenter.Core/UserService.cs"
+      - "src/DemaConsulting.ReviewCenter.Core/User.cs"
+      - "src/DemaConsulting.ReviewCenter.Core/UserRole.cs"
+      - "src/DemaConsulting.ReviewCenter.Core/Actor.cs"
+      - "src/DemaConsulting.ReviewCenter.Core/IUserStore.cs"
+      - "src/DemaConsulting.ReviewCenter.Core/IPasswordHasher.cs"
+      - "test/**/Core/UserServiceTests.cs"
+
   # ReviewCenter - Storage
   - id: ReviewCenter-Storage
     title: Review of ReviewCenter Storage subsystem architecture and interfaces
@@ -460,6 +584,20 @@ reviews:
       - "docs/verification/review-center/storage/review-store.md"
       - "src/**/Storage/ReviewStore.cs"
       - "test/**/Storage/ReviewStoreTests.cs"
+
+  - id: ReviewCenter-Storage-UserStore
+    title: Review of ReviewCenter UserStore unit implementation
+    context:
+      - docs/design/review-center.md
+      - docs/reqstream/review-center.yaml
+      - docs/design/review-center/storage.md
+      - docs/reqstream/review-center/storage.yaml
+    paths:
+      - "docs/reqstream/review-center/storage/user-store.yaml"
+      - "docs/design/review-center/storage/user-store.md"
+      - "docs/verification/review-center/storage/user-store.md"
+      - "src/**/Storage/UserStore.cs"
+      - "test/**/Storage/UserStoreTests.cs"
 
   - id: ReviewCenter-Storage-DatabaseSetup
     title: Review of ReviewCenter DatabaseSetup unit implementation

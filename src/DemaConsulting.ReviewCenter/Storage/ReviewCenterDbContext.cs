@@ -24,15 +24,15 @@ using Microsoft.EntityFrameworkCore;
 namespace DemaConsulting.ReviewCenter.Storage;
 
 /// <summary>
-///     The Entity Framework Core model of the ReviewCenter database: projects, reviews, review files, the
+///     The Entity Framework Core model of the ReviewCenter database: users, projects, reviews, review files, the
 ///     comment threads of a review with their comments, and the review checklist (frozen snapshot, section
 ///     applicability and answers).
 /// </summary>
 /// <remarks>
 ///     The model maps the Core entities as they are, so Core stays free of any database library.
 ///     The schema is created with <c>EnsureCreated</c> (see <see cref="DatabaseSetup"/>); there are no
-///     migrations yet, so a database created before threads or checklists existed does not gain their
-///     tables and must be recreated. Instances are short-lived and not thread-safe: create one per operation
+///     migrations yet, so a database created before users, threads or checklists existed does not gain their
+///     tables or columns and must be deleted and recreated. Instances are short-lived and not thread-safe: create one per operation
 ///     through <see cref="IDbContextFactory{TContext}"/>.
 /// </remarks>
 internal sealed class ReviewCenterDbContext : DbContext
@@ -107,6 +107,11 @@ internal sealed class ReviewCenterDbContext : DbContext
     public DbSet<ChecklistAnswer> ChecklistAnswers => Set<ChecklistAnswer>();
 
     /// <summary>
+    ///     Gets the users table.
+    /// </summary>
+    public DbSet<User> Users => Set<User>();
+
+    /// <summary>
     ///     Configures keys, relationships, length limits and conversions.
     /// </summary>
     /// <param name="modelBuilder">The builder used to describe the model.</param>
@@ -170,11 +175,25 @@ internal sealed class ReviewCenterDbContext : DbContext
                 .OnDelete(DeleteBehavior.Cascade);
         });
 
+        // Users: identity assigned by the database; the user name is unique without regard to case (the NOCASE
+        // collation makes the unique index and every lookup case-insensitive); the role is stored by name
+        modelBuilder.Entity<User>(user =>
+        {
+            user.HasKey(u => u.Id);
+            user.Property(u => u.Username).IsRequired().HasMaxLength(ReviewLimits.MaxUsernameLength)
+                .UseCollation("NOCASE");
+            user.HasIndex(u => u.Username).IsUnique();
+            user.Property(u => u.DisplayName).IsRequired().HasMaxLength(ReviewLimits.MaxDisplayNameLength);
+            user.Property(u => u.Role).HasConversion<string>().HasMaxLength(StateColumnLength);
+            user.Property(u => u.PasswordHash).IsRequired();
+        });
+
         // Comments: identity assigned by the database, so it grows with posting order
         modelBuilder.Entity<ReviewComment>(comment =>
         {
             comment.HasKey(c => c.Id);
             comment.Property(c => c.Author).IsRequired().HasMaxLength(ReviewLimits.MaxAuthorLength);
+            comment.Property(c => c.AuthorUsername).IsRequired().HasMaxLength(ReviewLimits.MaxUsernameLength);
             comment.Property(c => c.Text).IsRequired().HasMaxLength(ReviewLimits.MaxCommentLength);
         });
 
@@ -201,6 +220,7 @@ internal sealed class ReviewCenterDbContext : DbContext
             section.Property(s => s.SectionId).HasMaxLength(ChecklistIdColumnLength);
             section.Property(s => s.Reason).HasMaxLength(ReviewLimits.MaxJustificationLength);
             section.Property(s => s.SetBy).IsRequired().HasMaxLength(ReviewLimits.MaxAuthorLength);
+            section.Property(s => s.SetByUsername).IsRequired().HasMaxLength(ReviewLimits.MaxUsernameLength);
             section.HasOne<Review>()
                 .WithMany()
                 .HasForeignKey(s => new { s.ProjectId, s.ReviewId })
@@ -215,6 +235,7 @@ internal sealed class ReviewCenterDbContext : DbContext
             answer.Property(a => a.Outcome).HasConversion<string>().HasMaxLength(StateColumnLength);
             answer.Property(a => a.Justification).HasMaxLength(ReviewLimits.MaxJustificationLength);
             answer.Property(a => a.AnsweredBy).IsRequired().HasMaxLength(ReviewLimits.MaxAuthorLength);
+            answer.Property(a => a.AnsweredByUsername).IsRequired().HasMaxLength(ReviewLimits.MaxUsernameLength);
             answer.HasOne<Review>()
                 .WithMany()
                 .HasForeignKey(a => new { a.ProjectId, a.ReviewId })

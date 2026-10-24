@@ -28,3 +28,28 @@ sections:
         tests:
           - Routes_Render_RootUrl_RendersHomePage
           - Routes_Render_UnknownUrl_ShowsNotFoundMessage
+
+      - id: ReviewCenter-App-Header
+        title: >-
+          The App unit shall show in the header of every page the display name of the signed-in user, a link
+          to the account page, and a logout button, or a sign-in link when nobody is signed in.
+        justification: |
+          Users need to see who they are signed in as, and to sign in or out from wherever they are, without
+          searching for a page.
+        tests:
+          - MainLayout_Render_SignedInUser_ShowsNameAccountAndLogout
+          - MainLayout_Render_NobodySignedIn_ShowsSignInLink
+
+      - id: ReviewCenter-App-RouteAuthorization
+        title: >-
+          The App unit shall apply the authorization rules of a page when the user navigates to it inside an open
+          interactive session, showing a signed-in user without the needed role an access denied message and a
+          signed-out user a link to the login page, without rendering the page.
+        justification: |
+          The endpoint check runs only for requests to the server; navigation inside an open interactive session
+          does not make such a request, so without this rule a reviewer could open the user administration page
+          and a signed-out user could open a protected page.
+        tests:
+          - Routes_Render_ReviewerOpensUsersRoute_ShowsAccessDeniedNotUserList
+          - Routes_Render_AdminOpensUsersRoute_ShowsUsersPage
+          - Routes_Render_AnonymousOpensProjectsRoute_ShowsLoginLinkNotPage

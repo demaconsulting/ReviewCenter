@@ -23,6 +23,8 @@ N/A - standard test environment.
   are used.
 - The `serve` verb and the `--urls` option flow from `Context.Create` through `Program.Run` to a
   server that answers on the requested address, and `--urls` without `serve` is rejected.
+- The `user add` verb and its options flow from `Context.Create` into the `Context`, the help text documents them
+  and the password sources, and misuse is rejected.
 
 ### Test Scenarios
 
@@ -98,3 +100,10 @@ tested by `CliSubsystem_ServeFlow_ContextAndProgram_ServesOnRequestedUrlAndStops
 `["--urls", "http://127.0.0.1:6001"]` are passed to `Context.Create`; an `ArgumentException` is
 thrown because `--urls` requires the `serve` verb. This scenario is tested by
 `CliSubsystem_UrlsWithoutServe_Context_RejectsArgumentCombination`.
+
+**CliSubsystem_UserAddFlow_ContextAndProgram_ParsesOptionsDocumentsThemAndRejectsMisuse**: Arguments `["user",
+"add", "--username", "ann", "--display-name", "Ann", "--role", "Admin"]` are parsed by `Context.Create`, which
+records the verb and the three options. `Program.Run` with `--help` prints a help text that names `user add` and the
+`REVIEWCENTER_PASSWORD` variable, `user add` without names is rejected, and `--username` without the verb is
+rejected, each with an `ArgumentException`. This scenario is tested by
+`CliSubsystem_UserAddFlow_ContextAndProgram_ParsesOptionsDocumentsThemAndRejectsMisuse`.

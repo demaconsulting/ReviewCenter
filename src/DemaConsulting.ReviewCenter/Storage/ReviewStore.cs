@@ -359,6 +359,7 @@ internal sealed class ReviewStore(IDbContextFactory<ReviewCenterDbContext> facto
                 s => s.SetProperty(x => x.Applicable, state.Applicable)
                     .SetProperty(x => x.Reason, state.Reason)
                     .SetProperty(x => x.SetBy, state.SetBy)
+                    .SetProperty(x => x.SetByUsername, state.SetByUsername)
                     .SetProperty(x => x.SetAt, state.SetAt),
                 cancellationToken);
     }
@@ -381,6 +382,7 @@ internal sealed class ReviewStore(IDbContextFactory<ReviewCenterDbContext> facto
                 s => s.SetProperty(x => x.Outcome, answer.Outcome)
                     .SetProperty(x => x.Justification, answer.Justification)
                     .SetProperty(x => x.AnsweredBy, answer.AnsweredBy)
+                    .SetProperty(x => x.AnsweredByUsername, answer.AnsweredByUsername)
                     .SetProperty(x => x.AnsweredAt, answer.AnsweredAt),
                 cancellationToken);
     }
@@ -397,6 +399,7 @@ internal sealed class ReviewStore(IDbContextFactory<ReviewCenterDbContext> facto
         {
             ThreadId = threadId,
             Author = comment.Author,
+            AuthorUsername = comment.AuthorUsername,
             Text = comment.Text,
             Created = comment.Created
         };

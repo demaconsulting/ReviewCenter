@@ -507,4 +507,42 @@ public class CliSubsystemTests
         // Assert: the combination is rejected during parsing
         Assert.IsType<ArgumentException>(exception);
     }
+
+    /// <summary>
+    ///     Test that Context and Program work together for the user add verb: the verb and its options are
+    ///     parsed, the help text documents them, and misuse is rejected during parsing.
+    /// </summary>
+    [Fact]
+    public void CliSubsystem_UserAddFlow_ContextAndProgram_ParsesOptionsDocumentsThemAndRejectsMisuse()
+    {
+        // Arrange: capture console output for the help text
+        var originalOut = Console.Out;
+        try
+        {
+            using var outWriter = new StringWriter();
+            Console.SetOut(outWriter);
+
+            // Act: parse the verb, print the help, and parse two misuses
+            using var context = Context.Create(["user", "add", "--username", "ann", "--display-name", "Ann", "--role", "Admin"]);
+            using var help = Context.Create(["--help"]);
+            Program.Run(help);
+            var noName = Record.Exception(() => Context.Create(["user", "add"]));
+            var strayOption = Record.Exception(() => Context.Create(["--username", "ann"]));
+
+            // Assert: the options are recorded, the help documents them, and the misuse is refused
+            Assert.True(context.UserAdd);
+            Assert.Equal("ann", context.Username);
+            Assert.Equal("Ann", context.DisplayName);
+            Assert.Equal(DemaConsulting.ReviewCenter.Core.UserRole.Admin, context.Role);
+            var output = outWriter.ToString();
+            Assert.Contains("user add", output);
+            Assert.Contains("REVIEWCENTER_PASSWORD", output);
+            Assert.IsType<ArgumentException>(noName);
+            Assert.IsType<ArgumentException>(strayOption);
+        }
+        finally
+        {
+            Console.SetOut(originalOut);
+        }
+    }
 }

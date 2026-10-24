@@ -120,8 +120,8 @@ internal static class Program
     /// </param>
     /// <remarks>
     ///     Dispatch is priority-ordered: version check first, then help, then self-validation,
-    ///     then the serve verb, then the default tool logic. Only the highest-priority matching
-    ///     action is executed per invocation. The <c>serve</c> action blocks until the server stops.
+    ///     then the serve verb, then the user add verb, then the default tool logic. Only the highest-priority
+    ///     matching action is executed per invocation. The <c>serve</c> action blocks until the server stops.
     ///     A distinct method name (rather than an overload of <see cref="Run(Context)"/>) keeps
     ///     the common call site simple.
     /// </remarks>
@@ -160,7 +160,14 @@ internal static class Program
             return;
         }
 
-        // Priority 5: Default tool functionality
+        // Priority 5: Create a user
+        if (context.UserAdd)
+        {
+            UserCommand.Run(context);
+            return;
+        }
+
+        // Priority 6: Default tool functionality
         RunToolLogic(context);
     }
 
@@ -183,9 +190,12 @@ internal static class Program
     {
         context.WriteLine("Usage: reviewcenter [options]");
         context.WriteLine("       reviewcenter serve [--urls <url>] [options]");
+        context.WriteLine("       reviewcenter user add --username <name> --display-name <text> [--role <role>] [options]");
         context.WriteLine("");
         context.WriteLine("Verbs:");
         context.WriteLine("  serve                      Run the ReviewCenter web server until stopped");
+        context.WriteLine("  user add                   Create a user; the password is read from the REVIEWCENTER_PASSWORD");
+        context.WriteLine("                             environment variable, else standard input, else a prompt");
         context.WriteLine("");
         context.WriteLine("Options:");
         context.WriteLine("  -v, --version              Display version information");
@@ -196,6 +206,9 @@ internal static class Program
         context.WriteLine("  --depth <#>                Set heading depth for markdown output (default: 1)");
         context.WriteLine("  --log <file>               Write output to log file");
         context.WriteLine("  --urls <url>               URL for 'serve' to listen on (default: http://localhost:5000)");
+        context.WriteLine("  --username <name>          User name for 'user add' (3-50 letters, digits, '.', '_' or '-')");
+        context.WriteLine("  --display-name <text>      Display name for 'user add'");
+        context.WriteLine("  --role <Admin|Reviewer>    Role for 'user add' (default: Reviewer)");
     }
 
     /// <summary>

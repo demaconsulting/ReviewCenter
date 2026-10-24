@@ -35,7 +35,7 @@ namespace DemaConsulting.ReviewCenter.Web;
 ///     than the domain accepts. Browsers give a file input only the file name, so the path of an uploaded
 ///     file is its name and two files with the same name are rejected as duplicates by the service. Each
 ///     browser connection (circuit) gets its own page instance, so the state here is per-user and needs no
-///     synchronization. There is no authentication yet: every visitor is the same anonymous operator.
+///     synchronization. The page requires a signed-in user.
 /// </remarks>
 public partial class ProjectPage : ComponentBase
 {

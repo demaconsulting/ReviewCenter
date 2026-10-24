@@ -25,6 +25,10 @@ This document covers the verification design for the following software items:
     - **Context** — argument parser and I/O owner
   - **Hosting** subsystem
     - **ServerHost** — web host builder and runner
+    - **UserCommand** — the `user add` verb
+  - **Identity** subsystem
+    - **PasswordHasher** — password hashing and verification
+    - **SignIn** — cookie sign-in, authorization, and the signed-in actor
   - **Web** subsystem
     - **App** — HTML shell and router
     - **HomePage** — home page component
@@ -32,15 +36,20 @@ This document covers the verification design for the following software items:
     - **ProjectPage** — project page with review creation from uploaded files
     - **ReviewPage** — review, fingerprint, files, file content, and comment threads page
     - **ChecklistPage** — review checklist page
+    - **LoginPage** — sign-in page
+    - **AccountPage** — password change page of the signed-in user
+    - **UsersPage** — user administration page
   - **Core** subsystem
     - **Fingerprint** — ReviewMark-compatible content fingerprint
     - **ProjectService** — project rules
     - **ReviewService** — review rules
     - **ThreadService** — review comment rules
     - **ChecklistService** — review checklist rules, default checklist, and progress
+    - **UserService** — user, password, lockout, and last administrator rules
   - **Storage** subsystem
     - **ReviewCenterDbContext** — database schema mapping
     - **ReviewStore** — database implementation of the store interface
+    - **UserStore** — database implementation of the user store interface
     - **DatabaseSetup** — provider selection, connection resolution, and database creation
   - **SelfTest** subsystem
     - **Validation** — self-validation test runner
@@ -82,14 +91,15 @@ The following topics are out of scope:
 ## Folder Layout
 
 The test folder structure mirrors the source subsystem breakdown. The Core subsystem has its own source project
-but its tests are in the main test project, in the `Core/` folder, next to the `Storage/`, `Web/`, and `Hosting/`
-folders:
+but its tests are in the main test project, in the `Core/` folder, next to the `Storage/`, `Identity/`, `Web/`, and
+`Hosting/` folders:
 
 ```text
 test/
 ├── DemaConsulting.ReviewCenter.Tests/         — unit, subsystem, and integration tests of ReviewCenter
 │   ├── Core/                                  — Core unit and subsystem tests
 │   ├── Storage/                               — Storage unit and subsystem tests
+│   ├── Identity/                              — Identity unit and subsystem tests
 │   ├── Web/                                   — Web unit and subsystem tests
 │   └── Hosting/                               — Hosting unit and subsystem tests
 └── DemaConsulting.ReviewCenter.Puppet.Tests/  — unit, system, and end-to-end tests of ReviewCenterPuppet

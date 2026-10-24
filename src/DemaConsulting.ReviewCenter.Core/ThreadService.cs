@@ -27,7 +27,8 @@ namespace DemaConsulting.ReviewCenter.Core;
 ///     The service is the single place where comment rules live. A thread is anchored to the whole file
 ///     or to a range of lines and always starts with one comment; anyone can reply. Comments are
 ///     immutable, so the service offers no way to edit or delete one; the only change to an existing
-///     thread is its <see cref="ReviewThreadState"/>. There is no sign-in yet, so authors are unverified text.
+///     thread is its <see cref="ReviewThreadState"/>. The author of a comment is the signed-in
+///     <see cref="Actor"/>, never free text, so it cannot be spoofed by a form field.
 ///     Two pure static helpers shape threads for display (<see cref="BuildIndex"/>, <see cref="NextStep"/>).
 ///     The service holds no state of its own and is safe for concurrent use as long as the injected
 ///     <see cref="IReviewStore"/> is.
@@ -71,16 +72,14 @@ public sealed class ThreadService
     ///     The last line of the anchor (inclusive); <c>null</c> exactly when <paramref name="startLine"/> is
     ///     <c>null</c>. A range requires a text file with at least that many lines (see <see cref="FileText"/>).
     /// </param>
-    /// <param name="author">
-    ///     The author name; leading and trailing white space is removed. Must not be empty and must not
-    ///     exceed <see cref="ReviewLimits.MaxAuthorLength"/> characters.
-    /// </param>
+    /// <param name="actor">The signed-in user who writes the comment. Must not be null.</param>
     /// <param name="text">
     ///     The comment text; leading and trailing white space is removed. Must not be empty and must not
     ///     exceed <see cref="ReviewLimits.MaxCommentLength"/> characters.
     /// </param>
     /// <param name="cancellationToken">Cancels the operation.</param>
     /// <returns>The stored thread in the <see cref="ReviewThreadState.Open"/> state, with its first comment.</returns>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="actor"/> is null.</exception>
     /// <exception cref="DomainRuleException">
     ///     Thrown when a rule is violated (see <see cref="DomainRule"/>); nothing is stored then.
     /// </exception>
@@ -90,12 +89,12 @@ public sealed class ThreadService
         string filePath,
         int? startLine,
         int? endLine,
-        string? author,
+        Actor actor,
         string? text,
         CancellationToken cancellationToken = default)
     {
         // Validate everything that needs no I/O first so a bad request fails fast and cheaply
-        var trimmedAuthor = ValidateAuthor(author);
+        ArgumentNullException.ThrowIfNull(actor);
         var trimmedText = ValidateText(text);
         ValidateAnchorShape(startLine, endLine);
 
@@ -124,7 +123,16 @@ public sealed class ThreadService
             EndLine = endLine,
             State = ReviewThreadState.Open,
             Created = now,
-            Comments = [new ReviewComment { Author = trimmedAuthor, Text = trimmedText, Created = now }]
+            Comments =
+            [
+                new ReviewComment
+                {
+                    Author = actor.DisplayName,
+                    AuthorUsername = actor.Username,
+                    Text = trimmedText,
+                    Created = now
+                }
+            ]
         };
 
         return await _store.AddThreadAsync(thread, cancellationToken);
@@ -136,13 +144,14 @@ public sealed class ThreadService
     /// <param name="projectId">The identity of the owning project.</param>
     /// <param name="reviewId">The review identifier.</param>
     /// <param name="threadId">The identity of the thread; it must belong to the given review.</param>
-    /// <param name="author">The author name; same rules as for a new thread.</param>
+    /// <param name="actor">The signed-in user who writes the reply. Must not be null.</param>
     /// <param name="text">The reply text; same rules as for a new thread.</param>
     /// <param name="cancellationToken">Cancels the operation.</param>
     /// <returns>
     ///     The stored comment. Earlier comments are untouched and the thread state does not change, so a
     ///     resolved thread can still receive replies.
     /// </returns>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="actor"/> is null.</exception>
     /// <exception cref="DomainRuleException">
     ///     Thrown when a rule is violated (see <see cref="DomainRule"/>); nothing is stored then.
     /// </exception>
@@ -150,13 +159,15 @@ public sealed class ThreadService
         int projectId,
         string reviewId,
         int threadId,
-        string? author,
+        Actor actor,
         string? text,
         CancellationToken cancellationToken = default)
     {
+        ArgumentNullException.ThrowIfNull(actor);
         var comment = new ReviewComment
         {
-            Author = ValidateAuthor(author),
+            Author = actor.DisplayName,
+            AuthorUsername = actor.Username,
             Text = ValidateText(text),
             Created = _timeProvider.GetUtcNow()
         };
@@ -315,30 +326,6 @@ public sealed class ThreadService
     private static DomainRuleException ThreadNotFound(int threadId)
     {
         return new DomainRuleException(DomainRule.ThreadNotFound, $"Thread {threadId} does not exist in this review.");
-    }
-
-    /// <summary>
-    ///     Checks and normalizes a comment author.
-    /// </summary>
-    /// <param name="author">The candidate author.</param>
-    /// <returns>The author without leading and trailing white space.</returns>
-    /// <exception cref="DomainRuleException">Thrown with <see cref="DomainRule.CommentAuthorInvalid"/> when the author is empty or too long.</exception>
-    private static string ValidateAuthor(string? author)
-    {
-        var trimmed = author?.Trim() ?? string.Empty;
-        if (trimmed.Length == 0)
-        {
-            throw new DomainRuleException(DomainRule.CommentAuthorInvalid, "The author name is required.");
-        }
-
-        if (trimmed.Length > ReviewLimits.MaxAuthorLength)
-        {
-            throw new DomainRuleException(
-                DomainRule.CommentAuthorInvalid,
-                $"The author name must not be longer than {ReviewLimits.MaxAuthorLength} characters.");
-        }
-
-        return trimmed;
     }
 
     /// <summary>

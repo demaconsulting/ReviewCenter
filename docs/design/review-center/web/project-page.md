@@ -5,7 +5,8 @@
 #### Purpose
 
 `ProjectPage` is the page at `/projects/{id}`. Its responsibilities are to show one project and its reviews, and to
-create a review from files selected in the browser, enforcing the upload limits while the files are read. It is a
+create a review from files selected in the browser, enforcing the upload limits while the files are read. It requires
+a signed-in user. It is a
 Razor component split into presentation (`ProjectPage.razor`) and behavior (`ProjectPage.razor.cs`).
 
 #### Data Model
@@ -70,9 +71,10 @@ an upload limit is shown as an error message. Other exceptions are not handled b
 - **ProjectService** — reads the project.
 - **ReviewService** — lists and creates reviews.
 - **ReviewLimits** (Core) — the upload limits.
-- **ASP.NET Core Blazor components** — the component base class, file input, navigation, and the interactive
+- **ASP.NET Core Blazor components** — the component base class, file input, navigation, the authorization
+  attribute, and the interactive
   server render mode.
 
 #### Callers
 
-- **App** — the router renders the page for `/projects/{id}`.
+- **App** — the router renders the page for `/projects/{id}`; an anonymous visitor is sent to the login page first.
