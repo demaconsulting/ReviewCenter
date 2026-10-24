@@ -1,12 +1,14 @@
 @* ReviewPage: the view of one review at "/projects/{id}/reviews/{reviewId}", with its comment threads.
 
-   Presentation only; state and event handling live in ReviewPage.razor.cs. It shows the review id, title,
-   state, content fingerprint and the open/resolved thread counts, the list of files with size, per-file
-   SHA-256 hash and open-thread count, and for the selected file: the text as numbered lines (or a notice for
-   binary files), a form that starts a thread, and the threads of that file. All file and comment text is
-   rendered as plain text. Every interactive element and every key value carries a stable kebab-case
-   data-testid (file rows carry the list index, line and thread elements the line number or thread id), and
-   the data-interactive marker on the root flips to "true" once the live circuit is connected. *@
+   Presentation only; state and event handling live in ReviewPage.razor.cs. From the top it shows the title, a
+   one-sentence next step, the list of files with size and open-thread count, the thread index of all files
+   (filter All/Open/Resolved, default Open; choosing a row selects the file and highlights the lines), and for
+   the selected file: the text as numbered lines (or a notice for binary files), a form that starts a thread,
+   and the threads of that file (a resolved thread is a one-line header until expanded). The review id, state,
+   content fingerprint and per-file SHA-256 hashes are last, in a Details section that is collapsed. All file
+   and comment text is rendered as plain text. Every interactive element and every key value carries a stable
+   kebab-case data-testid (file rows carry the list index, line and thread elements the line number or thread
+   id), and the data-interactive marker on the root flips to "true" once the live circuit is connected. *@
 @page "/projects/{ProjectId:int}/reviews/{ReviewId}"
 @rendermode InteractiveServer
 
@@ -33,21 +35,7 @@
     {
         <h1 data-testid="review-title">@Review.Title</h1>
 
-        <section class="card">
-            <dl class="details">
-                <dt>Review id</dt>
-                <dd data-testid="review-id">@Review.Id</dd>
-                <dt>State</dt>
-                <dd><span class="badge" data-testid="review-state">@Review.State</span></dd>
-                <dt>Fingerprint</dt>
-                <dd class="hash" data-testid="review-fingerprint">@Review.ContentFingerprint</dd>
-                <dt>Threads</dt>
-                <dd data-testid="thread-summary">
-                    <span data-testid="threads-open-count">@Threads.Count(t => t.State == ReviewThreadState.Open)</span> open,
-                    <span data-testid="threads-resolved-count">@Threads.Count(t => t.State == ReviewThreadState.Resolved)</span> resolved
-                </dd>
-            </dl>
-        </section>
+        <p class="status" data-testid="next-step">@ThreadService.NextStep(Threads)</p>
 
         <section class="card">
             <h2>Files</h2>
@@ -59,16 +47,56 @@
                     <li class="file-row @(file.Path == SelectedPath ? "selected" : null)" data-testid="file-row-@index">
                         <div class="path" data-testid="file-path-@index">@file.Path</div>
                         <div class="muted file-size"><span data-testid="file-size-@index">@file.Size</span> bytes &middot; <span data-testid="file-open-threads-@index">@OpenThreadLabel(file.Path)</span></div>
-                        <div class="hash muted" data-testid="file-hash-@index">@file.Sha256</div>
                         <button type="button" data-testid="file-select-@index" aria-label="View @file.Path" @onclick="() => SelectFileAsync(fileIndex)">View</button>
                     </li>
                 }
             </ul>
         </section>
 
+        <section class="card" data-testid="thread-index">
+            <h2>Threads</h2>
+            <div class="index-filters" role="group" aria-label="Filter threads" data-testid="thread-summary">
+                <button type="button" class="secondary" aria-pressed="@(IndexFilter is null ? "true" : "false")"
+                        data-testid="index-filter-all" @onclick="() => SetFilter(null)">All (<span data-testid="threads-all-count">@Threads.Count</span>)</button>
+                <button type="button" class="secondary" aria-pressed="@(IndexFilter == ReviewThreadState.Open ? "true" : "false")"
+                        data-testid="index-filter-open" @onclick="() => SetFilter(ReviewThreadState.Open)">Open (<span data-testid="threads-open-count">@Threads.Count(t => t.State == ReviewThreadState.Open)</span>)</button>
+                <button type="button" class="secondary" aria-pressed="@(IndexFilter == ReviewThreadState.Resolved ? "true" : "false")"
+                        data-testid="index-filter-resolved" @onclick="() => SetFilter(ReviewThreadState.Resolved)">Resolved (<span data-testid="threads-resolved-count">@Threads.Count(t => t.State == ReviewThreadState.Resolved)</span>)</button>
+            </div>
+            @{
+                var indexRows = ThreadService.BuildIndex(Threads, IndexFilter);
+            }
+            @if (indexRows.Count == 0)
+            {
+                <p class="muted" data-testid="thread-index-empty">@IndexEmptyMessage()</p>
+            }
+            else
+            {
+                <ul class="item-list index-list" data-testid="thread-index-list">
+                    @foreach (var row in indexRows)
+                    {
+                        var rowThread = row;
+                        <li>
+                            <button type="button" class="index-row" data-testid="index-row-@row.Id"
+                                    aria-label="Show thread @row.Id on @row.FilePath"
+                                    @onclick="() => SelectThreadAsync(rowThread)">
+                                <span class="path" data-testid="index-file-@row.Id">@row.FilePath</span>
+                                <span data-testid="index-anchor-@row.Id">@AnchorLabel(row)</span>
+                                <span class="badge @(row.State == ReviewThreadState.Resolved ? "resolved" : null)" data-testid="index-state-@row.Id">@row.State</span>
+                                <span class="muted" data-testid="index-count-@row.Id">@CommentCountLabel(row)</span>
+                                <span class="muted" data-testid="index-author-@row.Id">@row.Comments.FirstOrDefault()?.Author</span>
+                                <span class="muted" data-testid="index-activity-@row.Id">@FormatTime(row.LastActivity)</span>
+                            </button>
+                        </li>
+                    }
+                </ul>
+            }
+        </section>
+
         @if (SelectedPath is not null)
         {
             var fileThreads = Threads.Where(t => t.FilePath == SelectedPath).ToList();
+            var focusedThread = fileThreads.FirstOrDefault(t => t.Id == FocusedThreadId);
 
             // Lines inside any thread's range are highlighted; the first line of a range carries a count marker
             var anchoredLines = new HashSet<int>();
@@ -101,7 +129,7 @@
                         @for (var number = 1; number <= SelectedLines.Count; number++)
                         {
                             var lineNumber = number;
-                            <div class="code-line @(anchoredLines.Contains(number) ? "anchored" : null)" data-testid="code-line-@number">
+                            <div class="code-line @(anchoredLines.Contains(number) ? "anchored" : null) @(IsFocusedLine(focusedThread, number) ? "focused" : null)" data-testid="code-line-@number">
                                 <span class="gutter">
                                     <button type="button" class="line-comment" data-testid="line-comment-@number"
                                             aria-label="Comment on line @number" title="Comment on line @number"
@@ -119,9 +147,77 @@
                         }
                     </div>
                 }
+            </section>
 
-                <form class="new-thread" data-testid="new-thread-form" novalidate @onsubmit="StartThreadAsync">
-                    <h3>New thread</h3>
+            <section class="card">
+                <h2>Threads on this file</h2>
+                @if (fileThreads.Count == 0)
+                {
+                    <p class="muted" data-testid="threads-empty">There are no threads on this file yet.</p>
+                }
+                else
+                {
+                    <ul class="item-list threads" data-testid="threads-list">
+                        @foreach (var thread in fileThreads)
+                        {
+                            var threadId = thread.Id;
+                            var resolved = thread.State == ReviewThreadState.Resolved;
+                            var expanded = !resolved || ExpandedThreads.Contains(threadId);
+                            <li class="thread @(thread.Id == FocusedThreadId ? "focused" : null)" data-testid="thread-@threadId">
+                                <div class="thread-head">
+                                    <span class="path" data-testid="thread-anchor-@threadId">@AnchorLabel(thread)</span>
+                                    <span class="badge @(resolved ? "resolved" : null)" data-testid="thread-state-@threadId">@thread.State</span>
+                                    <span class="muted" data-testid="thread-count-@threadId">@CommentCountLabel(thread)</span>
+                                    @if (resolved)
+                                    {
+                                        <button type="button" class="secondary" data-testid="thread-expand-@threadId"
+                                                aria-expanded="@(expanded ? "true" : "false")"
+                                                aria-label="@(expanded ? "Collapse" : "Expand") thread @threadId"
+                                                @onclick="() => ToggleThreadExpanded(threadId)">@(expanded ? "Collapse" : "Expand")</button>
+                                    }
+                                    @if (expanded)
+                                    {
+                                        <button type="button" class="secondary" data-testid="thread-toggle-@threadId"
+                                                aria-label="@(resolved ? "Reopen" : "Resolve") thread @threadId"
+                                                @onclick="() => ToggleThreadAsync(thread)">@(resolved ? "Reopen" : "Resolve")</button>
+                                    }
+                                </div>
+                                @if (expanded)
+                                {
+                                    @for (var n = 1; n <= thread.Comments.Count; n++)
+                                    {
+                                        var comment = thread.Comments[n - 1];
+                                        <div class="comment" data-testid="comment-@threadId-@n">
+                                            <div class="comment-meta">
+                                                <strong data-testid="comment-author-@threadId-@n">@comment.Author</strong>
+                                                <time class="muted" datetime="@comment.Created.UtcDateTime.ToString("O")" data-testid="comment-time-@threadId-@n">@FormatTime(comment.Created)</time>
+                                            </div>
+                                            <p class="comment-text" data-testid="comment-text-@threadId-@n">@comment.Text</p>
+                                        </div>
+                                    }
+                                    <div class="reply">
+                                        <textarea id="reply-text-@threadId" rows="2" maxlength="@ReviewLimits.MaxCommentLength"
+                                                  aria-label="Reply to thread @threadId" placeholder="Reply"
+                                                  data-testid="reply-text-@threadId" value="@ReplyTexts.GetValueOrDefault(threadId)"
+                                                  @oninput="e => ReplyTexts[threadId] = e.Value?.ToString() ?? string.Empty"></textarea>
+                                        @if (ReplyErrors.TryGetValue(threadId, out var replyError))
+                                        {
+                                            <p class="error" role="alert" data-testid="reply-error-@threadId">@replyError</p>
+                                        }
+                                        <button type="button" class="secondary" data-testid="reply-button-@threadId"
+                                                aria-label="Post reply to thread @threadId"
+                                                @onclick="() => ReplyAsync(threadId)">Reply</button>
+                                    </div>
+                                }
+                            </li>
+                        }
+                    </ul>
+                }
+            </section>
+
+            <section class="card">
+                <h2>New thread</h2>
+                <form data-testid="new-thread-form" novalidate @onsubmit="StartThreadAsync">
                     <div class="field">
                         <label for="comment-author">Your name</label>
                         <input id="comment-author" type="text" maxlength="@ReviewLimits.MaxAuthorLength"
@@ -153,57 +249,23 @@
                     <button type="submit" data-testid="start-thread-button">Start thread</button>
                 </form>
             </section>
-
-            <section class="card">
-                <h2>Threads on this file</h2>
-                @if (fileThreads.Count == 0)
-                {
-                    <p class="muted" data-testid="threads-empty">There are no threads on this file yet.</p>
-                }
-                else
-                {
-                    <ul class="item-list threads" data-testid="threads-list">
-                        @foreach (var thread in fileThreads)
-                        {
-                            var threadId = thread.Id;
-                            var resolved = thread.State == ReviewThreadState.Resolved;
-                            <li class="thread" data-testid="thread-@threadId">
-                                <div class="thread-head">
-                                    <span class="path" data-testid="thread-anchor-@threadId">@AnchorLabel(thread)</span>
-                                    <span class="badge @(resolved ? "resolved" : null)" data-testid="thread-state-@threadId">@thread.State</span>
-                                    <button type="button" class="secondary" data-testid="thread-toggle-@threadId"
-                                            aria-label="@(resolved ? "Reopen" : "Resolve") thread @threadId"
-                                            @onclick="() => ToggleThreadAsync(thread)">@(resolved ? "Reopen" : "Resolve")</button>
-                                </div>
-                                @for (var n = 1; n <= thread.Comments.Count; n++)
-                                {
-                                    var comment = thread.Comments[n - 1];
-                                    <div class="comment" data-testid="comment-@threadId-@n">
-                                        <div class="comment-meta">
-                                            <strong data-testid="comment-author-@threadId-@n">@comment.Author</strong>
-                                            <time class="muted" datetime="@comment.Created.UtcDateTime.ToString("O")" data-testid="comment-time-@threadId-@n">@FormatTime(comment.Created)</time>
-                                        </div>
-                                        <p class="comment-text" data-testid="comment-text-@threadId-@n">@comment.Text</p>
-                                    </div>
-                                }
-                                <div class="reply">
-                                    <textarea id="reply-text-@threadId" rows="2" maxlength="@ReviewLimits.MaxCommentLength"
-                                              aria-label="Reply to thread @threadId" placeholder="Reply"
-                                              data-testid="reply-text-@threadId" value="@ReplyTexts.GetValueOrDefault(threadId)"
-                                              @oninput="e => ReplyTexts[threadId] = e.Value?.ToString() ?? string.Empty"></textarea>
-                                    @if (ReplyErrors.TryGetValue(threadId, out var replyError))
-                                    {
-                                        <p class="error" role="alert" data-testid="reply-error-@threadId">@replyError</p>
-                                    }
-                                    <button type="button" class="secondary" data-testid="reply-button-@threadId"
-                                            aria-label="Post reply to thread @threadId"
-                                            @onclick="() => ReplyAsync(threadId)">Reply</button>
-                                </div>
-                            </li>
-                        }
-                    </ul>
-                }
-            </section>
         }
+
+        <details class="review-details" data-testid="review-details">
+            <summary data-testid="review-details-summary">Details</summary>
+            <dl class="details">
+                <dt>Review id</dt>
+                <dd data-testid="review-id">@Review.Id</dd>
+                <dt>State</dt>
+                <dd><span class="badge" data-testid="review-state">@Review.State</span></dd>
+                <dt>Fingerprint</dt>
+                <dd class="hash" data-testid="review-fingerprint">@Review.ContentFingerprint</dd>
+                @for (var index = 0; index < Review.Files.Count; index++)
+                {
+                    <dt data-testid="file-hash-path-@index">@Review.Files[index].Path</dt>
+                    <dd class="hash" data-testid="file-hash-@index">@Review.Files[index].Sha256</dd>
+                }
+            </dl>
+        </details>
     }
 </main>

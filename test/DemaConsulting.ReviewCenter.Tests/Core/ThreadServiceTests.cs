@@ -460,6 +460,91 @@ public class ThreadServiceTests
     }
 
     /// <summary>
+    ///     Creates a thread with comments at the given minutes after the test clock's instant.
+    /// </summary>
+    /// <param name="id">The thread identity.</param>
+    /// <param name="state">The thread state.</param>
+    /// <param name="commentMinutes">The posting time of each comment, in minutes after the instant.</param>
+    /// <returns>The thread.</returns>
+    private static ReviewThread MakeThread(int id, ReviewThreadState state, params int[] commentMinutes)
+    {
+        return new ReviewThread
+        {
+            Id = id,
+            State = state,
+            Created = _now,
+            Comments = commentMinutes
+                .Select(minutes => new ReviewComment { Author = "Ann", Text = "t", Created = _now.AddMinutes(minutes) })
+                .ToList()
+        };
+    }
+
+    /// <summary>
+    ///     Test that the last activity of a thread is the time of its latest comment.
+    /// </summary>
+    [Fact]
+    public void ThreadService_LastActivity_IsTimeOfLatestComment()
+    {
+        // Arrange: a thread with a later reply and a thread with one comment
+        var replied = MakeThread(1, ReviewThreadState.Open, 0, 30);
+        var single = MakeThread(2, ReviewThreadState.Open, 5);
+
+        // Act, Assert: the latest comment time is reported
+        Assert.Equal(_now.AddMinutes(30), replied.LastActivity);
+        Assert.Equal(_now.AddMinutes(5), single.LastActivity);
+    }
+
+    /// <summary>
+    ///     Test that the index keeps the threads of the requested state, newest activity first.
+    /// </summary>
+    [Fact]
+    public void ThreadService_BuildIndex_StateFilter_ReturnsMatchingNewestActivityFirst()
+    {
+        // Arrange: an old thread with a late reply, a newer thread, a resolved thread and a tie on time
+        var oldReplied = MakeThread(1, ReviewThreadState.Open, 0, 60);
+        var newer = MakeThread(2, ReviewThreadState.Open, 10);
+        var resolved = MakeThread(3, ReviewThreadState.Resolved, 20);
+        var tie = MakeThread(4, ReviewThreadState.Open, 10);
+        ReviewThread[] threads = [oldReplied, newer, resolved, tie];
+
+        // Act: build the index for all, open and resolved threads
+        var all = ThreadService.BuildIndex(threads, null);
+        var open = ThreadService.BuildIndex(threads, ReviewThreadState.Open);
+        var resolvedOnly = ThreadService.BuildIndex(threads, ReviewThreadState.Resolved);
+
+        // Assert: filtered by state, newest activity first, higher id first on a tie; empty input gives empty
+        Assert.Equal([1, 3, 4, 2], all.Select(t => t.Id));
+        Assert.Equal([1, 4, 2], open.Select(t => t.Id));
+        Assert.Equal([3], resolvedOnly.Select(t => t.Id));
+        Assert.Empty(ThreadService.BuildIndex([], null));
+    }
+
+    /// <summary>
+    ///     Test that the next step names the action for no threads, open threads and only resolved threads.
+    /// </summary>
+    /// <param name="open">The number of open threads.</param>
+    /// <param name="resolved">The number of resolved threads.</param>
+    /// <param name="expected">The expected sentence.</param>
+    [Theory]
+    [InlineData(0, 0, "No discussion yet - select a file and comment on a line.")]
+    [InlineData(1, 0, "1 open thread to resolve.")]
+    [InlineData(3, 1, "3 open threads to resolve.")]
+    [InlineData(0, 2, "All threads resolved.")]
+    public void ThreadService_NextStep_NoThreadsOpenAndAllResolved_NamesNextAction(int open, int resolved, string expected)
+    {
+        // Arrange: the requested mix of threads
+        var threads = Enumerable.Range(0, open).Select(i => MakeThread(i, ReviewThreadState.Open, 0))
+            .Concat(Enumerable.Range(100, resolved).Select(i => MakeThread(i, ReviewThreadState.Resolved, 0)))
+            .ToList();
+
+        // Act: word the next step
+        var sentence = ThreadService.NextStep(threads);
+
+        // Assert: the sentence names the action
+        Assert.Equal(expected, sentence);
+    }
+
+    /// <summary>
     ///     Test that the constructor refuses a missing store or clock.
     /// </summary>
     [Fact]

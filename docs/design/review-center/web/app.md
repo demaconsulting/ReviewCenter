@@ -16,7 +16,10 @@ their own.
 
 **App component**: Static server-rendered markup that emits the document type, the language
 attribute, the character set and viewport declarations, the base address (`/`), the page head
-outlet, the `Routes` component, and a script reference to `_framework/blazor.web.js`.
+outlet, the `Routes` component, a small inline script that defines `window.reviewCenter.scrollToTestId` (the review
+page calls it to bring the selected file's code, a thread's first line, or the new-thread form into view; Blazor
+cannot scroll by itself), and a script reference to
+`_framework/blazor.web.js`.
 
 **Routes component**: A router that searches the application assembly for page components.
 For a matched URL it renders the page through a route view; for an unmatched URL it renders

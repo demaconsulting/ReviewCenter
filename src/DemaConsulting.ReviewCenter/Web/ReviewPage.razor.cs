@@ -21,6 +21,7 @@
 using System.Globalization;
 using DemaConsulting.ReviewCenter.Core;
 using Microsoft.AspNetCore.Components;
+using Microsoft.JSInterop;
 
 namespace DemaConsulting.ReviewCenter.Web;
 
@@ -38,7 +39,9 @@ namespace DemaConsulting.ReviewCenter.Web;
 ///     sign-in yet, so the author name of a comment is a free-text label that the operator types once and that
 ///     is not verified. Threads are read when the page loads and after each change made here; comments posted
 ///     in other browsers appear on the next load or change. Each browser connection (circuit) gets its own
-///     page instance, so the state here is per-user and needs no synchronization.
+///     page instance, so the state here is per-user and needs no synchronization. The thread index lists
+///     the threads of every file through <see cref="ThreadService.BuildIndex"/>; choosing a row selects its
+///     file, highlights its lines and asks the browser to scroll them into view.
 /// </remarks>
 public partial class ReviewPage : ComponentBase
 {
@@ -47,6 +50,16 @@ public partial class ReviewPage : ComponentBase
     ///     on a live circuit.
     /// </summary>
     private bool _interactive;
+
+    /// <summary>
+    ///     The test id of the element to scroll into view after the next render, or <c>null</c>.
+    /// </summary>
+    private string? _scrollTarget;
+
+    /// <summary>
+    ///     Where the element of <see cref="_scrollTarget"/> lands in the window: <c>start</c> or <c>center</c>.
+    /// </summary>
+    private string _scrollBlock = "center";
 
     /// <summary>
     ///     Gets or sets the identity of the owning project, from the page address.
@@ -77,6 +90,12 @@ public partial class ReviewPage : ComponentBase
     /// </summary>
     [Inject]
     private ProjectService ProjectService { get; set; } = null!;
+
+    /// <summary>
+    ///     Gets or sets the browser script access used to scroll a thread into view, supplied by dependency injection.
+    /// </summary>
+    [Inject]
+    private IJSRuntime JS { get; set; } = null!;
 
     /// <summary>
     ///     Gets the name of the owning project shown in the breadcrumb, or <c>null</c> when it is unknown.
@@ -134,6 +153,21 @@ public partial class ReviewPage : ComponentBase
     private string? NewThreadError { get; set; }
 
     /// <summary>
+    ///     Gets the state the thread index is filtered to, or <c>null</c> for all threads; open by default.
+    /// </summary>
+    private ReviewThreadState? IndexFilter { get; set; } = ReviewThreadState.Open;
+
+    /// <summary>
+    ///     Gets the identities of the resolved threads the reader has expanded.
+    /// </summary>
+    private HashSet<int> ExpandedThreads { get; } = [];
+
+    /// <summary>
+    ///     Gets the identity of the thread chosen in the index (its lines are highlighted), or <c>null</c>.
+    /// </summary>
+    private int? FocusedThreadId { get; set; }
+
+    /// <summary>
     ///     Gets the reply text typed for each thread, by thread identity.
     /// </summary>
     private Dictionary<int, string> ReplyTexts { get; } = [];
@@ -170,6 +204,10 @@ public partial class ReviewPage : ComponentBase
         ClearNewThreadForm();
         ReplyTexts.Clear();
         ReplyErrors.Clear();
+        IndexFilter = ReviewThreadState.Open;
+        ExpandedThreads.Clear();
+        FocusedThreadId = null;
+        _scrollTarget = null;
 
         Review = await ReviewService.GetAsync(ProjectId, ReviewId);
         ProjectName = (await ProjectService.GetAsync(ProjectId))?.Name;
@@ -178,20 +216,36 @@ public partial class ReviewPage : ComponentBase
     }
 
     /// <summary>
-    ///     Marks the page interactive after it has rendered on a live circuit.
+    ///     Marks the page interactive after it has rendered on a live circuit, and scrolls a chosen thread into view.
     /// </summary>
     /// <param name="firstRender"><c>true</c> for the first render of this component instance.</param>
+    /// <returns>A task that completes when the optional scroll has been requested.</returns>
     /// <remarks>
     ///     <c>OnAfterRender</c> is never invoked during static prerendering, so reaching it proves that
-    ///     the circuit is connected. A second render makes the new marker value reach the browser.
+    ///     the circuit is connected. A second render makes the new marker value reach the browser. The scroll
+    ///     is requested once per chosen thread; a connection that is already gone is ignored.
     /// </remarks>
-    protected override void OnAfterRender(bool firstRender)
+    protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         // Only the first render transitions the marker; later renders must not loop
         if (firstRender)
         {
             _interactive = true;
             StateHasChanged();
+        }
+
+        if (_scrollTarget is not null)
+        {
+            var target = _scrollTarget;
+            _scrollTarget = null;
+            try
+            {
+                await JS.InvokeVoidAsync("reviewCenter.scrollToTestId", target, _scrollBlock);
+            }
+            catch (JSDisconnectedException)
+            {
+                // The browser went away; there is nothing left to scroll
+            }
         }
     }
 
@@ -221,18 +275,77 @@ public partial class ReviewPage : ComponentBase
         var text = FileText.TryDecode(content);
         SelectedPath = path;
         SelectedLines = text is null ? null : FileText.SplitLines(text);
+        FocusedThreadId = null;
         ClearNewThreadForm();
         Threads = await ThreadService.ListAsync(ProjectId, ReviewId);
+
+        // The code is the reviewer's task, so bring it to the top of the window
+        _scrollTarget = "selected-file-path";
+        _scrollBlock = "start";
     }
 
     /// <summary>
-    ///     Aims the new-thread form at one line.
+    ///     Filters the thread index.
+    /// </summary>
+    /// <param name="state">The state to show, or <c>null</c> for all threads.</param>
+    private void SetFilter(ReviewThreadState? state)
+    {
+        IndexFilter = state;
+    }
+
+    /// <summary>
+    ///     Expands a collapsed resolved thread, or collapses an expanded one.
+    /// </summary>
+    /// <param name="threadId">The identity of the thread.</param>
+    private void ToggleThreadExpanded(int threadId)
+    {
+        if (!ExpandedThreads.Remove(threadId))
+        {
+            ExpandedThreads.Add(threadId);
+        }
+    }
+
+    /// <summary>
+    ///     Shows a thread chosen in the index: selects its file, highlights its lines and scrolls to it.
+    /// </summary>
+    /// <param name="thread">The thread chosen.</param>
+    /// <returns>A task that completes when the file is shown.</returns>
+    /// <remarks>
+    ///     The file is only loaded when it is not already selected, so text typed in the new-thread form is kept.
+    ///     A resolved thread is expanded so its comments are visible.
+    /// </remarks>
+    private async Task SelectThreadAsync(ReviewThread thread)
+    {
+        if (Review is null)
+        {
+            return;
+        }
+
+        if (thread.FilePath != SelectedPath)
+        {
+            await SelectFileAsync(Review.Files.ToList().FindIndex(file => file.Path == thread.FilePath));
+        }
+
+        FocusedThreadId = thread.Id;
+        if (thread.State == ReviewThreadState.Resolved)
+        {
+            ExpandedThreads.Add(thread.Id);
+        }
+
+        _scrollTarget = thread.StartLine is null ? $"thread-{thread.Id}" : $"code-line-{thread.StartLine}";
+        _scrollBlock = "center";
+    }
+
+    /// <summary>
+    ///     Aims the new-thread form at one line and scrolls the form into view.
     /// </summary>
     /// <param name="line">The 1-based line number.</param>
     private void CommentOnLine(int line)
     {
         NewStartLine = line.ToString(CultureInfo.InvariantCulture);
         NewEndLine = NewStartLine;
+        _scrollTarget = "new-thread-form";
+        _scrollBlock = "center";
     }
 
     /// <summary>
@@ -313,6 +426,7 @@ public partial class ReviewPage : ComponentBase
             if (thread.State == ReviewThreadState.Open)
             {
                 await ThreadService.ResolveAsync(ProjectId, ReviewId, thread.Id);
+                ExpandedThreads.Remove(thread.Id);
             }
             else
             {
@@ -327,6 +441,41 @@ public partial class ReviewPage : ComponentBase
 
         ReplyErrors.Remove(thread.Id);
         Threads = await ThreadService.ListAsync(ProjectId, ReviewId);
+    }
+
+    /// <summary>
+    ///     Words the number of comments of a thread.
+    /// </summary>
+    /// <param name="thread">The thread.</param>
+    /// <returns>"1 comment" or, for example, "3 comments".</returns>
+    private static string CommentCountLabel(ReviewThread thread)
+    {
+        return thread.Comments.Count == 1 ? "1 comment" : $"{thread.Comments.Count} comments";
+    }
+
+    /// <summary>
+    ///     Words the message shown when the thread index has no rows, from the current filter.
+    /// </summary>
+    /// <returns>"No threads yet.", "No open threads." or "No resolved threads.".</returns>
+    private string IndexEmptyMessage()
+    {
+        return IndexFilter switch
+        {
+            ReviewThreadState.Open => "No open threads.",
+            ReviewThreadState.Resolved => "No resolved threads.",
+            _ => "No threads yet."
+        };
+    }
+
+    /// <summary>
+    ///     Tells whether a line is inside the anchor of the thread chosen in the index.
+    /// </summary>
+    /// <param name="focused">The chosen thread when it is on the selected file, otherwise <c>null</c>.</param>
+    /// <param name="line">The 1-based line number.</param>
+    /// <returns><c>true</c> when the line is covered by the chosen thread.</returns>
+    private static bool IsFocusedLine(ReviewThread? focused, int line)
+    {
+        return focused?.StartLine is not null && line >= focused.StartLine && line <= focused.EndLine;
     }
 
     /// <summary>

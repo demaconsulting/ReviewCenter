@@ -84,3 +84,25 @@ sections:
         tests:
           - ThreadService_ListAsync_SeveralThreads_ReturnsAllInOrderWithComments
           - ThreadService_ListAsync_NoThreadsOrUnknownReview_ReturnsEmpty
+
+      - id: ReviewCenter-ThreadService-Index
+        title: >-
+          The ThreadService class shall derive the last activity of a thread as the time of its latest comment,
+          and shall list the threads of a review, optionally only those Open or only those Resolved, newest
+          last activity first, without any change to what is stored.
+        justification: |
+          Reviewers look for the discussion that needs attention, which is usually the most recently active.
+          Deriving the time from the comments keeps one source of truth and needs no stored data.
+        tests:
+          - ThreadService_LastActivity_IsTimeOfLatestComment
+          - ThreadService_BuildIndex_StateFilter_ReturnsMatchingNewestActivityFirst
+
+      - id: ReviewCenter-ThreadService-NextStep
+        title: >-
+          The ThreadService class shall give, for the threads of a review, one short sentence naming the next
+          action: start a discussion when there are no threads, the number of open threads to resolve, or that
+          all threads are resolved.
+        justification: |
+          A reader should not have to count threads to know what to do next; one sentence says it.
+        tests:
+          - ThreadService_NextStep_NoThreadsOpenAndAllResolved_NamesNextAction

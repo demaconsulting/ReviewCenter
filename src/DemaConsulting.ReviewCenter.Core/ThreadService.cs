@@ -28,6 +28,7 @@ namespace DemaConsulting.ReviewCenter.Core;
 ///     or to a range of lines and always starts with one comment; anyone can reply. Comments are
 ///     immutable, so the service offers no way to edit or delete one; the only change to an existing
 ///     thread is its <see cref="ReviewThreadState"/>. There is no sign-in yet, so authors are unverified text.
+///     Two pure static helpers shape threads for display (<see cref="BuildIndex"/>, <see cref="NextStep"/>).
 ///     The service holds no state of its own and is safe for concurrent use as long as the injected
 ///     <see cref="IReviewStore"/> is.
 /// </remarks>
@@ -208,6 +209,51 @@ public sealed class ThreadService
         CancellationToken cancellationToken = default)
     {
         return _store.ListThreadsAsync(projectId, reviewId, cancellationToken);
+    }
+
+    /// <summary>
+    ///     Selects the threads of a review for the thread index, newest activity first.
+    /// </summary>
+    /// <param name="threads">The threads of the review.</param>
+    /// <param name="state">The state to keep, or <c>null</c> to keep every thread.</param>
+    /// <returns>
+    ///     The matching threads ordered by <see cref="ReviewThread.LastActivity"/> descending, then by
+    ///     <see cref="ReviewThread.Id"/> descending so the order is stable when times are equal.
+    /// </returns>
+    public static IReadOnlyList<ReviewThread> BuildIndex(IEnumerable<ReviewThread> threads, ReviewThreadState? state)
+    {
+        ArgumentNullException.ThrowIfNull(threads);
+
+        // Sorted in memory because the store cannot order by a time stamp
+        return threads
+            .Where(thread => state is null || thread.State == state)
+            .OrderByDescending(thread => thread.LastActivity)
+            .ThenByDescending(thread => thread.Id)
+            .ToList();
+    }
+
+    /// <summary>
+    ///     Words the next action for the reader of a review, from its threads.
+    /// </summary>
+    /// <param name="threads">The threads of the review.</param>
+    /// <returns>One short sentence: start a discussion, the number of open threads to resolve, or that all are resolved.</returns>
+    public static string NextStep(IEnumerable<ReviewThread> threads)
+    {
+        ArgumentNullException.ThrowIfNull(threads);
+
+        var all = threads.ToList();
+        if (all.Count == 0)
+        {
+            return "No discussion yet - select a file and comment on a line.";
+        }
+
+        var open = all.Count(thread => thread.State == ReviewThreadState.Open);
+        return open switch
+        {
+            0 => "All threads resolved.",
+            1 => "1 open thread to resolve.",
+            _ => $"{open} open threads to resolve."
+        };
     }
 
     /// <summary>

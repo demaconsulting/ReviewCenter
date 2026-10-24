@@ -137,10 +137,12 @@ unchanged, together with a fingerprint of that content.
 2. On the project page, enter a review identifier (1 to 100 letters, digits, `.`, `_`, or `-`, starting with a
    letter or digit; unique within the project) and a title (up to 200 characters), choose the files to review, and
    press the create button. The chosen files are listed with their sizes before you submit.
-3. The review page opens. It shows the identifier, title, and state (`Draft`; the only state in this release), the
-   review fingerprint, and the files with their size, SHA-256 hash, and open comment threads. Select a file to read
-   its content as numbered lines (see [Review Comments](#review-comments)). Binary
-   files, and files that are not valid UTF-8 text, show a notice instead of their content.
+3. The review page opens. From the top it shows the title, a line that says what to do next, the files with their
+   size and open comment threads, and the thread index. Select a file to read
+   its content as numbered lines (see [Review Comments](#review-comments)); the page scrolls to the code. Binary
+   files, and files that are not valid UTF-8 text, show a notice instead of their content. At the bottom, the
+   collapsed "Details" section holds the identifier, state (`Draft`; the only state in this release), the review
+   fingerprint, and the SHA-256 hash of each file; open it when you need them.
 
 The review fingerprint is calculated exactly as in the ReviewMark tool (see the "Fingerprinting" section of the
 ReviewMark User Guide): each file is hashed with SHA-256, the hashes are sorted, and the sorted hashes are hashed
@@ -165,9 +167,14 @@ network until authentication is added in a later release.
 
 ## Review Comments
 
-Select a file on the review page to read it as numbered lines and to discuss it in comment threads. The file list
-shows the number of open threads of each file, and the page shows the totals of open and resolved threads of the
-whole review.
+Select a file on the review page to read it as numbered lines and to discuss it in comment threads. The line at the
+top of the page says what is left to do: start a discussion, how many open threads are to be resolved, or that all
+are resolved. The file list shows the number of open threads of each file.
+
+The thread index lists the threads of all files with the file, the lines, the state, the number of comments, the
+author of the first comment, and the time of the last activity, newest first. Use the All, Open, and Resolved
+buttons (which show the totals) to filter it; it starts with Open. Press a row to show that thread: its file is
+selected, its lines are highlighted, and the page scrolls to them.
 
 1. Enter your name in the "Your name" field (1 to 100 characters). It is used for every comment you post and stays
    filled in while you work on the page.
@@ -175,10 +182,12 @@ whole review.
    line number yourself (a first line without a last line means that one line), or leave both line fields empty to
    comment on the whole file. The form shows where the comment will go. Enter the comment text (1 to 4000
    characters) and press the start button.
-3. A thread is listed below the file with the lines it covers (the whole file, a line, or a range of lines) and its
-   comments in the order they were posted. Lines that have a thread are marked.
+3. A thread is listed below the file's code with the lines it covers (the whole file, a line, or a range of lines)
+   and its comments in the order they were posted; the form to start a new thread follows it. Lines that have a
+   thread are marked.
 4. Anyone can reply to a thread. Press the resolve button to mark a thread resolved, and the reopen button to open
-   it again.
+   it again. A resolved thread is shown as one line (lines, state, and number of comments); press its expand
+   button to read it, reply, or reopen it, and the collapse button to fold it again.
 
 Lines are numbered from 1. Windows (CRLF) and Unix (LF) line endings count the same, a line ending at the very end
 of a file does not add a line, and an empty file has no lines. A binary file, or a file that is not valid UTF-8, and

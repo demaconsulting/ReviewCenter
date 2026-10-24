@@ -81,7 +81,8 @@ sections:
         title: >-
           The Core subsystem shall start comment threads on a file of a review, anchored to the whole file or a
           line range, let anyone reply, resolve and reopen threads, and read the threads of a review back with
-          their comments in order, never changing or removing a posted comment.
+          their comments in order, never changing or removing a posted comment, and give the last activity of a
+          thread, an index of threads by state, and a next step.
         justification: |
           Review comments are the purpose of a review. Keeping posted comments unchanged makes the discussion a
           reliable record of what was said and in which order.
@@ -90,5 +91,7 @@ sections:
           - ReviewCenter-ThreadService-Reply
           - ReviewCenter-ThreadService-State
           - ReviewCenter-ThreadService-Read
+          - ReviewCenter-ThreadService-Index
+          - ReviewCenter-ThreadService-NextStep
         tests:
           - CoreSubsystem_ThreadWorkflow_StartReplyResolveReopen_ReadsBackInOrder
