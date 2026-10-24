@@ -87,6 +87,23 @@ sections:
         tests:
           - WebSubsystem_CreatedProjectAndReview_ArePresentedByThePages
 
+      - id: ReviewCenter-Web-Comments
+        title: >-
+          The Web subsystem shall let a user, on the review page, start comment threads on the selected file,
+          reply to them, resolve and reopen them, and shall show the threads, their comments, and the open and
+          resolved counts.
+        justification: |
+          Comments are written and read next to the code on the review page. The subsystem test covers the
+          counts served from the database; starting, replying, and resolving need a live connection and are
+          verified by the component tests of the page unit.
+        children:
+          - ReviewCenter-ReviewPage-ThreadSummary
+          - ReviewCenter-ReviewPage-ThreadStart
+          - ReviewCenter-ReviewPage-ThreadShow
+          - ReviewCenter-ReviewPage-ThreadUpdate
+        tests:
+          - WebSubsystem_ReviewWithThreads_ArePresentedByThePage
+
       - id: ReviewCenter-Web-TestIds
         title: >-
           The Web subsystem shall give every interactive element (link, button, input, select, and text area) of
@@ -98,3 +115,4 @@ sections:
           as the pages evolve.
         tests:
           - WebSubsystem_AllPages_EveryInteractiveElementHasTestId
+          - ReviewPage_Render_ThreadControls_EveryInteractiveElementHasTestId

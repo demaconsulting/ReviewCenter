@@ -171,6 +171,104 @@ internal sealed class ReviewStore(IDbContextFactory<ReviewCenterDbContext> facto
             .FirstOrDefaultAsync(cancellationToken);
     }
 
+    /// <inheritdoc />
+    public async Task<ReviewThread> AddThreadAsync(ReviewThread thread, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(thread);
+
+        await using var context = await factory.CreateDbContextAsync(cancellationToken);
+
+        // Insert fresh entities so that the database always assigns the identities, whatever the caller supplied
+        var entity = new ReviewThread
+        {
+            ProjectId = thread.ProjectId,
+            ReviewId = thread.ReviewId,
+            FilePath = thread.FilePath,
+            StartLine = thread.StartLine,
+            EndLine = thread.EndLine,
+            State = thread.State,
+            Created = thread.Created,
+            Comments = thread.Comments.Select(comment => NewComment(comment)).ToList()
+        };
+        context.Threads.Add(entity);
+        await context.SaveChangesAsync(cancellationToken);
+        return entity;
+    }
+
+    /// <inheritdoc />
+    public async Task<ReviewComment?> AddCommentAsync(
+        int projectId,
+        string reviewId,
+        int threadId,
+        ReviewComment comment,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(comment);
+
+        await using var context = await factory.CreateDbContextAsync(cancellationToken);
+
+        // The thread must belong to the stated review, so an identity from another review cannot be commented on
+        var exists = await context.Threads.AnyAsync(
+            t => t.Id == threadId && t.ProjectId == projectId && t.ReviewId == reviewId,
+            cancellationToken);
+        if (!exists)
+        {
+            return null;
+        }
+
+        var entity = NewComment(comment, threadId);
+        context.Comments.Add(entity);
+        await context.SaveChangesAsync(cancellationToken);
+        return entity;
+    }
+
+    /// <inheritdoc />
+    public async Task<bool> SetThreadStateAsync(
+        int projectId,
+        string reviewId,
+        int threadId,
+        ReviewThreadState state,
+        CancellationToken cancellationToken = default)
+    {
+        await using var context = await factory.CreateDbContextAsync(cancellationToken);
+        var rows = await context.Threads
+            .Where(t => t.Id == threadId && t.ProjectId == projectId && t.ReviewId == reviewId)
+            .ExecuteUpdateAsync(s => s.SetProperty(t => t.State, state), cancellationToken);
+        return rows > 0;
+    }
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<ReviewThread>> ListThreadsAsync(
+        int projectId,
+        string reviewId,
+        CancellationToken cancellationToken = default)
+    {
+        // Ordered by identity, which grows with creation order (SQLite cannot order by a DateTimeOffset)
+        await using var context = await factory.CreateDbContextAsync(cancellationToken);
+        return await context.Threads.AsNoTracking()
+            .Where(t => t.ProjectId == projectId && t.ReviewId == reviewId)
+            .Include(t => t.Comments.OrderBy(c => c.Id))
+            .OrderBy(t => t.Id)
+            .ToListAsync(cancellationToken);
+    }
+
+    /// <summary>
+    ///     Copies a comment into a fresh entity without identities, so the database assigns them.
+    /// </summary>
+    /// <param name="comment">The comment to copy.</param>
+    /// <param name="threadId">The owning thread, or 0 when the comment is added together with a new thread.</param>
+    /// <returns>The fresh comment.</returns>
+    private static ReviewComment NewComment(ReviewComment comment, int threadId = 0)
+    {
+        return new ReviewComment
+        {
+            ThreadId = threadId,
+            Author = comment.Author,
+            Text = comment.Text,
+            Created = comment.Created
+        };
+    }
+
     /// <summary>
     ///     Reports whether a save failure was caused by a primary key or unique constraint violation.
     /// </summary>

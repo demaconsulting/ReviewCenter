@@ -53,9 +53,24 @@ internal sealed class FakeReviewStore : IReviewStore
     private readonly List<Review> _reviews = [];
 
     /// <summary>
+    ///     The stored threads, each with its comments.
+    /// </summary>
+    private readonly List<ReviewThread> _threads = [];
+
+    /// <summary>
+    ///     The identity given to the next stored comment.
+    /// </summary>
+    private int _nextCommentId = 1;
+
+    /// <summary>
     ///     Gets a snapshot of the reviews added so far, including their file content.
     /// </summary>
     public IReadOnlyList<Review> Reviews => _reviews.ToArray();
+
+    /// <summary>
+    ///     Gets a snapshot of the threads stored so far.
+    /// </summary>
+    public IReadOnlyList<ReviewThread> Threads => _threads.ToArray();
 
     /// <inheritdoc />
     public Task<Project> AddProjectAsync(Project project, CancellationToken cancellationToken = default)
@@ -125,6 +140,119 @@ internal sealed class FakeReviewStore : IReviewStore
             .SelectMany(review => review.Files)
             .FirstOrDefault(f => f.Path == path);
         return Task.FromResult(file?.Content);
+    }
+
+    /// <inheritdoc />
+    public Task<ReviewThread> AddThreadAsync(ReviewThread thread, CancellationToken cancellationToken = default)
+    {
+        var id = _threads.Count + 1;
+        var stored = new ReviewThread
+        {
+            Id = id,
+            ProjectId = thread.ProjectId,
+            ReviewId = thread.ReviewId,
+            FilePath = thread.FilePath,
+            StartLine = thread.StartLine,
+            EndLine = thread.EndLine,
+            State = thread.State,
+            Created = thread.Created,
+            Comments = thread.Comments.Select(comment => Copy(comment, id)).ToList()
+        };
+        _threads.Add(stored);
+        return Task.FromResult(stored);
+    }
+
+    /// <inheritdoc />
+    public Task<ReviewComment?> AddCommentAsync(
+        int projectId,
+        string reviewId,
+        int threadId,
+        ReviewComment comment,
+        CancellationToken cancellationToken = default)
+    {
+        var thread = Find(projectId, reviewId, threadId);
+        if (thread is null)
+        {
+            return Task.FromResult<ReviewComment?>(null);
+        }
+
+        var stored = Copy(comment, threadId);
+        thread.Comments.Add(stored);
+        return Task.FromResult<ReviewComment?>(stored);
+    }
+
+    /// <inheritdoc />
+    public Task<bool> SetThreadStateAsync(
+        int projectId,
+        string reviewId,
+        int threadId,
+        ReviewThreadState state,
+        CancellationToken cancellationToken = default)
+    {
+        var index = _threads.FindIndex(t => t.Id == threadId && t.ProjectId == projectId && t.ReviewId == reviewId);
+        if (index < 0)
+        {
+            return Task.FromResult(false);
+        }
+
+        // The state is init-only, so the stored thread is replaced by a copy with the new state
+        var old = _threads[index];
+        _threads[index] = new ReviewThread
+        {
+            Id = old.Id,
+            ProjectId = old.ProjectId,
+            ReviewId = old.ReviewId,
+            FilePath = old.FilePath,
+            StartLine = old.StartLine,
+            EndLine = old.EndLine,
+            State = state,
+            Created = old.Created,
+            Comments = old.Comments
+        };
+        return Task.FromResult(true);
+    }
+
+    /// <inheritdoc />
+    public Task<IReadOnlyList<ReviewThread>> ListThreadsAsync(
+        int projectId,
+        string reviewId,
+        CancellationToken cancellationToken = default)
+    {
+        IReadOnlyList<ReviewThread> list = _threads
+            .Where(t => t.ProjectId == projectId && t.ReviewId == reviewId)
+            .OrderBy(t => t.Id)
+            .ToList();
+        return Task.FromResult(list);
+    }
+
+    /// <summary>
+    ///     Finds a stored thread of a review.
+    /// </summary>
+    /// <param name="projectId">The project identity.</param>
+    /// <param name="reviewId">The review identifier.</param>
+    /// <param name="threadId">The thread identity.</param>
+    /// <returns>The thread, or <c>null</c> when the review has no such thread.</returns>
+    private ReviewThread? Find(int projectId, string reviewId, int threadId)
+    {
+        return _threads.FirstOrDefault(t => t.Id == threadId && t.ProjectId == projectId && t.ReviewId == reviewId);
+    }
+
+    /// <summary>
+    ///     Copies a comment and gives the copy the next identity.
+    /// </summary>
+    /// <param name="comment">The comment to copy.</param>
+    /// <param name="threadId">The thread the copy belongs to.</param>
+    /// <returns>The stored copy.</returns>
+    private ReviewComment Copy(ReviewComment comment, int threadId)
+    {
+        return new ReviewComment
+        {
+            Id = _nextCommentId++,
+            ThreadId = threadId,
+            Author = comment.Author,
+            Text = comment.Text,
+            Created = comment.Created
+        };
     }
 
     /// <summary>

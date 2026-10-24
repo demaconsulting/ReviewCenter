@@ -2,7 +2,7 @@
    390px phone width up. Rules that keep it from overflowing sideways:
    - every box is border-box and the page column never exceeds the viewport width;
    - long unbroken strings (hashes, paths, file names) wrap or break instead of widening the page;
-   - a <pre> scrolls horizontally inside its own box. */
+   - the code box and any <pre> scroll inside their own box. */
 
 :root {
     --text: #1f2933;
@@ -238,6 +238,175 @@ pre {
     padding-inline: 0.5rem;
     border-radius: 0.375rem;
     background: var(--code-background);
+}
+
+h3 {
+    margin: 0 0 0.5rem;
+    font-size: 1rem;
+}
+
+input[type="number"] {
+    display: block;
+    width: 100%;
+    max-width: 100%;
+    padding: 0.5rem;
+    border: 1px solid var(--border);
+    border-radius: 0.375rem;
+    background: var(--surface);
+    color: inherit;
+    font: inherit;
+}
+
+button.secondary {
+    background: var(--surface);
+    color: var(--accent);
+}
+
+.hint {
+    margin: 0.25rem 0 0.75rem;
+    font-size: 0.85rem;
+}
+
+.new-thread {
+    margin: 1rem 0 0;
+    padding: 1rem 0 0;
+    border-top: 1px solid var(--border);
+}
+
+.line-fields {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0 0.75rem;
+}
+
+/* The code box scrolls inside itself, so a long line never widens the page */
+.code {
+    max-width: 100%;
+    max-height: 32rem;
+    overflow: auto;
+    border: 1px solid var(--border);
+    border-radius: 0.375rem;
+    background: var(--code-background);
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 0.85rem;
+    line-height: 1.4;
+}
+
+.code-line {
+    display: flex;
+    min-width: max-content;
+}
+
+.code-line.anchored {
+    background: #fff4c2;
+}
+
+/* The gutter stays visible while a long line is scrolled sideways */
+.gutter {
+    position: sticky;
+    left: 0;
+    display: flex;
+    flex: none;
+    align-items: center;
+    background: inherit;
+    border-right: 1px solid var(--border);
+}
+
+.code-line .gutter {
+    background: var(--code-background);
+}
+
+.code-line.anchored .gutter {
+    background: #fff4c2;
+}
+
+.line-comment {
+    width: 1.75rem;
+    padding: 0;
+    border-color: transparent;
+    background: transparent;
+    color: var(--accent);
+    font-weight: 700;
+    line-height: inherit;
+}
+
+.line-no {
+    min-width: 2.75rem;
+    padding-right: 0.5rem;
+    color: var(--muted);
+    text-align: right;
+    user-select: none;
+}
+
+.line-marker {
+    display: inline-block;
+    min-width: 1.5rem;
+    padding-right: 0.25rem;
+}
+
+.thread-marker {
+    display: inline-block;
+    min-width: 1.25rem;
+    padding: 0 0.3rem;
+    border-radius: 999px;
+    background: var(--accent);
+    color: var(--accent-text);
+    font-size: 0.75rem;
+    line-height: 1.25rem;
+    text-align: center;
+}
+
+.line-text {
+    padding: 0 0.75rem;
+    white-space: pre;
+}
+
+.thread-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+    margin: 0 0 0.5rem;
+}
+
+.thread-head button {
+    margin: 0 0 0 auto;
+    padding: 0.25rem 0.75rem;
+}
+
+.badge.resolved {
+    border-color: #7fbf8f;
+    background: #e3f4e7;
+    color: #1d5a2c;
+}
+
+.comment {
+    margin: 0 0 0.5rem;
+    padding: 0.5rem 0.75rem;
+    border: 1px solid var(--border);
+    border-radius: 0.375rem;
+    background: var(--code-background);
+}
+
+.comment-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0 0.75rem;
+    font-size: 0.85rem;
+}
+
+.comment-text {
+    margin: 0.25rem 0 0;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
+
+.reply textarea {
+    margin: 0 0 0.5rem;
+}
+
+.item-list .reply button {
+    margin-top: 0;
 }
 
 @media (min-width: 40rem) {

@@ -346,4 +346,202 @@ public class ReviewStoreTests
         Assert.Null(review);
         Assert.Null(content);
     }
+
+    /// <summary>
+    ///     Builds a thread with one comment for the store tests.
+    /// </summary>
+    /// <param name="projectId">The owning project.</param>
+    /// <param name="reviewId">The review id.</param>
+    /// <param name="filePath">The file the thread is anchored to.</param>
+    /// <param name="start">The first line, or <c>null</c> for the whole file.</param>
+    /// <param name="end">The last line, or <c>null</c> for the whole file.</param>
+    /// <param name="text">The text of the first comment.</param>
+    /// <returns>The thread, ready to add.</returns>
+    private static ReviewThread NewThread(int projectId, string reviewId, string filePath, int? start, int? end, string text)
+    {
+        return new ReviewThread
+        {
+            Id = 9001, // supplied identities must be ignored; the store assigns its own
+            ProjectId = projectId,
+            ReviewId = reviewId,
+            FilePath = filePath,
+            StartLine = start,
+            EndLine = end,
+            State = ReviewThreadState.Open,
+            Created = _created,
+            Comments = [new ReviewComment { Id = 9002, ThreadId = 9003, Author = "Ann", Text = text, Created = _created }]
+        };
+    }
+
+    /// <summary>
+    ///     Adds a project with a review of the files <c>a.txt</c> and <c>b.txt</c>.
+    /// </summary>
+    /// <param name="db">The database.</param>
+    /// <param name="reviewId">The review id.</param>
+    /// <returns>The identity of the project.</returns>
+    private static async Task<int> AddReviewAsync(TestStore db, string reviewId = "REV-1")
+    {
+        var project = await db.Store.AddProjectAsync(new Project { Name = "P", Created = _created }, TestContext.Current.CancellationToken);
+        await db.Store.AddReviewAsync(
+            NewReview(project.Id, reviewId, ("a.txt", TestContent.A), ("b.txt", TestContent.B)), TestContext.Current.CancellationToken);
+        return project.Id;
+    }
+
+    /// <summary>
+    ///     Test that whole-file and line-range threads round-trip with their comments and database-assigned
+    ///     identities, whatever identities the caller supplied.
+    /// </summary>
+    [Fact]
+    public async Task ReviewStore_AddThreadAsync_WholeFileAndRange_RoundTripsWithComments()
+    {
+        // Arrange: a review with two files
+        using var db = new TestStore();
+        var projectId = await AddReviewAsync(db);
+
+        // Act: add a whole-file thread (with an ignored identity) and a range thread, then list them
+        var whole = await db.Store.AddThreadAsync(
+            NewThread(projectId, "REV-1", "a.txt", null, null, "Whole"), TestContext.Current.CancellationToken);
+        var range = await db.Store.AddThreadAsync(
+            NewThread(projectId, "REV-1", "b.txt", 2, 5, "Range"), TestContext.Current.CancellationToken);
+        var listed = await db.Store.ListThreadsAsync(projectId, "REV-1", TestContext.Current.CancellationToken);
+
+        // Assert: identities are assigned and growing, and every value survived
+        Assert.True(whole.Id > 0);
+        Assert.True(range.Id > whole.Id);
+        Assert.DoesNotContain(9001, new[] { whole.Id, range.Id });
+        Assert.Equal([whole.Id, range.Id], listed.Select(t => t.Id));
+        Assert.Null(listed[0].StartLine);
+        Assert.Null(listed[0].EndLine);
+        Assert.Equal((2, 5), (listed[1].StartLine, listed[1].EndLine));
+        Assert.Equal("b.txt", listed[1].FilePath);
+        Assert.Equal(ReviewThreadState.Open, listed[1].State);
+        Assert.Equal(_created, listed[1].Created);
+        var comment = Assert.Single(listed[1].Comments);
+        Assert.True(comment.Id > 0);
+        Assert.NotEqual(9002, comment.Id);
+        Assert.Equal(range.Id, comment.ThreadId);
+        Assert.Equal(("Ann", "Range", _created), (comment.Author, comment.Text, comment.Created));
+    }
+
+    /// <summary>
+    ///     Test that comments are appended in posting order.
+    /// </summary>
+    [Fact]
+    public async Task ReviewStore_AddCommentAsync_ExistingThread_AppendsInOrder()
+    {
+        // Arrange: a thread with one comment
+        using var db = new TestStore();
+        var projectId = await AddReviewAsync(db);
+        var thread = await db.Store.AddThreadAsync(
+            NewThread(projectId, "REV-1", "a.txt", null, null, "First"), TestContext.Current.CancellationToken);
+
+        // Act: add two comments and list
+        var second = await db.Store.AddCommentAsync(
+            projectId, "REV-1", thread.Id, new ReviewComment { Author = "Bob", Text = "Second", Created = _created }, TestContext.Current.CancellationToken);
+        await db.Store.AddCommentAsync(
+            projectId, "REV-1", thread.Id, new ReviewComment { Author = "Cy", Text = "Third", Created = _created }, TestContext.Current.CancellationToken);
+        var listed = Assert.Single(await db.Store.ListThreadsAsync(projectId, "REV-1", TestContext.Current.CancellationToken));
+
+        // Assert: the stored comment has an identity and the comments are in posting order
+        Assert.NotNull(second);
+        Assert.Equal(thread.Id, second.ThreadId);
+        Assert.Equal(["First", "Second", "Third"], listed.Comments.Select(c => c.Text));
+    }
+
+    /// <summary>
+    ///     Test that a comment cannot be added to an unknown thread or to a thread of another review.
+    /// </summary>
+    [Fact]
+    public async Task ReviewStore_AddCommentAsync_UnknownOrOtherReviewThread_ReturnsNull()
+    {
+        // Arrange: a thread in REV-1 and a second review
+        using var db = new TestStore();
+        var projectId = await AddReviewAsync(db);
+        await db.Store.AddReviewAsync(NewReview(projectId, "REV-2", ("a.txt", TestContent.A)), TestContext.Current.CancellationToken);
+        var thread = await db.Store.AddThreadAsync(
+            NewThread(projectId, "REV-1", "a.txt", null, null, "First"), TestContext.Current.CancellationToken);
+        var comment = new ReviewComment { Author = "Bob", Text = "Second", Created = _created };
+
+        // Act: comment on an unknown thread and on the thread through the other review
+        var unknown = await db.Store.AddCommentAsync(projectId, "REV-1", thread.Id + 100, comment, TestContext.Current.CancellationToken);
+        var other = await db.Store.AddCommentAsync(projectId, "REV-2", thread.Id, comment, TestContext.Current.CancellationToken);
+
+        // Assert: nothing is added
+        Assert.Null(unknown);
+        Assert.Null(other);
+        Assert.Single(Assert.Single(await db.Store.ListThreadsAsync(projectId, "REV-1", TestContext.Current.CancellationToken)).Comments);
+    }
+
+    /// <summary>
+    ///     Test that the state of a thread can be changed back and forth, and that an unknown thread reports false.
+    /// </summary>
+    [Fact]
+    public async Task ReviewStore_SetThreadStateAsync_ExistingAndUnknown_ChangesStateOrReturnsFalse()
+    {
+        // Arrange: a thread
+        using var db = new TestStore();
+        var projectId = await AddReviewAsync(db);
+        var thread = await db.Store.AddThreadAsync(
+            NewThread(projectId, "REV-1", "a.txt", null, null, "First"), TestContext.Current.CancellationToken);
+
+        // Act: resolve, read, reopen, read, and change an unknown thread and a thread through another review
+        var resolved = await db.Store.SetThreadStateAsync(projectId, "REV-1", thread.Id, ReviewThreadState.Resolved, TestContext.Current.CancellationToken);
+        var afterResolve = (await db.Store.ListThreadsAsync(projectId, "REV-1", TestContext.Current.CancellationToken)).Single().State;
+        var reopened = await db.Store.SetThreadStateAsync(projectId, "REV-1", thread.Id, ReviewThreadState.Open, TestContext.Current.CancellationToken);
+        var afterReopen = (await db.Store.ListThreadsAsync(projectId, "REV-1", TestContext.Current.CancellationToken)).Single().State;
+        var unknown = await db.Store.SetThreadStateAsync(projectId, "REV-1", thread.Id + 100, ReviewThreadState.Resolved, TestContext.Current.CancellationToken);
+        var otherReview = await db.Store.SetThreadStateAsync(projectId, "REV-2", thread.Id, ReviewThreadState.Resolved, TestContext.Current.CancellationToken);
+
+        // Assert: the states changed, and unknown threads report false
+        Assert.True(resolved);
+        Assert.Equal(ReviewThreadState.Resolved, afterResolve);
+        Assert.True(reopened);
+        Assert.Equal(ReviewThreadState.Open, afterReopen);
+        Assert.False(unknown);
+        Assert.False(otherReview);
+    }
+
+    /// <summary>
+    ///     Test that listing returns only the threads of the asked review, in creation order.
+    /// </summary>
+    [Fact]
+    public async Task ReviewStore_ListThreadsAsync_TwoReviews_ReturnsOnlyOwnThreadsInOrder()
+    {
+        // Arrange: threads in two reviews of one project, interleaved
+        using var db = new TestStore();
+        var projectId = await AddReviewAsync(db);
+        await db.Store.AddReviewAsync(NewReview(projectId, "REV-2", ("a.txt", TestContent.A)), TestContext.Current.CancellationToken);
+        await db.Store.AddThreadAsync(NewThread(projectId, "REV-1", "a.txt", null, null, "One"), TestContext.Current.CancellationToken);
+        await db.Store.AddThreadAsync(NewThread(projectId, "REV-2", "a.txt", null, null, "Other"), TestContext.Current.CancellationToken);
+        await db.Store.AddThreadAsync(NewThread(projectId, "REV-1", "b.txt", 1, 1, "Two"), TestContext.Current.CancellationToken);
+
+        // Act: list each review
+        var first = await db.Store.ListThreadsAsync(projectId, "REV-1", TestContext.Current.CancellationToken);
+        var second = await db.Store.ListThreadsAsync(projectId, "REV-2", TestContext.Current.CancellationToken);
+        var none = await db.Store.ListThreadsAsync(projectId, "REV-9", TestContext.Current.CancellationToken);
+
+        // Assert: each review sees only its own threads, in creation order
+        Assert.Equal(["One", "Two"], first.Select(t => t.Comments.Single().Text));
+        Assert.Equal(["Other"], second.Select(t => t.Comments.Single().Text));
+        Assert.Empty(none);
+    }
+
+    /// <summary>
+    ///     Test that the database refuses a thread for a file that is not in the review (the foreign key is
+    ///     enforced), and stores nothing.
+    /// </summary>
+    [Fact]
+    public async Task ReviewStore_AddThreadAsync_UnknownFile_IsRefusedByDatabase()
+    {
+        // Arrange: a review with two files
+        using var db = new TestStore();
+        var projectId = await AddReviewAsync(db);
+
+        // Act: add a thread for a file that does not exist
+        await Assert.ThrowsAsync<DbUpdateException>(() => db.Store.AddThreadAsync(
+            NewThread(projectId, "REV-1", "missing.txt", null, null, "Text"), TestContext.Current.CancellationToken));
+
+        // Assert: no thread exists afterwards
+        Assert.Empty(await db.Store.ListThreadsAsync(projectId, "REV-1", TestContext.Current.CancellationToken));
+    }
 }

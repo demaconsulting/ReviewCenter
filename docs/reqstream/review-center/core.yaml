@@ -3,8 +3,9 @@
 #
 # PURPOSE:
 # - Define requirements for the ReviewCenter Core subsystem
-# - The Core subsystem spans the Fingerprint, ProjectService, and ReviewService units, with the domain types
-#   they share (project, review, review file, upload, limits, rule exception, and store interface)
+# - The Core subsystem spans the Fingerprint, ProjectService, ReviewService, and ThreadService units, with the
+#   domain types they share (project, review, review file, thread, comment, upload, limits, rule exception,
+#   and store interface)
 # - Subsystem requirements describe the externally visible behavior of the domain model and its rules
 
 sections:
@@ -71,5 +72,23 @@ sections:
           - ReviewCenter-ReviewService-Project
           - ReviewCenter-ReviewService-Files
           - ReviewCenter-ReviewService-Limits
+          - ReviewCenter-ThreadService-Anchor
+          - ReviewCenter-ThreadService-Comment
         tests:
           - CoreSubsystem_RuleViolation_IsReportedAsDomainRuleAndStoresNothing
+
+      - id: ReviewCenter-Core-Threads
+        title: >-
+          The Core subsystem shall start comment threads on a file of a review, anchored to the whole file or a
+          line range, let anyone reply, resolve and reopen threads, and read the threads of a review back with
+          their comments in order, never changing or removing a posted comment.
+        justification: |
+          Review comments are the purpose of a review. Keeping posted comments unchanged makes the discussion a
+          reliable record of what was said and in which order.
+        children:
+          - ReviewCenter-ThreadService-Start
+          - ReviewCenter-ThreadService-Reply
+          - ReviewCenter-ThreadService-State
+          - ReviewCenter-ThreadService-Read
+        tests:
+          - CoreSubsystem_ThreadWorkflow_StartReplyResolveReopen_ReadsBackInOrder

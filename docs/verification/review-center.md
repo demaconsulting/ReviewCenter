@@ -58,6 +58,8 @@ loopback TCP ports.
   is already in use produces an error and a non-zero exit code.
 - The running server serves the projects page and has created its database; stored data is served again
   after a restart of the server.
+- Review comments (threads, replies, and resolve state) are presented by the review page and are kept after the
+  database is reopened.
 - A database setting that cannot be used stops the server with an error and a non-zero exit code.
 - Every interactive element of the home page carries a `data-testid`, and the same holds for every other page.
 
@@ -171,6 +173,14 @@ tests provide. The following scenarios belong to the system verification through
 **Review creation and display**: A project and a review are created through the domain services over a real
 database, and the review and project pages are requested over HTTP; the pages show the fingerprint, the files,
 and the project. This scenario is tested by `WebSubsystem_CreatedProjectAndReview_ArePresentedByThePages`.
+
+**Review comments**: A review with an open and a resolved thread is stored through the domain services over a
+real database, and the review page is requested over HTTP; the page shows the open and resolved thread counts and
+the open-thread count of the file. This scenario is tested by
+`WebSubsystem_ReviewWithThreads_ArePresentedByThePage`. In a second scenario a thread is started on a line of a
+file, replied to, and resolved; the database is then closed and opened again, and the thread keeps its anchor, its
+resolved state, and both comments in posting order. This scenario is tested by
+`StorageSubsystem_ServicesOverDatabase_ReopenedDatabase_KeepsThreadsAndComments`.
 
 **Persistence across restart**: A project is stored, the server is stopped and started again on the same
 database file, and the projects page still lists the project. This scenario is tested by

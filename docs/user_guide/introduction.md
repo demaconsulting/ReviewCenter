@@ -4,9 +4,10 @@
 
 ReviewCenter is a web-based formal code review service with a companion command-line
 interface. The service is an ASP.NET Core Blazor Server application started with the `serve`
-verb. The current release lets you create projects and draft reviews made from uploaded files, and shows the
-content fingerprint of each review; the remaining review features (comments, checklists, reviewers, sign-off) are
-still under development. The command-line interface is documented in this guide. A separate development tool,
+verb. The current release lets you create projects and draft reviews made from uploaded files, shows the
+content fingerprint of each review, and lets you discuss the files in threaded comments; the remaining review
+features (checklists, reviewers, sign-off) are still under development. The command-line interface is documented in
+this guide. A separate development tool,
 Puppet, is described near the end of this guide.
 
 ## Scope
@@ -120,7 +121,7 @@ The server provides these routes:
   when pressed, a counter button that increments a displayed count, and a link to the projects page.
 - `/projects` - the list of projects, with a form to create a new project.
 - `/projects/{id}` - one project, with its reviews and a form to create a review.
-- `/projects/{id}/reviews/{reviewId}` - one review, with its files and their content.
+- `/projects/{id}/reviews/{reviewId}` - one review, with its files, their content, and comment threads.
 - `/health` - a health check that answers with status 200 and the text `Healthy` while the server is running.
 
 The `--urls` option is only valid together with `serve`; using it without `serve` is reported as an error.
@@ -137,7 +138,8 @@ unchanged, together with a fingerprint of that content.
    letter or digit; unique within the project) and a title (up to 200 characters), choose the files to review, and
    press the create button. The chosen files are listed with their sizes before you submit.
 3. The review page opens. It shows the identifier, title, and state (`Draft`; the only state in this release), the
-   review fingerprint, and the files with their size and SHA-256 hash. Select a file to read its content. Binary
+   review fingerprint, and the files with their size, SHA-256 hash, and open comment threads. Select a file to read
+   its content as numbered lines (see [Review Comments](#review-comments)). Binary
    files, and files that are not valid UTF-8 text, show a notice instead of their content.
 
 The review fingerprint is calculated exactly as in the ReviewMark tool (see the "Fingerprinting" section of the
@@ -157,12 +159,41 @@ on the page, and nothing is created.
 ### Limitation: No Authentication
 
 This release has a single anonymous operator: there are no user accounts or permissions, and anyone who can reach
-the server can create and read all projects and reviews. Run the server only on `localhost` or on a trusted network
-until authentication is added in a later release.
+the server can create and read all projects and reviews, and add comments to them. The author of a comment is a name
+that you type; it is not verified, so anyone can use any name. Run the server only on `localhost` or on a trusted
+network until authentication is added in a later release.
+
+## Review Comments
+
+Select a file on the review page to read it as numbered lines and to discuss it in comment threads. The file list
+shows the number of open threads of each file, and the page shows the totals of open and resolved threads of the
+whole review.
+
+1. Enter your name in the "Your name" field (1 to 100 characters). It is used for every comment you post and stays
+   filled in while you work on the page.
+2. To start a thread, either press the Comment button of a line, which fills in that line, or type a first and a last
+   line number yourself (a first line without a last line means that one line), or leave both line fields empty to
+   comment on the whole file. The form shows where the comment will go. Enter the comment text (1 to 4000
+   characters) and press the start button.
+3. A thread is listed below the file with the lines it covers (the whole file, a line, or a range of lines) and its
+   comments in the order they were posted. Lines that have a thread are marked.
+4. Anyone can reply to a thread. Press the resolve button to mark a thread resolved, and the reopen button to open
+   it again.
+
+Lines are numbered from 1. Windows (CRLF) and Unix (LF) line endings count the same, a line ending at the very end
+of a file does not add a line, and an empty file has no lines. A binary file, or a file that is not valid UTF-8, and
+an empty file can be commented on as a whole only. A line number must be a whole number inside the file, and the
+first line must not be after the last line. Leading and trailing spaces of the name and the text are removed. A
+problem is shown as a message next to the form (or inside the thread for a reply) and nothing you typed is lost.
+
+Posted comments cannot be edited or deleted, so the record of the discussion stays complete; only a thread's state
+changes. Comments posted by other people appear when you reload the page or take an action on it. Comment text is
+always shown as plain text; any markup in it is displayed as typed.
 
 ## Database
 
-ReviewCenter keeps projects, reviews, and file contents in a SQLite database file. On first start it creates the
+ReviewCenter keeps projects, reviews, file contents, and comment threads in a SQLite database file. On first start
+it creates the
 folder, the file, and the tables. The default file is `reviewcenter.db` in the `ReviewCenter` folder of the
 per-user application data folder (`%LOCALAPPDATA%\ReviewCenter` on Windows, `~/.local/share/ReviewCenter` on
 Linux); when the account has no such folder, the file is `data/reviewcenter.db` beside the executable. To back up
@@ -186,7 +217,9 @@ Database__ConnectionString=/srv/reviewcenter/reviews.db reviewcenter serve
 
 If the database cannot be prepared (for example the provider is not supported or the location cannot be used), the
 server writes an error message and exits with a non-zero exit code. Database migrations are not provided in this
-release: the tables are created only when the database is new.
+release: the tables are created only when the database is new. A database file created before review comments
+existed does not have the comment tables, and the review page cannot work with it; delete the file (or point
+`Database:ConnectionString` at a new one) to start again. Do this only with development data.
 
 ## Self-Validation
 

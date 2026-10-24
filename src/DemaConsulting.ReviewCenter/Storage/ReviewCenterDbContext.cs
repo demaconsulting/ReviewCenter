@@ -24,12 +24,14 @@ using Microsoft.EntityFrameworkCore;
 namespace DemaConsulting.ReviewCenter.Storage;
 
 /// <summary>
-///     The Entity Framework Core model of the ReviewCenter database: projects, reviews and review files.
+///     The Entity Framework Core model of the ReviewCenter database: projects, reviews, review files, and the
+///     comment threads of a review with their comments.
 /// </summary>
 /// <remarks>
 ///     The model maps the Core entities as they are, so Core stays free of any database library.
 ///     The schema is created with <c>EnsureCreated</c> (see <see cref="DatabaseSetup"/>); there are no
-///     migrations yet. Instances are short-lived and not thread-safe: create one per operation
+///     migrations yet, so a database created before threads existed does not gain the thread tables and
+///     must be recreated. Instances are short-lived and not thread-safe: create one per operation
 ///     through <see cref="IDbContextFactory{TContext}"/>.
 /// </remarks>
 internal sealed class ReviewCenterDbContext : DbContext
@@ -66,6 +68,16 @@ internal sealed class ReviewCenterDbContext : DbContext
     ///     Gets the review files table.
     /// </summary>
     public DbSet<ReviewFile> ReviewFiles => Set<ReviewFile>();
+
+    /// <summary>
+    ///     Gets the review threads table.
+    /// </summary>
+    public DbSet<ReviewThread> Threads => Set<ReviewThread>();
+
+    /// <summary>
+    ///     Gets the review comments table.
+    /// </summary>
+    public DbSet<ReviewComment> Comments => Set<ReviewComment>();
 
     /// <summary>
     ///     Configures keys, relationships, length limits and conversions.
@@ -111,6 +123,32 @@ internal sealed class ReviewCenterDbContext : DbContext
             file.Property(f => f.Path).HasMaxLength(ReviewLimits.MaxPathLength);
             file.Property(f => f.Content).IsRequired();
             file.Property(f => f.Sha256).IsRequired().HasMaxLength(Sha256HexColumnLength);
+        });
+
+        // Threads: identity assigned by the database; tied to a file of the review, so a thread can never
+        // name a file that is not there, and it goes away with its file. State is stored by name
+        modelBuilder.Entity<ReviewThread>(thread =>
+        {
+            thread.HasKey(t => t.Id);
+            thread.Property(t => t.ReviewId).HasMaxLength(ReviewLimits.MaxReviewIdLength);
+            thread.Property(t => t.FilePath).IsRequired().HasMaxLength(ReviewLimits.MaxPathLength);
+            thread.Property(t => t.State).HasConversion<string>().HasMaxLength(StateColumnLength);
+            thread.HasOne<ReviewFile>()
+                .WithMany()
+                .HasForeignKey(t => new { t.ProjectId, t.ReviewId, t.FilePath })
+                .OnDelete(DeleteBehavior.Cascade);
+            thread.HasMany(t => t.Comments)
+                .WithOne()
+                .HasForeignKey(c => c.ThreadId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // Comments: identity assigned by the database, so it grows with posting order
+        modelBuilder.Entity<ReviewComment>(comment =>
+        {
+            comment.HasKey(c => c.Id);
+            comment.Property(c => c.Author).IsRequired().HasMaxLength(ReviewLimits.MaxAuthorLength);
+            comment.Property(c => c.Text).IsRequired().HasMaxLength(ReviewLimits.MaxCommentLength);
         });
     }
 }

@@ -281,6 +281,26 @@ sections:
           - ReviewCenter_ServeVerb_Started_ServesProjectsPageAndCreatesDatabase
           - HostingSubsystem_Startup_DatabaseConfigured_ServesStoredProjectsAfterRestart
 
+      - id: ReviewCenter-System-Comments
+        title: >-
+          The tool shall let a user start a comment thread on a file of a review, anchored to the whole file or
+          to a range of lines, with an author name and a text, let anyone reply to a thread, resolve and reopen
+          it, and show the number of open and resolved threads of the review and of open threads per file,
+          keeping every thread and comment in the database across restarts without ever changing or deleting a
+          posted comment.
+        tags: [system]
+        justification: |
+          Review comments are the substance of a review. Comments that cannot be edited or deleted make the
+          discussion a trustworthy record. There is no sign-in yet, so the author name is free text that is not
+          verified, in the same way the operator is anonymous, until user identity is added.
+        children:
+          - ReviewCenter-Web-Comments
+          - ReviewCenter-Core-Threads
+          - ReviewCenter-Storage-Threads
+        tests:
+          - WebSubsystem_ReviewWithThreads_ArePresentedByThePage
+          - StorageSubsystem_ServicesOverDatabase_ReopenedDatabase_KeepsThreadsAndComments
+
       - id: ReviewCenter-System-DatabaseFailure
         title: >-
           The tool shall report an error and return a non-zero exit code, without serving requests, when the

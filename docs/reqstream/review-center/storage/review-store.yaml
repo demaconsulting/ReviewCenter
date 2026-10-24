@@ -56,3 +56,19 @@ sections:
           that the user sees one consistent message.
         tests:
           - ReviewStore_AddReviewAsync_DuplicateKey_ThrowsReviewIdDuplicate
+
+      - id: ReviewCenter-ReviewStore-Threads
+        title: >-
+          The ReviewStore class shall save a thread with its first comment and assign their identifiers, append
+          a comment to a thread of a review, change the state of a thread, list the threads of one review with
+          their comments in creation order while keeping the threads of different reviews apart, and report a
+          thread that does not exist as nothing or false.
+        justification: |
+          Pages show the threads of exactly one review in a stable order, and a thread must be saved together
+          with its first comment or not at all. Identifiers belong to the database alone.
+        tests:
+          - ReviewStore_AddThreadAsync_WholeFileAndRange_RoundTripsWithComments
+          - ReviewStore_AddCommentAsync_ExistingThread_AppendsInOrder
+          - ReviewStore_AddCommentAsync_UnknownOrOtherReviewThread_ReturnsNull
+          - ReviewStore_SetThreadStateAsync_ExistingAndUnknown_ChangesStateOrReturnsFalse
+          - ReviewStore_ListThreadsAsync_TwoReviews_ReturnsOnlyOwnThreadsInOrder

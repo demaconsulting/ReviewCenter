@@ -1,0 +1,86 @@
+---
+# Software Unit Requirements for the ThreadService Class
+#
+# The ThreadService class starts review comment threads on a file of a review, appends replies, resolves and
+# reopens threads, enforces the comment rules, and reads threads back.
+
+sections:
+  - title: ThreadService Unit Requirements
+    requirements:
+      - id: ReviewCenter-ThreadService-Start
+        title: >-
+          The ThreadService class shall start a thread on an existing file of a review, anchored to the whole
+          file or to an inclusive range of 1-based lines, in the Open state, with the creation time and the
+          first comment.
+        justification: |
+          A review discussion is a thread of comments about a file or a part of it. Starting a thread always
+          records its first comment, so a thread is never empty.
+        tests:
+          - ThreadService_StartThreadAsync_WholeFile_StoresOpenThreadWithFirstComment
+          - ThreadService_StartThreadAsync_LineRange_StoresRange
+
+      - id: ReviewCenter-ThreadService-Anchor
+        title: >-
+          The ThreadService class shall reject a thread on a review or file that does not exist, a range with
+          only one endpoint given, a start line below 1, an end line before the start line, an end line beyond the
+          last line of the file, or a range on a binary or empty file, and shall accept a thread on the whole
+          of any file and a range that ends exactly at the last line, counting lines so that Windows and Unix
+          line endings count the same and a final line ending adds no line.
+        justification: |
+          A thread must point at something that exists, or the reader could not find what it is about. A file
+          that has no lines to point at can only be commented as a whole. Counting lines by their separators
+          gives the same numbers whichever line endings the file uses.
+        tests:
+          - ThreadService_StartThreadAsync_RangeLimits_AreInclusiveAndCountLinesBySeparator
+          - ThreadService_StartThreadAsync_InvalidRange_ThrowsThreadAnchorInvalid
+          - ThreadService_StartThreadAsync_RangeOnBinaryOrEmptyFile_ThrowsThreadAnchorInvalid
+          - ThreadService_StartThreadAsync_WholeFileOnBinaryFile_IsAllowed
+          - ThreadService_StartThreadAsync_UnknownFileOrReview_ThrowsThreadAnchorInvalid
+
+      - id: ReviewCenter-ThreadService-Comment
+        title: >-
+          The ThreadService class shall require an author of at most 100 characters and a text of at most 4000
+          characters that are not blank after trimming, shall store both trimmed, for a new thread and for a
+          reply, and shall store nothing when a rule is violated.
+        justification: |
+          A comment without an author or text carries no information, and unbounded text would make the
+          review record and its pages unwieldy. Trimmed values keep stray white space out of the record.
+        tests:
+          - ThreadService_StartThreadAsync_BlankOrLongAuthor_ThrowsCommentAuthorInvalid
+          - ThreadService_StartThreadAsync_BlankOrLongText_ThrowsCommentTextInvalid
+          - ThreadService_StartThreadAsync_PaddedAuthorAndText_AreTrimmed
+          - ThreadService_ReplyAsync_InvalidAuthorOrText_ThrowsAndStoresNothing
+
+      - id: ReviewCenter-ThreadService-Reply
+        title: >-
+          The ThreadService class shall append a reply with the creation time to an existing thread of the
+          review, keeping the earlier comments unchanged and in posting order without changing the state of the
+          thread, and shall reject a thread that does not exist or belongs to another review.
+        justification: |
+          Replies are how a discussion proceeds. Comments are immutable, so a reply only ever adds to the
+          thread, and a reply must never reach a thread of another review through a mistaken identity.
+        tests:
+          - ThreadService_ReplyAsync_ExistingThread_AppendsInOrderAndKeepsEarlierComments
+          - ThreadService_ReplyAsync_UnknownThreadOrOtherReview_ThrowsThreadNotFound
+
+      - id: ReviewCenter-ThreadService-State
+        title: >-
+          The ThreadService class shall resolve and reopen a thread of the review without touching its
+          comments, treating a repeated request as harmless, and shall reject a thread that does not exist or
+          belongs to another review.
+        justification: |
+          The state of a thread tells reviewers what still needs attention. A repeated click or request must
+          leave the thread in the requested state rather than fail.
+        tests:
+          - ThreadService_ResolveAsync_ReopenAsync_ChangeStateKeepCommentsAndAreIdempotent
+          - ThreadService_ResolveAsync_UnknownThread_ThrowsThreadNotFound
+
+      - id: ReviewCenter-ThreadService-Read
+        title: >-
+          The ThreadService class shall list all threads of a review with their comments, with threads and
+          comments in creation order, and an empty list when there are none.
+        justification: |
+          Pages show every thread of a review, and a stable order lets a reader follow the discussion.
+        tests:
+          - ThreadService_ListAsync_SeveralThreads_ReturnsAllInOrderWithComments
+          - ThreadService_ListAsync_NoThreadsOrUnknownReview_ReturnsEmpty

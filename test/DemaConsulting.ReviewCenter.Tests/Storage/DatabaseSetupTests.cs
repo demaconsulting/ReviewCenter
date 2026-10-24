@@ -198,6 +198,8 @@ public class DatabaseSetupTests
             Assert.Empty(context.Projects);
             Assert.Empty(context.Reviews);
             Assert.Empty(context.ReviewFiles);
+            Assert.Empty(context.Threads);
+            Assert.Empty(context.Comments);
         }
         finally
         {

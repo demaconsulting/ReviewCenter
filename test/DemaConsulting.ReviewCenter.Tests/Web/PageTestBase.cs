@@ -43,8 +43,10 @@ public abstract class PageTestBase : BunitContext
         var clock = new FixedTimeProvider(new DateTimeOffset(2025, 3, 4, 5, 6, 7, TimeSpan.Zero));
         Projects = new ProjectService(store, clock);
         Reviews = new ReviewService(store, clock);
+        Threads = new ThreadService(store, clock);
         Services.AddSingleton(Projects);
         Services.AddSingleton(Reviews);
+        Services.AddSingleton(Threads);
     }
 
     /// <summary>
@@ -56,4 +58,9 @@ public abstract class PageTestBase : BunitContext
     ///     Gets the review service the pages use.
     /// </summary>
     protected ReviewService Reviews { get; }
+
+    /// <summary>
+    ///     Gets the thread service the pages use.
+    /// </summary>
+    protected ThreadService Threads { get; }
 }

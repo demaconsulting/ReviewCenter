@@ -1,10 +1,12 @@
-@* ReviewPage: the read-only view of one review at "/projects/{id}/reviews/{reviewId}".
+@* ReviewPage: the view of one review at "/projects/{id}/reviews/{reviewId}", with its comment threads.
 
    Presentation only; state and event handling live in ReviewPage.razor.cs. It shows the review id, title,
-   state and content fingerprint, the list of files with size and per-file SHA-256 hash, and the raw text of
-   the selected file (or a notice for binary files). Every interactive element and every key value carries a
-   stable kebab-case data-testid (file rows carry the list index), and the data-interactive marker on the
-   root flips to "true" once the live circuit is connected. *@
+   state, content fingerprint and the open/resolved thread counts, the list of files with size, per-file
+   SHA-256 hash and open-thread count, and for the selected file: the text as numbered lines (or a notice for
+   binary files), a form that starts a thread, and the threads of that file. All file and comment text is
+   rendered as plain text. Every interactive element and every key value carries a stable kebab-case
+   data-testid (file rows carry the list index, line and thread elements the line number or thread id), and
+   the data-interactive marker on the root flips to "true" once the live circuit is connected. *@
 @page "/projects/{ProjectId:int}/reviews/{ReviewId}"
 @rendermode InteractiveServer
 
@@ -39,6 +41,11 @@
                 <dd><span class="badge" data-testid="review-state">@Review.State</span></dd>
                 <dt>Fingerprint</dt>
                 <dd class="hash" data-testid="review-fingerprint">@Review.ContentFingerprint</dd>
+                <dt>Threads</dt>
+                <dd data-testid="thread-summary">
+                    <span data-testid="threads-open-count">@Threads.Count(t => t.State == ReviewThreadState.Open)</span> open,
+                    <span data-testid="threads-resolved-count">@Threads.Count(t => t.State == ReviewThreadState.Resolved)</span> resolved
+                </dd>
             </dl>
         </section>
 
@@ -51,7 +58,7 @@
                     var fileIndex = index;
                     <li class="file-row @(file.Path == SelectedPath ? "selected" : null)" data-testid="file-row-@index">
                         <div class="path" data-testid="file-path-@index">@file.Path</div>
-                        <div class="muted file-size"><span data-testid="file-size-@index">@file.Size</span> bytes</div>
+                        <div class="muted file-size"><span data-testid="file-size-@index">@file.Size</span> bytes &middot; <span data-testid="file-open-threads-@index">@OpenThreadLabel(file.Path)</span></div>
                         <div class="hash muted" data-testid="file-hash-@index">@file.Sha256</div>
                         <button type="button" data-testid="file-select-@index" aria-label="View @file.Path" @onclick="() => SelectFileAsync(fileIndex)">View</button>
                     </li>
@@ -61,16 +68,140 @@
 
         @if (SelectedPath is not null)
         {
+            var fileThreads = Threads.Where(t => t.FilePath == SelectedPath).ToList();
+
+            // Lines inside any thread's range are highlighted; the first line of a range carries a count marker
+            var anchoredLines = new HashSet<int>();
+            var startCounts = new Dictionary<int, int>();
+            foreach (var thread in fileThreads.Where(t => t.StartLine is not null))
+            {
+                for (var line = thread.StartLine!.Value; line <= thread.EndLine!.Value; line++)
+                {
+                    anchoredLines.Add(line);
+                }
+
+                startCounts[thread.StartLine!.Value] = startCounts.GetValueOrDefault(thread.StartLine!.Value) + 1;
+            }
+
             <section class="card">
                 <h2>File content</h2>
                 <p class="path" data-testid="selected-file-path">@SelectedPath</p>
-                @if (SelectedText is null)
+
+                @if (SelectedLines is null)
                 {
                     <p class="notice" data-testid="file-binary-notice">This is a binary file; its content is not shown.</p>
                 }
+                else if (SelectedLines.Count == 0)
+                {
+                    <p class="notice" data-testid="file-empty-notice">This file is empty, so it has no lines to comment on.</p>
+                }
                 else
                 {
-                    <pre data-testid="file-content">@SelectedText</pre>
+                    <div class="code" data-testid="file-content">
+                        @for (var number = 1; number <= SelectedLines.Count; number++)
+                        {
+                            var lineNumber = number;
+                            <div class="code-line @(anchoredLines.Contains(number) ? "anchored" : null)" data-testid="code-line-@number">
+                                <span class="gutter">
+                                    <button type="button" class="line-comment" data-testid="line-comment-@number"
+                                            aria-label="Comment on line @number" title="Comment on line @number"
+                                            @onclick="() => CommentOnLine(lineNumber)">+</button>
+                                    <span class="line-no" data-testid="line-no-@number">@number</span>
+                                    <span class="line-marker">
+                                        @if (startCounts.TryGetValue(number, out var markerCount))
+                                        {
+                                            <span class="thread-marker" data-testid="line-marker-@number" title="@markerCount thread(s) start here">@markerCount</span>
+                                        }
+                                    </span>
+                                </span>
+                                <span class="line-text" data-testid="line-text-@number">@SelectedLines[number - 1]</span>
+                            </div>
+                        }
+                    </div>
+                }
+
+                <form class="new-thread" data-testid="new-thread-form" novalidate @onsubmit="StartThreadAsync">
+                    <h3>New thread</h3>
+                    <div class="field">
+                        <label for="comment-author">Your name</label>
+                        <input id="comment-author" type="text" maxlength="@ReviewLimits.MaxAuthorLength"
+                               data-testid="comment-author-input" @bind="AuthorName" @bind:event="oninput" />
+                        <p class="muted hint">There is no sign-in yet, so the name is not verified.</p>
+                    </div>
+                    <div class="line-fields">
+                        <div class="field">
+                            <label for="thread-start-line">Start line (optional)</label>
+                            <input id="thread-start-line" type="number" min="1"
+                                   data-testid="thread-start-line-input" @bind="NewStartLine" @bind:event="oninput" />
+                        </div>
+                        <div class="field">
+                            <label for="thread-end-line">End line (optional)</label>
+                            <input id="thread-end-line" type="number" min="1"
+                                   data-testid="thread-end-line-input" @bind="NewEndLine" @bind:event="oninput" />
+                        </div>
+                    </div>
+                    <p class="muted hint" data-testid="thread-target">@NewThreadTarget().</p>
+                    <div class="field">
+                        <label for="thread-text">Comment</label>
+                        <textarea id="thread-text" rows="3" maxlength="@ReviewLimits.MaxCommentLength"
+                                  data-testid="thread-text-input" @bind="NewText" @bind:event="oninput"></textarea>
+                    </div>
+                    @if (NewThreadError is not null)
+                    {
+                        <p class="error" role="alert" data-testid="thread-error">@NewThreadError</p>
+                    }
+                    <button type="submit" data-testid="start-thread-button">Start thread</button>
+                </form>
+            </section>
+
+            <section class="card">
+                <h2>Threads on this file</h2>
+                @if (fileThreads.Count == 0)
+                {
+                    <p class="muted" data-testid="threads-empty">There are no threads on this file yet.</p>
+                }
+                else
+                {
+                    <ul class="item-list threads" data-testid="threads-list">
+                        @foreach (var thread in fileThreads)
+                        {
+                            var threadId = thread.Id;
+                            var resolved = thread.State == ReviewThreadState.Resolved;
+                            <li class="thread" data-testid="thread-@threadId">
+                                <div class="thread-head">
+                                    <span class="path" data-testid="thread-anchor-@threadId">@AnchorLabel(thread)</span>
+                                    <span class="badge @(resolved ? "resolved" : null)" data-testid="thread-state-@threadId">@thread.State</span>
+                                    <button type="button" class="secondary" data-testid="thread-toggle-@threadId"
+                                            aria-label="@(resolved ? "Reopen" : "Resolve") thread @threadId"
+                                            @onclick="() => ToggleThreadAsync(thread)">@(resolved ? "Reopen" : "Resolve")</button>
+                                </div>
+                                @for (var n = 1; n <= thread.Comments.Count; n++)
+                                {
+                                    var comment = thread.Comments[n - 1];
+                                    <div class="comment" data-testid="comment-@threadId-@n">
+                                        <div class="comment-meta">
+                                            <strong data-testid="comment-author-@threadId-@n">@comment.Author</strong>
+                                            <time class="muted" datetime="@comment.Created.UtcDateTime.ToString("O")" data-testid="comment-time-@threadId-@n">@FormatTime(comment.Created)</time>
+                                        </div>
+                                        <p class="comment-text" data-testid="comment-text-@threadId-@n">@comment.Text</p>
+                                    </div>
+                                }
+                                <div class="reply">
+                                    <textarea id="reply-text-@threadId" rows="2" maxlength="@ReviewLimits.MaxCommentLength"
+                                              aria-label="Reply to thread @threadId" placeholder="Reply"
+                                              data-testid="reply-text-@threadId" value="@ReplyTexts.GetValueOrDefault(threadId)"
+                                              @oninput="e => ReplyTexts[threadId] = e.Value?.ToString() ?? string.Empty"></textarea>
+                                    @if (ReplyErrors.TryGetValue(threadId, out var replyError))
+                                    {
+                                        <p class="error" role="alert" data-testid="reply-error-@threadId">@replyError</p>
+                                    }
+                                    <button type="button" class="secondary" data-testid="reply-button-@threadId"
+                                            aria-label="Post reply to thread @threadId"
+                                            @onclick="() => ReplyAsync(threadId)">Reply</button>
+                                </div>
+                            </li>
+                        }
+                    </ul>
                 }
             </section>
         }

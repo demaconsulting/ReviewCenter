@@ -4,7 +4,8 @@
 
 ### Overview
 
-The `Storage` subsystem keeps projects and reviews in a relational database through Entity Framework Core. It
+The `Storage` subsystem keeps projects, reviews, and review comment threads in a relational database through Entity
+Framework Core. It
 implements the store interface of the `Core` subsystem and owns everything about the database: the schema, the
 choice of provider, the location of the data, and the creation of the database. It contains three units:
 `ReviewCenterDbContext`, the mapping of the domain types to tables; `ReviewStore`, the implementation of the
@@ -18,9 +19,10 @@ application; the rest of the system sees only the Core store interface.
 
 - *Type*: In-process .NET class implementing the Core interface.
 - *Role*: Provider.
-- *Contract*: Stores and reads projects, reviews, and file content as described by the Core interface. A review is
-  stored with all its files in one transaction. An attempt to store a review whose identifier exists in the
-  project raises a `DomainRuleException` for `ReviewIdDuplicate`.
+- *Contract*: Stores and reads projects, reviews, file content, and comment threads as described by the Core
+  interface. A review is stored with all its files in one transaction, and a thread with its first comment in one
+  transaction. An attempt to store a review whose identifier exists in the project raises a `DomainRuleException`
+  for `ReviewIdDuplicate`.
 - *Constraints*: Every operation uses its own short-lived database context, so it is safe for concurrent use.
 
 **Database settings**: The `Database` configuration section.
@@ -54,7 +56,11 @@ provider-neutrally.
 with migrations. This is adequate while there is no released schema to upgrade: a new installation gets the
 tables, and an existing database is left alone. The cost is that a database created by an earlier version is
 never altered, so a change of the schema needs a migration strategy before the first release that must keep
-data. This is a known limitation, recorded as an open decision in `architecture.md` and not yet resolved. A
+data. This is a known limitation, recorded as an open decision in `architecture.md` and not yet resolved. It
+already matters once: the tables for comment threads were added after the first schema, so a database created
+before them does not have them and the review page fails until the database file is deleted (or a new one is
+named) and created again. Databases kept for development must be recreated; no data of a released version is
+affected. A
 second limitation is that two processes starting at the same moment on a brand-new database file can collide
 while creating it; a single service instance per database is assumed.
 

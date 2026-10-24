@@ -21,6 +21,11 @@ be loadable on the test platform.
   their own project, ordered by identifier.
 - Review metadata is returned without file content, and an unknown review or file gives nothing.
 - A duplicate review key is reported as a duplicate review identifier.
+- A thread is stored with its anchor (whole file or line range), first comment, and state, and identities are
+  assigned by the database; comments are appended and read in posting order; the state can be changed back and
+  forth; and an unknown thread, or a thread of another review, is reported as not found.
+- Threads are listed only for their own review, in creation order, and the database refuses a thread for a file
+  that is not in the review.
 
 #### Test Scenarios
 
@@ -60,3 +65,28 @@ review, return null. This scenario is tested by `ReviewStore_GetReviewAsync_Unkn
 **ReviewStore_AddReviewAsync_DuplicateKey_ThrowsReviewIdDuplicate**: A review with an existing key is added; a
 `DomainRuleException` for `ReviewIdDuplicate` is thrown. This scenario is tested by
 `ReviewStore_AddReviewAsync_DuplicateKey_ThrowsReviewIdDuplicate`.
+
+**ReviewStore_AddThreadAsync_WholeFileAndRange_RoundTripsWithComments**: A whole-file thread and a range thread
+(each carrying an identity that must be ignored) are stored and listed; identities are assigned and growing, and
+the anchors, file path, state "Open", creation time, and first comment come back unchanged. This scenario is
+tested by `ReviewStore_AddThreadAsync_WholeFileAndRange_RoundTripsWithComments`.
+
+**ReviewStore_AddCommentAsync_ExistingThread_AppendsInOrder**: Two comments are added to a thread; the stored
+comment has an identity and the three comments are listed in posting order. This scenario is tested by
+`ReviewStore_AddCommentAsync_ExistingThread_AppendsInOrder`.
+
+**ReviewStore_AddCommentAsync_UnknownOrOtherReviewThread_ReturnsNull**: A comment for an unknown thread, and for a
+thread through another review, returns null and adds nothing. This scenario is tested by
+`ReviewStore_AddCommentAsync_UnknownOrOtherReviewThread_ReturnsNull`.
+
+**ReviewStore_SetThreadStateAsync_ExistingAndUnknown_ChangesStateOrReturnsFalse**: A thread is resolved and
+reopened; the listed state follows each change; an unknown thread and a thread of another review report false. This
+scenario is tested by `ReviewStore_SetThreadStateAsync_ExistingAndUnknown_ChangesStateOrReturnsFalse`.
+
+**ReviewStore_ListThreadsAsync_TwoReviews_ReturnsOnlyOwnThreadsInOrder**: Threads are added to two reviews in an
+interleaved order; each review lists only its own threads in creation order, and an unknown review lists none. This
+scenario is tested by `ReviewStore_ListThreadsAsync_TwoReviews_ReturnsOnlyOwnThreadsInOrder`.
+
+**ReviewStore_AddThreadAsync_UnknownFile_IsRefusedByDatabase**: A thread for a file that is not in the review
+raises a `DbUpdateException` and no thread is stored. This scenario is tested by
+`ReviewStore_AddThreadAsync_UnknownFile_IsRefusedByDatabase`.

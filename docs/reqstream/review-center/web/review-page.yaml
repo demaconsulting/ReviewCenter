@@ -34,16 +34,18 @@ sections:
 
       - id: ReviewCenter-ReviewPage-Content
         title: >-
-          The ReviewPage unit shall show no file content until a file is selected, show the content of the
-          selected file exactly as stored, as plain text, when it is valid UTF-8 text without NUL bytes
-          (including an empty file), and show the content of another file when that file is selected.
+          The ReviewPage unit shall show no file content until a file is selected, show the selected file, when
+          it is valid UTF-8 text without NUL bytes, as numbered lines whose text is exactly as stored, without
+          the line ending, as plain text (an empty file shows no lines), and show the lines of another file
+          when that file is selected.
         justification: |
-          Reviewers must see the true content of a file. Displaying it as plain text, never as markup, shows
-          every character and cannot execute anything in the file.
+          Reviewers must see the true content of a file, and line numbers are what a comment points at.
+          Displaying the text as plain text, never as markup, shows every character and cannot execute anything
+          in the file.
         tests:
           - ReviewPage_Render_NoFileSelected_ShowsNoContent
-          - ReviewPage_FileSelect_TextFile_ShowsRawTextInPre
-          - ReviewPage_FileSelect_EmptyFile_ShowsEmptyContent
+          - ReviewPage_FileSelect_TextFile_ShowsNumberedLinesWithExactText
+          - ReviewPage_FileSelect_EmptyFile_ShowsNoLines
           - ReviewPage_FileSelect_SecondFile_ReplacesContent
 
       - id: ReviewCenter-ReviewPage-Binary
@@ -56,6 +58,58 @@ sections:
         tests:
           - ReviewPage_FileSelect_BinaryFile_ShowsBinaryNoticeAndNoContent
           - ReviewPage_FileSelect_InvalidUtf8_ShowsBinaryNotice
+
+      - id: ReviewCenter-ReviewPage-ThreadSummary
+        title: >-
+          The ReviewPage unit shall show the number of open and of resolved threads of the review, and the
+          number of open threads next to every file.
+        justification: |
+          Reviewers need to see at a glance how much discussion is still open and which files it concerns.
+        tests:
+          - ReviewPage_Render_NoThreads_ShowsZeroSummaryAndZeroFileCounts
+          - ReviewPage_FileSelect_ThreadsExist_ShowsSummaryCountsMarkersAndComments
+
+      - id: ReviewCenter-ReviewPage-ThreadStart
+        title: >-
+          The ReviewPage unit shall let a reader start a thread on the selected file with an author name, an
+          optional start and end line, and a text, offer a Comment button on every line that fills in the line
+          range, show a violated rule or an unreadable line number as a message next to the form while keeping
+          the entered values, and on success clear the text and show the new thread.
+        justification: |
+          Comments are only useful when they are easy to start and a mistake is easy to correct. Keeping what
+          was typed saves the reader from typing it again. The author is plain text for now, because there is
+          no sign-in yet.
+        tests:
+          - ReviewPage_LineCommentButton_Click_FillsStartAndEndLine
+          - ReviewPage_StartThread_WholeFile_CreatesThreadAndClearsText
+          - ReviewPage_StartThread_LineRangeAndSingleLine_AnchorLines
+          - ReviewPage_StartThread_InvalidInput_ShowsErrorAndKeepsValues
+          - ReviewPage_StartThread_BinaryFile_WholeFileAllowedAndRangeRefused
+
+      - id: ReviewCenter-ReviewPage-ThreadShow
+        title: >-
+          The ReviewPage unit shall list the threads of the selected file in creation order, each with its
+          anchor, state, and comments (author, UTC time, and text as plain text), and shall mark the lines that
+          a thread is anchored to.
+        justification: |
+          Reviewers read the discussion next to the code. Showing comment text as plain text means that nothing
+          typed by an author can change the page.
+        tests:
+          - ReviewPage_FileSelect_ThreadsExist_ShowsSummaryCountsMarkersAndComments
+          - ReviewPage_FileSelect_NoThreadsOnFile_ShowsEmptyMessage
+          - ReviewPage_Render_ThreadText_IsShownAsPlainText
+
+      - id: ReviewCenter-ReviewPage-ThreadUpdate
+        title: >-
+          The ReviewPage unit shall let a reader reply to a thread, showing a violated rule inside that thread,
+          and resolve and reopen a thread, updating the thread and the counts.
+        justification: |
+          Replying, resolving, and reopening are how a discussion moves forward and how reviewers track what
+          is settled.
+        tests:
+          - ReviewPage_Reply_ValidAndBlank_AppendsCommentOrShowsErrorInThread
+          - ReviewPage_Reply_NoAuthor_ShowsErrorPointingToNameField
+          - ReviewPage_ResolveAndReopen_Toggle_ChangesStateAndSummary
 
       - id: ReviewCenter-ReviewPage-Interactive
         title: >-

@@ -52,7 +52,8 @@ gets its own empty database, so the schema created at startup would be missing f
 
 Checks the provider first, so that an unsupported setting fails before anything is created. It then creates the
 folder of the file (not for a `file:` URI) and asks Entity Framework Core to create
-the schema. An existing database is not changed, and no migrations are used.
+the schema. An existing database is not changed, and no migrations are used. A database created before the tables
+for comment threads existed therefore does not get them and must be deleted and created again.
 
 #### Error Handling
 

@@ -279,7 +279,7 @@ The architecture above is the target design. Only the first two slices are imple
   on roles and sign-off) comes in a later slice, and the server must only be exposed on `localhost` or a trusted
   network until then.
 - **Planned and deferred**: Api, Identity, ContentSources, Evidence, Messaging, the review lifecycle beyond `Draft`,
-  and the rest of Core and Storage (comments, checklists, reviewers, audit trail). They have no code, requirements,
+  and the rest of Core and Storage (checklists, reviewers, audit trail). They have no code, requirements,
   design documents, or verification documents yet, so the SysML2 model and the design documentation describe the
   implemented items only and are deliberately partial.
 - **Pipeline**: the CI/release pipeline builds net10.0 only and publishes the self-contained win-x64 and linux-x64

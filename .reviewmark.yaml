@@ -366,6 +366,24 @@ reviews:
       - "src/DemaConsulting.ReviewCenter.Core/UploadedFile.cs"
       - "test/**/Core/ReviewServiceTests.cs"
 
+  - id: ReviewCenter-Core-ThreadService
+    title: Review of ReviewCenter ThreadService unit implementation
+    context:
+      - docs/design/review-center.md
+      - docs/reqstream/review-center.yaml
+      - docs/design/review-center/core.md
+      - docs/reqstream/review-center/core.yaml
+    paths:
+      - "docs/reqstream/review-center/core/thread-service.yaml"
+      - "docs/design/review-center/core/thread-service.md"
+      - "docs/verification/review-center/core/thread-service.md"
+      - "src/DemaConsulting.ReviewCenter.Core/ThreadService.cs"
+      - "src/DemaConsulting.ReviewCenter.Core/ReviewThread.cs"
+      - "src/DemaConsulting.ReviewCenter.Core/ReviewComment.cs"
+      - "src/DemaConsulting.ReviewCenter.Core/ReviewThreadState.cs"
+      - "src/DemaConsulting.ReviewCenter.Core/FileText.cs"
+      - "test/**/Core/ThreadServiceTests.cs"
+
   # ReviewCenter - Storage
   - id: ReviewCenter-Storage
     title: Review of ReviewCenter Storage subsystem architecture and interfaces
