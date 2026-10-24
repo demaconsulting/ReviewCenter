@@ -95,10 +95,10 @@ summary even when the context is configured for silent operation.
 
 **Requirement coverage**: `ReviewCenter-OTS-xUnit-Execute`, `ReviewCenter-OTS-xUnit-Report`.
 
-#### SelectorResolver_Resolve_PlainName_UsesDataTestId
+#### SelectorResolver_Resolve_AllForms_ReturnsPlaywrightSelector
 
 **Scenario**: xUnit discovers and runs this test from the Puppet test project; the test verifies that a plain
-selector name is converted to a test-id selector.
+selector name and the prefixed selector forms are converted to Playwright selectors.
 
 **Expected**: xUnit executes the test, the test passes, and the result is recorded by name in the TRX output.
 

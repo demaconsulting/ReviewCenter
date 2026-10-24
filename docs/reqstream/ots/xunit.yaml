@@ -25,7 +25,7 @@ sections:
               - PathHelpers_SafePathCombine_ValidPaths_CombinesCorrectly
               - Program_Run_WithVersionFlag_DisplaysVersionOnly
               - Validation_Run_WithSilentContext_PrintsSummary
-              - SelectorResolver_Resolve_PlainName_UsesDataTestId
+              - SelectorResolver_Resolve_AllForms_ReturnsPlaywrightSelector
           - id: ReviewCenter-OTS-xUnit-Report
             title: >-
               The TRX result file produced by the test run shall contain results for the tests the project
@@ -46,4 +46,4 @@ sections:
               - PathHelpers_SafePathCombine_ValidPaths_CombinesCorrectly
               - Program_Run_WithVersionFlag_DisplaysVersionOnly
               - Validation_Run_WithSilentContext_PrintsSummary
-              - SelectorResolver_Resolve_PlainName_UsesDataTestId
+              - SelectorResolver_Resolve_AllForms_ReturnsPlaywrightSelector
