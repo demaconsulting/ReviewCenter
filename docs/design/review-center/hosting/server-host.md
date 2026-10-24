@@ -60,7 +60,10 @@ server render mode; and registers the start-up log callback.
   failure as its inner exception.
 
 Calls `DatabaseSetup.EnsureCreated`. It converts an unsupported provider, a database error, a file system
-error, an access error, and an invalid connection string into that one exception type.
+error, an access error, an invalid connection string, and a missing native SQLite library into that one exception
+type. For the missing library the message reports the root cause (the library that could not be loaded), because
+the type-initializer message that SQLite raises is not useful. That case was checked by hand against a published
+build with the native library removed (exit code 1 and the message above); no automated test removes the library.
 
 **RunAsync**: Builds and runs the web server until it is stopped.
 

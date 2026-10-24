@@ -234,11 +234,16 @@ internal static class ServerHost
             DatabaseSetup.EnsureCreated(factory, options);
         }
         catch (Exception ex) when (ex is InvalidOperationException or DbException or IOException
-                                       or UnauthorizedAccessException or ArgumentException)
+                                       or UnauthorizedAccessException or ArgumentException
+                                       or DllNotFoundException or TypeInitializationException)
         {
             // The application will never run, so release what building it acquired
             ((IDisposable)app).Dispose();
-            throw new InvalidOperationException($"Failed to prepare the database: {ex.Message}", ex);
+
+            // A missing native SQLite library surfaces as a type-initializer failure whose own message is
+            // unhelpful; report the root cause (the library that could not be loaded) instead
+            var detail = ex is TypeInitializationException ? ex.GetBaseException().Message : ex.Message;
+            throw new InvalidOperationException($"Failed to prepare the database: {detail}", ex);
         }
     }
 
