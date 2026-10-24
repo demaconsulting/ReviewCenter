@@ -103,7 +103,9 @@ the message also says which field to fill in (the 'Your name' field), because th
 **ToggleThreadAsync**: Resolves an open thread or reopens a resolved one, then reloads the threads. Resolving also
 collapses the thread. A thread that no longer exists is reported inside the thread.
 
-**SetFilter**: Sets the state the thread index shows. **ToggleThreadExpanded**: Expands or collapses a resolved
+**SetFilter**: Sets the state the thread index shows. Each index row is a button whose accessible name states the
+anchor, file, state, comment count, first author, and last activity, so a screen-reader user hears what a sighted
+user sees. **ToggleThreadExpanded**: Expands or collapses a resolved
 thread.
 
 **SelectThreadAsync**: Shows a thread chosen in the index. The thread's file is selected through `SelectFileAsync`

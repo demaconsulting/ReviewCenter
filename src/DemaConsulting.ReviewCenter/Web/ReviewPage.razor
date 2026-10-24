@@ -78,7 +78,7 @@
                         var rowThread = row;
                         <li>
                             <button type="button" class="index-row" data-testid="index-row-@row.Id"
-                                    aria-label="Show thread @row.Id on @row.FilePath"
+                                    aria-label="@IndexRowLabel(row)"
                                     @onclick="() => SelectThreadAsync(rowThread)">
                                 <span class="path" data-testid="index-file-@row.Id">@row.FilePath</span>
                                 <span data-testid="index-anchor-@row.Id">@AnchorLabel(row)</span>

@@ -1,6 +1,6 @@
 package ReviewCenter {
     part def App {
-        doc /* HTML shell and router that select the page for a requested URL. */
+        doc /* HTML shell and router that select the page for a requested URL, and provide the browser function that scrolls a page element into view. */
 
         comment sourceRef /* Source: src/DemaConsulting.ReviewCenter/Web/App.razor and Routes.razor */
         comment testRef /* Test: test/DemaConsulting.ReviewCenter.Tests/Web/AppTests.cs */

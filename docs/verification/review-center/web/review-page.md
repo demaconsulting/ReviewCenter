@@ -36,7 +36,8 @@ N/A - standard test environment.
   author message points to the name field.
 - Resolve and reopen change the thread state and the summary; the next-step line follows the threads.
 - The thread index shows the open threads by default and can show all or only resolved threads, each row with file,
-  anchor, state, number of comments, first author, and last activity; choosing a row selects its file, highlights
+  anchor, state, number of comments, first author, and last activity, and an accessible name that states the same
+  facts; choosing a row selects its file, highlights
    its lines and thread, expands a resolved thread, and asks the browser to scroll to the first line (the center of
   the window).
 - Choosing a file asks the browser to bring the top of its code into view, and the line Comment button asks it to

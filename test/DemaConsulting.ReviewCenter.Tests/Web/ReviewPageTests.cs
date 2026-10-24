@@ -772,6 +772,10 @@ public class ReviewPageTests : PageTestBase
         Assert.Equal("Ann", cut.Find($"[data-testid='index-author-{open.Id}']").TextContent);
         Assert.Equal("2025-03-04 05:06 UTC", cut.Find($"[data-testid='index-activity-{open.Id}']").TextContent);
 
+        // Assert: the row button's accessible name carries the same facts, not just the file
+        Assert.Equal(
+            "Show Lines 2-3 of a.txt, Open, 2 comments, first by Ann, last activity 2025-03-04 05:06 UTC",
+            cut.Find($"[data-testid='index-row-{open.Id}']").GetAttribute("aria-label"));
         // Act, Assert: All shows both threads, with the counts in the filter buttons
         await cut.Find("[data-testid='index-filter-all']").ClickAsync();
         Assert.Equal(2, cut.FindAll("[data-testid='thread-index-list'] > li").Count);

@@ -519,6 +519,17 @@ public partial class ReviewPage : ComponentBase
     }
 
     /// <summary>
+    ///     Words the accessible name of a thread index row, carrying the same facts as the visible cells.
+    /// </summary>
+    /// <param name="thread">The thread of the row.</param>
+    /// <returns>For example "Show Line 4 of src/a.cs, Open, 2 comments, first by Ann, last activity 2026-01-02 03:04 UTC".</returns>
+    private static string IndexRowLabel(ReviewThread thread)
+    {
+        return $"Show {AnchorLabel(thread)} of {thread.FilePath}, {thread.State}, {CommentCountLabel(thread)}, " +
+               $"first by {thread.Comments.FirstOrDefault()?.Author}, last activity {FormatTime(thread.LastActivity)}";
+    }
+
+    /// <summary>
     ///     Formats a comment time for display.
     /// </summary>
     /// <param name="time">The time to format.</param>
