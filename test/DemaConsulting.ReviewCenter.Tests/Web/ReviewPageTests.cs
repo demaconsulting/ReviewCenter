@@ -23,6 +23,7 @@ using Bunit;
 using DemaConsulting.ReviewCenter.Core;
 using DemaConsulting.ReviewCenter.Tests.Core;
 using DemaConsulting.ReviewCenter.Web;
+using Microsoft.AspNetCore.Components;
 
 using TestContext = Xunit.TestContext;
 
@@ -250,6 +251,45 @@ public class ReviewPageTests : PageTestBase
         // Assert: the second file is shown
         Assert.Equal("world\n", cut.Find("[data-testid='file-content']").TextContent);
         Assert.Equal("b.txt", cut.Find("[data-testid='selected-file-path']").TextContent);
+    }
+
+    /// <summary>
+    ///     Test that navigating to another review replaces the shown review and clears the selected file.
+    /// </summary>
+    [Fact]
+    public async Task ReviewPage_ParametersChange_OtherReview_ShowsNewReviewAndClearsSelection()
+    {
+        // Arrange: a page showing REV-1 with its file selected, and a second review in the project
+        var projectId = await CreateReviewAsync(new UploadedFile("a.txt", TestContent.A));
+        await Reviews.CreateDraftAsync(projectId, "REV-2", "Second review", [new("b.txt", TestContent.B)], TestContext.Current.CancellationToken);
+        var cut = RenderPage(projectId);
+        await cut.Find("[data-testid='file-select-0']").ClickAsync();
+
+        // Act: the router reuses the component for the other review
+        await cut.InvokeAsync(() => cut.Instance.SetParametersAsync(ParameterView.FromDictionary(
+            new Dictionary<string, object?> { [nameof(ReviewPage.ProjectId)] = projectId, [nameof(ReviewPage.ReviewId)] = "REV-2" })));
+
+        // Assert: the second review is shown and no file content from the first one remains
+        await cut.WaitForAssertionAsync(() => Assert.Equal("Second review", cut.Find("[data-testid='review-title']").TextContent));
+        Assert.Equal("b.txt", cut.Find("[data-testid='file-path-0']").TextContent);
+        Assert.Empty(cut.FindAll("[data-testid='file-content']"));
+    }
+
+    /// <summary>
+    ///     Test that every file button carries an accessible name that identifies its file.
+    /// </summary>
+    [Fact]
+    public async Task ReviewPage_Render_ExistingReview_FileButtonsNameTheirFile()
+    {
+        // Arrange: a review of two files
+        var projectId = await CreateReviewAsync(new UploadedFile("a.txt", TestContent.A), new UploadedFile("b.txt", TestContent.B));
+
+        // Act: render the page
+        var cut = RenderPage(projectId);
+
+        // Assert: each button's accessible name includes its file path
+        Assert.Equal("View a.txt", cut.Find("[data-testid='file-select-0']").GetAttribute("aria-label"));
+        Assert.Equal("View b.txt", cut.Find("[data-testid='file-select-1']").GetAttribute("aria-label"));
     }
 
     /// <summary>

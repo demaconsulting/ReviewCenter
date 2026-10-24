@@ -29,13 +29,15 @@ sections:
       - id: ReviewCenter-ProjectPage-Selection
         title: >-
           The ProjectPage unit shall list the name and size of each file the user selects for a new review, and
-          a new selection shall replace the previous one.
+          a new selection shall replace the previous one. When the page is reused for another project, it shall
+          show that project and discard the previous form values and selection.
         justification: |
           Users must see exactly which files they are about to submit before they submit them, and must be able
-          to correct a wrong selection.
+          to correct a wrong selection. Files chosen for one project must never be submitted into another.
         tests:
           - ProjectPage_FileInput_FilesSelected_ListsNamesAndSizes
           - ProjectPage_FileInput_SecondSelection_ReplacesFirst
+          - ProjectPage_ParametersChange_OtherProject_ClearsFormAndSelection
 
       - id: ReviewCenter-ProjectPage-Create
         title: >-

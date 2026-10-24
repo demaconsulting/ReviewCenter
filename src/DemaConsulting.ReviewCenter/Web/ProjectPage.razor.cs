@@ -46,6 +46,11 @@ public partial class ProjectPage : ComponentBase
     private bool _interactive;
 
     /// <summary>
+    ///     The project identity whose data is currently loaded, or <c>null</c> before the first load.
+    /// </summary>
+    private int? _loadedProjectId;
+
+    /// <summary>
     ///     Gets or sets the identity of the project to show, from the page address.
     /// </summary>
     [Parameter]
@@ -124,6 +129,21 @@ public partial class ProjectPage : ComponentBase
     /// <returns>A task that completes when the data is loaded.</returns>
     protected override async Task OnParametersSetAsync()
     {
+        // The router reuses this instance when only the project id changes; drop the previous project's
+        // data and form state so it can neither be shown nor submitted into the new project
+        if (_loadedProjectId != ProjectId)
+        {
+            _loadedProjectId = ProjectId;
+            Loaded = false;
+            Project = null;
+            Reviews = [];
+            ReviewId = string.Empty;
+            ReviewTitle = string.Empty;
+            SelectedFiles = [];
+            ErrorMessage = null;
+            SelectionRejected = false;
+        }
+
         Project = await ProjectService.GetAsync(ProjectId);
         Reviews = Project is null ? [] : await ReviewService.ListAsync(ProjectId);
         Loaded = true;

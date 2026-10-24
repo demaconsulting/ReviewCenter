@@ -18,7 +18,8 @@ N/A - standard test environment.
 - All component tests pass with zero failures.
 - An unknown project shows a not-found message and no form; a known project shows its name and description and
   its reviews with link, title, and state, or an empty message.
-- Selected files are listed with names and sizes, and a new selection replaces the previous one.
+- Selected files are listed with names and sizes, and a new selection replaces the previous one; reusing the page
+  for another project shows that project and discards the previous form values and selection.
 - A valid form creates the review with the exact bytes and the correct fingerprint and opens the review page.
 - Rule violations (no files, duplicate review identifier, duplicate file names) and a selection over a limit (too
   many files, a file over the size limit, or a total over the size limit) are shown as errors that keep the
@@ -44,6 +45,10 @@ size in bytes. This scenario is tested by `ProjectPage_FileInput_FilesSelected_L
 
 **ProjectPage_FileInput_SecondSelection_ReplacesFirst**: A second selection replaces the first. This scenario is
 tested by `ProjectPage_FileInput_SecondSelection_ReplacesFirst`.
+
+**ProjectPage_ParametersChange_OtherProject_ClearsFormAndSelection**: A form is filled and a file selected, then the
+page is reused for another project; the other project is shown with an empty form and no selected files. This
+scenario is tested by `ProjectPage_ParametersChange_OtherProject_ClearsFormAndSelection`.
 
 **ProjectPage_CreateForm_ValidInput_CreatesReviewAndNavigatesToIt**: Files are chosen, the form is completed and
 submitted; the review is stored with the title, the fingerprint of the files, and the exact file bytes, and the

@@ -34,7 +34,9 @@ Test identifiers: `project-page` (root), `home-link`, `projects-link`, `project-
 #### Key Methods
 
 **OnParametersSetAsync**: Loads the project and its reviews; a project that does not exist leaves `Project` null and
-the page shows a message.
+the page shows a message. When the project identity differs from the one already loaded (the router reuses the
+component), it first discards the previous project's data, form values, selected files and error, so files chosen
+for one project can never be submitted into another.
 
 **OnFilesSelectedAsync**: Reads the selected files into memory.
 

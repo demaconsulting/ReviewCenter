@@ -19,15 +19,18 @@ sections:
           - ReviewPage_Render_UnknownReview_ShowsNotFound
           - ReviewPage_Render_ExistingReview_ShowsIdTitleStateAndFingerprint
           - ReviewPage_Render_FileSelected_ShowsProjectNameAndHighlightsRow
+          - ReviewPage_ParametersChange_OtherReview_ShowsNewReviewAndClearsSelection
 
       - id: ReviewCenter-ReviewPage-Files
         title: >-
-          The ReviewPage unit shall list the files of the review with the path, size, and SHA-256 hash of each.
+          The ReviewPage unit shall list the files of the review with the path, size, and SHA-256 hash of each,
+          and give each file's View button an accessible name that identifies the file.
         justification: |
           Reviewers need to see what the review contains, and the per-file hashes let them verify a file
           independently of the product.
         tests:
           - ReviewPage_Render_ExistingReview_ListsFilesWithPathSizeAndHash
+          - ReviewPage_Render_ExistingReview_FileButtonsNameTheirFile
 
       - id: ReviewCenter-ReviewPage-Content
         title: >-

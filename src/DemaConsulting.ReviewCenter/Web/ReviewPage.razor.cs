@@ -112,10 +112,16 @@ public partial class ReviewPage : ComponentBase
     /// <returns>A task that completes when the review is loaded.</returns>
     protected override async Task OnParametersSetAsync()
     {
-        Review = await ReviewService.GetAsync(ProjectId, ReviewId);
-        ProjectName = (await ProjectService.GetAsync(ProjectId))?.Name;
+        // Clear the previous review before the first await so the loading state is shown, and a stale
+        // review is never displayed or acted on under the new address
+        Loaded = false;
+        Review = null;
+        ProjectName = null;
         SelectedPath = null;
         SelectedText = null;
+
+        Review = await ReviewService.GetAsync(ProjectId, ReviewId);
+        ProjectName = (await ProjectService.GetAsync(ProjectId))?.Name;
         Loaded = true;
     }
 

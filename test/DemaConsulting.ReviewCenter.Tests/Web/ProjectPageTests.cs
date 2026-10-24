@@ -325,6 +325,32 @@ public class ProjectPageTests : PageTestBase
     }
 
     /// <summary>
+    ///     Test that navigating to another project clears the form and the selection of the previous one.
+    /// </summary>
+    [Fact]
+    public async Task ProjectPage_ParametersChange_OtherProject_ClearsFormAndSelection()
+    {
+        // Arrange: a page for the first project with a filled form, a selected file and an error
+        var first = await Projects.CreateAsync("Apollo", null, TestContext.Current.CancellationToken);
+        var second = await Projects.CreateAsync("Gemini", null, TestContext.Current.CancellationToken);
+        var cut = RenderPage(first.Id);
+        await cut.Find("[data-testid='review-id-input']").InputAsync("REV-1");
+        await cut.Find("[data-testid='review-title-input']").InputAsync("First review");
+        SelectFiles(cut, ("a.txt", TestContent.A));
+        await cut.WaitForAssertionAsync(() => Assert.NotEmpty(cut.FindAll("[data-testid='selected-file-0']")));
+
+        // Act: the router reuses the component for the other project
+        await cut.InvokeAsync(() => cut.Instance.SetParametersAsync(
+            ParameterView.FromDictionary(new Dictionary<string, object?> { [nameof(ProjectPage.ProjectId)] = second.Id })));
+
+        // Assert: the new project is shown with an empty form and no selected files
+        await cut.WaitForAssertionAsync(() => Assert.Equal("Gemini", cut.Find("[data-testid='project-name']").TextContent));
+        Assert.Equal(string.Empty, cut.Find("[data-testid='review-id-input']").GetAttribute("value") ?? string.Empty);
+        Assert.Equal(string.Empty, cut.Find("[data-testid='review-title-input']").GetAttribute("value") ?? string.Empty);
+        Assert.Empty(cut.FindAll("[data-testid='selected-file-0']"));
+    }
+
+    /// <summary>
     ///     Test that the interactive marker is set once the component has rendered on a live circuit.
     /// </summary>
     [Fact]

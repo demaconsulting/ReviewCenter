@@ -17,7 +17,8 @@ N/A - standard test environment.
 - All component tests pass with zero failures.
 - An unknown review shows a not-found message and no details.
 - A known review shows its identifier, title, state, and the known fingerprint, and lists every file with path,
-  size, and SHA-256 hash.
+  size, and SHA-256 hash; each file's View button has an accessible name that includes the file path.
+- Reusing the page for another review shows the new review and clears the previously selected file.
 - No content is shown until a file is selected; selecting a text file shows its raw text in a preformatted block;
   selecting another file replaces the content.
 - Binary content, including text that is not valid UTF-8, shows a notice instead of content; an empty file shows
@@ -59,6 +60,13 @@ and no binary notice. This scenario is tested by `ReviewPage_FileSelect_EmptyFil
 
 **ReviewPage_FileSelect_SecondFile_ReplacesContent**: A second file is selected; its content and path replace the
 first. This scenario is tested by `ReviewPage_FileSelect_SecondFile_ReplacesContent`.
+
+**ReviewPage_Render_ExistingReview_FileButtonsNameTheirFile**: Every file's View button has an `aria-label` of
+`View` followed by its path. This scenario is tested by `ReviewPage_Render_ExistingReview_FileButtonsNameTheirFile`.
+
+**ReviewPage_ParametersChange_OtherReview_ShowsNewReviewAndClearsSelection**: A file is selected, then the page is
+reused for another review of the project; the other review is shown and no file content remains. This scenario is
+tested by `ReviewPage_ParametersChange_OtherReview_ShowsNewReviewAndClearsSelection`.
 
 **ReviewPage_AfterRender_Interactive_SetsMarker**: The page is rendered; its root element has `data-interactive`
 equal to `true`. This scenario is tested by `ReviewPage_AfterRender_Interactive_SetsMarker`.

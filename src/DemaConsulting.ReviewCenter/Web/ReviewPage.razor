@@ -53,7 +53,7 @@
                         <div class="path" data-testid="file-path-@index">@file.Path</div>
                         <div class="muted file-size"><span data-testid="file-size-@index">@file.Size</span> bytes</div>
                         <div class="hash muted" data-testid="file-hash-@index">@file.Sha256</div>
-                        <button type="button" data-testid="file-select-@index" @onclick="() => SelectFileAsync(fileIndex)">View</button>
+                        <button type="button" data-testid="file-select-@index" aria-label="View @file.Path" @onclick="() => SelectFileAsync(fileIndex)">View</button>
                     </li>
                 }
             </ul>

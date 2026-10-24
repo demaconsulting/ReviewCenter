@@ -32,8 +32,11 @@ Test identifiers: `review-page` (root), `home-link`, `projects-link`, `project-l
 
 #### Key Methods
 
-**OnParametersSetAsync**: Loads the review and clears any file selection, so that following a link to another
-review never shows the content of the previous one.
+**OnParametersSetAsync**: Clears the displayed review, project name and file selection and sets `Loaded` to
+false before the first await, then loads the review. The router reuses the component when only the route changes,
+so following a link to another review shows the loading state and never the previous review or its file content.
+Each file's `View` button has an `aria-label` of `View {path}` so that screen-reader users can tell the buttons
+apart.
 
 **SelectFileAsync**: Shows one file.
 
