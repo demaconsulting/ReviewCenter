@@ -13,18 +13,16 @@ N/A - standard test environment.
 ### Acceptance Criteria
 
 - All unit tests pass with zero failures.
-- A plain name resolves to a `data-testid` attribute selector.
-- CSS, text, and chained selectors pass through unchanged.
+- A plain name and a `testid:` name resolve to a `data-testid` attribute selector, with quotes escaped.
+- `css=`, `text=`, `role=`, and CSS selectors pass through unchanged.
 - Empty and white-space selectors are rejected.
 
 ### Test Scenarios
 
-**SelectorResolver_Resolve_PlainName_UsesDataTestId**: The name `hello-button` resolves to
-`[data-testid="hello-button"]`. This scenario is tested by `SelectorResolver_Resolve_PlainName_UsesDataTestId`.
-
-**SelectorResolver_Resolve_SpecialCharacters_PassesThroughUnchanged**: The selectors `#main`, `.button`,
-`text=Hello`, `button >> nth=0`, and `[data-testid='x']` are returned exactly as given. This scenario is tested by
-`SelectorResolver_Resolve_SpecialCharacters_PassesThroughUnchanged`.
+**SelectorResolver_Resolve_AllForms_ReturnsPlaywrightSelector**: `hello-button` and `testid:hello-button` resolve to
+`[data-testid="hello-button"]`, a quote in a test id is escaped, and `css=.button`, `text=Count: 2`,
+`role=button[name="Save"]`, and `#main` are returned exactly as given. Tested by
+`SelectorResolver_Resolve_AllForms_ReturnsPlaywrightSelector`.
 
 **SelectorResolver_Resolve_Blank_ThrowsArgumentException**: An empty selector and a selector of two spaces each
-cause an `ArgumentException`. This scenario is tested by `SelectorResolver_Resolve_Blank_ThrowsArgumentException`.
+cause an `ArgumentException`. Tested by `SelectorResolver_Resolve_Blank_ThrowsArgumentException`.

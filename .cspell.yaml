@@ -29,6 +29,7 @@ words:
   - buildmark
   - buildtransitive
   - contentfiles
+  - dblclick
   - dcterms
   - DEMA
   - Dema
@@ -44,6 +45,7 @@ words:
   - Qube
   - reqstream
   - reviewmark
+  - requestfailed
   - SARIF
   - sarifmark
   - setlocal
@@ -51,6 +53,7 @@ words:
   - sonarmark
   - sysml
   - sysml2tools
+  - tabindex
   - reviewcenter
   - venv
   - versionmark

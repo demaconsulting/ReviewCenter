@@ -10,29 +10,15 @@ sections:
     sections:
       - title: SelectorResolver Requirements
         requirements:
-          - id: ReviewCenterPuppet-SelectorResolver-TestId
+          - id: ReviewCenterPuppet-SelectorResolver-Resolve
             title: >-
-              The SelectorResolver unit shall resolve a plain name made of letters, digits, hyphens, and
-              underscores to a data-testid attribute selector.
+              The SelectorResolver unit shall resolve a testid: prefixed name or a plain name made of letters,
+              digits, hyphens, and underscores to a data-testid attribute selector, return any other selector
+              (css=, text=, role=, or CSS) unchanged, and reject a null or blank selector.
             justification: |
               The ReviewCenter web interface marks the elements a driver needs with stable test ids, so the
-              common case is as short as possible.
+              common case is as short as possible; elements without one are reached with CSS, text, or role
+              selectors that must arrive at the browser as typed; a blank selector cannot identify anything.
             tests:
-              - SelectorResolver_Resolve_PlainName_UsesDataTestId
-
-          - id: ReviewCenterPuppet-SelectorResolver-Passthrough
-            title: >-
-              The SelectorResolver unit shall return a selector that contains any other character unchanged.
-            justification: |
-              Elements without a test id are reached with CSS, text, or role selectors, which must arrive at
-              the browser exactly as the caller typed them.
-            tests:
-              - SelectorResolver_Resolve_SpecialCharacters_PassesThroughUnchanged
-
-          - id: ReviewCenterPuppet-SelectorResolver-BlankRejected
-            title: The SelectorResolver unit shall reject a null or blank selector.
-            justification: |
-              A blank selector cannot identify an element, so it is rejected instead of being passed to the
-              browser, where it would fail with a confusing message.
-            tests:
+              - SelectorResolver_Resolve_AllForms_ReturnsPlaywrightSelector
               - SelectorResolver_Resolve_Blank_ThrowsArgumentException

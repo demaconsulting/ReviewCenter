@@ -137,5 +137,4 @@ sections:
           detection without being falsely reported as disconnected from tool
           functionality.
         children:
-          - ReviewCenterPuppet-OTS-Playwright-Driver
-          - ReviewCenterPuppet-OTS-Playwright-LaunchFailure
+          - ReviewCenterPuppet-OTS-Playwright-Chromium

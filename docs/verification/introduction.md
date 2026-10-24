@@ -3,7 +3,7 @@
 This document provides the verification design for the ReviewCenter, a web-based formal code
 review service with a companion .NET command-line interface. The service is an ASP.NET Core
 Blazor Server application started with the `serve` verb; the repository also holds a separate
-development tool, Puppet, that drives the web interface from the command line.
+development tool, Puppet, that drives a persistent headless browser against the web interface.
 
 ## Purpose
 
@@ -33,14 +33,11 @@ This document covers the verification design for the following software items:
   - **Utilities** subsystem
     - **PathHelpers** — safe path combination utilities
 - **ReviewCenterPuppet** — a separate development-tool system with its own system and unit verification:
-  - **PuppetProgram** — entry point and command dispatcher
-  - **CommandLine** — command-line parser
+  - **PuppetProgram** — command-line parsing, start, and result printing
+  - **ControlChannel** — control file and loopback protocol
+  - **BrowserDaemon** — the persistent browser process
   - **SelectorResolver** — element selector translation
-  - **SessionStore** — session file storage
-  - **ControlChannel** — control protocol client and server
-  - **CommandExecutor** — browser command execution
-  - **DaemonHost** — background session host
-  - **DaemonLauncher** — detached daemon launcher
+  - **PlaywrightBrowser** — headless Chromium through Playwright
 
 **OTS items:**
 

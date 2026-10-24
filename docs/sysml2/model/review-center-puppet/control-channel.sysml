@@ -1,8 +1,8 @@
 package ReviewCenterPuppet {
     part def ControlChannel {
-        doc /* Loopback-only, token-authenticated newline-delimited JSON channel between client commands and the daemon. */
+        doc /* The control file and the loopback TCP protocol (one JSON line per request and response) between the puppet command and the daemon. */
 
-        comment sourceRef /* Source: tools/puppet/ControlProtocol.cs, tools/puppet/ControlServer.cs */
+        comment sourceRef /* Source: tools/puppet/ControlChannel.cs */
         comment testRef /* Test: test/DemaConsulting.ReviewCenter.Puppet.Tests/ControlChannelTests.cs */
         comment designRef /* Design: docs/design/review-center-puppet/control-channel.md */
         comment verificationRef /* Verification: docs/verification/review-center-puppet/control-channel.md */

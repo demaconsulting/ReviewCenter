@@ -267,10 +267,8 @@ reviews:
       - "docs/design/review-center-puppet.md"
       - "docs/verification/introduction.md"
       - "docs/verification/review-center-puppet.md"
-      - "test/**/PuppetSystemTests.cs"
       - "test/**/PuppetEndToEndTests.cs"
       - "test/**/SequentialCollection.cs"
-      - "test/**/Fakes.cs"
 
   - id: ReviewCenterPuppet-Design
     title: Review of ReviewCenterPuppet architectural and design consistency
@@ -313,17 +311,28 @@ reviews:
       - "tools/puppet/PuppetProgram.cs"
       - "test/**/PuppetProgramTests.cs"
 
-  - id: ReviewCenterPuppet-CommandLine
-    title: Review of ReviewCenterPuppet CommandLine unit implementation
+  - id: ReviewCenterPuppet-ControlChannel
+    title: Review of ReviewCenterPuppet ControlChannel unit implementation
     context:
       - docs/design/review-center-puppet.md
       - docs/reqstream/review-center-puppet.yaml
     paths:
-      - "docs/reqstream/review-center-puppet/command-line.yaml"
-      - "docs/design/review-center-puppet/command-line.md"
-      - "docs/verification/review-center-puppet/command-line.md"
-      - "tools/puppet/CommandLine.cs"
-      - "test/**/CommandLineTests.cs"
+      - "docs/reqstream/review-center-puppet/control-channel.yaml"
+      - "docs/design/review-center-puppet/control-channel.md"
+      - "docs/verification/review-center-puppet/control-channel.md"
+      - "tools/puppet/ControlChannel.cs"
+      - "test/**/ControlChannelTests.cs"
+
+  - id: ReviewCenterPuppet-BrowserDaemon
+    title: Review of ReviewCenterPuppet BrowserDaemon unit implementation
+    context:
+      - docs/design/review-center-puppet.md
+      - docs/reqstream/review-center-puppet.yaml
+    paths:
+      - "docs/reqstream/review-center-puppet/browser-daemon.yaml"
+      - "docs/design/review-center-puppet/browser-daemon.md"
+      - "docs/verification/review-center-puppet/browser-daemon.md"
+      - "tools/puppet/BrowserDaemon.cs"
 
   - id: ReviewCenterPuppet-SelectorResolver
     title: Review of ReviewCenterPuppet SelectorResolver unit implementation
@@ -337,68 +346,17 @@ reviews:
       - "tools/puppet/SelectorResolver.cs"
       - "test/**/SelectorResolverTests.cs"
 
-  - id: ReviewCenterPuppet-SessionStore
-    title: Review of ReviewCenterPuppet SessionStore unit implementation
+  - id: ReviewCenterPuppet-PlaywrightBrowser
+    title: Review of ReviewCenterPuppet PlaywrightBrowser unit implementation
     context:
       - docs/design/review-center-puppet.md
       - docs/reqstream/review-center-puppet.yaml
     paths:
-      - "docs/reqstream/review-center-puppet/session-store.yaml"
-      - "docs/design/review-center-puppet/session-store.md"
-      - "docs/verification/review-center-puppet/session-store.md"
-      - "tools/puppet/SessionStore.cs"
-      - "test/**/SessionStoreTests.cs"
-
-  - id: ReviewCenterPuppet-ControlChannel
-    title: Review of ReviewCenterPuppet ControlChannel unit implementation
-    context:
-      - docs/design/review-center-puppet.md
-      - docs/reqstream/review-center-puppet.yaml
-    paths:
-      - "docs/reqstream/review-center-puppet/control-channel.yaml"
-      - "docs/design/review-center-puppet/control-channel.md"
-      - "docs/verification/review-center-puppet/control-channel.md"
-      - "tools/puppet/ControlProtocol.cs"
-      - "tools/puppet/ControlServer.cs"
-      - "test/**/ControlChannelTests.cs"
-
-  - id: ReviewCenterPuppet-CommandExecutor
-    title: Review of ReviewCenterPuppet CommandExecutor unit implementation
-    context:
-      - docs/design/review-center-puppet.md
-      - docs/reqstream/review-center-puppet.yaml
-    paths:
-      - "docs/reqstream/review-center-puppet/command-executor.yaml"
-      - "docs/design/review-center-puppet/command-executor.md"
-      - "docs/verification/review-center-puppet/command-executor.md"
-      - "tools/puppet/CommandExecutor.cs"
-      - "test/**/CommandExecutorTests.cs"
-
-  - id: ReviewCenterPuppet-DaemonHost
-    title: Review of ReviewCenterPuppet DaemonHost unit implementation
-    context:
-      - docs/design/review-center-puppet.md
-      - docs/reqstream/review-center-puppet.yaml
-    paths:
-      - "docs/reqstream/review-center-puppet/daemon-host.yaml"
-      - "docs/design/review-center-puppet/daemon-host.md"
-      - "docs/verification/review-center-puppet/daemon-host.md"
-      - "tools/puppet/DaemonHost.cs"
-      - "tools/puppet/ServerProcessRunner.cs"
+      - "docs/reqstream/review-center-puppet/playwright-browser.yaml"
+      - "docs/design/review-center-puppet/playwright-browser.md"
+      - "docs/verification/review-center-puppet/playwright-browser.md"
       - "tools/puppet/PlaywrightBrowser.cs"
-      - "test/**/DaemonHostTests.cs"
-
-  - id: ReviewCenterPuppet-DaemonLauncher
-    title: Review of ReviewCenterPuppet DaemonLauncher unit implementation
-    context:
-      - docs/design/review-center-puppet.md
-      - docs/reqstream/review-center-puppet.yaml
-    paths:
-      - "docs/reqstream/review-center-puppet/daemon-launcher.yaml"
-      - "docs/design/review-center-puppet/daemon-launcher.md"
-      - "docs/verification/review-center-puppet/daemon-launcher.md"
-      - "tools/puppet/DaemonLauncher.cs"
-      - "test/**/DaemonLauncherTests.cs"
+      - "test/**/PlaywrightBrowserTests.cs"
 
   # OTS Items
   - id: OTS-AspNetCore
@@ -442,7 +400,6 @@ reviews:
       - "docs/reqstream/ots/playwright.yaml"
       - "docs/design/ots/playwright.md"
       - "docs/verification/ots/playwright.md"
-      - "test/**/PlaywrightOtsTests.cs"
 
   - id: OTS-ReqStream
     title: Review of ReqStream OTS verification evidence

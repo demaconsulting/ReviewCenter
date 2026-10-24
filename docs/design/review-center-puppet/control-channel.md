@@ -4,71 +4,36 @@
 
 ### Purpose
 
-`ControlChannel` carries commands from the short-lived client invocations to the session daemon. It is a loopback-only
-TCP connection that carries one JSON document per line, and every request must present the random session token. The
-unit consists of the message types and wire format (`ControlProtocol`, `ControlRequest`, `ControlResponse`), the
-client (`ControlClient`), the server (`ControlServer`), and the `PuppetException` that reports expected failures.
+`ControlChannel` is how the commands find and talk to the daemon: the control file and a minimal request/response
+protocol over loopback TCP.
 
 ### Data Model
 
-**ControlRequest**: a record with `Token`, `Command`, `Selector`, `Text`, `OutputPath`, `FullPage`, and `TimeoutMs`.
-`Text` holds the path of `goto` or the value of `fill`.
+**Control file**: `reviewcenter-puppet.json` in the temporary folder: `{"port":N,"baseUrl":"..."}` written by the
+daemon when it is ready, or `{"error":"..."}` when the daemon could not start.
 
-**ControlResponse**: a record with `Ok`, `ExitCode`, and `Message`. The message is the command output on success and
-the reason on failure.
+**Request**: one JSON line `{"command":"click","args":["hello-button"],"options":{}}`.
 
-**PuppetException**: the exception type for failures that the user can understand and act on. Its message is shown to
-the user as it is. Its internal helper `DescribeUnexpected` formats any other exception as a one-line message that
-names the exception type, so unanticipated failures stay visible without a stack trace.
-
-**MaxLineLength**: 8 MiB, the longest line either side accepts, which bounds memory use when a peer misbehaves.
-
-**Idle timeout**: supplied by the caller of `ControlServer.RunAsync`; the daemon uses 30 minutes.
+**Response**: one JSON line `{"ok":true,"output":"...","url":"...","title":"...","events":["..."]}`. The special
+request `ping` is answered with the output `pong`.
 
 ### Key Methods
 
-**ControlProtocol.Serialize / Deserialize**: Convert a message to and from one line of JSON. `Deserialize` raises a
-`PuppetException` when the text is not a valid message.
+**Read / Write**: Read and write the control file. A missing, half-written, or garbage file reads as no information.
 
-**ControlProtocol.ReadLineAsync**: Reads one newline-terminated line with the length limit. Returns null when the peer
-closes the connection before a complete line arrives.
+**SendAsync**: Connects to the loopback port, sends one request line, and reads one response line. One connection is
+used per command.
 
-**ControlClient.SendAsync**: Opens a connection to the loopback address and the given port, sends the request line,
-reads the response line, and returns the response. One connection is used per command. The whole exchange is bounded
-by the timeout the caller supplies.
+**ServeAsync**: The daemon side: accepts one connection at a time, reads a request line, calls the handler, and writes
+the response line. A client that disconnects or sends garbage does not stop the daemon.
 
-**ControlServer constructor**: Starts listening on the loopback address with a port chosen by the operating system.
-`Port` exposes the port.
-
-**ControlServer.CreateToken**: Returns a random 256-bit value as hexadecimal text.
-
-**ControlServer.RunAsync**: Accepts and serves one client at a time until the cancellation token is cancelled or no
-connection arrives within the idle timeout.
-
-- *Returns*: true when the loop ended because of the idle timeout and false when it was cancelled.
-
-For each client it reads the request line within 10 seconds, deserializes it, compares the presented token with the
-session token using a fixed-time comparison, and passes an authenticated request to the handler. A request with the
-wrong token receives a failed response and the handler is not called.
+**IsAnsweringAsync**: Sends `ping` with a 2 second limit. A control file whose port does not answer is stale.
 
 ### Error Handling
 
-The server converts a malformed message, an oversized line, a request that takes too long to arrive, and a rejected
-token into failed responses with exit code 1 and never stops the loop. An unexpected exception raised by the handler, for
-example from a browser that was killed, is also converted into a failed response with exit code 1 whose message
-comes from `PuppetException.DescribeUnexpected` (`Unexpected error (<type>): <first line>`); the loop keeps serving
-later requests, so one bad command cannot end the session without an answer. Only an out-of-memory condition is not
-caught. A client that disconnects before reading the
-answer is ignored. The client raises a `PuppetException` when it cannot connect, when the daemon closes the
-connection without answering, when the daemon does not answer in time, and when the answer is malformed. Cancellation
-by the caller is not converted.
+Connection and protocol failures surface as `SocketException` or `IOException` to the caller, which reports that the
+control file is stale.
 
 ### Dependencies
 
-- **.NET base class library**: sockets, JSON serialization, cryptographic random numbers, and fixed-time comparison.
-
-### Callers
-
-- **PuppetProgram**: uses `ControlClient.SendAsync` to send every browser command and `stop`.
-- **DaemonHost**: creates the `ControlServer` and runs it.
-- **CommandExecutor**: consumes `ControlRequest` and produces `ControlResponse`.
+None - uses only the .NET base class library.

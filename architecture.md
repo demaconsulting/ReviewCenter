@@ -104,7 +104,7 @@ ReviewCenter (Software Package: self-contained executables win-x64 / linux-x64)
                   structured logging, CLI verbs (serve; migrate reserved for later)
 
 Development tooling (in repo, not distributed)
-└── ReviewCenter.Puppet - Playwright CLI + per-session background daemon for AI agents
+└── ReviewCenter.Puppet - Playwright persistent-browser helper for AI agents
 
 OTS: ASP.NET Core, Blazor, EF Core + providers, ASP.NET Core Identity, Monaco editor, git CLI,
      Playwright, xUnit v3
@@ -163,14 +163,12 @@ driven so that future workflows can be added without restructuring it.
 
 ### Puppet
 
-ReviewCenter.Puppet is a Playwright-based command-line tool with a per-session background daemon. It lets AI agents
-drive the real user interface during development.
+ReviewCenter.Puppet is a small Playwright-based helper (`puppet start`, then one `puppet <command>` per shell call)
+that keeps one persistent headless browser open so AI agents can drive the real user interface during development.
+It is a minimal helper and is kept as small and simple as possible; see
+`tools/puppet/README.md` and `docs/design/review-center-puppet.md`.
 
-- **Commands**: `puppet start` (launches an isolated server on a random port with a temp SQLite DB and seeded users,
-  plus a headless browser daemon, and returns a session id), `login`, `goto`, `click`, `fill`, `screenshot` (writes a
-  PNG that the agent views directly), `snapshot` (an accessibility/DOM text dump) and `stop`.
 - **Selectors**: the UI exposes stable `data-testid` attributes.
-- **Signing**: agents perform the re-authentication ceremony through the same commands.
 - **Shared engine**: the same Playwright approach powers the E2E system tests.
 
 ## Architectural Decisions
@@ -266,7 +264,8 @@ The architecture above is the target design. Only a first slice is implemented s
 
 - **Implemented**: Hosting (the ASP.NET Core server host and its logging), Web (the Blazor Server hello-world home
   page with a health endpoint), the command-line interface (`serve`, `--urls`, and the template options), and the
-  Puppet developer tool (`tools/puppet`), which drives the web interface in headless Chromium.
+  Puppet developer tool (`tools/puppet`), a minimal helper that drives the web interface through one persistent
+  headless Chromium, one command per invocation.
 - **Planned and deferred**: Api, Identity, Core, Storage, ContentSources, Evidence, and Messaging. They have no code,
   requirements, design documents, or verification documents yet, so the SysML2 model and the design documentation
   describe the implemented items only and are deliberately partial.

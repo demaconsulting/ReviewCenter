@@ -23,8 +23,7 @@ namespace DemaConsulting.ReviewCenter.Puppet.Tests;
 /// <summary>
 ///     Defines the Sequential test collection.
 ///     Tests in this collection are disabled from running in parallel to prevent conflicts when
-///     sharing loopback TCP ports, child processes, browsers, process-wide environment variables,
-///     and timing-sensitive file locks.
+///     sharing loopback TCP ports, child processes, and browsers.
 /// </summary>
 [CollectionDefinition("Sequential", DisableParallelization = true)]
 public sealed class SequentialCollection { }

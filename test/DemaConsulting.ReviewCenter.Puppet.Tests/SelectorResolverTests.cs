@@ -26,55 +26,33 @@ namespace DemaConsulting.ReviewCenter.Puppet.Tests;
 public class SelectorResolverTests
 {
     /// <summary>
-    ///     Test that a plain name is treated as a data-testid.
+    ///     Test that test ids (prefixed or plain) become attribute selectors and everything else passes through.
     /// </summary>
     [Fact]
-    public void SelectorResolver_Resolve_PlainName_UsesDataTestId()
+    public void SelectorResolver_Resolve_AllForms_ReturnsPlaywrightSelector()
     {
-        // Arrange: a plain name
-        const string selector = "hello-button";
-
-        // Act: resolve it
-        var resolved = SelectorResolver.Resolve(selector);
-
-        // Assert: it becomes a data-testid attribute selector
-        Assert.Equal("[data-testid=\"hello-button\"]", resolved);
-    }
-
-    /// <summary>
-    ///     Test that selectors with special characters are passed through unchanged.
-    /// </summary>
-    /// <param name="selector">A Playwright selector.</param>
-    [Theory]
-    [InlineData("#main")]
-    [InlineData(".button")]
-    [InlineData("text=Hello")]
-    [InlineData("button >> nth=0")]
-    [InlineData("[data-testid='x']")]
-    public void SelectorResolver_Resolve_SpecialCharacters_PassesThroughUnchanged(string selector)
-    {
-        // Arrange: a selector that is not a plain name
-        // Act: resolve it
-        var resolved = SelectorResolver.Resolve(selector);
-
-        // Assert: it is unchanged
-        Assert.Equal(selector, resolved);
+        // Arrange: every supported form
+        // Act: resolve them
+        // Assert: test ids become data-testid selectors (with quotes escaped); the rest is unchanged
+        Assert.Equal("[data-testid=\"hello-button\"]", SelectorResolver.Resolve("hello-button"));
+        Assert.Equal("[data-testid=\"hello-button\"]", SelectorResolver.Resolve("testid:hello-button"));
+        Assert.Equal("[data-testid=\"a\\\"b\"]", SelectorResolver.Resolve("testid:a\"b"));
+        Assert.Equal("css=.button", SelectorResolver.Resolve("css=.button"));
+        Assert.Equal("text=Count: 2", SelectorResolver.Resolve("text=Count: 2"));
+        Assert.Equal("role=button[name=\"Save\"]", SelectorResolver.Resolve("role=button[name=\"Save\"]"));
+        Assert.Equal("#main", SelectorResolver.Resolve("#main"));
     }
 
     /// <summary>
     ///     Test that a blank selector is rejected.
     /// </summary>
-    /// <param name="selector">A blank selector.</param>
-    [Theory]
-    [InlineData("")]
-    [InlineData("  ")]
-    public void SelectorResolver_Resolve_Blank_ThrowsArgumentException(string selector)
+    [Fact]
+    public void SelectorResolver_Resolve_Blank_ThrowsArgumentException()
     {
-        // Arrange: a blank selector (the test parameter)
-        // Act: resolve it
-        var exception = Record.Exception(() => SelectorResolver.Resolve(selector));
-
-        // Assert: blank selectors fail
-        Assert.IsType<ArgumentException>(exception);
+        // Arrange: blank selectors
+        // Act and assert: both are rejected
+        Assert.Throws<ArgumentException>(() => SelectorResolver.Resolve("  "));
+        Assert.Throws<ArgumentException>(() => SelectorResolver.Resolve(string.Empty));
+        Assert.Throws<ArgumentException>(() => SelectorResolver.Resolve("testid:  "));
     }
 }

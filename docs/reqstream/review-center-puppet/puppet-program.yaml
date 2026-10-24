@@ -3,149 +3,33 @@
 #
 # PURPOSE:
 # - Define requirements for the PuppetProgram unit (tools/puppet/PuppetProgram.cs)
-# - PuppetProgram is the entry point and command dispatcher; it owns the exit codes of the tool
-# - Unit requirements are verified with PuppetProgramTests, which replace every collaborator
-#   (session store directory, daemon launcher, server runner, browser) with fakes
+# - PuppetProgram parses the command line, starts the daemon, sends one command to it, and prints the result
 
 sections:
   - title: ReviewCenterPuppet Requirements
     sections:
       - title: PuppetProgram Requirements
         requirements:
-          - id: ReviewCenterPuppet-PuppetProgram-Start
+          - id: ReviewCenterPuppet-PuppetProgram-Arguments
             title: >-
-              The PuppetProgram unit shall start a session through the daemon launcher, report the session id
-              and server URL when the daemon is ready, generate an id when none is given, and refuse to
-              replace a running session.
+              The PuppetProgram unit shall accept the documented commands with their arguments and options,
+              and reject an unknown command or option, a wrong argument count, or a malformed value with a
+              one-line usage message and exit code 2.
             justification: |
-              Starting is the first step of every Puppet workflow. The caller needs the session id and the
-              server URL to continue, and an existing running session must never be silently replaced because
-              that would discard the browser state the caller is working with.
+              The command line is the only interface of the tool, and a coding agent corrects its next call
+              from the message it gets back. Exit code 2 separates "could not run" from a failed command.
             tests:
-              - PuppetProgram_Run_StartDaemonReady_PrintsSessionAndUrl
-              - PuppetProgram_Run_StartWithoutSession_GeneratesEightCharacterId
-              - PuppetProgram_Run_StartExistingLiveSession_ExitsOne
+              - PuppetProgram_ParseCommand_ValidCommands_BuildRequests
+              - PuppetProgram_Run_BadArguments_ExitsTwoWithUsage
 
-          - id: ReviewCenterPuppet-PuppetProgram-StartFailure
+          - id: ReviewCenterPuppet-PuppetProgram-Results
             title: >-
-              The PuppetProgram unit shall exit with code 4 and the reason when a session cannot be started,
-              wait for a daemon that reported the failure to finish releasing its browser and server (ending
-              it and what it recorded if it does not), and only then remove the session file.
+              The PuppetProgram unit shall print the result of a command followed by the page URL, the page
+              title, and one line per new browser error, exit with 0 for a successful command and 1 for a
+              failed one, and exit with 2 and a start hint when no browser is running.
             justification: |
-              A session can fail to start because the server assembly is missing, the server or browser
-              fails, or the daemon dies. A dedicated exit code with the reason lets a script or coding agent
-              tell a start failure from a command failure, and removing the file keeps a failed attempt from
-              looking like a session. The file is also the only record of a server or browser that a failed
-              teardown left running, so it must not be deleted while the daemon may still be releasing them.
+              The agent decides its next step from the result line and the page state, so both are printed
+              after every command; the exit code tells it at once whether the command worked.
             tests:
-              - PuppetProgram_Run_StartDaemonFailed_ExitsFourWithReason
-              - PuppetProgram_Run_StartDaemonFailed_WaitsForDaemonExitBeforeDeletingSession
-              - PuppetProgram_Run_StartDaemonFailedAndNeverExits_TerminatesRecordedProcessesAndDeletesSession
-              - PuppetProgram_Run_StartDaemonDiesEarly_ExitsFour
-              - PuppetProgram_Run_StartMissingServerAssembly_ExitsFourWithHint
-
-          - id: ReviewCenterPuppet-PuppetProgram-StartExclusive
-            title: >-
-              The PuppetProgram unit shall launch at most one daemon when several start commands for the same
-              session id run at the same time, fail the others with exit code 1 and a message that the session
-              is already being started, and make the session id available again when the launch fails.
-            justification: |
-              Two daemons for one session would fight over the session file and leave an unreachable browser
-              and server behind. The loser needs a clear error rather than a confusing failure later, and a
-              failed launch must not block the id for the next attempt.
-            tests:
-              - PuppetProgram_Run_StartWhileAnotherStartInProgress_FailsAndLaunchesOnlyOnce
-              - PuppetProgram_Run_ConcurrentStartsOfSameSession_ExactlyOneSucceeds
-              - PuppetProgram_Run_StartLaunchFails_ReleasesTheSessionAndReportsError
-
-          - id: ReviewCenterPuppet-PuppetProgram-StartAbort
-            title: >-
-              The PuppetProgram unit shall end the daemon it launched, together with any server and browser
-              already recorded, when a start times out, is cancelled, or finds the daemon dead, even if no
-              session file was written yet, and shall remove the partial session state only after every one
-              of those processes is confirmed gone within a bounded wait (repeating the kill meanwhile),
-              keeping the record and saying so when one survives.
-            justification: |
-              A start that gives up must not leave a background daemon, a server, or a browser running with
-              nobody able to reach them. The daemon is known from the moment it is launched, so it can be
-              ended even before it has written any session file. Termination is asynchronous and can fail, and
-              the session file is the only record that lets a later command find a survivor, so it is deleted
-              only once the processes are confirmed gone.
-            tests:
-              - PuppetProgram_Run_StartTimesOutWithNoSessionFile_TerminatesLaunchedDaemon
-              - PuppetProgram_Run_StartTimesOutWithRecordedProcesses_TerminatesBrowserServerAndDaemon
-              - PuppetProgram_Run_StartCancelled_TerminatesLaunchedDaemonAndCleansUp
-              - PuppetProgram_Run_StartDaemonDiesEarly_ExitsFour
-              - PuppetProgram_Run_StartTimesOutAndProcessSurvives_KeepsRecordAndReportsUnconfirmed
-              - PuppetProgram_Run_StartTimesOutAndProcessesDieSlowly_DeletesRecordOnceConfirmedGone
-
-          - id: ReviewCenterPuppet-PuppetProgram-ClientCommands
-            title: >-
-              The PuppetProgram unit shall forward commands for a running session to its daemon and print the
-              daemon's answer, using exit code 1 when the command fails.
-            justification: |
-              Every command except start and list acts on the browser held by the session daemon.
-              Forwarding the command and reporting its outcome faithfully is what lets scripts control the
-              browser from separate short-lived processes.
-            tests:
-              - PuppetProgram_Run_ClientCommandsAgainstDaemon_ClickMissingElementAndStop
-
-          - id: ReviewCenterPuppet-PuppetProgram-Stop
-            title: >-
-              The PuppetProgram unit shall stop a session on request by asking its daemon to shut down,
-              waiting for the daemon to end (forcing it, and the server and browser the session records, to
-              end if it does not or cannot be asked), and removing the session file only once they are
-              confirmed gone (keeping the file and exiting with code 1 when one survives), but shall never
-              remove or end the processes of a newer session that replaced it in the meantime.
-            justification: |
-              A stopped session must release the server, the browser, and the session file so that nothing
-              keeps running after the developer or coding agent has finished. A start for the same id can
-              publish a new session while the stop is finishing, and the stop must not destroy it. The file
-              is the only record of a surviving process, so it is kept until the processes are confirmed gone.
-            tests:
-              - PuppetProgram_Run_ClientCommandsAgainstDaemon_ClickMissingElementAndStop
-              - PuppetProgram_Run_StopForced_SessionReplacedMeanwhile_KeepsReplacement
-              - PuppetProgram_Run_StopAccepted_SessionReplacedAfterDaemonExit_KeepsReplacement
-              - PuppetProgram_Run_StopForcedAndProcessSurvives_KeepsRecordAndExitsOne
-
-          - id: ReviewCenterPuppet-PuppetProgram-List
-            title: >-
-              The PuppetProgram unit shall list the running sessions, report when there are none, and clean
-              up stale sessions it finds.
-            justification: |
-              Developers and coding agents need to discover which sessions exist, and listing is a natural
-              moment to remove the leftovers of sessions whose daemon has died.
-            tests:
-              - PuppetProgram_Run_ListWithNoSessions_ReportsNone
-              - PuppetProgram_Run_ListWithStaleSession_ReportsAndCleansUp
-
-          - id: ReviewCenterPuppet-PuppetProgram-UnknownSession
-            title: >-
-              The PuppetProgram unit shall exit with code 2 when the requested session does not exist or no
-              session is running to choose from.
-            justification: |
-              A distinct exit code lets a script tell a missing session, which is fixed by starting one,
-              from a command that failed inside a live session.
-            tests:
-              - PuppetProgram_Run_UnknownSession_ExitsTwo
-              - PuppetProgram_Run_NoSessionRunning_ExitsTwo
-
-          - id: ReviewCenterPuppet-PuppetProgram-StaleSession
-            title: >-
-              The PuppetProgram unit shall exit with code 3 and remove the leftover session file when the
-              daemon of the requested session is no longer running.
-            justification: |
-              A crash, reboot, or closed terminal can leave a session file whose daemon is gone. Reporting it
-              with its own exit code and cleaning it up prevents every later command from failing confusingly.
-            tests:
-              - PuppetProgram_Run_StaleSession_ExitsThreeAndCleansUp
-
-          - id: ReviewCenterPuppet-PuppetProgram-BadArguments
-            title: >-
-              The PuppetProgram unit shall exit with code 1 and an explanatory message when the command line
-              is invalid.
-            justification: |
-              Scripts and coding agents need an immediate, specific message when a command is mistyped,
-              because nobody is available to interpret a vague failure.
-            tests:
-              - PuppetProgram_Run_BadArguments_ExitsOneWithMessage
+              - PuppetProgram_Format_ResultUrlTitleAndErrors_PrintsFooter
+              - PuppetProgram_Run_NotRunning_ExitsTwoWithStartHint

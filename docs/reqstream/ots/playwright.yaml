@@ -4,33 +4,21 @@
 # Requirements for the Playwright browser automation functionality used by the Puppet developer tool.
 # These requirements belong to the ReviewCenterPuppet system, so their IDs use that prefix.
 #
-# The requirements describe only what can be proven in any environment, so they are linked to tests
-# that need no browser and always run. Driving a real Chromium is covered by the real-browser
-# end-to-end test, which is linked to the ReviewCenterPuppet system requirements (not to these OTS
-# requirements): CI installs Chromium and fails that test when the browser is missing.
+# Driving a real Chromium is proven by the real-browser end-to-end test: CI installs Chromium and
+# fails that test when the browser is missing.
 
 sections:
   - title: OTS Software Requirements
     sections:
       - title: Playwright Requirements
         requirements:
-          - id: ReviewCenterPuppet-OTS-Playwright-Driver
+          - id: ReviewCenterPuppet-OTS-Playwright-Chromium
             title: >-
-              Playwright shall deliver its driver and its browser installation script with the build output
-              so that Chromium can be installed once per machine.
+              Playwright shall drive a headless Chromium to load pages, click, hover, fill, read text, emulate
+              the color scheme, and capture screenshots.
             justification: |
-              The Puppet developer tool depends on the Playwright driver to control a browser and on the
-              playwright.ps1 script to install Chromium. The missing-Chromium message tells the user to run
-              that script from next to the Puppet executable, so both must be present in the build output.
+              The Puppet developer tool depends on Playwright to show a coding agent the web interface.
             tags: [ots]
             tests:
-              - PlaywrightOts_BuildOutput_Inspected_ContainsInstallScriptAndDriver
-          - id: ReviewCenterPuppet-OTS-Playwright-LaunchFailure
-            title: Playwright shall start its driver and report a failed browser launch as a PlaywrightException.
-            justification: |
-              Puppet translates a failed launch, such as a Chromium that is not installed, into a clear message
-              with the install command. That translation depends on Playwright starting its driver and
-              reporting the failure as a PlaywrightException instead of another exception type.
-            tags: [ots]
-            tests:
-              - PlaywrightOts_Chromium_MissingExecutable_ThrowsPlaywrightException
+              - windows@PuppetEndToEnd_StartDriveStop_HelloAndCounter_WorksAgainstRealServer
+              - ubuntu@PuppetEndToEnd_StartDriveStop_HelloAndCounter_WorksAgainstRealServer

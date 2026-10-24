@@ -261,79 +261,10 @@ Then open `http://localhost:8080` in a browser, or check `http://localhost:8080/
 
 # Puppet Development Tool
 
-Puppet is a developer tool, not part of the distributed ReviewCenter executables. It lets a person, or a coding
-agent, look at and drive the ReviewCenter web interface from the command line. It starts the ReviewCenter server on
-a random local port, opens it in headless Chromium, and then accepts short commands such as `click`, `text`, and
-`screenshot`. Puppet is its own software system in this repository, with its own requirements, design, and
-verification documents.
-
-## Building and Setting Up Puppet
-
-Build Puppet from the repository root, then download Chromium once per machine with the Playwright script that the
-build places next to the Puppet executable:
-
-```bash
-dotnet build tools/puppet
-pwsh tools/puppet/bin/Debug/net10.0/playwright.ps1 install chromium
-```
-
-Replace `Debug` with `Release` if that configuration was built. If Chromium is missing, `start` fails with exit
-code 4 and prints the install command. The CI pipeline performs the same Chromium installation before it runs the
-Puppet end-to-end test.
-
-## Puppet Commands
-
-Run Puppet with `dotnet tools/puppet/bin/Debug/net10.0/DemaConsulting.ReviewCenter.Puppet.dll <command>`:
-
-| Command                                   | What it does                                                   |
-| ----------------------------------------- | -------------------------------------------------------------- |
-| `start [--session <id>]`                  | Starts the server and browser; prints the session id and URL   |
-| `goto <path>`                             | Navigates inside the session's server, for example `goto /`    |
-| `click <selector>`                        | Clicks an element                                              |
-| `fill <selector> <text>`                  | Types text into an input                                       |
-| `text <selector>`                         | Prints the text of an element                                  |
-| `screenshot [--out <file>] [--full-page]` | Saves a PNG image and prints its absolute path                 |
-| `snapshot`                                | Prints an accessibility snapshot, title, URL, and test ids     |
-| `stop`                                    | Stops the session: browser, server, and background daemon      |
-| `list`                                    | Lists sessions and cleans up leftovers of dead sessions        |
-
-Every command except `start`, `stop`, and `list` accepts `--session <id>` to choose the session and
-`--timeout <seconds>` (1 to 600, default 10) to limit how long it waits for the page. When `--session` is omitted,
-Puppet uses the `REVIEWCENTER_PUPPET_SESSION` environment variable, or the only running session.
-
-A selector made only of letters, digits, hyphens, and underscores is a test id, so `hello-button` means the element
-whose `data-testid` is `hello-button`. Any other selector, such as `#main` or `text=Hello`, is passed to Playwright
-unchanged.
-
-## Puppet Example Workflow
-
-```powershell
-$puppet = "tools/puppet/bin/Debug/net10.0/DemaConsulting.ReviewCenter.Puppet.dll"
-dotnet $puppet start --session demo
-dotnet $puppet goto / --session demo
-dotnet $puppet click hello-button --session demo
-dotnet $puppet text hello-message --session demo
-dotnet $puppet click counter-button --session demo
-dotnet $puppet text counter-value --session demo
-dotnet $puppet screenshot --out demo.png --session demo
-dotnet $puppet stop --session demo
-```
-
-The `$puppet` variable holds only the path of the DLL; the example invokes it with `dotnet`, because PowerShell does
-not split a string such as `"dotnet <path>"` into a program and an argument when it is run with `&`.
-
-## Puppet Exit Codes
-
-| Code | Meaning                                                                                     |
-| ---- | ------------------------------------------------------------------------------------------- |
-| 0    | The command succeeded                                                                       |
-| 1    | Bad arguments, or the command failed (element not found, timeout, navigation refused)       |
-| 2    | The session does not exist                                                                  |
-| 3    | The session was stale (its daemon had died); leftovers were cleaned up                      |
-| 4    | The session could not be started (server did not start, or Chromium is not installed)       |
-
-Puppet only navigates inside the server that belongs to its session. See the `README.md` in `tools/puppet` for
-more detail on how sessions work.
+Puppet is a small developer helper for AI agents, not part of the distributed ReviewCenter executables. It keeps one
+persistent headless Chromium open and drives it one command per shell call (go to a page, click, hover, fill, read
+text, screenshot) against a running ReviewCenter web interface. See `tools/puppet/README.md` for the setup, the
+commands, and the workflow.
 
 ## References
 
