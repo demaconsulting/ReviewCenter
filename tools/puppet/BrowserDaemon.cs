@@ -65,7 +65,8 @@ internal static class BrowserDaemon
                     // Remove the file before answering, so a caller that sees the answer sees Puppet as stopped
                     File.Delete(controlFile);
                     await stopped.CancelAsync();
-                    return new PuppetResponse(true, "stopped", string.Empty, string.Empty, []);
+                    var (url, title) = await browser.UrlAndTitleAsync();
+                    return new PuppetResponse(true, "stopped", url, title, browser.TakeNewEvents());
                 },
                 stopped.Token);
             return 0;

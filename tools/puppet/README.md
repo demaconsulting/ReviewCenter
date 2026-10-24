@@ -83,7 +83,7 @@ Actions fail after about 5 seconds so a wrong selector costs little.
 
 - Exit code 0: the command worked.
 - Exit code 1: the command failed, `puppet start` found Puppet already running, or the browser did not start.
-- Exit code 2: usage error, or Puppet is not running.
+- Exit code 2: usage error, Puppet is not running, or the daemon process could not be spawned.
 
 ## Visual polish loop
 

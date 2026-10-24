@@ -45,7 +45,7 @@ internal static class SelectorResolver
     ///     A <c>[data-testid="name"]</c> attribute selector when <paramref name="selector"/> has the
     ///     <c>testid:</c> prefix or is a plain name (letters, digits, hyphen, underscore); otherwise the text unchanged.
     /// </returns>
-    /// <exception cref="ArgumentException">Thrown when <paramref name="selector"/> is null or blank.</exception>
+    /// <exception cref="ArgumentException">Thrown when <paramref name="selector"/> is null or blank, or has the <c>testid:</c> prefix without a name.</exception>
     public static string Resolve(string selector)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(selector);
@@ -53,7 +53,8 @@ internal static class SelectorResolver
         // A name made only of identifier characters cannot be CSS/text/role syntax, so it is a test id
         if (selector.StartsWith(TestIdPrefix, StringComparison.Ordinal))
         {
-            return TestId(selector[TestIdPrefix.Length..]);
+            var name = selector[TestIdPrefix.Length..];
+            return string.IsNullOrWhiteSpace(name) ? throw new ArgumentException("A testid: selector needs a name, like testid:hello-button.", nameof(selector)) : TestId(name);
         }
 
         return selector.All(c => char.IsAsciiLetterOrDigit(c) || c == '-' || c == '_') ? TestId(selector) : selector;

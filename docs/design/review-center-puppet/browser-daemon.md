@@ -23,7 +23,8 @@ short message and never stops the daemon. Every response carries the current URL
 errors recorded since the previous response.
 
 **Stop handling**: The `stop` request deletes the control file before it answers, so a caller that sees the answer
-sees Puppet as stopped, then ends the serve loop; the daemon process exits after closing the browser.
+sees Puppet as stopped, then ends the serve loop (the answer carries the usual URL, title, and events); the daemon
+process exits after closing the browser.
 
 ### Error Handling
 

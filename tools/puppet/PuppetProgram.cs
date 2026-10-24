@@ -325,6 +325,7 @@ internal static class PuppetProgram
             await Task.Delay(100, cancellationToken);
         }
 
+        process.Kill();
         await error.WriteLineAsync("The Puppet daemon was not ready within 30 seconds.", cancellationToken);
         return 1;
     }

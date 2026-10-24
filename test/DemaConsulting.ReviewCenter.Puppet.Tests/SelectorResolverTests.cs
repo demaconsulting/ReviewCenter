@@ -53,5 +53,6 @@ public class SelectorResolverTests
         // Act and assert: both are rejected
         Assert.Throws<ArgumentException>(() => SelectorResolver.Resolve("  "));
         Assert.Throws<ArgumentException>(() => SelectorResolver.Resolve(string.Empty));
+        Assert.Throws<ArgumentException>(() => SelectorResolver.Resolve("testid:  "));
     }
 }

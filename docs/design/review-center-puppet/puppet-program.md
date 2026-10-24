@@ -15,7 +15,7 @@ arguments, and the options it accepts. It drives both validation and `--help`. F
 value; every other option takes one.
 
 **Exit codes**: 0 the command worked; 1 it failed (including `start` when Puppet is already running or the daemon
-could not start); 2 a usage error or Puppet is not running.
+could not start); 2 a usage error, Puppet is not running, or the daemon process could not be spawned.
 
 **PuppetException**: the exception used for every error that is reported to the user as a plain message.
 
@@ -33,8 +33,8 @@ a failed command goes to the error writer. Returns 0 or 1.
 
 **StartAsync**: Refuses when the control file names a port that answers a ping (exit code 1). Otherwise deletes a stale
 file, spawns the daemon, and polls every 100 ms for up to 30 seconds for the control file. A start-up error written
-by the daemon, an early daemon exit, or the time-out is reported with exit code 1. Success prints one line with the
-port and base URL.
+by the daemon, an early daemon exit, or the time-out (which also kills the daemon process) is reported with exit
+code 1. Success prints one line with the port and base URL.
 
 **Spawn**: Starts `dotnet <Puppet.dll> daemon ...` detached (see the lifecycle in the system chapter).
 

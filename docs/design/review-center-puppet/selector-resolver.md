@@ -25,7 +25,7 @@ None - `SelectorResolver` is a static class without state.
 
 ### Error Handling
 
-`Resolve` throws `ArgumentException` when the selector is null, empty, or only white space.
+`Resolve` throws `ArgumentException` when the selector is null, empty, only white space, or `testid:` without a name.
 
 ### Dependencies
 

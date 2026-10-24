@@ -111,15 +111,18 @@ internal sealed class PlaywrightBrowser : IAsyncDisposable
     {
         var size = ParseViewport(viewport);
         var playwright = await Playwright.CreateAsync();
+        IBrowser? browser = null;
         try
         {
-            var browser = await playwright.Chromium.LaunchAsync(new BrowserTypeLaunchOptions { Headless = !headed });
+            browser = await playwright.Chromium.LaunchAsync(new BrowserTypeLaunchOptions { Headless = !headed });
             var result = new PlaywrightBrowser(playwright, browser, baseUrl, size);
             await result.NewPageAsync();
             return result;
         }
         catch (PlaywrightException ex)
         {
+            // A browser that launched but got no page must not be left running
+            await (browser?.CloseAsync() ?? Task.CompletedTask);
             playwright.Dispose();
             throw new PuppetException(DescribeLaunchFailure(ex));
         }
