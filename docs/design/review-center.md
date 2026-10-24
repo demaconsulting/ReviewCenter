@@ -30,6 +30,7 @@ flowchart TD
         ProjectPage
         ReviewPage
     end
+    subgraph Core
         Fingerprint
         ProjectService
         ReviewService
