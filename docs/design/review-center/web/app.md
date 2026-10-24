@@ -48,6 +48,9 @@ N/A - the unit contains no error-producing logic. An unmatched URL is not an err
 renders the not-found message. Failures in a rendered page are handled by the framework
 and are outside this unit.
 
+Known limitation: the scroll function itself has no automated browser test. The review page tests assert the
+arguments it is called with, and the Puppet acceptance walk exercises the real scrolling.
+
 #### Dependencies
 
 - **HomePage** — found by the router at the root route; `App` does not reference it directly.
