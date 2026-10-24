@@ -98,6 +98,47 @@ public class StorageSubsystemTests
     }
 
     /// <summary>
+    ///     Test that threads, comments and the thread state written through the services are still there, in
+    ///     order, after the database is closed and opened again.
+    /// </summary>
+    [Fact]
+    public async Task StorageSubsystem_ServicesOverDatabase_ReopenedDatabase_KeepsThreadsAndComments()
+    {
+        // Arrange: a new database file
+        var options = new DatabaseOptions { ConnectionString = TestDatabase.NewConnectionString() };
+        int projectId;
+
+        // Act: create a review, start a thread on a line, reply and resolve it, then close the database
+        var first = Open(options);
+        using (first.Provider)
+        {
+            var project = await first.Projects.CreateAsync("Apollo", null, TestContext.Current.CancellationToken);
+            projectId = project.Id;
+            await first.Reviews.CreateDraftAsync(
+                projectId, "rev-1", "First", [new("a.txt", TestContent.A)], TestContext.Current.CancellationToken);
+            var threads = new ThreadService(first.Store, new FixedTimeProvider(_now));
+            var thread = await threads.StartThreadAsync(
+                projectId, "rev-1", "a.txt", 1, 1, "Ann", "First", TestContext.Current.CancellationToken);
+            await threads.ReplyAsync(projectId, "rev-1", thread.Id, "Bob", "Second", TestContext.Current.CancellationToken);
+            await threads.ResolveAsync(projectId, "rev-1", thread.Id, TestContext.Current.CancellationToken);
+        }
+
+        // Act: open the same database again and read the threads back
+        var second = Open(options);
+        using (second.Provider)
+        {
+            var listed = Assert.Single(
+                await new ThreadService(second.Store, new FixedTimeProvider(_now)).ListAsync(projectId, "rev-1", TestContext.Current.CancellationToken));
+
+            // Assert: anchor, state and both comments survived, in posting order
+            Assert.Equal((1, 1), (listed.StartLine, listed.EndLine));
+            Assert.Equal(ReviewThreadState.Resolved, listed.State);
+            Assert.Equal(["Ann", "Bob"], listed.Comments.Select(c => c.Author));
+            Assert.Equal(["First", "Second"], listed.Comments.Select(c => c.Text));
+        }
+    }
+
+    /// <summary>
     ///     Test that opening a database for a provider that is not supported fails with an error that names the
     ///     provider, and that no database file is created.
     /// </summary>

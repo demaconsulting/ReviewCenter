@@ -115,6 +115,35 @@ public partial class WebSubsystemTests
     }
 
     /// <summary>
+    ///     Test that a thread created through the domain service (as the page does) is presented by the review
+    ///     page through the real pipeline: the dependency injection, the database tables and the page agree.
+    /// </summary>
+    [Fact]
+    public async Task WebSubsystem_ReviewWithThreads_ArePresentedByThePage()
+    {
+        // Arrange: start the real pipeline, create a review and an open and a resolved thread on its file
+        var logs = new CapturingLoggerProvider();
+        await using var app = await TestWebApp.StartAsync(logs, "serve", "--silent");
+        using var client = app.GetTestClient();
+        var project = await app.Services.GetRequiredService<ProjectService>()
+            .CreateAsync("Apollo", null, TestContext.Current.CancellationToken);
+        await app.Services.GetRequiredService<ReviewService>().CreateDraftAsync(
+            project.Id, "rev-1", "First review", [new("a.txt", TestContent.A)], TestContext.Current.CancellationToken);
+        var threads = app.Services.GetRequiredService<ThreadService>();
+        await threads.StartThreadAsync(project.Id, "rev-1", "a.txt", null, null, "Ann", "Open", TestContext.Current.CancellationToken);
+        var resolved = await threads.StartThreadAsync(project.Id, "rev-1", "a.txt", 1, 1, "Bob", "Done", TestContext.Current.CancellationToken);
+        await threads.ResolveAsync(project.Id, "rev-1", resolved.Id, TestContext.Current.CancellationToken);
+
+        // Act: request the review page
+        var page = await ParseAsync(client, $"/projects/{project.Id}/reviews/rev-1");
+
+        // Assert: the summary and the file's open-thread count come from the stored threads
+        Assert.Equal("1", page.QuerySelector("[data-testid='threads-open-count']")?.TextContent);
+        Assert.Equal("1", page.QuerySelector("[data-testid='threads-resolved-count']")?.TextContent);
+        Assert.Equal("1 open thread", page.QuerySelector("[data-testid='file-open-threads-0']")?.TextContent);
+    }
+
+    /// <summary>
     ///     Test that every interactive element (a, button, input, select, textarea) on every page has a stable
     ///     kebab-case <c>data-testid</c>, so UI tests never need to depend on text or layout.
     /// </summary>

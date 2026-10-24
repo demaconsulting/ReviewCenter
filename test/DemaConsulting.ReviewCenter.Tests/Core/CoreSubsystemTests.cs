@@ -128,18 +128,20 @@ public class CoreSubsystemTests
         var store = new FakeReviewStore();
         var projects = new ProjectService(store, new FixedTimeProvider(_now));
         var reviews = new ReviewService(store, new FixedTimeProvider(_now));
+        var threads = new ThreadService(store, new FixedTimeProvider(_now));
         var project = await projects.CreateAsync("Apollo", null, TestContext.Current.CancellationToken);
         await reviews.CreateDraftAsync(
             project.Id, "rev-1", "First", [new("a.txt", TestContent.A)], TestContext.Current.CancellationToken);
 
         // Act: break the rule
         var exception = await Assert.ThrowsAsync<DomainRuleException>(
-            () => ViolateAsync(rule, projects, reviews, project.Id));
+            () => ViolateAsync(rule, projects, reviews, threads, project.Id));
 
-        // Assert: the rule is named, and only the first valid project and review exist
+        // Assert: the rule is named, and only the first valid project and review exist, with no thread
         Assert.Equal(rule, exception.Rule);
         Assert.Single(await projects.ListAsync(TestContext.Current.CancellationToken));
         Assert.Single(store.Reviews);
+        Assert.Empty(store.Threads);
     }
 
     /// <summary>
@@ -149,9 +151,15 @@ public class CoreSubsystemTests
     /// <param name="rule">The rule to break.</param>
     /// <param name="projects">The project service.</param>
     /// <param name="reviews">The review service.</param>
+    /// <param name="threads">The thread service.</param>
     /// <param name="projectId">The identity of the existing project.</param>
     /// <returns>The task of the request, which fails with the rule violation.</returns>
-    private static Task ViolateAsync(DomainRule rule, ProjectService projects, ReviewService reviews, int projectId)
+    private static Task ViolateAsync(
+        DomainRule rule,
+        ProjectService projects,
+        ReviewService reviews,
+        ThreadService threads,
+        int projectId)
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         List<UploadedFile> oneFile = [new("a.txt", TestContent.A)];
@@ -188,7 +196,55 @@ public class CoreSubsystemTests
                     .Select(i => new UploadedFile($"f{i}.bin", maxSizeContent))
                     .ToList(),
                 cancellationToken),
+            DomainRule.CommentAuthorInvalid => threads.StartThreadAsync(
+                projectId, "rev-1", "a.txt", null, null, " ", "Text", cancellationToken),
+            DomainRule.CommentTextInvalid => threads.StartThreadAsync(
+                projectId, "rev-1", "a.txt", null, null, "Ann", " ", cancellationToken),
+            DomainRule.ThreadAnchorInvalid => threads.StartThreadAsync(
+                projectId, "rev-1", "a.txt", 1, 99, "Ann", "Text", cancellationToken),
+            DomainRule.ThreadNotFound => threads.ResolveAsync(projectId, "rev-1", 99, cancellationToken),
             _ => throw new NotSupportedException($"No violation is defined for the rule '{rule}'.")
         };
+    }
+
+    /// <summary>
+    ///     Test the thread workflow: a thread is started on a line range, answered, resolved and reopened, and
+    ///     reads back with its comments in posting order and the time of the clock.
+    /// </summary>
+    [Fact]
+    public async Task CoreSubsystem_ThreadWorkflow_StartReplyResolveReopen_ReadsBackInOrder()
+    {
+        // Arrange: all three services over one store, with a project and a review of one two-line file
+        var store = new FakeReviewStore();
+        var projects = new ProjectService(store, new FixedTimeProvider(_now));
+        var reviews = new ReviewService(store, new FixedTimeProvider(_now));
+        var threads = new ThreadService(store, new FixedTimeProvider(_now));
+        var project = await projects.CreateAsync("Apollo", null, TestContext.Current.CancellationToken);
+        await reviews.CreateDraftAsync(
+            project.Id,
+            "rev-1",
+            "First",
+            [new("ab.txt", "a\nb\n"u8.ToArray())],
+            TestContext.Current.CancellationToken);
+
+        // Act: start a thread, reply twice, resolve it and read it back, then reopen it and read it again
+        var started = await threads.StartThreadAsync(
+            project.Id, "rev-1", "ab.txt", 1, 2, " Ann ", "First", TestContext.Current.CancellationToken);
+        await threads.ReplyAsync(project.Id, "rev-1", started.Id, "Bob", "Second", TestContext.Current.CancellationToken);
+        await threads.ReplyAsync(project.Id, "rev-1", started.Id, "Ann", "Third", TestContext.Current.CancellationToken);
+        await threads.ResolveAsync(project.Id, "rev-1", started.Id, TestContext.Current.CancellationToken);
+        var resolved = Assert.Single(await threads.ListAsync(project.Id, "rev-1", TestContext.Current.CancellationToken));
+        await threads.ReopenAsync(project.Id, "rev-1", started.Id, TestContext.Current.CancellationToken);
+        var reopened = Assert.Single(await threads.ListAsync(project.Id, "rev-1", TestContext.Current.CancellationToken));
+
+        // Assert: anchor, states and the comments in posting order with the clock time
+        Assert.Equal(1, resolved.StartLine);
+        Assert.Equal(2, resolved.EndLine);
+        Assert.Equal(ReviewThreadState.Resolved, resolved.State);
+        Assert.Equal(ReviewThreadState.Open, reopened.State);
+        Assert.Equal(_now, reopened.Created);
+        Assert.Equal(["Ann", "Bob", "Ann"], reopened.Comments.Select(c => c.Author));
+        Assert.Equal(["First", "Second", "Third"], reopened.Comments.Select(c => c.Text));
+        Assert.All(reopened.Comments, comment => Assert.Equal(_now, comment.Created));
     }
 }

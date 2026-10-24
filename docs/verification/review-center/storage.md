@@ -4,7 +4,8 @@
 
 The `Storage` subsystem is verified by subsystem tests defined in `StorageSubsystemTests.cs`. The tests build the
 real `DatabaseSetup`, `ReviewCenterDbContext`, and `ReviewStore` over a real SQLite database file, and run the real
-`ProjectService` and `ReviewService` of the `Core` subsystem over them, so that the subsystem is verified in the way
+`ProjectService`, `ReviewService`, and `ThreadService` of the `Core` subsystem over them, so that the subsystem is
+verified in the way
 the application uses it. Each test uses a new database file in a private temporary folder, supplied by the test
 helper `TestDatabase`. The units are verified in detail by their own unit tests, which also use real SQLite
 databases; no database substitute is used anywhere, because the behavior of the database (keys, constraints,
@@ -21,6 +22,8 @@ The native SQLite library must be loadable on the test platform (it is supplied 
 - Data written through the services is still present, byte for byte and with the same fingerprint, after the
   database is closed and opened again.
 - A duplicate review identifier is refused and the original review is unchanged.
+- Comment threads, their comments (in posting order), their anchors, and their state, written through the services,
+  are still present after the database is closed and opened again.
 - A review for a project that does not exist is refused, by the services and by the database itself, and the stored
   data is unchanged.
 - An unsupported provider is refused with an error that names it, and no database is created.
@@ -31,6 +34,11 @@ The native SQLite library must be loadable on the test platform (it is supplied 
 files are created through the services over a new database, which is then closed and opened again. The project,
 the review with its known fingerprint and three files, and the exact bytes of the binary file are read back. This
 scenario is tested by `StorageSubsystem_ServicesOverDatabase_ReopenedDatabase_KeepsProjectAndReview`.
+
+**StorageSubsystem_ServicesOverDatabase_ReopenedDatabase_KeepsThreadsAndComments**: A review is created through the
+services over a new database; a thread on line 1 is started, answered, and resolved through `ThreadService`; the
+database is closed and opened again. The anchor, the state "Resolved", and both comments in posting order are read
+back. This scenario is tested by `StorageSubsystem_ServicesOverDatabase_ReopenedDatabase_KeepsThreadsAndComments`.
 
 **StorageSubsystem_UnsupportedProvider_Opening_FailsWithClearErrorAndCreatesNothing**: A database is opened with
 the provider name `Oracle` and a new file path; an `InvalidOperationException` that names the provider is thrown

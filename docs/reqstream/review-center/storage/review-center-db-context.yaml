@@ -1,8 +1,8 @@
 ---
 # Software Unit Requirements for the ReviewCenterDbContext Class
 #
-# The ReviewCenterDbContext class is the Entity Framework Core model that maps projects, reviews, and review
-# files to database tables.
+# The ReviewCenterDbContext class is the Entity Framework Core model that maps projects, reviews, review
+# files, threads, and comments to database tables.
 
 sections:
   - title: ReviewCenterDbContext Unit Requirements
@@ -39,3 +39,15 @@ sections:
         tests:
           - ReviewStore_AddReviewAsync_DuplicateKey_ThrowsReviewIdDuplicate
           - ReviewStore_AddReviewAsync_UnknownProject_IsNotStored
+
+      - id: ReviewCenter-DbContext-Threads
+        title: >-
+          The ReviewCenterDbContext class shall map threads and comments to tables in which a thread belongs to
+          an existing file of its review and a comment belongs to a thread, so that the database refuses a
+          thread for a file that does not exist and deletes the comments of a deleted thread.
+        justification: |
+          A thread is about one file of one review. Having the database enforce that relationship keeps the
+          record consistent even when two requests overlap or a programming error occurs.
+        tests:
+          - DatabaseSetup_EnsureCreated_MissingFolder_CreatesFolderFileAndTables
+          - ReviewStore_AddThreadAsync_UnknownFile_IsRefusedByDatabase

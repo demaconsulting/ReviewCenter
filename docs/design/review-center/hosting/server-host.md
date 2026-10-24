@@ -45,7 +45,7 @@ Anchors the content root at the application directory; clears the default loggin
 and adds the console provider only when the context is not silent; registers Blazor Server
 components; registers the `Database` options, a `ReviewCenterDbContext` factory configured by
 `DatabaseSetup.Configure`, `TimeProvider.System`, `ReviewStore` as the Core store interface, and
-`ProjectService` and `ReviewService` as singletons; applies the options callback; loads static web assets
+`ProjectService`, `ReviewService`, and `ThreadService` as singletons; applies the options callback; loads static web assets
 when enabled; builds the application; calls `InitializeDatabase`; adds request forgery protection ahead of
 the component endpoints; maps static assets
 when enabled; maps `/health` to a plain-text 200 response; maps `App` with the interactive
@@ -102,7 +102,7 @@ always disposed.
 - **App** — the root component mapped as the user interface.
 - **DatabaseSetup**, **ReviewCenterDbContext**, **ReviewStore** — the database configuration, context, and
   store registered for the pages.
-- **ProjectService**, **ReviewService** — the Core services registered for the pages.
+- **ProjectService**, **ReviewService**, **ThreadService** — the Core services registered for the pages.
 - **ASP.NET Core shared framework** — `WebApplication`, Kestrel, endpoint routing, request forgery protection,
   Blazor Server components, and `Microsoft.Extensions.Logging`.
 - **Entity Framework Core** — the database context factory registration.

@@ -22,7 +22,7 @@ namespace DemaConsulting.ReviewCenter.Core;
 
 /// <summary>
 ///     The persistence boundary of the domain: everything the services need to store and read
-///     projects, reviews and review files.
+///     projects, reviews, review files and review threads.
 /// </summary>
 /// <remarks>
 ///     The interface is owned by Core and implemented by the Storage subsystem, so the domain rules
@@ -105,5 +105,60 @@ public interface IReviewStore
         int projectId,
         string reviewId,
         string path,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    ///     Stores a new thread together with its first comment and assigns their identities.
+    /// </summary>
+    /// <param name="thread">
+    ///     The thread to store, with its comments. Must not be null; the identities of the thread and its
+    ///     comments are ignored. The file it names must exist in the review.
+    /// </param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <returns>The stored thread, including the assigned identities.</returns>
+    Task<ReviewThread> AddThreadAsync(ReviewThread thread, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    ///     Appends a comment to an existing thread.
+    /// </summary>
+    /// <param name="projectId">The project identity.</param>
+    /// <param name="reviewId">The review identifier.</param>
+    /// <param name="threadId">The thread identity; the thread must belong to the given review.</param>
+    /// <param name="comment">The comment to store. Must not be null; its identities are ignored.</param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <returns>The stored comment, or <c>null</c> when the thread does not exist in that review.</returns>
+    Task<ReviewComment?> AddCommentAsync(
+        int projectId,
+        string reviewId,
+        int threadId,
+        ReviewComment comment,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    ///     Changes the state of a thread. It is the only change ever made to a stored thread.
+    /// </summary>
+    /// <param name="projectId">The project identity.</param>
+    /// <param name="reviewId">The review identifier.</param>
+    /// <param name="threadId">The thread identity; the thread must belong to the given review.</param>
+    /// <param name="state">The state to store.</param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <returns><c>true</c> when the thread exists in that review (also when it already had the state); otherwise <c>false</c>.</returns>
+    Task<bool> SetThreadStateAsync(
+        int projectId,
+        string reviewId,
+        int threadId,
+        ReviewThreadState state,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    ///     Lists the threads of a review, for every file, with their comments.
+    /// </summary>
+    /// <param name="projectId">The project identity.</param>
+    /// <param name="reviewId">The review identifier.</param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <returns>The threads ordered by identity, each with its comments ordered by identity; empty when there are none.</returns>
+    Task<IReadOnlyList<ReviewThread>> ListThreadsAsync(
+        int projectId,
+        string reviewId,
         CancellationToken cancellationToken = default);
 }

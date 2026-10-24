@@ -21,7 +21,7 @@
 namespace DemaConsulting.ReviewCenter.Core;
 
 /// <summary>
-///     The size and length limits the domain enforces on projects and reviews.
+///     The size and length limits the domain enforces on projects, reviews and comments.
 /// </summary>
 /// <remarks>
 ///     The limits are named constants in one place so the services, the database mapping and the
@@ -70,4 +70,14 @@ public static class ReviewLimits
     ///     The longest accepted review title, in characters.
     /// </summary>
     public const int MaxReviewTitleLength = 200;
+
+    /// <summary>
+    ///     The longest accepted comment author name, in characters.
+    /// </summary>
+    public const int MaxAuthorLength = 100;
+
+    /// <summary>
+    ///     The longest accepted comment text, in characters.
+    /// </summary>
+    public const int MaxCommentLength = 4000;
 }

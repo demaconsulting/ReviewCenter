@@ -36,6 +36,7 @@ input-files:
   - docs/verification/review-center/core/fingerprint.md
   - docs/verification/review-center/core/project-service.md
   - docs/verification/review-center/core/review-service.md
+  - docs/verification/review-center/core/thread-service.md
   - docs/verification/review-center/storage.md
   - docs/verification/review-center/storage/review-center-db-context.md
   - docs/verification/review-center/storage/review-store.md

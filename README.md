@@ -14,8 +14,8 @@ comments on code blocks and files, project-specific pass/fail/N/A checklists, pr
 reviewers, and re-authenticated electronic sign-off.
 
 The `serve` verb runs ReviewCenter as an ASP.NET Core Blazor Server web application with a home page, a health
-endpoint, and the first review features: projects, and draft reviews made from uploaded files. Review comments,
-checklists, reviewers, and sign-off are still under development.
+endpoint, projects, draft reviews made from uploaded files, and threaded review comments on those files.
+Checklists, reviewers, and sign-off are still under development.
 
 ## Features
 
@@ -26,8 +26,12 @@ The current release provides:
 - **Projects**: create projects and list them at `/projects`; each project has its own page at `/projects/{id}`
 - **Draft Reviews**: create a review in a project by uploading a set of files; the review page shows the files, the
   SHA-256 hash of each file, and a content fingerprint that is calculated exactly as the
-  [ReviewMark][link-reviewmark] tool calculates it, and lets you read each file's content
-- **Persistent Storage**: projects, reviews, and the uploaded file contents are kept in a SQLite database file
+  [ReviewMark][link-reviewmark] tool calculates it, and lets you read each file's content as numbered lines
+- **Review Comments**: on the review page, start a comment thread on a whole file or on a line range, reply to it,
+  and mark it resolved or reopen it; the file list shows the open threads per file and the page shows the open and
+  resolved totals
+- **Persistent Storage**: projects, reviews, the uploaded file contents, and the comment threads are kept in a
+  SQLite database file
   (default `reviewcenter.db` in the per-user application data folder, see
   [Data Location](#data-location-and-database-settings))
 - **Standardized Command-Line Interface**: Context class handling common arguments
@@ -162,10 +166,16 @@ non-zero exit code.
 - **No authentication**: this release has a single anonymous operator. Anyone who can reach the server can create
   and read projects and reviews. Run it only on `localhost` or on a trusted network until user authentication is
   added.
+- **Comment authors are free text**: because there is no sign-in yet, the author of a comment is a name that the
+  reader types, and it is not verified. This is temporary until user authentication is added.
+- **Comments cannot be edited or deleted**: a posted comment is permanent; only the thread state (open or resolved)
+  can be changed.
+- **Comments are not live**: comments posted by other people appear when you reload the page or take an action on it.
 - **Upload limits**: at most 200 files per review, 2 MiB per file, and 20 MiB per review. Only the file name of each
   uploaded file is kept, so two files with the same name cannot be in one review.
 - **No database migrations**: the database tables are created when the database file is new; a later release that
-  changes the tables will need a migration step.
+  changes the tables will need a migration step. A database file created by an earlier version, before comments
+  existed, does not have the comment tables, so delete it and start again (development databases only).
 
 ## Error Handling
 
@@ -239,7 +249,7 @@ Generated documentation includes:
 
 Planned but not yet implemented:
 
-- The remaining review features of the ReviewCenter web service: review comments, checklists, reviewers, sign-off,
+- The remaining review features of the ReviewCenter web service: checklists, reviewers, sign-off,
   and review states beyond Draft
 - User authentication
 - EF Core database migrations with an explicit `migrate` command, and further database providers

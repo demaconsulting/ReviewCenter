@@ -58,7 +58,7 @@ the server.
 - *Role*: Consumer.
 
 **Storage and Core (consumed)**: `DatabaseSetup`, `ReviewCenterDbContext`, and `ReviewStore` of the
-`Storage` subsystem, and `ProjectService`, `ReviewService`, and the store interface of the `Core` subsystem.
+`Storage` subsystem, and `ProjectService`, `ReviewService`, `ThreadService`, and the store interface of the `Core` subsystem.
 
 - *Type*: In-process .NET types.
 - *Role*: Consumer.

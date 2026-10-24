@@ -57,3 +57,17 @@ sections:
         tests:
           - StorageSubsystem_ServicesOverDatabase_ReopenedDatabase_KeepsProjectAndReview
           - StorageSubsystem_UnsupportedProvider_Opening_FailsWithClearErrorAndCreatesNothing
+
+      - id: ReviewCenter-Storage-Threads
+        title: >-
+          The Storage subsystem shall keep comment threads with their anchors, states, and comments in the
+          database file, so that they are all still there, unchanged and in order, when the database is opened
+          again.
+        justification: |
+          Review comments are part of the review record and must outlive the process that created them. A
+          thread can only exist for a file of an existing review, and the database enforces that.
+        children:
+          - ReviewCenter-ReviewStore-Threads
+          - ReviewCenter-DbContext-Threads
+        tests:
+          - StorageSubsystem_ServicesOverDatabase_ReopenedDatabase_KeepsThreadsAndComments

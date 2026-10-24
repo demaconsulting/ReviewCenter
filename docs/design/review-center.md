@@ -34,6 +34,7 @@ flowchart TD
         Fingerprint
         ProjectService
         ReviewService
+        ThreadService
     end
     subgraph Storage
         ReviewCenterDbContext
@@ -51,6 +52,7 @@ flowchart TD
     ServerHost --> ReviewStore
     ServerHost --> ProjectService
     ServerHost --> ReviewService
+    ServerHost --> ThreadService
     App --> HomePage
     App --> ProjectsPage
     App --> ProjectPage
@@ -59,9 +61,11 @@ flowchart TD
     ProjectPage --> ProjectService
     ProjectPage --> ReviewService
     ReviewPage --> ReviewService
+    ReviewPage --> ThreadService
     ReviewService --> Fingerprint
     ProjectService --> ReviewStore
     ReviewService --> ReviewStore
+    ThreadService --> ReviewStore
     ReviewStore --> ReviewCenterDbContext
     DatabaseSetup --> ReviewCenterDbContext
 ```
@@ -223,7 +227,9 @@ which button clicks are sent to the server, handled by `HomePage`, and the chang
 are sent back. A request for `/health` is answered directly by `ServerHost`. The project pages
 work the same way but call `ProjectService` and `ReviewService` in the handlers: a submitted
 review form carries its files to `ReviewService`, which validates them, computes the
-fingerprint with `Fingerprint`, and stores the review through `ReviewStore`. When the server is
+fingerprint with `Fingerprint`, and stores the review through `ReviewStore`. `ReviewPage` calls `ThreadService`
+to start, answer, resolve, and reopen comment threads on a file; `ThreadService` applies the comment rules and
+stores the threads through `ReviewStore`. When the server is
 stopped, `ServerHost.RunAsync` returns 0; if the server cannot start, including because the
 database cannot be used, it reports the reason
 through `Context.WriteError` and returns 1, which makes `Context.ExitCode` 1.

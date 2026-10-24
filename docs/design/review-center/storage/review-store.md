@@ -5,8 +5,8 @@
 #### Purpose
 
 `ReviewStore` implements the Core store interface on top of `ReviewCenterDbContext`. Its single responsibility is
-to persist projects, reviews, and file content, and to read them back, translating database behavior into the
-terms of the domain.
+to persist projects, reviews, file content, and comment threads, and to read them back, translating database
+behavior into the terms of the domain.
 
 #### Data Model
 
@@ -41,6 +41,21 @@ without file bytes, so that showing a review with large files does not load them
 
 **GetFileContentAsync**: Reads the bytes of one file of a review, exactly as stored; null when absent.
 
+**AddThreadAsync**: Stores a thread together with its first comment in one save, which is one transaction. Fresh
+entities are copied from the argument, so identities supplied by the caller are ignored and the database assigns
+them. A thread for a file that does not exist in the review is refused by the relationship constraint of the
+database.
+
+**AddCommentAsync**: Appends a comment to a thread. It first checks that the thread belongs to the stated project
+and review and returns null when it does not, so a thread identity from another review cannot be commented on.
+
+**SetThreadStateAsync**: Sets the state of a thread of the stated review with a single update statement and
+returns whether a thread was found.
+
+**ListThreadsAsync**: Lists the threads of one review, for every file, with their comments. Threads and comments
+are ordered by identity, which grows with the order of creation; the creation time is not used for ordering because
+SQLite cannot order by a `DateTimeOffset`.
+
 The bytes of files are stored and returned verbatim, including empty files and files containing carriage
 returns or zero bytes.
 
@@ -58,5 +73,5 @@ database failure propagates unchanged to the caller. Null arguments raise `Argum
 
 #### Callers
 
-- **ProjectService** and **ReviewService** — through the Core interface.
+- **ProjectService**, **ReviewService**, and **ThreadService** — through the Core interface.
 - **ServerHost** — registers the store as the implementation of the Core interface.

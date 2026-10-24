@@ -63,7 +63,22 @@ public enum DomainRule
     TooManyFiles,
 
     /// <summary>The files together are larger than <see cref="ReviewLimits.MaxTotalSizeBytes"/>.</summary>
-    TotalSizeExceeded
+    TotalSizeExceeded,
+
+    /// <summary>The comment author is empty or too long.</summary>
+    CommentAuthorInvalid,
+
+    /// <summary>The comment text is empty or too long.</summary>
+    CommentTextInvalid,
+
+    /// <summary>
+    ///     The thread anchor is not valid: the review or file does not exist, the line numbers are
+    ///     inconsistent or beyond the file, or a line range was given for a binary or empty file.
+    /// </summary>
+    ThreadAnchorInvalid,
+
+    /// <summary>The referenced thread does not exist in the review.</summary>
+    ThreadNotFound
 }
 
 /// <summary>

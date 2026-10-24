@@ -25,6 +25,8 @@ N/A - standard test environment (temporary SQLite databases are created by the t
   live connection. (The marker's switch to interactive is verified by the page units' component tests.)
 - A project and a review created through the services are presented by the pages with the correct fingerprint.
   (The creation forms and uploads are verified by the page units' component tests.)
+- Threads created through the Core service are presented by the review page: the summary and the per-file open
+  count are correct.
 - Every interactive element of every page has a `data-testid`.
 
 ### Test Scenarios
@@ -45,6 +47,11 @@ the projects page, the project page, and the review page are requested. The proj
 linked, and the review page shows the title, the Draft state, the fingerprint, and the path and hash of each
 file, equal to the known values. This scenario is tested by
 `WebSubsystem_CreatedProjectAndReview_ArePresentedByThePages`.
+
+**WebSubsystem_ReviewWithThreads_ArePresentedByThePage**: A review with one open whole-file thread and one resolved
+line thread is created through the Core services of the real pipeline, and the review page is requested. The
+summary shows one open and one resolved thread and the file shows "1 open thread". This scenario is tested by
+`WebSubsystem_ReviewWithThreads_ArePresentedByThePage`.
 
 **WebSubsystem_AllPages_EveryInteractiveElementHasTestId**: Every route (home, projects, a project, a missing
 project, a review, a missing review) is requested over the in-memory server; every link, button, input, select,

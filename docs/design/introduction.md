@@ -71,10 +71,10 @@ The ReviewCenter system is divided as follows:
   ServerHost unit
 - **Web** (subsystem): the Blazor Server user interface; contains the App unit (HTML shell and router),
   the HomePage unit, and the ProjectsPage, ProjectPage, and ReviewPage units
-- **Core** (subsystem): the domain model and rules for projects and reviews, free of web and database
-  technology; contains the Fingerprint, ProjectService, and ReviewService units
-- **Storage** (subsystem): persistence of projects and reviews in a database through Entity Framework Core;
-  contains the ReviewCenterDbContext, ReviewStore, and DatabaseSetup units
+- **Core** (subsystem): the domain model and rules for projects, reviews, and review comments, free of web and
+  database technology; contains the Fingerprint, ProjectService, ReviewService, and ThreadService units
+- **Storage** (subsystem): persistence of projects, reviews, and comment threads in a database through Entity
+  Framework Core; contains the ReviewCenterDbContext, ReviewStore, and DatabaseSetup units
 - **SelfTest** (subsystem): self-validation; contains the Validation unit
 - **Utilities** (subsystem): shared helpers; contains the PathHelpers unit
 

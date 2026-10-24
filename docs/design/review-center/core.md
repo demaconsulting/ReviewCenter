@@ -4,23 +4,26 @@
 
 ### Overview
 
-The `Core` subsystem is the domain of ReviewCenter: projects, reviews of uploaded files, the rules
-that protect them, and the content fingerprint that identifies a review's files. It is deliberately
-free of web and database technology so that the rules can be reviewed and tested on their own. It
-contains three units: `Fingerprint`, the content fingerprint algorithm; `ProjectService`, the rules
-for projects; and `ReviewService`, the rules for reviews. The domain types (`Project`, `Review`,
-`ReviewFile`, `ReviewState`, `UploadedFile`), the limits (`ReviewLimits`), the rule failure type
+The `Core` subsystem is the domain of ReviewCenter: projects, reviews of uploaded files, comment threads on
+those files, the rules that protect them, and the content fingerprint that identifies a review's files. It is
+deliberately free of web and database technology so that the rules can be reviewed and tested on their own. It
+contains four units: `Fingerprint`, the content fingerprint algorithm; `ProjectService`, the rules
+for projects; `ReviewService`, the rules for reviews; and `ThreadService`, the rules for review comments. The
+domain types (`Project`, `Review`, `ReviewFile`, `ReviewState`, `UploadedFile`, `ReviewThread`, `ReviewComment`,
+`ReviewThreadState`), the text and line definition (`FileText`), the limits (`ReviewLimits`), the rule failure type
 (`DomainRuleException` with the `DomainRule` enumeration), and the store interface (`IReviewStore`) are
 supporting types, documented with the unit that owns them.
 
 ### Interfaces
 
-**ProjectService and ReviewService**: The operations used by the `Web` subsystem.
+**ProjectService, ReviewService, and ThreadService**: The operations used by the `Web` subsystem.
 
 - *Type*: In-process .NET classes.
 - *Role*: Provider.
 - *Contract*: Create a project; list and read projects; create a draft review from uploaded files; list and
-  read reviews; read the exact bytes of one file of a review. Rule violations are reported as a
+  read reviews; read the exact bytes of one file of a review; start a comment thread on a file or a line range,
+  reply to it, resolve and reopen it, and list the threads of a review with their comments. Posted comments are
+  immutable: there is no operation to edit or delete one. Rule violations are reported as a
   `DomainRuleException` that carries a `DomainRule` value and a message suitable for display to the user.
 - *Constraints*: The services hold no state and are safe for concurrent use if the store is.
 
@@ -28,9 +31,12 @@ supporting types, documented with the unit that owns them.
 
 - *Type*: In-process .NET interface.
 - *Role*: Consumer (implemented by `ReviewStore` in the `Storage` subsystem).
-- *Contract*: Add and read projects; check, add, read, and list reviews; read one file's content.
+- *Contract*: Add and read projects; check, add, read, and list reviews; read one file's content; add a thread with
+  its first comment; add a comment to a thread of a review; set the state of a thread; list the threads of a review
+  with their comments.
 - *Constraints*: A review is added with all its files in one operation, and an attempt to add a review whose
-  identifier already exists in the project fails with a `DomainRuleException` for `ReviewIdDuplicate`.
+  identifier already exists in the project fails with a `DomainRuleException` for `ReviewIdDuplicate`. A thread is
+  added with its first comment in one operation.
 
 **ReviewLimits**: The limits of the system as constants (see the `ProjectService` unit).
 
@@ -53,7 +59,10 @@ stored when a rule fails. The bytes of each file are kept exactly as uploaded; n
 line-ending normalization is applied, since that would change the fingerprint.
 
 Draft is the only review state at present. The state is a closed enumeration and is stored as text so that
-states can be added without renumbering.
+states can be added without renumbering. A comment thread is `Open` or `Resolved`, stored the same way. Comments
+are immutable by design: a posted comment can neither be edited nor deleted, so a discussion stays a reliable
+record. The only change to an existing thread is its state. The comment author is free text, because there is no
+sign-in yet; it is not verified and will be replaced by the signed-in user when identity is added.
 
 Rule failures are reported as `DomainRuleException` rather than as return codes, because the pages show the
 message and keep the entered values, and there is a single, easily tested path for all rules. The rules are:
@@ -72,3 +81,7 @@ message and keep the entered values, and there is a single, easily tested path f
 | `DuplicatePath` | Two files have the same path (ordinal comparison) |
 | `FileTooLarge` | A file is larger than the per-file limit |
 | `TotalSizeExceeded` | The files together are larger than the total limit |
+| `CommentAuthorInvalid` | The comment author is empty after trimming or is too long |
+| `CommentTextInvalid` | The comment text is empty after trimming or is too long |
+| `ThreadAnchorInvalid` | The file is not in the review, or the line range does not fit the file (see ThreadService) |
+| `ThreadNotFound` | A reply, resolve, or reopen names a thread that does not exist in the review |
