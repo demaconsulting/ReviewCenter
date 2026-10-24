@@ -305,6 +305,56 @@ public class ProjectPageTests : PageTestBase
     }
 
     /// <summary>
+    ///     Test that a client that declares small files but sends more bytes than the total limit allows is
+    ///     rejected based on the bytes actually received.
+    /// </summary>
+    [Fact]
+    public async Task ProjectPage_FileInput_DeclaredSizesUnderstated_RejectsOnReceivedBytes()
+    {
+        // Arrange: files that declare one byte each but stream the per-file maximum, enough to pass the total limit
+        var project = await Projects.CreateAsync("Apollo", null, TestContext.Current.CancellationToken);
+        var cut = RenderPage(project.Id);
+        var count = (int)(ReviewLimits.MaxTotalSizeBytes / ReviewLimits.MaxFileSizeBytes) + 1;
+        var content = new byte[ReviewLimits.MaxFileSizeBytes];
+        IReadOnlyList<IBrowserFile> files = Enumerable.Range(0, count)
+            .Select(i => (IBrowserFile)new UnderstatedBrowserFile($"part-{i}.bin", content))
+            .ToArray();
+
+        // Act: deliver the selection to the file input's change callback
+        await cut.InvokeAsync(() => cut.FindComponent<InputFile>().Instance.OnChange.InvokeAsync(new InputFileChangeEventArgs(files)));
+
+        // Assert: the total-limit error is shown and no file is kept
+        Assert.Contains("together", cut.Find("[data-testid='review-error']").TextContent, StringComparison.Ordinal);
+        Assert.Empty(cut.FindAll("[data-testid='selected-files-list']"));
+    }
+
+    /// <summary>
+    ///     A browser file that reports a size of one byte but streams the given content.
+    /// </summary>
+    /// <param name="name">The file name.</param>
+    /// <param name="content">The bytes actually streamed.</param>
+    private sealed class UnderstatedBrowserFile(string name, byte[] content) : IBrowserFile
+    {
+        /// <inheritdoc />
+        public string Name { get; } = name;
+
+        /// <inheritdoc />
+        public DateTimeOffset LastModified { get; } = DateTimeOffset.UnixEpoch;
+
+        /// <inheritdoc />
+        public long Size => 1;
+
+        /// <inheritdoc />
+        public string ContentType => "application/octet-stream";
+
+        /// <inheritdoc />
+        public Stream OpenReadStream(long maxAllowedSize = 512000, CancellationToken cancellationToken = default)
+        {
+            return new MemoryStream(content, writable: false);
+        }
+    }
+
+    /// <summary>
     ///     Test that a new selection replaces the previous one.
     /// </summary>
     [Fact]

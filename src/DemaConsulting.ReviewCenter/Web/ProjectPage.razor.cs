@@ -213,8 +213,10 @@ public partial class ProjectPage : ComponentBase
             return;
         }
 
-        // Read each file into memory, keeping the bytes exactly as sent
+        // Read each file into memory, keeping the bytes exactly as sent. The declared sizes come from the
+        // client, so the bytes actually received are counted too, and reading stops at the total limit
         var files = new List<UploadedFile>(browserFiles.Count);
+        long received = 0;
         foreach (var browserFile in browserFiles)
         {
             // The explicit limit is the domain maximum (2 MiB); the analyzer cannot see through the constant
@@ -223,6 +225,14 @@ public partial class ProjectPage : ComponentBase
 #pragma warning restore S5693
             using var buffer = new MemoryStream();
             await stream.CopyToAsync(buffer);
+            received += buffer.Length;
+            if (received > ReviewLimits.MaxTotalSizeBytes)
+            {
+                ErrorMessage = $"The files together are larger than the limit of {ReviewLimits.MaxTotalSizeBytes / 1024 / 1024} MiB.";
+                SelectionRejected = true;
+                return;
+            }
+
             files.Add(new UploadedFile(browserFile.Name, buffer.ToArray()));
         }
 

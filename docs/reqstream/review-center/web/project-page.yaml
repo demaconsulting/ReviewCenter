@@ -75,6 +75,7 @@ sections:
           - ProjectPage_FileInput_FileTooLarge_ShowsErrorAndKeepsNothing
           - ProjectPage_FileInput_TooManyFiles_ShowsErrorAndKeepsNothing
           - ProjectPage_FileInput_TotalSizeTooLarge_ShowsErrorAndKeepsNothing
+          - ProjectPage_FileInput_DeclaredSizesUnderstated_RejectsOnReceivedBytes
 
       - id: ReviewCenter-ProjectPage-Interactive
         title: >-

@@ -45,7 +45,10 @@ for one project can never be submitted into another.
 
 Rejects more than 200 files before touching any of them; rejects a file larger than 2 MiB or a total larger than
 20 MiB from the sizes the browser reports, before reading anything; then reads each file with a read limit of the
-file size limit. The path recorded for a file is its browser file name, since a browser does not expose folders,
+file size limit while counting the bytes actually received, because the reported sizes are client-supplied, and
+stops with the same total-size rejection as soon as the received bytes pass 20 MiB, so memory use stays bounded
+even for a client that understates its sizes. The path recorded for a file is its browser file name, since a
+browser does not expose folders,
 so two files with the same name are later refused by `ReviewService` as a duplicate path. A selection that breaks
 a limit is rejected as a whole, so a half-read selection can never be submitted. Submitting the form after such a
 rejection does nothing and leaves the rejection reason visible, rather than replacing it with a "no files" message.

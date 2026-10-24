@@ -82,5 +82,10 @@ test's memory use low); the error says the files together are too large and no s
 submitted; the error is still shown and nothing is stored. This scenario is tested by
 `ProjectPage_FileInput_TotalSizeTooLarge_ShowsErrorAndKeepsNothing`.
 
+**ProjectPage_FileInput_DeclaredSizesUnderstated_RejectsOnReceivedBytes**: A fake browser file reports one byte
+but streams the per-file maximum, and enough of them are delivered to the file input to pass the total limit; the
+total-size error is shown and no selection is kept. This scenario is tested by
+`ProjectPage_FileInput_DeclaredSizesUnderstated_RejectsOnReceivedBytes`.
+
 **ProjectPage_AfterRender_Interactive_SetsMarker**: The page is rendered; its root element has `data-interactive`
 equal to `true`. This scenario is tested by `ProjectPage_AfterRender_Interactive_SetsMarker`.
