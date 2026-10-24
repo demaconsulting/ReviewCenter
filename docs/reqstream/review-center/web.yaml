@@ -67,7 +67,8 @@ sections:
         title: >-
           The Web subsystem shall let a user create a review of selected files on the project page, within the
           upload limits, and shall serve a page for each review at /projects/{project}/reviews/{review} that
-          shows its fingerprint, its files with size and hash, and the content of a selected file.
+          shows its files and the content of a selected file ahead of its fingerprint and file hashes, which are in
+          a collapsed Details section.
         justification: |
           Creating a review from files, and seeing the fingerprint and the exact content again, is the first
           review capability of the product. Showing the user the reason for every refusal makes the upload
@@ -80,6 +81,7 @@ sections:
           - ReviewCenter-ProjectPage-Limits
           - ReviewCenter-ProjectPage-Interactive
           - ReviewCenter-ReviewPage-Show
+          - ReviewCenter-ReviewPage-Layout
           - ReviewCenter-ReviewPage-Files
           - ReviewCenter-ReviewPage-Content
           - ReviewCenter-ReviewPage-Binary
@@ -90,14 +92,17 @@ sections:
       - id: ReviewCenter-Web-Comments
         title: >-
           The Web subsystem shall let a user, on the review page, start comment threads on the selected file,
-          reply to them, resolve and reopen them, and shall show the threads, their comments, and the open and
-          resolved counts.
+          reply to them, resolve and reopen them, and shall show the next step, an index of the threads of all
+          files, the threads with their comments (resolved ones collapsed), and the open and resolved counts.
         justification: |
           Comments are written and read next to the code on the review page. The subsystem test covers the
           counts served from the database; starting, replying, and resolving need a live connection and are
           verified by the component tests of the page unit.
         children:
           - ReviewCenter-ReviewPage-ThreadSummary
+          - ReviewCenter-ReviewPage-NextStep
+          - ReviewCenter-ReviewPage-ThreadIndex
+          - ReviewCenter-ReviewPage-ThreadCollapse
           - ReviewCenter-ReviewPage-ThreadStart
           - ReviewCenter-ReviewPage-ThreadShow
           - ReviewCenter-ReviewPage-ThreadUpdate

@@ -5,7 +5,8 @@
 #### Purpose
 
 `ThreadService` owns the rules for review comments: it starts a thread on a file of a review, appends replies,
-resolves and reopens threads, and reads the threads of a review back. It is also the home of the comment types
+resolves and reopens threads, and reads the threads of a review back, and it shapes them for display (last activity,
+an index by state, and a next-step sentence). It is also the home of the comment types
 `ReviewThread`, `ReviewComment`, and `ReviewThreadState`, and of `FileText`, which defines what a text file and a
 line are.
 
@@ -13,7 +14,8 @@ line are.
 
 **ReviewThread**: a data class (init-only properties) of `Id` (assigned by the store), `ProjectId`, `ReviewId`,
 `FilePath` (the path of one file of the review), `StartLine` and `EndLine` (both null for a thread on the whole
-file, otherwise an inclusive 1-based range), `State`, `Created`, and `Comments` (a list of `ReviewComment`).
+file, otherwise an inclusive 1-based range), `State`, `Created`, `Comments` (a list of `ReviewComment`), and the
+derived, not stored, `LastActivity`.
 
 **ReviewComment**: a data class (init-only properties) of `Id` (assigned by the store), `ThreadId`, `Author`, `Text`,
 and `Created` (UTC).
@@ -70,6 +72,22 @@ the state as requested. A thread that does not exist in the review is reported a
 
 **ListAsync**: Lists all threads of a review, for every file, in creation order, each with its comments in posting
 order; the list is empty when there are none or the review does not exist.
+
+**BuildIndex**: A static, pure function that shapes the threads of a review for an index.
+
+- *Parameters*: `IEnumerable<ReviewThread> threads` and `ReviewThreadState? state` — the state to keep, or `null`
+  for all.
+- *Returns*: `IReadOnlyList<ReviewThread>` — the matching threads, newest `LastActivity` first, and the higher `Id`
+  first when the times are equal, so the order is stable.
+
+The sort is done in memory because the database cannot order by a time stamp. Nothing is stored or read.
+
+**NextStep**: A static, pure function that words the next action for the threads of a review as one sentence: "No
+discussion yet - select a file and comment on a line." when there are no threads, "1 open thread to resolve." or
+"{n} open threads to resolve." when some are open, and "All threads resolved." otherwise.
+
+**ReviewThread.LastActivity**: A read-only value derived from the comments, the time of the latest comment (the
+thread's `Created` when it has none). It is not stored, so the database is unchanged.
 
 #### Error Handling
 

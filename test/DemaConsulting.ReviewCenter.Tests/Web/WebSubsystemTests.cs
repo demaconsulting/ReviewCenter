@@ -141,6 +141,13 @@ public partial class WebSubsystemTests
         Assert.Equal("1", page.QuerySelector("[data-testid='threads-open-count']")?.TextContent);
         Assert.Equal("1", page.QuerySelector("[data-testid='threads-resolved-count']")?.TextContent);
         Assert.Equal("1 open thread", page.QuerySelector("[data-testid='file-open-threads-0']")?.TextContent);
+
+        // Assert: the next step, the index row of the open thread (activity read back from the database) and
+        // the collapsed details
+        Assert.Equal("1 open thread to resolve.", page.QuerySelector("[data-testid='next-step']")?.TextContent);
+        Assert.Single(page.QuerySelectorAll("[data-testid='thread-index-list'] > li"));
+        Assert.False(string.IsNullOrWhiteSpace(page.QuerySelector("[data-testid^='index-activity-']")?.TextContent));
+        Assert.False(page.QuerySelector("[data-testid='review-details']")?.HasAttribute("open"));
     }
 
     /// <summary>

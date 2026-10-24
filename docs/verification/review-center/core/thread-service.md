@@ -26,6 +26,9 @@ N/A - standard test environment.
 - Resolving and reopening change only the state and are idempotent.
 - An unknown thread, or one of another review, is rejected with `ThreadNotFound`.
 - Threads are listed in creation order with their comments, and the list is empty when there are none.
+- The last activity of a thread is the time of its latest comment; the index keeps the threads of the requested
+  state (or all), newest activity first, the higher identity first on equal times, and is empty for no threads.
+- The next step names starting a discussion, the number of open threads, or that all threads are resolved.
 
 #### Test Scenarios
 
@@ -95,6 +98,19 @@ listed; all are returned in creation order with their comments in posting order.
 **ThreadService_ListAsync_NoThreadsOrUnknownReview_ReturnsEmpty**: A review without threads and a review that does
 not exist both give an empty list. This scenario is tested by
 `ThreadService_ListAsync_NoThreadsOrUnknownReview_ReturnsEmpty`.
+
+**ThreadService_LastActivity_IsTimeOfLatestComment**: A thread with a later reply and a thread with one comment are
+created as objects; the last activity is the latest comment time in each. This scenario is tested by
+`ThreadService_LastActivity_IsTimeOfLatestComment`.
+
+**ThreadService_BuildIndex_StateFilter_ReturnsMatchingNewestActivityFirst**: Open and resolved threads, one with a
+late reply and two with equal times, are indexed for all, Open and Resolved; the result is filtered, ordered newest
+activity first with the higher identity first on a tie, and empty input gives an empty list. This scenario is
+tested by `ThreadService_BuildIndex_StateFilter_ReturnsMatchingNewestActivityFirst`.
+
+**ThreadService_NextStep_NoThreadsOpenAndAllResolved_NamesNextAction**: No threads, one open thread, three open and
+one resolved thread, and only resolved threads each give the matching sentence. This scenario is tested by
+`ThreadService_NextStep_NoThreadsOpenAndAllResolved_NamesNextAction`.
 
 **ThreadService_Constructor_NullArguments_Throws**: A null store and a null clock are rejected with
 `ArgumentNullException`. This scenario is tested by `ThreadService_Constructor_NullArguments_Throws`.

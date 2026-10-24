@@ -24,12 +24,14 @@ The current release provides:
 - **Blazor Server Web Application**: `reviewcenter serve` hosts the web interface (home page at `/`) and a
   `/health` endpoint, listening on `http://localhost:5000` by default or on the address given with `--urls`
 - **Projects**: create projects and list them at `/projects`; each project has its own page at `/projects/{id}`
-- **Draft Reviews**: create a review in a project by uploading a set of files; the review page shows the files, the
+- **Draft Reviews**: create a review in a project by uploading a set of files; the review page shows the files and
+  lets you read each file's content as numbered lines; a collapsed Details section holds the review id, state, the
   SHA-256 hash of each file, and a content fingerprint that is calculated exactly as the
-  [ReviewMark][link-reviewmark] tool calculates it, and lets you read each file's content as numbered lines
+  [ReviewMark][link-reviewmark] tool calculates it
 - **Review Comments**: on the review page, start a comment thread on a whole file or on a line range, reply to it,
-  and mark it resolved or reopen it; the file list shows the open threads per file and the page shows the open and
-  resolved totals
+  and mark it resolved or reopen it; a next-step line says what is left to do, a thread index of all files (open by
+  default, or all, or resolved) jumps to the thread's lines, resolved threads are collapsed to one line, and the
+  file list shows the open threads per file
 - **Persistent Storage**: projects, reviews, the uploaded file contents, and the comment threads are kept in a
   SQLite database file
   (default `reviewcenter.db` in the per-user application data folder, see

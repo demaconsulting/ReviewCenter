@@ -9,22 +9,44 @@ sections:
     requirements:
       - id: ReviewCenter-ReviewPage-Show
         title: >-
-          The ReviewPage unit shall show the identifier, title, state, and content fingerprint of the review, a
-          link back to the owning project labeled with the project name, or a not-found message when the review
-          does not exist.
+          The ReviewPage unit shall show the identifier, title, state, and content fingerprint of the review (the
+          identifier, state, and fingerprint in the Details section), a link back to the owning project labeled
+          with the project name, or a not-found message when the review does not exist.
         justification: |
-          The fingerprint identifies the exact content under review, so it must be visible. A mistyped link must
-          lead to a clear answer, and the reviewer must see which project the review belongs to.
+          The fingerprint identifies the exact content under review, so it must be available. A mistyped link
+          must lead to a clear answer, and the reviewer must see which project the review belongs to.
         tests:
           - ReviewPage_Render_UnknownReview_ShowsNotFound
           - ReviewPage_Render_ExistingReview_ShowsIdTitleStateAndFingerprint
+          - ReviewPage_Render_ExistingReview_FilesFirstAndDetailsCollapsedHoldMetadata
           - ReviewPage_Render_FileSelected_ShowsProjectNameAndHighlightsRow
           - ReviewPage_ParametersChange_OtherReview_ShowsNewReviewAndClearsSelection
 
+      - id: ReviewCenter-ReviewPage-Layout
+        title: >-
+          The ReviewPage unit shall present the next-step line, the files, the thread index and the content of
+          the selected file ahead of the review identifier, state, content fingerprint and per-file hashes,
+          which it keeps in a Details section that is collapsed by default.
+        justification: |
+          Reviewers come to read code and discussion. Identifiers and hashes are needed rarely, so they must not
+          compete with the code for attention, yet they must stay one click away.
+        tests:
+          - ReviewPage_Render_ExistingReview_FilesFirstAndDetailsCollapsedHoldMetadata
+
+      - id: ReviewCenter-ReviewPage-NextStep
+        title: >-
+          The ReviewPage unit shall show one short sentence at the top of the page, derived from the threads,
+          that tells the reader what to do next, and keep it current after every change.
+        justification: |
+          The reader should see what is expected of them without working it out from counts.
+        tests:
+          - ReviewPage_Render_NextStep_FollowsThreadState
+
       - id: ReviewCenter-ReviewPage-Files
         title: >-
-          The ReviewPage unit shall list the files of the review with the path, size, and SHA-256 hash of each,
-          and give each file's View button an accessible name that identifies the file.
+          The ReviewPage unit shall list the files of the review with the path and size of each, show the
+          SHA-256 hash of each file in the Details section, and give each file's View button an accessible name
+          that identifies the file.
         justification: |
           Reviewers need to see what the review contains, and the per-file hashes let them verify a file
           independently of the product.
@@ -61,13 +83,37 @@ sections:
 
       - id: ReviewCenter-ReviewPage-ThreadSummary
         title: >-
-          The ReviewPage unit shall show the number of open and of resolved threads of the review, and the
-          number of open threads next to every file.
+          The ReviewPage unit shall show the number of open and of resolved threads of the review (on the filter
+          buttons of the thread index), and the number of open threads next to every file.
         justification: |
           Reviewers need to see at a glance how much discussion is still open and which files it concerns.
         tests:
           - ReviewPage_Render_NoThreads_ShowsZeroSummaryAndZeroFileCounts
           - ReviewPage_FileSelect_ThreadsExist_ShowsSummaryCountsMarkersAndComments
+
+      - id: ReviewCenter-ReviewPage-ThreadIndex
+        title: >-
+          The ReviewPage unit shall list the threads of all files in one index showing file, anchor, state,
+          number of comments, author of the first comment and time of last activity, filterable to All, Open
+          (default) and Resolved, where choosing a thread selects its file and highlights and scrolls to its
+          anchored lines.
+        justification: |
+          Reviewers need to find the discussion that needs them without opening every file, and to go from a
+          thread to the code it is about in one step.
+        tests:
+          - ReviewPage_ThreadIndex_Filters_ShowRowsWithFileAnchorStateCountAuthorAndActivity
+          - ReviewPage_ThreadIndex_RowClick_SelectsFileHighlightsAnchorAndScrolls
+
+      - id: ReviewCenter-ReviewPage-ThreadCollapse
+        title: >-
+          The ReviewPage unit shall show a resolved thread as a one-line header (anchor, state, number of
+          comments) that expands and collapses on request, keep open threads expanded, and collapse a thread
+          when it is resolved.
+        justification: |
+          Settled discussion should not push the open discussion out of sight, yet it must stay readable and
+          open to being reopened.
+        tests:
+          - ReviewPage_ResolvedThread_CollapsedHeaderExpandsOnRequest
 
       - id: ReviewCenter-ReviewPage-ThreadStart
         title: >-

@@ -3,7 +3,8 @@
    This is static server-side rendered markup: it emits the document skeleton, the router that
    selects a page for the requested URL, and the Blazor client script that upgrades interactive
    pages to a live server connection. Pages opt in to interactivity individually (see HomePage),
-   so everything outside a page stays cheap, static HTML. *@
+   so everything outside a page stays cheap, static HTML. It also carries one tiny script, the scroll
+   helper that the review page calls to bring a thread's lines into view (Blazor cannot scroll by itself). *@
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -15,6 +16,14 @@
 </head>
 <body>
     <Routes />
+    <script>
+        window.reviewCenter = {
+            scrollToTestId: function (id, block) {
+                var element = document.querySelector('[data-testid="' + id + '"]');
+                if (element) { element.scrollIntoView({ block: block }); }
+            }
+        };
+    </script>
     <script src="_framework/blazor.web.js"></script>
 </body>
 </html>

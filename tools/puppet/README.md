@@ -91,6 +91,10 @@ Actions fail after about 5 seconds so a wrong selector costs little.
 2. `puppet reload`, then `puppet wait <sel>` if the page loads asynchronously.
 3. `puppet screenshot shot.png`, or `--selector <sel>` for one element, and look at the image: open the PNG with the
    image viewer of your tool (an agent can read the PNG file directly as an image).
+3a. Apply the human-factors test to every screenshot, and fix the page whenever an answer is "no":
+    (a) Can I quickly see the information I need?
+    (b) Am I given so much other information that I cannot find what I am after?
+    (c) Does the UI help me work out what I can or need to do next?
 4. Check other sizes and themes: `puppet viewport 390x800`, `puppet theme dark`, then screenshot again.
 5. Confirm details numerically with `puppet eval`, for example
    `puppet eval "getComputedStyle(document.querySelector('[data-testid=hello-button]')).color"` or

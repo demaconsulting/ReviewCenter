@@ -54,6 +54,8 @@ public class ReviewPageTests : PageTestBase
     /// <returns>The rendered component.</returns>
     private IRenderedComponent<ReviewPage> RenderPage(int projectId, string reviewId = "REV-1")
     {
+        // File and thread selection ask the browser to scroll; the tests only check what was asked
+        JSInterop.Mode = JSRuntimeMode.Loose;
         return Render<ReviewPage>(parameters => parameters
             .Add(page => page.ProjectId, projectId)
             .Add(page => page.ReviewId, reviewId));
@@ -450,6 +452,10 @@ public class ReviewPageTests : PageTestBase
         Assert.Equal("2", cut.Find("[data-testid='thread-start-line-input']").GetAttribute("value"));
         Assert.Equal("2", cut.Find("[data-testid='thread-end-line-input']").GetAttribute("value"));
         Assert.Contains("line 2", cut.Find("[data-testid='thread-target']").TextContent, StringComparison.Ordinal);
+
+        // Assert: the browser was asked to bring the form into view, since it sits below the code
+        await cut.WaitForAssertionAsync(() =>
+            Assert.Equal(["new-thread-form", "center"], JSInterop.Invocations["reviewCenter.scrollToTestId"][^1].Arguments));
     }
 
     /// <summary>
@@ -630,14 +636,16 @@ public class ReviewPageTests : PageTestBase
         // Act: resolve
         await cut.Find($"[data-testid='thread-toggle-{thread.Id}']").ClickAsync();
 
-        // Assert: resolved, with the button offering to reopen, and the counts moved
+        // Assert: resolved and collapsed, so it offers to expand; the counts moved
         Assert.Equal("Resolved", cut.Find($"[data-testid='thread-state-{thread.Id}']").TextContent);
-        Assert.Equal("Reopen", cut.Find($"[data-testid='thread-toggle-{thread.Id}']").TextContent);
+        Assert.Empty(cut.FindAll($"[data-testid='thread-toggle-{thread.Id}']"));
         Assert.Equal("0", cut.Find("[data-testid='threads-open-count']").TextContent);
         Assert.Equal("1", cut.Find("[data-testid='threads-resolved-count']").TextContent);
         Assert.Equal("0 open threads", cut.Find("[data-testid='file-open-threads-0']").TextContent);
 
-        // Act: reopen
+        // Act: expand and reopen
+        await cut.Find($"[data-testid='thread-expand-{thread.Id}']").ClickAsync();
+        Assert.Equal("Reopen", cut.Find($"[data-testid='thread-toggle-{thread.Id}']").TextContent);
         await cut.Find($"[data-testid='thread-toggle-{thread.Id}']").ClickAsync();
 
         // Assert: open again and the counts moved back
@@ -671,16 +679,220 @@ public class ReviewPageTests : PageTestBase
     }
 
     /// <summary>
+    ///     Test that the files, thread index and code come before the review details, which are collapsed and
+    ///     hold the id, state, fingerprint and per-file hashes.
+    /// </summary>
+    [Fact]
+    public async Task ReviewPage_Render_ExistingReview_FilesFirstAndDetailsCollapsedHoldMetadata()
+    {
+        // Arrange: a review of two files
+        var projectId = await CreateReviewAsync(
+            new UploadedFile("a.txt", TestContent.A),
+            new UploadedFile("b.txt", TestContent.B),
+            new UploadedFile("c.bin", TestContent.C));
+
+        // Act: render the page
+        var cut = RenderPage(projectId);
+
+        // Assert: files and the thread index come before the details in the page
+        var markup = cut.Markup;
+        var nextStep = markup.IndexOf("data-testid=\"next-step\"", StringComparison.Ordinal);
+        var files = markup.IndexOf("data-testid=\"files-list\"", StringComparison.Ordinal);
+        var index = markup.IndexOf("data-testid=\"thread-index\"", StringComparison.Ordinal);
+        var details = markup.IndexOf("data-testid=\"review-details\"", StringComparison.Ordinal);
+        Assert.InRange(nextStep, 0, files - 1);
+        Assert.InRange(files, nextStep, index - 1);
+        Assert.InRange(index, files, details - 1);
+
+        // Assert: the details are collapsed and hold the metadata; the file list holds no hash
+        var detailsElement = cut.Find("[data-testid='review-details']");
+        Assert.False(detailsElement.HasAttribute("open"));
+        Assert.Equal("REV-1", detailsElement.QuerySelector("[data-testid='review-id']")?.TextContent);
+        Assert.Equal("Draft", detailsElement.QuerySelector("[data-testid='review-state']")?.TextContent);
+        Assert.Equal(TestContent.FingerprintABC, detailsElement.QuerySelector("[data-testid='review-fingerprint']")?.TextContent);
+        Assert.Equal(TestContent.HashA, detailsElement.QuerySelector("[data-testid='file-hash-0']")?.TextContent);
+        Assert.Equal("c.bin", detailsElement.QuerySelector("[data-testid='file-hash-path-2']")?.TextContent);
+        Assert.Empty(cut.Find("[data-testid='files-list']").QuerySelectorAll("[data-testid^='file-hash']"));
+    }
+
+    /// <summary>
+    ///     Test that the next-step line follows the state of the threads.
+    /// </summary>
+    [Fact]
+    public async Task ReviewPage_Render_NextStep_FollowsThreadState()
+    {
+        // Arrange: a review without threads
+        var projectId = await CreateReviewAsync(new UploadedFile("a.txt", TestContent.A));
+        var cut = RenderPage(projectId);
+        Assert.Equal("No discussion yet - select a file and comment on a line.", cut.Find("[data-testid='next-step']").TextContent);
+
+        // Act: start a thread through the page
+        await cut.Find("[data-testid='file-select-0']").ClickAsync();
+        await cut.Find("[data-testid='comment-author-input']").InputAsync("Ann");
+        await cut.Find("[data-testid='thread-text-input']").InputAsync("Please check");
+        await cut.Find("[data-testid='new-thread-form']").SubmitAsync();
+
+        // Assert: one open thread to resolve
+        Assert.Equal("1 open thread to resolve.", cut.Find("[data-testid='next-step']").TextContent);
+
+        // Act: resolve it
+        var thread = Assert.Single(await Threads.ListAsync(projectId, "REV-1", TestContext.Current.CancellationToken));
+        await cut.Find($"[data-testid='thread-toggle-{thread.Id}']").ClickAsync();
+
+        // Assert: nothing left to do
+        Assert.Equal("All threads resolved.", cut.Find("[data-testid='next-step']").TextContent);
+    }
+
+    /// <summary>
+    ///     Test that the thread index shows the open threads by default, filters to All and Resolved, and
+    ///     shows file, anchor, state, comment count, first author and last activity on each row.
+    /// </summary>
+    [Fact]
+    public async Task ReviewPage_ThreadIndex_Filters_ShowRowsWithFileAnchorStateCountAuthorAndActivity()
+    {
+        // Arrange: a page rendered before any thread exists
+        var projectId = await CreateReviewAsync(new UploadedFile("a.txt", "a\nb\nc\n"u8.ToArray()), new UploadedFile("b.txt", TestContent.B));
+        var cut = RenderPage(projectId);
+        Assert.Equal("No open threads.", cut.Find("[data-testid='thread-index-empty']").TextContent);
+
+        // Arrange: an open thread with a reply on a.txt and a resolved thread on b.txt, loaded by selecting a file
+        var open = await Threads.StartThreadAsync(projectId, "REV-1", "a.txt", 2, 3, "Ann", "Look", TestContext.Current.CancellationToken);
+        await Threads.ReplyAsync(projectId, "REV-1", open.Id, "Bob", "Done", TestContext.Current.CancellationToken);
+        var resolved = await Threads.StartThreadAsync(projectId, "REV-1", "b.txt", null, null, "Cy", "Old", TestContext.Current.CancellationToken);
+        await Threads.ResolveAsync(projectId, "REV-1", resolved.Id, TestContext.Current.CancellationToken);
+        await cut.Find("[data-testid='file-select-0']").ClickAsync();
+
+        // Assert: only the open thread is listed, with all its facts
+        Assert.Equal("true", cut.Find("[data-testid='index-filter-open']").GetAttribute("aria-pressed"));
+        Assert.Single(cut.FindAll("[data-testid='thread-index-list'] > li"));
+        Assert.Equal("a.txt", cut.Find($"[data-testid='index-file-{open.Id}']").TextContent);
+        Assert.Equal("Lines 2-3", cut.Find($"[data-testid='index-anchor-{open.Id}']").TextContent);
+        Assert.Equal("Open", cut.Find($"[data-testid='index-state-{open.Id}']").TextContent);
+        Assert.Equal("2 comments", cut.Find($"[data-testid='index-count-{open.Id}']").TextContent);
+        Assert.Equal("Ann", cut.Find($"[data-testid='index-author-{open.Id}']").TextContent);
+        Assert.Equal("2025-03-04 05:06 UTC", cut.Find($"[data-testid='index-activity-{open.Id}']").TextContent);
+
+        // Assert: the row button's accessible name carries the same facts, not just the file
+        Assert.Equal(
+            "Show Lines 2-3 of a.txt, Open, 2 comments, first by Ann, last activity 2025-03-04 05:06 UTC",
+            cut.Find($"[data-testid='index-row-{open.Id}']").GetAttribute("aria-label"));
+        // Act, Assert: All shows both threads, with the counts in the filter buttons
+        await cut.Find("[data-testid='index-filter-all']").ClickAsync();
+        Assert.Equal(2, cut.FindAll("[data-testid='thread-index-list'] > li").Count);
+        Assert.Equal("2", cut.Find("[data-testid='threads-all-count']").TextContent);
+        Assert.Equal("true", cut.Find("[data-testid='index-filter-all']").GetAttribute("aria-pressed"));
+
+        // Act, Assert: Resolved shows only the resolved thread
+        await cut.Find("[data-testid='index-filter-resolved']").ClickAsync();
+        Assert.Empty(cut.FindAll($"[data-testid='index-row-{open.Id}']"));
+        Assert.Equal("Whole file", cut.Find($"[data-testid='index-anchor-{resolved.Id}']").TextContent);
+        Assert.Equal("Resolved", cut.Find($"[data-testid='index-state-{resolved.Id}']").TextContent);
+        Assert.Equal("1 comment", cut.Find($"[data-testid='index-count-{resolved.Id}']").TextContent);
+    }
+
+    /// <summary>
+    ///     Test that choosing an index row selects its file, highlights its lines and thread, expands a
+    ///     resolved thread and asks the browser to scroll to the first line.
+    /// </summary>
+    [Fact]
+    public async Task ReviewPage_ThreadIndex_RowClick_SelectsFileHighlightsAnchorAndScrolls()
+    {
+        // Arrange: a resolved thread on lines 2-3 of b.txt, and a page showing a.txt
+        var projectId = await CreateReviewAsync(
+            new UploadedFile("a.txt", TestContent.A),
+            new UploadedFile("b.txt", "x\ny\nz\n"u8.ToArray()));
+        var thread = await Threads.StartThreadAsync(projectId, "REV-1", "b.txt", 2, 3, "Ann", "Check this", TestContext.Current.CancellationToken);
+        await Threads.ResolveAsync(projectId, "REV-1", thread.Id, TestContext.Current.CancellationToken);
+        var cut = RenderPage(projectId);
+        await cut.Find("[data-testid='file-select-0']").ClickAsync();
+        await cut.Find("[data-testid='index-filter-all']").ClickAsync();
+
+        // Assert: choosing a file asked the browser to bring its code to the top of the window
+        await cut.WaitForAssertionAsync(() =>
+            Assert.Equal(["selected-file-path", "start"], JSInterop.Invocations["reviewCenter.scrollToTestId"][^1].Arguments));
+
+        // Act: choose the thread in the index
+        await cut.Find($"[data-testid='index-row-{thread.Id}']").ClickAsync();
+
+        // Assert: its file is shown with the covered lines and the thread highlighted, and the thread is expanded
+        Assert.Equal("b.txt", cut.Find("[data-testid='selected-file-path']").TextContent);
+        Assert.DoesNotContain("focused", cut.Find("[data-testid='code-line-1']").ClassList);
+        Assert.Contains("focused", cut.Find("[data-testid='code-line-2']").ClassList);
+        Assert.Contains("focused", cut.Find("[data-testid='code-line-3']").ClassList);
+        Assert.Contains("focused", cut.Find($"[data-testid='thread-{thread.Id}']").ClassList);
+        Assert.Equal("Check this", cut.Find($"[data-testid='comment-text-{thread.Id}-1']").TextContent);
+
+        // Assert: the browser was last asked to scroll the first line to the middle of the window
+        await cut.WaitForAssertionAsync(() =>
+        {
+            var scroll = JSInterop.Invocations["reviewCenter.scrollToTestId"][^1];
+            Assert.Equal(["code-line-2", "center"], scroll.Arguments);
+        });
+    }
+
+    /// <summary>
+    ///     Test that a resolved thread is a one-line header that expands and collapses on request, an open
+    ///     thread stays expanded, and resolving a thread collapses it.
+    /// </summary>
+    [Fact]
+    public async Task ReviewPage_ResolvedThread_CollapsedHeaderExpandsOnRequest()
+    {
+        // Arrange: a resolved thread with a reply and an open thread on the selected file
+        var projectId = await CreateReviewAsync(new UploadedFile("a.txt", "a\nb\n"u8.ToArray()));
+        var done = await Threads.StartThreadAsync(projectId, "REV-1", "a.txt", 1, 1, "Ann", "Fixed?", TestContext.Current.CancellationToken);
+        await Threads.ReplyAsync(projectId, "REV-1", done.Id, "Bob", "Yes", TestContext.Current.CancellationToken);
+        await Threads.ResolveAsync(projectId, "REV-1", done.Id, TestContext.Current.CancellationToken);
+        var open = await Threads.StartThreadAsync(projectId, "REV-1", "a.txt", 2, 2, "Cy", "Why?", TestContext.Current.CancellationToken);
+        var cut = RenderPage(projectId);
+
+        // Act: select the file
+        await cut.Find("[data-testid='file-select-0']").ClickAsync();
+
+        // Assert: the resolved thread shows only its header; the open thread is expanded
+        Assert.Equal("Line 1", cut.Find($"[data-testid='thread-anchor-{done.Id}']").TextContent);
+        Assert.Equal("Resolved", cut.Find($"[data-testid='thread-state-{done.Id}']").TextContent);
+        Assert.Equal("2 comments", cut.Find($"[data-testid='thread-count-{done.Id}']").TextContent);
+        Assert.Empty(cut.FindAll($"[data-testid='comment-text-{done.Id}-1']"));
+        Assert.Empty(cut.FindAll($"[data-testid='reply-text-{done.Id}']"));
+        Assert.Equal("Why?", cut.Find($"[data-testid='comment-text-{open.Id}-1']").TextContent);
+        Assert.Empty(cut.FindAll($"[data-testid='thread-expand-{open.Id}']"));
+
+        // Act: expand it
+        await cut.Find($"[data-testid='thread-expand-{done.Id}']").ClickAsync();
+
+        // Assert: comments and Reopen are shown
+        Assert.Equal("Fixed?", cut.Find($"[data-testid='comment-text-{done.Id}-1']").TextContent);
+        Assert.Equal("Yes", cut.Find($"[data-testid='comment-text-{done.Id}-2']").TextContent);
+        Assert.Equal("Reopen", cut.Find($"[data-testid='thread-toggle-{done.Id}']").TextContent);
+
+        // Act: collapse it again
+        await cut.Find($"[data-testid='thread-expand-{done.Id}']").ClickAsync();
+
+        // Assert: only the header remains
+        Assert.Empty(cut.FindAll($"[data-testid='comment-text-{done.Id}-1']"));
+
+        // Act: resolve the open thread
+        await cut.Find($"[data-testid='thread-toggle-{open.Id}']").ClickAsync();
+
+        // Assert: it collapsed
+        Assert.Empty(cut.FindAll($"[data-testid='comment-text-{open.Id}-1']"));
+        Assert.NotEmpty(cut.FindAll($"[data-testid='thread-expand-{open.Id}']"));
+    }
+
+    /// <summary>
     ///     Test that every interactive element of the review page, with a file selected and threads present,
     ///     has a kebab-case <c>data-testid</c>.
     /// </summary>
     [Fact]
     public async Task ReviewPage_Render_ThreadControls_EveryInteractiveElementHasTestId()
     {
-        // Arrange: a selected file with a thread and an error shown
+        // Arrange: a selected file with an open and a resolved thread, and an error shown
         var projectId = await CreateReviewAsync(new UploadedFile("a.txt", "a\nb\n"u8.ToArray()));
         await Threads.StartThreadAsync(projectId, "REV-1", "a.txt", 1, 2, "Ann", "First", TestContext.Current.CancellationToken);
+        var done = await Threads.StartThreadAsync(projectId, "REV-1", "a.txt", null, null, "Bob", "Done", TestContext.Current.CancellationToken);
+        await Threads.ResolveAsync(projectId, "REV-1", done.Id, TestContext.Current.CancellationToken);
         var cut = RenderPage(projectId);
+        await cut.Find("[data-testid='index-filter-all']").ClickAsync();
         await cut.Find("[data-testid='file-select-0']").ClickAsync();
         await cut.Find("[data-testid='new-thread-form']").SubmitAsync();
 

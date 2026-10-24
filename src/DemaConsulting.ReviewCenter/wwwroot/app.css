@@ -233,9 +233,33 @@ pre {
     overflow-y: auto;
 }
 
+/* A file row is a compact grid: name and size on the left, the View button on the right */
+.file-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas: "path button" "size button";
+    column-gap: 1rem;
+    align-items: center;
+}
+
+.file-row .path {
+    grid-area: path;
+}
+
+.file-row .file-size {
+    grid-area: size;
+}
+
+.file-row button {
+    grid-area: button;
+    margin-top: 0;
+    padding: 0.25rem 0.75rem;
+}
+
 .file-row.selected {
     margin-inline: -0.5rem;
     padding-inline: 0.5rem;
+    border-left: 4px solid var(--accent);
     border-radius: 0.375rem;
     background: var(--code-background);
 }
@@ -265,12 +289,6 @@ button.secondary {
 .hint {
     margin: 0.25rem 0 0.75rem;
     font-size: 0.85rem;
-}
-
-.new-thread {
-    margin: 1rem 0 0;
-    padding: 1rem 0 0;
-    border-top: 1px solid var(--border);
 }
 
 .line-fields {
@@ -370,8 +388,12 @@ button.secondary {
 }
 
 .thread-head button {
-    margin: 0 0 0 auto;
+    margin: 0;
     padding: 0.25rem 0.75rem;
+}
+
+.thread-head .badge + .muted {
+    margin-right: auto;
 }
 
 .badge.resolved {
@@ -405,6 +427,74 @@ button.secondary {
     margin: 0 0 0.5rem;
 }
 
+/* One-sentence next step at the top of the review page */
+.status {
+    margin: 0 0 1rem;
+    padding: 0.5rem 0.75rem;
+    border-left: 4px solid var(--accent);
+    border-radius: 0.25rem;
+    background: var(--surface);
+    font-weight: 600;
+}
+
+.index-filters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin: 0 0 0.75rem;
+}
+
+.index-filters button {
+    padding: 0.25rem 0.75rem;
+}
+
+.index-filters button[aria-pressed="true"] {
+    background: var(--accent);
+    color: var(--accent-text);
+}
+
+/* A thread-index row is one button laid out as a wrapping line of facts */
+.item-list button.index-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0 0.75rem;
+    width: 100%;
+    margin: 0;
+    background: var(--surface);
+    color: var(--text);
+    text-align: left;
+}
+
+/* A long index scrolls inside its panel instead of pushing the code down the page */
+.index-list {
+    max-height: 22rem;
+    overflow-y: auto;
+}
+
+.thread.focused {
+    outline: 2px solid var(--accent);
+    outline-offset: 4px;
+}
+
+.code-line.focused,
+.code-line.focused .gutter {
+    background: #ffd76a;
+}
+
+.review-details {
+    margin: 0 0 1rem;
+}
+
+.review-details summary {
+    cursor: pointer;
+    color: var(--muted);
+}
+
+.review-details .details {
+    margin-top: 0.75rem;
+}
+
 .item-list .reply button {
     margin-top: 0;
 }
@@ -429,27 +519,17 @@ button.secondary {
     }
 
     .file-row {
+        grid-template-columns: minmax(0, 1fr) auto auto;
+        grid-template-areas: "path size button";
+    }
+
+    .item-list button.index-row {
         display: grid;
-        grid-template-columns: minmax(0, 1fr) auto;
-        grid-template-areas: "path button" "size button" "hash button";
-        column-gap: 1rem;
-        align-items: center;
+        grid-template-columns: minmax(0, 1.6fr) 6.5rem 4.5rem 5.5rem minmax(0, 0.6fr) 11.5rem;
+        gap: 0 0.75rem;
     }
 
-    .file-row .path {
-        grid-area: path;
-    }
-
-    .file-row .file-size {
-        grid-area: size;
-    }
-
-    .file-row .hash {
-        grid-area: hash;
-    }
-
-    .file-row button {
-        grid-area: button;
-        margin-top: 0;
+    .item-list button.index-row .badge {
+        justify-self: start;
     }
 }

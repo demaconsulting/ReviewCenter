@@ -76,4 +76,11 @@ public sealed class ReviewThread
     ///     Gets the comments of the thread in posting order; never empty for a stored thread.
     /// </summary>
     public List<ReviewComment> Comments { get; init; } = [];
+
+    /// <summary>
+    ///     Gets the time of the latest comment, or <see cref="Created"/> when the thread has no comments.
+    /// </summary>
+    /// <remarks>Derived from <see cref="Comments"/>; it is not stored.</remarks>
+    public DateTimeOffset LastActivity =>
+        Comments.Count == 0 ? Created : Comments.Max(comment => comment.Created);
 }
