@@ -116,6 +116,28 @@ public class DatabaseSetupTests
     }
 
     /// <summary>
+    ///     Test that an in-memory SQLite database is refused with a message that asks for a file path.
+    /// </summary>
+    /// <param name="connectionString">An in-memory form of the connection string.</param>
+    [Theory]
+    [InlineData("Data Source=:memory:")]
+    [InlineData(":memory:")]
+    [InlineData("Mode=Memory")]
+    [InlineData("Data Source=")]
+    public void DatabaseSetup_ResolveConnectionString_InMemory_ThrowsClearError(string connectionString)
+    {
+        // Arrange: options that select an in-memory database
+        var options = new DatabaseOptions { ConnectionString = connectionString };
+
+        // Act: resolve the connection string
+        var exception = Assert.Throws<InvalidOperationException>(() => DatabaseSetup.ResolveConnectionString(options));
+
+        // Assert: the message names the problem and the remedy
+        Assert.Contains("in-memory", exception.Message, StringComparison.Ordinal);
+        Assert.Contains("file path", exception.Message, StringComparison.Ordinal);
+    }
+
+    /// <summary>
     ///     Test that an unsupported provider is rejected with a message naming it and the supported one.
     /// </summary>
     [Fact]

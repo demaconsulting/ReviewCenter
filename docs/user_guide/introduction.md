@@ -176,7 +176,8 @@ with environment variables (which take precedence):
 | `Database:Provider`         | `Database__Provider`         | Database provider; only `Sqlite` is supported           |
 | `Database:ConnectionString` | `Database__ConnectionString` | Database file path or SQLite connection string          |
 
-A value without an `=` sign is treated as a file path; an empty value selects the default file. For example:
+A value without an `=` sign is treated as a file path; an empty value selects the default file. An in-memory
+SQLite database (`:memory:`) is not supported and is refused at startup. For example:
 
 ```bash
 # Linux: keep the data in another file

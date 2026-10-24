@@ -21,6 +21,7 @@ be loadable on the test platform.
   used unchanged.
 - The provider name is matched without regard to case, and an unsupported provider is refused with a message that
   names it, before anything is created.
+- An in-memory database setting is refused with a message that asks for a file path.
 - Creation makes the missing folder, the file, and the tables.
 
 #### Test Scenarios
@@ -41,6 +42,10 @@ This scenario is tested by `DatabaseSetup_ResolveConnectionString_PlainPath_Beco
 
 **DatabaseSetup_ResolveConnectionString_FullConnectionString_IsUsedAsIs**: A full connection string is returned
 unchanged. This scenario is tested by `DatabaseSetup_ResolveConnectionString_FullConnectionString_IsUsedAsIs`.
+
+**DatabaseSetup_ResolveConnectionString_InMemory_ThrowsClearError**: Each in-memory form (`Data Source=:memory:`,
+`:memory:`, `Mode=Memory`, an empty data source) is refused with a message naming the in-memory database and asking
+for a file path. This scenario is tested by `DatabaseSetup_ResolveConnectionString_InMemory_ThrowsClearError`.
 
 **DatabaseSetup_Configure_UnsupportedProvider_ThrowsClearError**: An unsupported provider is refused with a
 message that names it and the supported provider. This scenario is tested by

@@ -24,6 +24,9 @@ directory of the executable.
 
 **Connection string resolution**: an empty value selects the default file; a value containing `=` is taken as a
 complete connection string and used as it is; any other value is a file path and is wrapped as the data source.
+An in-memory database (`:memory:`, `Mode=Memory`, or an empty data source) is refused with an
+`InvalidOperationException` that asks for a file path, because every SQLite connection to an in-memory database
+gets its own empty database, so the schema created at startup would be missing for the requests that follow.
 
 #### Key Methods
 
@@ -48,7 +51,7 @@ complete connection string and used as it is; any other value is a file path and
   exist.
 
 Checks the provider first, so that an unsupported setting fails before anything is created. It then creates the
-folder of the file (not for an in-memory database or a `file:` URI) and asks Entity Framework Core to create
+folder of the file (not for a `file:` URI) and asks Entity Framework Core to create
 the schema. An existing database is not changed, and no migrations are used.
 
 #### Error Handling

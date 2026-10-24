@@ -22,15 +22,18 @@ sections:
       - id: ReviewCenter-DatabaseSetup-Connection
         title: >-
           The DatabaseSetup class shall use the default database file when no connection string is configured,
-          shall treat a configured value without an equals sign as a database file path, and shall use any
-          other configured value as the full connection string.
+          shall treat a configured value without an equals sign as a database file path, shall use any
+          other configured value as the full connection string, and shall reject an in-memory database with an
+          error that asks for a file path.
         justification: |
           Operators need the simplest setting for the common case, a file path, and the full connection string
-          for options such as pooling.
+          for options such as pooling. An in-memory SQLite database gives every connection its own empty
+          database, so accepting it would start a server that cannot serve any data.
         tests:
           - DatabaseSetup_ResolveConnectionString_Empty_UsesDefaultFile
           - DatabaseSetup_ResolveConnectionString_PlainPath_BecomesDataSource
           - DatabaseSetup_ResolveConnectionString_FullConnectionString_IsUsedAsIs
+          - DatabaseSetup_ResolveConnectionString_InMemory_ThrowsClearError
 
       - id: ReviewCenter-DatabaseSetup-Provider
         title: >-

@@ -96,6 +96,10 @@ internal static class DatabaseSetup
     /// <param name="options">The configured options. Must not be null.</param>
     /// <returns>A full SQLite connection string.</returns>
     /// <exception cref="ArgumentNullException">Thrown when <paramref name="options"/> is null.</exception>
+    /// <exception cref="InvalidOperationException">
+    ///     Thrown when the connection string selects an in-memory database, which cannot work here because each
+    ///     connection would get its own empty database.
+    /// </exception>
     /// <remarks>
     ///     An empty value selects the default file. A value containing <c>=</c> is taken as a full
     ///     connection string (for example <c>Data Source=...;Pooling=False</c>); anything else is taken as a
@@ -114,9 +118,24 @@ internal static class DatabaseSetup
         }
 
         // A full connection string is used as it is; a plain path is wrapped
-        return configured.Contains('=', StringComparison.Ordinal)
+        var resolved = configured.Contains('=', StringComparison.Ordinal)
             ? configured
             : new SqliteConnectionStringBuilder { DataSource = configured }.ToString();
+
+        // Each connection to an in-memory database is a separate empty database, so the schema created at
+        // startup would not exist for the requests that follow: refuse it instead of starting a host that
+        // cannot serve data
+        var builder = new SqliteConnectionStringBuilder(resolved);
+        if (builder.Mode == SqliteOpenMode.Memory ||
+            string.IsNullOrWhiteSpace(builder.DataSource) ||
+            builder.DataSource.Trim().Equals(":memory:", StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException(
+                "An in-memory SQLite database is not supported because every connection would get its own empty database. " +
+                "Configure a database file path instead.");
+        }
+
+        return resolved;
     }
 
     /// <summary>
@@ -178,7 +197,6 @@ internal static class DatabaseSetup
         // SQLite creates the file but not its folder
         var dataSource = new SqliteConnectionStringBuilder(ResolveConnectionString(options)).DataSource;
         if (!string.IsNullOrEmpty(dataSource) &&
-            !dataSource.Equals(":memory:", StringComparison.Ordinal) &&
             !dataSource.StartsWith("file:", StringComparison.OrdinalIgnoreCase))
         {
             var folder = Path.GetDirectoryName(Path.GetFullPath(dataSource));
