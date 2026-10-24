@@ -100,6 +100,9 @@ internal static class ServerHost
         // Blazor Server: server-side Razor components rendered over an interactive circuit
         builder.Services.AddRazorComponents().AddInteractiveServerComponents();
 
+        // Makes the signed-in user available to AuthorizeRouteView and the layout
+        builder.Services.AddCascadingAuthenticationState();
+
         // Persistence and the Core services, shared with the user command
         AddServices(builder.Services, builder.Configuration);
 

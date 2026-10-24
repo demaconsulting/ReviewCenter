@@ -263,8 +263,10 @@ on the page, and nothing is created.
 - The lockout counts failures per user name, not per source address, so someone can keep a user name locked by
   guessing wrongly on purpose.
 - A page that is already open keeps its sign-in state until it is reloaded (the user management page is the
-  exception: it refuses every action once you are no longer an enabled administrator), and changing a password does
-  not end the user's other sessions.
+  exception: it refuses every action once you are no longer an enabled administrator, although an action that was
+  already in progress at that moment can still finish), and changing a password does not end the user's other
+  sessions. Opening a page that needs a role from an already open page is checked against the role you had when
+  the page was opened.
 
 ## Review Comments
 

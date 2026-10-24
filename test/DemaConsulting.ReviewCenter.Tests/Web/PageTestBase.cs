@@ -23,8 +23,10 @@ using Bunit;
 using DemaConsulting.ReviewCenter.Core;
 using DemaConsulting.ReviewCenter.Identity;
 using DemaConsulting.ReviewCenter.Tests.Core;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace DemaConsulting.ReviewCenter.Tests.Web;
 
@@ -62,6 +64,13 @@ public abstract class PageTestBase : BunitContext
         Services.AddSingleton(Checklists);
         Services.AddSingleton(Users);
         Services.AddSingleton<AuthenticationStateProvider>(_authentication);
+
+        // bUnit pre-registers placeholder authorization services that throw when used; replace them with the
+        // real ones so that AuthorizeRouteView evaluates the [Authorize] attributes of the pages
+        Services.RemoveAll<IAuthorizationService>();
+        Services.RemoveAll<IAuthorizationPolicyProvider>();
+        Services.AddAuthorizationCore();
+        Services.AddCascadingAuthenticationState();
     }
 
     /// <summary>

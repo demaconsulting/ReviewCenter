@@ -145,6 +145,7 @@ sections:
           connection and are verified by the component tests of the page units.
         children:
           - ReviewCenter-App-Header
+          - ReviewCenter-App-RouteAuthorization
           - ReviewCenter-LoginPage-Form
           - ReviewCenter-LoginPage-Error
           - ReviewCenter-AccountPage-Show

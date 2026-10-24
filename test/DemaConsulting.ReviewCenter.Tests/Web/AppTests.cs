@@ -21,8 +21,11 @@
 using Bunit;
 using DemaConsulting.ReviewCenter.Core;
 using DemaConsulting.ReviewCenter.Web;
+using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
+
+using TestContext = Xunit.TestContext;
 
 namespace DemaConsulting.ReviewCenter.Tests.Web;
 
@@ -123,5 +126,65 @@ public class AppTests : PageTestBase
         Assert.Equal("/login", cut.Find("[data-testid='signin-link']").GetAttribute("href"));
         Assert.Empty(cut.FindAll("[data-testid='current-user']"));
         Assert.Empty(cut.FindAll("[data-testid='logout-button']"));
+    }
+
+    /// <summary>
+    ///     Test that a reviewer who navigates to the user administration route inside the circuit is refused
+    ///     with the access denied message and is not shown the user list.
+    /// </summary>
+    [Fact]
+    public async Task Routes_Render_ReviewerOpensUsersRoute_ShowsAccessDeniedNotUserList()
+    {
+        // Arrange: a reviewer is signed in, one user exists, and the router is at /users
+        SignInAs("ann", "Ann");
+        await Users.CreateAsync("root", "Root User", UserRole.Admin, "correct horse battery", TestContext.Current.CancellationToken);
+        Services.GetRequiredService<NavigationManager>().NavigateTo("/users");
+
+        // Act: render the router
+        var cut = Render<Routes>();
+
+        // Assert: access is denied and neither the user list nor the creation form is rendered
+        Assert.Contains("Access denied", cut.Find("[data-testid='access-denied']").TextContent, StringComparison.Ordinal);
+        Assert.Empty(cut.FindAll("[data-testid='create-user-button']"));
+        Assert.DoesNotContain("Root User", cut.Markup, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    ///     Test that an administrator opening the user administration route is shown the page.
+    /// </summary>
+    [Fact]
+    public void Routes_Render_AdminOpensUsersRoute_ShowsUsersPage()
+    {
+        // Arrange: an administrator is signed in and the router is at /users
+        SignInAs("root", "Root", UserRole.Admin);
+        Services.GetRequiredService<NavigationManager>().NavigateTo("/users");
+
+        // Act: render the router
+        var cut = Render<Routes>();
+
+        // Assert: the creation form is shown and there is no access denied message
+        Assert.NotNull(cut.Find("[data-testid='create-user-button']"));
+        Assert.Empty(cut.FindAll("[data-testid='access-denied']"));
+    }
+
+    /// <summary>
+    ///     Test that a signed-out user who navigates to a protected route is not shown the page and is pointed to
+    ///     the login page, which returns to the requested page.
+    /// </summary>
+    [Fact]
+    public void Routes_Render_AnonymousOpensProjectsRoute_ShowsLoginLinkNotPage()
+    {
+        // Arrange: nobody is signed in and the router is at /projects
+        SignOut();
+        Services.GetRequiredService<NavigationManager>().NavigateTo("/projects");
+
+        // Act: render the router
+        var cut = Render<Routes>();
+
+        // Assert: the projects page is not rendered; a link to the login page with the return address is
+        Assert.Empty(cut.FindAll("[data-testid='projects-page']"));
+        Assert.Equal(
+            "/login?ReturnUrl=" + Uri.EscapeDataString("/projects"),
+            cut.Find("[data-testid='access-denied-login-link']").GetAttribute("href"));
     }
 }

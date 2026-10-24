@@ -1,12 +1,45 @@
 @* Routes: maps the requested URL to a page component (part of the App unit).
 
    Unknown URLs fall through to a plain "not found" message so that a mistyped address gives the
-   user a clear answer instead of a blank page. *@
+   user a clear answer instead of a blank page.
+
+   AuthorizeRouteView applies the [Authorize] rules of a page also when the user navigates inside an open
+   interactive circuit, where the endpoint check does not run (RouteView would ignore them). A signed-out
+   user is pointed to the login page; a signed-in user without the needed role sees the same "Access denied"
+   explanation as the endpoint check gives. *@
+@using Microsoft.AspNetCore.Components.Authorization
+@inject NavigationManager Navigation
 <Router AppAssembly="typeof(Routes).Assembly">
     <Found Context="routeData">
-        <RouteView RouteData="routeData" DefaultLayout="typeof(MainLayout)" />
+        <AuthorizeRouteView RouteData="routeData" DefaultLayout="typeof(MainLayout)">
+            <NotAuthorized Context="state">
+                <main class="page" data-testid="access-denied">
+                    @if (state.User.Identity?.IsAuthenticated == true)
+                    {
+                        <h1>Access denied</h1>
+                        <p>Your account does not have permission to open this page.</p>
+                        <p><a href="/projects" data-testid="access-denied-projects-link">Back to projects</a></p>
+                    }
+                    else
+                    {
+                        <h1>Sign in required</h1>
+                        <p>Please sign in to open this page.</p>
+                        <p>
+                            <a href="@LoginLink" data-testid="access-denied-login-link">Go to the login page</a>
+                        </p>
+                    }
+                </main>
+            </NotAuthorized>
+        </AuthorizeRouteView>
     </Found>
     <NotFound>
         <p>Page not found.</p>
     </NotFound>
 </Router>
+
+@code {
+    /// <summary>
+    ///     Gets the login page address that returns to the page the user asked for.
+    /// </summary>
+    private string LoginLink => "/login?ReturnUrl=" + Uri.EscapeDataString("/" + Navigation.ToBaseRelativePath(Navigation.Uri));
+}
