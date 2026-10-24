@@ -1,7 +1,8 @@
 ---
 # Software Unit Requirements for the HomePage Unit
 #
-# The HomePage unit is the hello-world landing page served at the root URL.
+# The HomePage unit is the landing page served at the root URL, with a greeting button, a counter, and a link
+# to the projects page.
 
 sections:
   - title: HomePage Unit Requirements
@@ -36,6 +37,14 @@ sections:
         tests:
           - HomePage_Render_Default_CounterStartsAtZero
           - HomePage_CounterButton_ClickedThreeTimes_ShowsCountThree
+
+      - id: ReviewCenter-HomePage-ProjectsLink
+        title: The HomePage unit shall offer a link to the projects page.
+        justification: |
+          The home page is the entry point of the web interface, and the review features start at the projects
+          page, so users need a way to get there.
+        tests:
+          - HomePage_Render_Default_LinksToProjects
 
       - id: ReviewCenter-HomePage-Interactive
         title: >-

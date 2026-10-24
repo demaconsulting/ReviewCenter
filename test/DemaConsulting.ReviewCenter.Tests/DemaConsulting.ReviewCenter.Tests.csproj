@@ -74,6 +74,7 @@
   <!-- Project References -->
   <ItemGroup>
     <ProjectReference Include="..\..\src\DemaConsulting.ReviewCenter\DemaConsulting.ReviewCenter.csproj" />
+    <ProjectReference Include="..\..\src\DemaConsulting.ReviewCenter.Core\DemaConsulting.ReviewCenter.Core.csproj" />
   </ItemGroup>
 
 </Project>

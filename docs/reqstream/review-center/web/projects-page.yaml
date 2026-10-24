@@ -1,0 +1,46 @@
+---
+# Software Unit Requirements for the ProjectsPage Unit
+#
+# The ProjectsPage unit is the page at /projects that lists the projects and offers a form to create one.
+
+sections:
+  - title: ProjectsPage Unit Requirements
+    requirements:
+      - id: ReviewCenter-ProjectsPage-List
+        title: >-
+          The ProjectsPage unit shall list every project with a link to its page and its description, or show a
+          message that there are no projects.
+        justification: |
+          The projects page is where users find their work. An explicit empty message tells a new user that
+          nothing is wrong and what to do next.
+        tests:
+          - ProjectsPage_Render_NoProjects_ShowsEmptyMessageAndForm
+          - ProjectsPage_Render_ExistingProjects_ListsThemWithLinks
+
+      - id: ReviewCenter-ProjectsPage-Create
+        title: >-
+          The ProjectsPage unit shall offer a form with a name and a description that creates a project and
+          shows it in the list.
+        justification: |
+          Users must be able to start a new body of work without any other tool.
+        tests:
+          - ProjectsPage_CreateForm_ValidInput_AddsProjectToList
+
+      - id: ReviewCenter-ProjectsPage-Error
+        title: >-
+          The ProjectsPage unit shall show the reason when a project cannot be created, and shall create
+          nothing.
+        justification: |
+          A rejected form must tell users what to correct, and must not silently create a project.
+        tests:
+          - ProjectsPage_CreateForm_BlankName_ShowsErrorAndCreatesNothing
+
+      - id: ReviewCenter-ProjectsPage-Interactive
+        title: >-
+          The ProjectsPage unit shall report that it is interactive, through a marker on its root element, once
+          it has rendered on a live connection.
+        justification: |
+          Users, automated tests, and tooling need a reliable signal that the page now responds, so that they do
+          not act before the live connection exists.
+        tests:
+          - ProjectsPage_AfterRender_Interactive_SetsMarker

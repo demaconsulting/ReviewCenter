@@ -24,6 +24,14 @@ package ReviewCenter {
         expose WebSubsystem;
     }
 
+    view CoreView {
+        expose CoreSubsystem;
+    }
+
+    view StorageView {
+        expose StorageSubsystem;
+    }
+
     view SelfTestView {
         expose SelfTestSubsystem;
     }

@@ -1,0 +1,286 @@
+/* ReviewCenter styles: plain, tidy and responsive. Layout is a single centered column that works from a
+   390px phone width up. Rules that keep it from overflowing sideways:
+   - every box is border-box and the page column never exceeds the viewport width;
+   - long unbroken strings (hashes, paths, file names) wrap or break instead of widening the page;
+   - a <pre> scrolls horizontally inside its own box. */
+
+:root {
+    --text: #1f2933;
+    --muted: #616e7c;
+    --border: #cbd2d9;
+    --surface: #ffffff;
+    --background: #f5f7fa;
+    --accent: #1f5fbf;
+    --accent-text: #ffffff;
+    --error-text: #8a1c1c;
+    --error-background: #fdeaea;
+    --error-border: #e5a3a3;
+    --code-background: #f0f2f5;
+}
+
+*,
+*::before,
+*::after {
+    box-sizing: border-box;
+}
+
+html {
+    -webkit-text-size-adjust: 100%;
+}
+
+body {
+    margin: 0;
+    background: var(--background);
+    color: var(--text);
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    line-height: 1.5;
+    overflow-wrap: break-word;
+}
+
+main,
+.page {
+    display: block;
+    width: 100%;
+    max-width: 52rem;
+    margin: 0 auto;
+    padding: 1rem;
+}
+
+h1 {
+    margin: 0.5rem 0 1rem;
+    font-size: 1.5rem;
+    line-height: 1.25;
+    overflow-wrap: anywhere;
+}
+
+h2 {
+    margin: 0 0 0.75rem;
+    font-size: 1.1rem;
+}
+
+a {
+    color: var(--accent);
+    overflow-wrap: anywhere;
+}
+
+.breadcrumb {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem 0.5rem;
+    font-size: 0.9rem;
+}
+
+.card {
+    margin: 0 0 1rem;
+    padding: 1rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 0.5rem;
+    min-width: 0;
+}
+
+.muted {
+    color: var(--muted);
+}
+
+.item-list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.item-list > li {
+    padding: 0.6rem 0;
+    border-top: 1px solid var(--border);
+    min-width: 0;
+}
+
+.item-list > li:first-child {
+    padding-top: 0;
+    border-top: 0;
+}
+
+.item-list p {
+    margin: 0.25rem 0 0;
+}
+
+.field {
+    margin: 0 0 0.75rem;
+}
+
+.field label {
+    display: block;
+    margin: 0 0 0.25rem;
+    font-weight: 600;
+}
+
+input[type="text"],
+textarea {
+    display: block;
+    width: 100%;
+    max-width: 100%;
+    padding: 0.5rem;
+    border: 1px solid var(--border);
+    border-radius: 0.375rem;
+    background: var(--surface);
+    color: inherit;
+    font: inherit;
+}
+
+input[type="file"] {
+    display: block;
+    width: 100%;
+    max-width: 100%;
+}
+
+button {
+    padding: 0.5rem 1rem;
+    border: 1px solid var(--accent);
+    border-radius: 0.375rem;
+    background: var(--accent);
+    color: var(--accent-text);
+    font: inherit;
+    cursor: pointer;
+}
+
+button:hover {
+    filter: brightness(1.1);
+}
+
+.item-list button {
+    margin-top: 0.4rem;
+    background: var(--surface);
+    color: var(--accent);
+}
+
+:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+}
+
+.error {
+    margin: 0 0 0.75rem;
+    padding: 0.5rem 0.75rem;
+    border: 1px solid var(--error-border);
+    border-radius: 0.375rem;
+    background: var(--error-background);
+    color: var(--error-text);
+}
+
+.notice {
+    margin: 0;
+    padding: 0.5rem 0.75rem;
+    border: 1px solid var(--border);
+    border-radius: 0.375rem;
+    background: var(--code-background);
+}
+
+.badge {
+    display: inline-block;
+    padding: 0 0.5rem;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    background: var(--code-background);
+    font-size: 0.85rem;
+}
+
+.details {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.15rem;
+    margin: 0;
+}
+
+.details dt {
+    margin-top: 0.5rem;
+    color: var(--muted);
+    font-size: 0.85rem;
+}
+
+.details dt:first-child {
+    margin-top: 0;
+}
+
+.details dd {
+    margin: 0;
+    min-width: 0;
+}
+
+.path {
+    font-weight: 600;
+    overflow-wrap: anywhere;
+}
+
+.hash {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 0.85rem;
+    word-break: break-all;
+}
+
+pre {
+    max-width: 100%;
+    margin: 0;
+    padding: 0.75rem;
+    overflow-x: auto;
+    border: 1px solid var(--border);
+    border-radius: 0.375rem;
+    background: var(--code-background);
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 0.85rem;
+    line-height: 1.4;
+    white-space: pre;
+    max-height: 32rem;
+    overflow-y: auto;
+}
+
+.file-row.selected {
+    margin-inline: -0.5rem;
+    padding-inline: 0.5rem;
+    border-radius: 0.375rem;
+    background: var(--code-background);
+}
+
+@media (min-width: 40rem) {
+    main,
+    .page {
+        padding: 1.5rem;
+    }
+
+    h1 {
+        font-size: 1.75rem;
+    }
+
+    .details {
+        grid-template-columns: max-content minmax(0, 1fr);
+        gap: 0.25rem 1rem;
+    }
+
+    .details dt {
+        margin-top: 0;
+    }
+
+    .file-row {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        grid-template-areas: "path button" "size button" "hash button";
+        column-gap: 1rem;
+        align-items: center;
+    }
+
+    .file-row .path {
+        grid-area: path;
+    }
+
+    .file-row .file-size {
+        grid-area: size;
+    }
+
+    .file-row .hash {
+        grid-area: hash;
+    }
+
+    .file-row button {
+        grid-area: button;
+        margin-top: 0;
+    }
+}

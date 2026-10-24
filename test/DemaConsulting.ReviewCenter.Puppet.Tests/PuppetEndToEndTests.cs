@@ -136,9 +136,12 @@ public class PuppetEndToEndTests
     {
         private readonly Process _process;
 
-        private TestServer(Process process, string url)
+        private readonly string _databaseFile;
+
+        private TestServer(Process process, string url, string databaseFile)
         {
             _process = process;
+            _databaseFile = databaseFile;
             Url = url;
         }
 
@@ -159,6 +162,8 @@ public class PuppetEndToEndTests
             var url = $"http://127.0.0.1:{((IPEndPoint)listener.LocalEndpoint).Port}";
             listener.Stop();
 
+            // The server gets a private database file so the run never touches the real application data folder
+            var databaseFile = Path.Combine(Path.GetTempPath(), "ReviewCenterPuppet-" + Guid.NewGuid().ToString("N") + ".db");
             var dll = typeof(PuppetEndToEndTests).Assembly.GetCustomAttributes<AssemblyMetadataAttribute>().First(a => a.Key == "ServerDllPath").Value!;
             var info = new ProcessStartInfo(Environment.GetEnvironmentVariable("DOTNET_HOST_PATH") ?? "dotnet")
             {
@@ -166,12 +171,13 @@ public class PuppetEndToEndTests
                 RedirectStandardError = true,
                 WorkingDirectory = Path.GetDirectoryName(dll)!
             };
+            info.Environment["Database__ConnectionString"] = $"Data Source={databaseFile};Pooling=False";
             info.ArgumentList.Add(dll);
             info.ArgumentList.Add("serve");
             info.ArgumentList.Add("--urls");
             info.ArgumentList.Add(url);
             var process = Process.Start(info)!;
-            var server = new TestServer(process, url);
+            var server = new TestServer(process, url, databaseFile);
 
             // Drain the output so the server never blocks on a full pipe
             process.OutputDataReceived += (_, _) => { };
@@ -205,7 +211,18 @@ public class PuppetEndToEndTests
         public void Dispose()
         {
             _process.Kill(entireProcessTree: true);
+            _process.WaitForExit();
             _process.Dispose();
+
+            // Best-effort removal of the private database file
+            try
+            {
+                File.Delete(_databaseFile);
+            }
+            catch (IOException)
+            {
+                // Ignored: the file is under the temp directory
+            }
         }
     }
 }

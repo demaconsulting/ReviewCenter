@@ -4,8 +4,8 @@
 
 #### Purpose
 
-`HomePage` is the hello-world landing page served at the root URL. Its single responsibility
-is to show the product name and two small interactions, a Hello button that reveals a greeting
+`HomePage` is the landing page served at the root URL. Its responsibilities are to show the product name,
+a link to the projects page, and two small interactions, a Hello button that reveals a greeting
 and a counter button that counts clicks, and to report when the page is interactive. The unit
 is a Razor component split into presentation (`HomePage.razor`) and behavior
 (`HomePage.razor.cs`).
@@ -29,8 +29,8 @@ Once `true` it never returns to `false`.
 rendered as the `data-interactive` attribute of the root element.
 
 The markup gives each element a stable `data-testid` so that tests and tooling can find it:
-`home-page` (root element), `hello-button`, `hello-message`, `counter-button`, and
-`counter-value`.
+`home-page` (root element), `hello-button`, `hello-message`, `counter-button`, `counter-value`, and
+`projects-link`, the link to the projects page at `/projects`.
 
 #### Key Methods
 

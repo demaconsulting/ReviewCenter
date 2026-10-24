@@ -38,3 +38,28 @@ sections:
           - ReviewCenter-ServerHost-SilentMode
         tests:
           - HostingSubsystem_Startup_LoggingConfigured_EmitsStructuredEntry
+
+      - id: ReviewCenter-Hosting-Database
+        title: >-
+          The Hosting subsystem shall create the configured database when the server starts and make the project
+          and review services available to the pages through it, so that stored data is served again after the
+          server is restarted.
+        justification: |
+          The pages are only useful if what users create is kept. Opening the database at start-up, rather than
+          on first use, makes a configuration problem visible immediately, and a restart must not lose data.
+        children:
+          - ReviewCenter-ServerHost-Database
+        tests:
+          - HostingSubsystem_Startup_DatabaseConfigured_ServesStoredProjectsAfterRestart
+
+      - id: ReviewCenter-Hosting-DatabaseFailure
+        title: >-
+          The Hosting subsystem shall report a database setting that cannot be used as an error and exit code 1,
+          without starting to serve requests.
+        justification: |
+          A service that starts with a database it cannot use would fail on the first request. Stopping
+          immediately with a clear message lets the operator fix the setting.
+        children:
+          - ReviewCenter-ServerHost-DatabaseFailure
+        tests:
+          - HostingSubsystem_Startup_UnsupportedDatabaseProvider_FailsWithExitCodeOne

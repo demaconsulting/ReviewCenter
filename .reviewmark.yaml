@@ -195,6 +195,7 @@ reviews:
       - "docs/verification/review-center/hosting.md"
       - "test/**/Hosting/HostingSubsystemTests.cs"
       - "test/**/TestWebApp.cs"
+      - "test/**/TestDatabase.cs"
 
   - id: ReviewCenter-Hosting-ServerHost
     title: Review of ReviewCenter ServerHost unit implementation
@@ -254,6 +255,171 @@ reviews:
       - "src/**/Web/HomePage.razor"
       - "src/**/Web/HomePage.razor.cs"
       - "test/**/Web/HomePageTests.cs"
+      - "test/**/Web/PageTestBase.cs"
+
+  - id: ReviewCenter-Web-ProjectsPage
+    title: Review of ReviewCenter ProjectsPage unit implementation
+    context:
+      - docs/design/review-center.md
+      - docs/reqstream/review-center.yaml
+      - docs/design/review-center/web.md
+      - docs/reqstream/review-center/web.yaml
+    paths:
+      - "docs/reqstream/review-center/web/projects-page.yaml"
+      - "docs/design/review-center/web/projects-page.md"
+      - "docs/verification/review-center/web/projects-page.md"
+      - "src/**/Web/ProjectsPage.razor"
+      - "src/**/Web/ProjectsPage.razor.cs"
+      - "test/**/Web/ProjectsPageTests.cs"
+
+  - id: ReviewCenter-Web-ProjectPage
+    title: Review of ReviewCenter ProjectPage unit implementation
+    context:
+      - docs/design/review-center.md
+      - docs/reqstream/review-center.yaml
+      - docs/design/review-center/web.md
+      - docs/reqstream/review-center/web.yaml
+    paths:
+      - "docs/reqstream/review-center/web/project-page.yaml"
+      - "docs/design/review-center/web/project-page.md"
+      - "docs/verification/review-center/web/project-page.md"
+      - "src/**/Web/ProjectPage.razor"
+      - "src/**/Web/ProjectPage.razor.cs"
+      - "test/**/Web/ProjectPageTests.cs"
+
+  - id: ReviewCenter-Web-ReviewPage
+    title: Review of ReviewCenter ReviewPage unit implementation
+    context:
+      - docs/design/review-center.md
+      - docs/reqstream/review-center.yaml
+      - docs/design/review-center/web.md
+      - docs/reqstream/review-center/web.yaml
+    paths:
+      - "docs/reqstream/review-center/web/review-page.yaml"
+      - "docs/design/review-center/web/review-page.md"
+      - "docs/verification/review-center/web/review-page.md"
+      - "src/**/Web/ReviewPage.razor"
+      - "src/**/Web/ReviewPage.razor.cs"
+      - "test/**/Web/ReviewPageTests.cs"
+
+  # ReviewCenter - Core
+  - id: ReviewCenter-Core
+    title: Review of ReviewCenter Core subsystem architecture and interfaces
+    context:
+      - docs/design/review-center.md
+      - docs/reqstream/review-center.yaml
+    paths:
+      - "docs/reqstream/review-center/core.yaml"
+      - "docs/design/review-center/core.md"
+      - "docs/verification/review-center/core.md"
+      - "test/**/Core/CoreSubsystemTests.cs"
+      - "test/**/Core/FakeReviewStore.cs"
+      - "test/**/Core/TestContent.cs"
+
+  - id: ReviewCenter-Core-Fingerprint
+    title: Review of ReviewCenter Fingerprint unit implementation
+    context:
+      - docs/design/review-center.md
+      - docs/reqstream/review-center.yaml
+      - docs/design/review-center/core.md
+      - docs/reqstream/review-center/core.yaml
+    paths:
+      - "docs/reqstream/review-center/core/fingerprint.yaml"
+      - "docs/design/review-center/core/fingerprint.md"
+      - "docs/verification/review-center/core/fingerprint.md"
+      - "src/DemaConsulting.ReviewCenter.Core/Fingerprint.cs"
+      - "test/**/Core/FingerprintTests.cs"
+
+  - id: ReviewCenter-Core-ProjectService
+    title: Review of ReviewCenter ProjectService unit implementation
+    context:
+      - docs/design/review-center.md
+      - docs/reqstream/review-center.yaml
+      - docs/design/review-center/core.md
+      - docs/reqstream/review-center/core.yaml
+    paths:
+      - "docs/reqstream/review-center/core/project-service.yaml"
+      - "docs/design/review-center/core/project-service.md"
+      - "docs/verification/review-center/core/project-service.md"
+      - "src/DemaConsulting.ReviewCenter.Core/ProjectService.cs"
+      - "src/DemaConsulting.ReviewCenter.Core/Project.cs"
+      - "src/DemaConsulting.ReviewCenter.Core/IReviewStore.cs"
+      - "src/DemaConsulting.ReviewCenter.Core/DomainRuleException.cs"
+      - "src/DemaConsulting.ReviewCenter.Core/ReviewLimits.cs"
+      - "test/**/Core/ProjectServiceTests.cs"
+
+  - id: ReviewCenter-Core-ReviewService
+    title: Review of ReviewCenter ReviewService unit implementation
+    context:
+      - docs/design/review-center.md
+      - docs/reqstream/review-center.yaml
+      - docs/design/review-center/core.md
+      - docs/reqstream/review-center/core.yaml
+    paths:
+      - "docs/reqstream/review-center/core/review-service.yaml"
+      - "docs/design/review-center/core/review-service.md"
+      - "docs/verification/review-center/core/review-service.md"
+      - "src/DemaConsulting.ReviewCenter.Core/ReviewService.cs"
+      - "src/DemaConsulting.ReviewCenter.Core/Review.cs"
+      - "src/DemaConsulting.ReviewCenter.Core/ReviewFile.cs"
+      - "src/DemaConsulting.ReviewCenter.Core/ReviewState.cs"
+      - "src/DemaConsulting.ReviewCenter.Core/UploadedFile.cs"
+      - "test/**/Core/ReviewServiceTests.cs"
+
+  # ReviewCenter - Storage
+  - id: ReviewCenter-Storage
+    title: Review of ReviewCenter Storage subsystem architecture and interfaces
+    context:
+      - docs/design/review-center.md
+      - docs/reqstream/review-center.yaml
+    paths:
+      - "docs/reqstream/review-center/storage.yaml"
+      - "docs/design/review-center/storage.md"
+      - "docs/verification/review-center/storage.md"
+      - "test/**/Storage/StorageSubsystemTests.cs"
+      - "test/**/TestDatabase.cs"
+
+  - id: ReviewCenter-Storage-ReviewCenterDbContext
+    title: Review of ReviewCenter ReviewCenterDbContext unit implementation
+    context:
+      - docs/design/review-center.md
+      - docs/reqstream/review-center.yaml
+      - docs/design/review-center/storage.md
+      - docs/reqstream/review-center/storage.yaml
+    paths:
+      - "docs/reqstream/review-center/storage/review-center-db-context.yaml"
+      - "docs/design/review-center/storage/review-center-db-context.md"
+      - "docs/verification/review-center/storage/review-center-db-context.md"
+      - "src/**/Storage/ReviewCenterDbContext.cs"
+
+  - id: ReviewCenter-Storage-ReviewStore
+    title: Review of ReviewCenter ReviewStore unit implementation
+    context:
+      - docs/design/review-center.md
+      - docs/reqstream/review-center.yaml
+      - docs/design/review-center/storage.md
+      - docs/reqstream/review-center/storage.yaml
+    paths:
+      - "docs/reqstream/review-center/storage/review-store.yaml"
+      - "docs/design/review-center/storage/review-store.md"
+      - "docs/verification/review-center/storage/review-store.md"
+      - "src/**/Storage/ReviewStore.cs"
+      - "test/**/Storage/ReviewStoreTests.cs"
+
+  - id: ReviewCenter-Storage-DatabaseSetup
+    title: Review of ReviewCenter DatabaseSetup unit implementation
+    context:
+      - docs/design/review-center.md
+      - docs/reqstream/review-center.yaml
+      - docs/design/review-center/storage.md
+      - docs/reqstream/review-center/storage.yaml
+    paths:
+      - "docs/reqstream/review-center/storage/database-setup.yaml"
+      - "docs/design/review-center/storage/database-setup.md"
+      - "docs/verification/review-center/storage/database-setup.md"
+      - "src/**/Storage/DatabaseSetup.cs"
+      - "src/**/Storage/DatabaseOptions.cs"
+      - "test/**/Storage/DatabaseSetupTests.cs"
 
   # ReviewCenterPuppet - Specials (separate software system, development tool)
   - id: ReviewCenterPuppet-Architecture
@@ -379,6 +545,13 @@ reviews:
       - "docs/reqstream/ots/bunit.yaml"
       - "docs/design/ots/bunit.md"
       - "docs/verification/ots/bunit.md"
+
+  - id: OTS-EfCore
+    title: Review of Entity Framework Core OTS verification evidence
+    paths:
+      - "docs/reqstream/ots/efcore.yaml"
+      - "docs/design/ots/efcore.md"
+      - "docs/verification/ots/efcore.md"
 
   - id: OTS-FileAssert
     title: Review of FileAssert OTS verification evidence

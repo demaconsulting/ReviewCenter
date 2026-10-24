@@ -1,0 +1,40 @@
+---
+# EF Core OTS Software Requirements
+#
+# Requirements for Entity Framework Core and its SQLite provider, which the Storage subsystem uses to keep
+# projects and reviews in a database file.
+
+sections:
+  - title: OTS Software Requirements
+    sections:
+      - title: EfCore Requirements
+        requirements:
+          - id: ReviewCenter-OTS-EfCore-Mapping
+            title: >-
+              Entity Framework Core shall map entity classes to database tables, including composite keys and
+              binary columns, and save and read them back unchanged.
+            justification: |
+              Entity Framework Core is the object-relational mapper behind the Storage subsystem. Passing tests
+              that save projects, reviews, and binary file content, and read them back from a real database,
+              confirm that it maps the model correctly, including keys that span a project and a review
+              identifier.
+            tags: [ots]
+            tests:
+              - ReviewStore_AddProjectAsync_ValidProject_RoundTrips
+              - ReviewStore_AddReviewAsync_BinaryCrLfAndEmptyFiles_StoresBytesVerbatim
+              - ReviewStore_AddReviewAsync_SameIdInTwoProjects_KeepsThemApart
+
+          - id: ReviewCenter-OTS-EfCore-Sqlite
+            title: >-
+              The Entity Framework Core SQLite provider shall create a database file with the tables of the model
+              on first use and shall make the database enforce key uniqueness and the relationship between
+              reviews and projects.
+            justification: |
+              SQLite is the supported database. Passing tests that create a database in a new folder and that
+              show the database refusing a duplicate key and a review without a project confirm the provider
+              behaves as the Storage subsystem relies on.
+            tags: [ots]
+            tests:
+              - DatabaseSetup_EnsureCreated_MissingFolder_CreatesFolderFileAndTables
+              - ReviewStore_AddReviewAsync_DuplicateKey_ThrowsReviewIdDuplicate
+              - ReviewStore_AddReviewAsync_UnknownProject_IsNotStored

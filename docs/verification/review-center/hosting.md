@@ -20,6 +20,8 @@ N/A - standard test environment.
 - The health route and the home route are both registered and answer.
 - Start-up writes a structured log entry with a named property, and framework logging reaches
   the same logger providers.
+- The database is created for a configured location, the stored data is served again by a second host on the
+  same database, and an unsupported database provider ends the run with exit code 1.
 
 ### Test Scenarios
 
@@ -35,3 +37,13 @@ tested by `HostingSubsystem_Startup_LoggingConfigured_EmitsStructuredEntry`.
 **HostingSubsystem_Routes_BothRegistered_HomeAndHealthAnswer**: The host is started in memory
 and both `/` and `/health` are requested; both answer HTTP status 200. This scenario is tested
 by `HostingSubsystem_Routes_BothRegistered_HomeAndHealthAnswer`.
+
+**HostingSubsystem_Startup_DatabaseConfigured_ServesStoredProjectsAfterRestart**: A host is started on a new
+database file and a project is stored through its services; the host is stopped and a second host is started on
+the same file. A request to `/projects` lists the stored project. This scenario is tested by
+`HostingSubsystem_Startup_DatabaseConfigured_ServesStoredProjectsAfterRestart`.
+
+**HostingSubsystem_Startup_UnsupportedDatabaseProvider_FailsWithExitCodeOne**: The server is run through
+`ServerHost.RunAsync` with an unsupported database provider; it returns 1 and the context records the failure,
+and no unhandled exception escapes. This scenario is tested by
+`HostingSubsystem_Startup_UnsupportedDatabaseProvider_FailsWithExitCodeOne`.

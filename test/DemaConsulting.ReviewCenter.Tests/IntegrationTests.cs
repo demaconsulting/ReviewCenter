@@ -451,6 +451,32 @@ public class IntegrationTests
     }
 
     /// <summary>
+    ///     Test that the running server serves the projects page backed by the (temporary) database, and that
+    ///     the database file named by the configuration is created at start-up.
+    /// </summary>
+    [Fact]
+    public async Task ReviewCenter_ServeVerb_Started_ServesProjectsPageAndCreatesDatabase()
+    {
+        // Arrange: start the server; the test process points it at a temporary database
+        using var server = ServerProcess.Start();
+        var healthy = await server.WaitUntilHealthyAsync(TimeSpan.FromSeconds(30));
+        Assert.True(healthy, "Server did not become healthy in time");
+
+        // Act: request the projects page
+        using var client = new HttpClient();
+        var html = await client.GetStringAsync($"{server.BaseUrl}/projects", TestContext.Current.CancellationToken);
+
+        // Assert: the empty list and the creation form are served, and the database file exists
+        Assert.Contains("data-testid=\"projects-page\"", html);
+        Assert.Contains("data-testid=\"new-project-form\"", html);
+        Assert.Contains("data-testid=\"create-project-button\"", html);
+        var connectionString = Environment.GetEnvironmentVariable("Database__ConnectionString");
+        Assert.NotNull(connectionString);
+        var file = connectionString.Split(';')[0].Replace("Data Source=", string.Empty, StringComparison.OrdinalIgnoreCase);
+        Assert.True(File.Exists(file), $"Database file '{file}' was not created");
+    }
+
+    /// <summary>
     ///     Test that the serve verb writes a structured start-up log entry that names the listen URL.
     /// </summary>
     [Fact]

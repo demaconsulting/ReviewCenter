@@ -18,14 +18,19 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
+using System.Text.RegularExpressions;
+using AngleSharp.Html.Parser;
+using DemaConsulting.ReviewCenter.Core;
+using DemaConsulting.ReviewCenter.Tests.Core;
 using Microsoft.AspNetCore.TestHost;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace DemaConsulting.ReviewCenter.Tests.Web;
 
 /// <summary>
 ///     Subsystem tests for the Web subsystem: the shell, router, and home page working together.
 /// </summary>
-public class WebSubsystemTests
+public partial class WebSubsystemTests
 {
     /// <summary>
     ///     Test that requesting the home route renders the title and all interactive controls.
@@ -68,4 +73,108 @@ public class WebSubsystemTests
         // Assert: drivers must wait for the marker to flip before clicking
         Assert.Contains("data-interactive=\"false\"", html);
     }
+
+    /// <summary>
+    ///     Test the complete read path through the real pipeline: a project and a review created through the
+    ///     domain services (as the forms do) are shown by the projects, project and review pages, with the
+    ///     review's fingerprint, file list, sizes and per-file hashes.
+    /// </summary>
+    [Fact]
+    public async Task WebSubsystem_CreatedProjectAndReview_ArePresentedByThePages()
+    {
+        // Arrange: start the real pipeline and create a project with a review of three files
+        var logs = new CapturingLoggerProvider();
+        await using var app = await TestWebApp.StartAsync(logs, "serve", "--silent");
+        using var client = app.GetTestClient();
+        var project = await app.Services.GetRequiredService<ProjectService>()
+            .CreateAsync("Apollo", "Moon landing", TestContext.Current.CancellationToken);
+        await app.Services.GetRequiredService<ReviewService>().CreateDraftAsync(
+            project.Id,
+            "rev-1",
+            "First review",
+            [new("a.txt", TestContent.A), new("b.txt", TestContent.B), new("c.bin", TestContent.C)],
+            TestContext.Current.CancellationToken);
+
+        // Act: request the three pages
+        var projects = await ParseAsync(client, "/projects");
+        var projectPage = await ParseAsync(client, $"/projects/{project.Id}");
+        var reviewPage = await ParseAsync(client, $"/projects/{project.Id}/reviews/rev-1");
+
+        // Assert: the project is listed and linked, the review is listed and linked, and the review page
+        // shows the known fingerprint and the per-file values
+        Assert.Equal("Apollo", projects.QuerySelector($"[data-testid='project-link-{project.Id}']")?.TextContent);
+        Assert.Equal($"/projects/{project.Id}", projects.QuerySelector($"[data-testid='project-link-{project.Id}']")?.GetAttribute("href"));
+        Assert.Equal("Apollo", projectPage.QuerySelector("[data-testid='project-name']")?.TextContent);
+        Assert.Equal($"/projects/{project.Id}/reviews/rev-1", projectPage.QuerySelector("[data-testid='review-link-rev-1']")?.GetAttribute("href"));
+        Assert.Equal("First review", reviewPage.QuerySelector("[data-testid='review-title']")?.TextContent);
+        Assert.Equal("Draft", reviewPage.QuerySelector("[data-testid='review-state']")?.TextContent);
+        Assert.Equal(TestContent.FingerprintABC, reviewPage.QuerySelector("[data-testid='review-fingerprint']")?.TextContent);
+        Assert.Equal("a.txt", reviewPage.QuerySelector("[data-testid='file-path-0']")?.TextContent);
+        Assert.Equal(TestContent.HashA, reviewPage.QuerySelector("[data-testid='file-hash-0']")?.TextContent);
+        Assert.Equal(TestContent.HashC, reviewPage.QuerySelector("[data-testid='file-hash-2']")?.TextContent);
+    }
+
+    /// <summary>
+    ///     Test that every interactive element (a, button, input, select, textarea) on every page has a stable
+    ///     kebab-case <c>data-testid</c>, so UI tests never need to depend on text or layout.
+    /// </summary>
+    [Fact]
+    public async Task WebSubsystem_AllPages_EveryInteractiveElementHasTestId()
+    {
+        // Arrange: start the real pipeline with data, so list rows and forms are all rendered
+        var logs = new CapturingLoggerProvider();
+        await using var app = await TestWebApp.StartAsync(logs, "serve", "--silent");
+        using var client = app.GetTestClient();
+        var project = await app.Services.GetRequiredService<ProjectService>()
+            .CreateAsync("Apollo", "Moon landing", TestContext.Current.CancellationToken);
+        await app.Services.GetRequiredService<ReviewService>().CreateDraftAsync(
+            project.Id, "rev-1", "First review", [new("a.txt", TestContent.A)], TestContext.Current.CancellationToken);
+        string[] routes =
+        [
+            "/",
+            "/projects",
+            $"/projects/{project.Id}",
+            "/projects/9999",
+            $"/projects/{project.Id}/reviews/rev-1",
+            $"/projects/{project.Id}/reviews/missing"
+        ];
+
+        foreach (var route in routes)
+        {
+            // Act: render the page and collect its interactive elements
+            var document = await ParseAsync(client, route);
+            var elements = document.QuerySelectorAll("a, button, input, select, textarea");
+
+            // Assert: the page has interactive elements and each has a kebab-case test id
+            Assert.NotEmpty(elements);
+            foreach (var element in elements)
+            {
+                var testId = element.GetAttribute("data-testid");
+                Assert.True(
+                    testId is not null && KebabCase().IsMatch(testId),
+                    $"A <{element.LocalName}> on '{route}' has no kebab-case data-testid (found '{testId}').");
+            }
+        }
+    }
+
+    /// <summary>
+    ///     Requests a page and parses the returned document.
+    /// </summary>
+    /// <param name="client">The in-memory client.</param>
+    /// <param name="route">The route to request.</param>
+    /// <returns>The parsed document.</returns>
+    private static async Task<AngleSharp.Html.Dom.IHtmlDocument> ParseAsync(HttpClient client, string route)
+    {
+        var response = await client.GetAsync(route, TestContext.Current.CancellationToken);
+        Assert.Equal(System.Net.HttpStatusCode.OK, response.StatusCode);
+        var html = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
+        return await new HtmlParser().ParseDocumentAsync(html, TestContext.Current.CancellationToken);
+    }
+
+    /// <summary>
+    ///     Matches lowercase words, digits and dots joined by single hyphens.
+    /// </summary>
+    /// <returns>The compiled expression.</returns>
+    [GeneratedRegex(@"^[a-z0-9]+(?:[-.][a-z0-9]+)*$")]
+    private static partial Regex KebabCase();
 }

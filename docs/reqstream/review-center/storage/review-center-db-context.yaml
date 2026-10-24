@@ -1,0 +1,41 @@
+---
+# Software Unit Requirements for the ReviewCenterDbContext Class
+#
+# The ReviewCenterDbContext class is the Entity Framework Core model that maps projects, reviews, and review
+# files to database tables.
+
+sections:
+  - title: ReviewCenterDbContext Unit Requirements
+    requirements:
+      - id: ReviewCenter-DbContext-Schema
+        title: >-
+          The ReviewCenterDbContext class shall map projects, reviews, and review files to tables in which a
+          review is identified by its project and identifier, so that the same review identifier can exist in
+          different projects.
+        justification: |
+          Review identifiers are chosen by users per project. A key that included only the identifier would
+          force identifiers to be unique across all projects.
+        tests:
+          - DatabaseSetup_EnsureCreated_MissingFolder_CreatesFolderFileAndTables
+          - ReviewStore_AddReviewAsync_SameIdInTwoProjects_KeepsThemApart
+
+      - id: ReviewCenter-DbContext-Content
+        title: >-
+          The ReviewCenterDbContext class shall store the content of a review file as binary data, so that any
+          bytes, including empty content, binary content, and Windows line endings, are stored unchanged.
+        justification: |
+          Review content is fingerprinted and shown byte for byte. Storing it as text would let the database
+          change line endings or reject bytes that are not valid text.
+        tests:
+          - ReviewStore_AddReviewAsync_BinaryCrLfAndEmptyFiles_StoresBytesVerbatim
+
+      - id: ReviewCenter-DbContext-Integrity
+        title: >-
+          The ReviewCenterDbContext class shall make the database refuse a review whose project and identifier
+          are already used, and a review whose project does not exist.
+        justification: |
+          Relationships and uniqueness are enforced by the database so that concurrent requests and any
+          programming error cannot leave inconsistent review records.
+        tests:
+          - ReviewStore_AddReviewAsync_DuplicateKey_ThrowsReviewIdDuplicate
+          - ReviewStore_AddReviewAsync_UnknownProject_IsNotStored

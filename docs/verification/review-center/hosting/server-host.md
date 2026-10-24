@@ -20,6 +20,10 @@ N/A - standard test environment.
 - The start-up log entry exposes the listen URL as a named value.
 - The console logging provider is registered unless the context is silent.
 - A null context is rejected with an `ArgumentNullException`.
+- The configured database is created and the Core services work against it; data survives a second application
+  instance on the same file.
+- An unsupported database provider and an unusable database location are reported as the error "Failed to prepare
+  the database", and `RunAsync` returns exit code 1 for each.
 
 #### Test Scenarios
 
@@ -44,3 +48,25 @@ by `ServerHost_CreateApplication_NotSilent_IncludesConsoleProvider`.
 **ServerHost_CreateApplication_NullContext_ThrowsArgumentNullException**: `CreateApplication` is
 called with a null context; an `ArgumentNullException` is thrown. This scenario is tested by
 `ServerHost_CreateApplication_NullContext_ThrowsArgumentNullException`.
+
+**ServerHost_CreateApplication_DatabaseConfigured_CreatesFileAndServesDomainServices**: The pipeline is started
+with the database connection string pointing at a new file; a project is created through the registered
+`ProjectService`. The file exists afterwards and the project is stored in it. This scenario is tested by
+`ServerHost_CreateApplication_DatabaseConfigured_CreatesFileAndServesDomainServices`.
+
+**ServerHost_CreateApplication_RestartedOnSameDatabase_KeepsData**: A project is created through one application
+instance, which is then disposed; a second instance on the same database file lists the project. This scenario is
+tested by `ServerHost_CreateApplication_RestartedOnSameDatabase_KeepsData`.
+
+**ServerHost_CreateApplication_UnsupportedProvider_ThrowsClearError**: The pipeline is built with an unsupported
+database provider; an `InvalidOperationException` whose message begins "Failed to prepare the database" and names
+the provider is thrown. This scenario is tested by
+`ServerHost_CreateApplication_UnsupportedProvider_ThrowsClearError`.
+
+**ServerHost_RunAsync_UnsupportedProvider_ReturnsExitCodeOne**: `RunAsync` is called with an unsupported database
+provider; it returns 1, and the context holds the error. This scenario is tested by
+`ServerHost_RunAsync_UnsupportedProvider_ReturnsExitCodeOne`.
+
+**ServerHost_RunAsync_UnusableDatabaseLocation_ReturnsExitCodeOne**: `RunAsync` is called with a database path that
+is an existing folder; it returns 1, and the context holds the error. This scenario is tested by
+`ServerHost_RunAsync_UnusableDatabaseLocation_ReturnsExitCodeOne`.

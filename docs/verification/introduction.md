@@ -28,6 +28,17 @@ This document covers the verification design for the following software items:
   - **Web** subsystem
     - **App** — HTML shell and router
     - **HomePage** — home page component
+    - **ProjectsPage** — projects list and creation page
+    - **ProjectPage** — project page with review creation from uploaded files
+    - **ReviewPage** — review, fingerprint, files, and file content page
+  - **Core** subsystem
+    - **Fingerprint** — ReviewMark-compatible content fingerprint
+    - **ProjectService** — project rules
+    - **ReviewService** — review rules
+  - **Storage** subsystem
+    - **ReviewCenterDbContext** — database schema mapping
+    - **ReviewStore** — database implementation of the store interface
+    - **DatabaseSetup** — provider selection, connection resolution, and database creation
   - **SelfTest** subsystem
     - **Validation** — self-validation test runner
   - **Utilities** subsystem
@@ -44,6 +55,7 @@ This document covers the verification design for the following software items:
 - **ASP.NET Core** — web application platform and Blazor Server component framework
 - **BuildMark** — build-notes documentation tool
 - **bUnit** — Blazor component testing library and in-memory test host
+- **Entity Framework Core** — object-relational mapper and SQLite provider
 - **FileAssert** — document assertion tool
 - **Pandoc** — Markdown-to-HTML conversion tool
 - **Playwright** — browser automation library used by the Puppet developer tool
@@ -66,13 +78,22 @@ The following topics are out of scope:
 
 ## Folder Layout
 
-The test folder structure mirrors the source subsystem breakdown:
+The test folder structure mirrors the source subsystem breakdown. The Core subsystem has its own source project
+but its tests are in the main test project, in the `Core/` folder, next to the `Storage/`, `Web/`, and `Hosting/`
+folders:
 
 ```text
 test/
 ├── DemaConsulting.ReviewCenter.Tests/         — unit, subsystem, and integration tests of ReviewCenter
+│   ├── Core/                                  — Core unit and subsystem tests
+│   ├── Storage/                               — Storage unit and subsystem tests
+│   ├── Web/                                   — Web unit and subsystem tests
+│   └── Hosting/                               — Hosting unit and subsystem tests
 └── DemaConsulting.ReviewCenter.Puppet.Tests/  — unit, system, and end-to-end tests of ReviewCenterPuppet
 ```
+
+Tests that touch a database use temporary SQLite files created by a shared test helper in a private temporary
+folder, so no test reads or changes the real data folder of the user running the tests.
 
 ## Companion Artifact Structure
 

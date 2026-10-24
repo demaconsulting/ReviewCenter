@@ -19,6 +19,7 @@ N/A - standard test environment.
 - Clicking Hello shows the greeting, and clicking it again still shows a single greeting.
 - The counter starts at 0 and increases by 1 per click of the counter button.
 - The interactive marker is `true` after the page has rendered on a live connection.
+- The page links to the projects page.
 
 #### Test Scenarios
 
@@ -46,3 +47,6 @@ counter button is clicked three times; the counter shows 3. This scenario is tes
 **HomePage_AfterRender_Interactive_SetsMarker**: The page is rendered with the life-cycle that
 a live connection uses; the `data-interactive` attribute of the root element is `true`. This
 scenario is tested by `HomePage_AfterRender_Interactive_SetsMarker`.
+
+**HomePage_Render_Default_LinksToProjects**: The page is rendered; the link with the test identifier
+`projects-link` points to `/projects`. This scenario is tested by `HomePage_Render_Default_LinksToProjects`.

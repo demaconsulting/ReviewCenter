@@ -1,0 +1,45 @@
+---
+# Software Unit Requirements for the Fingerprint Class
+#
+# The Fingerprint class calculates the SHA-256 hash of a file's bytes and the content fingerprint of a set of
+# files, using the algorithm of the ReviewMark tool.
+
+sections:
+  - title: Fingerprint Unit Requirements
+    requirements:
+      - id: ReviewCenter-Fingerprint-FileHash
+        title: >-
+          The Fingerprint class shall calculate the SHA-256 hash of the exact bytes of a file as 64 lowercase
+          hexadecimal characters, without converting line endings or any other content.
+        justification: |
+          ReviewMark hashes raw file bytes. Converting line endings would give a different fingerprint than
+          ReviewMark for the same files, and would make files that differ only in line endings look identical.
+        tests:
+          - Fingerprint_ComputeFileHash_KnownText_MatchesKnownAnswer
+          - Fingerprint_ComputeFileHash_BinaryWithCrLf_MatchesKnownAnswer
+          - Fingerprint_ComputeFileHash_CrLfVersusLf_DiffersBecauseNoNormalization
+
+      - id: ReviewCenter-Fingerprint-SetHash
+        title: >-
+          The Fingerprint class shall calculate the content fingerprint of a set of files as the SHA-256 hash,
+          in lowercase hexadecimal, of the per-file hashes sorted in ordinal order and joined without a
+          separator, so that the result does not depend on file order or names.
+        justification: |
+          This is the ReviewMark fingerprint algorithm. Sorting makes the result independent of the order in
+          which files were selected, and hashing only contents makes it independent of paths, so the same
+          content always yields the same fingerprint.
+        tests:
+          - Fingerprint_Compute_SingleFile_MatchesKnownAnswer
+          - Fingerprint_Compute_ThreeFilesIncludingBinary_MatchesKnownAnswer
+          - Fingerprint_Compute_DifferentOrder_GivesSameFingerprint
+          - Fingerprint_Compute_FromFileHashes_EqualsFromContents
+
+      - id: ReviewCenter-Fingerprint-Duplicates
+        title: >-
+          The Fingerprint class shall count every file of a set, so that two files with identical content give a
+          different fingerprint than one file of that content.
+        justification: |
+          ReviewMark does not collapse duplicate contents. A review that contains the same content twice is a
+          different set of files than one that contains it once, and its fingerprint must say so.
+        tests:
+          - Fingerprint_Compute_DuplicateContent_IsNotCollapsed

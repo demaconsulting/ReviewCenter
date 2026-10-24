@@ -1,0 +1,58 @@
+---
+# Software Unit Requirements for the ReviewStore Class
+#
+# The ReviewStore class is the database implementation of the Core store interface.
+
+sections:
+  - title: ReviewStore Unit Requirements
+    requirements:
+      - id: ReviewCenter-ReviewStore-Projects
+        title: >-
+          The ReviewStore class shall save a project and assign its identifier, ignoring any identifier supplied
+          by the caller, return a project by identifier or nothing when there is none, and list projects ordered
+          by name.
+        justification: |
+          Pages list projects in a stable, predictable order and must tell a missing project from an existing
+          one. Identifiers belong to the database alone, so a caller can never overwrite or collide with an
+          existing project.
+        tests:
+          - ReviewStore_AddProjectAsync_ValidProject_RoundTrips
+          - ReviewStore_AddProjectAsync_SuppliedId_IsIgnoredAndDatabaseAssignsOwn
+          - ReviewStore_ListProjectsAsync_SeveralProjects_OrdersByName
+          - ReviewStore_GetProjectAsync_UnknownId_ReturnsNull
+
+      - id: ReviewCenter-ReviewStore-Reviews
+        title: >-
+          The ReviewStore class shall save a review with its files, keep the reviews of different projects
+          apart even when their identifiers are the same, and list the reviews of one project ordered by
+          identifier.
+        justification: |
+          A project page must show exactly the reviews of that project, in a stable order, and a review must be
+          saved together with all of its files or not at all.
+        tests:
+          - ReviewStore_AddReviewAsync_BinaryCrLfAndEmptyFiles_StoresBytesVerbatim
+          - ReviewStore_AddReviewAsync_SameIdInTwoProjects_KeepsThemApart
+          - ReviewStore_ListReviewsAsync_TwoProjects_ReturnsOnlyOwnReviewsOrderedById
+
+      - id: ReviewCenter-ReviewStore-Metadata
+        title: >-
+          The ReviewStore class shall return a review with the path, size, and hash of its files but without
+          their content, return the content of one file on request, and return nothing for a review or file
+          that does not exist.
+        justification: |
+          A review can hold tens of megabytes. Lists and detail pages need only file metadata, so content is
+          read one file at a time, when a reviewer asks to see it.
+        tests:
+          - ReviewStore_GetReviewAsync_StoredReview_ReturnsMetadataWithoutContent
+          - ReviewStore_GetReviewAsync_UnknownReviewOrFile_ReturnsNull
+
+      - id: ReviewCenter-ReviewStore-Duplicate
+        title: >-
+          The ReviewStore class shall report a review whose project and identifier already exist as a domain
+          rule exception that names the duplicate identifier rule.
+        justification: |
+          When two requests create the same review identifier at the same moment, the database refuses the
+          second one. The caller must receive the same rule violation as for the ordinary duplicate check, so
+          that the user sees one consistent message.
+        tests:
+          - ReviewStore_AddReviewAsync_DuplicateKey_ThrowsReviewIdDuplicate

@@ -37,3 +37,28 @@ sections:
         tests:
           - ServerHost_CreateApplication_Silent_OmitsConsoleProvider
           - ServerHost_CreateApplication_NotSilent_IncludesConsoleProvider
+
+      - id: ReviewCenter-ServerHost-Database
+        title: >-
+          The ServerHost class shall read the Database settings, register the database store and the project
+          and review services for the pages, and create the database when the application is built.
+        justification: |
+          The composition root is the one place that connects the pages to the database. Creating the database
+          while building the application means a ready database exists before the first request and a failure
+          is found before the server starts.
+        tests:
+          - ServerHost_CreateApplication_DatabaseConfigured_CreatesFileAndServesDomainServices
+          - ServerHost_CreateApplication_RestartedOnSameDatabase_KeepsData
+
+      - id: ReviewCenter-ServerHost-DatabaseFailure
+        title: >-
+          The ServerHost class shall fail with an error that begins Failed to prepare the database when the
+          database settings cannot be used, and shall report that error and return exit code 1 when running the
+          server.
+        justification: |
+          Operators need one clear message for any database problem (an unsupported provider, an unusable
+          location), and a non-zero exit code so that a supervisor or script notices the failure.
+        tests:
+          - ServerHost_CreateApplication_UnsupportedProvider_ThrowsClearError
+          - ServerHost_RunAsync_UnsupportedProvider_ReturnsExitCodeOne
+          - ServerHost_RunAsync_UnusableDatabaseLocation_ReturnsExitCodeOne

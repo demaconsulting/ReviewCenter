@@ -4,9 +4,10 @@
 
 ReviewCenter is a web-based formal code review service with a companion command-line
 interface. The service is an ASP.NET Core Blazor Server application started with the `serve`
-verb. The review features themselves are still under development; the current release provides
-the web host with a home page and a health endpoint, plus the command-line interface documented
-in this guide. A separate development tool, Puppet, is described near the end of this guide.
+verb. The current release lets you create projects and draft reviews made from uploaded files, and shows the
+content fingerprint of each review; the remaining review features (comments, checklists, reviewers, sign-off) are
+still under development. The command-line interface is documented in this guide. A separate development tool,
+Puppet, is described near the end of this guide.
 
 ## Scope
 
@@ -14,7 +15,7 @@ This user guide covers:
 
 - Installation instructions
 - Usage examples for common tasks
-- Running the web server
+- Running the web server, creating projects and reviews, and configuring the database
 - Command-line options reference
 - The Puppet development tool
 - Practical examples for various scenarios
@@ -56,7 +57,9 @@ Get-FileHash reviewcenter-<version>-win-x64.zip -Algorithm SHA256
 Expand-Archive reviewcenter-<version>-win-x64.zip -DestinationPath .
 ```
 
-Keep the extracted files together, because the executable serves the web assets that sit beside it. Either add the
+Keep the extracted files together, because the executable serves the web assets that sit beside it, and the native
+SQLite library (`e_sqlite3.dll` on Windows, `libe_sqlite3.so` on Linux) is a separate file that must stay in the
+same folder as the executable. Either add the
 extracted folder to your `PATH`, or run the executable by its path (`./reviewcenter-<version>-linux-x64/reviewcenter`
 or `.\reviewcenter-<version>-win-x64\reviewcenter.exe`). Start the server with `reviewcenter serve`
 (`reviewcenter.exe serve` on Windows) once it is on your `PATH`. No release has been published yet; until one is, build
@@ -114,11 +117,75 @@ reviewcenter serve --urls http://localhost:8080
 The server provides these routes:
 
 - `/` - the ReviewCenter home page. It shows the title `ReviewCenter`, a Hello button that displays a greeting
-  when pressed, and a counter button that increments a displayed count.
+  when pressed, a counter button that increments a displayed count, and a link to the projects page.
+- `/projects` - the list of projects, with a form to create a new project.
+- `/projects/{id}` - one project, with its reviews and a form to create a review.
+- `/projects/{id}/reviews/{reviewId}` - one review, with its files and their content.
 - `/health` - a health check that answers with status 200 and the text `Healthy` while the server is running.
 
 The `--urls` option is only valid together with `serve`; using it without `serve` is reported as an error.
 The `--silent` option suppresses the server's console log output.
+
+## Projects and Reviews
+
+A project groups the reviews of one body of work. A review is a named set of files whose content is stored
+unchanged, together with a fingerprint of that content.
+
+1. Open `/projects`, enter a project name (up to 100 characters) and an optional description (up to 1000
+   characters), and press the create button. The project appears in the list; select it to open its page.
+2. On the project page, enter a review identifier (1 to 100 letters, digits, `.`, `_`, or `-`, starting with a
+   letter or digit; unique within the project) and a title (up to 200 characters), choose the files to review, and
+   press the create button. The chosen files are listed with their sizes before you submit.
+3. The review page opens. It shows the identifier, title, and state (`Draft`; the only state in this release), the
+   review fingerprint, and the files with their size and SHA-256 hash. Select a file to read its content. Binary
+   files, and files that are not valid UTF-8 text, show a notice instead of their content.
+
+The review fingerprint is calculated exactly as in the ReviewMark tool (see the "Fingerprinting" section of the
+ReviewMark User Guide): each file is hashed with SHA-256, the hashes are sorted, and the sorted hashes are hashed
+again. It depends only on the content of the files, not on their names or order, and it is not affected by line
+ending conversion because the bytes are never changed.
+
+Error messages (for example a blank name, an identifier already used in the project, or too many files) are shown
+on the page, and nothing is created.
+
+### Upload Limits
+
+- At most 200 files per review, 2 MiB per file, and 20 MiB for all files of a review.
+- Only the file name of each chosen file is kept (not its folder), so two files with the same name cannot be in the
+  same review; the page reports this when you submit.
+
+### Limitation: No Authentication
+
+This release has a single anonymous operator: there are no user accounts or permissions, and anyone who can reach
+the server can create and read all projects and reviews. Run the server only on `localhost` or on a trusted network
+until authentication is added in a later release.
+
+## Database
+
+ReviewCenter keeps projects, reviews, and file contents in a SQLite database file. On first start it creates the
+folder, the file, and the tables. The default file is `reviewcenter.db` in the `ReviewCenter` folder of the
+per-user application data folder (`%LOCALAPPDATA%\ReviewCenter` on Windows, `~/.local/share/ReviewCenter` on
+Linux); when the account has no such folder, the file is `data/reviewcenter.db` beside the executable. To back up
+the data, stop the server and copy the file.
+
+Configure the database in the `Database` section of the `appsettings.json` file that sits beside the executable, or
+with environment variables (which take precedence):
+
+| Setting                     | Environment variable         | Meaning                                                 |
+| --------------------------- | ---------------------------- | ------------------------------------------------------- |
+| `Database:Provider`         | `Database__Provider`         | Database provider; only `Sqlite` is supported           |
+| `Database:ConnectionString` | `Database__ConnectionString` | Database file path or SQLite connection string          |
+
+A value without an `=` sign is treated as a file path; an empty value selects the default file. For example:
+
+```bash
+# Linux: keep the data in another file
+Database__ConnectionString=/srv/reviewcenter/reviews.db reviewcenter serve
+```
+
+If the database cannot be prepared (for example the provider is not supported or the location cannot be used), the
+server writes an error message and exits with a non-zero exit code. Database migrations are not provided in this
+release: the tables are created only when the database is new.
 
 ## Self-Validation
 

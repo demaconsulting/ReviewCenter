@@ -1,5 +1,6 @@
 <Solution>
   <Folder Name="/src/">
+    <Project Path="src/DemaConsulting.ReviewCenter.Core/DemaConsulting.ReviewCenter.Core.csproj" />
     <Project Path="src/DemaConsulting.ReviewCenter/DemaConsulting.ReviewCenter.csproj" />
   </Folder>
   <Folder Name="/test/">

@@ -1,0 +1,195 @@
+// Copyright (c) DEMA Consulting
+// 
+// Permission is hereby granted, free of charge, to any person obtaining a copy
+// of this software and associated documentation files (the "Software"), to deal
+// in the Software without restriction, including without limitation the rights
+// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the Software is
+// furnished to do so, subject to the following conditions:
+// 
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
+// 
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+// SOFTWARE.
+
+using Microsoft.Data.Sqlite;
+using Microsoft.EntityFrameworkCore;
+
+namespace DemaConsulting.ReviewCenter.Storage;
+
+/// <summary>
+///     Chooses and prepares the database from the configured <see cref="DatabaseOptions"/>: provider
+///     selection, connection string and default file location, and schema creation.
+/// </summary>
+/// <remarks>
+///     Only SQLite is implemented. The provider switch in <see cref="Configure"/> is the one place
+///     to extend when another provider is added; any other provider name is reported as a clear
+///     configuration error rather than silently falling back. The class is stateless and thread-safe.
+/// </remarks>
+internal static class DatabaseSetup
+{
+    /// <summary>
+    ///     The name of the configuration section that holds <see cref="DatabaseOptions"/>.
+    /// </summary>
+    public const string SectionName = "Database";
+
+    /// <summary>
+    ///     The name of the SQLite provider, the only supported one.
+    /// </summary>
+    public const string SqliteProvider = "Sqlite";
+
+    /// <summary>
+    ///     The folder name, inside the application data folder, that holds the default database.
+    /// </summary>
+    private const string DefaultFolderName = "ReviewCenter";
+
+    /// <summary>
+    ///     The file name of the default database.
+    /// </summary>
+    private const string DefaultFileName = "reviewcenter.db";
+
+    /// <summary>
+    ///     Gets the default database file path for the current user and machine.
+    /// </summary>
+    /// <returns>An absolute path under the local application data folder.</returns>
+    /// <remarks>
+    ///     Side effect: none; the file and its folder are only created by <see cref="EnsureCreated"/>.
+    /// </remarks>
+    public static string GetDefaultDatabasePath()
+    {
+        return GetDefaultDatabasePath(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            AppContext.BaseDirectory);
+    }
+
+    /// <summary>
+    ///     Computes the default database file path from the given folders.
+    /// </summary>
+    /// <param name="localApplicationData">
+    ///     The local application data folder; may be empty (a Linux service without a home folder).
+    /// </param>
+    /// <param name="baseDirectory">The application directory, used when no data folder is available.</param>
+    /// <returns>
+    ///     <c>{localApplicationData}/ReviewCenter/reviewcenter.db</c>, or
+    ///     <c>{baseDirectory}/data/reviewcenter.db</c> when the data folder is empty.
+    /// </returns>
+    /// <remarks>
+    ///     Separated from <see cref="GetDefaultDatabasePath()"/> so the fallback can be tested on any machine.
+    /// </remarks>
+    public static string GetDefaultDatabasePath(string localApplicationData, string baseDirectory)
+    {
+        // A service account without a home folder reports an empty data folder; keep the data beside the program then
+        return string.IsNullOrEmpty(localApplicationData)
+            ? Path.Combine(baseDirectory, "data", DefaultFileName)
+            : Path.Combine(localApplicationData, DefaultFolderName, DefaultFileName);
+    }
+
+    /// <summary>
+    ///     Computes the SQLite connection string for the options.
+    /// </summary>
+    /// <param name="options">The configured options. Must not be null.</param>
+    /// <returns>A full SQLite connection string.</returns>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="options"/> is null.</exception>
+    /// <remarks>
+    ///     An empty value selects the default file. A value containing <c>=</c> is taken as a full
+    ///     connection string (for example <c>Data Source=...;Pooling=False</c>); anything else is taken as a
+    ///     database file path. Relative paths are resolved by SQLite against the working directory.
+    /// </remarks>
+    public static string ResolveConnectionString(DatabaseOptions options)
+    {
+        ArgumentNullException.ThrowIfNull(options);
+
+        var configured = options.ConnectionString?.Trim() ?? string.Empty;
+
+        // Default location when nothing is configured
+        if (configured.Length == 0)
+        {
+            return new SqliteConnectionStringBuilder { DataSource = GetDefaultDatabasePath() }.ToString();
+        }
+
+        // A full connection string is used as it is; a plain path is wrapped
+        return configured.Contains('=', StringComparison.Ordinal)
+            ? configured
+            : new SqliteConnectionStringBuilder { DataSource = configured }.ToString();
+    }
+
+    /// <summary>
+    ///     Selects the database provider and connection on a context options builder.
+    /// </summary>
+    /// <param name="builder">The builder to configure. Must not be null.</param>
+    /// <param name="options">The configured options. Must not be null.</param>
+    /// <exception cref="ArgumentNullException">Thrown when an argument is null.</exception>
+    /// <exception cref="InvalidOperationException">
+    ///     Thrown when the provider is not supported; the message lists the supported providers.
+    /// </exception>
+    public static void Configure(DbContextOptionsBuilder builder, DatabaseOptions options)
+    {
+        ArgumentNullException.ThrowIfNull(builder);
+        ArgumentNullException.ThrowIfNull(options);
+
+        // The provider switch: add the other providers here (and in RequireSupportedProvider) when implemented
+        RequireSupportedProvider(options);
+        builder.UseSqlite(ResolveConnectionString(options));
+    }
+
+    /// <summary>
+    ///     Throws a clear configuration error when the configured provider is not supported.
+    /// </summary>
+    /// <param name="options">The configured options.</param>
+    /// <exception cref="InvalidOperationException">
+    ///     Thrown when the provider is not supported; the message lists the supported providers.
+    /// </exception>
+    private static void RequireSupportedProvider(DatabaseOptions options)
+    {
+        if (!string.Equals(options.Provider?.Trim(), SqliteProvider, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException(
+                $"The database provider '{options.Provider}' is not supported. Supported providers: {SqliteProvider}.");
+        }
+    }
+
+    /// <summary>
+    ///     Makes sure the database folder and the schema exist.
+    /// </summary>
+    /// <param name="factory">The factory that creates database contexts. Must not be null.</param>
+    /// <param name="options">The configured options, used to find the database file folder. Must not be null.</param>
+    /// <exception cref="ArgumentNullException">Thrown when an argument is null.</exception>
+    /// <exception cref="InvalidOperationException">Thrown when the provider is not supported.</exception>
+    /// <remarks>
+    ///     Side effects: creates the folder of the SQLite file when it is missing, and creates the file and
+    ///     the tables when they do not exist. An existing database is left unchanged, which is also why a
+    ///     future schema change needs a migration strategy (there are no migrations yet). Failures from the
+    ///     file system or the database (for example an unwritable folder) propagate to the caller.
+    /// </remarks>
+    public static void EnsureCreated(IDbContextFactory<ReviewCenterDbContext> factory, DatabaseOptions options)
+    {
+        ArgumentNullException.ThrowIfNull(factory);
+        ArgumentNullException.ThrowIfNull(options);
+
+        // Validate the provider before touching the file system
+        RequireSupportedProvider(options);
+
+        // SQLite creates the file but not its folder
+        var dataSource = new SqliteConnectionStringBuilder(ResolveConnectionString(options)).DataSource;
+        if (!string.IsNullOrEmpty(dataSource) &&
+            !dataSource.Equals(":memory:", StringComparison.Ordinal) &&
+            !dataSource.StartsWith("file:", StringComparison.OrdinalIgnoreCase))
+        {
+            var folder = Path.GetDirectoryName(Path.GetFullPath(dataSource));
+            if (!string.IsNullOrEmpty(folder))
+            {
+                Directory.CreateDirectory(folder);
+            }
+        }
+
+        // Create the schema when the database is new
+        using var context = factory.CreateDbContext();
+        context.Database.EnsureCreated();
+    }
+}
