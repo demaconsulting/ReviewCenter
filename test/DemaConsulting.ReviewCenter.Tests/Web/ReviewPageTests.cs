@@ -716,15 +716,15 @@ public class ReviewPageTests : PageTestBase
     }
 
     /// <summary>
-    ///     Test that the next-step line follows the state of the threads.
+    ///     Test that the next-step line follows the state of the threads, next to the unanswered checks.
     /// </summary>
     [Fact]
     public async Task ReviewPage_Render_NextStep_FollowsThreadState()
     {
-        // Arrange: a review without threads
+        // Arrange: a review without threads, with its 58 checks all unanswered
         var projectId = await CreateReviewAsync(new UploadedFile("a.txt", TestContent.A));
         var cut = RenderPage(projectId);
-        Assert.Equal("No discussion yet - select a file and comment on a line.", cut.Find("[data-testid='next-step']").TextContent);
+        Assert.Equal("58 checklist checks unanswered.", cut.Find("[data-testid='next-step']").TextContent);
 
         // Act: start a thread through the page
         await cut.Find("[data-testid='file-select-0']").ClickAsync();
@@ -732,15 +732,100 @@ public class ReviewPageTests : PageTestBase
         await cut.Find("[data-testid='thread-text-input']").InputAsync("Please check");
         await cut.Find("[data-testid='new-thread-form']").SubmitAsync();
 
-        // Assert: one open thread to resolve
-        Assert.Equal("1 open thread to resolve.", cut.Find("[data-testid='next-step']").TextContent);
+        // Assert: the checks and one open thread to resolve are named in one sentence
+        Assert.Equal(
+            "58 checklist checks unanswered, 1 open thread to resolve.",
+            cut.Find("[data-testid='next-step']").TextContent);
 
         // Act: resolve it
         var thread = Assert.Single(await Threads.ListAsync(projectId, "REV-1", TestContext.Current.CancellationToken));
         await cut.Find($"[data-testid='thread-toggle-{thread.Id}']").ClickAsync();
 
-        // Assert: nothing left to do
-        Assert.Equal("All threads resolved.", cut.Find("[data-testid='next-step']").TextContent);
+        // Assert: only the checks are left
+        Assert.Equal("58 checklist checks unanswered.", cut.Find("[data-testid='next-step']").TextContent);
+    }
+
+    /// <summary>
+    ///     Test that the next-step line counts the unanswered checks, and says so when the checklist is complete.
+    /// </summary>
+    [Fact]
+    public async Task ReviewPage_Render_NextStep_IncludesChecklistProgress()
+    {
+        // Arrange: a review with one answered check and a not-applicable section of 5 checks
+        var projectId = await CreateReviewAsync(new UploadedFile("a.txt", TestContent.A));
+        await Checklists.SetAnswerAsync(
+            projectId, "REV-1", "REQ-01", ChecklistOutcome.Pass, null, "Ann", TestContext.Current.CancellationToken);
+        await Checklists.SetSectionApplicabilityAsync(
+            projectId, "REV-1", "DES", false, "No design", "Ann", TestContext.Current.CancellationToken);
+
+        // Act, Assert: 58 - 1 answered - 5 not applicable = 52 unanswered
+        Assert.Equal("52 checklist checks unanswered.", RenderPage(projectId).Find("[data-testid='next-step']").TextContent);
+
+        // Arrange: everything that applies is answered, and the one thread is resolved
+        foreach (var item in DefaultChecklist.Current.Sections.Where(s => s.Id != "DES").SelectMany(s => s.Items))
+        {
+            await Checklists.SetAnswerAsync(
+                projectId, "REV-1", item.Id, ChecklistOutcome.Pass, null, "Ann", TestContext.Current.CancellationToken);
+        }
+
+        var thread = await Threads.StartThreadAsync(
+            projectId, "REV-1", "a.txt", null, null, "Ann", "Done", TestContext.Current.CancellationToken);
+        await Threads.ResolveAsync(projectId, "REV-1", thread.Id, TestContext.Current.CancellationToken);
+
+        // Act, Assert: one sentence says that nothing is left
+        Assert.Equal(
+            "Checklist complete and all threads resolved.",
+            RenderPage(projectId).Find("[data-testid='next-step']").TextContent);
+    }
+
+    /// <summary>
+    ///     Test that the review page shows the checklist progress and a link to the checklist.
+    /// </summary>
+    [Fact]
+    public async Task ReviewPage_Render_NewReview_ShowsChecklistProgressAndLink()
+    {
+        // Arrange: a review with two answered checks
+        var projectId = await CreateReviewAsync(new UploadedFile("a.txt", TestContent.A));
+        foreach (var id in new[] { "REQ-01", "REQ-02" })
+        {
+            await Checklists.SetAnswerAsync(
+                projectId, "REV-1", id, ChecklistOutcome.Pass, null, "Ann", TestContext.Current.CancellationToken);
+        }
+
+        // Act: render the page
+        var cut = RenderPage(projectId);
+
+        // Assert: the summary and the link to the checklist page
+        Assert.Equal("2 of 58 checks answered", cut.Find("[data-testid='checklist-progress-summary']").TextContent);
+        Assert.Equal(
+            $"/projects/{projectId}/reviews/REV-1/checklist",
+            cut.Find("[data-testid='checklist-link']").GetAttribute("href"));
+    }
+
+    /// <summary>
+    ///     Test that a review without a checklist shows no checklist card.
+    /// </summary>
+    [Fact]
+    public async Task ReviewPage_Render_ReviewWithoutChecklist_HidesChecklistCard()
+    {
+        // Arrange: a review stored without a snapshot, straight into the store
+        var project = await Projects.CreateAsync("Apollo", null, TestContext.Current.CancellationToken);
+        await Store.AddReviewAsync(
+            new Review
+            {
+                ProjectId = project.Id,
+                Id = "REV-9",
+                Title = "Old",
+                Created = new DateTimeOffset(2025, 3, 4, 5, 6, 7, TimeSpan.Zero)
+            },
+            TestContext.Current.CancellationToken);
+        // Act: render the page of that review
+        var cut = RenderPage(project.Id, "REV-9");
+
+        // Assert: the review shows, without checklist card or checklist words in the next step
+        Assert.Equal("Old", cut.Find("[data-testid='review-title']").TextContent);
+        Assert.Empty(cut.FindAll("[data-testid='checklist-card']"));
+        Assert.DoesNotContain("checklist", cut.Find("[data-testid='next-step']").TextContent, StringComparison.OrdinalIgnoreCase);
     }
 
     /// <summary>

@@ -1,0 +1,103 @@
+---
+# Software Unit Requirements for the ChecklistService Class
+#
+# The ChecklistService class provides the review checklist: the default checklist, the frozen copy each review
+# keeps, section applicability, the answers to the checks, and the progress derived from them.
+
+sections:
+  - title: ChecklistService Unit Requirements
+    requirements:
+      - id: ReviewCenter-ChecklistService-Default
+        title: >-
+          The ChecklistService class shall provide a default checklist of 14 sections and 58 checks, with the
+          section and check identifiers, titles, and wording of the Continuous Compliance review template, each
+          check identifier unique and starting with the identifier of its section, and a version that names the
+          wording.
+        justification: |
+          Reviewers follow the same checks in every review, and a check keeps one stable identifier. A version
+          names which wording a review was done against, so that the wording can be improved later without
+          changing what earlier reviews recorded.
+        tests:
+          - ChecklistService_DefaultChecklist_HasTemplateSectionsAndItemIdsInOrder
+          - ChecklistService_DefaultChecklist_IdsUniqueAndPrefixedBySection
+          - ChecklistService_DefaultChecklist_RoundTripsThroughJson
+
+      - id: ReviewCenter-ChecklistService-Freeze
+        title: >-
+          The ChecklistService class shall read the checklist of a review from the copy that the review received
+          when it was created, so that a later change to the default checklist does not change an existing
+          review, and shall report that a review without such a copy has no checklist.
+        justification: |
+          A review is a record. Changing the questions after the answers were given would change the meaning of
+          the answers, so each review keeps the checklist it was started with.
+        tests:
+          - ReviewService_CreateDraftAsync_ValidInput_AttachesDefaultChecklistSnapshot
+          - ChecklistService_Get_AfterDefaultChanges_ReturnsFrozenSnapshot
+          - ChecklistService_Get_UnknownReview_ReturnsNull
+
+      - id: ReviewCenter-ChecklistService-Applicability
+        title: >-
+          The ChecklistService class shall record whether a section of a review's checklist applies to the
+          review, shall require a reason of at most 2000 characters, stored trimmed, when a section does not
+          apply, shall clear the reason when it applies again, and shall reject a section that is not in the
+          checklist, storing nothing on a violation.
+        justification: |
+          Not every section is relevant to every review, for example a review without source code has no code
+          checks. Saying why a section was skipped keeps that decision visible to the people who rely on the
+          review.
+        tests:
+          - ChecklistService_SetSectionApplicability_NotApplicableWithoutReason_Throws
+          - ChecklistService_SetSectionApplicability_NotApplicableWithReason_StoresTrimmedReason
+          - ChecklistService_SetSectionApplicability_Applicable_ClearsReason
+          - ChecklistService_SetSectionApplicability_UnknownSection_ThrowsChecklistItemNotFound
+
+      - id: ReviewCenter-ChecklistService-Answer
+        title: >-
+          The ChecklistService class shall record the answer Pass, Fail, or N/A to a check of a review's
+          checklist, replacing an earlier answer to the same check, shall require a justification for Fail and
+          N/A, shall accept a justification of at most 2000 characters stored trimmed (none stored for an empty
+          one on a Pass), and shall reject a check that is not in the checklist and a review that has no
+          checklist, storing nothing on a violation.
+        justification: |
+          A failed or not-applicable check is only useful to the next reader when it says why. A pass needs no
+          explanation. Replacing the answer lets a reviewer correct a mistake without leaving two answers to one
+          question.
+        tests:
+          - ChecklistService_SetAnswer_PassWithoutJustification_Stores
+          - ChecklistService_SetAnswer_FailOrNotApplicableWithoutJustification_Throws
+          - ChecklistService_SetAnswer_JustificationTooLong_Throws
+          - ChecklistService_SetAnswer_UnknownItem_ThrowsChecklistItemNotFound
+          - ChecklistService_SetAnswer_UnknownReview_ThrowsChecklistNotFound
+          - ChecklistService_SetAnswer_ReanswerWithPaddedJustification_OverwritesAndTrims
+
+      - id: ReviewCenter-ChecklistService-AnsweredBy
+        title: >-
+          The ChecklistService class shall require the name of the person for each answer and for each change
+          of section applicability, at most 100 characters and not blank after trimming, and shall store the
+          trimmed name with the UTC time of the change, until sign-in supplies a verified identity.
+        justification: |
+          Every answer must be attributable and dated. There is no sign-in yet, so the name is free text that is
+          not verified; this is temporary and is replaced by the signed-in user when user identity is added.
+        tests:
+          - ChecklistService_SetAnswer_BlankOrTooLongName_ThrowsAnsweredByInvalid
+          - ChecklistService_SetAnswer_StoresNameAndUtcTime
+
+      - id: ReviewCenter-ChecklistService-Progress
+        title: >-
+          The ChecklistService class shall derive from a review's checklist the number of answered and total
+          checks per section and overall, counting a failed check as answered, leaving out the checks of a
+          section that does not apply (such a section counts as done) and any answers kept for it, shall report
+          the checklist complete when every check of every applicable section is answered, and shall give the
+          first section with unanswered checks and the first unanswered check.
+        justification: |
+          Reviewers need to see what is left to do without counting. One set of rules in one place keeps every
+          page showing the same numbers, and the first unanswered check lets a page lead the reviewer to the
+          next piece of work.
+        tests:
+          - ChecklistState_Progress_CountsAnsweredPerSectionAndOverall
+          - ChecklistState_Progress_NotApplicableSection_CountsAsDoneAndLeavesTotal
+          - ChecklistState_Progress_AnswersInNotApplicableSection_Ignored
+          - ChecklistState_Progress_AllApplicableAnswered_IsComplete
+          - ChecklistState_Progress_AllSectionsNotApplicable_IsComplete
+          - ChecklistState_NextUnansweredItemId_SkipsAnsweredAndNotApplicableSections
+          - ChecklistState_FirstIncompleteSectionId_ReturnsFirstSectionWithUnanswered

@@ -3,9 +3,9 @@
 #
 # PURPOSE:
 # - Define requirements for the ReviewCenter Core subsystem
-# - The Core subsystem spans the Fingerprint, ProjectService, ReviewService, and ThreadService units, with the
-#   domain types they share (project, review, review file, thread, comment, upload, limits, rule exception,
-#   and store interface)
+# - The Core subsystem spans the Fingerprint, ProjectService, ReviewService, ThreadService, and
+#   ChecklistService units, with the domain types they share (project, review, review file, thread, comment,
+#   checklist, upload, limits, rule exception, and store interface)
 # - Subsystem requirements describe the externally visible behavior of the domain model and its rules
 
 sections:
@@ -95,3 +95,22 @@ sections:
           - ReviewCenter-ThreadService-NextStep
         tests:
           - CoreSubsystem_ThreadWorkflow_StartReplyResolveReopen_ReadsBackInOrder
+
+      - id: ReviewCenter-Core-Checklist
+        title: >-
+          The Core subsystem shall give every review a checklist of checks grouped in sections, frozen when the
+          review is created, let each section be marked as not applicable with a reason, let each check be
+          answered Pass, Fail, or N/A with a justification where required, and give the progress per section and
+          overall and whether the checklist is complete.
+        justification: |
+          The checklist turns the review into a defined set of checks, so that it is clear what was examined and
+          what is still open. Freezing it at creation keeps the questions fixed for the life of the review.
+        children:
+          - ReviewCenter-ChecklistService-Default
+          - ReviewCenter-ChecklistService-Freeze
+          - ReviewCenter-ChecklistService-Applicability
+          - ReviewCenter-ChecklistService-Answer
+          - ReviewCenter-ChecklistService-AnsweredBy
+          - ReviewCenter-ChecklistService-Progress
+        tests:
+          - CoreSubsystem_Checklist_FrozenAtCreationAnswerAndProgress

@@ -24,14 +24,15 @@ using Microsoft.EntityFrameworkCore;
 namespace DemaConsulting.ReviewCenter.Storage;
 
 /// <summary>
-///     The Entity Framework Core model of the ReviewCenter database: projects, reviews, review files, and the
-///     comment threads of a review with their comments.
+///     The Entity Framework Core model of the ReviewCenter database: projects, reviews, review files, the
+///     comment threads of a review with their comments, and the review checklist (frozen snapshot, section
+///     applicability and answers).
 /// </summary>
 /// <remarks>
 ///     The model maps the Core entities as they are, so Core stays free of any database library.
 ///     The schema is created with <c>EnsureCreated</c> (see <see cref="DatabaseSetup"/>); there are no
-///     migrations yet, so a database created before threads existed does not gain the thread tables and
-///     must be recreated. Instances are short-lived and not thread-safe: create one per operation
+///     migrations yet, so a database created before threads or checklists existed does not gain their
+///     tables and must be recreated. Instances are short-lived and not thread-safe: create one per operation
 ///     through <see cref="IDbContextFactory{TContext}"/>.
 /// </remarks>
 internal sealed class ReviewCenterDbContext : DbContext
@@ -45,6 +46,17 @@ internal sealed class ReviewCenterDbContext : DbContext
     ///     The width of a column that holds a SHA-256 value written as lowercase hexadecimal (64 characters).
     /// </summary>
     private const int Sha256HexColumnLength = 64;
+
+    /// <summary>
+    ///     The width of the column that holds the version label of a checklist.
+    /// </summary>
+    private const int ChecklistVersionColumnLength = 64;
+
+    /// <summary>
+    ///     The width of a column that holds a checklist section or check identifier.
+    /// </summary>
+    private const int ChecklistIdColumnLength = 32;
+
     /// <summary>
     ///     Initializes a new instance of the <see cref="ReviewCenterDbContext"/> class.
     /// </summary>
@@ -78,6 +90,21 @@ internal sealed class ReviewCenterDbContext : DbContext
     ///     Gets the review comments table.
     /// </summary>
     public DbSet<ReviewComment> Comments => Set<ReviewComment>();
+
+    /// <summary>
+    ///     Gets the table of frozen review checklists.
+    /// </summary>
+    public DbSet<ReviewChecklist> ReviewChecklists => Set<ReviewChecklist>();
+
+    /// <summary>
+    ///     Gets the table of checklist section applicability.
+    /// </summary>
+    public DbSet<ChecklistSectionState> ChecklistSectionStates => Set<ChecklistSectionState>();
+
+    /// <summary>
+    ///     Gets the table of checklist answers.
+    /// </summary>
+    public DbSet<ChecklistAnswer> ChecklistAnswers => Set<ChecklistAnswer>();
 
     /// <summary>
     ///     Configures keys, relationships, length limits and conversions.
@@ -149,6 +176,49 @@ internal sealed class ReviewCenterDbContext : DbContext
             comment.HasKey(c => c.Id);
             comment.Property(c => c.Author).IsRequired().HasMaxLength(ReviewLimits.MaxAuthorLength);
             comment.Property(c => c.Text).IsRequired().HasMaxLength(ReviewLimits.MaxCommentLength);
+        });
+
+        // Checklists: one frozen snapshot per review, and the answers and section applicability keyed by the
+        // check or section identifier within it; all go away with the review
+        modelBuilder.Entity<ReviewChecklist>(checklist =>
+        {
+            checklist.HasKey(c => new { c.ProjectId, c.ReviewId });
+            checklist.Property(c => c.ReviewId).HasMaxLength(ReviewLimits.MaxReviewIdLength);
+            checklist.Property(c => c.Version).IsRequired().HasMaxLength(ChecklistVersionColumnLength);
+            checklist.Property(c => c.Definition).IsRequired();
+        });
+
+        modelBuilder.Entity<Review>()
+            .HasOne(r => r.Checklist)
+            .WithOne()
+            .HasForeignKey<ReviewChecklist>(c => new { c.ProjectId, c.ReviewId })
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<ChecklistSectionState>(section =>
+        {
+            section.HasKey(s => new { s.ProjectId, s.ReviewId, s.SectionId });
+            section.Property(s => s.ReviewId).HasMaxLength(ReviewLimits.MaxReviewIdLength);
+            section.Property(s => s.SectionId).HasMaxLength(ChecklistIdColumnLength);
+            section.Property(s => s.Reason).HasMaxLength(ReviewLimits.MaxJustificationLength);
+            section.Property(s => s.SetBy).IsRequired().HasMaxLength(ReviewLimits.MaxAuthorLength);
+            section.HasOne<Review>()
+                .WithMany()
+                .HasForeignKey(s => new { s.ProjectId, s.ReviewId })
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<ChecklistAnswer>(answer =>
+        {
+            answer.HasKey(a => new { a.ProjectId, a.ReviewId, a.ItemId });
+            answer.Property(a => a.ReviewId).HasMaxLength(ReviewLimits.MaxReviewIdLength);
+            answer.Property(a => a.ItemId).HasMaxLength(ChecklistIdColumnLength);
+            answer.Property(a => a.Outcome).HasConversion<string>().HasMaxLength(StateColumnLength);
+            answer.Property(a => a.Justification).HasMaxLength(ReviewLimits.MaxJustificationLength);
+            answer.Property(a => a.AnsweredBy).IsRequired().HasMaxLength(ReviewLimits.MaxAuthorLength);
+            answer.HasOne<Review>()
+                .WithMany()
+                .HasForeignKey(a => new { a.ProjectId, a.ReviewId })
+                .OnDelete(DeleteBehavior.Cascade);
         });
     }
 }

@@ -5,7 +5,7 @@
 #### Purpose
 
 `ReviewStore` implements the Core store interface on top of `ReviewCenterDbContext`. Its single responsibility is
-to persist projects, reviews, file content, and comment threads, and to read them back, translating database
+to persist projects, reviews, file content, comment threads, and checklists, and to read them back, translating database
 behavior into the terms of the domain.
 
 #### Data Model
@@ -27,9 +27,10 @@ neither be persisted nor collide with an existing project; the returned project 
 
 **ReviewExistsAsync**: Reports whether a review with the identifier exists in a project.
 
-**AddReviewAsync**: Stores a review and all its files in one save, which is one transaction.
+**AddReviewAsync**: Stores a review, all its files, and its checklist snapshot (when it has one) in one save, which
+is one transaction.
 
-- *Postconditions*: Either the review and all its files are stored, or nothing is. An identifier that already
+- *Postconditions*: Either the review, all its files, and its snapshot are stored, or nothing is. An identifier that already
   exists in the project, whether found by an earlier check or by a race, is reported as a `DomainRuleException`
   for `ReviewIdDuplicate`. A review for a project that does not exist is not stored; the relationship constraint
   of the database refuses it.
@@ -60,6 +61,16 @@ on their number and no pagination, which is deferred until real volumes are know
 The bytes of files are stored and returned verbatim, including empty files and files containing carriage
 returns or zero bytes.
 
+**GetChecklistAsync**: Reads the checklist snapshot of a review; null when the review has none.
+
+**ListChecklistSectionStatesAsync** and **ListChecklistAnswersAsync**: List the stored section states and the
+answers of a review, with names and UTC times as saved.
+
+**SetChecklistSectionStateAsync** and **SetChecklistAnswerAsync**: Replace the state of a section or the answer to
+a check. Each first tries to overwrite the existing row with one update statement and adds a row only when there
+was none; if two requests add the same row at the same moment, the loser of the race overwrites instead, so
+there is always exactly one row and neither request fails.
+
 #### Error Handling
 
 A duplicate review identifier is detected from the SQLite primary key and unique constraint error codes (1555 and
@@ -74,5 +85,5 @@ database failure propagates unchanged to the caller. Null arguments raise `Argum
 
 #### Callers
 
-- **ProjectService**, **ReviewService**, and **ThreadService** — through the Core interface.
+- **ProjectService**, **ReviewService**, **ThreadService**, and **ChecklistService** — through the Core interface.
 - **ServerHost** — registers the store as the implementation of the Core interface.

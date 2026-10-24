@@ -1,0 +1,178 @@
+@* ChecklistPage: the checklist of one review at "/projects/{id}/reviews/{reviewId}/checklist".
+
+   Presentation only; state and event handling live in ChecklistPage.razor.cs. From the top it shows what is left
+   to do (status line, progress, a "Next unanswered check" button) and the reviewer's name, then the sections of the
+   checklist with their progress. One section is open at a time (the first with unanswered checks to begin with);
+   it offers the "applies to this review" switch (with a required reason when it does not) and one row per check
+   with Pass / Fail / N/A buttons. Fail and N/A ask for a justification next to the buttons. Every interactive
+   element and every key value carries a stable kebab-case data-testid (section and check ids are lower-cased,
+   for example "check-pass-req-01"), and the data-interactive marker on the root flips to "true" once the live
+   circuit is connected. *@
+@page "/projects/{ProjectId:int}/reviews/{ReviewId}/checklist"
+@rendermode InteractiveServer
+
+<PageTitle>Checklist - @(Review?.Id ?? "Review") - ReviewCenter</PageTitle>
+
+<main class="page" data-testid="checklist-page" data-interactive="@InteractiveMarker">
+    <nav class="breadcrumb">
+        <a href="/" data-testid="home-link">ReviewCenter</a>
+        <span aria-hidden="true">/</span>
+        <a href="/projects" data-testid="projects-link">Projects</a>
+        <span aria-hidden="true">/</span>
+        <a href="/projects/@ProjectId" data-testid="project-link">@(ProjectName ?? $"Project {ProjectId}")</a>
+        <span aria-hidden="true">/</span>
+        <a href="/projects/@ProjectId/reviews/@ReviewId" data-testid="review-link">@ReviewId</a>
+    </nav>
+
+    @if (!Loaded)
+    {
+        <p class="muted" data-testid="checklist-loading">Loading...</p>
+    }
+    else if (Review is null)
+    {
+        <p class="error" role="alert" data-testid="checklist-not-found">Review '@ReviewId' does not exist in project @ProjectId.</p>
+    }
+    else if (State is null)
+    {
+        <p class="notice" data-testid="checklist-missing">This review has no checklist.</p>
+    }
+    else
+    {
+        <h1>Checklist</h1>
+        <p class="muted" data-testid="checklist-review-title">@Review.Title</p>
+
+        <section class="card">
+            <p class="status" data-testid="checklist-status">@StatusLine()</p>
+            <p data-testid="checklist-progress">@ProgressLine()</p>
+            @if (!State.IsComplete)
+            {
+                <button type="button" data-testid="next-unanswered-button" @onclick="GoToNextUnanswered">Next unanswered check</button>
+            }
+            else
+            {
+                <a class="action" href="/projects/@ProjectId/reviews/@ReviewId" data-testid="back-to-review-link">Back to the review</a>
+            }
+            <div class="field name-field">
+                <label for="checklist-author">Your name</label>
+                <input id="checklist-author" type="text" maxlength="@ReviewLimits.MaxAuthorLength"
+                       data-testid="checklist-author-input" @bind="AuthorName" @bind:event="oninput" />
+                <p class="muted hint">There is no sign-in yet, so the name is not verified.</p>
+            </div>
+        </section>
+
+        <ul class="checklist-sections">
+            @foreach (var section in State.Definition.Sections)
+            {
+                var sid = TestId(section.Id);
+                var sectionId = section.Id;
+                var isOpen = OpenSectionId == section.Id;
+                var progress = State.SectionProgress(section.Id);
+                var applicable = IsApplicableInPage(section.Id);
+                <li class="checklist-section" data-testid="section-@sid">
+                    <h2 class="section-heading">
+                        <button type="button" class="section-toggle" aria-expanded="@(isOpen ? "true" : "false")"
+                                data-testid="section-@sid-toggle" @onclick="() => ToggleSection(sectionId)">
+                            <span class="section-title"><span class="section-chevron" aria-hidden="true">@(isOpen ? "\u25BE" : "\u25B8")</span>@section.Title</span>
+                            <span class="badge @(State.IsApplicable(section.Id) && progress.IsDone ? "resolved" : null)"
+                                  data-testid="section-@sid-progress">@SectionProgressLabel(section.Id)</span>
+                        </button>
+                    </h2>
+
+                    @if (isOpen)
+                    {
+                        <div class="section-body">
+                            <label class="switch" for="applicable-@sid">
+                                <input id="applicable-@sid" type="checkbox" checked="@applicable"
+                                       data-testid="section-@sid-applicable"
+                                       @onchange="e => SetApplicableAsync(sectionId, (bool)(e.Value ?? false))" />
+                                This section applies to the review
+                            </label>
+
+                            @if (!applicable)
+                            {
+                                <p class="muted hint">@section.ApplicabilityHint</p>
+                                <div class="field">
+                                    <label for="reason-@sid">Reason it does not apply <span class="required">* required</span></label>
+                                    <textarea id="reason-@sid" rows="2" maxlength="@ReviewLimits.MaxJustificationLength"
+                                              data-testid="section-@sid-reason" value="@ReasonText(section.Id)"
+                                              @oninput="e => ReasonTexts[sectionId] = e.Value?.ToString() ?? string.Empty"></textarea>
+                                </div>
+                                <button type="button" data-testid="section-@sid-save" @onclick="() => SaveNotApplicableAsync(sectionId)">Save reason</button>
+                                @if (SectionErrors.TryGetValue(section.Id, out var sectionError))
+                                {
+                                    <p class="error" role="alert" data-testid="section-@sid-error">@sectionError</p>
+                                }
+                            }
+                            else
+                            {
+                                @if (SectionErrors.TryGetValue(section.Id, out var applicableError))
+                                {
+                                    <p class="error" role="alert" data-testid="section-@sid-error">@applicableError</p>
+                                }
+                                <ul class="checks">
+                                    @foreach (var item in section.Items)
+                                    {
+                                        var iid = TestId(item.Id);
+                                        var itemId = item.Id;
+                                        var answer = State.AnswerFor(item.Id);
+                                        var shown = ShownOutcome(item.Id);
+                                        var needsJustification = shown is ChecklistOutcome.Fail or ChecklistOutcome.NotApplicable;
+                                        <li class="check-row @(answer is null ? "unanswered" : null)" data-testid="check-@iid">
+                                            <p class="check-text" id="check-text-@iid"><span class="check-id">@item.Id</span> @item.Text</p>
+                                            <div class="segmented" role="group" aria-labelledby="check-text-@iid">
+                                                <button type="button" class="secondary" aria-pressed="@PressedValue(shown, ChecklistOutcome.Pass)"
+                                                        data-testid="check-pass-@iid" @onclick="() => ChooseAsync(itemId, ChecklistOutcome.Pass)">Pass</button>
+                                                <button type="button" class="secondary fail" aria-pressed="@PressedValue(shown, ChecklistOutcome.Fail)"
+                                                        data-testid="check-fail-@iid" @onclick="() => ChooseAsync(itemId, ChecklistOutcome.Fail)">Fail</button>
+                                                <button type="button" class="secondary" aria-pressed="@PressedValue(shown, ChecklistOutcome.NotApplicable)"
+                                                        data-testid="check-na-@iid" @onclick="() => ChooseAsync(itemId, ChecklistOutcome.NotApplicable)">N/A</button>
+                                            </div>
+
+                                            @if (needsJustification)
+                                            {
+                                                <div class="field">
+                                                    <label for="justification-@iid">Justification <span class="required">* required for Fail and N/A</span></label>
+                                                    <textarea id="justification-@iid" rows="2" maxlength="@ReviewLimits.MaxJustificationLength"
+                                                              data-testid="check-justification-@iid" value="@JustificationText(item.Id)"
+                                                              @oninput="e => JustificationTexts[itemId] = e.Value?.ToString() ?? string.Empty"></textarea>
+                                                </div>
+                                                <button type="button" data-testid="check-save-@iid" @onclick="() => SaveAsync(itemId)">Save</button>
+                                                @if (IsUnsaved(item.Id))
+                                                {
+                                                    <span class="muted hint">Not saved yet.</span>
+                                                }
+                                            }
+
+                                            @if (ItemErrors.TryGetValue(item.Id, out var itemError))
+                                            {
+                                                <p class="error" role="alert" data-testid="check-error-@iid">@itemError</p>
+                                            }
+
+                                            @if (answer is not null)
+                                            {
+                                                <p class="muted hint" data-testid="check-answered-by-@iid">Answered by @answer.AnsweredBy, @FormatTime(answer.AnsweredAt)</p>
+                                            }
+                                        </li>
+                                    }
+                                </ul>
+                            }
+
+                            @if (progress.IsDone && !PendingNotApplicable.Contains(section.Id))
+                            {
+                                @* The section is finished: say what comes next, here where the reviewer is looking *@
+                                @if (State.IsComplete)
+                                {
+                                    <p class="section-next"><a class="action" href="/projects/@ProjectId/reviews/@ReviewId" data-testid="section-@sid-back">Back to the review</a></p>
+                                }
+                                else
+                                {
+                                    <p class="section-next"><button type="button" data-testid="section-@sid-next" @onclick="GoToNextUnanswered">Next unanswered check</button></p>
+                                }
+                            }
+                        </div>
+                    }
+                </li>
+            }
+        </ul>
+    }
+</main>

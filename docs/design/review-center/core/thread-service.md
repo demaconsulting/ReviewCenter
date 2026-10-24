@@ -82,9 +82,15 @@ order; the list is empty when there are none or the review does not exist.
 
 The sort is done in memory because the database cannot order by a time stamp. Nothing is stored or read.
 
-**NextStep**: A static, pure function that words the next action for the threads of a review as one sentence: "No
+**NextStep**: A static, pure function that words the next action for the threads of a review and, optionally, the
+progress of its checklist (`ChecklistProgress?`) as one short sentence. Without a checklist: "No
 discussion yet - select a file and comment on a line." when there are no threads, "1 open thread to resolve." or
-"{n} open threads to resolve." when some are open, and "All threads resolved." otherwise.
+"{n} open threads to resolve." when some are open, and "All threads resolved." otherwise. With a checklist the
+unanswered checks come first and the sentence stays one line: "{n} checklist checks unanswered, {m} open threads to
+resolve." when both remain, "{n} checklist checks unanswered." when only checks remain, "Checklist complete; {m} open
+threads to resolve." when only threads remain, "Checklist complete and all threads resolved." when there are threads
+and all are resolved, and "Checklist complete." when the checklist is complete and there are no threads (singular
+forms are used for one). Having no threads yet is not a task when a checklist exists, so the checklist leads.
 
 **ReviewThread.LastActivity**: A read-only value derived from the comments, the time of the latest comment (the
 thread's `Created` when it has none). It is not stored, so the database is unchanged.

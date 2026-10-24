@@ -233,27 +233,55 @@ public sealed class ThreadService
     }
 
     /// <summary>
-    ///     Words the next action for the reader of a review, from its threads.
+    ///     Words the next action for the reader of a review, from its threads and, when it has one, its checklist.
     /// </summary>
     /// <param name="threads">The threads of the review.</param>
-    /// <returns>One short sentence: start a discussion, the number of open threads to resolve, or that all are resolved.</returns>
-    public static string NextStep(IEnumerable<ReviewThread> threads)
+    /// <param name="checklist">
+    ///     The checklist progress of the review, or <c>null</c> when the review has no checklist (the wording
+    ///     then depends on the threads alone).
+    /// </param>
+    /// <returns>
+    ///     One short sentence: the number of unanswered checks and open threads, that the checklist is complete,
+    ///     that all threads are resolved, or (without a checklist and without threads) to start a discussion.
+    /// </returns>
+    public static string NextStep(IEnumerable<ReviewThread> threads, ChecklistProgress? checklist = null)
     {
         ArgumentNullException.ThrowIfNull(threads);
 
         var all = threads.ToList();
-        if (all.Count == 0)
+        var open = all.Count(thread => thread.State == ReviewThreadState.Open);
+
+        // Without a checklist the sentence depends on the threads alone
+        if (checklist is null)
         {
-            return "No discussion yet - select a file and comment on a line.";
+            if (all.Count == 0)
+            {
+                return "No discussion yet - select a file and comment on a line.";
+            }
+
+            return open switch
+            {
+                0 => "All threads resolved.",
+                1 => "1 open thread to resolve.",
+                _ => $"{open} open threads to resolve."
+            };
         }
 
-        var open = all.Count(thread => thread.State == ReviewThreadState.Open);
-        return open switch
+        // With a checklist the unanswered checks come first, then the open threads
+        var unanswered = checklist.Value.Unanswered;
+        var checks = unanswered == 1 ? "1 checklist check unanswered" : $"{unanswered} checklist checks unanswered";
+        var threadsToResolve = open == 1 ? "1 open thread to resolve" : $"{open} open threads to resolve";
+        if (unanswered > 0)
         {
-            0 => "All threads resolved.",
-            1 => "1 open thread to resolve.",
-            _ => $"{open} open threads to resolve."
-        };
+            return open > 0 ? $"{checks}, {threadsToResolve}." : $"{checks}.";
+        }
+
+        if (open > 0)
+        {
+            return $"Checklist complete; {threadsToResolve}.";
+        }
+
+        return all.Count > 0 ? "Checklist complete and all threads resolved." : "Checklist complete.";
     }
 
     /// <summary>

@@ -34,7 +34,10 @@ N/A - standard test environment.
   typed.
 - A reply is added to a thread; a blank reply or a missing author shows a message in that thread, and the missing
   author message points to the name field.
-- Resolve and reopen change the thread state and the summary; the next-step line follows the threads.
+- Resolve and reopen change the thread state and the summary; the next-step line follows the threads and the
+  unanswered checks of the checklist.
+- A review with a checklist shows a card with its progress and a link to the checklist page; a review without one
+  shows no card.
 - The thread index shows the open threads by default and can show all or only resolved threads, each row with file,
   anchor, state, number of comments, first author, and last activity, and an accessible name that states the same
   facts; choosing a row selects its file, highlights
@@ -67,9 +70,22 @@ line, the files, and the thread index come before the Details section, which has
 identifier, state, fingerprint, and file hashes, while the file list holds no hash. This scenario is tested by
 `ReviewPage_Render_ExistingReview_FilesFirstAndDetailsCollapsedHoldMetadata`.
 
-**ReviewPage_Render_NextStep_FollowsThreadState**: With no threads the line says to start a discussion; after a
-thread is started it says one open thread is to be resolved; after the thread is resolved it says all threads are
-resolved. This scenario is tested by `ReviewPage_Render_NextStep_FollowsThreadState`.
+**ReviewPage_Render_NextStep_FollowsThreadState**: With no threads the line names the 58 unanswered checks; after a
+thread is started it names the checks and one open thread to resolve in one sentence; after the thread is resolved
+only the checks are named again. This scenario is tested by `ReviewPage_Render_NextStep_FollowsThreadState`.
+
+**ReviewPage_Render_NextStep_IncludesChecklistProgress**: A check is answered and a section is marked not
+applicable; the line counts the remaining unanswered checks (52). When everything that applies is answered and the
+thread is resolved, the line says the checklist is complete and all threads are resolved. This scenario is tested by
+`ReviewPage_Render_NextStep_IncludesChecklistProgress`.
+
+**ReviewPage_Render_NewReview_ShowsChecklistProgressAndLink**: A review with two answered checks is rendered; the
+checklist card shows "2 of 58 checks answered" and a link to the checklist page of the review. This scenario is
+tested by `ReviewPage_Render_NewReview_ShowsChecklistProgressAndLink`.
+
+**ReviewPage_Render_ReviewWithoutChecklist_HidesChecklistCard**: A review stored without a checklist is rendered;
+there is no checklist card, and the next-step line does not mention the checklist. This scenario is tested by
+`ReviewPage_Render_ReviewWithoutChecklist_HidesChecklistCard`.
 
 **ReviewPage_ThreadIndex_Filters_ShowRowsWithFileAnchorStateCountAuthorAndActivity**: With no threads the index
 says there are no open threads; with an open thread (with a reply) and a resolved thread, the default shows only

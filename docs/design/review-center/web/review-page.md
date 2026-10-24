@@ -5,7 +5,9 @@
 #### Purpose
 
 `ReviewPage` is the page at `/projects/{id}/reviews/{reviewId}`. Its responsibility is to show one review, with the
-reader's work first. From the top it shows the title, a one-sentence next step, the files with the size and number
+reader's work first. From the top it shows the title, a one-sentence next step, a checklist card (progress summary
+such as "37 of 58 checks answered" and a link to the checklist page; absent when the review has no checklist), the
+files with the size and number
 of open threads of each, the thread index of all files, the numbered lines of a selected file, the comment
 threads on that file, which a reader can answer, resolve, and reopen (a resolved thread is a one-line header
 until expanded), and the form that starts a new thread. Last, in a native `<details>` element that is collapsed by
@@ -32,6 +34,9 @@ file is shown as binary.
 **Threads**: all threads of the review, for every file, in creation order. The summary and the per-file counts are
 calculated from this list, and the selected file's threads are the ones with its path.
 
+**Checklist**: the `ChecklistState` of the review, or `null` when it has none. The page only reads it for the summary
+and the next-step line; the answers are made on `ChecklistPage`.
+
 **AuthorName**: the author typed once in the "Your name" field and used for new threads and replies. There is no
 sign-in yet, so it is free text that is not verified.
 
@@ -46,7 +51,8 @@ expanded. **FocusedThreadId**: the thread chosen in the index, whose lines and c
 keeps the test id to scroll to after the next render. All of these are cleared when the route parameters change.
 
 Test identifiers: `review-page` (root), `home-link`, `projects-link`, `project-link`, `review-loading`,
-`review-not-found`, `review-title`, `next-step`, `review-details`, `review-details-summary`, `review-id`,
+`review-not-found`, `review-title`, `next-step`, `checklist-card`, `checklist-progress-summary`, `checklist-link`,
+`review-details`, `review-details-summary`, `review-id`,
 `review-state`, `review-fingerprint`, `file-hash-path-{index}`, `file-hash-{index}`, `thread-index`,
 `thread-summary` (the filter group), `index-filter-all`, `index-filter-open`, `index-filter-resolved`,
 `threads-all-count`, `threads-open-count`, `threads-resolved-count`, `thread-index-list`, `thread-index-empty`,
@@ -112,7 +118,9 @@ thread.
 only when it is not already shown, so text typed in the new-thread form is kept; the thread becomes the focused
 thread, a resolved thread is expanded, and the first line of its anchor (or the thread card for a whole-file
 thread) becomes the scroll target. The index rows come from `ThreadService.BuildIndex` and the next-step line from
-`ThreadService.NextStep`, so the page holds no ordering or wording rules of its own.
+`ThreadService.NextStep` (given the checklist progress), so the page holds no ordering or wording rules of its own.
+The summary of the checklist card is "{answered} of {total} checks answered", or "Checklist complete" when nothing
+is left to answer.
 
 **OnAfterRenderAsync**: Marks the page interactive after the first render on a live connection, and, when a scroll
 target is set, calls the browser function `reviewCenter.scrollToTestId` (defined in `App`) once with the test id and
@@ -121,7 +129,7 @@ where it should land (`start` or `center`) and clears the target. Highlighting i
 connection that is already gone is ignored.
 
 Comments are read when the page loads and after each change made on the page. A comment posted in another browser
-appears when this page is next loaded or changed; nothing is pushed.
+appears when this page is next loaded or changed; nothing is pushed. The checklist is read when the page loads.
 
 #### Error Handling
 
@@ -135,6 +143,7 @@ own.
 - **ReviewService** — reads the review and the bytes of a file.
 - **ThreadService** — starts, answers, resolves, reopens, and lists threads, and shapes them for the index and the
   next-step line.
+- **ChecklistService** — reads the checklist progress for the summary and the next-step line.
 - **FileText** — decides whether a file is text and splits it into lines.
 - **ProjectService** — reads the name of the owning project for the breadcrumb.
 - **ASP.NET Core Blazor components** — the component base class, events, JavaScript interop, and the interactive

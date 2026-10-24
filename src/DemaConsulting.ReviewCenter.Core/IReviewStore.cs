@@ -65,7 +65,7 @@ public interface IReviewStore
     Task<bool> ReviewExistsAsync(int projectId, string reviewId, CancellationToken cancellationToken = default);
 
     /// <summary>
-    ///     Stores a new review together with its files.
+    ///     Stores a new review together with its files and, when it has one, its frozen checklist.
     /// </summary>
     /// <param name="review">The review to store, with its files and their bytes. Must not be null.</param>
     /// <param name="cancellationToken">Cancels the operation.</param>
@@ -161,4 +161,56 @@ public interface IReviewStore
         int projectId,
         string reviewId,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    ///     Reads the frozen checklist of a review.
+    /// </summary>
+    /// <param name="projectId">The project identity.</param>
+    /// <param name="reviewId">The review identifier.</param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <returns>The checklist, or <c>null</c> when the review does not exist or was stored without one.</returns>
+    Task<ReviewChecklist?> GetChecklistAsync(
+        int projectId,
+        string reviewId,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    ///     Lists the stored applicability of the checklist sections of a review.
+    /// </summary>
+    /// <param name="projectId">The project identity.</param>
+    /// <param name="reviewId">The review identifier.</param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <returns>One entry per section that has been set; empty when none has.</returns>
+    Task<IReadOnlyList<ChecklistSectionState>> ListChecklistSectionStatesAsync(
+        int projectId,
+        string reviewId,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    ///     Lists the stored checklist answers of a review.
+    /// </summary>
+    /// <param name="projectId">The project identity.</param>
+    /// <param name="reviewId">The review identifier.</param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <returns>One entry per answered check; empty when none has been answered.</returns>
+    Task<IReadOnlyList<ChecklistAnswer>> ListChecklistAnswersAsync(
+        int projectId,
+        string reviewId,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    ///     Stores the applicability of a checklist section, replacing an earlier one.
+    /// </summary>
+    /// <param name="state">The state to store. Must not be null; the review must exist.</param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <returns>A task that completes when the state is stored.</returns>
+    Task SetChecklistSectionStateAsync(ChecklistSectionState state, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    ///     Stores the answer to a checklist check, replacing an earlier answer.
+    /// </summary>
+    /// <param name="answer">The answer to store. Must not be null; the review must exist.</param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <returns>A task that completes when the answer is stored.</returns>
+    Task SetChecklistAnswerAsync(ChecklistAnswer answer, CancellationToken cancellationToken = default);
 }

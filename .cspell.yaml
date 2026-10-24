@@ -20,6 +20,7 @@ words:
   - wwwroot
   - aspnetcore
   - icdp
+  - labelledby
   - bunit
   - Antiforgery
   - apphost
@@ -55,6 +56,12 @@ words:
   - sysml2tools
   - tabindex
   - reviewcenter
+  - reanswer
+  - upserts
+  - reqdoc
+  - reqimp
+  - reqtest
+  - codedoc
   - venv
   - versionmark
   - ordinally

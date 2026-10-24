@@ -24,11 +24,13 @@ includes:
   - docs/reqstream/review-center/web/projects-page.yaml
   - docs/reqstream/review-center/web/project-page.yaml
   - docs/reqstream/review-center/web/review-page.yaml
+  - docs/reqstream/review-center/web/checklist-page.yaml
   - docs/reqstream/review-center/core.yaml
   - docs/reqstream/review-center/core/fingerprint.yaml
   - docs/reqstream/review-center/core/project-service.yaml
   - docs/reqstream/review-center/core/review-service.yaml
   - docs/reqstream/review-center/core/thread-service.yaml
+  - docs/reqstream/review-center/core/checklist-service.yaml
   - docs/reqstream/review-center/storage.yaml
   - docs/reqstream/review-center/storage/review-center-db-context.yaml
   - docs/reqstream/review-center/storage/review-store.yaml

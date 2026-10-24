@@ -3,8 +3,8 @@
 #
 # PURPOSE:
 # - Define requirements for the ReviewCenter Web subsystem
-# - The Web subsystem spans the App (App.razor, Routes.razor), HomePage, ProjectsPage, ProjectPage, and
-#   ReviewPage units
+# - The Web subsystem spans the App (App.razor, Routes.razor), HomePage, ProjectsPage, ProjectPage, ReviewPage,
+#   and ChecklistPage units
 # - Subsystem requirements describe the externally visible behavior of the web user interface
 # - The subsystem tests run over plain HTTP, so they verify what the server renders: the pages, the read path from
 #   the database, and the initial not-yet-interactive marker. Behavior that needs a live connection (forms,
@@ -108,6 +108,25 @@ sections:
           - ReviewCenter-ReviewPage-ThreadUpdate
         tests:
           - WebSubsystem_ReviewWithThreads_ArePresentedByThePage
+
+      - id: ReviewCenter-Web-Checklist
+        title: >-
+          The Web subsystem shall show on the review page the progress of the review's checklist with a link to
+          a checklist page at /projects/{project}/reviews/{review}/checklist, where a user can see what is left
+          to do, answer each check, mark sections as not applicable, and be led to the next unanswered check.
+        justification: |
+          The checklist is worked through on its own page, and the review page shows how far it has got. The
+          subsystem test covers the pages served from the database; answering needs a live connection and is
+          verified by the component tests of the page units.
+        children:
+          - ReviewCenter-ReviewPage-Checklist
+          - ReviewCenter-ChecklistPage-Show
+          - ReviewCenter-ChecklistPage-Answer
+          - ReviewCenter-ChecklistPage-Applicability
+          - ReviewCenter-ChecklistPage-NextUnanswered
+          - ReviewCenter-ChecklistPage-Interactive
+        tests:
+          - WebSubsystem_ChecklistPage_AnsweredChecksSurviveReload
 
       - id: ReviewCenter-Web-TestIds
         title: >-

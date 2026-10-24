@@ -29,6 +29,8 @@ N/A - standard test environment.
 - The last activity of a thread is the time of its latest comment; the index keeps the threads of the requested
   state (or all), newest activity first, the higher identity first on equal times, and is empty for no threads.
 - The next step names starting a discussion, the number of open threads, or that all threads are resolved.
+- With a checklist, the next step names the unanswered checks first, then the open threads, and says when the
+  checklist is complete and all threads are resolved.
 
 #### Test Scenarios
 
@@ -111,6 +113,11 @@ tested by `ThreadService_BuildIndex_StateFilter_ReturnsMatchingNewestActivityFir
 **ThreadService_NextStep_NoThreadsOpenAndAllResolved_NamesNextAction**: No threads, one open thread, three open and
 one resolved thread, and only resolved threads each give the matching sentence. This scenario is tested by
 `ThreadService_NextStep_NoThreadsOpenAndAllResolved_NamesNextAction`.
+
+**ThreadService_NextStep_WithChecklist_CombinesChecksAndThreads**: A theory over the number of unanswered checks,
+open threads, and resolved threads: only checks, one check, checks with open threads, checks with one open thread,
+a complete checklist with open threads, with only resolved threads, and with no threads each give the matching
+sentence. This scenario is tested by `ThreadService_NextStep_WithChecklist_CombinesChecksAndThreads`.
 
 **ThreadService_Constructor_NullArguments_Throws**: A null store and a null clock are rejected with
 `ArgumentNullException`. This scenario is tested by `ThreadService_Constructor_NullArguments_Throws`.

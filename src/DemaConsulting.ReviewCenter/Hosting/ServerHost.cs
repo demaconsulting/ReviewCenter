@@ -110,6 +110,7 @@ internal static class ServerHost
         builder.Services.AddSingleton<ProjectService>();
         builder.Services.AddSingleton<ReviewService>();
         builder.Services.AddSingleton<ThreadService>();
+        builder.Services.AddSingleton<ChecklistService>();
 
         // Allow the caller (tests) to replace the server or add logger providers
         options.ConfigureBuilder?.Invoke(builder);

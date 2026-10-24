@@ -301,6 +301,25 @@ sections:
           - WebSubsystem_ReviewWithThreads_ArePresentedByThePage
           - StorageSubsystem_ServicesOverDatabase_ReopenedDatabase_KeepsThreadsAndComments
 
+      - id: ReviewCenter-System-Checklist
+        title: >-
+          The tool shall give every review a checklist that follows the Continuous Compliance review template,
+          let a user answer each check Pass, Fail, or N/A with a justification where required, mark a section
+          as not applicable with a reason, and see what is left to do, keeping the answers in the database
+          across restarts, with a review keeping the checklist it was created with.
+        tags: [system]
+        justification: |
+          The checklist is how a formal review shows what was examined. A reviewer must see at a glance what is
+          unanswered and be led to the next check. There is no sign-in yet, so the name saved with an answer is
+          free text that is not verified, until user identity is added.
+        children:
+          - ReviewCenter-Web-Checklist
+          - ReviewCenter-Core-Checklist
+          - ReviewCenter-Storage-Checklist
+        tests:
+          - WebSubsystem_ChecklistPage_AnsweredChecksSurviveReload
+          - StorageSubsystem_Checklist_PersistsSnapshotAnswersAndSectionsAcrossReopen
+
       - id: ReviewCenter-System-DatabaseFailure
         title: >-
           The tool shall report an error and return a non-zero exit code, without serving requests, when the

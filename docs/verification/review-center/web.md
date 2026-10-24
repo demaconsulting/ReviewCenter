@@ -27,6 +27,8 @@ N/A - standard test environment (temporary SQLite databases are created by the t
   (The creation forms and uploads are verified by the page units' component tests.)
 - Threads created through the Core service are presented by the review page: the next-step line, the thread index,
   the summary, and the per-file open count are correct, and the Details section is collapsed.
+- The review page links the checklist page and shows its progress; the checklist page presents the answers stored
+  through the Core service, also when requested again.
 - Every interactive element of every page has a `data-testid`.
 
 ### Test Scenarios
@@ -55,7 +57,14 @@ thread, the index lists the open thread with an activity time read back from the
 is collapsed. This scenario is tested by
 `WebSubsystem_ReviewWithThreads_ArePresentedByThePage`.
 
+**WebSubsystem_ChecklistPage_AnsweredChecksSurviveReload**: A review is created through the Core services of the
+real pipeline and two checks are answered, one Pass and one Fail with a justification. The checklist page is
+requested twice and the review page once. Both loads of the checklist page say "56 checks unanswered.", show the
+section progress "2 of 8", the pressed Pass button, and the saved justification; the review page shows "2 of 58
+checks answered", a link to the checklist page, and "56 checklist checks unanswered." as the next step. This
+scenario is tested by `WebSubsystem_ChecklistPage_AnsweredChecksSurviveReload`.
+
 **WebSubsystem_AllPages_EveryInteractiveElementHasTestId**: Every route (home, projects, a project, a missing
-project, a review, a missing review) is requested over the in-memory server; every link, button, input, select,
+project, a review, a missing review, a checklist) is requested over the in-memory server; every link, button, input, select,
 and text area in each response has a `data-testid` in kebab-case. This scenario is tested by
 `WebSubsystem_AllPages_EveryInteractiveElementHasTestId`.

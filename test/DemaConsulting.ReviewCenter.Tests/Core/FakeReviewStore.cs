@@ -58,6 +58,16 @@ internal sealed class FakeReviewStore : IReviewStore
     private readonly List<ReviewThread> _threads = [];
 
     /// <summary>
+    ///     The stored checklist section states.
+    /// </summary>
+    private readonly List<ChecklistSectionState> _sectionStates = [];
+
+    /// <summary>
+    ///     The stored checklist answers.
+    /// </summary>
+    private readonly List<ChecklistAnswer> _answers = [];
+
+    /// <summary>
     ///     The identity given to the next stored comment.
     /// </summary>
     private int _nextCommentId = 1;
@@ -223,6 +233,56 @@ internal sealed class FakeReviewStore : IReviewStore
             .OrderBy(t => t.Id)
             .ToList();
         return Task.FromResult(list);
+    }
+
+    /// <inheritdoc />
+    public Task<ReviewChecklist?> GetChecklistAsync(
+        int projectId,
+        string reviewId,
+        CancellationToken cancellationToken = default)
+    {
+        var review = _reviews.FirstOrDefault(r => r.ProjectId == projectId && r.Id == reviewId);
+        return Task.FromResult(review?.Checklist);
+    }
+
+    /// <inheritdoc />
+    public Task<IReadOnlyList<ChecklistSectionState>> ListChecklistSectionStatesAsync(
+        int projectId,
+        string reviewId,
+        CancellationToken cancellationToken = default)
+    {
+        IReadOnlyList<ChecklistSectionState> list = _sectionStates
+            .Where(s => s.ProjectId == projectId && s.ReviewId == reviewId)
+            .ToList();
+        return Task.FromResult(list);
+    }
+
+    /// <inheritdoc />
+    public Task<IReadOnlyList<ChecklistAnswer>> ListChecklistAnswersAsync(
+        int projectId,
+        string reviewId,
+        CancellationToken cancellationToken = default)
+    {
+        IReadOnlyList<ChecklistAnswer> list = _answers
+            .Where(a => a.ProjectId == projectId && a.ReviewId == reviewId)
+            .ToList();
+        return Task.FromResult(list);
+    }
+
+    /// <inheritdoc />
+    public Task SetChecklistSectionStateAsync(ChecklistSectionState state, CancellationToken cancellationToken = default)
+    {
+        _sectionStates.RemoveAll(s => s.ProjectId == state.ProjectId && s.ReviewId == state.ReviewId && s.SectionId == state.SectionId);
+        _sectionStates.Add(state);
+        return Task.CompletedTask;
+    }
+
+    /// <inheritdoc />
+    public Task SetChecklistAnswerAsync(ChecklistAnswer answer, CancellationToken cancellationToken = default)
+    {
+        _answers.RemoveAll(a => a.ProjectId == answer.ProjectId && a.ReviewId == answer.ReviewId && a.ItemId == answer.ItemId);
+        _answers.Add(answer);
+        return Task.CompletedTask;
     }
 
     /// <summary>

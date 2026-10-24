@@ -31,7 +31,8 @@ namespace DemaConsulting.ReviewCenter.Web;
 /// </summary>
 /// <remarks>
 ///     The page reads reviews through <see cref="ReviewService"/> and reads and changes threads through
-///     <see cref="ThreadService"/> only; the rules live there and a violation is shown next to the form that
+///     <see cref="ThreadService"/> only (plus the checklist progress, read through <see cref="ChecklistService"/>
+///     for the checklist card and the next-step line); the rules live there and a violation is shown next to the form that
 ///     caused it. File bytes are loaded one file at a time when the operator selects it, never with the file
 ///     list. A file is shown as numbered lines only when it is valid UTF-8 without NUL bytes (see
 ///     <see cref="FileText"/>); anything else is reported as a binary file rather than rendered as garbage.
@@ -86,6 +87,12 @@ public partial class ReviewPage : ComponentBase
     private ThreadService ThreadService { get; set; } = null!;
 
     /// <summary>
+    ///     Gets or sets the service that reads the review checklist, supplied by dependency injection.
+    /// </summary>
+    [Inject]
+    private ChecklistService ChecklistService { get; set; } = null!;
+
+    /// <summary>
     ///     Gets or sets the service that reads projects, supplied by dependency injection.
     /// </summary>
     [Inject]
@@ -126,6 +133,11 @@ public partial class ReviewPage : ComponentBase
     ///     Gets all threads of the review (every file), in creation order.
     /// </summary>
     private IReadOnlyList<ReviewThread> Threads { get; set; } = [];
+
+    /// <summary>
+    ///     Gets the checklist state of the review, or <c>null</c> when the review has no checklist.
+    /// </summary>
+    private ChecklistState? Checklist { get; set; }
 
     /// <summary>
     ///     Gets or sets the author name typed by the operator; used for new threads and replies.
@@ -201,6 +213,7 @@ public partial class ReviewPage : ComponentBase
         SelectedPath = null;
         SelectedLines = null;
         Threads = [];
+        Checklist = null;
         ClearNewThreadForm();
         ReplyTexts.Clear();
         ReplyErrors.Clear();
@@ -212,6 +225,7 @@ public partial class ReviewPage : ComponentBase
         Review = await ReviewService.GetAsync(ProjectId, ReviewId);
         ProjectName = (await ProjectService.GetAsync(ProjectId))?.Name;
         Threads = await ThreadService.ListAsync(ProjectId, ReviewId);
+        Checklist = await ChecklistService.GetAsync(ProjectId, ReviewId);
         Loaded = true;
     }
 
@@ -527,6 +541,16 @@ public partial class ReviewPage : ComponentBase
     {
         return $"Show {AnchorLabel(thread)} of {thread.FilePath}, {thread.State}, {CommentCountLabel(thread)}, " +
                $"first by {thread.Comments.FirstOrDefault()?.Author}, last activity {FormatTime(thread.LastActivity)}";
+    }
+
+    /// <summary>
+    ///     Words the checklist progress for the checklist card.
+    /// </summary>
+    /// <returns>For example "37 of 58 checks answered", or "Checklist complete" when nothing is left to answer.</returns>
+    private string ChecklistSummary()
+    {
+        var overall = Checklist!.Overall;
+        return overall.IsDone ? "Checklist complete" : $"{overall.Answered} of {overall.Total} checks answered";
     }
 
     /// <summary>

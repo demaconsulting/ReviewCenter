@@ -302,6 +302,21 @@ reviews:
       - "src/**/Web/ReviewPage.razor.cs"
       - "test/**/Web/ReviewPageTests.cs"
 
+  - id: ReviewCenter-Web-ChecklistPage
+    title: Review of ReviewCenter ChecklistPage unit implementation
+    context:
+      - docs/design/review-center.md
+      - docs/reqstream/review-center.yaml
+      - docs/design/review-center/web.md
+      - docs/reqstream/review-center/web.yaml
+    paths:
+      - "docs/reqstream/review-center/web/checklist-page.yaml"
+      - "docs/design/review-center/web/checklist-page.md"
+      - "docs/verification/review-center/web/checklist-page.md"
+      - "src/**/Web/ChecklistPage.razor"
+      - "src/**/Web/ChecklistPage.razor.cs"
+      - "test/**/Web/ChecklistPageTests.cs"
+
   # ReviewCenter - Core
   - id: ReviewCenter-Core
     title: Review of ReviewCenter Core subsystem architecture and interfaces
@@ -383,6 +398,28 @@ reviews:
       - "src/DemaConsulting.ReviewCenter.Core/ReviewThreadState.cs"
       - "src/DemaConsulting.ReviewCenter.Core/FileText.cs"
       - "test/**/Core/ThreadServiceTests.cs"
+
+  - id: ReviewCenter-Core-ChecklistService
+    title: Review of ReviewCenter ChecklistService unit implementation
+    context:
+      - docs/design/review-center.md
+      - docs/reqstream/review-center.yaml
+      - docs/design/review-center/core.md
+      - docs/reqstream/review-center/core.yaml
+    paths:
+      - "docs/reqstream/review-center/core/checklist-service.yaml"
+      - "docs/design/review-center/core/checklist-service.md"
+      - "docs/verification/review-center/core/checklist-service.md"
+      - "src/DemaConsulting.ReviewCenter.Core/ChecklistService.cs"
+      - "src/DemaConsulting.ReviewCenter.Core/ChecklistState.cs"
+      - "src/DemaConsulting.ReviewCenter.Core/ChecklistDefinition.cs"
+      - "src/DemaConsulting.ReviewCenter.Core/DefaultChecklist.cs"
+      - "src/DemaConsulting.ReviewCenter.Core/ReviewChecklist.cs"
+      - "src/DemaConsulting.ReviewCenter.Core/ChecklistSectionState.cs"
+      - "src/DemaConsulting.ReviewCenter.Core/ChecklistAnswer.cs"
+      - "src/DemaConsulting.ReviewCenter.Core/ChecklistOutcome.cs"
+      - "src/DemaConsulting.ReviewCenter.Core/ChecklistProgress.cs"
+      - "test/**/Core/ChecklistServiceTests.cs"
 
   # ReviewCenter - Storage
   - id: ReviewCenter-Storage

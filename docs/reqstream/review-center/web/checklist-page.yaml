@@ -1,0 +1,85 @@
+---
+# Software Unit Requirements for the ChecklistPage Unit
+#
+# The ChecklistPage unit is the page at /projects/{project}/reviews/{review}/checklist that shows the checklist of
+# one review, lets a reviewer answer its checks, and shows what is left to do.
+
+sections:
+  - title: ChecklistPage Unit Requirements
+    requirements:
+      - id: ReviewCenter-ChecklistPage-Show
+        title: >-
+          The ChecklistPage unit shall show a status line of how many checks are unanswered (or that the
+          checklist is complete), the overall progress with the number of sections that do not apply, and every
+          section with its own progress, with only the first section that has unanswered checks open to begin
+          with, and shall show a not-found message when the review does not exist and a message when the review
+          has no checklist.
+        justification: |
+          A reviewer must see at once what is left to do and where to start. Opening only one section keeps the
+          fifty-odd checks from burying what matters. A mistyped link must lead to a clear answer.
+        tests:
+          - ChecklistPage_Render_NewReview_ShowsProgressAndOpensFirstSection
+          - ChecklistPage_Render_UnknownReview_ShowsNotFound
+          - ChecklistPage_Render_ReviewWithoutChecklist_ShowsMissing
+          - ChecklistPage_Render_PartlyAnswered_OpensFirstIncompleteSection
+          - ChecklistPage_Render_AllAnswered_ShowsCompleteAndNoNextAction
+
+      - id: ReviewCenter-ChecklistPage-Answer
+        title: >-
+          The ChecklistPage unit shall offer Pass, Fail, and N/A buttons for each check of the open section, store
+          a Pass at once, ask for a justification, marked as required, only for Fail and N/A and store those when
+          the reviewer saves, show the name and UTC time of the answer, take the reviewer's name from one field at
+          the top, and show a violated rule as a message next to the check, pointing to the name field when the
+          name is missing.
+        justification: |
+          One click per check keeps the work fast, and the justification is only asked for where it is needed.
+          A message beside the check tells the reviewer exactly what to fix. There is no sign-in yet, so the
+          name is typed once and is not verified, until user identity is added.
+        tests:
+          - ChecklistPage_Answer_Pass_SavesImmediately
+          - ChecklistPage_Answer_Fail_ShowsJustificationBoxAndRequiresText
+          - ChecklistPage_Answer_FailWithJustification_SavesAndShowsAnsweredBy
+          - ChecklistPage_Answer_NoName_ShowsNameError
+
+      - id: ReviewCenter-ChecklistPage-Applicability
+        title: >-
+          The ChecklistPage unit shall let the reviewer mark the open section as not applying, asking for a
+          required reason and storing it when the reviewer saves, show such a section as not applicable with no
+          checks to answer and leave it out of the progress totals, show a violated rule next to the reason, and
+          let the reviewer mark the section as applying again.
+        justification: |
+          Sections that do not fit the review, such as code checks in a documentation-only review, must not
+          leave the checklist incomplete forever, but skipping one must be a visible, explained decision.
+        tests:
+          - ChecklistPage_Applicability_NotApplicableWithoutReason_ShowsError
+          - ChecklistPage_Applicability_NotApplicableWithReason_CountsAsDoneAndHidesChecks
+
+      - id: ReviewCenter-ChecklistPage-NextUnanswered
+        title: >-
+          The ChecklistPage unit shall offer, while checks are unanswered, a Next unanswered check button that
+          opens the section of the first unanswered check and scrolls to that check (skipping sections that are being
+          switched off, unless only those are left, when it opens the first of them at its reason field), offer the
+          same button at the
+          end of a finished section, and, once the checklist is complete, offer a link back to the review instead.
+        justification: |
+          The page tells the reviewer what to do next, so that they do not have to look for the one check that
+          is left, or scroll back to the top when a section is done.
+        tests:
+          - ChecklistPage_NextUnanswered_Click_OpensSectionOfFirstUnansweredCheck
+          - ChecklistPage_NextUnanswered_PendingNotApplicableSection_SkipsIt
+          - ChecklistPage_NextUnanswered_OnlyPendingNotApplicableSectionLeft_OpensItsReasonField
+          - ChecklistPage_Render_AllAnswered_ShowsCompleteAndNoNextAction
+          - ChecklistPage_FinishedSection_OffersNextActionAtItsEnd
+
+      - id: ReviewCenter-ChecklistPage-Interactive
+        title: >-
+          The ChecklistPage unit shall keep one section open at a time, give every interactive element a stable
+          lowercase hyphenated data-testid attribute, and report that it is interactive, through a marker on its
+          root element, once it has rendered on a live connection.
+        justification: |
+          One open section keeps the page short. Stable identifiers keep automated tests and the Puppet tool
+          working as the page evolves, and the marker tells them when the page responds.
+        tests:
+          - ChecklistPage_Render_OpeningSection_ClosesOthers
+          - ChecklistPage_Render_EveryInteractiveElementHasKebabCaseTestId
+          - ChecklistPage_AfterRender_Interactive_SetsMarker

@@ -40,14 +40,22 @@ public abstract class PageTestBase : BunitContext
     protected PageTestBase()
     {
         var store = new FakeReviewStore();
+        Store = store;
         var clock = new FixedTimeProvider(new DateTimeOffset(2025, 3, 4, 5, 6, 7, TimeSpan.Zero));
         Projects = new ProjectService(store, clock);
         Reviews = new ReviewService(store, clock);
         Threads = new ThreadService(store, clock);
+        Checklists = new ChecklistService(store, clock);
         Services.AddSingleton(Projects);
         Services.AddSingleton(Reviews);
         Services.AddSingleton(Threads);
+        Services.AddSingleton(Checklists);
     }
+
+    /// <summary>
+    ///     Gets the in-memory store behind the services, for arranging data the services would not create.
+    /// </summary>
+    internal FakeReviewStore Store { get; }
 
     /// <summary>
     ///     Gets the project service the pages use.
@@ -63,4 +71,9 @@ public abstract class PageTestBase : BunitContext
     ///     Gets the thread service the pages use.
     /// </summary>
     protected ThreadService Threads { get; }
+
+    /// <summary>
+    ///     Gets the checklist service the pages use.
+    /// </summary>
+    protected ChecklistService Checklists { get; }
 }

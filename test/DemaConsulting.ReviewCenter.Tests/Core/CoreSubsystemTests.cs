@@ -129,19 +129,23 @@ public class CoreSubsystemTests
         var projects = new ProjectService(store, new FixedTimeProvider(_now));
         var reviews = new ReviewService(store, new FixedTimeProvider(_now));
         var threads = new ThreadService(store, new FixedTimeProvider(_now));
+        var checklists = new ChecklistService(store, new FixedTimeProvider(_now));
         var project = await projects.CreateAsync("Apollo", null, TestContext.Current.CancellationToken);
         await reviews.CreateDraftAsync(
             project.Id, "rev-1", "First", [new("a.txt", TestContent.A)], TestContext.Current.CancellationToken);
 
         // Act: break the rule
         var exception = await Assert.ThrowsAsync<DomainRuleException>(
-            () => ViolateAsync(rule, projects, reviews, threads, project.Id));
+            () => ViolateAsync(rule, projects, reviews, threads, checklists, project.Id));
 
-        // Assert: the rule is named, and only the first valid project and review exist, with no thread
+        // Assert: the rule is named, and only the first valid project and review exist, with no thread or answer
         Assert.Equal(rule, exception.Rule);
         Assert.Single(await projects.ListAsync(TestContext.Current.CancellationToken));
         Assert.Single(store.Reviews);
         Assert.Empty(store.Threads);
+        Assert.Equal(
+            0,
+            (await checklists.GetAsync(project.Id, "rev-1", TestContext.Current.CancellationToken))!.Overall.Answered);
     }
 
     /// <summary>
@@ -152,6 +156,7 @@ public class CoreSubsystemTests
     /// <param name="projects">The project service.</param>
     /// <param name="reviews">The review service.</param>
     /// <param name="threads">The thread service.</param>
+    /// <param name="checklists">The checklist service.</param>
     /// <param name="projectId">The identity of the existing project.</param>
     /// <returns>The task of the request, which fails with the rule violation.</returns>
     private static Task ViolateAsync(
@@ -159,6 +164,7 @@ public class CoreSubsystemTests
         ProjectService projects,
         ReviewService reviews,
         ThreadService threads,
+        ChecklistService checklists,
         int projectId)
     {
         var cancellationToken = TestContext.Current.CancellationToken;
@@ -203,6 +209,14 @@ public class CoreSubsystemTests
             DomainRule.ThreadAnchorInvalid => threads.StartThreadAsync(
                 projectId, "rev-1", "a.txt", 1, 99, "Ann", "Text", cancellationToken),
             DomainRule.ThreadNotFound => threads.ResolveAsync(projectId, "rev-1", 99, cancellationToken),
+            DomainRule.ChecklistNotFound => checklists.SetAnswerAsync(
+                projectId, "no-such-review", "REQ-01", ChecklistOutcome.Pass, null, "Ann", cancellationToken),
+            DomainRule.ChecklistItemNotFound => checklists.SetAnswerAsync(
+                projectId, "rev-1", "NOPE-01", ChecklistOutcome.Pass, null, "Ann", cancellationToken),
+            DomainRule.ChecklistJustificationInvalid => checklists.SetAnswerAsync(
+                projectId, "rev-1", "REQ-01", ChecklistOutcome.Fail, " ", "Ann", cancellationToken),
+            DomainRule.ChecklistAnsweredByInvalid => checklists.SetAnswerAsync(
+                projectId, "rev-1", "REQ-01", ChecklistOutcome.Pass, null, " ", cancellationToken),
             _ => throw new NotSupportedException($"No violation is defined for the rule '{rule}'.")
         };
     }
@@ -246,5 +260,44 @@ public class CoreSubsystemTests
         Assert.Equal(["Ann", "Bob", "Ann"], reopened.Comments.Select(c => c.Author));
         Assert.Equal(["First", "Second", "Third"], reopened.Comments.Select(c => c.Text));
         Assert.All(reopened.Comments, comment => Assert.Equal(_now, comment.Created));
+    }
+
+    /// <summary>
+    ///     Test the checklist workflow: a review gets the default checklist when it is created, a failed check is
+    ///     answered with its justification, a section is marked as not applicable, and the progress and
+    ///     completeness follow.
+    /// </summary>
+    [Fact]
+    public async Task CoreSubsystem_Checklist_FrozenAtCreationAnswerAndProgress()
+    {
+        // Arrange: the services over one store, with a project and a review
+        var store = new FakeReviewStore();
+        var projects = new ProjectService(store, new FixedTimeProvider(_now));
+        var reviews = new ReviewService(store, new FixedTimeProvider(_now));
+        var checklists = new ChecklistService(store, new FixedTimeProvider(_now));
+        var project = await projects.CreateAsync("Apollo", null, TestContext.Current.CancellationToken);
+        await reviews.CreateDraftAsync(
+            project.Id, "rev-1", "First", [new("a.txt", TestContent.A)], TestContext.Current.CancellationToken);
+
+        // Act: read the new checklist, answer one check as failed, mark one section as not applicable, read again
+        var initial = await checklists.GetAsync(project.Id, "rev-1", TestContext.Current.CancellationToken);
+        await checklists.SetAnswerAsync(
+            project.Id, "rev-1", "REQ-01", ChecklistOutcome.Fail, " Two requirements share an id ", "Ann",
+            TestContext.Current.CancellationToken);
+        await checklists.SetSectionApplicabilityAsync(
+            project.Id, "rev-1", "DES", false, "No design files", "Ann", TestContext.Current.CancellationToken);
+        var after = await checklists.GetAsync(project.Id, "rev-1", TestContext.Current.CancellationToken);
+
+        // Assert: the review started with the whole default checklist
+        Assert.NotNull(initial);
+        Assert.Equal(DefaultChecklist.Version, initial.Definition.Version);
+        Assert.Equal(new ChecklistProgress(0, 58), initial.Overall);
+
+        // Assert: the failed answer counts as answered, the not-applicable section leaves the total, and the
+        // checklist is not complete yet
+        Assert.NotNull(after);
+        Assert.Equal("Two requirements share an id", after.AnswerFor("REQ-01")!.Justification);
+        Assert.Equal(new ChecklistProgress(1, 53), after.Overall);
+        Assert.False(after.IsComplete);
     }
 }
