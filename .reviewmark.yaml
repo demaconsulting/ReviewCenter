@@ -267,10 +267,8 @@ reviews:
       - "docs/design/review-center-puppet.md"
       - "docs/verification/introduction.md"
       - "docs/verification/review-center-puppet.md"
-      - "test/**/PuppetSystemTests.cs"
       - "test/**/PuppetEndToEndTests.cs"
       - "test/**/SequentialCollection.cs"
-      - "test/**/Fakes.cs"
 
   - id: ReviewCenterPuppet-Design
     title: Review of ReviewCenterPuppet architectural and design consistency
@@ -313,18 +311,28 @@ reviews:
       - "tools/puppet/PuppetProgram.cs"
       - "test/**/PuppetProgramTests.cs"
 
-  - id: ReviewCenterPuppet-StepRunner
-    title: Review of ReviewCenterPuppet StepRunner unit implementation
+  - id: ReviewCenterPuppet-ControlChannel
+    title: Review of ReviewCenterPuppet ControlChannel unit implementation
     context:
       - docs/design/review-center-puppet.md
       - docs/reqstream/review-center-puppet.yaml
     paths:
-      - "docs/reqstream/review-center-puppet/step-runner.yaml"
-      - "docs/design/review-center-puppet/step-runner.md"
-      - "docs/verification/review-center-puppet/step-runner.md"
-      - "tools/puppet/StepFile.cs"
-      - "tools/puppet/StepRunner.cs"
-      - "test/**/StepRunnerTests.cs"
+      - "docs/reqstream/review-center-puppet/control-channel.yaml"
+      - "docs/design/review-center-puppet/control-channel.md"
+      - "docs/verification/review-center-puppet/control-channel.md"
+      - "tools/puppet/ControlChannel.cs"
+      - "test/**/ControlChannelTests.cs"
+
+  - id: ReviewCenterPuppet-BrowserDaemon
+    title: Review of ReviewCenterPuppet BrowserDaemon unit implementation
+    context:
+      - docs/design/review-center-puppet.md
+      - docs/reqstream/review-center-puppet.yaml
+    paths:
+      - "docs/reqstream/review-center-puppet/browser-daemon.yaml"
+      - "docs/design/review-center-puppet/browser-daemon.md"
+      - "docs/verification/review-center-puppet/browser-daemon.md"
+      - "tools/puppet/BrowserDaemon.cs"
 
   - id: ReviewCenterPuppet-SelectorResolver
     title: Review of ReviewCenterPuppet SelectorResolver unit implementation
@@ -337,18 +345,6 @@ reviews:
       - "docs/verification/review-center-puppet/selector-resolver.md"
       - "tools/puppet/SelectorResolver.cs"
       - "test/**/SelectorResolverTests.cs"
-
-  - id: ReviewCenterPuppet-ServerProcess
-    title: Review of ReviewCenterPuppet ServerProcess unit implementation
-    context:
-      - docs/design/review-center-puppet.md
-      - docs/reqstream/review-center-puppet.yaml
-    paths:
-      - "docs/reqstream/review-center-puppet/server-process.yaml"
-      - "docs/design/review-center-puppet/server-process.md"
-      - "docs/verification/review-center-puppet/server-process.md"
-      - "tools/puppet/ServerProcess.cs"
-      - "test/**/ServerProcessTests.cs"
 
   - id: ReviewCenterPuppet-PlaywrightBrowser
     title: Review of ReviewCenterPuppet PlaywrightBrowser unit implementation

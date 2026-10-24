@@ -2,57 +2,48 @@
 
 ## Verification Approach
 
-System-level verification runs the whole Puppet pipeline in one test process through `PuppetProgram.RunAsync`:
-argument parsing, the steps file on disk, the `StepRunner`, selector resolution, and the teardown all take part. Only
-the server and the browser are replaced by fakes from `Fakes.cs`, so the system tests run on any machine, including
-build agents without Chromium. They assert on exit codes, captured output, the calls that reached the fake page, the
-files written, and how often the fakes were disposed.
+Puppet is verified by unit tests of its units plus ONE real end-to-end test; there are no fakes and no test-only
+abstractions. The unit tests call the units directly: argument parsing and result formatting in `PuppetProgram`,
+the request/response protocol and the stale-file ping in `ControlChannel`, selector resolution, and the browser-free
+helpers of `PlaywrightBrowser`.
 
-The production server and Playwright adapters are exercised by one real-browser end-to-end test,
-`PuppetEndToEnd_StepsFile_HelloAndCounter_WritesScreenshotAndReportsText`, which runs a steps file against the real
-ReviewCenter server in real headless Chromium. It is requirement-linked evidence for
-`ReviewCenterPuppet-System-RunSteps` and `ReviewCenterPuppet-OTS-Playwright-Chromium` on both platforms. The CI
-pipeline installs Chromium and sets `REVIEWCENTER_REQUIRE_CHROMIUM=true`, so a missing or broken browser fails the
-test instead of skipping it. Without that variable, as on a developer machine without Chromium, the test skips
-itself with a clear reason.
+The end-to-end test, `PuppetEndToEnd_StartDriveStop_HelloAndCounter_WorksAgainstRealServer`, starts the real
+ReviewCenter server on a free port, runs `puppet start`, drives the home page in real headless Chromium with separate
+commands, and stops Puppet again. It is requirement-linked evidence for the three system requirements,
+`ReviewCenterPuppet-BrowserDaemon-Lifecycle`, and `ReviewCenterPuppet-OTS-Playwright-Chromium` on both platforms.
+The CI pipeline installs Chromium and sets `REVIEWCENTER_REQUIRE_CHROMIUM=true`, so a missing or broken browser
+fails the test instead of skipping it. Without that variable, as on a developer machine without Chromium, the test
+skips itself with a clear reason.
 
 ## Test Environment
 
-The tests run on net10.0 on Windows and Linux. Each test uses its own temporary folder (`TempDirectory`). The
-end-to-end test and the `ServerProcess` test start the real server on a free loopback port, so the environment must
-allow that. Tests that bind ports or start processes belong to the serial `Sequential` xUnit collection and run one
-at a time. In CI the two test assemblies also run one after the other (`--max-parallel-test-modules 1`).
+The tests run on net10.0 on Windows and Linux. The end-to-end test starts the real server and the real daemon on
+free loopback ports and uses a private control file in a temporary folder, so it never touches the control file of a
+Puppet that a developer has running. Tests that bind ports or start processes belong to the serial `Sequential`
+xUnit collection and run one at a time. In CI the two test assemblies also run one after the other
+(`--max-parallel-test-modules 1`).
 
 ## Acceptance Criteria
 
-- All system tests pass with zero failures on all supported platforms.
-- A run whose steps all succeed returns exit code 0, prints one result line per step, and stops the server and the
-  browser once each.
-- A run with a failing step returns exit code 1, prints only the steps that ran, writes `failure-step-N.png`, and
-  still stops the server and the browser.
-- A browser that cannot launch returns exit code 2 with the message and still stops the server.
-- The end-to-end run produces a PNG screenshot and reports the greeting text and the counter value after two clicks.
+- All tests pass with zero failures on all supported platforms.
+- `puppet start` while Puppet is already running fails with exit code 1; `puppet stop` removes the control file and a
+  second `puppet stop` exits with code 2.
+- A hover stays in effect for later commands: after `hover`, a separate `screenshot` and `eval` still see the
+  element hovered, until `mouse-move` moves the mouse away.
+- A command that fails (for example an unknown element) exits with code 1 and a one-line message naming the selector.
+- The end-to-end run produces a PNG screenshot and reports the counter value after two clicks, after a `wait` for
+  the asynchronous update.
 
 ## Test Scenarios
 
-**ReviewCenterPuppet_Run_AllStepsSucceed_ExitsZeroAndStopsEverything**: A steps file with `goto`, `click`, and `text`
-runs over a fake server and a fake page. The exit code is 0, three result lines are printed (the last with the text
-`done`), the page was sent to the fake server URL, and the server and the page were each disposed once. Tested by
-`ReviewCenterPuppet_Run_AllStepsSucceed_ExitsZeroAndStopsEverything`.
+**PuppetEndToEnd_StartDriveStop_HelloAndCounter_WorksAgainstRealServer**: Starts Puppet, goes to the home page, and
+checks that `snapshot` lists the hello button. After `hover` on that button, a `screenshot` and an `eval` of
+`matches(':hover')` show it hovered, and after `mouse-move 0 0` it is not. Two `click` commands, `wait text=Count: 2`,
+and `text` show the counter. A click on a missing element exits with 1; `screenshot` writes a PNG; `viewport` and
+`theme dark` apply (checked with `eval`); `console` succeeds; `start` while running exits with 1; `stop` exits with 0
+and removes the control file; a second `stop` exits with 2. Tested by
+`windows@PuppetEndToEnd_StartDriveStop_HelloAndCounter_WorksAgainstRealServer` and
+`ubuntu@PuppetEndToEnd_StartDriveStop_HelloAndCounter_WorksAgainstRealServer`.
 
-**ReviewCenterPuppet_Run_StepFails_ExitsOneWithFailureScreenshotAndStopsEverything**: The second of three steps
-fails. The exit code is 1, two result lines are printed, `failure-step-2.png` exists, and the server and the page were
-each disposed once. Tested by `ReviewCenterPuppet_Run_StepFails_ExitsOneWithFailureScreenshotAndStopsEverything`.
-
-**ReviewCenterPuppet_Run_BrowserCannotLaunch_ExitsTwoAndStopsServer**: The browser launcher throws a
-`PuppetException`. The exit code is 2, the message is on the error stream, and the server was disposed once. Tested
-by `ReviewCenterPuppet_Run_BrowserCannotLaunch_ExitsTwoAndStopsServer`.
-
-**PuppetEndToEnd_StepsFile_HelloAndCounter_WritesScreenshotAndReportsText**: A steps file clicks the hello button,
-reads the greeting, clicks the counter button twice, reads the counter, and takes a screenshot, against the real
-server in real Chromium. The exit code is 0, the results contain "Hello from ReviewCenter!" and "2", and the screenshot
-is a PNG. Tested by `windows@PuppetEndToEnd_StepsFile_HelloAndCounter_WritesScreenshotAndReportsText` and
-`ubuntu@PuppetEndToEnd_StepsFile_HelloAndCounter_WritesScreenshotAndReportsText`.
-
-**Unit-level coverage**: Argument handling, steps-file validation, step execution, selector resolution, the server
-lifecycle, and the launch failure message are verified by the unit tests of the five units.
+**Unit-level coverage**: Argument handling and result formatting, the control channel, selector resolution, and the
+launch failure message are verified by the unit tests of the five units.

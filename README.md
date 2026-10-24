@@ -27,8 +27,8 @@ The current release provides:
 - **Self-Validation**: Built-in validation tests with TRX/JUnit output
 - **Multi-Platform Support**: Self-contained single-file executables for Windows (win-x64) and Linux (linux-x64)
 - **Modern .NET**: Built on .NET 10 (`net10.0`); the runtime is bundled, so no installation is needed
-- **Puppet Developer Tool**: A small in-repository helper for AI agents that runs a steps file against the web
-  interface and takes screenshots (see `tools/puppet/README.md`); not part of the distributed executables
+- **Puppet Developer Tool**: A small in-repository helper for AI agents that drives one persistent headless browser
+  one command at a time and takes screenshots (see `tools/puppet/README.md`); not part of the distributed executables
 - **Comprehensive CI/CD**: GitHub Actions workflows with quality checks, builds, and
   integration tests of the published executables
 - **Linting Enforcement**: markdownlint, cspell, and yamllint enforced on every CI run

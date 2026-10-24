@@ -18,59 +18,147 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
+using System.Globalization;
 using Microsoft.Playwright;
 
 namespace DemaConsulting.ReviewCenter.Puppet;
 
 /// <summary>
-///     Launches headless Chromium through Playwright and drives its single page.
+///     Drives one persistent headless Chromium and exposes it as commands.
 /// </summary>
 /// <remarks>
-///     Playwright downloads its browsers separately from the NuGet package. When Chromium has not been
-///     installed yet, launching fails with a cryptic message, so that case is detected and replaced
-///     with the exact command that fixes it.
+///     The Playwright objects live in one place: this class. Every command is a one-to-three line wrapper
+///     in <see cref="ExecuteAsync"/>. Playwright keeps the mouse position on the page, so a hover stays in
+///     effect until the next mouse command. There are no fixed sleeps: after a navigation the page's own
+///     <c>data-interactive</c> marker is awaited, and the caller uses <c>wait</c> after async updates.
 /// </remarks>
-internal static class PlaywrightBrowserLauncher
+internal sealed class PlaywrightBrowser : IAsyncDisposable
 {
     /// <summary>
-    ///     The width of the browser viewport in pixels; fixed so screenshots are reproducible.
+    ///     The default viewport, as <c>WxH</c>.
     /// </summary>
-    private const int ViewportWidth = 1280;
+    public const string DefaultViewport = "1280x800";
 
     /// <summary>
-    ///     The height of the browser viewport in pixels.
+    ///     The default timeout of an action in milliseconds; short so a bad selector fails fast.
     /// </summary>
-    private const int ViewportHeight = 720;
+    private const float ActionTimeoutMs = 5000;
 
     /// <summary>
-    ///     Launches headless Chromium with one blank page.
+    ///     The most buffered console/page/request events; the oldest are dropped.
     /// </summary>
-    /// <returns>The page; disposing it closes the browser.</returns>
-    /// <exception cref="PuppetException">Thrown when the browser cannot be launched.</exception>
-    public static async Task<IBrowserPage> LaunchAsync()
+    private const int MaxEvents = 200;
+
+    /// <summary>
+    ///     The longest <c>text</c> result in characters.
+    /// </summary>
+    private const int MaxText = 8000;
+
+    /// <summary>
+    ///     Lists the visible interactive or test-id elements, at most 200, one per line.
+    /// </summary>
+    private const string SnapshotScript = """
+        () => {
+          const lines = [];
+          const selector = 'a,button,input,select,textarea,summary,h1,h2,h3,[role],[data-testid],[tabindex]';
+          for (const e of document.querySelectorAll(selector)) {
+            const box = e.getBoundingClientRect();
+            if (box.width === 0 || box.height === 0 || getComputedStyle(e).visibility === 'hidden') continue;
+            const name = (e.getAttribute('aria-label') || e.innerText || e.value || e.placeholder || '')
+              .trim().replace(/\s+/g, ' ').slice(0, 60);
+            const flags = (e.disabled ? ' disabled' : '') + (e.checked ? ' checked' : '');
+            lines.push(e.tagName.toLowerCase() + (e.getAttribute('role') ? ' role=' + e.getAttribute('role') : '') +
+              ' "' + name + '"' + (e.dataset.testid ? ' testid=' + e.dataset.testid : '') + flags);
+          }
+          if (lines.length > 200) { const more = lines.length - 200; lines.length = 200; lines.push('... ' + more + ' more not shown'); }
+          return lines.join('\n') || '(no visible elements)';
+        }
+        """;
+
+    private readonly IPlaywright _playwright;
+    private readonly IBrowser _browser;
+    private readonly string? _baseUrl;
+    private readonly List<string> _events = [];
+
+    /// <summary>
+    ///     How many buffered events were already reported to the caller.
+    /// </summary>
+    private int _reported;
+
+    // Remembered so that reset keeps the viewport and the color scheme
+    private ViewportSize _viewport;
+    private ColorScheme _scheme = ColorScheme.Light;
+    private IBrowserContext _context = null!;
+    private IPage _page = null!;
+
+    private PlaywrightBrowser(IPlaywright playwright, IBrowser browser, string? baseUrl, ViewportSize viewport)
     {
-        IPlaywright? playwright = null;
-        IBrowser? browser = null;
+        _playwright = playwright;
+        _browser = browser;
+        _baseUrl = baseUrl;
+        _viewport = viewport;
+    }
+
+    /// <summary>
+    ///     Launches Chromium with one blank page.
+    /// </summary>
+    /// <param name="baseUrl">The base URL for relative <c>goto</c> paths, or <c>null</c>.</param>
+    /// <param name="viewport">The viewport as <c>WxH</c>.</param>
+    /// <param name="headed">Whether to show the browser window.</param>
+    /// <returns>The browser; disposing it closes Chromium.</returns>
+    /// <exception cref="PuppetException">Thrown when the browser cannot be launched.</exception>
+    public static async Task<PlaywrightBrowser> LaunchAsync(string? baseUrl, string viewport, bool headed)
+    {
+        var size = ParseViewport(viewport);
+        var playwright = await Playwright.CreateAsync();
         try
         {
-            playwright = await Playwright.CreateAsync();
-            browser = await playwright.Chromium.LaunchAsync(new BrowserTypeLaunchOptions { Headless = true });
-            var context = await browser.NewContextAsync(new BrowserNewContextOptions
-            {
-                ViewportSize = new ViewportSize { Width = ViewportWidth, Height = ViewportHeight }
-            });
-            return new PlaywrightPage(playwright, browser, await context.NewPageAsync());
+            var browser = await playwright.Chromium.LaunchAsync(new BrowserTypeLaunchOptions { Headless = !headed });
+            var result = new PlaywrightBrowser(playwright, browser, baseUrl, size);
+            await result.NewPageAsync();
+            return result;
         }
         catch (PlaywrightException ex)
         {
-            if (browser is not null)
-            {
-                await browser.DisposeAsync();
-            }
-
-            playwright?.Dispose();
-            throw new PuppetException(DescribeLaunchFailure(ex), ex);
+            playwright.Dispose();
+            throw new PuppetException(DescribeLaunchFailure(ex));
         }
+    }
+
+    /// <summary>
+    ///     Parses a viewport such as <c>1280x800</c>.
+    /// </summary>
+    /// <param name="text">The text.</param>
+    /// <returns>The size.</returns>
+    /// <exception cref="PuppetException">Thrown when the text is not <c>WxH</c> with positive whole numbers.</exception>
+    public static ViewportSize ParseViewport(string text)
+    {
+        var parts = text.Split('x');
+        if (parts.Length == 2 && int.TryParse(parts[0], out var width) && int.TryParse(parts[1], out var height) && width > 0 && height > 0)
+        {
+            return new ViewportSize { Width = width, Height = height };
+        }
+
+        throw new PuppetException($"The viewport must look like 1280x800, not '{text}'.");
+    }
+
+    /// <summary>
+    ///     Resolves the argument of <c>goto</c> to an absolute URL.
+    /// </summary>
+    /// <param name="target">An absolute http(s) URL, or a path relative to the base URL.</param>
+    /// <param name="baseUrl">The base URL, or <c>null</c> when none was given.</param>
+    /// <returns>The absolute URL.</returns>
+    /// <exception cref="PuppetException">Thrown for a relative path without a base URL.</exception>
+    public static string ResolveUrl(string target, string? baseUrl)
+    {
+        if (Uri.TryCreate(target, UriKind.Absolute, out var uri) && uri.Scheme is "http" or "https")
+        {
+            return target;
+        }
+
+        return baseUrl is null
+            ? throw new PuppetException($"'{target}' is not an absolute URL; start Puppet with --url <base-url> to use paths.")
+            : $"{baseUrl.TrimEnd('/')}/{target.TrimStart('/')}";
     }
 
     /// <summary>
@@ -80,7 +168,7 @@ internal static class PlaywrightBrowserLauncher
     /// <returns>
     ///     The exact install command when Chromium is not installed; otherwise the first line of the failure.
     /// </returns>
-    internal static string DescribeLaunchFailure(PlaywrightException exception)
+    public static string DescribeLaunchFailure(PlaywrightException exception)
     {
         // Playwright reports a missing browser binary with this wording
         if (exception.Message.Contains("Executable doesn't exist", StringComparison.OrdinalIgnoreCase) ||
@@ -98,92 +186,97 @@ internal static class PlaywrightBrowserLauncher
     /// </summary>
     /// <param name="message">The message.</param>
     /// <returns>The text up to the first line break.</returns>
-    internal static string FirstLine(string message)
+    public static string FirstLine(string message)
     {
         var index = message.IndexOfAny(['\r', '\n']);
         return index < 0 ? message : message[..index];
     }
-}
-
-/// <summary>
-///     <see cref="IBrowserPage"/> implemented on a Playwright page.
-/// </summary>
-/// <remarks>
-///     Translates Playwright's exceptions into <see cref="PuppetException"/> messages that name the
-///     selector and the timeout, so a failed step tells the user what to fix. Disposing it closes the
-///     browser and releases Playwright.
-/// </remarks>
-/// <param name="playwright">The Playwright instance; disposed with the page.</param>
-/// <param name="browser">The browser; closed with the page.</param>
-/// <param name="page">The Playwright page.</param>
-internal sealed class PlaywrightPage(IPlaywright playwright, IBrowser browser, IPage page) : IBrowserPage
-{
-    /// <summary>
-    ///     The attribute ReviewCenter pages use to report that their live connection is established.
-    /// </summary>
-    private const string InteractiveAttribute = "data-interactive";
 
     /// <summary>
-    ///     How long to let the page settle after a click or fill. A Blazor Server page re-renders over its
-    ///     live connection after the event returns, so a text step that follows immediately could read the
-    ///     old value; a short pause is the simplest remedy.
+    ///     Runs one command on the page.
     /// </summary>
-    private const float SettleMs = 300;
-
-    /// <inheritdoc />
-    public Task GotoAsync(string url, int timeoutMs)
+    /// <param name="request">The command; the client has already checked its argument count.</param>
+    /// <returns>The result text.</returns>
+    /// <exception cref="PuppetException">Thrown when the command fails or times out.</exception>
+    public async Task<string> ExecuteAsync(PuppetRequest request)
     {
-        return GuardAsync($"loading {url}", timeoutMs, async () =>
+        var a = request.Args;
+        var timeout = request.Options.TryGetValue("timeout", out var t) ? Number(t) : ActionTimeoutMs;
+        var navigation = request.Command is "goto" or "reload" or "back";
+        try
         {
-            await page.GotoAsync(url, new PageGotoOptions { Timeout = timeoutMs });
-
-            // A Blazor Server page is static HTML until its circuit connects; clicking before then does
-            // nothing, so wait for the page's own marker instead of guessing with a sleep
-            if (await page.Locator($"[{InteractiveAttribute}]").CountAsync() > 0)
+            switch (request.Command)
             {
-                await page.Locator($"[{InteractiveAttribute}='true']").First
-                    .WaitForAsync(new LocatorWaitForOptions { Timeout = timeoutMs });
+                case "goto": return await StatusAsync(await _page.GotoAsync(ResolveUrl(a[0], _baseUrl)));
+                case "reload": return await StatusAsync(await _page.ReloadAsync());
+                case "back": await _page.GoBackAsync(); await WaitInteractiveAsync(); return "ok";
+                case "click": await Find(a[0]).ClickAsync(); return "ok";
+                case "dblclick": await Find(a[0]).DblClickAsync(); return "ok";
+                case "hover": await Find(a[0]).HoverAsync(); return "ok";
+                case "fill": await Find(a[0]).FillAsync(a[1]); return "ok";
+                case "press": await (a.Length > 1 ? Find(a[1]).PressAsync(a[0]) : _page.Keyboard.PressAsync(a[0])); return "ok";
+                case "type": await _page.Keyboard.TypeAsync(a[0]); return "ok";
+                case "select": await Find(a[0]).SelectOptionAsync(a[1]); return "ok";
+                case "check": await Find(a[0]).CheckAsync(); return "ok";
+                case "uncheck": await Find(a[0]).UncheckAsync(); return "ok";
+                case "upload": await Find(a[0]).SetInputFilesAsync(a[1]); return "ok";
+                case "mouse-move": await _page.Mouse.MoveAsync(Number(a[0]), Number(a[1])); return "ok";
+                case "mouse-click": await _page.Mouse.ClickAsync(Number(a[0]), Number(a[1])); return "ok";
+                case "wait": await Find(a[0]).First.WaitForAsync(new LocatorWaitForOptions { Timeout = timeout }); return "ok";
+                case "text": return await TextAsync(a.FirstOrDefault());
+                case "snapshot": return await _page.EvaluateAsync<string>(SnapshotScript);
+                case "screenshot": return await ScreenshotAsync(a[0], request.Options);
+                case "viewport":
+                    _viewport = ParseViewport(a[0]);
+                    await _page.SetViewportSizeAsync(_viewport.Width, _viewport.Height);
+                    return "ok";
+                case "theme":
+                    _scheme = a[0] == "dark" ? ColorScheme.Dark : ColorScheme.Light;
+                    await _page.EmulateMediaAsync(new PageEmulateMediaOptions { ColorScheme = _scheme });
+                    return "ok";
+                case "eval": return await _page.EvaluateAsync<string?>("e => JSON.stringify(window.eval(e))", a[0]) ?? "null";
+                case "console": return ConsoleText();
+                case "reset": await _context.CloseAsync(); await NewPageAsync(); return "ok";
+                default: throw new PuppetException($"Unknown command '{request.Command}'.");
             }
-        });
-    }
-
-    /// <inheritdoc />
-    public Task ClickAsync(string selector, int timeoutMs)
-    {
-        // Playwright waits for the element to exist and be clickable, up to the timeout
-        return GuardAsync($"clicking {selector}", timeoutMs, async () =>
+        }
+        catch (TimeoutException)
         {
-            await page.Locator(selector).ClickAsync(new LocatorClickOptions { Timeout = timeoutMs });
-            await page.WaitForTimeoutAsync(SettleMs);
-        });
-    }
-
-    /// <inheritdoc />
-    public Task FillAsync(string selector, string text, int timeoutMs)
-    {
-        return GuardAsync($"filling {selector}", timeoutMs, async () =>
+            throw new PuppetException(navigation
+                ? $"navigation failed: timed out loading {a.FirstOrDefault() ?? "the page"}"
+                : $"{request.Command} timed out after {timeout:0}ms (selector not found or not actionable): {string.Join(' ', a)}");
+        }
+        catch (PlaywrightException ex)
         {
-            await page.Locator(selector).FillAsync(text, new LocatorFillOptions { Timeout = timeoutMs });
-            await page.WaitForTimeoutAsync(SettleMs);
-        });
+            throw new PuppetException($"{(navigation ? "navigation" : request.Command)} failed: {FirstLine(ex.Message)}");
+        }
     }
 
-    /// <inheritdoc />
-    public async Task<string> TextAsync(string selector, int timeoutMs)
+    /// <summary>
+    ///     Gets the current URL and title; empty strings when the page cannot be queried (for example mid-navigation).
+    /// </summary>
+    /// <returns>The URL and title.</returns>
+    public async Task<(string Url, string Title)> UrlAndTitleAsync()
     {
-        var text = string.Empty;
-        await GuardAsync($"reading {selector}", timeoutMs, async () =>
-            text = await page.Locator(selector).InnerTextAsync(new LocatorInnerTextOptions { Timeout = timeoutMs }));
-        return text;
+        try
+        {
+            return (_page.Url, await _page.TitleAsync());
+        }
+        catch (PlaywrightException)
+        {
+            return (string.Empty, string.Empty);
+        }
     }
 
-    /// <inheritdoc />
-    public async Task<byte[]> ScreenshotAsync(bool fullPage, int timeoutMs)
+    /// <summary>
+    ///     Gets the events recorded since the previous call and marks them as reported.
+    /// </summary>
+    /// <returns>The new events.</returns>
+    public string[] TakeNewEvents()
     {
-        var bytes = Array.Empty<byte>();
-        await GuardAsync("taking a screenshot", timeoutMs, async () =>
-            bytes = await page.ScreenshotAsync(new PageScreenshotOptions { FullPage = fullPage, Type = ScreenshotType.Png, Timeout = timeoutMs }));
-        return bytes;
+        var events = _events.Skip(_reported).ToArray();
+        _reported = _events.Count;
+        return events;
     }
 
     /// <summary>
@@ -192,39 +285,99 @@ internal sealed class PlaywrightPage(IPlaywright playwright, IBrowser browser, I
     /// <returns>A task that completes when everything is released.</returns>
     public async ValueTask DisposeAsync()
     {
-        try
-        {
-            await browser.CloseAsync();
-        }
-        catch (PlaywrightException)
-        {
-            // The browser already went away; releasing Playwright below finishes the cleanup
-        }
+        await _browser.CloseAsync();
+        _playwright.Dispose();
+    }
 
-        playwright.Dispose();
+    private static float Number(string text)
+    {
+        return float.Parse(text, CultureInfo.InvariantCulture);
+    }
+
+    private ILocator Find(string selector)
+    {
+        return _page.Locator(SelectorResolver.Resolve(selector));
     }
 
     /// <summary>
-    ///     Runs a Playwright operation and converts its failures to user messages.
+    ///     Waits for a Blazor Server page's live connection, so a click is not lost on static HTML.
     /// </summary>
-    /// <param name="what">What the operation does, for messages (for example "clicking [data-testid=\"x\"]").</param>
-    /// <param name="timeoutMs">The timeout, for messages.</param>
-    /// <param name="operation">The operation to run.</param>
-    /// <returns>A task that completes when the operation has finished.</returns>
-    /// <exception cref="PuppetException">Thrown when the operation times out or fails.</exception>
-    private static async Task GuardAsync(string what, int timeoutMs, Func<Task> operation)
+    /// <returns>A task that completes when the page is interactive (or has no such marker).</returns>
+    private async Task WaitInteractiveAsync()
     {
-        try
+        if (await _page.Locator("[data-interactive]").CountAsync() > 0)
         {
-            await operation();
+            await _page.Locator("[data-interactive='true']").First.WaitForAsync();
         }
-        catch (TimeoutException)
+    }
+
+    private async Task<string> StatusAsync(IResponse? response)
+    {
+        await WaitInteractiveAsync();
+        return response is null ? "ok" : $"HTTP {response.Status}";
+    }
+
+    private async Task<string> TextAsync(string? selector)
+    {
+        var text = selector is null ? await _page.InnerTextAsync("body") : await Find(selector).InnerTextAsync();
+        return text.Length > MaxText ? $"{text[..MaxText]}\n... truncated at {MaxText} characters" : text;
+    }
+
+    /// <summary>
+    ///     Saves a screenshot of the page or of one element; it never moves the mouse.
+    /// </summary>
+    /// <param name="file">The absolute PNG path.</param>
+    /// <param name="options">Optional <c>full</c> and <c>selector</c>.</param>
+    /// <returns>The path and size.</returns>
+    private async Task<string> ScreenshotAsync(string file, Dictionary<string, string> options)
+    {
+        if (options.TryGetValue("selector", out var selector))
         {
-            throw new PuppetException($"Timed out after {timeoutMs / 1000.0:0.#} s {what}.");
+            await Find(selector).ScreenshotAsync(new LocatorScreenshotOptions { Path = file, Scale = ScreenshotScale.Css });
         }
-        catch (PlaywrightException ex)
+        else
         {
-            throw new PuppetException($"Problem {what}: {PlaywrightBrowserLauncher.FirstLine(ex.Message)}", ex);
+            await _page.ScreenshotAsync(new PageScreenshotOptions { Path = file, FullPage = options.ContainsKey("full"), Scale = ScreenshotScale.Css });
         }
+
+        return $"{file} ({new FileInfo(file).Length} bytes)";
+    }
+
+    /// <summary>
+    ///     Lists the last 50 buffered events and marks everything as reported.
+    /// </summary>
+    /// <returns>The events, one per line.</returns>
+    private string ConsoleText()
+    {
+        _reported = _events.Count;
+        return _events.Count == 0 ? "(no console errors, page errors, or failed requests)" : string.Join('\n', _events.TakeLast(50));
+    }
+
+    private void Record(string text)
+    {
+        if (_events.Count >= MaxEvents)
+        {
+            _events.RemoveAt(0);
+            _reported = Math.Max(0, _reported - 1);
+        }
+
+        _events.Add(text);
+    }
+
+    /// <summary>
+    ///     Creates a context and page with the remembered viewport and color scheme, and starts recording events.
+    /// </summary>
+    /// <returns>A task that completes when the page exists.</returns>
+    private async Task NewPageAsync()
+    {
+        _events.Clear();
+        _reported = 0;
+        _context = await _browser.NewContextAsync(new BrowserNewContextOptions { ViewportSize = _viewport, ColorScheme = _scheme });
+        _context.SetDefaultTimeout(ActionTimeoutMs);
+        _context.SetDefaultNavigationTimeout(30000);
+        _page = await _context.NewPageAsync();
+        _page.Console += (_, m) => { if (m.Type == "error") { Record($"console.error: {m.Text}"); } };
+        _page.PageError += (_, m) => Record($"pageerror: {FirstLine(m)}");
+        _page.RequestFailed += (_, r) => Record($"requestfailed: {r.Method} {r.Url} {r.Failure}");
     }
 }

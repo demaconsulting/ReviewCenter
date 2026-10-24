@@ -3,7 +3,7 @@
 #
 # PURPOSE:
 # - Define requirements for the PuppetProgram unit (tools/puppet/PuppetProgram.cs)
-# - PuppetProgram parses the command line and runs the steps file with guaranteed teardown
+# - PuppetProgram parses the command line, starts the daemon, sends one command to it, and prints the result
 
 sections:
   - title: ReviewCenterPuppet Requirements
@@ -12,13 +12,24 @@ sections:
         requirements:
           - id: ReviewCenterPuppet-PuppetProgram-Arguments
             title: >-
-              The PuppetProgram unit shall accept the run command with a steps file, the server, URL, output
-              folder, and timeout options, print usage for help, and reject unknown or malformed arguments
-              with a clear message and exit code 2.
+              The PuppetProgram unit shall accept the documented commands with their arguments and options,
+              and reject an unknown command or option, a wrong argument count, or a malformed value with a
+              one-line usage message and exit code 2.
             justification: |
               The command line is the only interface of the tool, and a coding agent corrects its next call
-              from the message it gets back. Exit code 2 separates "could not run" from a failed step.
+              from the message it gets back. Exit code 2 separates "could not run" from a failed command.
             tests:
-              - PuppetProgram_Run_Help_PrintsUsageAndExitsZero
-              - PuppetProgram_Run_BadArguments_ExitsTwoWithMessage
-              - PuppetProgram_Run_UrlOption_UsesGivenServerWithoutStartingOne
+              - PuppetProgram_ParseCommand_ValidCommands_BuildRequests
+              - PuppetProgram_Run_BadArguments_ExitsTwoWithUsage
+
+          - id: ReviewCenterPuppet-PuppetProgram-Results
+            title: >-
+              The PuppetProgram unit shall print the result of a command followed by the page URL, the page
+              title, and one line per new browser error, exit with 0 for a successful command and 1 for a
+              failed one, and exit with 2 and a start hint when no browser is running.
+            justification: |
+              The agent decides its next step from the result line and the page state, so both are printed
+              after every command; the exit code tells it at once whether the command worked.
+            tests:
+              - PuppetProgram_Format_ResultUrlTitleAndErrors_PrintsFooter
+              - PuppetProgram_Run_NotRunning_ExitsTwoWithStartHint

@@ -48,19 +48,6 @@
     </PackageReference>
   </ItemGroup>
 
-  <!-- The server is started by the Puppet as a separate process. Referencing the project with
-       ReferenceOutputAssembly=false makes sure the server is built first without linking its assembly. -->
-  <ItemGroup>
-    <ProjectReference Include="..\..\src\DemaConsulting.ReviewCenter\DemaConsulting.ReviewCenter.csproj"
-                      ReferenceOutputAssembly="false" />
-  </ItemGroup>
-
-  <!-- Record where the freshly built server assembly lives so 'run' works without extra arguments -->
-  <ItemGroup>
-    <AssemblyMetadata Include="ServerDllPath"
-                      Value="$([MSBuild]::NormalizePath('$(MSBuildThisFileDirectory)', '..', '..', 'src', 'DemaConsulting.ReviewCenter', 'bin', '$(Configuration)', '$(TargetFramework)', 'DemaConsulting.ReviewCenter.dll'))" />
-  </ItemGroup>
-
   <ItemGroup>
     <InternalsVisibleTo Include="DemaConsulting.ReviewCenter.Puppet.Tests" />
   </ItemGroup>

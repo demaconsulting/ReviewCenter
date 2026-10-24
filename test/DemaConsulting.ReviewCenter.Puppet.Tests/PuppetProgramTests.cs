@@ -21,90 +21,138 @@
 namespace DemaConsulting.ReviewCenter.Puppet.Tests;
 
 /// <summary>
-///     Unit tests for the command-line handling of <see cref="PuppetProgram"/>, using fake collaborators.
+///     Unit tests for the argument parsing and output formatting of <see cref="PuppetProgram"/>.
 /// </summary>
 public class PuppetProgramTests
 {
     /// <summary>
-    ///     Test that --help prints the usage and succeeds.
+    ///     Test that valid command lines become the expected requests.
     /// </summary>
     [Fact]
-    public async Task PuppetProgram_Run_Help_PrintsUsageAndExitsZero()
+    public void PuppetProgram_ParseCommand_ValidCommands_BuildRequests()
     {
-        // Arrange: collaborators that must not be used
+        // Arrange and act: parse a representative set of command lines
+        var go = PuppetProgram.ParseCommand(["goto", "/about"]);
+        var press = PuppetProgram.ParseCommand(["press", "Enter", "testid:name"]);
+        var pressKey = PuppetProgram.ParseCommand(["press", "Escape"]);
+        var wait = PuppetProgram.ParseCommand(["wait", "text=Count: 2", "--timeout", "1500"]);
+        var shot = PuppetProgram.ParseCommand(["screenshot", "shot.png", "--full", "--selector", "hello-button"]);
+        var theme = PuppetProgram.ParseCommand(["theme", "dark"]);
+        var start = PuppetProgram.ParseCommand(["start", "--url", "http://127.0.0.1:5199/", "--viewport", "390x800", "--headed"]);
+
+        // Assert: arguments and options are split, files are absolute, and the start URL loses its trailing slash
+        Assert.Equal("goto", go.Command);
+        Assert.Equal(["/about"], go.Args);
+        Assert.Equal(["Enter", "testid:name"], press.Args);
+        Assert.Equal(["Escape"], pressKey.Args);
+        Assert.Equal(("wait", "1500"), (wait.Command, wait.Options["timeout"]));
+        Assert.Equal(Path.GetFullPath("shot.png"), shot.Args[0]);
+        Assert.Equal(("true", "hello-button"), (shot.Options["full"], shot.Options["selector"]));
+        Assert.Equal(["dark"], theme.Args);
+        Assert.Equal("http://127.0.0.1:5199", start.Options["url"]);
+        Assert.Equal(("390x800", "true"), (start.Options["viewport"], start.Options["headed"]));
+    }
+
+    /// <summary>
+    ///     Test that bad command lines exit with 2 and a usage message, and that help succeeds.
+    /// </summary>
+    /// <returns>A task that completes when the test has finished.</returns>
+    [Fact]
+    public async Task PuppetProgram_Run_BadArguments_ExitsTwoWithUsage()
+    {
+        // Arrange: bad command lines with the message each must produce
+        var cases = new (string CommandLine, string Message)[]
+        {
+            ("", "Usage: puppet"),
+            ("bogus", "Unknown command 'bogus'"),
+            ("click", "Usage: puppet click <selector>"),
+            ("click a b", "Usage: puppet click <selector>"),
+            ("click a --bogus", "Unknown option '--bogus'"),
+            ("wait a --timeout", "needs a value"),
+            ("wait a --timeout 0", "--timeout must be"),
+            ("viewport wide", "viewport must look like"),
+            ("theme blue", "theme must be light or dark"),
+            ("upload a missing-file.txt", "does not exist"),
+            ("start --url nope", "--url must be an absolute"),
+        };
+
+        foreach (var (commandLine, message) in cases)
+        {
+            var error = new StringWriter();
+
+            // Act: run it (nothing is started because parsing fails first)
+            var exitCode = await PuppetProgram.RunAsync(
+                commandLine.Split(' ', StringSplitOptions.RemoveEmptyEntries),
+                new StringWriter(),
+                error,
+                NoControlFile(),
+                TestContext.Current.CancellationToken);
+
+            // Assert: exit code 2 and a message that names the problem
+            Assert.Equal(2, exitCode);
+            Assert.Contains(message, error.ToString(), StringComparison.Ordinal);
+        }
+
+        // Assert: help prints the usage and succeeds
         var output = new StringWriter();
-
-        // Act: ask for help
-        var exitCode = await PuppetProgram.RunAsync(["--help"], output, new StringWriter(), NoServices(), TestContext.Current.CancellationToken);
-
-        // Assert: usage is printed
-        Assert.Equal(0, exitCode);
-        Assert.Contains("Usage: puppet run", output.ToString(), StringComparison.Ordinal);
+        Assert.Equal(0, await PuppetProgram.RunAsync(["--help"], output, new StringWriter(), NoControlFile(), TestContext.Current.CancellationToken));
+        Assert.Contains("puppet screenshot", output.ToString(), StringComparison.Ordinal);
     }
 
     /// <summary>
-    ///     Test that bad arguments are rejected with exit code 2 and a message.
+    ///     Test that a command without a running Puppet exits with 2 and says how to start it.
     /// </summary>
-    /// <param name="commandLine">The arguments, separated by spaces.</param>
-    /// <param name="expectedMessage">A fragment of the expected message.</param>
-    [Theory]
-    [InlineData("", "Expected the verb 'run'")]
-    [InlineData("start steps.json", "Expected the verb 'run'")]
-    [InlineData("run", "steps file is missing")]
-    [InlineData("run steps.json --bogus", "Unexpected argument '--bogus'")]
-    [InlineData("run steps.json --timeout 0", "--timeout must be")]
-    [InlineData("run steps.json --out", "needs a value")]
-    [InlineData("run steps.json --url http://x --server-dll y.dll", "cannot be used together")]
-    [InlineData("run does-not-exist.json", "Cannot read the steps file")]
-    public async Task PuppetProgram_Run_BadArguments_ExitsTwoWithMessage(string commandLine, string expectedMessage)
+    /// <returns>A task that completes when the test has finished.</returns>
+    [Fact]
+    public async Task PuppetProgram_Run_NotRunning_ExitsTwoWithStartHint()
     {
-        // Arrange: a bad command line and collaborators that must not be used
-        var error = new StringWriter();
-        var args = commandLine.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        // Arrange: no control file at all, then a stale one whose port nobody listens on
+        var controlFile = NoControlFile();
+        var absent = new StringWriter();
+        var stale = new StringWriter();
 
-        // Act: run it
-        var exitCode = await PuppetProgram.RunAsync(args, new StringWriter(), error, NoServices(), TestContext.Current.CancellationToken);
+        // Act: send a command in both situations
+        var absentCode = await PuppetProgram.RunAsync(["snapshot"], new StringWriter(), absent, controlFile, TestContext.Current.CancellationToken);
+        ControlChannel.Write(controlFile, new ControlInfo(1, null, null));
+        var staleCode = await PuppetProgram.RunAsync(["snapshot"], new StringWriter(), stale, controlFile, TestContext.Current.CancellationToken);
+        File.Delete(controlFile);
 
-        // Assert: exit code 2 and a message that names the problem
-        Assert.Equal(2, exitCode);
-        Assert.Contains(expectedMessage, error.ToString(), StringComparison.Ordinal);
+        // Assert: both exit with 2 and point at 'puppet start'
+        Assert.Equal(2, absentCode);
+        Assert.Equal(2, staleCode);
+        Assert.Contains("puppet start", absent.ToString(), StringComparison.Ordinal);
+        Assert.Contains("puppet start", stale.ToString(), StringComparison.Ordinal);
     }
 
     /// <summary>
-    ///     Test that --url drives the given server without starting one.
+    ///     Test that a response prints its result, the URL and title line, and the new errors, with the right exit code.
     /// </summary>
     [Fact]
-    public async Task PuppetProgram_Run_UrlOption_UsesGivenServerWithoutStartingOne()
+    public void PuppetProgram_Format_ResultUrlTitleAndErrors_PrintsFooter()
     {
-        // Arrange: a steps file, a fake browser, and a server starter that fails the test if called
-        using var directory = new TempDirectory();
-        var steps = directory.WriteFile("steps.json", """[{ "kind": "goto", "url": "/about" }]""");
-        var page = new FakeBrowserPage();
-        var services = new PuppetServices(
-            (_, _) => throw new InvalidOperationException("The server must not be started."),
-            () => Task.FromResult<IBrowserPage>(page));
+        // Arrange: a successful multi-line result with one new error, and a failure
+        var ok = new PuppetResponse(true, "line 1\nline 2", "http://x/", "Title", ["console.error: boom"]);
+        var failed = new PuppetResponse(false, "click timed out", "http://x/", "Title", []);
+        var output = new StringWriter();
+        var error = new StringWriter();
 
-        // Act: run against an existing server
-        var exitCode = await PuppetProgram.RunAsync(
-            ["run", steps, "--url", "http://localhost:5000/", "--out", directory.Path],
-            new StringWriter(),
-            new StringWriter(),
-            services,
-            TestContext.Current.CancellationToken);
+        // Act: format both
+        var okCode = PuppetProgram.Format(ok, output, error);
+        var failedCode = PuppetProgram.Format(failed, new StringWriter(), error);
 
-        // Assert: the page was driven at the given URL
-        Assert.Equal(0, exitCode);
-        Assert.Equal(["goto http://localhost:5000/about"], page.Calls);
+        // Assert: the result, the footer, and the event line are printed; a failure goes to stderr with exit code 1
+        Assert.Equal(0, okCode);
+        Assert.Equal($"line 1\nline 2\n@ http://x/  \"Title\"\n! console.error: boom\n".ReplaceLineEndings(), output.ToString().ReplaceLineEndings());
+        Assert.Equal(1, failedCode);
+        Assert.Equal("click timed out", error.ToString().Trim());
     }
 
     /// <summary>
-    ///     Creates services that fail the test if they are used.
+    ///     Gets a control file path that does not exist.
     /// </summary>
-    /// <returns>The services.</returns>
-    private static PuppetServices NoServices()
+    /// <returns>A unique path in the temp folder.</returns>
+    private static string NoControlFile()
     {
-        return new PuppetServices(
-            (_, _) => throw new InvalidOperationException("The server must not be started."),
-            () => throw new InvalidOperationException("The browser must not be launched."));
+        return Path.Combine(Path.GetTempPath(), $"puppet-tests-{Guid.NewGuid():N}.json");
     }
 }

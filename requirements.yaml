@@ -24,9 +24,9 @@ includes:
   - docs/reqstream/review-center/platform-requirements.yaml
   - docs/reqstream/review-center-puppet.yaml
   - docs/reqstream/review-center-puppet/puppet-program.yaml
-  - docs/reqstream/review-center-puppet/step-runner.yaml
+  - docs/reqstream/review-center-puppet/control-channel.yaml
+  - docs/reqstream/review-center-puppet/browser-daemon.yaml
   - docs/reqstream/review-center-puppet/selector-resolver.yaml
-  - docs/reqstream/review-center-puppet/server-process.yaml
   - docs/reqstream/review-center-puppet/playwright-browser.yaml
   - docs/reqstream/ots/xunit.yaml
   - docs/reqstream/ots/aspnetcore.yaml

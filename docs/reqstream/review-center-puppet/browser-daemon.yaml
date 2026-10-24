@@ -1,0 +1,24 @@
+---
+# BrowserDaemon Unit Requirements
+#
+# PURPOSE:
+# - Define requirements for the BrowserDaemon unit (tools/puppet/BrowserDaemon.cs)
+# - BrowserDaemon is the long-lived process that owns the browser and serves commands
+# - Its behavior is proven by the end-to-end test linked to the system requirements
+
+sections:
+  - title: ReviewCenterPuppet Requirements
+    sections:
+      - title: BrowserDaemon Requirements
+        requirements:
+          - id: ReviewCenterPuppet-BrowserDaemon-Lifecycle
+            title: >-
+              The BrowserDaemon unit shall launch the browser, publish the control file only when it is
+              ready, attach the page URL, title, and new browser errors to every response, and on stop close
+              the browser, delete the control file, and exit.
+            justification: |
+              The control file is how the commands find the daemon, so it must exist only while the daemon
+              can answer; a stop must leave neither a browser nor a control file behind.
+            tests:
+              - windows@PuppetEndToEnd_StartDriveStop_HelloAndCounter_WorksAgainstRealServer
+              - ubuntu@PuppetEndToEnd_StartDriveStop_HelloAndCounter_WorksAgainstRealServer

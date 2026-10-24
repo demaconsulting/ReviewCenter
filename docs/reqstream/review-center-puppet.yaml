@@ -3,63 +3,65 @@
 #
 # PURPOSE:
 # - Define system-level requirements describing what a coding agent needs the Puppet development
-#   tool to provide: run a steps file against the ReviewCenter server and leave screenshots
+#   tool to provide: one persistent headless browser that it drives one command per shell call
+#   (act, look at the screenshot or page text, decide, act) against a ReviewCenter server that
+#   the agent starts separately
 # - Puppet is a separate software system that is not part of the distributed ReviewCenter package
-# - System requirements are validated by system tests that run the whole pipeline with only the
-#   browser and the server process replaced by fakes (so they run anywhere), and by the real-browser
-#   end-to-end test, which is linked with the windows@ and ubuntu@ filters to prove it passed on both
-#   supported platforms. CI installs Chromium and makes a missing browser fail that test.
+# - System requirements are validated by the single real-browser end-to-end test, which is linked
+#   with the windows@ and ubuntu@ filters to prove it passed on both supported platforms. CI
+#   installs Chromium and makes a missing browser fail that test.
 
 sections:
   - title: ReviewCenterPuppet Requirements
     requirements:
-      - id: ReviewCenterPuppet-System-RunSteps
+      - id: ReviewCenterPuppet-System-Lifecycle
         title: >-
-          The tool shall start the ReviewCenter server and a headless browser, run the ordered steps of a
-          steps file (go to a page, click, fill, read text, take a screenshot), print one result line per
-          step, and write the screenshots to an output folder.
+          The tool shall start one persistent headless browser that stays open between commands, report
+          when it is already running or not running, and stop the browser and remove its control file
+          when told to stop.
         tags: [system]
         justification: |
-          A coding agent needs to see the web interface it is changing. One command that runs a list of
-          steps and leaves screenshots and text results behind is all it needs to check the result.
+          A coding agent runs one shell command at a time. A browser that lives between commands lets it
+          keep the page, the scroll position, and the hover state while it decides what to do next.
         children:
           - ReviewCenterPuppet-PuppetProgram-Arguments
-          - ReviewCenterPuppet-StepRunner-Parse
-          - ReviewCenterPuppet-StepRunner-Execute
-          - ReviewCenterPuppet-SelectorResolver-Resolve
-          - ReviewCenterPuppet-ServerProcess-Lifecycle
-          - ReviewCenterPuppet-OTS-Playwright-Chromium
-        tests:
-          - ReviewCenterPuppet_Run_AllStepsSucceed_ExitsZeroAndStopsEverything
-          - windows@PuppetEndToEnd_StepsFile_HelloAndCounter_WritesScreenshotAndReportsText
-          - ubuntu@PuppetEndToEnd_StepsFile_HelloAndCounter_WritesScreenshotAndReportsText
-
-      - id: ReviewCenterPuppet-System-Failures
-        title: >-
-          The tool shall stop at the first failing step, save a failure screenshot when it can, and exit with
-          a non-zero code and a clear message; it shall exit with a different code when it cannot run at all
-          (bad arguments, bad steps file, browser or server that cannot start).
-        tags: [system]
-        justification: |
-          A coding agent reads the exit code and the message to decide what to fix. A missing element or a
-          missing Chromium installation must therefore be reported plainly, with the install command where
-          that is the fix, and never reported as success.
-        children:
-          - ReviewCenterPuppet-StepRunner-Execute
+          - ReviewCenterPuppet-ControlChannel-Protocol
+          - ReviewCenterPuppet-BrowserDaemon-Lifecycle
           - ReviewCenterPuppet-PlaywrightBrowser-LaunchFailure
         tests:
-          - ReviewCenterPuppet_Run_StepFails_ExitsOneWithFailureScreenshotAndStopsEverything
-          - ReviewCenterPuppet_Run_BrowserCannotLaunch_ExitsTwoAndStopsServer
+          - windows@PuppetEndToEnd_StartDriveStop_HelloAndCounter_WorksAgainstRealServer
+          - ubuntu@PuppetEndToEnd_StartDriveStop_HelloAndCounter_WorksAgainstRealServer
 
-      - id: ReviewCenterPuppet-System-Cleanup
+      - id: ReviewCenterPuppet-System-Interact
         title: >-
-          The tool shall stop the browser and the server it started when the run ends, whether the steps
-          succeeded, a step failed, or the browser could not be launched.
+          The tool shall navigate, click, hover, fill, press keys, wait for an element or text, and read
+          page text or the list of interactive elements, with the hover state persisting between commands
+          until the mouse is moved again; every result shall include the current URL, the page title, and
+          any new console errors, page errors, or failed requests, and a failed command shall print a
+          short message and exit with a non-zero code.
         tags: [system]
         justification: |
-          A leftover server or browser makes later runs unreliable and wastes resources. Cleanup is best
-          effort: if the Puppet process itself is killed, a server or browser may linger.
+          The agent decides its next action from what the last command reported, so each result must show
+          where the browser is and what went wrong, and a bad selector must fail fast with a clear
+          message. Hover effects only show in a later screenshot if the hover is not undone in between.
+        children:
+          - ReviewCenterPuppet-PuppetProgram-Results
+          - ReviewCenterPuppet-SelectorResolver-Resolve
+          - ReviewCenterPuppet-PlaywrightBrowser-Navigation
         tests:
-          - ReviewCenterPuppet_Run_AllStepsSucceed_ExitsZeroAndStopsEverything
-          - ReviewCenterPuppet_Run_StepFails_ExitsOneWithFailureScreenshotAndStopsEverything
-          - ReviewCenterPuppet_Run_BrowserCannotLaunch_ExitsTwoAndStopsServer
+          - windows@PuppetEndToEnd_StartDriveStop_HelloAndCounter_WorksAgainstRealServer
+          - ubuntu@PuppetEndToEnd_StartDriveStop_HelloAndCounter_WorksAgainstRealServer
+
+      - id: ReviewCenterPuppet-System-VisualCheck
+        title: >-
+          The tool shall save a PNG screenshot of the page or of one element, change the viewport size,
+          emulate the light or dark color scheme, and evaluate a JavaScript expression in the page.
+        tags: [system]
+        justification: |
+          A coding agent polishing the interface looks at screenshots at several sizes and themes and
+          reads computed styles to confirm what it sees.
+        children:
+          - ReviewCenterPuppet-OTS-Playwright-Chromium
+        tests:
+          - windows@PuppetEndToEnd_StartDriveStop_HelloAndCounter_WorksAgainstRealServer
+          - ubuntu@PuppetEndToEnd_StartDriveStop_HelloAndCounter_WorksAgainstRealServer

@@ -18,7 +18,10 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-using System.Reflection;
+using System.ComponentModel;
+using System.Diagnostics;
+using System.Globalization;
+using System.Net.Sockets;
 
 namespace DemaConsulting.ReviewCenter.Puppet;
 
@@ -26,9 +29,9 @@ namespace DemaConsulting.ReviewCenter.Puppet;
 ///     A failure the user should be told about as a plain message, without a stack trace.
 /// </summary>
 /// <remarks>
-///     Used for every anticipated operational problem: a bad argument, an invalid steps file, a missing
-///     element, a timeout, a server or browser that cannot start. Unexpected programming errors use other
-///     exception types so they are not hidden behind a friendly message.
+///     Used for every anticipated operational problem: a bad argument, a missing element, a timeout, a
+///     browser that cannot start. Unexpected programming errors use other exception types so they are not
+///     hidden behind a friendly message.
 /// </remarks>
 public sealed class PuppetException : Exception
 {
@@ -40,385 +43,374 @@ public sealed class PuppetException : Exception
         : base(message)
     {
     }
-
-    /// <summary>
-    ///     Initializes a new instance of the <see cref="PuppetException"/> class with an inner exception.
-    /// </summary>
-    /// <param name="message">The message shown to the user.</param>
-    /// <param name="innerException">The underlying cause.</param>
-    public PuppetException(string message, Exception innerException)
-        : base(message, innerException)
-    {
-    }
 }
 
 /// <summary>
-///     The collaborators a run uses to reach the outside world; replaced by fakes in tests.
-/// </summary>
-/// <param name="StartServer">Starts the ReviewCenter server from the given assembly path.</param>
-/// <param name="LaunchBrowser">Launches the browser and returns its page.</param>
-internal sealed record PuppetServices(
-    Func<string, CancellationToken, Task<IRunningServer>> StartServer,
-    Func<Task<IBrowserPage>> LaunchBrowser)
-{
-    /// <summary>
-    ///     Gets the production collaborators.
-    /// </summary>
-    /// <returns>Services backed by a real server process and headless Chromium.</returns>
-    public static PuppetServices CreateDefault()
-    {
-        return new PuppetServices(ServerProcess.StartAsync, PlaywrightBrowserLauncher.LaunchAsync);
-    }
-}
-
-/// <summary>
-///     Entry point of the Puppet tool: runs a steps file against the ReviewCenter web UI.
+///     Entry point of the Puppet tool: <c>start</c> one persistent headless browser, drive it with one command
+///     per invocation, then <c>stop</c> it.
 /// </summary>
 /// <remarks>
-///     The Puppet is a minimal helper that lets an AI drive and screenshot the UI. It has one verb,
-///     <c>run</c>: start the server (unless <c>--url</c> is given), launch headless Chromium, execute the
-///     steps in order, and stop both again in a <c>finally</c> block. Cleanup is best effort.
-///     Exit codes: 0 every step succeeded, 1 a step failed, 2 the run could not be performed.
+///     The Puppet is a minimal helper that lets an AI drive and screenshot the UI. <c>start</c> spawns a
+///     detached daemon (this same assembly with the hidden verb <c>daemon</c>); every other verb is a thin
+///     client that sends one command to it and prints the result, the page URL and title, and any new browser
+///     errors. Exit codes: 0 ok, 1 the command failed, 2 usage error or Puppet is not running.
 /// </remarks>
 internal static class PuppetProgram
 {
     /// <summary>
-    ///     Exit code: every step succeeded.
+    ///     The commands: usage text, the minimum and maximum positional arguments, and the allowed options.
+    ///     <c>daemon</c> is the hidden verb that <c>start</c> spawns.
     /// </summary>
-    public const int ExitOk = 0;
-
-    /// <summary>
-    ///     Exit code: a step failed.
-    /// </summary>
-    public const int ExitStepFailed = 1;
-
-    /// <summary>
-    ///     Exit code: the run could not be performed (bad arguments, invalid steps file, server or browser problem).
-    /// </summary>
-    public const int ExitCannotRun = 2;
-
-    /// <summary>
-    ///     The one-line usage text.
-    /// </summary>
-    private const string UsageLine =
-        "Usage: puppet run <steps.json> [--server-dll <path> | --url <base-url>] [--out <dir>] [--timeout <seconds>]";
-
-    /// <summary>
-    ///     The default folder for screenshots, relative to the current directory (git-ignored in this repository).
-    /// </summary>
-    private const string DefaultOutDirectory = "artifacts/puppet";
-
-    /// <summary>
-    ///     The default per-wait timeout in seconds.
-    /// </summary>
-    private const int DefaultTimeoutSeconds = 10;
-
-    /// <summary>
-    ///     The largest accepted per-wait timeout in seconds.
-    /// </summary>
-    private const int MaxTimeoutSeconds = 600;
+    private static readonly Dictionary<string, (string Usage, int Min, int Max, string Options)> Commands = new()
+    {
+        ["start"] = ("[--url <base-url>] [--viewport <WxH>] [--headed]", 0, 0, "url viewport headed"),
+        ["daemon"] = (string.Empty, 0, 0, "url viewport headed control-file"),
+        ["goto"] = ("<url-or-path>", 1, 1, string.Empty),
+        ["reload"] = (string.Empty, 0, 0, string.Empty),
+        ["back"] = (string.Empty, 0, 0, string.Empty),
+        ["click"] = ("<selector>", 1, 1, string.Empty),
+        ["dblclick"] = ("<selector>", 1, 1, string.Empty),
+        ["hover"] = ("<selector>", 1, 1, string.Empty),
+        ["fill"] = ("<selector> <text>", 2, 2, string.Empty),
+        ["press"] = ("<key> [selector]", 1, 2, string.Empty),
+        ["type"] = ("<text>", 1, 1, string.Empty),
+        ["select"] = ("<selector> <value>", 2, 2, string.Empty),
+        ["check"] = ("<selector>", 1, 1, string.Empty),
+        ["uncheck"] = ("<selector>", 1, 1, string.Empty),
+        ["upload"] = ("<selector> <file>", 2, 2, string.Empty),
+        ["mouse-move"] = ("<x> <y>", 2, 2, string.Empty),
+        ["mouse-click"] = ("<x> <y>", 2, 2, string.Empty),
+        ["wait"] = ("<selector|text=...> [--timeout <ms>]", 1, 1, "timeout"),
+        ["text"] = ("[selector]", 0, 1, string.Empty),
+        ["snapshot"] = (string.Empty, 0, 0, string.Empty),
+        ["screenshot"] = ("<file.png> [--full] [--selector <selector>]", 1, 1, "full selector"),
+        ["viewport"] = ("<WxH>", 1, 1, string.Empty),
+        ["theme"] = ("<light|dark>", 1, 1, string.Empty),
+        ["eval"] = ("<js-expression>", 1, 1, string.Empty),
+        ["console"] = (string.Empty, 0, 0, string.Empty),
+        ["reset"] = (string.Empty, 0, 0, string.Empty),
+        ["stop"] = (string.Empty, 0, 0, string.Empty),
+    };
 
     /// <summary>
     ///     The process entry point.
     /// </summary>
     /// <param name="args">The command-line arguments.</param>
     /// <returns>The process exit code.</returns>
-    public static async Task<int> Main(string[] args)
+    public static Task<int> Main(string[] args)
     {
-        // Ctrl+C cancels instead of killing the process, so the browser and server are still stopped
-        using var cancellation = new CancellationTokenSource();
-        Console.CancelKeyPress += (_, e) =>
-        {
-            e.Cancel = true;
-            cancellation.Cancel();
-        };
-
-        return await RunAsync(args, Console.Out, Console.Error, PuppetServices.CreateDefault(), cancellation.Token);
+        return RunAsync(args, Console.Out, Console.Error, ControlChannel.DefaultControlFile, CancellationToken.None);
     }
 
     /// <summary>
     ///     Runs one Puppet invocation.
     /// </summary>
     /// <param name="args">The command-line arguments.</param>
-    /// <param name="output">Receives one result line per executed step.</param>
-    /// <param name="error">Receives error messages and warnings.</param>
-    /// <param name="services">The collaborators to use.</param>
-    /// <param name="cancellationToken">Cancels the run.</param>
-    /// <returns>The exit code (see the <c>Exit*</c> constants).</returns>
+    /// <param name="output">Receives results.</param>
+    /// <param name="error">Receives error messages.</param>
+    /// <param name="controlFile">The control file shared with the daemon.</param>
+    /// <param name="cancellationToken">Cancels the invocation.</param>
+    /// <returns>The exit code: 0 ok, 1 the command failed, 2 usage error or not running.</returns>
     public static async Task<int> RunAsync(
         string[] args,
         TextWriter output,
         TextWriter error,
-        PuppetServices services,
+        string controlFile,
         CancellationToken cancellationToken)
     {
-        if (args.Length > 0 && args[0] is "--help" or "-h" or "-?")
+        if (args.Length == 0 || args[0] is "--help" or "-h" or "-?")
         {
-            PrintUsage(output);
-            return ExitOk;
+            PrintUsage(args.Length == 0 ? error : output);
+            return args.Length == 0 ? 2 : 0;
         }
 
-        IRunningServer? server = null;
-        IBrowserPage? page = null;
         try
         {
-            var options = ParseOptions(args);
-            var steps = StepFile.Parse(ReadSteps(options.StepsPath), options.StepsPath);
-
-            // Use the given server, or start our own
-            var baseUrl = options.Url;
-            if (baseUrl is null)
+            var request = ParseCommand(args);
+            var o = request.Options;
+            return request.Command switch
             {
-                server = await services.StartServer(ResolveServerPath(options.ServerDll), cancellationToken);
-                baseUrl = server.Url;
-            }
-
-            page = await services.LaunchBrowser();
-            var allOk = await StepRunner.RunAsync(
-                steps,
-                page,
-                baseUrl,
-                Path.GetFullPath(options.OutDirectory),
-                options.TimeoutSeconds * 1000,
-                result => output.WriteLine(result.ToJson()),
-                cancellationToken);
-            return allOk ? ExitOk : ExitStepFailed;
+                "daemon" => await BrowserDaemon.RunAsync(
+                    o.GetValueOrDefault("control-file", controlFile),
+                    o.GetValueOrDefault("url"),
+                    o.GetValueOrDefault("viewport", PlaywrightBrowser.DefaultViewport),
+                    o.ContainsKey("headed")),
+                "start" => await StartAsync(request, output, error, controlFile, cancellationToken),
+                _ => await SendAsync(request, output, error, controlFile, cancellationToken)
+            };
         }
         catch (PuppetException ex)
         {
-            WriteLine(error, ex.Message);
-            return ExitCannotRun;
-        }
-        catch (OperationCanceledException)
-        {
-            WriteLine(error, "Cancelled.");
-            return ExitCannotRun;
-        }
-        catch (Exception ex) when (ex is IOException or ArgumentException or NotSupportedException or UnauthorizedAccessException)
-        {
-            // For example an unusable --out path
-            WriteLine(error, ex.Message);
-            return ExitCannotRun;
-        }
-        finally
-        {
-            // Best effort: a failed cleanup is reported but never changes the exit code
-            await DisposeQuietlyAsync(page, error);
-            await DisposeQuietlyAsync(server, error);
+            await error.WriteLineAsync(ex.Message, cancellationToken);
+            return 2;
         }
     }
 
     /// <summary>
-    ///     Finds the server assembly to run.
+    ///     Parses and validates one command line.
     /// </summary>
-    /// <param name="explicitPath">The <c>--server-dll</c> value, or <c>null</c>.</param>
-    /// <returns>The path of an existing server assembly.</returns>
-    /// <exception cref="PuppetException">Thrown when no server assembly can be found.</exception>
-    internal static string ResolveServerPath(string? explicitPath)
+    /// <param name="args">The arguments; the first is the command name.</param>
+    /// <returns>The request, with file paths made absolute.</returns>
+    /// <exception cref="PuppetException">Thrown for an unknown command, a wrong argument count, or a bad value.</exception>
+    internal static PuppetRequest ParseCommand(string[] args)
     {
-        // The path recorded at build time is the default, so a built checkout needs no arguments
-        var path = explicitPath
-                   ?? typeof(PuppetProgram).Assembly.GetCustomAttributes<AssemblyMetadataAttribute>()
-                       .FirstOrDefault(a => a.Key == "ServerDllPath")?.Value;
-
-        if (string.IsNullOrWhiteSpace(path) || !File.Exists(path))
+        var name = args[0];
+        if (!Commands.TryGetValue(name, out var spec))
         {
-            throw new PuppetException(
-                $"The ReviewCenter server assembly was not found ({path ?? "no path configured"}). " +
-                "Build the solution first, or pass --server-dll <path to DemaConsulting.ReviewCenter.dll>.");
+            throw new PuppetException($"Unknown command '{name}'. Run 'puppet --help' for the list.");
         }
 
-        return Path.GetFullPath(path);
-    }
-
-    /// <summary>
-    ///     Parses the command line.
-    /// </summary>
-    /// <param name="args">The arguments.</param>
-    /// <returns>The options.</returns>
-    /// <exception cref="PuppetException">Thrown when the arguments are not valid.</exception>
-    private static Options ParseOptions(string[] args)
-    {
-        if (args.Length == 0 || args[0] != "run")
+        var positional = new List<string>();
+        var options = new Dictionary<string, string>();
+        using var rest = args.Skip(1).GetEnumerator();
+        while (rest.MoveNext())
         {
-            throw new PuppetException("Expected the verb 'run'. " + UsageLine);
-        }
-
-        string? stepsPath = null;
-        string? serverDll = null;
-        string? url = null;
-        var outDirectory = DefaultOutDirectory;
-        var timeout = DefaultTimeoutSeconds;
-
-        for (var i = 1; i < args.Length; i++)
-        {
-            switch (args[i])
+            var arg = rest.Current;
+            var option = arg.StartsWith("--", StringComparison.Ordinal) ? arg[2..] : null;
+            if (option is null)
             {
-                case "--server-dll":
-                    serverDll = ValueOf(args, ref i);
-                    break;
-                case "--url":
-                    url = ValueOf(args, ref i);
-                    break;
-                case "--out":
-                    outDirectory = ValueOf(args, ref i);
-                    break;
-                case "--timeout":
-                    timeout = ParseTimeout(ValueOf(args, ref i));
-                    break;
-                default:
-                    if (args[i].StartsWith('-') || stepsPath is not null)
-                    {
-                        throw new PuppetException($"Unexpected argument '{args[i]}'. {UsageLine}");
-                    }
-
-                    stepsPath = args[i];
-                    break;
+                positional.Add(arg);
+            }
+            else if (!spec.Options.Split(' ').Contains(option))
+            {
+                throw new PuppetException($"Unknown option '{arg}' for '{name}'. Usage: puppet {name} {spec.Usage}");
+            }
+            else if (option is "full" or "headed")
+            {
+                options[option] = "true";
+            }
+            else
+            {
+                options[option] = rest.MoveNext() ? rest.Current : throw new PuppetException($"The option {arg} needs a value.");
             }
         }
 
-        if (stepsPath is null)
+        if (positional.Count < spec.Min || positional.Count > spec.Max)
         {
-            throw new PuppetException("The steps file is missing. " + UsageLine);
+            throw new PuppetException($"Usage: puppet {name} {spec.Usage}");
         }
 
-        ValidateUrlOptions(url, serverDll);
-        return new Options(stepsPath, serverDll, url?.TrimEnd('/'), outDirectory, timeout);
+        Validate(name, positional, options);
+        return new PuppetRequest(name, [.. positional], options);
     }
 
     /// <summary>
-    ///     Parses the <c>--timeout</c> value.
+    ///     Formats a response: the result, then the page URL and title, then one line per new browser error.
     /// </summary>
-    /// <param name="text">The option value.</param>
-    /// <returns>The timeout in seconds.</returns>
-    /// <exception cref="PuppetException">Thrown when the value is not a whole number in range.</exception>
-    private static int ParseTimeout(string text)
+    /// <param name="response">The daemon's response.</param>
+    /// <param name="output">Receives the result of a successful command, the URL line, and the event lines.</param>
+    /// <param name="error">Receives the message of a failed command.</param>
+    /// <returns>0 when the command succeeded; otherwise 1.</returns>
+    internal static int Format(PuppetResponse response, TextWriter output, TextWriter error)
     {
-        if (!int.TryParse(text, out var timeout) || timeout is < 1 or > MaxTimeoutSeconds)
+        (response.Ok ? output : error).WriteLine(response.Output);
+        if (response.Url.Length > 0)
         {
-            throw new PuppetException($"--timeout must be a whole number of seconds from 1 to {MaxTimeoutSeconds}, not '{text}'.");
+            output.WriteLine($"@ {response.Url}  \"{response.Title}\"");
         }
 
-        return timeout;
+        foreach (var text in response.Events)
+        {
+            output.WriteLine($"! {text}");
+        }
+
+        return response.Ok ? 0 : 1;
     }
 
     /// <summary>
-    ///     Checks the <c>--url</c> and <c>--server-dll</c> options.
+    ///     Checks the values of a parsed command and makes its file paths absolute (the daemon runs elsewhere).
     /// </summary>
-    /// <param name="url">The <c>--url</c> value, or <c>null</c>.</param>
-    /// <param name="serverDll">The <c>--server-dll</c> value, or <c>null</c>.</param>
-    /// <exception cref="PuppetException">Thrown when the combination is not valid.</exception>
-    private static void ValidateUrlOptions(string? url, string? serverDll)
+    /// <param name="name">The command name.</param>
+    /// <param name="args">The positional arguments; file paths are replaced by absolute ones.</param>
+    /// <param name="options">The options; the <c>start</c> URL loses its trailing slash.</param>
+    /// <exception cref="PuppetException">Thrown when a value is not valid.</exception>
+    private static void Validate(string name, List<string> args, Dictionary<string, string> options)
     {
-        if (url is null)
+        if (options.TryGetValue("timeout", out var timeout) && !(int.TryParse(timeout, out var ms) && ms > 0))
         {
-            return;
+            throw new PuppetException($"--timeout must be a positive number of milliseconds, not '{timeout}'.");
         }
 
-        if (serverDll is not null)
+        if (options.TryGetValue("viewport", out var viewport))
         {
-            throw new PuppetException("--url and --server-dll cannot be used together.");
+            PlaywrightBrowser.ParseViewport(viewport);
         }
 
-        if (!(Uri.TryCreate(url, UriKind.Absolute, out var uri) && uri.Scheme is "http" or "https"))
+        if (options.TryGetValue("url", out var url))
         {
-            throw new PuppetException($"--url must be an absolute http or https URL, not '{url}'.");
+            options["url"] = Uri.TryCreate(url, UriKind.Absolute, out var uri) && uri.Scheme is "http" or "https"
+                ? url.TrimEnd('/')
+                : throw new PuppetException($"--url must be an absolute http or https URL, not '{url}'.");
+        }
+
+        if (name is "mouse-move" or "mouse-click" && !args.All(a => float.TryParse(a, CultureInfo.InvariantCulture, out _)))
+        {
+            throw new PuppetException("The mouse coordinates must be numbers.");
+        }
+
+        if (name == "viewport")
+        {
+            PlaywrightBrowser.ParseViewport(args[0]);
+        }
+
+        if (name == "theme" && args[0] is not ("light" or "dark"))
+        {
+            throw new PuppetException($"The theme must be light or dark, not '{args[0]}'.");
+        }
+
+        if (name == "screenshot")
+        {
+            args[0] = Path.GetFullPath(args[0]);
+        }
+
+        if (name == "upload")
+        {
+            args[1] = File.Exists(args[1]) ? Path.GetFullPath(args[1]) : throw new PuppetException($"The file '{args[1]}' does not exist.");
         }
     }
 
     /// <summary>
-    ///     Gets the value that follows an option.
+    ///     Handles <c>start</c>: refuses when one is running, otherwise spawns the daemon and waits until it is ready.
     /// </summary>
-    /// <param name="args">The arguments.</param>
-    /// <param name="index">The index of the option; advanced to the value.</param>
-    /// <returns>The value.</returns>
-    /// <exception cref="PuppetException">Thrown when the option has no value.</exception>
-    private static string ValueOf(string[] args, ref int index)
+    /// <returns>0 when started; 1 when already running or the daemon failed.</returns>
+    private static async Task<int> StartAsync(
+        PuppetRequest request,
+        TextWriter output,
+        TextWriter error,
+        string controlFile,
+        CancellationToken cancellationToken)
     {
-        if (index + 1 >= args.Length)
+        var existing = ControlChannel.Read(controlFile);
+        if (existing?.Port is int running && await ControlChannel.IsAnsweringAsync(running))
         {
-            throw new PuppetException($"The option {args[index]} needs a value.");
+            await error.WriteLineAsync($"puppet is already running (port {running}); run 'puppet stop' first.", cancellationToken);
+            return 1;
         }
 
-        index++;
-        return args[index];
+        // Whatever is left over is stale or an old start-up error
+        File.Delete(controlFile);
+        var arguments = new List<string> { typeof(PuppetProgram).Assembly.Location, "daemon", "--control-file", controlFile };
+        foreach (var (key, value) in request.Options)
+        {
+            arguments.Add($"--{key}");
+            arguments.AddRange(value == "true" ? [] : [value]);
+        }
+
+        using var process = Spawn(arguments);
+        var deadline = DateTime.UtcNow.AddSeconds(30);
+        while (DateTime.UtcNow < deadline)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var exited = process.HasExited;
+            var info = ControlChannel.Read(controlFile);
+            if (info?.Error is not null)
+            {
+                File.Delete(controlFile);
+                await error.WriteLineAsync(info.Error, cancellationToken);
+                return 1;
+            }
+
+            if (info?.Port is int port && await ControlChannel.IsAnsweringAsync(port))
+            {
+                await output.WriteLineAsync($"puppet started (port {port}{(info.BaseUrl is null ? string.Empty : $", base URL {info.BaseUrl}")})", cancellationToken);
+                return 0;
+            }
+
+            if (exited)
+            {
+                await error.WriteLineAsync($"The Puppet daemon exited with code {process.ExitCode} before it was ready.", cancellationToken);
+                return 1;
+            }
+
+            await Task.Delay(100, cancellationToken);
+        }
+
+        await error.WriteLineAsync("The Puppet daemon was not ready within 30 seconds.", cancellationToken);
+        return 1;
     }
 
     /// <summary>
-    ///     Reads the steps file.
+    ///     Starts the daemon process detached from this process's console and pipes.
     /// </summary>
-    /// <param name="path">The file path.</param>
-    /// <returns>The file text.</returns>
-    /// <exception cref="PuppetException">Thrown when the file cannot be read.</exception>
-    private static string ReadSteps(string path)
+    /// <param name="arguments">The daemon's command line, starting with the assembly path.</param>
+    /// <returns>The process.</returns>
+    private static Process Spawn(List<string> arguments)
     {
+        // On Windows only a shell-executed process inherits none of the caller's pipe handles, so a caller
+        // that waits for the end of our output (an agent's shell tool) is not held up by the long-lived daemon.
+        // Elsewhere .NET passes only stdin/stdout/stderr to the child, so redirecting them and closing our ends is enough.
+        var windows = OperatingSystem.IsWindows();
+        var info = new ProcessStartInfo(Environment.GetEnvironmentVariable("DOTNET_HOST_PATH") ?? "dotnet")
+        {
+            Arguments = string.Join(' ', arguments.Select(a => $"\"{a}\"")),
+            UseShellExecute = windows,
+            WindowStyle = ProcessWindowStyle.Hidden,
+            RedirectStandardInput = !windows,
+            RedirectStandardOutput = !windows,
+            RedirectStandardError = !windows
+        };
+
         try
         {
-            return File.ReadAllText(path);
+            var process = Process.Start(info) ?? throw new PuppetException("Could not start the Puppet daemon.");
+            if (!windows)
+            {
+                process.StandardInput.Close();
+                process.StandardOutput.Close();
+                process.StandardError.Close();
+            }
+
+            return process;
         }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        catch (Win32Exception ex)
         {
-            throw new PuppetException($"Cannot read the steps file '{path}': {ex.Message}", ex);
+            throw new PuppetException($"Could not start the Puppet daemon ('dotnet' not found?): {ex.Message}");
         }
     }
 
     /// <summary>
-    ///     Disposes an object during teardown, reporting (not throwing) a failure.
+    ///     Sends a command to the running daemon and prints the result.
     /// </summary>
-    /// <param name="resource">The object to dispose; may be <c>null</c>.</param>
-    /// <param name="error">Receives the warning.</param>
-    /// <returns>A task that completes when the disposal attempt has finished.</returns>
-    private static async Task DisposeQuietlyAsync(IAsyncDisposable? resource, TextWriter error)
+    /// <returns>0 when the command succeeded; 1 when it failed.</returns>
+    /// <exception cref="PuppetException">Thrown when Puppet is not running.</exception>
+    private static async Task<int> SendAsync(
+        PuppetRequest request,
+        TextWriter output,
+        TextWriter error,
+        string controlFile,
+        CancellationToken cancellationToken)
     {
-        if (resource is null)
+        const string notRunning = "puppet is not running; start it with: puppet start [--url <base-url>]";
+        if (ControlChannel.Read(controlFile)?.Port is not int port)
         {
-            return;
+            throw new PuppetException(notRunning);
         }
 
         try
         {
-            await resource.DisposeAsync();
+            return Format(await ControlChannel.SendAsync(port, request, cancellationToken), output, error);
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is SocketException or IOException)
         {
-            WriteLine(error, $"warning: cleanup failed, a server or browser may still be running: {ex.Message}");
+            throw new PuppetException($"{notRunning} (the control file is stale)");
         }
-    }
-
-    /// <summary>
-    ///     Writes one line of text; synchronous because the console writers are.
-    /// </summary>
-    /// <param name="writer">The writer.</param>
-    /// <param name="text">The text.</param>
-    private static void WriteLine(TextWriter writer, string text)
-    {
-        writer.WriteLine(text);
     }
 
     /// <summary>
     ///     Prints the usage text.
     /// </summary>
-    /// <param name="output">Receives the text.</param>
-    private static void PrintUsage(TextWriter output)
+    /// <param name="writer">Receives the text.</param>
+    private static void PrintUsage(TextWriter writer)
     {
-        output.WriteLine(UsageLine);
-        output.WriteLine();
-        output.WriteLine("  --server-dll <path>   ReviewCenter server assembly to start (default: the one built next to this tool)");
-        output.WriteLine("  --url <base-url>      Drive an already running server instead of starting one");
-        output.WriteLine($"  --out <dir>           Screenshot folder (default: {DefaultOutDirectory})");
-        output.WriteLine($"  --timeout <seconds>   Wait limit for each step, 1-{MaxTimeoutSeconds} (default: {DefaultTimeoutSeconds})");
-        output.WriteLine();
-        output.WriteLine("Exit codes: 0 every step succeeded, 1 a step failed, 2 the run could not be performed");
-        output.WriteLine("First-time setup: pwsh <output folder>/playwright.ps1 install chromium");
-    }
+        writer.WriteLine("Usage: puppet <command> [arguments]");
+        foreach (var (name, spec) in Commands.Where(c => c.Key != "daemon"))
+        {
+            writer.WriteLine($"  puppet {name} {spec.Usage}".TrimEnd());
+        }
 
-    /// <summary>
-    ///     The parsed command line.
-    /// </summary>
-    /// <param name="StepsPath">The steps file.</param>
-    /// <param name="ServerDll">The server assembly given with <c>--server-dll</c>, or <c>null</c>.</param>
-    /// <param name="Url">The base URL given with <c>--url</c>, or <c>null</c>.</param>
-    /// <param name="OutDirectory">The screenshot folder.</param>
-    /// <param name="TimeoutSeconds">The per-wait timeout in seconds.</param>
-    private sealed record Options(string StepsPath, string? ServerDll, string? Url, string OutDirectory, int TimeoutSeconds);
+        writer.WriteLine();
+        writer.WriteLine("Selectors: testid:foo or foo (data-testid), css=..., text=..., role=...");
+        writer.WriteLine("Exit codes: 0 ok, 1 the command failed, 2 usage error or Puppet is not running");
+        writer.WriteLine("First-time setup: pwsh <output folder>/playwright.ps1 install chromium");
+    }
 }

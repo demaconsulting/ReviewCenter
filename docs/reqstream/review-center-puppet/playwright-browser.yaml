@@ -3,7 +3,7 @@
 #
 # PURPOSE:
 # - Define requirements for the PlaywrightBrowser unit (tools/puppet/PlaywrightBrowser.cs)
-# - PlaywrightBrowser drives headless Chromium through Playwright
+# - PlaywrightBrowser drives headless Chromium through Playwright, one flat command at a time
 # - Driving a real Chromium is proven by the end-to-end test linked to the system requirements
 
 sections:
@@ -20,3 +20,13 @@ sections:
               message can name.
             tests:
               - PlaywrightBrowser_DescribeLaunchFailure_ChromiumMissingOrOtherFailure_NamesFixOrFirstLine
+
+          - id: ReviewCenterPuppet-PlaywrightBrowser-Navigation
+            title: >-
+              The PlaywrightBrowser unit shall resolve a path against the base URL given at start, accept an
+              absolute URL as is, and reject a path when no base URL was given.
+            justification: |
+              The agent types short paths such as /counter while the server port changes from run to run;
+              without a base URL a bare path cannot be resolved and must be reported as such.
+            tests:
+              - PlaywrightBrowser_ResolveUrl_PathAndAbsoluteAndMissingBase_ResolvesOrThrows

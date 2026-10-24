@@ -1,0 +1,23 @@
+---
+# ControlChannel Unit Requirements
+#
+# PURPOSE:
+# - Define requirements for the ControlChannel unit (tools/puppet/ControlChannel.cs)
+# - ControlChannel is the control file plus the loopback TCP protocol between the command and the daemon
+
+sections:
+  - title: ReviewCenterPuppet Requirements
+    sections:
+      - title: ControlChannel Requirements
+        requirements:
+          - id: ReviewCenterPuppet-ControlChannel-Protocol
+            title: >-
+              The ControlChannel unit shall carry one JSON request line and one JSON response line per
+              connection over loopback TCP, and shall treat a control file whose port does not answer a ping
+              as stale.
+            justification: |
+              One short connection per command keeps the protocol trivial, and the ping lets a later start
+              replace the control file that a killed daemon left behind instead of refusing to run.
+            tests:
+              - ControlChannel_SendAsync_RoundTrip_DeliversRequestAndResponse
+              - ControlChannel_IsAnsweringAsync_StaleControlFile_ReturnsFalse

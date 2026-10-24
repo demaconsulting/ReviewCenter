@@ -3,7 +3,7 @@
 This document provides the verification design for the ReviewCenter, a web-based formal code
 review service with a companion .NET command-line interface. The service is an ASP.NET Core
 Blazor Server application started with the `serve` verb; the repository also holds a separate
-development tool, Puppet, that runs steps files against the web interface.
+development tool, Puppet, that drives a persistent headless browser against the web interface.
 
 ## Purpose
 
@@ -33,10 +33,10 @@ This document covers the verification design for the following software items:
   - **Utilities** subsystem
     - **PathHelpers** — safe path combination utilities
 - **ReviewCenterPuppet** — a separate development-tool system with its own system and unit verification:
-  - **PuppetProgram** — entry point and teardown
-  - **StepRunner** — steps-file parsing and step execution
+  - **PuppetProgram** — command-line parsing, start, and result printing
+  - **ControlChannel** — control file and loopback protocol
+  - **BrowserDaemon** — the persistent browser process
   - **SelectorResolver** — element selector translation
-  - **ServerProcess** — server start and stop
   - **PlaywrightBrowser** — headless Chromium through Playwright
 
 **OTS items:**

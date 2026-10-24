@@ -261,9 +261,10 @@ Then open `http://localhost:8080` in a browser, or check `http://localhost:8080/
 
 # Puppet Development Tool
 
-Puppet is a small developer helper for AI agents, not part of the distributed ReviewCenter executables. It runs a
-steps file (go to a page, click, fill, read text, screenshot) against the ReviewCenter web interface in headless
-Chromium and writes screenshots. See `tools/puppet/README.md` for the setup, the steps file format, and an example.
+Puppet is a small developer helper for AI agents, not part of the distributed ReviewCenter executables. It keeps one
+persistent headless Chromium open and drives it one command per shell call (go to a page, click, hover, fill, read
+text, screenshot) against a running ReviewCenter web interface. See `tools/puppet/README.md` for the setup, the
+commands, and the workflow.
 
 ## References
 

@@ -14,11 +14,11 @@ sections:
         requirements:
           - id: ReviewCenterPuppet-OTS-Playwright-Chromium
             title: >-
-              Playwright shall drive a headless Chromium to load pages, click, fill, read text, and capture
-              screenshots.
+              Playwright shall drive a headless Chromium to load pages, click, hover, fill, read text, emulate
+              the color scheme, and capture screenshots.
             justification: |
               The Puppet developer tool depends on Playwright to show a coding agent the web interface.
             tags: [ots]
             tests:
-              - windows@PuppetEndToEnd_StepsFile_HelloAndCounter_WritesScreenshotAndReportsText
-              - ubuntu@PuppetEndToEnd_StepsFile_HelloAndCounter_WritesScreenshotAndReportsText
+              - windows@PuppetEndToEnd_StartDriveStop_HelloAndCounter_WorksAgainstRealServer
+              - ubuntu@PuppetEndToEnd_StartDriveStop_HelloAndCounter_WorksAgainstRealServer

@@ -6,11 +6,11 @@ the ReviewCenterPuppet system.
 ### Required Functionality
 
 Playwright for .NET with its Chromium build is the browser automation library used by the Puppet developer tool. The
-project needs it to drive a headless Chromium: load pages, click, fill, read text, and capture screenshots.
+project needs it to drive a headless Chromium: load pages, click, hover, fill, read text, and capture screenshots.
 
 ### Verification Approach
 
-Playwright is verified by the real-browser end-to-end test of the Puppet system, which runs a steps file against the
+Playwright is verified by the real-browser end-to-end test of the Puppet system, which starts Puppet and drives the
 real ReviewCenter server in headless Chromium.
 
 ### Test Environment
@@ -25,11 +25,12 @@ skipping when the browser cannot be launched. Locally the test skips with a reas
 
 ### Test Scenarios
 
-#### PuppetEndToEnd_StepsFile_HelloAndCounter_WritesScreenshotAndReportsText
+#### PuppetEndToEnd_StartDriveStop_HelloAndCounter_WorksAgainstRealServer
 
-**Scenario**: A steps file navigates to the home page, clicks both buttons, reads the texts, and takes a screenshot.
+**Scenario**: Puppet is started, navigates to the home page, hovers and clicks the buttons, reads the texts, changes
+the viewport and color scheme, takes a screenshot, and is stopped.
 
-**Expected**: Every step succeeds, the texts are "Hello from ReviewCenter!" and "2", and the screenshot is a PNG.
+**Expected**: Every command succeeds, the hover persists, the counter text is "2", and the screenshot is a PNG.
 
 **Requirement coverage**: `ReviewCenterPuppet-OTS-Playwright-Chromium`.
 

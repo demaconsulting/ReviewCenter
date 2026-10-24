@@ -37,7 +37,8 @@
 
 The Puppet is a minimal helper that lets an AI drive and screenshot the UI. Keep it as small and simple as possible:
 no production-grade hardening, no process-identity/race engineering, best-effort cleanup only, few tests. Do not grow
-it beyond what an agent needs to run steps and see screenshots. See `tools/puppet/README.md`.
+it beyond what an agent needs for its look, decide, act loop (one persistent browser, one command per shell call).
+See `tools/puppet/README.md`.
 
 # Language and Spelling (ALL Agents)
 

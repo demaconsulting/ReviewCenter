@@ -1,6 +1,6 @@
 package ReviewCenterPuppet {
     part def PlaywrightBrowser {
-        doc /* Launches headless Chromium through Playwright and implements the browser page abstraction. */
+        doc /* Launches headless Chromium through Playwright and performs one browser command at a time. */
 
         comment sourceRef /* Source: tools/puppet/PlaywrightBrowser.cs */
         comment testRef /* Test: test/DemaConsulting.ReviewCenter.Puppet.Tests/PlaywrightBrowserTests.cs */

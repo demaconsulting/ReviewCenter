@@ -2,7 +2,7 @@
 
 ### Verification Approach
 
-The launch failure message of `PlaywrightBrowser` is verified with one browser-free unit test defined in
+The browser-free helpers of `PlaywrightBrowser` are verified with two unit tests defined in
 `PlaywrightBrowserTests.cs`. Driving a real Chromium is verified by the end-to-end test of the system, which is
 linked to the system requirements.
 
@@ -12,9 +12,10 @@ N/A - standard test environment. No Chromium is needed.
 
 ### Acceptance Criteria
 
-- The test passes.
+- The tests pass.
 - Playwright's missing-browser error is described with the install script and command; any other launch error is
   described by its first line.
+- A path is resolved against the base URL, an absolute URL is kept, and a path without a base URL is refused.
 
 ### Test Scenarios
 
@@ -22,3 +23,7 @@ N/A - standard test environment. No Chromium is needed.
 with the "Executable doesn't exist" wording yields a message naming `playwright.ps1` and the install command; an
 unrelated multi-line error yields only its first line. Tested by
 `PlaywrightBrowser_DescribeLaunchFailure_ChromiumMissingOrOtherFailure_NamesFixOrFirstLine`.
+
+**PlaywrightBrowser_ResolveUrl_PathAndAbsoluteAndMissingBase_ResolvesOrThrows**: `/about` and `about` join the base
+URL (with or without a trailing slash), an absolute URL is untouched, and a path with no base URL raises a
+`PuppetException`. Tested by `PlaywrightBrowser_ResolveUrl_PathAndAbsoluteAndMissingBase_ResolvesOrThrows`.
