@@ -1,0 +1,104 @@
+@* AuditPage: the whole audit trail for administrators, at "/audit".
+
+   Presentation only; state and event handling live in AuditPage.razor.cs. A "Verify chain" button that checks the
+   hash chain of the whole trail and shows either "Chain intact: N entries, head hash <full hash>" or "Chain broken
+   at entry N" with the head hash, followed by the entries newest first, 50 per page, with Older / Newer links that
+   carry the position in the address. Access is limited to the Admin role by the attribute below, and the page
+   re-checks the user in the store when it loads and when the button is used. All text comes from the audit trail and
+   is rendered as plain text (Razor encodes it; no raw markup). Every interactive element and every key value
+   carries a stable kebab-case data-testid, and the data-interactive marker on the root flips to "true" once the
+   live circuit is connected.
+
+   The page body is inside SessionGate, which replaces it with a "Session ended" message when the user is no longer
+   valid while the page is open. *@
+@page "/audit"
+@using DemaConsulting.ReviewCenter.Identity
+@rendermode InteractiveServer
+@attribute [Authorize(Roles = SignIn.AdminRole)]
+
+<PageTitle>Audit trail - ReviewCenter</PageTitle>
+
+<SessionGate>
+<main class="page" data-testid="audit-page" data-interactive="@InteractiveMarker">
+    <nav class="breadcrumb">
+        <a href="/" data-testid="home-link">ReviewCenter</a>
+    </nav>
+
+    <h1>Audit trail</h1>
+
+    @if (ErrorMessage is not null)
+    {
+        <p class="error" role="alert" data-testid="audit-error">@ErrorMessage</p>
+    }
+
+    <section class="card">
+        <h2>Verification</h2>
+        <p class="muted">Checks that no entry in the middle of the trail was changed, removed, inserted or reordered. It cannot detect removal of the newest entries or a complete rewrite unless you recorded the head hash elsewhere.</p>
+        <button type="button" data-testid="audit-verify" @onclick="VerifyAsync">Verify chain</button>
+        @if (Result is not null)
+        {
+            @if (Result.IsIntact)
+            {
+                <p class="notice" role="status" data-testid="audit-result">Chain intact: @Result.Count entries, head hash <span class="audit-hash" data-testid="audit-head-hash">@Result.HeadHash</span></p>
+            }
+            else
+            {
+                <p class="error" role="alert" data-testid="audit-result">Chain broken at entry @Result.FirstBadSequence. Head hash <span class="audit-hash" data-testid="audit-head-hash">@Result.HeadHash</span></p>
+                <p class="muted" data-testid="audit-broken-hint">The history no longer matches its hash chain at this entry. Do not edit the database; preserve it and report this entry number.</p>
+            }
+        }
+    </section>
+
+    @if (Loaded && Page is not null)
+    {
+        @if (Page.Entries.Count == 0)
+        {
+            <p class="muted" data-testid="audit-empty">Nothing has been recorded yet.</p>
+        }
+        else
+        {
+            <div class="audit-scroll">
+                <table class="audit-table" data-testid="audit-table">
+                    <thead>
+                        <tr>
+                            <th scope="col">No.</th>
+                            <th scope="col">Time (UTC)</th>
+                            <th scope="col">Actor</th>
+                            <th scope="col">Action</th>
+                            <th scope="col">Review</th>
+                            <th scope="col">Detail</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var entry in Page.Entries)
+                        {
+                            <tr data-testid="audit-row">
+                                <td data-testid="audit-sequence">@entry.Sequence</td>
+                                <td class="audit-time" data-testid="audit-time">@FormatTime(entry)</td>
+                                <td data-testid="audit-actor">@entry.ActorName</td>
+                                <td data-testid="audit-action">@entry.Action</td>
+                                <td data-testid="audit-review">@ReviewLabel(entry)</td>
+                                <td class="audit-detail" data-testid="audit-detail">@entry.Detail</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+
+        @if (Page.HasNewer || Page.HasOlder)
+        {
+            <p class="audit-paging">
+                @if (Page.HasNewer)
+                {
+                    <a href="@PageLink("after", Page.NewerAfter)" data-testid="audit-newer">Newer</a>
+                }
+                @if (Page.HasOlder)
+                {
+                    <a href="@PageLink("before", Page.OlderBefore)" data-testid="audit-older">Older</a>
+                }
+            </p>
+        }
+    }
+</main>
+</SessionGate>

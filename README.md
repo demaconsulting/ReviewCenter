@@ -15,12 +15,13 @@ reviewers, and re-authenticated electronic sign-off.
 
 The `serve` verb runs ReviewCenter as an ASP.NET Core Blazor Server web application with sign-in, a home page, a
 health endpoint, projects, draft reviews made from uploaded files, threaded review comments on those files, a
-checklist for each review, and reviewer slots with re-authenticated signatures. Every comment, checklist answer, and
-signature is recorded under the signed-in user. Review states beyond Draft are still under development.
+checklist for each review, reviewer slots with re-authenticated signatures, and a hash-chained audit trail. Every
+comment, checklist answer, and signature is recorded under the signed-in user. Review states beyond Draft are still
+under development.
 
-> **Warning: databases created by an earlier build must be recreated.** The reviewer slots and signatures add tables
-> that an earlier development database does not have, and the database is created by `EnsureCreated` without
-> migrations. Delete the old database file before starting this version (development databases only).
+> **Warning: databases created by an earlier build must be recreated.** The audit trail adds a table that an earlier
+> development database does not have, and the database is created by `EnsureCreated` without migrations. Delete the
+> old database file before starting this version (development databases only).
 
 ## Features
 
@@ -54,12 +55,19 @@ The current release provides:
   exact record that was reviewed (the content fingerprint, the checklist answers, and the threads with their
   comments), so a later change makes it out of date and the slot can be signed again; the review page and the
   project page show the review as Approved or In review (see [Reviewers and Signatures](#reviewers-and-signatures))
+- **Audit Trail**: every change (projects, reviews, comments, checklist answers, reviewer slots, signatures, and
+  users) and every sign-in, sign-out, failed sign-in, and lockout is recorded with the time, the person, the action,
+  and a short detail, and is stored in the same database transaction as the change; entries are chained by SHA-256
+  hashes; a History page for each review is open to every signed-in user, and administrators see the whole trail at
+  `/audit` and can verify the chain there or with `reviewcenter audit verify` (see
+  [Audit Trail](#audit-trail))
 - **Persistent Storage**: users, projects, reviews, the uploaded file contents, the comment threads, the
-  checklists, and the reviewer slots and signatures are kept in a SQLite database file
+  checklists, the reviewer slots and signatures, and the audit trail are kept in a SQLite database file
   (default `reviewcenter.db` in the per-user application data folder, see
   [Data Location](#data-location-and-database-settings))
 - **Standardized Command-Line Interface**: Context class handling common arguments
-  (`serve`, `user add`, `--urls`, `--version`, `--help`, `--silent`, `--validate`, `--results`, `--depth`, `--log`)
+  (`serve`, `user add`, `audit verify`, `--urls`, `--version`, `--help`, `--silent`, `--validate`, `--results`,
+  `--depth`, `--log`)
 - **Self-Validation**: Built-in validation tests with TRX/JUnit output
 - **Multi-Platform Support**: Self-contained single-file executables for Windows (win-x64) and Linux (linux-x64)
 - **Modern .NET**: Built on .NET 10 (`net10.0`); the runtime is bundled, so no installation is needed
@@ -135,6 +143,9 @@ reviewcenter serve --urls http://localhost:8080
 # Create the first administrator (the password is read from REVIEWCENTER_PASSWORD, from standard input, or prompted)
 reviewcenter user add --username admin --display-name "Ada Admin" --role Admin
 
+# Verify the hash chain of the audit trail (exit code 0 when intact, 1 when broken or unreadable)
+reviewcenter audit verify
+
 # Run self-validation
 reviewcenter --validate
 
@@ -159,6 +170,7 @@ reviewcenter --silent --log output.log
 | `--username <name>`                   | User name for `user add` (3-50 characters)                   |
 | `--display-name <text>`               | Display name for `user add`                                  |
 | `--role <Admin\|Reviewer>`            | Role for `user add` (default: `Reviewer`)                    |
+| `audit verify`                        | Verify the audit trail hash chain; see Audit Trail below     |
 | `-v`, `--version`                     | Display version information                                  |
 | `-?`, `-h`, `--help`                  | Display help message                                         |
 | `--silent`                            | Suppress console output                                      |
@@ -242,6 +254,59 @@ signatures are kept. A slot that has any signature, current or out of date, cann
 If the record changes while a reviewer is signing, the signature is refused and the page asks the reviewer to review
 the record again.
 
+## Audit Trail
+
+Every change that the application makes to projects, reviews, comments, checklists, reviewer slots, signatures, and
+users is recorded in an audit trail in the database, and so is every sign-in, sign-out, failed sign-in, and lockout.
+An entry names the time, the person, the action, and a short detail. A change and its entry are stored in the same
+database transaction, so a change without an entry, or an entry without a change, cannot be left behind by the
+application. A password is never recorded, and the text of a comment or a justification is recorded only as a short
+digest prefix (eight hexadecimal characters of its SHA-256 hash). The entries cannot be edited or deleted through
+the application.
+
+Each entry carries the SHA-256 hash of the previous entry and its own hash, which covers the previous hash and every
+field of the entry. This is the chain. The **History** link on the review page opens the history of that review for
+every signed-in user, newest first, 50 entries at a time. Administrators have an **Audit** link in the page header
+that opens the whole trail at `/audit`, with Older and Newer links and a **Verify chain** button. Verification reads
+the whole trail once and reports either "intact" with the number of entries and the head hash (the hash of the newest
+entry), or the first entry at which the chain is broken. The same check runs from the command line:
+
+```bash
+reviewcenter audit verify
+```
+
+It prints `Audit chain intact: N entries` and exits with code 0 for an intact chain, and prints
+`Audit chain BROKEN at entry N` and exits with code 1 for a broken chain. It also exits with code 1 when the audit
+trail cannot be read. The command line does not print the head hash; the Audit page does.
+
+The recorded actions are:
+
+| Group     | Action codes                                                                                  |
+| --------- | --------------------------------------------------------------------------------------------- |
+| Projects  | `project.created`, `review.created`                                                           |
+| Slots     | `slot.added`, `slot.updated`, `slot.removed`, `signature.added`                               |
+| Threads   | `thread.started`, `thread.replied`, `thread.resolved`, `thread.reopened`                      |
+| Checklist | `checklist.answered`, `checklist.applicability-changed`                                       |
+| Users     | `user.created`, `user.enabled`, `user.disabled`, `user.role-changed`                          |
+| Passwords | `user.password-set-by-admin`, `user.password-changed`                                         |
+| Sign-in   | `auth.sign-in`, `auth.sign-out`, `auth.sign-in-failed`, `auth.locked-out`                     |
+
+### What the Chain Proves, and What It Does Not
+
+The chain **detects** an edited entry, a deleted entry, an inserted entry, and a reordering of entries in the middle
+of the history, because each of these makes a later hash or link not match.
+
+The chain does **not** detect the removal of the newest entries, because what remains is still a valid chain. It also
+does not detect a complete rewrite of the trail by someone who can write to the database and who recalculates every
+hash, because the hash has no secret key. Both can be found only if the head hash and the entry count were recorded
+somewhere else earlier, and are compared with the values now. This release has no external anchoring. An
+administrator who wants that protection should record the head hash and the entry count from the Audit page outside
+the database (for example in a ticket, a signed email, or a write-once log) at times that matter, such as after a
+review has been approved.
+
+Sign-in, sign-out, failed sign-in, and lockout entries are recorded on a best-effort basis in their own transaction;
+if that cannot be stored, the sign-in itself is not blocked, and the failure is logged.
+
 ## Data Location and Database Settings
 
 ReviewCenter keeps its data in one SQLite database file, which is created (with its folder and tables) on first
@@ -289,9 +354,12 @@ non-zero exit code.
   can be changed.
 - **Signed slots cannot be changed**: a reviewer slot that has any signature cannot be reassigned or removed; to
   change the reviewers after a signature, add a new slot. Anyone who is signed in can add and change unsigned slots.
-- **No tamper-evident audit trail yet**: signatures are kept and never changed by the application, but the history is
-  not yet protected by a hash chain, so a person with direct access to the database file could alter it undetected.
-  A hash-chained audit trail is planned for a later release.
+- **Audit trail limits**: the hash chain detects changes in the middle of the history, but not the removal of the
+  newest entries or a complete rewrite by someone with write access to the database, unless the head hash was
+  recorded elsewhere (see [Audit Trail](#audit-trail)); there is no external anchoring, no export, and no retention
+  or archiving of the trail. Failed attempts on an account that is already locked are not recorded. A wrong current
+  password at a signature or on the account page is recorded as `auth.sign-in-failed`, as it counts toward the same
+  lockout. Sign-in events are recorded on a best-effort basis.
 - **Approval is computed**: the Approved or In review status is calculated from the record and its signatures each
   time it is shown; it is not a stored review state, and the review state is still Draft.
 - **Comments are not live**: comments posted by other people appear when you reload the page or take an action on it.
@@ -299,8 +367,8 @@ non-zero exit code.
   uploaded file is kept, so two files with the same name cannot be in one review.
 - **No database migrations**: the database tables are created when the database file is new; a later release that
   changes the tables will need a migration step. A database file created by an earlier version, before users,
-  comments, checklists, or reviewer signatures existed, does not have the tables or columns that are needed, so
-  **delete it and start again** (development databases only).
+  comments, checklists, reviewer signatures, or the audit trail existed, does not have the tables or columns that are
+  needed, so **delete it and start again** (development databases only).
 
 ## Error Handling
 
@@ -374,8 +442,8 @@ Generated documentation includes:
 
 Planned but not yet implemented:
 
-- The remaining review features of the ReviewCenter web service: review states beyond Draft, and a hash-chained
-  audit trail of the review history
+- The remaining review features of the ReviewCenter web service: review states beyond Draft
+- External anchoring, export, and retention of the audit trail
 - Password reset, multi-factor sign-in, and external identity providers
 - EF Core database migrations with an explicit `migrate` command, and further database providers
   (PostgreSQL, SQL Server)

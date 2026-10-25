@@ -40,6 +40,8 @@ supplied via `--depth`.
 
 **UserAdd**: `bool` — `true` when the `user add` verb was present in the argument list.
 
+**AuditVerify**: `bool` — `true` when the `audit verify` verb was present in the argument list.
+
 **Username**: `string?` — The user name supplied via `--username`; set whenever `UserAdd` is `true`.
 
 **DisplayName**: `string?` — The display name supplied via `--display-name`; set whenever `UserAdd` is `true`.
@@ -62,7 +64,8 @@ supplied via `--depth`.
 Delegates to the private `ArgumentParser` helper to parse flags, then opens the log file by
 calling `OpenLogFile` if `--log` was present. The parser treats `serve` as a verb that sets
 `Serve`, and `--urls` as an option whose value must parse as an absolute http or https URL.
-It treats `user` as a verb that must be followed by the action `add`, which sets `UserAdd`; `--username` and
+It treats `user` as a verb that must be followed by the action `add`, which sets `UserAdd`, and `audit` as a verb that
+must be followed by the action `verify`, which sets `AuditVerify`; `--username` and
 `--display-name` take a text value and `--role` takes the name of a role (numbers are not accepted).
 After all arguments are consumed, the parser rejects a `--urls` value given without `serve`, rejects the user options
 given without `user add`, and rejects `user add` without both `--username` and `--display-name`.
@@ -104,7 +107,8 @@ the action is missing or is not `add` ("user requires the add action"), for `--u
 value is missing, for `--role` when the value is missing or is not `Admin` or `Reviewer`
 ("--role requires Admin or Reviewer but was '{value}'"), when a user option is supplied without `user add`
 ("--username, --display-name and --role require the user add verb"), and when `user add` lacks a name
-("user add requires --username and --display-name"). It throws
+("user add requires --username and --display-name"). For `audit` it throws `ArgumentException` when the action is
+missing or is not `verify` ("audit requires the verify action"). It throws
 `InvalidOperationException` ("Failed to open log file '{path}': {detail}") when the `--log`
 file cannot be opened. Both exceptions propagate to `Program.Main`.
 
@@ -125,3 +129,4 @@ available.
 - **ServerHost** — reads `Urls` and `Silent`, and calls `WriteError` when the server cannot
   start.
 - **UserCommand** — reads `Username`, `DisplayName`, and `Role`, and calls `WriteLine` and `WriteError`.
+- **AuditCommand** — calls `WriteLine` for an intact chain and `WriteError` for a broken chain or a read failure.

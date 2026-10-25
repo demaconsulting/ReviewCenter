@@ -141,3 +141,9 @@ enabled users. This scenario is tested by `SigningService_ListCandidatesAsync_Re
 
 **SigningService_Constructor_NullArguments_Throw**: A null store, user service, or clock is rejected with an
 `ArgumentNullException`. This scenario is tested by `SigningService_Constructor_NullArguments_Throw`.
+
+**SigningService_SlotAndSignatureEvents_AreRecordedWithMembersAndDigest**: A slot is added, changed, and signed; the
+entries `slot.added`, `slot.updated`, and `signature.added` carry the members and the signed record digest, and no
+password. This scenario is tested by `SigningService_SlotAndSignatureEvents_AreRecordedWithMembersAndDigest`. The
+removal of a slot records `slot.removed` with its members, which is tested by
+`SigningService_RemoveSlotAsync_RecordsSlotRemovedWithItsMembers`. Both tests are defined in `AuditEventTests.cs`.

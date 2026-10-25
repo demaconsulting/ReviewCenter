@@ -35,10 +35,14 @@ public interface IUserStore
     ///     Adds a user.
     /// </summary>
     /// <param name="user">The user to add; <see cref="User.Id"/> is ignored.</param>
+    /// <param name="audit">
+    ///     Builds the audit draft from the stored user (so the draft can name the assigned identity); saved in
+    ///     the same transaction as the user. Must not be null.
+    /// </param>
     /// <param name="cancellationToken">Cancels the operation.</param>
     /// <returns>The stored user with its assigned identity.</returns>
     /// <exception cref="DomainRuleException">Thrown with <see cref="DomainRule.UserNameTaken"/> when the user name exists.</exception>
-    Task<User> AddAsync(User user, CancellationToken cancellationToken = default);
+    Task<User> AddAsync(User user, Func<User, AuditDraft> audit, CancellationToken cancellationToken = default);
 
     /// <summary>
     ///     Reads a user by user name.
@@ -59,7 +63,11 @@ public interface IUserStore
     ///     Stores the changed state of an existing user.
     /// </summary>
     /// <param name="user">The user, identified by <see cref="User.Id"/>; all stored fields are replaced.</param>
+    /// <param name="audit">
+    ///     The audit draft of the change, saved in the same transaction; <c>null</c> for a change that is not
+    ///     audited here (the failure counter and the lockout state, which have their own events).
+    /// </param>
     /// <param name="cancellationToken">Cancels the operation.</param>
     /// <returns>A task that completes when the user is stored.</returns>
-    Task UpdateAsync(User user, CancellationToken cancellationToken = default);
+    Task UpdateAsync(User user, AuditDraft? audit, CancellationToken cancellationToken = default);
 }

@@ -1,0 +1,47 @@
+---
+# Software Unit Requirements for the AuditPage Component
+#
+# The AuditPage component shows the whole audit trail to administrators and verifies its hash chain.
+
+sections:
+  - title: AuditPage Unit Requirements
+    requirements:
+      - id: ReviewCenter-AuditPage-Display
+        title: >-
+          The AuditPage component shall show the whole audit trail newest first, 50 entries to a page, with the
+          sequence, time, actor, action, review, and detail of each, with links to the older and newer page, a
+          message when the trail is empty, and all text rendered as plain text.
+        justification: |
+          Administrators review what happened in the system, and the text comes from users.
+        tests:
+          - AuditPage_Render_Admin_ShowsEntriesNewestFirst
+          - AuditPage_Render_EmptyTrail_ShowsEmptyMessage
+          - AuditPage_Render_LongTrail_PagesByFifty
+          - AuditPage_Render_MarkupInEntries_IsEscaped
+
+      - id: ReviewCenter-AuditPage-Verify
+        title: >-
+          The AuditPage component shall let an administrator verify the hash chain and shall show the entry count
+          and the full head hash of an intact chain, or the first broken entry with the head hash of the last entry
+          that verified.
+        justification: |
+          The head hash is what an administrator records outside the database to detect later removal of the newest
+          entries.
+        tests:
+          - AuditPage_Verify_IntactChain_ShowsCountAndFullHeadHash
+          - AuditPage_Verify_TamperedChain_ShowsFirstBadEntry
+          - AuditPage_Verify_EmptyTrail_ReportsIntactWithZeroEntries
+
+      - id: ReviewCenter-AuditPage-Admin
+        title: >-
+          The AuditPage component shall show entries and verify only for a user who is an enabled administrator in
+          the user store, on load and on every verification, and shall show an error and read nothing otherwise.
+        justification: |
+          The audit trail names every user and action, and an open page keeps its state for a while after a user is
+          demoted or disabled.
+        tests:
+          - AuditPage_Render_NonAdmin_IsRefusedAndShowsNoEntries
+          - AuditPage_Render_ClaimsAdminButStoreSaysNot_IsRefused
+          - AuditPage_Verify_UserDemotedAfterOpening_IsRefusedWithoutReadingTrail
+          - Routes_Render_ReviewerOpensAuditRoute_ShowsAccessDeniedNotTrail
+          - Routes_Render_AdminOpensAuditRoute_ShowsAuditPage

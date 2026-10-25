@@ -1,0 +1,91 @@
+@* HistoryPage: the audit history of one review at "/projects/{id}/reviews/{reviewId}/history".
+
+   Presentation only; state and loading live in HistoryPage.razor.cs. A table of the audit entries recorded for the
+   review, newest first, 50 per page, with Older / Newer links that carry the position in the address. Each row
+   shows the time (UTC), the actor, the action code and the detail. All text comes from the audit trail and is
+   rendered as plain text (Razor encodes it; no raw markup). Every interactive element and every key value carries a
+   stable kebab-case data-testid, and the data-interactive marker on the root flips to "true" once the live circuit
+   is connected.
+
+   The page body is inside SessionGate, which replaces it with a "Session ended" message when the user is no longer
+   valid while the page is open. *@
+@page "/projects/{ProjectId:int}/reviews/{ReviewId}/history"
+@rendermode InteractiveServer
+@attribute [Authorize]
+
+<PageTitle>History - @ReviewId - ReviewCenter</PageTitle>
+
+<SessionGate>
+<main class="page" data-testid="history-page" data-interactive="@InteractiveMarker">
+    <nav class="breadcrumb">
+        <a href="/" data-testid="home-link">ReviewCenter</a>
+        <span aria-hidden="true">/</span>
+        <a href="/projects" data-testid="projects-link">Projects</a>
+        <span aria-hidden="true">/</span>
+        <a href="/projects/@ProjectId" data-testid="project-link">@(ProjectName ?? $"Project {ProjectId}")</a>
+        <span aria-hidden="true">/</span>
+        <a href="/projects/@ProjectId/reviews/@ReviewId" data-testid="review-link">@ReviewId</a>
+    </nav>
+
+    @if (!Loaded)
+    {
+        <p class="muted" data-testid="history-loading">Loading...</p>
+    }
+    else if (Review is null)
+    {
+        <p class="error" role="alert" data-testid="history-not-found">Review '@ReviewId' does not exist in project @ProjectId.</p>
+    }
+    else
+    {
+        <h1>History</h1>
+        <p class="muted" data-testid="history-review-title">@Review.Title</p>
+
+        @if (Page is null || Page.Entries.Count == 0)
+        {
+            <p class="muted" data-testid="history-empty">No history has been recorded for this review.</p>
+        }
+        else
+        {
+            <div class="audit-scroll">
+                <table class="audit-table" data-testid="history-table">
+                    <thead>
+                        <tr>
+                            <th scope="col">Time (UTC)</th>
+                            <th scope="col">Actor</th>
+                            <th scope="col">Action</th>
+                            <th scope="col">Detail</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var entry in Page.Entries)
+                        {
+                            <tr data-testid="history-row">
+                                <td class="audit-time" data-testid="history-time">@FormatTime(entry)</td>
+                                <td data-testid="history-actor">@entry.ActorName</td>
+                                <td data-testid="history-action">@entry.Action</td>
+                                <td class="audit-detail" data-testid="history-detail">@entry.Detail</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+
+        @if (Page is not null && (Page.HasNewer || Page.HasOlder))
+        {
+            <p class="audit-paging">
+                @if (Page.HasNewer)
+                {
+                    <a href="@PageLink("after", Page.NewerAfter)" data-testid="history-newer">Newer</a>
+                }
+                @if (Page.HasOlder)
+                {
+                    <a href="@PageLink("before", Page.OlderBefore)" data-testid="history-older">Older</a>
+                }
+            </p>
+        }
+
+        <p><a href="/projects/@ProjectId/reviews/@ReviewId" data-testid="history-back">Back to the review</a></p>
+    }
+</main>
+</SessionGate>

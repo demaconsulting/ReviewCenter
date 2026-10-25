@@ -127,3 +127,19 @@ sections:
           page can show instead of a failure of the whole page.
         tests:
           - SignIn_GetActorAsync_SignedInAndAnonymous_ReturnsActorOrThrows
+
+      - id: ReviewCenter-SignIn-Audit
+        title: >-
+          The SignIn unit shall record a successful sign-in and a sign-out in the audit trail on a best-effort basis,
+          after the cookie was set or before it is cleared, taking the actor from the server-side sign-in state, and
+          shall record a failed sign-in and a lockout without echoing the typed user name or password.
+        justification: |
+          Who was signed in when something happened is part of the history. The actor must come from the server
+          and not from form input, and a failing trail must not stop anybody from signing in or out.
+        tests:
+          - SignIn_Login_ValidCredentials_RecordsSignInEntry
+          - SignIn_Logout_SignedInUser_RecordsSignOutEntry
+          - SignIn_Login_UnknownUser_RecordsUnknownUserWithoutEchoingInput
+          - SignIn_Login_WrongPassword_RecordsFailureForTheUserWithoutPassword
+          - SignIn_Login_RepeatedFailures_RecordsLockoutOnce
+          - SignIn_Flow_LoginFailureAndLogout_FormAnIntactChain

@@ -1,6 +1,6 @@
 package ReviewCenter {
     part def HostingSubsystem {
-        doc /* Web server composition: listen address, endpoints, structured logging, database wiring, and the authentication pipeline for the serve verb, and the user add verb that creates users. */
+        doc /* Web server composition: listen address, endpoints, structured logging, database wiring, and the authentication pipeline for the serve verb, the user add verb that creates users, and the audit verify verb that verifies the audit trail. */
 
         comment testRef /* Test: test/DemaConsulting.ReviewCenter.Tests/Hosting/HostingSubsystemTests.cs */
         comment designRef /* Design: docs/design/review-center/hosting.md */
@@ -9,5 +9,6 @@ package ReviewCenter {
 
         part serverHost : ServerHost;
         part userCommand : UserCommand;
+        part auditCommand : AuditCommand;
     }
 }

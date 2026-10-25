@@ -10,9 +10,11 @@ domain.
 
 #### Data Model
 
-The unit is stateless apart from the injected context factory. Every operation creates its own short-lived context from
-the factory and disposes it before returning, so concurrent operations never share a context. Reads use no change
-tracking, so every read returns a new `User` object.
+The unit is stateless apart from the injected context factory and the shared `AuditAppender`. Every read creates its own
+short-lived context from the factory and disposes it before returning, so concurrent operations never share a context.
+Reads use no change tracking, so every read returns a new `User` object. Every change goes through
+`AuditAppender.ExecuteAsync`, so it is serialized by the process-wide audit gate and stored in a `Serializable`
+transaction together with its audit entry.
 
 The user name is unique without regard to case: the column has the case-insensitive collation of SQLite, and the unique
 index on it uses that collation, so the same collation also makes every lookup by user name case-insensitive (see
@@ -22,8 +24,9 @@ index on it uses that collation, so the same collation also makes every lookup b
 
 **AddAsync**: Stores a user and returns it with the identity assigned by the database. The unit copies the fields of
 the argument into a new entity, so an identity supplied by the caller is ignored and can neither be persisted nor
-collide with an existing user; the returned user is the stored entity. A user name that already exists, in any
-capitalization, is reported as a `DomainRuleException` for `UserNameTaken`.
+collide with an existing user; the returned user is the stored entity. The audit draft is built from the stored user (so
+it can name the assigned identity) and saved in the same transaction. A user name that already exists, in any
+capitalization, is reported as a `DomainRuleException` for `UserNameTaken`, and nothing is stored.
 
 **GetByUsernameAsync**: Reads one user by user name, without regard to case; null when absent.
 
@@ -31,7 +34,9 @@ capitalization, is reported as a `DomainRuleException` for `UserNameTaken`.
 
 **UpdateAsync**: Stores the changed state of an existing user. The user is a detached copy that was read earlier, and
 the update replaces every stored column of that row (identity, user name, and creation time do not change in
-practice, because the domain type does not let them change).
+practice, because the domain type does not let them change). The audit draft is saved in the same transaction; a null
+draft means the change is not audited here (the failure counter and the lockout state, which have their own events),
+but the update still passes through the gate, so that all writes stay serialized.
 
 #### Error Handling
 
@@ -43,6 +48,7 @@ but never logged.
 #### Dependencies
 
 - **ReviewCenterDbContext** — the schema and the context factory.
+- **AuditAppender** — runs every change together with its audit entry.
 - **Core domain types and IUserStore** — the `User` type stored and the interface implemented.
 - **Entity Framework Core and Microsoft.Data.Sqlite** — queries and the error code of a constraint violation.
 

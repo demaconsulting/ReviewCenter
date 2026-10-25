@@ -226,6 +226,20 @@ reviews:
       - "src/**/Hosting/UserCommand.cs"
       - "test/**/Hosting/UserCommandTests.cs"
 
+  - id: ReviewCenter-Hosting-AuditCommand
+    title: Review of ReviewCenter AuditCommand unit implementation
+    context:
+      - docs/design/review-center.md
+      - docs/reqstream/review-center.yaml
+      - docs/design/review-center/hosting.md
+      - docs/reqstream/review-center/hosting.yaml
+    paths:
+      - "docs/reqstream/review-center/hosting/audit-command.yaml"
+      - "docs/design/review-center/hosting/audit-command.md"
+      - "docs/verification/review-center/hosting/audit-command.md"
+      - "src/**/Hosting/AuditCommand.cs"
+      - "test/**/Hosting/AuditCommandTests.cs"
+
   # ReviewCenter - Identity
   - id: ReviewCenter-Identity
     title: Review of ReviewCenter Identity subsystem architecture and interfaces
@@ -269,6 +283,7 @@ reviews:
       - "src/**/Identity/SignIn.cs"
       - "src/**/Identity/AuthOptions.cs"
       - "test/**/Identity/SignInTests.cs"
+      - "test/**/Identity/SignInAuditTests.cs"
 
   - id: ReviewCenter-Identity-RevalidatingAuthenticationStateProvider
     title: Review of ReviewCenter RevalidatingAuthenticationStateProvider unit implementation
@@ -436,6 +451,36 @@ reviews:
       - "src/**/Web/UsersPage.razor.cs"
       - "test/**/Web/UsersPageTests.cs"
 
+  - id: ReviewCenter-Web-HistoryPage
+    title: Review of ReviewCenter HistoryPage unit implementation
+    context:
+      - docs/design/review-center.md
+      - docs/reqstream/review-center.yaml
+      - docs/design/review-center/web.md
+      - docs/reqstream/review-center/web.yaml
+    paths:
+      - "docs/reqstream/review-center/web/history-page.yaml"
+      - "docs/design/review-center/web/history-page.md"
+      - "docs/verification/review-center/web/history-page.md"
+      - "src/**/Web/HistoryPage.razor"
+      - "src/**/Web/HistoryPage.razor.cs"
+      - "test/**/Web/HistoryPageTests.cs"
+
+  - id: ReviewCenter-Web-AuditPage
+    title: Review of ReviewCenter AuditPage unit implementation
+    context:
+      - docs/design/review-center.md
+      - docs/reqstream/review-center.yaml
+      - docs/design/review-center/web.md
+      - docs/reqstream/review-center/web.yaml
+    paths:
+      - "docs/reqstream/review-center/web/audit-page.yaml"
+      - "docs/design/review-center/web/audit-page.md"
+      - "docs/verification/review-center/web/audit-page.md"
+      - "src/**/Web/AuditPage.razor"
+      - "src/**/Web/AuditPage.razor.cs"
+      - "test/**/Web/AuditPageTests.cs"
+
   # ReviewCenter - Core
   - id: ReviewCenter-Core
     title: Review of ReviewCenter Core subsystem architecture and interfaces
@@ -449,6 +494,8 @@ reviews:
       - "test/**/Core/CoreSubsystemTests.cs"
       - "test/**/Core/FakeReviewStore.cs"
       - "test/**/Core/FakeUserStore.cs"
+      - "test/**/Core/FakeAuditStore.cs"
+      - "test/**/Core/AuditTestExtensions.cs"
       - "test/**/Core/TestContent.cs"
 
   - id: ReviewCenter-Core-Fingerprint
@@ -482,6 +529,7 @@ reviews:
       - "src/DemaConsulting.ReviewCenter.Core/DomainRuleException.cs"
       - "src/DemaConsulting.ReviewCenter.Core/ReviewLimits.cs"
       - "test/**/Core/ProjectServiceTests.cs"
+      - "test/**/Core/AuditEventTests.cs"
 
   - id: ReviewCenter-Core-ReviewService
     title: Review of ReviewCenter ReviewService unit implementation
@@ -500,6 +548,7 @@ reviews:
       - "src/DemaConsulting.ReviewCenter.Core/ReviewState.cs"
       - "src/DemaConsulting.ReviewCenter.Core/UploadedFile.cs"
       - "test/**/Core/ReviewServiceTests.cs"
+      - "test/**/Core/AuditEventTests.cs"
 
   - id: ReviewCenter-Core-ThreadService
     title: Review of ReviewCenter ThreadService unit implementation
@@ -518,6 +567,7 @@ reviews:
       - "src/DemaConsulting.ReviewCenter.Core/ReviewThreadState.cs"
       - "src/DemaConsulting.ReviewCenter.Core/FileText.cs"
       - "test/**/Core/ThreadServiceTests.cs"
+      - "test/**/Core/AuditEventTests.cs"
 
   - id: ReviewCenter-Core-ChecklistService
     title: Review of ReviewCenter ChecklistService unit implementation
@@ -540,6 +590,7 @@ reviews:
       - "src/DemaConsulting.ReviewCenter.Core/ChecklistOutcome.cs"
       - "src/DemaConsulting.ReviewCenter.Core/ChecklistProgress.cs"
       - "test/**/Core/ChecklistServiceTests.cs"
+      - "test/**/Core/AuditEventTests.cs"
 
   - id: ReviewCenter-Core-UserService
     title: Review of ReviewCenter UserService unit implementation
@@ -559,6 +610,7 @@ reviews:
       - "src/DemaConsulting.ReviewCenter.Core/IUserStore.cs"
       - "src/DemaConsulting.ReviewCenter.Core/IPasswordHasher.cs"
       - "test/**/Core/UserServiceTests.cs"
+      - "test/**/Core/AuditEventTests.cs"
 
   - id: ReviewCenter-Core-RecordDigest
     title: Review of ReviewCenter RecordDigest unit implementation
@@ -592,6 +644,41 @@ reviews:
       - "src/DemaConsulting.ReviewCenter.Core/SlotRole.cs"
       - "src/DemaConsulting.ReviewCenter.Core/ReviewApproval.cs"
       - "test/**/Core/SigningServiceTests.cs"
+      - "test/**/Core/AuditEventTests.cs"
+
+  # ReviewCenter - Core audit trail
+  - id: ReviewCenter-Core-AuditChain
+    title: Review of ReviewCenter AuditChain unit implementation
+    context:
+      - docs/design/review-center.md
+      - docs/reqstream/review-center.yaml
+      - docs/design/review-center/core.md
+      - docs/reqstream/review-center/core.yaml
+    paths:
+      - "docs/reqstream/review-center/core/audit-chain.yaml"
+      - "docs/design/review-center/core/audit-chain.md"
+      - "docs/verification/review-center/core/audit-chain.md"
+      - "src/DemaConsulting.ReviewCenter.Core/AuditChain.cs"
+      - "src/DemaConsulting.ReviewCenter.Core/AuditText.cs"
+      - "src/DemaConsulting.ReviewCenter.Core/AuditEntry.cs"
+      - "src/DemaConsulting.ReviewCenter.Core/AuditDraft.cs"
+      - "test/**/Core/AuditChainTests.cs"
+      - "test/**/Core/AuditTextTests.cs"
+
+  - id: ReviewCenter-Core-AuditService
+    title: Review of ReviewCenter AuditService unit implementation
+    context:
+      - docs/design/review-center.md
+      - docs/reqstream/review-center.yaml
+      - docs/design/review-center/core.md
+      - docs/reqstream/review-center/core.yaml
+    paths:
+      - "docs/reqstream/review-center/core/audit-service.yaml"
+      - "docs/design/review-center/core/audit-service.md"
+      - "docs/verification/review-center/core/audit-service.md"
+      - "src/DemaConsulting.ReviewCenter.Core/AuditService.cs"
+      - "src/DemaConsulting.ReviewCenter.Core/IAuditStore.cs"
+      - "test/**/Core/AuditServiceTests.cs"
 
   # ReviewCenter - Storage
   - id: ReviewCenter-Storage
@@ -647,6 +734,21 @@ reviews:
       - "docs/verification/review-center/storage/user-store.md"
       - "src/**/Storage/UserStore.cs"
       - "test/**/Storage/UserStoreTests.cs"
+
+  - id: ReviewCenter-Storage-AuditStore
+    title: Review of ReviewCenter AuditStore unit implementation
+    context:
+      - docs/design/review-center.md
+      - docs/reqstream/review-center.yaml
+      - docs/design/review-center/storage.md
+      - docs/reqstream/review-center/storage.yaml
+    paths:
+      - "docs/reqstream/review-center/storage/audit-store.yaml"
+      - "docs/design/review-center/storage/audit-store.md"
+      - "docs/verification/review-center/storage/audit-store.md"
+      - "src/**/Storage/AuditStore.cs"
+      - "src/**/Storage/AuditAppender.cs"
+      - "test/**/Storage/AuditStoreTests.cs"
 
   - id: ReviewCenter-Storage-DatabaseSetup
     title: Review of ReviewCenter DatabaseSetup unit implementation

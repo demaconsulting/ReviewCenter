@@ -120,7 +120,7 @@ internal static class Program
     /// </param>
     /// <remarks>
     ///     Dispatch is priority-ordered: version check first, then help, then self-validation,
-    ///     then the serve verb, then the user add verb, then the default tool logic. Only the highest-priority
+    ///     then the serve verb, then the user add verb, then the audit verify verb, then the default tool logic. Only the highest-priority
     ///     matching action is executed per invocation. The <c>serve</c> action blocks until the server stops.
     ///     A distinct method name (rather than an overload of <see cref="Run(Context)"/>) keeps
     ///     the common call site simple.
@@ -167,7 +167,14 @@ internal static class Program
             return;
         }
 
-        // Priority 6: Default tool functionality
+        // Priority 6: Verify the audit trail
+        if (context.AuditVerify)
+        {
+            AuditCommand.Run(context);
+            return;
+        }
+
+        // Priority 7: Default tool functionality
         RunToolLogic(context);
     }
 
@@ -191,11 +198,13 @@ internal static class Program
         context.WriteLine("Usage: reviewcenter [options]");
         context.WriteLine("       reviewcenter serve [--urls <url>] [options]");
         context.WriteLine("       reviewcenter user add --username <name> --display-name <text> [--role <role>] [options]");
+        context.WriteLine("       reviewcenter audit verify [options]");
         context.WriteLine("");
         context.WriteLine("Verbs:");
         context.WriteLine("  serve                      Run the ReviewCenter web server until stopped");
         context.WriteLine("  user add                   Create a user; the password is read from the REVIEWCENTER_PASSWORD");
         context.WriteLine("                             environment variable, else standard input, else a prompt");
+        context.WriteLine("  audit verify               Verify the audit trail hash chain; exit code 0 when intact, 1 when broken");
         context.WriteLine("");
         context.WriteLine("Options:");
         context.WriteLine("  -v, --version              Display version information");

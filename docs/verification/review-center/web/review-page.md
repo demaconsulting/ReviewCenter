@@ -288,3 +288,7 @@ resolved thread are shown, and the sign-in state ends without the page being tol
 the second are both attempted. Each thread shows the message that the user is no longer signed in, and both threads
 keep their stored state, so the approval state cannot be changed. This scenario is tested by
 `ReviewPage_ResolveAndReopen_SessionEndedBeforePageKnows_ShowsClearErrorAndChangesNothing`.
+
+**ReviewPage_Render_ExistingReview_ShowsHistoryLink**: A review is rendered; the page contains the history link
+that points to the history page of the review. This scenario is tested by
+`ReviewPage_Render_ExistingReview_ShowsHistoryLink`.

@@ -35,6 +35,8 @@ N/A - standard test environment.
 - A review with a reviewer slot, answered completely and without open threads, is signed with the password; the
   signature makes the review approved, a later change of the record makes it out of date and not approved, and the
   slot can be signed again.
+- Every change made through the services is recorded in the audit trail with the person, the action, and a detail
+  that never holds a password; recorded entries verify as an intact chain.
 
 ### Test Scenarios
 
@@ -90,3 +92,11 @@ wrong password is refused with `ReauthenticationFailed`; signing with the right 
 then opened and resolved, which changes the record: the slot is out of date, the review is not approved, and the
 digest differs. The alternate signs the new record, and the review is approved again with the alternate as signer.
 This scenario is tested by `CoreSubsystem_Signatures_SignChangeOutOfDateAndResign_FollowsTheRecord`.
+
+**Audit trail of the services**: The unit tests of `AuditService` and `UserService` verify the subsystem requirement
+for the audit trail. A draft recorded through `AuditService` is stored and the chain verifies, which is tested by
+`AuditService_RecordAsync_Draft_StoresEntryThatVerifies`, and the administration events of `UserService` (creation,
+enabling, disabling, role change, and password changes) are recorded with the acting person and without a password,
+which is tested by `UserService_AdministrationEvents_AreRecordedWithoutPasswords`. The domain services are tested
+against a fake store that holds the entries in memory; the transaction that stores a change with its entry is verified
+in the `Storage` subsystem.

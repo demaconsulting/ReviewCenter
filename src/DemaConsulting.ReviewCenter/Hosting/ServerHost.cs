@@ -177,6 +177,11 @@ internal static class ServerHost
         services.AddDbContextFactory<ReviewCenterDbContext>((provider, dbOptions) =>
             DatabaseSetup.Configure(dbOptions, provider.GetRequiredService<IOptions<DatabaseOptions>>().Value));
         services.AddSingleton(TimeProvider.System);
+        services.AddSingleton<AuditAppender>();
+        services.AddSingleton<IAuditStore, AuditStore>();
+        services.AddSingleton(provider => new AuditService(
+            provider.GetRequiredService<IAuditStore>(),
+            exception => LogAuditFailure(provider.GetRequiredService<ILoggerFactory>(), exception)));
         services.AddSingleton<IReviewStore, ReviewStore>();
         services.AddSingleton<IUserStore, UserStore>();
         services.AddSingleton<IPasswordHasher, PasswordHasher>();
@@ -186,6 +191,19 @@ internal static class ServerHost
         services.AddSingleton<ChecklistService>();
         services.AddSingleton<UserService>();
         services.AddSingleton<SigningService>();
+    }
+
+    /// <summary>
+    ///     Logs a failed best-effort audit entry; the user never sees the failure.
+    /// </summary>
+    /// <param name="loggerFactory">The factory that creates the logger.</param>
+    /// <param name="exception">The failure; its message is logged, never shown to a user.</param>
+    private static void LogAuditFailure(ILoggerFactory loggerFactory, Exception exception)
+    {
+#pragma warning disable CA1848 // A rare failure path; a LoggerMessage delegate adds no value here
+        loggerFactory.CreateLogger(typeof(ServerHost).FullName!)
+            .LogWarning(exception, "An audit entry could not be recorded");
+#pragma warning restore CA1848
     }
 
     /// <summary>

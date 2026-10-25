@@ -73,6 +73,15 @@ loopback TCP ports.
 - Reviewer slots and signatures are presented by the review and project pages: a review is Approved only while every
   slot has a signature of the current record, a change of the record makes a signature out of date, and slots and
   signatures are kept after the database is reopened.
+- Every change of data, and every sign-in, sign-out, failed sign-in, and lockout, is recorded in an audit trail whose
+  entries are chained by hashes, and the change and its entry are stored together; the entries never contain a password
+  or the text of a comment or justification.
+- Every signed-in user sees the history of a review, and only administrators see the whole audit trail, in pages of 50,
+  newest first.
+- The audit chain is verified on request, from the audit page and with the `audit verify` verb; an intact chain gives
+  exit code 0 and a broken chain, or an unreadable database, exit code 1.
+- The limits of the chain are stated to the user: it does not detect the removal of the newest entries or a complete
+  rewrite by someone with write access to the database, unless the head hash was recorded elsewhere.
 - A database setting that cannot be used stops the server with an error and a non-zero exit code.
 - Every interactive element of the home page carries a `data-testid`, and the same holds for every other page.
 
@@ -241,6 +250,24 @@ by `WebSubsystem_SignedReview_ApprovalIsPresentedAndGoesOutOfDateWhenRecordChang
 its signature are stored over a real database; the database is closed and opened again, the signature is still
 current, and the review is approved. This scenario is tested by
 `StorageSubsystem_Signatures_PersistAcrossReopenAndStayCurrent`.
+
+**Audit trail chain**: Changes are made at the same moment through the three stores (review, user, and audit), which
+share the process-wide gate; the resulting trail has consecutive sequence numbers and an intact chain, so the changes
+were serialized and none was lost. This scenario is tested by
+`AuditStore_ConcurrentChangesFromDifferentStores_ProduceLinearChain`. In a second scenario a user signs in with the
+wrong password, signs in, and signs out over the real pipeline; the trail contains the three events in order and its
+chain is intact. This scenario is tested by `SignIn_Flow_LoginFailureAndLogout_FormAnIntactChain`.
+
+**Audit history and audit page**: The history page of a review with a long history shows 50 entries, newest first,
+with Older and Newer links; the audit page refuses a user who is not an administrator and shows no entries. These
+scenarios are tested by `HistoryPage_Render_LongHistory_PagesByFiftyWithOlderAndNewerLinks` and
+`AuditPage_Render_NonAdmin_IsRefusedAndShowsNoEntries`.
+
+**Audit verification**: The `audit verify` verb reports an intact trail with its entry count and exit code 0, and the
+Verify button of the audit page reports the first broken entry of a tampered chain. These scenarios are tested by
+`AuditCommand_Run_IntactTrail_ReportsEntryCountWithExitCodeZero` and
+`AuditPage_Verify_TamperedChain_ShowsFirstBadEntry`. No test starts the tool as a process with the `audit verify`
+verb; the dispatch of `Program` to the command is verified by inspection and by the tests of the command.
 
 **Persistence across restart**: A project is stored, the server is stopped and started again on the same
 database file, and a signed-in user sees the project on the projects page. This scenario is tested by

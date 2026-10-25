@@ -1,0 +1,63 @@
+---
+# Software Unit Requirements for the AuditStore Class
+#
+# The AuditStore class and its AuditAppender persist the audit trail: every entry is appended once, in order,
+# linked to its predecessor, and, for a change of data, in the same transaction as the change.
+
+sections:
+  - title: AuditStore Unit Requirements
+    requirements:
+      - id: ReviewCenter-AuditStore-Append
+        title: >-
+          The AuditStore unit shall append each audit entry with the next sequence number and the hash of its
+          predecessor, resolving the acting user, cleaning the text, and stamping the time inside the process-wide
+          gate, so that the sequence has no gap and the chain is verifiable.
+        justification: |
+          A gap or a fork in the sequence would make a healthy trail look tampered with.
+        tests:
+          - AuditStore_AppendAsync_SequentialAppends_GapFreeLinkedAndVerifiable
+          - AuditStore_AppendAsync_Draft_StoresResolvedActorCleanedTextAndTime
+
+      - id: ReviewCenter-AuditStore-Atomic
+        title: >-
+          The AuditStore unit shall store a change of data and its audit entry in one Serializable transaction, so
+          that either both or neither are stored, with no entry for a change that did not take effect, and shall
+          release the gate on every path.
+        justification: |
+          An entry without its change, or a change without its entry, would make the history untrue.
+        tests:
+          - ReviewStore_AddProjectAsync_WithDraft_StoresProjectAndEntryTogether
+          - ReviewStore_AddReviewAsync_FailedChange_LeavesNoAuditEntry
+          - ReviewStore_AddProjectAsync_DraftFactoryThrows_StoresNothing
+          - ReviewStore_AddProjectAsync_AuditInsertFails_RollsBackTheChange
+          - UserStore_AddAsync_AuditInsertFails_RollsBackTheUserAndTheGateIsReleased
+          - ReviewStore_NoOpChanges_RecordNothing
+          - UserStore_UpdateAsync_WithAndWithoutDraft_RecordsOnlyWithDraft
+
+      - id: ReviewCenter-AuditStore-Concurrency
+        title: >-
+          The AuditStore unit shall keep the chain linear when appends arrive concurrently, whether from the same
+          store or from different stores, and shall refuse a second entry with the same sequence number through the
+          primary key of the table.
+        justification: |
+          Several users act at the same time, so one gate and one database key must make the order of entries
+          unambiguous.
+        tests:
+          - AuditStore_AppendAsync_ConcurrentAppends_ProduceLinearChain
+          - AuditStore_ConcurrentChangesFromDifferentStores_ProduceLinearChain
+          - AuditStore_Database_DuplicateSequence_IsRefusedByUniqueKey
+
+      - id: ReviewCenter-AuditStore-Read
+        title: >-
+          The AuditStore unit shall list entries newest first, optionally for one review and before or after a
+          sequence, shall read entries in ascending bounded batches for verification, and shall offer no operation
+          that updates or deletes an entry.
+        justification: |
+          Reading must support paging and streaming verification, and the application must not provide a way to
+          rewrite history.
+        tests:
+          - AuditStore_ListAsync_FilterAndCursors_ReturnExpectedEntriesNewestFirst
+          - AuditStore_ReadAfterAsync_Batches_AreAscendingAndBounded
+          - AuditStore_PublicSurface_OffersNoUpdateOrDelete
+          - AuditStore_Verification_EditedRow_ReportsThatSequence
+          - AuditStore_Verification_DeletedRow_ReportsThatSequence

@@ -23,6 +23,7 @@ includes:
   - docs/reqstream/review-center/hosting.yaml
   - docs/reqstream/review-center/hosting/server-host.yaml
   - docs/reqstream/review-center/hosting/user-command.yaml
+  - docs/reqstream/review-center/hosting/audit-command.yaml
   - docs/reqstream/review-center/web.yaml
   - docs/reqstream/review-center/web/app.yaml
   - docs/reqstream/review-center/web/home-page.yaml
@@ -33,6 +34,8 @@ includes:
   - docs/reqstream/review-center/web/login-page.yaml
   - docs/reqstream/review-center/web/account-page.yaml
   - docs/reqstream/review-center/web/users-page.yaml
+  - docs/reqstream/review-center/web/history-page.yaml
+  - docs/reqstream/review-center/web/audit-page.yaml
   - docs/reqstream/review-center/core.yaml
   - docs/reqstream/review-center/core/fingerprint.yaml
   - docs/reqstream/review-center/core/project-service.yaml
@@ -42,10 +45,13 @@ includes:
   - docs/reqstream/review-center/core/user-service.yaml
   - docs/reqstream/review-center/core/record-digest.yaml
   - docs/reqstream/review-center/core/signing-service.yaml
+  - docs/reqstream/review-center/core/audit-chain.yaml
+  - docs/reqstream/review-center/core/audit-service.yaml
   - docs/reqstream/review-center/storage.yaml
   - docs/reqstream/review-center/storage/review-center-db-context.yaml
   - docs/reqstream/review-center/storage/review-store.yaml
   - docs/reqstream/review-center/storage/user-store.yaml
+  - docs/reqstream/review-center/storage/audit-store.yaml
   - docs/reqstream/review-center/storage/database-setup.yaml
   - docs/reqstream/review-center/platform-requirements.yaml
   - docs/reqstream/review-center-puppet.yaml

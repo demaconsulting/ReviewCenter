@@ -183,9 +183,9 @@ public partial class UsersPage : ComponentBase
     private async Task CreateUserAsync()
     {
         var username = NewUsername.Trim();
-        await RunAsync(null, $"Created user '{username}'.", async () =>
+        await RunAsync(null, $"Created user '{username}'.", async actor =>
         {
-            await UserService.CreateAsync(NewUsername, NewDisplayName, NewRole, NewPassword);
+            await UserService.CreateAsync(NewUsername, NewDisplayName, NewRole, NewPassword, actor);
             NewUsername = string.Empty;
             NewDisplayName = string.Empty;
             NewRole = UserRole.Reviewer;
@@ -201,7 +201,7 @@ public partial class UsersPage : ComponentBase
     private Task ToggleEnabledAsync(User user)
     {
         return RunAsync(user.Id, $"{(user.Enabled ? "Disabled" : "Enabled")} '{user.Username}'.",
-            () => UserService.SetEnabledAsync(user.Username, !user.Enabled));
+            actor => UserService.SetEnabledAsync(user.Username, !user.Enabled, actor));
     }
 
     /// <summary>
@@ -213,7 +213,7 @@ public partial class UsersPage : ComponentBase
     {
         var role = RoleChoice(user);
         return RunAsync(user.Id, $"Role of '{user.Username}' is now {role}.",
-            () => UserService.SetRoleAsync(user.Username, role));
+            actor => UserService.SetRoleAsync(user.Username, role, actor));
     }
 
     /// <summary>
@@ -224,7 +224,7 @@ public partial class UsersPage : ComponentBase
     private async Task SetPasswordAsync(User user)
     {
         await RunAsync(user.Id, $"Password of '{user.Username}' changed.",
-            () => UserService.SetPasswordAsync(user.Username, PasswordChoice(user.Id)));
+            actor => UserService.SetPasswordAsync(user.Username, PasswordChoice(user.Id), actor));
         Passwords.Remove(user.Id);
     }
 
@@ -233,14 +233,14 @@ public partial class UsersPage : ComponentBase
     /// </summary>
     /// <param name="userId">The user row the change was started from, or <c>null</c> for the new-user form.</param>
     /// <param name="success">The message to show when the change is stored.</param>
-    /// <param name="action">The change to run.</param>
+    /// <param name="action">The change to run; it receives the verified administrator as the actor to audit.</param>
     /// <returns>A task that completes when the change is stored or the problem is shown.</returns>
     /// <remarks>
     ///     The change is refused, without reloading, unless the signed-in user is still an enabled
     ///     administrator in the user store, and also when the sign-in state has already ended (the message then
     ///     says so).
     /// </remarks>
-    private async Task RunAsync(int? userId, string success, Func<Task> action)
+    private async Task RunAsync(int? userId, string success, Func<Actor, Task> action)
     {
         // The outcome is shown next to the control that was used, where the operator is looking
         MessageUserId = userId;
@@ -269,7 +269,7 @@ public partial class UsersPage : ComponentBase
 
         try
         {
-            await action();
+            await action(actor);
             StatusMessage = success;
         }
         catch (DomainRuleException ex)

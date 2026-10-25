@@ -91,3 +91,13 @@ and the review page shows "Signature out of date". This scenario is tested by
 requested over the in-memory server; every link, button, visible input, select, and text area in each response has a
 `data-testid` in kebab-case. This scenario is tested by
 `WebSubsystem_AllPages_EveryInteractiveElementHasTestId`.
+
+**Audit pages**: The history and audit pages are verified by their unit tests, which render them with the component
+test host. The history page shows only the entries of its review, newest first, which is tested by
+`HistoryPage_Render_ReviewWithEntries_ShowsOnlyItsEntriesNewestFirst`; a visitor who is not signed in does not get
+the entries, which is tested by `Routes_Render_NobodySignedInOpensHistoryRoute_DoesNotShowEntries`. The audit page
+shows the entry count and the full head hash of an intact chain, which is tested by
+`AuditPage_Verify_IntactChain_ShowsCountAndFullHeadHash`, and a reviewer who opens the audit route gets an access
+denied message and no entries, which is tested by `Routes_Render_ReviewerOpensAuditRoute_ShowsAccessDeniedNotTrail`.
+The subsystem test of all pages does not include the two new routes; their `data-testid` attributes are checked in
+the unit tests.

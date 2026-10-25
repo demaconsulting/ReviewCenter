@@ -64,7 +64,10 @@ public abstract class PageTestBase : BunitContext
         Reviews = new ReviewService(store, clock);
         Threads = new ThreadService(store, clock);
         Checklists = new ChecklistService(store, clock);
-        Users = new UserService(new FakeUserStore(), new FakePasswordHasher(), clock);
+        AuditStore = new FakeAuditStore(clock);
+        Audit = new AuditService(AuditStore);
+        Users = new UserService(new FakeUserStore(), new FakePasswordHasher(), clock, Audit);
+        Services.AddSingleton(Audit);
         Services.AddSingleton(Projects);
         Services.AddSingleton(Reviews);
         Services.AddSingleton(Threads);
@@ -86,6 +89,16 @@ public abstract class PageTestBase : BunitContext
     ///     Gets the in-memory store behind the services, for arranging data the services would not create.
     /// </summary>
     internal FakeReviewStore Store { get; }
+
+    /// <summary>
+    ///     Gets the in-memory audit store behind the audit service, for arranging and tampering with entries.
+    /// </summary>
+    internal FakeAuditStore AuditStore { get; }
+
+    /// <summary>
+    ///     Gets the audit service the pages use.
+    /// </summary>
+    protected AuditService Audit { get; }
 
     /// <summary>
     ///     Gets the project service the pages use.

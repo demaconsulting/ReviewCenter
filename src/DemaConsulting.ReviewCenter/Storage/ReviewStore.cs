@@ -35,9 +35,12 @@ namespace DemaConsulting.ReviewCenter.Storage;
 ///     Answers and section states are replaced in place (one row per check or section). Slots are plain rows;
 ///     signatures are only ever inserted, inside a transaction that rechecks the record digest. A uniqueness violation on the review key is translated to a
 ///     <see cref="DomainRuleException"/> so callers see the same error as for the service pre-check.
+///     Every change is made through <see cref="AuditAppender.ExecuteAsync{TResult}"/>: one write transaction, under the
+///     process-wide audit gate, that stores the change and its audit entry together or not at all.
 /// </remarks>
 /// <param name="factory">The factory that creates a context per operation.</param>
-internal sealed class ReviewStore(IDbContextFactory<ReviewCenterDbContext> factory) : IReviewStore
+/// <param name="appender">The appender that runs each change together with its audit entry.</param>
+internal sealed class ReviewStore(IDbContextFactory<ReviewCenterDbContext> factory, AuditAppender appender) : IReviewStore
 {
     /// <summary>
     ///     The SQLite extended result code for a primary key constraint violation.
@@ -50,22 +53,30 @@ internal sealed class ReviewStore(IDbContextFactory<ReviewCenterDbContext> facto
     private const int SqliteUniqueViolation = 2067;
 
     /// <inheritdoc />
-    public async Task<Project> AddProjectAsync(Project project, CancellationToken cancellationToken = default)
+    public async Task<Project> AddProjectAsync(
+        Project project,
+        Func<Project, AuditDraft> audit,
+        CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(project);
+        ArgumentNullException.ThrowIfNull(audit);
 
-        await using var context = await factory.CreateDbContextAsync(cancellationToken);
-
-        // Insert a fresh entity so that the database always assigns the identity, whatever the caller supplied
-        var entity = new Project
-        {
-            Name = project.Name,
-            Description = project.Description,
-            Created = project.Created
-        };
-        context.Projects.Add(entity);
-        await context.SaveChangesAsync(cancellationToken);
-        return entity;
+        return await appender.ExecuteAsync<Project>(
+            factory,
+            async context =>
+            {
+                // Insert a fresh entity so that the database always assigns the identity, whatever the caller supplied
+                var entity = new Project
+                {
+                    Name = project.Name,
+                    Description = project.Description,
+                    Created = project.Created
+                };
+                context.Projects.Add(entity);
+                await context.SaveChangesAsync(cancellationToken);
+                return (entity, audit(entity));
+            },
+            cancellationToken);
     }
 
     /// <inheritdoc />
@@ -97,23 +108,31 @@ internal sealed class ReviewStore(IDbContextFactory<ReviewCenterDbContext> facto
     }
 
     /// <inheritdoc />
-    public async Task AddReviewAsync(Review review, CancellationToken cancellationToken = default)
+    public async Task AddReviewAsync(Review review, AuditDraft audit, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(review);
+        ArgumentNullException.ThrowIfNull(audit);
 
-        await using var context = await factory.CreateDbContextAsync(cancellationToken);
-        context.Reviews.Add(review);
-        try
-        {
-            await context.SaveChangesAsync(cancellationToken);
-        }
-        catch (DbUpdateException ex) when (IsDuplicateKey(ex))
-        {
-            // Two requests passed the service pre-check at the same time; the key constraint stopped the second
-            throw new DomainRuleException(
-                DomainRule.ReviewIdDuplicate,
-                $"A review with the id '{review.Id}' already exists in this project.");
-        }
+        await appender.ExecuteAsync<bool>(
+            factory,
+            async context =>
+            {
+                context.Reviews.Add(review);
+                try
+                {
+                    await context.SaveChangesAsync(cancellationToken);
+                }
+                catch (DbUpdateException ex) when (IsDuplicateKey(ex))
+                {
+                    // Two requests passed the service pre-check at the same time; the key constraint stopped the second
+                    throw new DomainRuleException(
+                        DomainRule.ReviewIdDuplicate,
+                        $"A review with the id '{review.Id}' already exists in this project.");
+                }
+
+                return (true, audit);
+            },
+            cancellationToken);
     }
 
     /// <inheritdoc />
@@ -175,27 +194,35 @@ internal sealed class ReviewStore(IDbContextFactory<ReviewCenterDbContext> facto
     }
 
     /// <inheritdoc />
-    public async Task<ReviewThread> AddThreadAsync(ReviewThread thread, CancellationToken cancellationToken = default)
+    public async Task<ReviewThread> AddThreadAsync(
+        ReviewThread thread,
+        Func<ReviewThread, AuditDraft> audit,
+        CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(thread);
+        ArgumentNullException.ThrowIfNull(audit);
 
-        await using var context = await factory.CreateDbContextAsync(cancellationToken);
-
-        // Insert fresh entities so that the database always assigns the identities, whatever the caller supplied
-        var entity = new ReviewThread
-        {
-            ProjectId = thread.ProjectId,
-            ReviewId = thread.ReviewId,
-            FilePath = thread.FilePath,
-            StartLine = thread.StartLine,
-            EndLine = thread.EndLine,
-            State = thread.State,
-            Created = thread.Created,
-            Comments = thread.Comments.Select(comment => NewComment(comment)).ToList()
-        };
-        context.Threads.Add(entity);
-        await context.SaveChangesAsync(cancellationToken);
-        return entity;
+        return await appender.ExecuteAsync<ReviewThread>(
+            factory,
+            async context =>
+            {
+                // Insert fresh entities so that the database always assigns the identities, whatever the caller supplied
+                var entity = new ReviewThread
+                {
+                    ProjectId = thread.ProjectId,
+                    ReviewId = thread.ReviewId,
+                    FilePath = thread.FilePath,
+                    StartLine = thread.StartLine,
+                    EndLine = thread.EndLine,
+                    State = thread.State,
+                    Created = thread.Created,
+                    Comments = thread.Comments.Select(comment => NewComment(comment)).ToList()
+                };
+                context.Threads.Add(entity);
+                await context.SaveChangesAsync(cancellationToken);
+                return (entity, audit(entity));
+            },
+            cancellationToken);
     }
 
     /// <inheritdoc />
@@ -204,25 +231,31 @@ internal sealed class ReviewStore(IDbContextFactory<ReviewCenterDbContext> facto
         string reviewId,
         int threadId,
         ReviewComment comment,
+        Func<ReviewComment, AuditDraft> audit,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(comment);
+        ArgumentNullException.ThrowIfNull(audit);
 
-        await using var context = await factory.CreateDbContextAsync(cancellationToken);
+        return await appender.ExecuteAsync<ReviewComment?>(
+            factory,
+            async context =>
+            {
+                // The thread must belong to the stated review, so an identity from another review cannot be commented on
+                var exists = await context.Threads.AnyAsync(
+                    t => t.Id == threadId && t.ProjectId == projectId && t.ReviewId == reviewId,
+                    cancellationToken);
+                if (!exists)
+                {
+                    return (null, null);
+                }
 
-        // The thread must belong to the stated review, so an identity from another review cannot be commented on
-        var exists = await context.Threads.AnyAsync(
-            t => t.Id == threadId && t.ProjectId == projectId && t.ReviewId == reviewId,
+                var entity = NewComment(comment, threadId);
+                context.Comments.Add(entity);
+                await context.SaveChangesAsync(cancellationToken);
+                return (entity, audit(entity));
+            },
             cancellationToken);
-        if (!exists)
-        {
-            return null;
-        }
-
-        var entity = NewComment(comment, threadId);
-        context.Comments.Add(entity);
-        await context.SaveChangesAsync(cancellationToken);
-        return entity;
     }
 
     /// <inheritdoc />
@@ -231,13 +264,21 @@ internal sealed class ReviewStore(IDbContextFactory<ReviewCenterDbContext> facto
         string reviewId,
         int threadId,
         ReviewThreadState state,
+        AuditDraft audit,
         CancellationToken cancellationToken = default)
     {
-        await using var context = await factory.CreateDbContextAsync(cancellationToken);
-        var rows = await context.Threads
-            .Where(t => t.Id == threadId && t.ProjectId == projectId && t.ReviewId == reviewId)
-            .ExecuteUpdateAsync(s => s.SetProperty(t => t.State, state), cancellationToken);
-        return rows > 0;
+        ArgumentNullException.ThrowIfNull(audit);
+
+        return await appender.ExecuteAsync<bool>(
+            factory,
+            async context =>
+            {
+                var rows = await context.Threads
+                    .Where(t => t.Id == threadId && t.ProjectId == projectId && t.ReviewId == reviewId)
+                    .ExecuteUpdateAsync(s => s.SetProperty(t => t.State, state), cancellationToken);
+                return rows > 0 ? (true, audit) : (false, null);
+            },
+            cancellationToken);
     }
 
     /// <inheritdoc />
@@ -293,54 +334,52 @@ internal sealed class ReviewStore(IDbContextFactory<ReviewCenterDbContext> facto
     /// <inheritdoc />
     public async Task SetChecklistSectionStateAsync(
         ChecklistSectionState state,
+        AuditDraft audit,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(state);
+        ArgumentNullException.ThrowIfNull(audit);
 
-        await using var context = await factory.CreateDbContextAsync(cancellationToken);
+        // Replace the row when there is one; otherwise insert it. The write lock is held for the whole
+        // transaction, so no other request can insert the row between the update and the insert
+        await appender.ExecuteAsync<bool>(
+            factory,
+            async context =>
+            {
+                if (await UpdateSectionStateAsync(context, state, cancellationToken) == 0)
+                {
+                    context.ChecklistSectionStates.Add(state);
+                    await context.SaveChangesAsync(cancellationToken);
+                }
 
-        // Replace the row when there is one; otherwise insert it. Two requests can both find no row, so the
-        // loser of the insert race updates the row the winner created
-        if (await UpdateSectionStateAsync(context, state, cancellationToken) > 0)
-        {
-            return;
-        }
-
-        context.ChecklistSectionStates.Add(state);
-        try
-        {
-            await context.SaveChangesAsync(cancellationToken);
-        }
-        catch (DbUpdateException ex) when (IsDuplicateKey(ex))
-        {
-            context.ChangeTracker.Clear();
-            await UpdateSectionStateAsync(context, state, cancellationToken);
-        }
+                return (true, audit);
+            },
+            cancellationToken);
     }
 
     /// <inheritdoc />
-    public async Task SetChecklistAnswerAsync(ChecklistAnswer answer, CancellationToken cancellationToken = default)
+    public async Task SetChecklistAnswerAsync(
+        ChecklistAnswer answer,
+        AuditDraft audit,
+        CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(answer);
-
-        await using var context = await factory.CreateDbContextAsync(cancellationToken);
+        ArgumentNullException.ThrowIfNull(audit);
 
         // Same replace-or-insert approach as for the section state
-        if (await UpdateAnswerAsync(context, answer, cancellationToken) > 0)
-        {
-            return;
-        }
+        await appender.ExecuteAsync<bool>(
+            factory,
+            async context =>
+            {
+                if (await UpdateAnswerAsync(context, answer, cancellationToken) == 0)
+                {
+                    context.ChecklistAnswers.Add(answer);
+                    await context.SaveChangesAsync(cancellationToken);
+                }
 
-        context.ChecklistAnswers.Add(answer);
-        try
-        {
-            await context.SaveChangesAsync(cancellationToken);
-        }
-        catch (DbUpdateException ex) when (IsDuplicateKey(ex))
-        {
-            context.ChangeTracker.Clear();
-            await UpdateAnswerAsync(context, answer, cancellationToken);
-        }
+                return (true, audit);
+            },
+            cancellationToken);
     }
 
     /// <inheritdoc />
@@ -402,23 +441,31 @@ internal sealed class ReviewStore(IDbContextFactory<ReviewCenterDbContext> facto
     }
 
     /// <inheritdoc />
-    public async Task<ReviewerSlot> AddSlotAsync(ReviewerSlot slot, CancellationToken cancellationToken = default)
+    public async Task<ReviewerSlot> AddSlotAsync(
+        ReviewerSlot slot,
+        Func<ReviewerSlot, AuditDraft> audit,
+        CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(slot);
+        ArgumentNullException.ThrowIfNull(audit);
 
-        await using var context = await factory.CreateDbContextAsync(cancellationToken);
-
-        // Insert a fresh entity so that the database always assigns the identity, whatever the caller supplied
-        var entity = new ReviewerSlot
-        {
-            ProjectId = slot.ProjectId,
-            ReviewId = slot.ReviewId,
-            PrimaryUserId = slot.PrimaryUserId,
-            AlternateUserId = slot.AlternateUserId
-        };
-        context.ReviewerSlots.Add(entity);
-        await context.SaveChangesAsync(cancellationToken);
-        return entity;
+        return await appender.ExecuteAsync<ReviewerSlot>(
+            factory,
+            async context =>
+            {
+                // Insert a fresh entity so that the database always assigns the identity, whatever the caller supplied
+                var entity = new ReviewerSlot
+                {
+                    ProjectId = slot.ProjectId,
+                    ReviewId = slot.ReviewId,
+                    PrimaryUserId = slot.PrimaryUserId,
+                    AlternateUserId = slot.AlternateUserId
+                };
+                context.ReviewerSlots.Add(entity);
+                await context.SaveChangesAsync(cancellationToken);
+                return (entity, audit(entity));
+            },
+            cancellationToken);
     }
 
     /// <inheritdoc />
@@ -428,16 +475,24 @@ internal sealed class ReviewStore(IDbContextFactory<ReviewCenterDbContext> facto
         int slotId,
         int primaryUserId,
         int? alternateUserId,
+        AuditDraft audit,
         CancellationToken cancellationToken = default)
     {
-        await using var context = await factory.CreateDbContextAsync(cancellationToken);
-        var rows = await context.ReviewerSlots
-            .Where(s => s.Id == slotId && s.ProjectId == projectId && s.ReviewId == reviewId)
-            .ExecuteUpdateAsync(
-                s => s.SetProperty(x => x.PrimaryUserId, primaryUserId)
-                    .SetProperty(x => x.AlternateUserId, alternateUserId),
-                cancellationToken);
-        return rows > 0;
+        ArgumentNullException.ThrowIfNull(audit);
+
+        return await appender.ExecuteAsync<bool>(
+            factory,
+            async context =>
+            {
+                var rows = await context.ReviewerSlots
+                    .Where(s => s.Id == slotId && s.ProjectId == projectId && s.ReviewId == reviewId)
+                    .ExecuteUpdateAsync(
+                        s => s.SetProperty(x => x.PrimaryUserId, primaryUserId)
+                            .SetProperty(x => x.AlternateUserId, alternateUserId),
+                        cancellationToken);
+                return rows > 0 ? (true, audit) : (false, null);
+            },
+            cancellationToken);
     }
 
     /// <inheritdoc />
@@ -445,15 +500,22 @@ internal sealed class ReviewStore(IDbContextFactory<ReviewCenterDbContext> facto
         int projectId,
         string reviewId,
         int slotId,
+        AuditDraft audit,
         CancellationToken cancellationToken = default)
     {
-        await using var context = await factory.CreateDbContextAsync(cancellationToken);
+        ArgumentNullException.ThrowIfNull(audit);
 
-        // The foreign key from the signatures makes the database refuse to remove a slot that was signed
-        var rows = await context.ReviewerSlots
-            .Where(s => s.Id == slotId && s.ProjectId == projectId && s.ReviewId == reviewId)
-            .ExecuteDeleteAsync(cancellationToken);
-        return rows > 0;
+        return await appender.ExecuteAsync<bool>(
+            factory,
+            async context =>
+            {
+                // The foreign key from the signatures makes the database refuse to remove a slot that was signed
+                var rows = await context.ReviewerSlots
+                    .Where(s => s.Id == slotId && s.ProjectId == projectId && s.ReviewId == reviewId)
+                    .ExecuteDeleteAsync(cancellationToken);
+                return rows > 0 ? (true, audit) : (false, null);
+            },
+            cancellationToken);
     }
 
     /// <inheritdoc />
@@ -472,68 +534,69 @@ internal sealed class ReviewStore(IDbContextFactory<ReviewCenterDbContext> facto
     /// <inheritdoc />
     public async Task<ReviewSignature> AddSignatureAsync(
         ReviewSignature signature,
+        AuditDraft audit,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(signature);
+        ArgumentNullException.ThrowIfNull(audit);
 
-        await using var context = await factory.CreateDbContextAsync(cancellationToken);
+        // The write transaction (begun by the appender) takes the SQLite write lock at once, so no other writer can
+        // change the record between the digest check below and the insert
+        return await appender.ExecuteAsync<ReviewSignature>(
+            factory,
+            async context =>
+            {
+                // Recompute the digest from what is stored right now, with the same code the service used
+                var record = await LoadRecordAsync(context, signature.ProjectId, signature.ReviewId, cancellationToken)
+                             ?? throw new DomainRuleException(
+                                 DomainRule.ReviewNotFound,
+                                 $"Review '{signature.ReviewId}' does not exist.");
+                if (RecordDigest.Compute(record) != signature.RecordDigest)
+                {
+                    throw new DomainRuleException(
+                        DomainRule.RecordChanged,
+                        "The record changed while you were signing. Review it and try again.");
+                }
 
-        // Serializable makes SQLite take the write lock when the transaction begins, so no other writer can change
-        // the record between the digest check below and the insert
-        await using var transaction = await context.Database.BeginTransactionAsync(
-            IsolationLevel.Serializable,
+                var slotExists = await context.ReviewerSlots.AnyAsync(
+                    s => s.Id == signature.SlotId && s.ProjectId == signature.ProjectId && s.ReviewId == signature.ReviewId,
+                    cancellationToken);
+                if (!slotExists)
+                {
+                    throw new DomainRuleException(
+                        DomainRule.SlotNotFound,
+                        $"Slot {signature.SlotId} does not exist in this review.");
+                }
+
+                // Insert a fresh entity so that the database always assigns the identity
+                var entity = new ReviewSignature
+                {
+                    ProjectId = signature.ProjectId,
+                    ReviewId = signature.ReviewId,
+                    SlotId = signature.SlotId,
+                    UserId = signature.UserId,
+                    DisplayName = signature.DisplayName,
+                    Role = signature.Role,
+                    SignedAt = signature.SignedAt,
+                    RecordDigest = signature.RecordDigest,
+                    Meaning = signature.Meaning
+                };
+                context.Signatures.Add(entity);
+                try
+                {
+                    await context.SaveChangesAsync(cancellationToken);
+                }
+                catch (DbUpdateException ex) when (IsDuplicateKey(ex))
+                {
+                    // The unique index on (slot, digest) stopped a second signature of the same record from the same slot
+                    throw new DomainRuleException(
+                        DomainRule.SigningNotAllowed,
+                        "This slot already has a signature of the current record.");
+                }
+
+                return (entity, audit);
+            },
             cancellationToken);
-
-        // Recompute the digest from what is stored right now, with the same code the service used
-        var record = await LoadRecordAsync(context, signature.ProjectId, signature.ReviewId, cancellationToken)
-                     ?? throw new DomainRuleException(
-                         DomainRule.ReviewNotFound,
-                         $"Review '{signature.ReviewId}' does not exist.");
-        if (RecordDigest.Compute(record) != signature.RecordDigest)
-        {
-            throw new DomainRuleException(
-                DomainRule.RecordChanged,
-                "The record changed while you were signing. Review it and try again.");
-        }
-
-        var slotExists = await context.ReviewerSlots.AnyAsync(
-            s => s.Id == signature.SlotId && s.ProjectId == signature.ProjectId && s.ReviewId == signature.ReviewId,
-            cancellationToken);
-        if (!slotExists)
-        {
-            throw new DomainRuleException(
-                DomainRule.SlotNotFound,
-                $"Slot {signature.SlotId} does not exist in this review.");
-        }
-
-        // Insert a fresh entity so that the database always assigns the identity
-        var entity = new ReviewSignature
-        {
-            ProjectId = signature.ProjectId,
-            ReviewId = signature.ReviewId,
-            SlotId = signature.SlotId,
-            UserId = signature.UserId,
-            DisplayName = signature.DisplayName,
-            Role = signature.Role,
-            SignedAt = signature.SignedAt,
-            RecordDigest = signature.RecordDigest,
-            Meaning = signature.Meaning
-        };
-        context.Signatures.Add(entity);
-        try
-        {
-            await context.SaveChangesAsync(cancellationToken);
-        }
-        catch (DbUpdateException ex) when (IsDuplicateKey(ex))
-        {
-            // The unique index on (slot, digest) stopped a second signature of the same record from the same slot
-            throw new DomainRuleException(
-                DomainRule.SigningNotAllowed,
-                "This slot already has a signature of the current record.");
-        }
-
-        await transaction.CommitAsync(cancellationToken);
-        return entity;
     }
 
     /// <summary>

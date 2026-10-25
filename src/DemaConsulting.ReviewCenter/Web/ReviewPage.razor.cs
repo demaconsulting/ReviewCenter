@@ -535,16 +535,16 @@ public partial class ReviewPage : ComponentBase
     {
         try
         {
-            // The service takes no actor yet; asking for one refuses an ended sign-in state
-            _ = await AuthenticationState.GetActorAsync();
+            // The actor is audited; asking for it also refuses an ended sign-in state
+            var actor = await AuthenticationState.GetActorAsync();
             if (thread.State == ReviewThreadState.Open)
             {
-                await ThreadService.ResolveAsync(ProjectId, ReviewId, thread.Id);
+                await ThreadService.ResolveAsync(ProjectId, ReviewId, thread.Id, actor);
                 ExpandedThreads.Remove(thread.Id);
             }
             else
             {
-                await ThreadService.ReopenAsync(ProjectId, ReviewId, thread.Id);
+                await ThreadService.ReopenAsync(ProjectId, ReviewId, thread.Id, actor);
             }
         }
         catch (DomainRuleException ex)

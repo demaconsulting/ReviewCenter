@@ -100,3 +100,9 @@ the list of its project, and the content of a file is read. This scenario is tes
 **ReviewService_GetFileContentAsync_MissingFileOrReview_ReturnsNull**: The content of a file that does not exist
 in an existing review, and of a file of a review that does not exist, is read; both return null. This scenario is
 tested by `ReviewService_GetFileContentAsync_MissingFileOrReview_ReturnsNull`.
+
+**ReviewService_CreateDraftAsync_Review_RecordsReviewCreatedWithFingerprint**: A review is created by a named actor;
+the audit entry `review.created` is recorded with the review title, the file count, and the fingerprint in the
+detail. This scenario is tested by `ReviewService_CreateDraftAsync_Review_RecordsReviewCreatedWithFingerprint`, and
+the plural wording for several files by `ReviewService_CreateDraftAsync_SeveralFiles_RecordsPluralCount`; both are
+defined in `AuditEventTests.cs`.

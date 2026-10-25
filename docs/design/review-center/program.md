@@ -41,7 +41,7 @@ Inspects flags in priority order: (1) if `context.Version` is true, calls
 true, calls `PrintHelp` and returns; (4) if `context.Validate` is true, calls
 `Validation.Run(context)`; (5) if `context.Serve` is true, runs the web server through
 `ServerHost.RunAsync` and blocks until it stops; (6) if `context.UserAdd` is true, calls `UserCommand.Run(context)`;
-(7) otherwise calls `RunToolLogic(context)`.
+(7) if `context.AuditVerify` is true, calls `AuditCommand.Run(context)`; (8) otherwise calls `RunToolLogic(context)`.
 `Run` supplies no stop request; the process stops the server with Ctrl+C or a termination
 signal.
 
@@ -65,9 +65,11 @@ deterministically.
 - *Parameters*: `Context context` — output target.
 - *Returns*: `void`.
 
-**PrintHelp**: Writes the usage synopsis, the `serve` and `user add` verbs, and the options table (including
+**PrintHelp**: Writes the usage synopsis, the `serve`, `user add`, and `audit verify` verbs, and the options table
+(including
 `--urls`, `--username`, `--display-name`, and `--role`) to `context`. The help text says that the password of
-`user add` is read from the environment variable `REVIEWCENTER_PASSWORD`, from standard input, or from a prompt.
+`user add` is read from the environment variable `REVIEWCENTER_PASSWORD`, from standard input, or from a prompt, and
+that `audit verify` exits with 0 when the chain is intact and 1 when it is broken.
 
 - *Parameters*: `Context context` — output target.
 - *Returns*: `void`.
@@ -99,6 +101,8 @@ error that yields exit code 1 rather than an unhandled exception.
 - **ServerHost** — `Program.RunWithCancellation` calls `ServerHost.RunAsync(context,
   cancellationToken)` when the `serve` verb is present.
 - **UserCommand** — `Program.RunWithCancellation` calls `UserCommand.Run(context)` when the `user add` verb is
+  present.
+- **AuditCommand** — `Program.RunWithCancellation` calls `AuditCommand.Run(context)` when the `audit verify` verb is
   present.
 
 ### Callers

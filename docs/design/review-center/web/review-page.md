@@ -20,7 +20,8 @@ presentation
 (`ReviewPage.razor`) and behavior (`ReviewPage.razor.cs`). It reads reviews through `ReviewService` and works with
 threads only through `ThreadService`, so every comment rule is applied there. It works with reviewer slots,
 signatures, and the approval status only through `SigningService`, so the page contains no signing rules. It requires
-a signed-in user, and every comment, slot change, and signature is made on behalf of that user.
+a signed-in user, and every comment, slot change, and signature is made on behalf of that user. The title row also
+has a link to the history page of the review (`history-link`), where the audit entries of the review are listed.
 
 #### Data Model
 
@@ -224,3 +225,4 @@ raises no other errors of its own.
 
 - **App** — the router renders the page for the review route.
 - **ProjectPage** — navigates to the page after a review is created.
+- **HistoryPage** — links back to the page.

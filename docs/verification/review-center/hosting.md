@@ -48,3 +48,9 @@ is tested by
 `ServerHost.RunAsync` with an unsupported database provider; it returns 1 and the context records the failure,
 and no unhandled exception escapes. This scenario is tested by
 `HostingSubsystem_Startup_UnsupportedDatabaseProvider_FailsWithExitCodeOne`.
+
+**Audit verify verb**: The `AuditCommand` unit tests run the verb over a real database. An intact trail gives the
+entry count and exit code 0, which is tested by `AuditCommand_Run_IntactTrail_ReportsEntryCountWithExitCodeZero`, and
+a tampered entry gives the first bad entry and exit code 1, which is tested by
+`AuditCommand_Run_TamperedEntry_ReportsFirstBadEntryWithExitCodeOne`. The registration of the audit services in
+`ServerHost.AddServices` is exercised by the sign-in audit tests, not by a separate hosting test.

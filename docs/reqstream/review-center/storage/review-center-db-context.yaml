@@ -95,3 +95,16 @@ sections:
           - ReviewStore_RemoveSlotAsync_SignedSlot_IsRefusedByDatabase
           - ReviewStore_AddSignatureAsync_SameSlotAndDigestTwice_ThrowsSigningNotAllowed
           - ReviewStore_AddSignatureAsync_CurrentDigest_StoresAndRoundTrips
+
+      - id: ReviewCenter-DbContext-AuditEntries
+        title: >-
+          The ReviewCenterDbContext class shall map the audit entries to a table keyed by the sequence number,
+          never assigned by the database, so that a second entry with the same sequence is refused, with no
+          relationship to any other table so that an entry survives whatever happens to the rows it describes,
+          and with an index for reading the entries of one review.
+        justification: |
+          The key is the last defense of the hash chain against two entries with the same position, and an entry
+          is a snapshot of text that must not depend on other rows.
+        tests:
+          - AuditStore_Database_DuplicateSequence_IsRefusedByUniqueKey
+          - AuditStore_ListAsync_FilterAndCursors_ReturnExpectedEntriesNewestFirst

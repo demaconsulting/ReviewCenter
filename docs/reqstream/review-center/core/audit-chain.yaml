@@ -1,0 +1,77 @@
+---
+# Software Unit Requirements for the AuditChain Unit
+#
+# The AuditChain unit holds the audit entry types, the canonical encoding and hash of an entry, the cleaning of
+# the text that enters the trail, and the streaming verifier of the hash chain.
+
+sections:
+  - title: AuditChain Unit Requirements
+    requirements:
+      - id: ReviewCenter-AuditChain-Hash
+        title: >-
+          The AuditChain unit shall compute the hash of an audit entry as the lowercase hexadecimal SHA-256 of a
+          canonical, length-prefixed encoding of the sequence, the time, the actor, the action, the optional project
+          and review, the detail, and the previous hash, so that the hash changes when any of them changes and no
+          text can move between two fields without changing it.
+        justification: |
+          The hash chain is only evidence if the hash covers every recorded value without ambiguity. A pinned
+          known-answer value protects the encoding against accidental change.
+        tests:
+          - AuditChain_GenesisHash_IsSixtyFourZeros
+          - AuditChain_ComputeHash_KnownEntry_MatchesPinnedValue
+          - AuditChain_ComputeHash_KnownEntryWithoutOptionalFields_MatchesPinnedValue
+          - AuditChain_ComputeHash_SameFields_IsStableLowercaseHexAndIgnoresStoredHash
+          - AuditChain_ComputeHash_SameInstantOtherOffset_SameHash
+          - AuditChain_ComputeHash_NullEntry_Throws
+          - AuditChain_ComputeHash_AnyFieldChanged_ChangesHash
+          - AuditChain_ComputeHash_NullReviewVersusEmptyReview_DiffersFromEachOther
+          - AuditChain_ComputeHash_TextMovedBetweenAdjacentFields_ChangesHash
+          - AuditChain_ComputeHash_TextMovedFromDetailToReview_ChangesHash
+          - AuditChain_ComputeHash_UnicodeText_IsHashed
+
+      - id: ReviewCenter-AuditChain-Verify
+        title: >-
+          The AuditChain unit shall verify a sequence of audit entries one by one, without holding it in memory,
+          and shall report the sequence of the first entry that is edited, missing, inserted, duplicated, out of
+          order, or linked to the wrong predecessor, together with the hash of the last entry that verified.
+        justification: |
+          Verification must detect edits, deletions, insertions, and reordering in the middle of the history, and
+          it must work on a trail of any size.
+        tests:
+          - AuditChain_Verify_EmptyChain_IsIntactWithGenesisHead
+          - AuditChain_Verify_ValidChain_IsIntactWithLastHashAsHead
+          - AuditChain_Verify_EditedEntry_ReportsThatEntry
+          - AuditChain_Verify_EditedEntryWithRecomputedHash_BreaksAtNextEntry
+          - AuditChain_Verify_DeletedEntry_ReportsTheMissingSequence
+          - AuditChain_Verify_DeletedFirstEntry_ReportsSequenceOne
+          - AuditChain_Verify_ReorderedEntries_ReportsFirstOutOfOrderSequence
+          - AuditChain_Verify_InsertedEntry_IsDetected
+          - AuditChain_Verify_DuplicatedEntry_IsDetected
+          - AuditChain_Verify_WrongPreviousHash_ReportsThatEntry
+          - AuditChain_Verify_FirstEntryWithOtherSequence_ReportsSequenceOne
+          - AuditChain_Verify_TwoBadEntries_ReportsTheFirst
+          - AuditChain_Verify_BadEntry_StopsReadingTheSequence
+          - AuditChainVerifier_Add_AfterFailure_StaysFailedWithLastGoodHead
+
+      - id: ReviewCenter-AuditChain-Text
+        title: >-
+          The AuditChain unit shall clean every text that enters the trail (trimming it, replacing control
+          characters and line breaks, replacing lone surrogates, and cutting it with an ellipsis at a length limit
+          without splitting a surrogate pair), shall identify a text that must not be stored by the short SHA-256
+          hash of its trimmed text, and shall name the actor of an audit draft as the display name and user name of
+          a user or as the command line.
+        justification: |
+          The trail is shown on pages and read in logs, so its text must be one safe line of bounded length, and a
+          comment or a justification must be identifiable without being copied into a history that cannot be edited.
+        tests:
+          - AuditText_Clean_PlainText_IsUnchanged
+          - AuditText_Clean_NullAndPadded_AreEmptyAndTrimmed
+          - AuditText_Clean_ControlCharactersAndLineBreaks_BecomeSpaces
+          - AuditText_Clean_Surrogates_PairKeptLoneReplaced
+          - AuditText_Clean_LongText_IsCutWithEllipsisWithinLimit
+          - AuditText_Clean_CutInsideSurrogatePair_DoesNotSplitThePair
+          - AuditText_Clean_LimitBelowFour_Throws
+          - AuditText_ShortHash_Text_IsPrefixOfSha256OfTrimmedText
+          - AuditText_ShortHash_NullAndDifferentText_BehavesAsEmptyAndDiffers
+          - AuditDraft_By_SignedInActor_NamesDisplayNameAndUserName
+          - AuditDraft_By_CommandLineActor_NamesOnlyTheDisplayName

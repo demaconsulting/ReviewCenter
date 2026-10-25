@@ -70,3 +70,17 @@ sections:
         tests:
           - Program_Run_WithHelpFlag_ListsUserAddVerbAndOptions
           - ReviewCenter_UserAddVerb_PasswordFromEnvironment_CreatesUserThenRejectsDuplicate
+
+      - id: ReviewCenter-Program-AuditVerify
+        title: >-
+          The Program class shall list the audit verify verb in the help text, and shall run the audit trail
+          verification, with exit code 0 for an intact chain and 1 for a broken chain or an unreadable database,
+          when the verb is provided.
+        justification: |
+          Program is the single dispatcher for every action of the tool, and operators discover the verb from the
+          help text. The dispatch itself is verified through the AuditCommand unit tests, which run the command
+          directly.
+        tests:
+          - Program_Run_Help_DocumentsAuditVerify
+          - AuditCommand_Run_IntactTrail_ReportsEntryCountWithExitCodeZero
+          - AuditCommand_Run_TamperedEntry_ReportsFirstBadEntryWithExitCodeOne

@@ -48,7 +48,7 @@ public class UserStoreTests
             .BuildServiceProvider();
         var factory = provider.GetRequiredService<IDbContextFactory<ReviewCenterDbContext>>();
         DatabaseSetup.EnsureCreated(factory, options);
-        return new UserStore(factory);
+        return new UserStore(factory, new AuditAppender(TimeProvider.System));
     }
 
     /// <summary>

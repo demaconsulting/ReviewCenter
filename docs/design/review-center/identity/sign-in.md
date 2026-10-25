@@ -75,10 +75,14 @@ redirects to `/login?error=1`, adding `&ReturnUrl=` with the escaped safe return
 attempt still leads to the place the user wanted. The failure is the same for an unknown user, a wrong password, a
 disabled account, and a locked account, so the response does not reveal which user names exist or that an account is
 locked.
+After the cookie has been issued, the sign-in is recorded as `auth.sign-in` through `AuditService.TryRecordAsync`
+(awaited, best-effort: a failure is logged and never changes the response).
 
 **POST /auth/logout**: Removes the cookie and redirects to `/`. This endpoint binds no form field, so the framework
 does not check the antiforgery token by itself; the endpoint validates it through the antiforgery service and answers
-HTTP status 400 without changing the session when the token is missing or wrong.
+HTTP status 400 without changing the session when the token is missing or wrong. Before the cookie is removed, the
+sign-out is recorded as `auth.sign-out` (best-effort, as for the sign-in), with the actor taken from the server-side
+`HttpContext.User`, never from the form.
 
 **SafeReturnUrl**: Reduces a requested return URL to one that stays on this site.
 
@@ -122,11 +126,13 @@ because an open page can lose its user between two clicks (the state ends when t
 changed), and the pages already show a rule violation as a message next to the control that was used instead of failing.
 Rule failures of the login are not errors: they are the generic failure redirect.
 An invalid `SessionHours` or `RevalidationSeconds` value makes the options validation fail, which `ServerHost` reports
-when the server starts. The login and logout endpoints do not log the password or the hash.
+when the server starts. The login and logout endpoints do not log the password or the hash. A failure to record an
+audit event is logged as a warning and swallowed (see the `AuditService` unit for why).
 
 #### Dependencies
 
 - **UserService** (Core) — checks the password and reads the user for the per-request validation.
+- **AuditService** (Core) — records the sign-in and the sign-out.
 - **Actor**, **User**, **UserRole**, and **DomainRuleException** (Core) — the type produced for the pages, the user
   that `IsCurrent` compares with, the role names of the claims, and the refusal of `GetActorAsync`.
 - **RevalidatingAuthenticationStateProvider** (Identity) — registered by `AddSignIn`; it calls `IsCurrent`.

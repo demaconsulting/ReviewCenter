@@ -38,3 +38,7 @@ created through `UserService`, and the authentication state provider is resolved
 gets it; it must be the revalidating provider. The provider is given a signed-in state of the user and checks it: the
 user is valid. The user is disabled through the real service, and the check is repeated: the user is no longer valid.
 This scenario is tested by `IdentitySubsystem_Revalidation_UserDisabledAfterSignIn_OpenSessionIsNoLongerValid`.
+
+**Sign-in audit**: On the real pipeline a user signs in with a wrong password, then with the right one, and signs
+out; the audit trail holds the failed sign-in, the sign-in, and the sign-out in this order, and its chain is intact.
+This scenario is tested by `SignIn_Flow_LoginFailureAndLogout_FormAnIntactChain`.

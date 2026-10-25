@@ -82,3 +82,8 @@ from `["--help"]`; the output contains "serve", "--urls", and the default addres
 **Program_Run_WithHelpFlag_ListsUserAddVerbAndOptions**: `Program.Run` is called with a context from `["--help"]`;
 the output contains "user add", "--username", "--display-name", "--role", and the password variable
 `REVIEWCENTER_PASSWORD`. This scenario is tested by `Program_Run_WithHelpFlag_ListsUserAddVerbAndOptions`.
+
+**Program_Run_Help_DocumentsAuditVerify**: `Program.Run` is called with a context from `["--help"]`; the output names
+`audit verify`. This scenario is tested by `Program_Run_Help_DocumentsAuditVerify`, which is defined in
+`CliSubsystemTests.cs`. No test dispatches `Program.Run` to `AuditCommand.Run`; the dispatch is a single branch that
+is verified by inspection, and the command itself is verified by the `AuditCommand` tests.

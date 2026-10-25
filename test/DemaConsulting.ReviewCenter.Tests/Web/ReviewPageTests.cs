@@ -79,6 +79,22 @@ public class ReviewPageTests : PageTestBase
     }
 
     /// <summary>
+    ///     Test that the title row links to the history of the review.
+    /// </summary>
+    [Fact]
+    public async Task ReviewPage_Render_ExistingReview_ShowsHistoryLink()
+    {
+        // Arrange
+        var projectId = await CreateReviewAsync(new UploadedFile("a.txt", TestContent.A));
+
+        // Act
+        var cut = RenderPage(projectId);
+
+        // Assert
+        Assert.Equal($"/projects/{projectId}/reviews/REV-1/history", cut.Find("[data-testid='history-link']").GetAttribute("href"));
+    }
+
+    /// <summary>
     ///     Test that the review's id, title, state and fingerprint are shown.
     /// </summary>
     [Fact]

@@ -50,7 +50,7 @@ public class StorageSubsystemTests
             .BuildServiceProvider();
         var factory = provider.GetRequiredService<IDbContextFactory<ReviewCenterDbContext>>();
         DatabaseSetup.EnsureCreated(factory, options);
-        var store = new ReviewStore(factory);
+        var store = new ReviewStore(factory, new AuditAppender(TimeProvider.System));
         var time = new FixedTimeProvider(_now);
         return (provider, new ProjectService(store, time), new ReviewService(store, time), store);
     }
@@ -277,7 +277,7 @@ public class StorageSubsystemTests
     private static UserService NewUserService(ServiceProvider provider)
     {
         var factory = provider.GetRequiredService<IDbContextFactory<ReviewCenterDbContext>>();
-        return new UserService(new UserStore(factory), new FakePasswordHasher(), new FixedTimeProvider(_now));
+        return new UserService(new UserStore(factory, new AuditAppender(TimeProvider.System)), new FakePasswordHasher(), new FixedTimeProvider(_now));
     }
 
     /// <summary>

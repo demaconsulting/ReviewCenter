@@ -34,7 +34,8 @@ namespace DemaConsulting.ReviewCenter.Storage;
 ///     so callers see a domain error, not a database one.
 /// </remarks>
 /// <param name="factory">The factory that creates a context per operation.</param>
-internal sealed class UserStore(IDbContextFactory<ReviewCenterDbContext> factory) : IUserStore
+/// <param name="appender">The appender that runs each change together with its audit entry.</param>
+internal sealed class UserStore(IDbContextFactory<ReviewCenterDbContext> factory, AuditAppender appender) : IUserStore
 {
     /// <summary>
     ///     The SQLite extended result code for a unique constraint violation.
@@ -42,37 +43,45 @@ internal sealed class UserStore(IDbContextFactory<ReviewCenterDbContext> factory
     private const int SqliteUniqueViolation = 2067;
 
     /// <inheritdoc />
-    public async Task<User> AddAsync(User user, CancellationToken cancellationToken = default)
+    public async Task<User> AddAsync(
+        User user,
+        Func<User, AuditDraft> audit,
+        CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(user);
+        ArgumentNullException.ThrowIfNull(audit);
 
-        await using var context = await factory.CreateDbContextAsync(cancellationToken);
+        return await appender.ExecuteAsync<User>(
+            factory,
+            async context =>
+            {
+                // Insert a fresh entity so that the database always assigns the identity, whatever the caller supplied
+                var entity = new User
+                {
+                    Username = user.Username,
+                    DisplayName = user.DisplayName,
+                    Role = user.Role,
+                    Enabled = user.Enabled,
+                    PasswordHash = user.PasswordHash,
+                    FailedLoginCount = user.FailedLoginCount,
+                    LockoutUntil = user.LockoutUntil,
+                    Created = user.Created
+                };
+                context.Users.Add(entity);
+                try
+                {
+                    await context.SaveChangesAsync(cancellationToken);
+                }
+                catch (DbUpdateException ex) when (ex.InnerException is SqliteException { SqliteExtendedErrorCode: SqliteUniqueViolation })
+                {
+                    throw new DomainRuleException(
+                        DomainRule.UserNameTaken,
+                        $"A user with the name '{user.Username}' already exists.");
+                }
 
-        // Insert a fresh entity so that the database always assigns the identity, whatever the caller supplied
-        var entity = new User
-        {
-            Username = user.Username,
-            DisplayName = user.DisplayName,
-            Role = user.Role,
-            Enabled = user.Enabled,
-            PasswordHash = user.PasswordHash,
-            FailedLoginCount = user.FailedLoginCount,
-            LockoutUntil = user.LockoutUntil,
-            Created = user.Created
-        };
-        context.Users.Add(entity);
-        try
-        {
-            await context.SaveChangesAsync(cancellationToken);
-        }
-        catch (DbUpdateException ex) when (ex.InnerException is SqliteException { SqliteExtendedErrorCode: SqliteUniqueViolation })
-        {
-            throw new DomainRuleException(
-                DomainRule.UserNameTaken,
-                $"A user with the name '{user.Username}' already exists.");
-        }
-
-        return entity;
+                return (entity, audit(entity));
+            },
+            cancellationToken);
     }
 
     /// <inheritdoc />
@@ -97,13 +106,19 @@ internal sealed class UserStore(IDbContextFactory<ReviewCenterDbContext> factory
     }
 
     /// <inheritdoc />
-    public async Task UpdateAsync(User user, CancellationToken cancellationToken = default)
+    public async Task UpdateAsync(User user, AuditDraft? audit, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(user);
 
-        // The user is a detached copy that was read earlier; Update marks every column of that row as changed
-        await using var context = await factory.CreateDbContextAsync(cancellationToken);
-        context.Users.Update(user);
-        await context.SaveChangesAsync(cancellationToken);
+        // The user is a detached copy that was read earlier; Update marks every column of that row as changed.
+        // Unaudited updates (failure counters) still pass the gate, so all writes stay serialized
+        await appender.ExecuteAsync<bool>(
+            factory,
+            context =>
+            {
+                context.Users.Update(user);
+                return Task.FromResult((true, audit));
+            },
+            cancellationToken);
     }
 }

@@ -5,12 +5,13 @@
 ### Overview
 
 The `Web` subsystem is the Blazor Server user interface of ReviewCenter. It owns what a browser
-shows and how it responds to user actions. It contains nine units: `App`, the HTML shell, the URL router, the
+shows and how it responds to user actions. It contains eleven units: `App`, the HTML shell, the URL router, the
 page frame with the sign-in header, and the `SessionGate` that replaces an open page when its user is no longer
 signed in; `HomePage`, the interactive landing page served at the root URL; `ProjectsPage`,
-`ProjectPage`, `ReviewPage`, and `ChecklistPage`, the pages for projects, reviews, and review checklists; and
+`ProjectPage`, `ReviewPage`, and `ChecklistPage`, the pages for projects, reviews, and review checklists;
 `LoginPage`, `AccountPage`, and `UsersPage`, the pages for signing in, changing one's own password, and managing
-users. The subsystem
+users; and `HistoryPage` and `AuditPage`, the pages that show the history of a review and let an administrator
+verify the audit trail. The subsystem
 does not start or configure the server; the `Hosting` subsystem maps `App` as the root
 component of the server and supplies the endpoints around it, and the `Identity` subsystem supplies the sign-in and
 the authorization the pages rely on. The pages use the `Core` subsystem for
@@ -68,6 +69,26 @@ pages for projects, reviews, and review checklists.
   password.
 - *Constraints*: Requires the role `Admin`; a signed-in user with another role gets HTTP status 403.
 
+**History route** (`GET /projects/{id}/reviews/{reviewId}/history`): The history of one review.
+
+- *Type*: HTTP `GET`, followed by a live Blazor connection for interactivity.
+- *Role*: Provider.
+- *Contract*: Lists the audit entries of the review newest first in pages of 50 (time in UTC, actor, action, and
+  detail), with Older and Newer links (the position is carried in the query values `before` and `after`), a message when
+  the review does not exist, and a message when nothing was recorded.
+- *Constraints*: Requires a signed-in user. It is reached from the link in the title row of the review page.
+
+**Audit route** (`GET /audit`): The page where an administrator reads and verifies the whole audit trail.
+
+- *Type*: HTTP `GET`, followed by a live Blazor connection for interactivity.
+- *Role*: Provider.
+- *Contract*: Lists the entries of the whole system newest first in pages of 50, with Older and Newer links (the
+  position is carried in the query values `before` and `after`), and a Verify chain button that checks the whole hash
+  chain and shows either "Chain intact" with the number of entries and the head hash, or the first broken entry and the
+  head hash.
+- *Constraints*: Requires the role `Admin`, which is re-checked against the stored user on load and on every
+  verification. It is reached from the Audit link of the page frame, which only an administrator sees.
+
 **Unknown routes**: Any other URL.
 
 - *Type*: HTTP `GET`.
@@ -112,12 +133,14 @@ address), and on the ASP.NET Core Blazor components framework.
 
 #### Pages and domain access
 
-`ProjectsPage`, `ProjectPage`, `ReviewPage`, `ChecklistPage`, `AccountPage`, and `UsersPage` follow the pattern of
+`ProjectsPage`, `ProjectPage`, `ReviewPage`, `ChecklistPage`, `AccountPage`, `UsersPage`, `HistoryPage`, and
+`AuditPage` follow the pattern of
 `HomePage`: a Razor
 presentation file and a code-behind file, interactive server rendering, and the `data-interactive`
 marker. They obtain `ProjectService`, `ReviewService`, and the other Core services they need (`ReviewPage`:
 `ThreadService`, `ChecklistService`, and `SigningService`; `ProjectPage`: also `SigningService`; `ChecklistPage`:
 `ChecklistService`; `AccountPage` and `UsersPage`:
+`UserService`; `HistoryPage` and `AuditPage`: `AuditService`, and `AuditPage` also the user store through
 `UserService`) from the service container and call them
 from their handlers. Each page loads its data when it is created, so a connection that is
 established after the server-rendered snapshot shows current data. A rule violation reported by
@@ -129,21 +152,23 @@ by `@onsubmit`, so Enter submits them and tests can submit them without a button
 #### Authorization and the signed-in user
 
 Every page except the home page and the login page requires a signed-in user, declared on the page with an
-authorization attribute; `UsersPage` requires the role `Admin`. The checks are made by the authorization of the
-`Identity` subsystem before the page is rendered, so a page never shows data to an anonymous visitor. The
-page frame (`MainLayout` in the `App` unit) shows the display name of the signed-in user with links to the account
-page and, for an administrator, the users page, and a logout button, or a link to the login page when nobody is signed
-in. The pages that record something on behalf of a person (`ReviewPage` and `ChecklistPage`) get the signed-in user
+authorization attribute; `UsersPage` and `AuditPage` require the role `Admin`. The checks are made by the
+authorization of the `Identity` subsystem before the page is rendered, so a page never shows data to an anonymous
+visitor. The page frame (`MainLayout` in the `App` unit) shows the display name of the signed-in user with links to
+the account page and, for an administrator, the users page and the audit page, and a logout button, or a link to the
+login page when nobody is signed in. The pages that record something on behalf of a person (`ReviewPage` and
+`ChecklistPage`) get the signed-in user
 from the authentication state and pass it to Core as an `Actor`; there is no field in which a person could type
 another name. A page that is already open makes no request, so the cookie check does not reach it; the
 `RevalidatingAuthenticationStateProvider` of the `Identity` subsystem re-reads the user at a fixed interval and ends the
 authentication state of the page when the user is no longer valid (see *Open pages and the end of a session* below).
-`UsersPage` also re-checks the stored user before every action, so a user who is no longer an enabled
+`UsersPage` also re-checks the stored user before every action, and `AuditPage` on load and before every
+verification, so a user who is no longer an enabled
 administrator is refused at once, and so does the signing of a review in Core. The other actions keep acting for the
 original user until the next check, which is at most one revalidation interval, and what they record is attributed to
 that user. Every action that changes something (creating a project or a review, starting, answering, resolving, and
 reopening a thread, answering checklist checks, changing reviewer slots, signing, changing a password, and the user
-administration actions) first asks `GetActorAsync` for the current user, even where its Core service takes no actor yet,
+administration actions) first asks `GetActorAsync` for the current user, even where its Core service takes no actor,
 so an action that meets an authentication state that has already ended is refused with a message and saves nothing.
 
 #### Open pages and the end of a session
@@ -151,8 +176,9 @@ so an action that meets an authentication state that has already ended is refuse
 Each protected page opts in to interactive rendering on its own, so each page is a root component of its own live
 connection, while `App`, `Routes`, and `MainLayout` are served as static markup once. Neither the router nor the
 header can react when the authentication state of an open page ends; only a component inside the page can. The
-`SessionGate` component of the `App` unit therefore wraps the content of each of the six protected pages
-(`ProjectsPage`, `ProjectPage`, `ReviewPage`, `ChecklistPage`, `AccountPage`, `UsersPage`). While a user is signed in it
+`SessionGate` component of the `App` unit therefore wraps the content of each of the eight protected pages
+(`ProjectsPage`, `ProjectPage`, `ReviewPage`, `ChecklistPage`, `AccountPage`, `UsersPage`, `HistoryPage`,
+`AuditPage`). While a user is signed in it
 adds no element, so the markup and the `data-interactive` marker of the page do not change. When the state becomes
 anonymous, it removes the page content, and with it every handler, and shows a "Session ended" message with a link to
 the login page that returns to the same page. `HomePage` and `LoginPage` are open to anonymous visitors, have no
@@ -186,6 +212,16 @@ while it is typed, passes to `SigningService.SignAsync`, and clears in a `finall
 never rendered back into the page. The page also passes the record digest it displayed, so a signature always covers
 the record the reader saw, and a record that changed since the page was drawn is refused. The project page shows the
 approval status of every listed review, one lookup per review.
+
+#### History and audit
+
+`HistoryPage` and `AuditPage` only read. They show the audit entries through `AuditService`, which pages them 50 at a
+time newest first, and the position is carried in the address, so the Older and Newer links are plain anchors. A page
+shows what the trail says; it does not claim more. Only `AuditPage` verifies the chain, and its result text says what
+was checked (the chain is intact, or the first entry that no longer fits) and shows the head hash so that an
+administrator can record it elsewhere: the verification alone cannot tell that the newest entries were removed. The
+history link in the title row of the review page is shown to every signed-in user, and the audit link of the page
+frame only to an administrator, which is a convenience and not the protection: the page has its own authorization.
 
 #### Test identifiers
 

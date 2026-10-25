@@ -48,6 +48,7 @@
             {
                 <span class="badge @(Approval.IsApproved ? "approved" : null)" data-testid="review-approval">@(Approval.IsApproved ? "Approved" : "In review")</span>
             }
+            <a class="action" href="/projects/@ProjectId/reviews/@ReviewId/history" data-testid="history-link">History</a>
         </div>
 
         <p class="status" data-testid="next-step">@Approval?.NextStep</p>

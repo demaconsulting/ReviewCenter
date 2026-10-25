@@ -128,6 +128,18 @@ way to guess passwords, and is reported as `CurrentPasswordIncorrect`. Other ses
 checked (`PasswordInvalid`), an unknown user is reported as `UserNotFound`, and the failure counter and lockout of the
 user are cleared, so it also ends a lockout. Other sessions of the user are not ended.
 
+**Audit**: The operations that change a user take the `Actor` and record `user.created`, `user.enabled`,
+`user.disabled`, `user.role-changed`, and `user.password-set-by-admin`; changing one's own password records
+`user.password-changed` with that user as the actor. These drafts are saved by the store in the same transaction as the
+change. The command line passes `Actor.CommandLine`. The constructor takes an optional `AuditService` (the web server
+and the command line supply it): with it, a failed sign-in records `auth.sign-in-failed` (detail `wrong password`,
+`account disabled`, or `unknown user`, the last as the actor text `unknown user`) and the fifth failure also records
+`auth.locked-out`. These events change no data of their own and are recorded best-effort through `TryRecordAsync`,
+awaited and logged on failure, so a broken trail can never block a sign-in. The update of the failure counter and the
+lockout state is itself not audited (no draft). Two limits are known and deliberate: an attempt on an account that is
+already locked is refused before the password is checked and is not recorded, and a wrong current password at signing
+or on the account page is reported by the same code path and appears as `auth.sign-in-failed`.
+
 #### Error Handling
 
 Rule violations raise `DomainRuleException` with the matching `DomainRule`. A null store, hasher, or clock at

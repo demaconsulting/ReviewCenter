@@ -98,6 +98,11 @@ The rules are checked in this order, and the first violation is reported: that t
 (`ChecklistItemNotFound`); and the justification or reason (`ChecklistJustificationInvalid`). An outcome that is not
 a defined value is a programming error and throws `ArgumentOutOfRangeException` before any rule is checked.
 
+**Audit**: Changing the applicability of a section records `checklist.applicability-changed`, and answering a check
+records `checklist.answered`. The draft is passed to the store and saved in the same transaction. The detail of an
+answer names the item and the outcome and, when there is a justification, only a short hash of it, not the text. See
+the `AuditService` unit for the detail formats.
+
 #### Error Handling
 
 Rule violations raise `DomainRuleException` with the matching `DomainRule`. A null store or clock at construction,

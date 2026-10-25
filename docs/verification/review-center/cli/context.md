@@ -186,3 +186,8 @@ wrong is thrown for each. This scenario is tested by `Context_Create_UserAddMisu
 **Context_Create_PasswordOption_IsNotSupported**: `Context.Create` is called with `user add` and a `--password`
 option; an `ArgumentException` containing "Unsupported argument" is thrown, so a password cannot be given on the
 command line. This scenario is tested by `Context_Create_PasswordOption_IsNotSupported`.
+
+**Audit verify verb**: `Context.Create` with `audit verify` sets `AuditVerify` and is off otherwise, which is tested
+by `Context_Create_AuditVerifyVerb_SetsAuditVerify`; `audit` alone or with another action is rejected with an
+`ArgumentException`, which is tested by `Context_Create_AuditMisuse_ThrowsArgumentException`. Both tests are defined
+in `CliSubsystemTests.cs`.

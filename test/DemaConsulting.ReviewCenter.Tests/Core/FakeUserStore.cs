@@ -85,8 +85,16 @@ internal sealed class FakeUserStore : IUserStore
     /// </summary>
     private readonly List<User> _users = [];
 
+    /// <summary>
+    ///     Gets the audit drafts received so far, in the order the changes were made; unaudited updates add none.
+    /// </summary>
+    public List<AuditDraft> Audits { get; } = [];
+
     /// <inheritdoc />
-    public Task<User> AddAsync(User user, CancellationToken cancellationToken = default)
+    public Task<User> AddAsync(
+        User user,
+        Func<User, AuditDraft> audit,
+        CancellationToken cancellationToken = default)
     {
         if (_users.Any(existing => string.Equals(existing.Username, user.Username, StringComparison.OrdinalIgnoreCase)))
         {
@@ -94,7 +102,9 @@ internal sealed class FakeUserStore : IUserStore
         }
 
         _users.Add(Copy(user, _users.Count + 1));
-        return Task.FromResult(Copy(_users[^1], _users[^1].Id));
+        var stored = Copy(_users[^1], _users[^1].Id);
+        Audits.Add(audit(stored));
+        return Task.FromResult(stored);
     }
 
     /// <inheritdoc />
@@ -116,10 +126,15 @@ internal sealed class FakeUserStore : IUserStore
     }
 
     /// <inheritdoc />
-    public Task UpdateAsync(User user, CancellationToken cancellationToken = default)
+    public Task UpdateAsync(User user, AuditDraft? audit, CancellationToken cancellationToken = default)
     {
         var index = _users.FindIndex(existing => existing.Id == user.Id);
         _users[index] = Copy(user, user.Id);
+        if (audit is not null)
+        {
+            Audits.Add(audit);
+        }
+
         return Task.CompletedTask;
     }
 

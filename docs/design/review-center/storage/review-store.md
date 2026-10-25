@@ -10,11 +10,22 @@ them back, translating database behavior into the terms of the domain.
 
 #### Data Model
 
-The unit is stateless apart from the injected context factory. Every operation creates its own short-lived
-context from the factory and disposes it before returning, so concurrent operations never share a context.
-Reads use no change tracking.
+The unit is stateless apart from the injected context factory and the shared `AuditAppender`. Every read creates its own
+short-lived context from the factory and disposes it before returning, so concurrent operations never share a context.
+Reads use no change tracking. Every change goes through `AuditAppender.ExecuteAsync`, which takes the process-wide audit
+gate, opens a `Serializable` transaction, runs the change, appends the audit entry to the same context, saves, and
+commits (see the `AuditStore` unit).
 
 #### Key Methods
+
+**Audit transaction of every change**: `AddProjectAsync`, `AddReviewAsync`, `AddThreadAsync`, `AddCommentAsync`,
+`SetThreadStateAsync`, `SetChecklistSectionStateAsync`, `SetChecklistAnswerAsync`, `AddSlotAsync`, `UpdateSlotAsync`,
+`RemoveSlotAsync`, and `AddSignatureAsync` take the audit draft of the change (or a function that builds it from the
+stored entity, when the draft names an identity that the database assigns). The change and its audit entry are
+stored in the same transaction, so both exist or neither does. A change that did not take effect (a thread, slot, or
+review that is not found) returns its null or false result and stores no entry. A failure of any kind, including a
+duplicate review identifier or a refused signature, rolls back the change and the entry together. The descriptions below
+are of the change itself.
 
 **AddProjectAsync**: Stores a project and returns it with the identity assigned by the database. The unit copies the
 name, description, and creation time into a new entity, so an identity supplied by the caller is ignored and can
@@ -112,7 +123,8 @@ moment.
 - *Preconditions*: `signature` is not null.
 - *Postconditions*: Either one signature is stored, or nothing is and a `DomainRuleException` is raised.
 
-The method opens a transaction with the `Serializable` isolation level. With Microsoft.Data.Sqlite this begins the
+The method runs in the write transaction that the appender begins with the `Serializable` isolation level (the same
+one that stores the audit entry). With Microsoft.Data.Sqlite this begins the
 transaction as an immediate write transaction, so the database write lock is taken at the begin and no other writer
 can change the record until the transaction ends. The method reloads the record with the shared loader, recomputes
 the digest with the Core `RecordDigest.Compute` (the same code the service used to compute the digest the signer
@@ -135,8 +147,9 @@ refusal to delete a signed slot. Null arguments raise `ArgumentNullException`.
 #### Dependencies
 
 - **ReviewCenterDbContext** — the schema and the context factory.
+- **AuditAppender** — runs every change together with its audit entry.
 - **Core domain types and IReviewStore** — the types stored and the interface implemented, including `ReviewRecord`,
-  `ReviewerSlot`, `ReviewSignature`, and `RecordDigest`.
+  `ReviewerSlot`, `ReviewSignature`, `RecordDigest`, and `AuditDraft`.
 - **Entity Framework Core and Microsoft.Data.Sqlite** — queries and the error code of a constraint violation.
 
 #### Callers

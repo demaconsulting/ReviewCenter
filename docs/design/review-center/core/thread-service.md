@@ -102,6 +102,13 @@ default of 0 the wording is the same as before signing existed.
 **ReviewThread.LastActivity**: A read-only value derived from the comments, the time of the latest comment (the
 thread's `Created` when it has none). It is not stored, so the database is unchanged.
 
+**Audit**: Starting a thread, replying, resolving, and reopening take the `Actor` and record `thread.started`,
+`thread.replied`, `thread.resolved`, and `thread.reopened`. The draft is saved by the store in the same transaction as
+the change, and only when the change took effect (a thread that does not exist records nothing). The text of a comment
+is never written to the trail: the detail holds the identifiers and the first 8 hex characters of the SHA-256 of the
+text, so that a later edit of the text would be noticed without copying the text into a second place. See the
+`AuditService` unit for the detail formats.
+
 #### Error Handling
 
 Rule violations raise `DomainRuleException` with the matching `DomainRule`. A null store or clock at construction,

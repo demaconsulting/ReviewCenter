@@ -91,3 +91,17 @@ sections:
           - ReviewCenter-SignIn-RevalidationSetting
         tests:
           - IdentitySubsystem_Revalidation_UserDisabledAfterSignIn_OpenSessionIsNoLongerValid
+
+      - id: ReviewCenter-Identity-AuditTrail
+        title: >-
+          The Identity subsystem shall record successful sign-ins, sign-outs, failed sign-ins, and lockouts in the
+          audit trail on a best-effort basis, taking the actor from the server-side sign-in state, never echoing
+          a user name that does not exist or a password, and never letting a failure of the trail change the
+          result of a sign-in or sign-out.
+        justification: |
+          Attempts to break in and the use of accounts belong to the history, but an unauthenticated caller must
+          not be able to fill the trail with text of their choice, and a failing trail must not lock anybody out.
+        children:
+          - ReviewCenter-SignIn-Audit
+        tests:
+          - SignIn_Flow_LoginFailureAndLogout_FormAnIntactChain

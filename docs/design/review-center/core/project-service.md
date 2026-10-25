@@ -54,6 +54,11 @@ than the limit (`ProjectNameInvalid`) and that the description is not longer tha
 
 **GetAsync**: Reads one project by identity; returns null when it does not exist.
 
+**Audit**: `CreateAsync` takes the `Actor` that creates the project, builds the audit draft `project.created` (detail
+`project 'Name'`) from the stored project, so it can name the identity the database assigned, and passes it to the store,
+which saves it in the same transaction. A creation that is refused records nothing. See the `AuditService` unit for the
+action codes.
+
 #### Error Handling
 
 Rule violations raise `DomainRuleException` before any store access, with `ProjectNameInvalid` or

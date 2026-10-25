@@ -53,7 +53,8 @@ gets its own empty database, so the schema created at startup would be missing f
 Checks the provider first, so that an unsupported setting fails before anything is created. It then creates the
 folder of the file (not for a `file:` URI) and asks Entity Framework Core to create
 the schema. An existing database is not changed, and no migrations are used. A database created before the tables
-for comment threads existed therefore does not get them and must be deleted and created again.
+for comment threads existed therefore does not get them and must be deleted and created again; the same holds for a
+database created before the audit trail, which has no `AuditEntries` table.
 
 #### Error Handling
 
@@ -70,5 +71,6 @@ turns them into one start-up error. Null arguments raise `ArgumentNullException`
 #### Callers
 
 - **ServerHost** — configures the context factory and calls `EnsureCreated` while building the application.
-- **UserCommand** — calls `EnsureCreated` before it creates a user, so the first administrator can be created in a
-  new database.
+- **UserCommand** and **AuditCommand** — call `EnsureCreated` before they work, so the first administrator can be
+  created in a new database. `AuditCommand` therefore creates an empty database when none exists at the configured
+  location.

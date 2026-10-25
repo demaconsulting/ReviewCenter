@@ -123,9 +123,9 @@ public partial class ProjectsPage : ComponentBase
     {
         try
         {
-            // The service takes no actor yet; asking for one refuses an ended sign-in state
-            _ = await AuthenticationState.GetActorAsync();
-            await ProjectService.CreateAsync(NewName, NewDescription);
+            // The actor is audited; asking for it also refuses an ended sign-in state
+            var actor = await AuthenticationState.GetActorAsync();
+            await ProjectService.CreateAsync(NewName, NewDescription, actor);
         }
         catch (DomainRuleException ex)
         {

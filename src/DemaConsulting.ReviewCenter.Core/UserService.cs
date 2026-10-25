@@ -66,6 +66,11 @@ public sealed class UserService
     private readonly SemaphoreSlim _gate = new(1, 1);
 
     /// <summary>
+    ///     Records the sign-in failures and lockouts, or <c>null</c> when they are not audited.
+    /// </summary>
+    private readonly AuditService? _audit;
+
+    /// <summary>
     ///     A hash of no account, verified against when the user is unknown so the response time is similar;
     ///     created on first use.
     /// </summary>
@@ -77,8 +82,12 @@ public sealed class UserService
     /// <param name="store">The store that persists users. Must not be null.</param>
     /// <param name="hasher">The password hasher. Must not be null.</param>
     /// <param name="timeProvider">The clock; injected so tests control time. Must not be null.</param>
-    /// <exception cref="ArgumentNullException">Thrown when an argument is null.</exception>
-    public UserService(IUserStore store, IPasswordHasher hasher, TimeProvider timeProvider)
+    /// <param name="audit">
+    ///     Records failed sign-ins and lockouts in the audit trail on a best-effort basis; <c>null</c> to record
+    ///     nothing. Changes of users are audited by the store regardless.
+    /// </param>
+    /// <exception cref="ArgumentNullException">Thrown when a required argument is null.</exception>
+    public UserService(IUserStore store, IPasswordHasher hasher, TimeProvider timeProvider, AuditService? audit = null)
     {
         ArgumentNullException.ThrowIfNull(store);
         ArgumentNullException.ThrowIfNull(hasher);
@@ -86,6 +95,7 @@ public sealed class UserService
         _store = store;
         _hasher = hasher;
         _timeProvider = timeProvider;
+        _audit = audit;
     }
 
     /// <summary>
@@ -104,8 +114,10 @@ public sealed class UserService
     ///     The initial password: <see cref="ReviewLimits.MinPasswordLength"/> to
     ///     <see cref="ReviewLimits.MaxPasswordLength"/> characters, taken as it is (not trimmed).
     /// </param>
+    /// <param name="actor">The administrator (or <see cref="Actor.CommandLine"/>) who creates the user; recorded in the audit trail. Must not be null.</param>
     /// <param name="cancellationToken">Cancels the operation.</param>
     /// <returns>The stored user; only the hash of the password is kept.</returns>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="actor"/> is null.</exception>
     /// <exception cref="ArgumentOutOfRangeException">Thrown when <paramref name="role"/> is not a defined value.</exception>
     /// <exception cref="DomainRuleException">Thrown when a rule is violated (see <see cref="DomainRule"/>); nothing is stored then.</exception>
     public async Task<User> CreateAsync(
@@ -113,8 +125,11 @@ public sealed class UserService
         string? displayName,
         UserRole role,
         string? password,
+        Actor actor,
         CancellationToken cancellationToken = default)
     {
+        ArgumentNullException.ThrowIfNull(actor);
+
         // Validate everything that needs no I/O first so a bad request fails fast and cheaply
         ValidateUsername(username);
         var trimmedDisplayName = ValidateDisplayName(displayName);
@@ -124,7 +139,8 @@ public sealed class UserService
             throw new ArgumentOutOfRangeException(nameof(role), role, "The role is not a known value.");
         }
 
-        // The store enforces the unique user name, which also covers two requests racing
+        // The store enforces the unique user name, which also covers two requests racing; the audit entry never
+        // carries the password or its hash
         return await _store.AddAsync(
             new User
             {
@@ -135,6 +151,7 @@ public sealed class UserService
                 PasswordHash = _hasher.Hash(password!),
                 Created = _timeProvider.GetUtcNow()
             },
+            stored => AuditDraft.By(actor, "user.created", $"user '{stored.Username}', role {stored.Role}"),
             cancellationToken);
     }
 
@@ -186,6 +203,7 @@ public sealed class UserService
             if (user is null)
             {
                 VerifyDummy(password);
+                await RecordFailureAsync(null, "unknown user", cancellationToken);
                 return null;
             }
 
@@ -205,6 +223,7 @@ public sealed class UserService
             // A disabled account never signs in, however right the password is
             if (!user.Enabled)
             {
+                await RecordFailureAsync(user, "account disabled", cancellationToken);
                 return null;
             }
 
@@ -222,14 +241,21 @@ public sealed class UserService
     /// </summary>
     /// <param name="username">The user name; compared without regard to case.</param>
     /// <param name="enabled"><c>true</c> to let the user sign in; <c>false</c> to stop it.</param>
+    /// <param name="actor">The administrator who makes the change; recorded in the audit trail. Must not be null.</param>
     /// <param name="cancellationToken">Cancels the operation.</param>
     /// <returns>A task that completes when the change is stored.</returns>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="actor"/> is null.</exception>
     /// <exception cref="DomainRuleException">
     ///     Thrown with <see cref="DomainRule.UserNotFound"/> when there is no such user, or with
     ///     <see cref="DomainRule.LastAdmin"/> when the change would disable the last enabled administrator.
     /// </exception>
-    public async Task SetEnabledAsync(string username, bool enabled, CancellationToken cancellationToken = default)
+    public async Task SetEnabledAsync(
+        string username,
+        bool enabled,
+        Actor actor,
+        CancellationToken cancellationToken = default)
     {
+        ArgumentNullException.ThrowIfNull(actor);
         await _gate.WaitAsync(cancellationToken);
         try
         {
@@ -240,7 +266,10 @@ public sealed class UserService
             }
 
             user.Enabled = enabled;
-            await _store.UpdateAsync(user, cancellationToken);
+            await _store.UpdateAsync(
+                user,
+                AuditDraft.By(actor, enabled ? "user.enabled" : "user.disabled", $"user '{user.Username}'"),
+                cancellationToken);
         }
         finally
         {
@@ -253,15 +282,22 @@ public sealed class UserService
     /// </summary>
     /// <param name="username">The user name; compared without regard to case.</param>
     /// <param name="role">The new role.</param>
+    /// <param name="actor">The administrator who makes the change; recorded in the audit trail. Must not be null.</param>
     /// <param name="cancellationToken">Cancels the operation.</param>
     /// <returns>A task that completes when the change is stored.</returns>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="actor"/> is null.</exception>
     /// <exception cref="ArgumentOutOfRangeException">Thrown when <paramref name="role"/> is not a defined value.</exception>
     /// <exception cref="DomainRuleException">
     ///     Thrown with <see cref="DomainRule.UserNotFound"/> when there is no such user, or with
     ///     <see cref="DomainRule.LastAdmin"/> when the change would demote the last enabled administrator.
     /// </exception>
-    public async Task SetRoleAsync(string username, UserRole role, CancellationToken cancellationToken = default)
+    public async Task SetRoleAsync(
+        string username,
+        UserRole role,
+        Actor actor,
+        CancellationToken cancellationToken = default)
     {
+        ArgumentNullException.ThrowIfNull(actor);
         if (!Enum.IsDefined(role))
         {
             throw new ArgumentOutOfRangeException(nameof(role), role, "The role is not a known value.");
@@ -276,8 +312,12 @@ public sealed class UserService
                 await EnsureNotLastAdminAsync(user, cancellationToken);
             }
 
+            var previous = user.Role;
             user.Role = role;
-            await _store.UpdateAsync(user, cancellationToken);
+            await _store.UpdateAsync(
+                user,
+                AuditDraft.By(actor, "user.role-changed", $"user '{user.Username}': {previous} -> {role}"),
+                cancellationToken);
         }
         finally
         {
@@ -328,7 +368,12 @@ public sealed class UserService
             user.PasswordHash = _hasher.Hash(newPassword!);
             user.FailedLoginCount = 0;
             user.LockoutUntil = null;
-            await _store.UpdateAsync(user, cancellationToken);
+
+            // The person who changes their own password is the actor; neither password reaches the entry
+            await _store.UpdateAsync(
+                user,
+                AuditDraft.By(new Actor(user.Username, user.DisplayName), "user.password-changed", $"user '{user.Username}'"),
+                cancellationToken);
         }
         finally
         {
@@ -341,14 +386,21 @@ public sealed class UserService
     /// </summary>
     /// <param name="username">The user name; compared without regard to case.</param>
     /// <param name="newPassword">The new password; same policy as for a new user.</param>
+    /// <param name="actor">The administrator who sets the password; recorded in the audit trail. Must not be null.</param>
     /// <param name="cancellationToken">Cancels the operation.</param>
     /// <returns>A task that completes when the new hash is stored; a lockout of the user ends with it.</returns>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="actor"/> is null.</exception>
     /// <exception cref="DomainRuleException">
     ///     Thrown with <see cref="DomainRule.PasswordInvalid"/> when the password breaks the policy, or with
     ///     <see cref="DomainRule.UserNotFound"/> when there is no such user.
     /// </exception>
-    public async Task SetPasswordAsync(string username, string? newPassword, CancellationToken cancellationToken = default)
+    public async Task SetPasswordAsync(
+        string username,
+        string? newPassword,
+        Actor actor,
+        CancellationToken cancellationToken = default)
     {
+        ArgumentNullException.ThrowIfNull(actor);
         ValidatePassword(newPassword);
 
         await _gate.WaitAsync(cancellationToken);
@@ -358,7 +410,10 @@ public sealed class UserService
             user.PasswordHash = _hasher.Hash(newPassword!);
             user.FailedLoginCount = 0;
             user.LockoutUntil = null;
-            await _store.UpdateAsync(user, cancellationToken);
+            await _store.UpdateAsync(
+                user,
+                AuditDraft.By(actor, "user.password-set-by-admin", $"user '{user.Username}'"),
+                cancellationToken);
         }
         finally
         {
@@ -435,14 +490,58 @@ public sealed class UserService
     private async Task RegisterFailureAsync(User user, CancellationToken cancellationToken)
     {
         user.FailedLoginCount++;
-        if (user.FailedLoginCount >= MaxFailedAttempts)
+        var lockedOut = user.FailedLoginCount >= MaxFailedAttempts;
+        if (lockedOut)
         {
             // The counter restarts after the lockout so the next window gets a fresh set of attempts
             user.LockoutUntil = _timeProvider.GetUtcNow() + LockoutDuration;
             user.FailedLoginCount = 0;
         }
 
-        await _store.UpdateAsync(user, cancellationToken);
+        // The counter and the lockout are state, not events: the events below are recorded separately
+        await _store.UpdateAsync(user, null, cancellationToken);
+        await RecordFailureAsync(user, "wrong password", cancellationToken);
+        if (lockedOut)
+        {
+            await RecordAsync(
+                user,
+                "auth.locked-out",
+                $"locked for {LockoutDuration.TotalMinutes:0} minutes after {MaxFailedAttempts} failed attempts",
+                cancellationToken);
+        }
+    }
+
+    /// <summary>
+    ///     Records a refused sign-in on a best-effort basis.
+    /// </summary>
+    /// <param name="user">The account that was tried, or <c>null</c> when there is none; the typed text is never recorded.</param>
+    /// <param name="reason">The reason: <c>wrong password</c>, <c>account disabled</c> or <c>unknown user</c>.</param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <returns>A task that completes when the entry is stored or its failure has been reported.</returns>
+    private Task RecordFailureAsync(User? user, string reason, CancellationToken cancellationToken)
+    {
+        return RecordAsync(user, "auth.sign-in-failed", reason, cancellationToken);
+    }
+
+    /// <summary>
+    ///     Records a sign-in event on a best-effort basis.
+    /// </summary>
+    /// <param name="user">The account, or <c>null</c> for an unknown user (recorded as plain <c>unknown user</c>).</param>
+    /// <param name="action">The action code.</param>
+    /// <param name="detail">The detail text.</param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <returns>A task that completes when the entry is stored or its failure has been reported.</returns>
+    private async Task RecordAsync(User? user, string action, string detail, CancellationToken cancellationToken)
+    {
+        if (_audit is null)
+        {
+            return;
+        }
+
+        var draft = user is null
+            ? new AuditDraft(action, null, "unknown user", null, null, detail)
+            : AuditDraft.By(new Actor(user.Username, user.DisplayName), action, detail);
+        await _audit.TryRecordAsync(draft, cancellationToken);
     }
 
     /// <summary>
@@ -460,7 +559,7 @@ public sealed class UserService
 
         user.FailedLoginCount = 0;
         user.LockoutUntil = null;
-        await _store.UpdateAsync(user, cancellationToken);
+        await _store.UpdateAsync(user, null, cancellationToken);
     }
 
     /// <summary>

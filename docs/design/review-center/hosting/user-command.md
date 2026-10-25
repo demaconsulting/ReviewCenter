@@ -42,8 +42,11 @@ The password is read first, so that a missing one is reported before the databas
 its configuration and services the same way the server does: the same `appsettings.json` and environment variables
 (for example `Database__ConnectionString`) and the same registration (`ServerHost.AddServices`), with the host logging
 switched off because the command reports through the context. It calls `DatabaseSetup.EnsureCreated`, so the database
-is created when it does not exist yet, and then `UserService.CreateAsync`, so every user rule applies. A database that
-was created before identity existed has no users table and must be deleted and created again (see the `Storage`
+is created when it does not exist yet, and then `UserService.CreateAsync` with `Actor.CommandLine` as the actor, so
+every user rule applies and the creation is recorded in the audit trail as `user.created` by the command line. A
+database that
+was created before identity existed has no users table, and one created before the audit trail has no audit table;
+either must be deleted and created again (see the `Storage`
 design).
 
 #### Error Handling

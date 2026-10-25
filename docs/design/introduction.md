@@ -67,22 +67,23 @@ The ReviewCenter system is divided as follows:
 
 - **Program** (unit): entry point and execution orchestrator
 - **Cli** (subsystem): argument parsing and output; contains the Context unit
-- **Hosting** (subsystem): builds and runs the ASP.NET Core web host for the `serve` verb and creates users for the
-  `user add` verb; contains the ServerHost and UserCommand units
+- **Hosting** (subsystem): builds and runs the ASP.NET Core web host for the `serve` verb, creates users for the
+  `user add` verb, and verifies the audit trail for the `audit verify` verb; contains the ServerHost, UserCommand, and
+  AuditCommand units
 - **Identity** (subsystem): the web side of local accounts, cookie sign-in and authorization, and the periodic re-check
   of the user of an open page; contains the PasswordHasher, SignIn, and RevalidatingAuthenticationStateProvider units
 - **Web** (subsystem): the Blazor Server user interface; contains the App unit (HTML shell, router, page frame, and the
   SessionGate that replaces an open page when its user is no longer signed in),
-  the HomePage unit, the ProjectsPage, ProjectPage, ReviewPage, and ChecklistPage units, and the LoginPage,
-  AccountPage, and UsersPage units
+  the HomePage unit, the ProjectsPage, ProjectPage, ReviewPage, and ChecklistPage units, the LoginPage,
+  AccountPage, and UsersPage units, and the HistoryPage and AuditPage units
 - **Core** (subsystem): the domain model and rules for projects, reviews, review comments, review checklists,
-  users, and reviewer signatures, free of web and
-  database technology; contains the Fingerprint, RecordDigest, ProjectService, ReviewService, ThreadService,
-  ChecklistService, UserService, and SigningService units
-- **Storage** (subsystem): persistence of projects, reviews, comment threads, checklists, users, reviewer slots, and
-  signatures in a database
+  users, reviewer signatures, and the hash-chained audit trail, free of web and
+  database technology; contains the Fingerprint, RecordDigest, AuditChain, AuditService, ProjectService,
+  ReviewService, ThreadService, ChecklistService, UserService, and SigningService units
+- **Storage** (subsystem): persistence of projects, reviews, comment threads, checklists, users, reviewer slots,
+  signatures, and the audit trail in a database
   through Entity
-  Framework Core; contains the ReviewCenterDbContext, ReviewStore, UserStore, and DatabaseSetup units
+  Framework Core; contains the ReviewCenterDbContext, ReviewStore, UserStore, AuditStore, and DatabaseSetup units
 - **SelfTest** (subsystem): self-validation; contains the Validation unit
 - **Utilities** (subsystem): shared helpers; contains the PathHelpers unit
 

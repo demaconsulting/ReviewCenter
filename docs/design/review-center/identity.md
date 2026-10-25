@@ -47,12 +47,14 @@ The rules about accounts (the password policy, the lockout, the last administrat
   `/login?error=1` (with the safe return URL when it is not `/`); the failure is the same for an unknown user, a
   wrong password, a disabled account, and a locked account.
 - *Constraints*: The antiforgery token is required; a request without a valid token is refused with HTTP status 400.
+  A successful sign-in is recorded as `auth.sign-in`, best-effort.
 
 **Logout endpoint** (`POST /auth/logout`): Ends the session.
 
 - *Type*: HTTP `POST` of a form with the antiforgery token.
 - *Role*: Provider.
-- *Contract*: Removes the authentication cookie and redirects to `/`.
+- *Contract*: Removes the authentication cookie and redirects to `/`. The sign-out is recorded as `auth.sign-out`,
+  best-effort, before the cookie is removed.
 - *Constraints*: The antiforgery token is required and is checked by the endpoint itself; a request without a valid
   token is refused with HTTP status 400 and the session is kept.
 
@@ -89,6 +91,11 @@ open interactive page (circuit).
 - *Type*: In-process .NET class.
 - *Role*: Consumer.
 
+**AuditService (consumed)**: The `Core` service that records sign-in and sign-out.
+
+- *Type*: In-process .NET class.
+- *Role*: Consumer.
+
 ### Design
 
 Signing in is plain HTTP, not an event of the Blazor live connection. The login page is a server-rendered form that
@@ -117,6 +124,14 @@ Known limitations, all deliberate: the lockout counts failures per user name, no
 so someone who knows a user name can lock that account for 5 minutes at a time; and changing a password does
 not end the other sessions of the user. Behind a proxy that ends TLS, the server must be told to trust the forwarded
 headers so that the cookie is issued as `Secure`.
+
+**Audit events of sign-in and sign-out**: The two endpoints record events that change no data in the audit trail
+through `AuditService.TryRecordAsync`: `auth.sign-in` after the cookie has been issued, and `auth.sign-out` before the
+cookie is removed, with the actor taken from the server-side principal of the request, never from the form. The
+recording is awaited but best-effort: a failure is logged and never changes the response, so a broken audit trail
+cannot lock everybody out. Failed sign-ins and lockouts are recorded by `UserService` (see its design), because the
+endpoint cannot tell the reasons apart and must not either. The best-effort rule is a deliberate trade-off: an
+attacker who can make the recording fail can sign in without an entry.
 
 An open page (a live connection) makes no request, so the cookie check never reaches it. A scoped
 `RevalidatingAuthenticationStateProvider` therefore re-reads the user every `Auth:RevalidationSeconds` seconds and

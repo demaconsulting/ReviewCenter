@@ -101,3 +101,14 @@ sections:
           - ChecklistState_Progress_AllSectionsNotApplicable_IsComplete
           - ChecklistState_NextUnansweredItemId_SkipsAnsweredAndNotApplicableSections
           - ChecklistState_FirstIncompleteSectionId_ReturnsFirstSectionWithUnanswered
+
+      - id: ReviewCenter-ChecklistService-Audit
+        title: >-
+          The ChecklistService class shall record answering a check and changing the applicability of a section in
+          the audit trail, in the same transaction as the change, naming the actor, the identifiers, and the outcome,
+          with a short hash of the justification but never the justification itself.
+        justification: |
+          The history must show who answered which check and how, without copying free text into a record that
+          cannot be edited.
+        tests:
+          - ChecklistService_ChecklistEvents_RecordOutcomeAndDigestButNotJustification

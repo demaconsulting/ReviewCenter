@@ -88,6 +88,11 @@ internal sealed class Context : IDisposable
     public bool UserAdd { get; private init; }
 
     /// <summary>
+    ///     Gets a value indicating whether the <c>audit verify</c> verb was specified.
+    /// </summary>
+    public bool AuditVerify { get; private init; }
+
+    /// <summary>
     ///     Gets the user name given with <c>--username</c>; set whenever <see cref="UserAdd"/> is <c>true</c>.
     /// </summary>
     public string? Username { get; private init; }
@@ -152,6 +157,7 @@ internal sealed class Context : IDisposable
             Serve = parser.Serve,
             Urls = parser.Urls ?? DefaultUrls,
             UserAdd = parser.UserAdd,
+            AuditVerify = parser.AuditVerify,
             Username = parser.Username,
             DisplayName = parser.DisplayName,
             Role = parser.Role ?? UserRole.Reviewer
@@ -241,6 +247,11 @@ internal sealed class Context : IDisposable
         ///     Gets a value indicating whether the <c>user add</c> verb was specified.
         /// </summary>
         public bool UserAdd { get; private set; }
+
+        /// <summary>
+        ///     Gets a value indicating whether the <c>audit verify</c> verb was specified.
+        /// </summary>
+        public bool AuditVerify { get; private set; }
 
         /// <summary>
         ///     Gets the value of <c>--username</c>, or <c>null</c> when the option was not given.
@@ -356,6 +367,16 @@ internal sealed class Context : IDisposable
                     }
 
                     UserAdd = true;
+                    return index + 1;
+
+                case "audit":
+                    // 'verify' is the only action; it must follow directly
+                    if (index >= args.Length || args[index] != "verify")
+                    {
+                        throw new ArgumentException("audit requires the verify action", nameof(args));
+                    }
+
+                    AuditVerify = true;
                     return index + 1;
 
                 case "--username":

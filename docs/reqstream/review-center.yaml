@@ -460,3 +460,58 @@ sections:
         tests:
           - ReviewCenter_ServeVerb_Started_HomePageContainsTitleAndControls
           - WebSubsystem_AllPages_EveryInteractiveElementHasTestId
+
+      - id: ReviewCenter-System-AuditTrail
+        title: >-
+          The tool shall record every change of projects, reviews, comments, checklists, reviewer slots,
+          signatures, and users, and every sign-in, sign-out, failed sign-in, and lockout, in an audit trail in the
+          database, naming the time, the person, the action, and a short detail, without ever recording a password
+          or the text of a comment or a justification, and chaining the entries by hashes so that an edit, a
+          deletion, an insertion, or a reordering in the middle of the history can be detected.
+        tags: [system]
+        justification: |
+          A review record is only evidence when its history can be checked. The chain detects changes of the
+          middle of the history, but it does not detect the removal of the newest entries or a complete rewrite by
+          someone with write access to the database, unless the head hash was recorded elsewhere; this version has
+          no external anchoring, and that limit is stated to the user.
+        children:
+          - ReviewCenter-Core-AuditTrail
+          - ReviewCenter-Storage-AuditTrail
+          - ReviewCenter-Identity-AuditTrail
+        tests:
+          - AuditStore_ConcurrentChangesFromDifferentStores_ProduceLinearChain
+          - SignIn_Flow_LoginFailureAndLogout_FormAnIntactChain
+
+      - id: ReviewCenter-System-AuditHistory
+        title: >-
+          The tool shall show every signed-in user the audit entries of a review, and shall show administrators
+          alone the whole audit trail, in pages of 50 entries, newest first, with all text shown as plain text.
+        tags: [system]
+        justification: |
+          Participants and administrators need to see who did what and when. The whole trail names every user and
+          action, so it is limited to administrators.
+        children:
+          - ReviewCenter-Web-AuditHistory
+          - ReviewCenter-Web-AuditPage
+        tests:
+          - HistoryPage_Render_LongHistory_PagesByFiftyWithOlderAndNewerLinks
+          - AuditPage_Render_NonAdmin_IsRefusedAndShowsNoEntries
+
+      - id: ReviewCenter-System-AuditVerify
+        title: >-
+          The tool shall verify the hash chain of the audit trail on request, from the audit page for an
+          administrator and from the command line with the audit verify verb, reporting an intact chain with the
+          number of entries (and on the page the head hash) and a broken chain with the first broken entry,
+          and shall return exit code 0 for an intact chain and 1 for a broken chain or an unreadable database.
+        tags: [system]
+        justification: |
+          Verification is how tampering is found. The command line lets scripts and scheduled jobs check the
+          trail, and the head hash lets an administrator record the state of the trail outside the database.
+        children:
+          - ReviewCenter-Program-AuditVerify
+          - ReviewCenter-Cli-AuditVerify
+          - ReviewCenter-Hosting-AuditVerify
+          - ReviewCenter-Web-AuditPage
+        tests:
+          - AuditCommand_Run_IntactTrail_ReportsEntryCountWithExitCodeZero
+          - AuditPage_Verify_TamperedChain_ShowsFirstBadEntry

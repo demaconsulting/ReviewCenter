@@ -61,3 +61,7 @@ by `DatabaseSetup_EnsureCreated_UnsupportedProvider_ThrowsAndCreatesNothing`.
 **DatabaseSetup_EnsureCreated_MissingFolder_CreatesFolderFileAndTables**: Creation with a database path in a
 missing folder makes the folder, the file, and the tables. This scenario is tested by
 `DatabaseSetup_EnsureCreated_MissingFolder_CreatesFolderFileAndTables`.
+
+**Audit table**: The database created by `EnsureCreated` includes the `AuditEntries` table, as the tests of
+`AuditStore` and `AuditCommand` rely on it. There are no migrations, so a database created before this table existed
+must be recreated.

@@ -86,3 +86,15 @@ sections:
           - ServerHost_CreateApplication_UnsupportedProvider_ThrowsClearError
           - ServerHost_RunAsync_UnsupportedProvider_ReturnsExitCodeOne
           - ServerHost_RunAsync_UnusableDatabaseLocation_ReturnsExitCodeOne
+
+      - id: ReviewCenter-ServerHost-AuditServices
+        title: >-
+          The ServerHost class shall register the audit appender, the audit store, and the audit service once for the
+          whole process, shared by the server and by the command-line verbs, with a logging hook that writes a
+          warning, never shown to the user, when the audit trail cannot be written.
+        justification: |
+          One gate shared by all stores is what keeps the hash chain linear, and the operator must learn from the
+          log when the trail could not be written.
+        tests:
+          - AuditCommand_Run_IntactTrail_ReportsEntryCountWithExitCodeZero
+          - SignIn_Flow_LoginFailureAndLogout_FormAnIntactChain

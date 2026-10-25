@@ -49,3 +49,6 @@ scenario is tested by `UserCommand_Run_NoPassword_ReportsErrorWithExitCodeOne`.
 
 **UserCommand_Run_NullContext_ThrowsArgumentNullException**: `Run` is called with a null context; an
 `ArgumentNullException` is thrown. This scenario is tested by `UserCommand_Run_NullContext_ThrowsArgumentNullException`.
+
+**Actor of the command**: The user created by the command is recorded in the audit trail with the actor `(command
+line)`. This is tested at the service level by `UserService_CreateAsync_CommandLineActor_IsRecordedAsCommandLine`.

@@ -113,3 +113,16 @@ sections:
           - ThreadService_NextStep_NoThreadsOpenAndAllResolved_NamesNextAction
           - ThreadService_NextStep_WithChecklist_CombinesChecksAndThreads
           - ThreadService_NextStep_WithFailedChecks_NamesThemBeforeThreads
+
+      - id: ReviewCenter-ThreadService-Audit
+        title: >-
+          The ThreadService class shall record starting a thread, replying, resolving, and reopening in the audit
+          trail, in the same transaction as the change, naming the actor, the identifiers, the anchor, and a short
+          hash of the comment text but never the text itself, and shall record nothing for a thread that does not
+          exist.
+        justification: |
+          The history must show who discussed what and when without copying the comments into a record that cannot
+          be edited, and a request that changed nothing must leave no entry.
+        tests:
+          - ThreadService_ThreadEvents_RecordIdsAnchorsAndDigestButNotText
+          - ThreadService_ResolveAsync_MissingThread_RecordsNothing

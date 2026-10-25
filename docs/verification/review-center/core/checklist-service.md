@@ -128,3 +128,9 @@ check that is neither answered nor in a not-applicable section. This scenario is
 **ChecklistState_FirstIncompleteSectionId_ReturnsFirstSectionWithUnanswered**: The first incomplete section is the
 first applicable section with an unanswered check. This scenario is tested by
 `ChecklistState_FirstIncompleteSectionId_ReturnsFirstSectionWithUnanswered`.
+
+**ChecklistService_ChecklistEvents_RecordOutcomeAndDigestButNotJustification**: A check is answered and the
+applicability of a section is changed; the entries `checklist.answered` and `checklist.applicability-changed` carry
+the check or section and the outcome, and a justification appears only as an eight-character digest prefix. This
+scenario is tested by `ChecklistService_ChecklistEvents_RecordOutcomeAndDigestButNotJustification`, which is defined
+in `AuditEventTests.cs`.

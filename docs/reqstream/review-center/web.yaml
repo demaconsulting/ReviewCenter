@@ -219,3 +219,35 @@ sections:
           - WebSubsystem_AllPages_EveryInteractiveElementHasTestId
           - ReviewPage_Render_ThreadControls_EveryInteractiveElementHasTestId
           - ReviewPage_Render_ReviewersCard_EveryInteractiveElementHasTestId
+
+      - id: ReviewCenter-Web-AuditHistory
+        title: >-
+          The Web subsystem shall show every signed-in user the audit entries of a review, newest first, 50 to a
+          page, on a history page that is reached from the review, with all text shown as plain text.
+        justification: |
+          Participants need to see who did what to a review and when, from the review itself.
+        children:
+          - ReviewCenter-HistoryPage-Display
+          - ReviewCenter-HistoryPage-Paging
+          - ReviewCenter-HistoryPage-Access
+          - ReviewCenter-ReviewPage-HistoryLink
+        tests:
+          - HistoryPage_Render_ReviewWithEntries_ShowsOnlyItsEntriesNewestFirst
+          - Routes_Render_NobodySignedInOpensHistoryRoute_DoesNotShowEntries
+
+      - id: ReviewCenter-Web-AuditPage
+        title: >-
+          The Web subsystem shall show administrators, and nobody else, the whole audit trail on an audit page that
+          is reached from the header, and let them verify the hash chain and read the entry count and the head hash
+          of an intact chain or the first broken entry.
+        justification: |
+          The whole trail names every user and action. The head hash is what an administrator records outside the
+          database to detect the later removal of the newest entries.
+        children:
+          - ReviewCenter-AuditPage-Display
+          - ReviewCenter-AuditPage-Verify
+          - ReviewCenter-AuditPage-Admin
+          - ReviewCenter-App-AuditLink
+        tests:
+          - AuditPage_Verify_IntactChain_ShowsCountAndFullHeadHash
+          - Routes_Render_ReviewerOpensAuditRoute_ShowsAccessDeniedNotTrail

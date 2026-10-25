@@ -135,6 +135,14 @@ changes or deletes a signature. `UpdateSlotAsync` and `RemoveSlotAsync` return `
 - *Preconditions*: The actor and the expected digest are not null.
 - *Postconditions*: Nothing is stored when a rule fails.
 
+**Audit**: Adding, updating, and removing a slot record `slot.added`, `slot.updated`, and `slot.removed`, and signing
+records `signature.added` with the slot, the role, and the record digest the reviewer signed. Each draft is passed to
+the store and saved in the same transaction as the change, so a signature and its entry exist together or not at all.
+Signing runs under the gate of this service; the audit gate of the `AuditAppender` is taken inside it (the lock order is
+the service gates first, the appender gate last). This is also what protects the signature history: the table of
+signatures can still be edited by someone with write access to the database, but the entry of each signature is in the
+hash chain. See the `AuditChain` unit for what the chain does and does not prove.
+
 #### Error Handling
 
 A null actor, expected digest, or constructor argument raises `ArgumentNullException`. A violated rule raises

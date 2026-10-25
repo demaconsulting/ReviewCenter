@@ -1,0 +1,56 @@
+---
+# Software Unit Requirements for the AuditService Class
+#
+# The AuditService class records the events that change no data on a best-effort basis, reads the audit trail one
+# page at a time, and verifies the hash chain by streaming. It also defines the store contract.
+
+sections:
+  - title: AuditService Unit Requirements
+    requirements:
+      - id: ReviewCenter-AuditService-Record
+        title: >-
+          The AuditService class shall record an audit draft as the next entry of the trail, letting a failure
+          propagate for the strict operation and, for the best-effort operation, awaiting the write, reporting a
+          failure to an error hook, never letting it reach the caller, and never swallowing cancellation.
+        justification: |
+          Sign-in, sign-out, failed sign-in, and lockout change no data, so a failing trail must not stop anybody
+          from signing in, yet the failure must be visible to the operator through the log.
+        tests:
+          - AuditService_Constructor_NullStore_Throws
+          - AuditService_RecordAsync_Draft_StoresEntryThatVerifies
+          - AuditService_RecordAsync_NullDraftOrStoreFailure_Throws
+          - AuditService_TryRecordAsync_Draft_StoresEntryAndReturnsTrue
+          - AuditService_TryRecordAsync_StoreFailure_IsSwallowedAndReported
+          - AuditService_TryRecordAsync_FailingOrMissingHook_StillReturnsFalse
+          - AuditService_TryRecordAsync_Cancellation_Propagates
+          - AuditService_TryRecordAsync_NullDraft_Throws
+
+      - id: ReviewCenter-AuditService-List
+        title: >-
+          The AuditService class shall list the audit trail newest first, 50 entries to a page, for the whole trail
+          or for one review, with cursors for the older and the newer page that are offered only when entries exist
+          behind them, and with the older position winning when both are given.
+        justification: |
+          The history of a review and the audit page must show a trail of any length in bounded pages, and every
+          entry must appear exactly once while paging.
+        tests:
+          - AuditService_ListAsync_FirstPage_IsNewestFirstWithOlderOnly
+          - AuditService_ListAsync_PagingOlder_CoversEveryEntryOnce
+          - AuditService_ListAsync_PagingNewer_ReturnsThePageBefore
+          - AuditService_ListAsync_ExactlyOnePage_HasNoLinks
+          - AuditService_ListAsync_EmptyTrail_GivesEmptyPage
+          - AuditService_ListAsync_ReviewFilter_ReturnsOnlyThatReview
+          - AuditService_ListAsync_ReviewFilterOverFiftyEntries_Pages
+          - AuditService_ListAsync_BothPositions_BeforeWins
+
+      - id: ReviewCenter-AuditService-Verify
+        title: >-
+          The AuditService class shall verify the hash chain of the whole trail by reading it in ordered batches,
+          reporting an intact chain with its entry count and head hash, or the first broken entry.
+        justification: |
+          An operator must be able to check a trail of any size without loading it into memory, and a tampered entry
+          in any batch must be found.
+        tests:
+          - AuditService_VerifyAsync_UntouchedTrail_IsIntactAndReadInBatches
+          - AuditService_VerifyAsync_EmptyTrail_IsIntact
+          - AuditService_VerifyAsync_TamperedEntryInLaterBatch_ReportsItsSequence

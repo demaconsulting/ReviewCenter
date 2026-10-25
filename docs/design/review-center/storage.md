@@ -4,14 +4,16 @@
 
 ### Overview
 
-The `Storage` subsystem keeps projects, reviews, review comment threads, review checklists, users, reviewer slots, and
-signatures in a relational
+The `Storage` subsystem keeps projects, reviews, review comment threads, review checklists, users, reviewer slots,
+signatures, and the hash-chained audit trail in a relational
 database through Entity
 Framework Core. It
 implements the store interfaces of the `Core` subsystem and owns everything about the database: the schema, the
-choice of provider, the location of the data, and the creation of the database. It contains four units:
+choice of provider, the location of the data, and the creation of the database. It contains five units:
 `ReviewCenterDbContext`, the mapping of the domain types to tables; `ReviewStore`, the implementation of the
-review store interface; `UserStore`, the implementation of the user store interface; and `DatabaseSetup`, the
+review store interface; `UserStore`, the implementation of the user store interface; `AuditStore`, the implementation
+of the audit store interface together with the `AuditAppender` that serializes and chains the entries; and
+`DatabaseSetup`, the
 provider selection, connection string resolution, and database
 creation, together with its options type `DatabaseOptions`. The types of the subsystem are internal to the
 application; the rest of the system sees only the Core store interfaces.
@@ -33,7 +35,8 @@ application; the rest of the system sees only the Core store interfaces.
   with comments) is read as one snapshot. A signature is appended, never changed or deleted, in a transaction that
   recomputes the digest of the stored record: a digest that is not the current one raises a `DomainRuleException` for
   `RecordChanged` and stores nothing, a second signature of the same slot and digest raises one for
-  `SigningNotAllowed`, and an unknown slot or review raises one for `SlotNotFound` or `ReviewNotFound`.
+  `SigningNotAllowed`, and an unknown slot or review raises one for `SlotNotFound` or `ReviewNotFound`. Every change of
+  data is stored together with its audit entry in one transaction, and a change that has no effect stores no entry.
 - *Constraints*: Every operation uses its own short-lived database context, so it is safe for concurrent use.
 
 **UserStore (as IUserStore)**: The persistence operations for users.
@@ -42,8 +45,18 @@ application; the rest of the system sees only the Core store interfaces.
 - *Role*: Provider.
 - *Contract*: Stores a user, reads a user by user name without regard to case, lists the users, and replaces the
   stored state of a user. An attempt to store a user whose name exists, in any capitalization, raises a
-  `DomainRuleException` for `UserNameTaken`.
+  `DomainRuleException` for `UserNameTaken`. A new user, and an update that carries an audit draft, are stored together
+  with their audit entry in one transaction.
 - *Constraints*: Every operation uses its own short-lived database context, so it is safe for concurrent use.
+
+**AuditStore (as IAuditStore)**: The persistence operations for the audit trail.
+
+- *Type*: In-process .NET class implementing the Core interface.
+- *Role*: Provider.
+- *Contract*: Appends one entry (for events that change no data), lists entries newest first, optionally of one review,
+  before or after a sequence, and reads entries in ascending batches. Each entry gets the next sequence number and
+  the hash of its predecessor. There is no operation to update or delete an entry.
+- *Constraints*: Appends from every store are serialized by one process-wide gate and by the database write lock.
 
 **Database settings**: The `Database` configuration section.
 
@@ -79,13 +92,14 @@ with migrations. This is adequate while there is no released schema to upgrade: 
 tables, and an existing database is left alone. The cost is that a database created by an earlier version is
 never altered, so a change of the schema needs a migration strategy before the first release that must keep
 data. This is a known limitation, recorded as an open decision in `architecture.md` and not yet resolved. It
-already matters four times: the tables for comment threads were added after the first schema, the tables for review
+already matters five times: the tables for comment threads were added after the first schema, the tables for review
 checklists after those, the users table and the user name columns of comments, answers, and section decisions
-after those, and the tables of reviewer slots and signatures after those, so a database created before them does not
+after those, the tables of reviewer slots and signatures after those, and the audit table after those, so a database
+created before them does not
 have them and the pages fail until the
 database file is deleted (or a new one is
 named) and created again. Databases created before the identity slice must be deleted and recreated, and so must
-databases created before the signature slice; there is no
+databases created before the signature slice and before the audit trail; there is no
 migration of their data, and no data of a released version is
 affected. A
 second limitation is that two processes starting at the same moment on a brand-new database file can collide
@@ -113,6 +127,19 @@ signature to its slot uses the
 `NoAction` delete behavior, which still refuses to delete a signed slot but, unlike `Restrict`, lets SQLite delete a
 whole review with its slots and signatures. This transaction mode and the foreign key behavior are SQLite specific
 and would need an equivalent for another provider.
+
+**The audit trail and its transaction**: Every audited change is stored together with its audit entry. All stores
+share one `AuditAppender`, which owns a process-wide gate, a semaphore with one slot. A mutation takes the gate, opens a
+`Serializable` transaction (for SQLite the write lock is taken when it begins, so another process, such as the
+`audit verify` or `user add` command beside the server, is serialized by the database), makes the change, appends the
+audit entry to the same context, saves, and commits. If anything fails, the change and its entry are rolled back
+together, and a change that did not take effect (not found, nothing to do) appends no entry. The primary key of the
+audit table, the sequence number, is assigned under the gate and is the backstop against a second entry with the same
+position. The gate is the innermost lock of the system: it is acquired after the gates of `UserService` and
+`SigningService`, nothing inside it calls a service, and it is released on every path. The entries have no foreign
+keys, so they stay when the rows they describe are removed (for example a whole review). The `AuditStore` unit offers
+no update or delete. See the `AuditStore` unit for the details and `AuditChain` for what the hash chain does and does
+not prove.
 
 **Native library**: SQLite needs a native library (`e_sqlite3.dll` on Windows, `libe_sqlite3.so` on Linux). The
 single-file executable cannot embed it, so it is published as a side file next to the executable; the

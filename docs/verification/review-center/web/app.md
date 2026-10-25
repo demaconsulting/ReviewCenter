@@ -83,3 +83,7 @@ then ends; the content is replaced by the message. This scenario is tested by
 review, checklist, account, and users pages; each is rendered with nobody signed in, and each shows the message and
 not its own root element. This scenario is tested by
 `SessionGate_Render_EveryProtectedPageSignedOut_ShowsSessionEndedAndNoPage`.
+
+**MainLayout_Render_SignedInUser_ShowsNameAccountAndLogout**: The layout is rendered for a reviewer and for an
+administrator; the audit link to `/audit` is shown to the administrator only. This scenario is tested by
+`MainLayout_Render_SignedInUser_ShowsNameAccountAndLogout`.

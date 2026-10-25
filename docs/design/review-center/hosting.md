@@ -4,18 +4,18 @@
 
 ### Overview
 
-The `Hosting` subsystem turns a parsed command-line request into a running web server, and creates users from the
-command line. It owns
+The `Hosting` subsystem turns a parsed command-line request into a running web server, creates users from the
+command line, and verifies the audit trail from the command line. It owns
 the composition of the ASP.NET Core application behind the `serve` verb: the listen address,
 the logging configuration, the health endpoint, the sign-in configuration and endpoints of the `Identity`
 subsystem, the mapping of the user interface provided
 by the `Web` subsystem, and the connection of the pages to the database: reading the `Database` settings,
 creating the database, and registering the `Core` services with the `Storage` stores. It also owns the
 start, run, and stop lifecycle of that application and
-the translation of start-up failures into ordinary error reports. The `user add` verb reuses the same registration of
-the database and the services to create a user without starting a server. The subsystem contains two
+the translation of start-up failures into ordinary error reports. The `user add` and `audit verify` verbs reuse the same
+registration of the database and the services to work without starting a server. The subsystem contains three
 units: `ServerHost`, together with its small options type `ServerHostOptions`, which is
-documented with `ServerHost` as a supporting type, and `UserCommand`.
+documented with `ServerHost` as a supporting type, `UserCommand`, and `AuditCommand`.
 
 ### Interfaces
 
@@ -47,7 +47,8 @@ documented with `ServerHost` as a supporting type, and `UserCommand`.
 - *Type*: In-process .NET static method.
 - *Role*: Provider.
 - *Contract*: Registers the database settings and context factory, the clock, the stores, the password hasher, and the
-  Core services in a service collection built from a configuration. It is shared by the server and by `UserCommand`.
+  Core services in a service collection built from a configuration. It is shared by the server, `UserCommand`, and
+  `AuditCommand`.
 - *Constraints*: None.
 
 **UserCommand.Run**: Creates a user from the command line.
@@ -58,6 +59,16 @@ documented with `ServerHost` as a supporting type, and `UserCommand`.
   from the command line), creates the database if needed, and creates the user, or reports the reason of a failure
   through `Context.WriteError`.
 - *Constraints*: The caller is `Program`.
+
+**AuditCommand.Run**: Verifies the audit trail from the command line.
+
+- *Type*: In-process .NET static method.
+- *Role*: Provider.
+- *Contract*: Takes the parsed `Context`, creates the database if needed, verifies the hash chain of the audit trail,
+  and reports an intact chain with its entry count (exit code 0), or the first broken entry, or the failure to read the
+  database, through `Context.WriteError` (exit code 1).
+- *Constraints*: The caller is `Program`. It never changes the trail. Because it creates a database that does not exist,
+  running it against a wrong location creates an empty database there.
 
 **Health endpoint**: The `/health` route of the running server.
 
@@ -84,9 +95,10 @@ the server.
 - *Type*: In-process .NET types.
 - *Role*: Consumer.
 
-**Storage and Core (consumed)**: `DatabaseSetup`, `ReviewCenterDbContext`, `ReviewStore`, and `UserStore` of the
+**Storage and Core (consumed)**: `DatabaseSetup`, `ReviewCenterDbContext`, `ReviewStore`, `UserStore`, `AuditStore`, and
+`AuditAppender` of the
 `Storage` subsystem, and `ProjectService`, `ReviewService`, `ThreadService`, `ChecklistService`, `UserService`,
-`SigningService`, and the store and hasher interfaces of the `Core` subsystem.
+`SigningService`, `AuditService`, and the store and hasher interfaces of the `Core` subsystem.
 
 - *Type*: In-process .NET types.
 - *Role*: Consumer.
@@ -109,12 +121,17 @@ callback that writes the structured start-up log entry once the server has start
 The persistence registration binds the `Database` configuration section (`appsettings.json` and
 environment variables such as `Database__Provider` and `Database__ConnectionString`) to the options type
 of the `Storage` subsystem, registers a `ReviewCenterDbContext` factory configured by `DatabaseSetup`,
-and registers `TimeProvider.System`, `ReviewStore` and `UserStore` as the Core store interfaces, `PasswordHasher` as
-the Core hasher interface, and the six Core services (`ProjectService`, `ReviewService`, `ThreadService`,
-`ChecklistService`, `UserService`, and `SigningService`) as singletons shared by all browser connections. The
+and registers `TimeProvider.System`, `AuditAppender`, `ReviewStore`, `UserStore`, and `AuditStore` as the Core store
+interfaces (the appender is a single instance shared by all three stores, which is what makes the audit gate
+process-wide), `PasswordHasher` as
+the Core hasher interface, and the seven Core services (`ProjectService`, `ReviewService`, `ThreadService`,
+`ChecklistService`, `UserService`, `SigningService`, and `AuditService`) as singletons shared by all browser
+connections. `AuditService` is created with a hook that writes a warning to the log when an event cannot be recorded
+(the failure is never shown to the user), and `UserService` receives it so that failed sign-ins and lockouts are
+recorded. The
 services hold no per-user state, and every
 database operation opens its own short-lived context from the factory. The registration is the public method
-`AddServices`, so that `UserCommand` builds exactly the same services.
+`AddServices`, so that `UserCommand` and `AuditCommand` build exactly the same services.
 
 The database is created right after the application is built, before the first request, so that a
 problem with the settings or the file system stops the start-up with one clear message rather than
@@ -125,7 +142,8 @@ failing at the first sign-in.
 
 `UserCommand` does not start a server. It builds the configuration the same way (the same `appsettings.json` and
 environment), registers the services with `AddServices`, creates the database if needed, and calls
-`UserService.CreateAsync`; see its design.
+`UserService.CreateAsync`; see its design. `AuditCommand` does the same and calls `AuditService.VerifyAsync`; see its
+design.
 
 The composition is shared by production and tests. `ServerHostOptions` lets a test switch off
 static asset mapping, which needs a manifest that only the real application has, and attach an

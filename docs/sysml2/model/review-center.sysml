@@ -5,10 +5,11 @@ package ReviewCenter {
      * interface, for performing formal code reviews. The current implementation
      * serves a Blazor Server web interface and a health endpoint through the
      * serve verb of the command-line interface, which also provides version, help,
-     * user creation, and self-validation actions. Users sign in with a local account
-     * and a password. The web interface manages projects and draft
-     * reviews of uploaded files, which are stored in a database together with a
-     * content fingerprint of each review.
+     * user creation, audit trail verification, and self-validation actions. Users
+     * sign in with a local account and a password. The web interface manages projects
+     * and draft reviews of uploaded files, which are stored in a database together
+     * with a content fingerprint of each review. Every change is recorded in a
+     * hash-chained audit trail that makes later edits of the history evident.
      */
 
     part def ReviewCenterSystem {
