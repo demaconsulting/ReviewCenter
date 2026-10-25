@@ -10,7 +10,8 @@ resource-path:
   - docs/verification/review-center/web
   - docs/verification/review-center/core
   - docs/verification/review-center/storage
-  - docs/verification/review-center/content-sources  - docs/verification/review-center-puppet
+  - docs/verification/review-center/content-sources
+  - docs/verification/review-center-puppet
   - docs/verification/ots
   - docs/template
 

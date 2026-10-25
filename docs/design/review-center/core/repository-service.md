@@ -78,7 +78,8 @@ lists the
 - *Name*: trimmed; letters, digits, `.`, `_`, and `-`; starts with a letter or digit; at most 40 characters
   (`RepositoryNameInvalid`). Uniqueness ignores case and is decided by the store (`RepositoryNameTaken`).
 - *Location*: 1 to 500 characters, no control characters, not starting with `-`. Either an `https://`, `http://`, or
-  `file://` address that is a valid absolute address without white space, without user information, and (except for
+  `file://` address that is a valid absolute address without white space, without user information, without a query
+  string or fragment, and (except for
   `file`) with a host, or a fully qualified local path. SSH and scp-style addresses are refused
   (`RepositoryLocationInvalid`).
 - *Credentials*: a user name or token is accepted only for an `https://` location. A token needs a user name. The user

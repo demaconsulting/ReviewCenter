@@ -280,6 +280,30 @@ public class GitRunnerTests
     }
 
     /// <summary>
+    ///     Test that a home folder that cannot be created gives the administrator-level error without the path.
+    /// </summary>
+    [Fact]
+    public async Task GitRunner_RunAsync_HomeFolderNotWritable_ThrowsGitUnavailable()
+    {
+        // Arrange: a cache path below a regular file, which can never be created
+        using var root = new TempFolder();
+        var blocker = Path.Combine(root.Path, "blocker");
+        await File.WriteAllTextAsync(blocker, "not a folder", TestContext.Current.CancellationToken);
+        var cache = Path.Combine(blocker, "cache");
+        var runner = new GitRunner(Options(cache));
+
+        // Act: run any git call
+        var exception = await Assert.ThrowsAsync<DomainRuleException>(
+            () => runner.RunAsync(["--version"], null, 4096, TestContext.Current.CancellationToken));
+
+        // Assert: the rule and the setting are named, the path is not and no inner exception is chained
+        Assert.Equal(DomainRule.GitUnavailable, exception.Rule);
+        Assert.Contains("Git:CachePath", exception.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain(cache, exception.Message, StringComparison.Ordinal);
+        Assert.Null(exception.InnerException);
+    }
+
+    /// <summary>
     ///     Test that a call that never finishes is stopped at the time limit with the timeout error.
     /// </summary>
     [Fact]

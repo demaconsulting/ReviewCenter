@@ -77,3 +77,15 @@ sections:
         tests:
           - GitSource_ReadBlob_ReadsExactBytesAndEnforcesTheLimit
           - GitSource_BlobAndCommitIds_NotObjectIds_ThrowArgumentException
+
+      - id: ReviewCenter-GitSource-CacheFolder
+        title: >-
+          The GitSource class shall report a cache folder that cannot be written as an administrator-level
+          `GitUnavailable` error that names the setting but not the path, and shall release the repository lock.
+        justification: |
+          A cache folder that is missing or read-only is a server problem that only an administrator can fix. The
+          user must get a clear message instead of a failed page, the path must not reach ordinary users, and a
+          lock that stayed held would block every later review of the repository.
+        tests:
+          - GitSource_Open_CacheFolderNotWritable_ThrowsGitUnavailable
+          - GitRunner_RunAsync_HomeFolderNotWritable_ThrowsGitUnavailable

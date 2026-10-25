@@ -85,7 +85,10 @@ described below.
 All failures are `DomainRuleException` values (`GitUnavailable`, `GitAccessFailed`, `GitTimeout`, `RevisionInvalid`,
 `RevisionNotFound`), most of them produced by `GitRunner`. A malformed object id is a programming error and raises
 `ArgumentException`; a missing cache path raises `InvalidOperationException`; a null argument raises
-`ArgumentNullException`. A caller's cancellation propagates as `OperationCanceledException`. The credentials are used
+`ArgumentNullException`. A caller's cancellation propagates as `OperationCanceledException`. An I/O or permission
+failure on the cache folder (creating, replacing, or moving a mirror folder) is `GitUnavailable` with an
+administrator-level message that names the `Git:CachePath` setting, not the path, and has no inner exception; the
+repository lock is released first. The credentials are used
 only by the clone and the fetch; the session works on a copy of the access data without the user name and token, so a
 failure in a session can never carry them.
 

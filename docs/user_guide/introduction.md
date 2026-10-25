@@ -580,11 +580,13 @@ An administrator sees a **Repositories** link in the page header, next to **User
 - **Add repository**: enter a name (letters, digits, dot, underscore, and hyphen, up to 40 characters, unique without
   regard to case), a location, and for a private repository a user name and an access token. The location is an
   `https://`, `http://`, or `file://` URL, or an absolute local path. A user name or token is accepted only with an
-  `https://` location, because the token must not travel in clear text.
+  `https://` location, because the token must not travel in clear text. The location must not contain a user name or
+  password, a query string, or a fragment; enter the credentials in their own fields.
 - **List**: shows each repository with its location, user name, enabled state, and "token set" or "no token". The
   token itself is never shown.
 - **Edit**: change the name, location, or user name, and choose what happens to the token: keep the stored token,
-  replace it (type the new one), or clear it.
+  replace it (type the new one), or clear it. Keeping the token sends it to the new location, so choose replace or clear
+  when you point a repository at a different host.
 - **Disable and enable**: a disabled repository cannot be read and is not offered to users. A repository cannot be
   deleted.
 
@@ -621,6 +623,12 @@ know gives a clear "unknown revision" message. The changed files between two rev
 as a delete and an add; without a baseline revision every file of the revision is listed. Symbolic links and submodules
 are skipped with a note, and the per-file and total size limits are the same as for an upload, checked before a file is
 read. A call that runs longer than `Git:TimeoutSeconds` is stopped together with its child processes.
+
+Redirects are not followed, so a location that redirects (for example one that needs the `.git` ending) must be entered
+in its final form. If the cache folder cannot be written, the operation fails with a message that the server "cannot
+write its git cache folder" and names the `Git:CachePath` setting; an administrator must fix the folder or its
+permissions. When git itself fails, the first line of its (redacted) error is shown to the user but is not written to the
+server log.
 
 ### Selecting Files
 

@@ -203,6 +203,9 @@ public class RepositoryServiceTests
     [InlineData("https://")]
     [InlineData("https://example.com/my repo.git")]
     [InlineData("https://example.com/r.git\nx")]
+    [InlineData("https://example.com/r.git?token=abc")]
+    [InlineData("https://example.com/r.git#frag")]
+    [InlineData("https://example.com/r.git?")]
     public async Task RepositoryService_CreateAsync_InvalidLocation_ThrowsRepositoryLocationInvalid(string location)
     {
         // Arrange: a fixture

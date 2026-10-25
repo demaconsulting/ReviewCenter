@@ -404,6 +404,36 @@ public class GitSourceTests
     }
 
     /// <summary>
+    ///     Test that a cache folder that cannot be created gives an administrator-level error that names the setting but
+    ///     not the path, and that the repository gate is released so a second attempt does not hang.
+    /// </summary>
+    [Fact]
+    public async Task GitSource_Open_CacheFolderNotWritable_ThrowsGitUnavailable()
+    {
+        // Arrange: a cache path below a regular file, which can never be created
+        using var root = new TempFolder();
+        var blocker = Path.Combine(root.Path, "blocker");
+        await File.WriteAllTextAsync(blocker, "not a folder", TestContext.Current.CancellationToken);
+        var cache = Path.Combine(blocker, "cache");
+        var source = NewSource(cache);
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+        timeout.CancelAfter(TimeSpan.FromSeconds(30));
+
+        // Act: open it twice (a held gate would make the second call wait until the timeout)
+        var first = await Assert.ThrowsAsync<DomainRuleException>(
+            () => source.OpenAsync(Access("unused"), timeout.Token));
+        var second = await Assert.ThrowsAsync<DomainRuleException>(
+            () => source.OpenAsync(Access("unused"), timeout.Token));
+
+        // Assert: the rule is named, the setting is named, the path is not and no inner exception is chained
+        Assert.Equal(DomainRule.GitUnavailable, first.Rule);
+        Assert.Equal(DomainRule.GitUnavailable, second.Rule);
+        Assert.Contains("Git:CachePath", first.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain(cache, first.Message, StringComparison.Ordinal);
+        Assert.Null(first.InnerException);
+    }
+
+    /// <summary>
     ///     Test that the mirror's configuration never holds the token, even when access carries one.
     /// </summary>
     [Fact]

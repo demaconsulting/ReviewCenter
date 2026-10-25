@@ -28,7 +28,8 @@ local server on the loopback address and the installed git).
   information of an address) is replaced in text, and missing text or secrets are handled.
 - A failed call is described with the repository name and without any secret, and an authentication failure gets a clear
   message.
-- A missing or too old git is `GitUnavailable`; output over the limit is `GitAccessFailed`; a call that never finishes is
+- A missing or too old git is `GitUnavailable`, as is a cache folder that cannot be created; output over the limit is
+  `GitAccessFailed`; a call that never finishes is
   stopped at the time limit as `GitTimeout`.
 - Git sends the token as a basic authorization header, and a refusal is reported as denied access without the token or
   its encodings.
@@ -59,6 +60,10 @@ scenario is tested by `GitRunner_RunAsync_MissingGit_ThrowsGitUnavailable`.
 
 **GitRunner_RunAsync_OldGit_ThrowsGitUnavailable**: A git that reports a version older than the minimum is refused as
 unavailable. This scenario is tested by `GitRunner_RunAsync_OldGit_ThrowsGitUnavailable`.
+
+**GitRunner_RunAsync_HomeFolderNotWritable_ThrowsGitUnavailable**: When the cache path cannot be created (it lies below
+a regular file), a call fails with `GitUnavailable`; the message names `Git:CachePath` but not the path, and no inner
+exception is chained. This scenario is tested by `GitRunner_RunAsync_HomeFolderNotWritable_ThrowsGitUnavailable`.
 
 **GitRunner_RunAsync_RealGit_ReturnsOutputAndExitCode**: A real git call returns its output, and a failing call
 returns its

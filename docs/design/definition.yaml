@@ -10,7 +10,8 @@ resource-path:
   - docs/design/review-center/web
   - docs/design/review-center/core
   - docs/design/review-center/storage
-  - docs/design/review-center/content-sources  - docs/design/review-center-puppet
+  - docs/design/review-center/content-sources
+  - docs/design/review-center-puppet
   - docs/design/ots
   - docs/template
 

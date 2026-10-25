@@ -97,6 +97,10 @@ internal sealed class GitSource : IGitRepositoryProvider
     }
 
     /// <inheritdoc />
+    /// <exception cref="DomainRuleException">
+    ///     Thrown with <see cref="DomainRule.GitUnavailable"/> when the cache folder cannot be written; the message
+    ///     names the setting but not the path, and the repository gate is released.
+    /// </exception>
     public async Task<IGitRepository> OpenAsync(RepositoryAccess access, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(access);
@@ -112,6 +116,12 @@ internal sealed class GitSource : IGitRepositoryProvider
             var folder = Path.Combine(Path.GetFullPath(_options.CachePath), string.Create(CultureInfo.InvariantCulture, $"repo-{access.RepositoryId}"));
             await EnsureMirrorAsync(access, folder, cancellationToken);
             return new Session(_runner, access, folder, gate);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            // The raw message names server paths; the exception is deliberately not chained
+            gate.Release();
+            throw GitRunner.CacheFolderUnwritable();
         }
         catch
         {

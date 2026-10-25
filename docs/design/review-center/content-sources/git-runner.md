@@ -101,11 +101,17 @@ All failures are `DomainRuleException` values, except a cancellation requested b
 - A git that cannot be started (missing, not executable) or is older than the minimum is `GitUnavailable` with a
   message that asks an administrator to install a current git, and no inner exception, so a path or a system message is
   not exposed.
+- A home folder (`<cache>/.git-home`) that cannot be created, because of an I/O or permission failure, is
+  `GitUnavailable` with a message that asks an administrator to check the `Git:CachePath` setting and the folder
+  permissions; it names the setting, not the path, and has no inner exception.
 - A command that exceeds the time limit is `GitTimeout` ("Git did not finish within N seconds and was stopped.").
 - Output beyond the limit is `GitAccessFailed` ("Git returned more data than the server accepts.").
 - A non-zero exit code is turned into `GitAccessFailed` by `FailureFor`.
 
 A null options object or argument list raises `ArgumentNullException`.
+
+**Known limitation**: git failures are not written to the server log. The redacted first line of the error is shown to
+the user in the exception. A logger can be added later without changing the contract.
 
 #### Dependencies
 

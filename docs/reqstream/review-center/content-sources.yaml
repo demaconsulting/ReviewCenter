@@ -100,12 +100,13 @@ sections:
         title: >-
           The ContentSources subsystem shall report a clear, secret-free error that names the cause when git is not
           installed or too old, when a revision does not exist, when access is refused or the location cannot be
-          read, and when a call runs out of time.
+          read, and when a call runs out of time, or when the cache folder cannot be written.
         justification: |
           Operators and users must be able to tell a missing program from a wrong location, a refused token, or a
           slow server, and must be able to act on the message.
         children:
           - ReviewCenter-GitRunner-Errors
+          - ReviewCenter-GitSource-CacheFolder
         tests:
           - ContentSourcesSubsystem_RegisteredRepository_IsReadThroughTheRealGitSource
 

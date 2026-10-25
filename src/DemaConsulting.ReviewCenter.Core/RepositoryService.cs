@@ -437,6 +437,11 @@ public sealed class RepositoryService
                 throw LocationInvalid("The location must not contain a user name or password; enter the credentials in their own fields.");
             }
 
+            if (trimmed.Contains('?') || trimmed.Contains('#'))
+            {
+                throw LocationInvalid("The location must not contain a query string or fragment; enter the credentials in their own fields.");
+            }
+
             if (uri.Scheme != Uri.UriSchemeFile && uri.Host.Length == 0)
             {
                 throw LocationInvalid($"The location has no host name. {forms}");

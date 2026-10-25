@@ -517,13 +517,34 @@ internal sealed class GitRunner
     ///     Gets the private, empty folder used as the home of every git call, so no user configuration is found.
     /// </summary>
     /// <returns>The folder path; it is created when missing.</returns>
+    /// <exception cref="DomainRuleException">
+    ///     Thrown with <see cref="DomainRule.GitUnavailable"/> when the folder cannot be created.
+    /// </exception>
     private string HomeFolder()
     {
         var root = string.IsNullOrWhiteSpace(_options.CachePath) ? Path.GetTempPath() : _options.CachePath;
         var home = Path.Combine(root, ".git-home");
-        Directory.CreateDirectory(home);
+        try
+        {
+            Directory.CreateDirectory(home);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            // The raw message names server paths; the exception is deliberately not chained
+            throw CacheFolderUnwritable();
+        }
+
         return home;
     }
+
+    /// <summary>
+    ///     Creates the exception for a cache folder that cannot be written. The message names the setting, not the path.
+    /// </summary>
+    /// <returns>The exception to throw.</returns>
+    internal static DomainRuleException CacheFolderUnwritable() =>
+        new(
+            DomainRule.GitUnavailable,
+            "The server cannot write its git cache folder. Ask an administrator to check the Git:CachePath setting and the folder permissions.");
 
     /// <summary>
     ///     Creates the exception for a missing or too old git.

@@ -23,7 +23,7 @@ sections:
           The RepositoryService class shall accept as the location of a repository an https, http, or file URL or an
           absolute local path, and shall refuse an empty or too long location, a location that git could read as an
           option or a helper, any other form (including ssh and git addresses), and a location that carries
-          credentials of its own.
+          credentials of its own, in the user information, the query string, or a fragment.
         justification: |
           The location is handed to git and fetched by the server. Only the forms that the server can use safely are
           allowed, and credentials belong in the token, where they are protected, not in the location, where they

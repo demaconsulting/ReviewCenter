@@ -50,8 +50,8 @@ refused; a name that differs only in case from an existing one is refused with `
 tested by `RepositoryService_CreateAsync_NameLimitsAndDuplicate_AreEnforced`.
 
 **RepositoryService_CreateAsync_InvalidLocation_ThrowsRepositoryLocationInvalid**: Locations that are empty, too long,
-start with `-`, hold control characters or white space, carry user information, lack a host, use an unsupported scheme,
-or
+start with `-`, hold control characters or white space, carry user information or a query string or fragment, lack a
+host, use an unsupported scheme, or
 are SSH or scp-style addresses or relative paths are refused with `RepositoryLocationInvalid`. This scenario is tested by
 `RepositoryService_CreateAsync_InvalidLocation_ThrowsRepositoryLocationInvalid`.
 
