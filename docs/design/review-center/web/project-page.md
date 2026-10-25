@@ -66,13 +66,15 @@ rejection does nothing and leaves the rejection reason visible, rather than repl
 **CreateReviewAsync**: Handles submission of the form.
 
 - *Postconditions*: On success the browser is taken to the page of the new review. On a rule violation the entered
-  values and files are kept and the message is shown.
+  values and files are kept and the message is shown. The handler first asks for the current user, so an ended
+  sign-in state is refused with a message and no review is created.
 
 **OnAfterRender**: Marks the page interactive after the first render on a live connection.
 
 #### Error Handling
 
-A `DomainRuleException` from `ReviewService` is caught and its message shown in the page. A selection that breaks
+A `DomainRuleException` from `ReviewService`, or from the check of the current user, is caught and its message shown
+in the page. A selection that breaks
 an upload limit is shown as an error message. Other exceptions are not handled by the page.
 
 #### Dependencies

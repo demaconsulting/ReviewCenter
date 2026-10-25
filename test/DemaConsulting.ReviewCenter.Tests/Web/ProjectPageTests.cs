@@ -190,6 +190,30 @@ public class ProjectPageTests : PageTestBase
     }
 
     /// <summary>
+    ///     Test that a review submitted after the session ended, but before the page learned of it, shows a clear
+    ///     message and stores nothing.
+    /// </summary>
+    [Fact]
+    public async Task ProjectPage_CreateForm_SessionEndedBeforePageKnows_ShowsClearErrorAndCreatesNothing()
+    {
+        // Arrange: a filled-in form, and then the session ends without the page being told
+        var project = await Projects.CreateAsync("Apollo", null, TestContext.Current.CancellationToken);
+        var cut = RenderPage(project.Id);
+        await cut.Find("[data-testid='review-id-input']").InputAsync("REV-1");
+        await cut.Find("[data-testid='review-title-input']").InputAsync("First review");
+        SelectFiles(cut, ("a.txt", TestContent.A));
+        await cut.WaitForAssertionAsync(() => Assert.NotEmpty(cut.FindAll("[data-testid='selected-file-0']")));
+        SignOutQuietly();
+
+        // Act: submit the form
+        await cut.Find("[data-testid='new-review-form']").SubmitAsync();
+
+        // Assert: the page says why nothing was saved, and no review exists
+        Assert.Contains("no longer signed in", cut.Find("[data-testid='review-error']").TextContent, StringComparison.Ordinal);
+        Assert.Empty(await Reviews.ListAsync(project.Id, TestContext.Current.CancellationToken));
+    }
+
+    /// <summary>
     ///     Test that submitting without files shows the empty-file-set error and creates nothing.
     /// </summary>
     [Fact]

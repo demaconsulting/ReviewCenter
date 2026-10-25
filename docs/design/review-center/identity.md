@@ -127,4 +127,5 @@ live connection, while the header and the router are served once, so only a comp
 documented behavior: the page reacts up to one revalidation interval after the change, and during that window actions
 that do not re-check the user are still accepted (signing a review and the actions of the users page re-check the stored
 user on every action and refuse at once); and the header keeps showing the old name until the next navigation or reload.
-An action that meets an already ended state is refused by `GetActorAsync` with a message and saves nothing.
+An action that meets an already ended state is refused by `GetActorAsync` with a message and saves nothing; every
+action that changes something on the protected pages asks for the actor first, even where its Core service takes none.

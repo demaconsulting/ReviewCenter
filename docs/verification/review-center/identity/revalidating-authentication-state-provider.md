@@ -56,7 +56,8 @@ cannot be matched to a stored user; the check answers `false`. This scenario is 
 `RevalidatingAuthenticationStateProvider_IsCurrentAsync_NoNameClaim_ReturnsFalse`.
 
 **RevalidatingAuthenticationStateProvider_IsCurrentAsync_LookupThrows_ReturnsFalseFailClosed**: The store throws on the
-read; the check answers `false` and does not throw, so a user who cannot be verified does not stay signed in. This
+read; the check answers `false` and does not throw, so a user who cannot be verified does not stay signed in. A warning
+naming the user, and containing no password or hash, is logged. This
 scenario is tested by `RevalidatingAuthenticationStateProvider_IsCurrentAsync_LookupThrows_ReturnsFalseFailClosed`.
 
 **RevalidatingAuthenticationStateProvider_IsCurrentAsync_CancelledLookup_ThrowsTaskCanceledWithToken**: The token is

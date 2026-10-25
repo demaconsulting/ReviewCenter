@@ -278,7 +278,9 @@ non-zero exit code.
   only at its next check, so for up to the interval (30 seconds by default; `Auth:RevalidationSeconds`) the open
   page still accepts actions that are not re-checked, such as answering checks and adding comments and threads.
   Signing, changing reviewer slots, and user administration re-check the account on every action and are refused at
-  once. The name in the page header stays the same until you navigate or reload the page, and changing a password
+  once. Once the page's sign-in state has ended, every action that changes something (including creating projects and
+  reviews and resolving threads) is refused with a message and saves nothing. The name in the page header stays the
+  same until you navigate or reload the page, and changing a password
   does not end the user's other sessions.
 - **Checklists are fixed per review**: every review gets a copy of the default checklist when it is created and
   keeps it; there is no project-level checklist editor or import yet. Checklist answers are not linked to comment

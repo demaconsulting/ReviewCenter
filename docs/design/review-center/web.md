@@ -139,10 +139,12 @@ another name. A page that is already open makes no request, so the cookie check 
 `RevalidatingAuthenticationStateProvider` of the `Identity` subsystem re-reads the user at a fixed interval and ends the
 authentication state of the page when the user is no longer valid (see *Open pages and the end of a session* below).
 `UsersPage` also re-checks the stored user before every action, so a user who is no longer an enabled
-administrator is refused at once, and so does the signing of a review in Core. The other pages (`ReviewPage`,
-`ChecklistPage`) keep acting for the original user until the next check, which is at most one revalidation interval,
-and what they record is attributed to that user. An action that meets an authentication state that has already ended
-is refused by `GetActorAsync` with a message and saves nothing.
+administrator is refused at once, and so does the signing of a review in Core. The other actions keep acting for the
+original user until the next check, which is at most one revalidation interval, and what they record is attributed to
+that user. Every action that changes something (creating a project or a review, starting, answering, resolving, and
+reopening a thread, answering checklist checks, changing reviewer slots, signing, changing a password, and the user
+administration actions) first asks `GetActorAsync` for the current user, even where its Core service takes no actor yet,
+so an action that meets an authentication state that has already ended is refused with a message and saves nothing.
 
 #### Open pages and the end of a session
 

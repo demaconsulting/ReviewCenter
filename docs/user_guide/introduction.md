@@ -212,7 +212,9 @@ Some things to know:
 
 - The check is periodic, so for up to one interval after a change the open page still shows its content and accepts
   actions that are not re-checked, such as answering a checklist check or adding a comment. Signing a review and
-  every action on the Users page check the account again each time and are refused at once.
+  every action on the Users page check the account again each time and are refused at once. Once the page itself has
+  ended, every action that changes something (for example creating a project or review, or resolving a thread) is
+  refused with a message and saves nothing.
 - The page header, which shows your display name, keeps the old name until you navigate to another page or reload.
   Anything you typed on the page that ended is lost, because the page content is replaced.
 - Use the link in the message to sign in again, and you return to the page you were on.

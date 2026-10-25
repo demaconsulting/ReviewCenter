@@ -282,3 +282,9 @@ This scenario is tested by `ReviewPage_Revalidation_UserDisabled_PageStopsShowin
 typed, and the sign-in state ends without the page being told; the thread form is submitted. The thread error says
 that the user is no longer signed in, and no thread exists. This scenario is tested by
 `ReviewPage_StartThread_SessionEndedBeforePageKnows_ShowsClearErrorAndStoresNothing`.
+
+**ReviewPage_ResolveAndReopen_SessionEndedBeforePageKnows_ShowsClearErrorAndChangesNothing**: An open thread and a
+resolved thread are shown, and the sign-in state ends without the page being told; resolving the first and reopening
+the second are both attempted. Each thread shows the message that the user is no longer signed in, and both threads
+keep their stored state, so the approval state cannot be changed. This scenario is tested by
+`ReviewPage_ResolveAndReopen_SessionEndedBeforePageKnows_ShowsClearErrorAndChangesNothing`.

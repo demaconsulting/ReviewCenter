@@ -527,10 +527,16 @@ public partial class ReviewPage : ComponentBase
     /// </summary>
     /// <param name="thread">The thread as shown.</param>
     /// <returns>A task that completes when the state is stored or the problem is shown.</returns>
+    /// <remarks>
+    ///     Refused, with a message, when the sign-in state of the page has already ended. Resolving or reopening
+    ///     changes the approval state, so it must not run for a user who is no longer signed in.
+    /// </remarks>
     private async Task ToggleThreadAsync(ReviewThread thread)
     {
         try
         {
+            // The service takes no actor yet; asking for one refuses an ended sign-in state
+            _ = await AuthenticationState.GetActorAsync();
             if (thread.State == ReviewThreadState.Open)
             {
                 await ThreadService.ResolveAsync(ProjectId, ReviewId, thread.Id);

@@ -23,6 +23,7 @@ using DemaConsulting.ReviewCenter.Core;
 using DemaConsulting.ReviewCenter.Identity;
 using DemaConsulting.ReviewCenter.Tests.Core;
 using Microsoft.AspNetCore.Components.Authorization;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 
@@ -170,15 +171,26 @@ public class RevalidatingAuthenticationStateProviderTests
     [Fact]
     public async Task RevalidatingAuthenticationStateProvider_IsCurrentAsync_LookupThrows_ReturnsFalseFailClosed()
     {
-        // Arrange: a store that fails, for example because the database is unavailable
+        // Arrange: a store that fails, for example because the database is unavailable, and a captured log
         var store = new ScriptedUserStore((_, _) => throw new InvalidOperationException("The database is unavailable."));
-        var provider = NewProvider(new UserService(store, new FakePasswordHasher(), TimeProvider.System));
+        var logs = new CapturingLoggerProvider();
+        using var loggers = LoggerFactory.Create(builder => builder.AddProvider(logs));
+        var provider = new RevalidatingAuthenticationStateProvider(
+            loggers, new UserService(store, new FakePasswordHasher(), TimeProvider.System), ShortInterval);
 
         // Act: check the state
         var current = await provider.IsCurrentAsync(StateOf("ann", "Ann", UserRole.Reviewer), TestContext.Current.CancellationToken);
 
         // Assert: an unverifiable user is not valid, and no exception reaches the framework
         Assert.False(current);
+
+        // Assert: exactly one warning names the user, and it carries no secret (no password, hash, or claim value)
+        var entry = Assert.Single(logs.Entries, e => e.Category.EndsWith(nameof(RevalidatingAuthenticationStateProvider), StringComparison.Ordinal));
+        Assert.Equal(LogLevel.Warning, entry.Level);
+        Assert.Contains("'ann'", entry.Message, StringComparison.Ordinal);
+        Assert.Equal("ann", entry.Properties["Username"]);
+        Assert.DoesNotContain("password", entry.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("Ann", entry.Message, StringComparison.Ordinal);
     }
 
     /// <summary>

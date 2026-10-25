@@ -657,6 +657,35 @@ public class ReviewPageTests : PageTestBase
     }
 
     /// <summary>
+    ///     Test that resolving and reopening a thread after the session ended, but before the page learned of it,
+    ///     shows a clear message and leaves the thread state, and so the approval state, unchanged.
+    /// </summary>
+    [Fact]
+    public async Task ReviewPage_ResolveAndReopen_SessionEndedBeforePageKnows_ShowsClearErrorAndChangesNothing()
+    {
+        // Arrange: an open thread and a resolved thread on the selected file
+        var projectId = await CreateReviewAsync(new UploadedFile("a.txt", TestContent.A));
+        var open = await Threads.StartThreadAsync(projectId, "REV-1", "a.txt", null, null, TestActors.Ann, "Open one", TestContext.Current.CancellationToken);
+        var resolved = await Threads.StartThreadAsync(projectId, "REV-1", "a.txt", null, null, TestActors.Ann, "Resolved one", TestContext.Current.CancellationToken);
+        await Threads.ResolveAsync(projectId, "REV-1", resolved.Id, TestContext.Current.CancellationToken);
+        var cut = RenderPage(projectId);
+        await cut.Find("[data-testid='file-select-0']").ClickAsync();
+        await cut.Find($"[data-testid='thread-expand-{resolved.Id}']").ClickAsync();
+        SignOutQuietly();
+
+        // Act: resolve the open thread, and reopen the resolved one
+        await cut.Find($"[data-testid='thread-toggle-{open.Id}']").ClickAsync();
+        await cut.Find($"[data-testid='thread-toggle-{resolved.Id}']").ClickAsync();
+
+        // Assert: each shows why nothing was saved, and both threads keep their state
+        Assert.Contains("no longer signed in", cut.Find($"[data-testid='reply-error-{open.Id}']").TextContent, StringComparison.Ordinal);
+        Assert.Contains("no longer signed in", cut.Find($"[data-testid='reply-error-{resolved.Id}']").TextContent, StringComparison.Ordinal);
+        var stored = (await Threads.ListAsync(projectId, "REV-1", TestContext.Current.CancellationToken)).ToDictionary(thread => thread.Id);
+        Assert.Equal(ReviewThreadState.Open, stored[open.Id].State);
+        Assert.Equal(ReviewThreadState.Resolved, stored[resolved.Id].State);
+    }
+
+    /// <summary>
     ///     Test that author and comment text containing markup are shown as plain text.
     /// </summary>
     [Fact]

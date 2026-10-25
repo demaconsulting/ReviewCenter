@@ -183,14 +183,18 @@ sections:
         title: >-
           The Web subsystem shall make an open protected page, when its user is no longer valid, stop showing
           data and stop offering actions by replacing the page with a message that the session has ended and a
-          link to the login page, and shall, until then, refuse every action of a user administration page that
-          is no longer made by an enabled administrator.
+          link to the login page, and shall refuse every action that changes something on a protected page, with a
+          message and without saving anything, once the sign-in state of the page has ended, and, until then,
+          refuse every action of a user administration page that is no longer made by an enabled administrator.
         justification: |
           A page that stays open makes no request, so a user who was disabled, removed, or given another role
           would otherwise keep seeing and changing review data until the page is reloaded. The page is replaced
           once the sign-in state of the page ends, which happens at most one revalidation interval after the
-          change; the header is served once and keeps the old name until the next navigation. The component tests
-          of the page units cover the live pages, because ending an open page needs a live connection.
+          change; the header is served once and keeps the old name until the next navigation. An event that was
+          already queued when the state ended can still reach a handler of the replaced page, so every handler
+          that changes something asks for the current user first, even where its service takes no actor yet. The
+          component tests of the page units cover the live pages, because ending an open page needs a live
+          connection.
         children:
           - ReviewCenter-App-SessionGate
           - ReviewCenter-UsersPage-AdminCheck
@@ -198,6 +202,9 @@ sections:
           - ReviewPage_Revalidation_UserDisabled_PageStopsShowingAndAcceptingActions
           - UsersPage_Revalidation_AdminDemoted_PageShowsSessionEndedAndNoActions
           - SessionGate_Render_EveryProtectedPageSignedOut_ShowsSessionEndedAndNoPage
+          - ProjectsPage_CreateForm_SessionEndedBeforePageKnows_ShowsClearErrorAndCreatesNothing
+          - ProjectPage_CreateForm_SessionEndedBeforePageKnows_ShowsClearErrorAndCreatesNothing
+          - ReviewPage_ResolveAndReopen_SessionEndedBeforePageKnows_ShowsClearErrorAndChangesNothing
 
       - id: ReviewCenter-Web-TestIds
         title: >-

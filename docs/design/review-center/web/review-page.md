@@ -199,7 +199,9 @@ the page loaded is shown as empty text rather than failing the connection. Comme
 are shown as messages next to the control that caused them and never end the connection. An action that meets an
 authentication state that has already ended (the user was disabled, removed, or changed since the page was opened,
 and the page has not yet been replaced) is refused by `GetActorAsync` with a rule violation, which the same handlers
-show as the message "You are no longer signed in, so nothing was saved. Reload the page to sign in again." The page
+show as the message "You are no longer signed in, so nothing was saved. Reload the page to sign in again." The handlers
+that change something without a service that takes an actor (resolving and reopening a thread) ask for the actor first
+for the same reason. The page
 raises no other errors of its own.
 
 #### Dependencies
