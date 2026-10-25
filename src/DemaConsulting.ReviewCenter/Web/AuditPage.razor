@@ -44,6 +44,7 @@
             else
             {
                 <p class="error" role="alert" data-testid="audit-result">Chain broken at entry @Result.FirstBadSequence. Head hash <span class="audit-hash" data-testid="audit-head-hash">@Result.HeadHash</span></p>
+                <p class="muted" data-testid="audit-broken-hint">The history no longer matches its hash chain at this entry. Do not edit the database; preserve it and report this entry number.</p>
             }
         }
     </section>

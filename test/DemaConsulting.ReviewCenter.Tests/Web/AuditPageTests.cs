@@ -205,6 +205,7 @@ public class AuditPageTests : PageTestBase
         Assert.StartsWith("Chain broken at entry 2", cut.Find("[data-testid='audit-result']").TextContent, StringComparison.Ordinal);
         Assert.Equal(AuditStore.Entries[0].Hash, cut.Find("[data-testid='audit-head-hash']").TextContent);
         Assert.DoesNotContain("Chain intact", cut.Markup, StringComparison.Ordinal);
+        Assert.Contains("report this entry number", cut.Find("[data-testid='audit-broken-hint']").TextContent, StringComparison.Ordinal);
     }
 
     /// <summary>

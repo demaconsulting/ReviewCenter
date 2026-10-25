@@ -772,6 +772,35 @@ a.action {
     margin-top: 0.75rem;
 }
 
+/* On a narrow screen each entry becomes a small card: two cells per line, the detail on its own full-width line */
+@media (max-width: 39.99rem) {
+    .audit-table thead {
+        position: absolute;
+        left: -9999px;
+    }
+
+    .audit-table,
+    .audit-table tbody {
+        display: block;
+    }
+
+    .audit-table tr {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        border-bottom: 1px solid var(--border);
+        padding: 0.4rem 0;
+    }
+
+    .audit-table td {
+        border-bottom: 0;
+        padding: 0.1rem 0.6rem;
+    }
+
+    .audit-table td.audit-detail {
+        grid-column: 1 / -1;
+    }
+}
+
 @media (min-width: 40rem) {
     main,
     .page {
