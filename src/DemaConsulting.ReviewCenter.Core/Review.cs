@@ -64,6 +64,36 @@ public sealed class Review
     public string ContentFingerprint { get; init; } = string.Empty;
 
     /// <summary>
+    ///     Gets the identity of the registered repository the review was created from, or <c>null</c> for an upload.
+    /// </summary>
+    public int? RepositoryId { get; init; }
+
+    /// <summary>
+    ///     Gets the name the repository had when the review was created (a display snapshot), or <c>null</c> for an upload.
+    /// </summary>
+    public string? RepositoryName { get; init; }
+
+    /// <summary>
+    ///     Gets the full commit identifier of the baseline revision, or <c>null</c> for an upload or a review of all head files.
+    /// </summary>
+    public string? BaselineSha { get; init; }
+
+    /// <summary>
+    ///     Gets the full commit identifier of the head revision, or <c>null</c> for an upload.
+    /// </summary>
+    public string? HeadSha { get; init; }
+
+    /// <summary>
+    ///     Gets the file selection text (normalized patterns, one per line) used to pick the changed files, or <c>null</c> for an upload.
+    /// </summary>
+    public string? Selection { get; init; }
+
+    /// <summary>
+    ///     Gets a value indicating whether the review was created from a repository.
+    /// </summary>
+    public bool IsFromRepository => RepositoryId is not null;
+
+    /// <summary>
     ///     Gets the files of the review.
     /// </summary>
     public List<ReviewFile> Files { get; init; } = [];

@@ -1,0 +1,56 @@
+---
+# Software Unit Requirements for the SelectionMatcher Class
+#
+# The SelectionMatcher class parses the file selection patterns an author gives when a review is created from a
+# repository and decides which paths they select.
+
+sections:
+  - title: SelectionMatcher Unit Requirements
+    requirements:
+      - id: ReviewCenter-SelectionMatcher-Match
+        title: >-
+          The SelectionMatcher class shall select a path when the last pattern that matches it is an inclusion, with
+          a star matching any characters inside one path segment but never a separator, a question mark matching one
+          character, a segment of two stars matching any number of segments (at least one when it ends the pattern),
+          a leading exclamation mark making the pattern an exclusion, and matching that is case-sensitive.
+        justification: |
+          Authors choose the files of a review with a short, predictable syntax. The result must not depend on the
+          platform, and a later exclusion must be able to take back what an earlier pattern selected.
+        tests:
+          - SelectionMatcher_IsMatch_Patterns_SelectExpectedPaths
+          - SelectionMatcher_IsMatch_TrailingDoubleStar_NeedsAtLeastOneSegment
+          - SelectionMatcher_IsMatch_Star_DoesNotCrossSeparators
+
+      - id: ReviewCenter-SelectionMatcher-Parse
+        title: >-
+          The SelectionMatcher class shall read a selection as lines that are trimmed and normalized with blank lines
+          skipped, and shall refuse a selection that is empty or has too many patterns, a pattern that is too long,
+          or a pattern that uses a backslash, a dot or double dot segment, an empty segment, or a control character,
+          while accepting a selection at exactly the limits.
+        justification: |
+          A pattern must never be able to reach outside the repository or to hide text, and the size of a selection
+          must be bounded. The user is told which rule a selection broke.
+        tests:
+          - SelectionMatcher_Parse_Lines_AreTrimmedAndNormalized
+          - SelectionMatcher_Parse_InvalidText_ThrowsSelectionInvalid
+          - SelectionMatcher_Parse_Limits_AreInclusive
+
+      - id: ReviewCenter-SelectionMatcher-Bounded
+        title: >-
+          The SelectionMatcher class shall decide a path in a time that stays small even for a pattern with many
+          double-star segments.
+        justification: |
+          Patterns are typed by users. A pattern that makes matching take exponential time would let one request
+          stop the server.
+        tests:
+          - SelectionMatcher_IsMatch_ManyDoubleStars_FinishesQuickly
+
+      - id: ReviewCenter-SelectionMatcher-Compatibility
+        title: >-
+          The SelectionMatcher class shall select the same paths as the glob matching used by ReviewMark for the
+          syntax that both support.
+        justification: |
+          Authors already write the selection of files for ReviewMark. The same text must select the same files in a
+          review of ReviewCenter, so that the two tools agree about what is reviewed.
+        tests:
+          - SelectionMatcher_IsMatch_CommonSyntax_AgreesWithFileSystemGlobbing

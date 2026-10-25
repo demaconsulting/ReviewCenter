@@ -52,6 +52,11 @@ public static class ReviewLimits
     public const int MaxPathLength = 400;
 
     /// <summary>
+    ///     The longest accepted file selection text of a repository review, in characters.
+    /// </summary>
+    public const int MaxSelectionLength = 2000;
+
+    /// <summary>
     ///     The longest accepted project name, in characters.
     /// </summary>
     public const int MaxProjectNameLength = 100;

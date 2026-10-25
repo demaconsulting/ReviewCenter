@@ -174,6 +174,20 @@ internal sealed class FakeReviewStore : IReviewStore
     }
 
     /// <inheritdoc />
+    public Task<byte[]?> GetBaselineContentAsync(
+        int projectId,
+        string reviewId,
+        string path,
+        CancellationToken cancellationToken = default)
+    {
+        var file = _reviews
+            .Where(review => review.ProjectId == projectId && review.Id == reviewId)
+            .SelectMany(review => review.Files)
+            .FirstOrDefault(f => f.Path == path);
+        return Task.FromResult(file?.BaselineContent);
+    }
+
+    /// <inheritdoc />
     public Task<ReviewThread> AddThreadAsync(
         ReviewThread thread,
         Func<ReviewThread, AuditDraft> audit,
@@ -339,7 +353,21 @@ internal sealed class FakeReviewStore : IReviewStore
             review.Checklist,
             _sectionStates.Where(s => s.ProjectId == projectId && s.ReviewId == reviewId).ToList(),
             _answers.Where(a => a.ProjectId == projectId && a.ReviewId == reviewId).ToList(),
-            _threads.Where(t => t.ProjectId == projectId && t.ReviewId == reviewId).OrderBy(t => t.Id).ToList());
+            _threads.Where(t => t.ProjectId == projectId && t.ReviewId == reviewId).OrderBy(t => t.Id).ToList(),
+            review.IsFromRepository
+                ? new ReviewSource(
+                    review.RepositoryId,
+                    review.BaselineSha,
+                    review.HeadSha,
+                    review.Selection,
+                    review.Files
+                        .Select(f => new ChangedFile(
+                            f.Path,
+                            f.ChangeKind,
+                            f.BaselineSha256,
+                            f.ChangeKind == ChangeKind.Deleted ? null : f.Sha256))
+                        .ToList())
+                : ReviewSource.Upload);
         return Task.FromResult<ReviewRecord?>(record);
     }
 
@@ -535,6 +563,11 @@ internal sealed class FakeReviewStore : IReviewStore
             State = review.State,
             Created = review.Created,
             ContentFingerprint = review.ContentFingerprint,
+            RepositoryId = review.RepositoryId,
+            RepositoryName = review.RepositoryName,
+            BaselineSha = review.BaselineSha,
+            HeadSha = review.HeadSha,
+            Selection = review.Selection,
             Files = review.Files
                 .Select(file => new ReviewFile
                 {
@@ -542,7 +575,10 @@ internal sealed class FakeReviewStore : IReviewStore
                     ReviewId = file.ReviewId,
                     Path = file.Path,
                     Size = file.Size,
-                    Sha256 = file.Sha256
+                    Sha256 = file.Sha256,
+                    ChangeKind = file.ChangeKind,
+                    BaselineSize = file.BaselineSize,
+                    BaselineSha256 = file.BaselineSha256
                 })
                 .ToList()
         };

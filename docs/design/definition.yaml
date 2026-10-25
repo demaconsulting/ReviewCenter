@@ -10,6 +10,7 @@ resource-path:
   - docs/design/review-center/web
   - docs/design/review-center/core
   - docs/design/review-center/storage
+  - docs/design/review-center/content-sources
   - docs/design/review-center-puppet
   - docs/design/ots
   - docs/template
@@ -41,6 +42,7 @@ input-files:
   - docs/design/review-center/web/login-page.md
   - docs/design/review-center/web/account-page.md
   - docs/design/review-center/web/users-page.md
+  - docs/design/review-center/web/repositories-page.md
   - docs/design/review-center/core.md
   - docs/design/review-center/core/fingerprint.md
   - docs/design/review-center/core/project-service.md
@@ -50,11 +52,19 @@ input-files:
   - docs/design/review-center/core/user-service.md
   - docs/design/review-center/core/record-digest.md
   - docs/design/review-center/core/signing-service.md
+  - docs/design/review-center/core/selection-matcher.md
+  - docs/design/review-center/core/revision-validator.md
+  - docs/design/review-center/core/repository-service.md
   - docs/design/review-center/storage.md
   - docs/design/review-center/storage/review-center-db-context.md
   - docs/design/review-center/storage/review-store.md
   - docs/design/review-center/storage/user-store.md
   - docs/design/review-center/storage/database-setup.md
+  - docs/design/review-center/storage/repository-store.md
+  - docs/design/review-center/content-sources.md
+  - docs/design/review-center/content-sources/git-runner.md
+  - docs/design/review-center/content-sources/git-source.md
+  - docs/design/review-center/content-sources/credential-protector.md
   - docs/design/review-center-puppet.md
   - docs/design/review-center-puppet/puppet-program.md
   - docs/design/review-center-puppet/control-channel.md
@@ -67,6 +77,8 @@ input-files:
   - docs/design/ots/bunit.md
   - docs/design/ots/efcore.md
   - docs/design/ots/fileassert.md
+  - docs/design/ots/filesystemglobbing.md
+  - docs/design/ots/git.md
   - docs/design/ots/pandoc.md
   - docs/design/ots/playwright.md
   - docs/design/ots/reqstream.md

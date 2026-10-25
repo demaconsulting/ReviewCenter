@@ -100,11 +100,20 @@ public sealed class ThreadService
 
         // The file must exist in the review; the metadata read does not load any file bytes
         var review = await _store.GetReviewAsync(projectId, reviewId, cancellationToken);
-        if (review is null || !review.Files.Any(file => string.Equals(file.Path, filePath, StringComparison.Ordinal)))
+        var file = review?.Files.FirstOrDefault(f => string.Equals(f.Path, filePath, StringComparison.Ordinal));
+        if (file is null)
         {
             throw new DomainRuleException(
                 DomainRule.ThreadAnchorInvalid,
                 $"The file '{filePath}' does not exist in this review.");
+        }
+
+        // A deleted file has no head content, so there are no head lines to anchor to
+        if (startLine is not null && file.ChangeKind == ChangeKind.Deleted)
+        {
+            throw new DomainRuleException(
+                DomainRule.ThreadAnchorInvalid,
+                "Deleted files accept whole-file comments only.");
         }
 
         // Only a line range needs the bytes, to count lines the way the page shows them

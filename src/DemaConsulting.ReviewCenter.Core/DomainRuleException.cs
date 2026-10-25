@@ -135,7 +135,49 @@ public enum DomainRule
     ReauthenticationFailed,
 
     /// <summary>The review record changed after the signer last saw it, so the signature was not stored.</summary>
-    RecordChanged
+    RecordChanged,
+
+    /// <summary>The name of a repository is empty, too long or contains characters that are not allowed.</summary>
+    RepositoryNameInvalid,
+
+    /// <summary>Another repository already has the name, compared without regard to case.</summary>
+    RepositoryNameTaken,
+
+    /// <summary>The location of a repository is empty, too long, not a supported form or carries credentials of its own.</summary>
+    RepositoryLocationInvalid,
+
+    /// <summary>The user name or token of a repository is not valid, a token is given for a location that cannot use one, or a token is contained in the repository name, the user name or the location.</summary>
+    RepositoryCredentialInvalid,
+
+    /// <summary>The referenced repository does not exist.</summary>
+    RepositoryNotFound,
+
+    /// <summary>The repository is disabled and cannot be used as a content source.</summary>
+    RepositoryDisabled,
+
+    /// <summary>A revision name is empty, too long or not a plain branch, tag or commit name.</summary>
+    RevisionInvalid,
+
+    /// <summary>The revision does not exist in the repository.</summary>
+    RevisionNotFound,
+
+    /// <summary>The file selection patterns are empty, too many, too long or use a form that is not allowed.</summary>
+    SelectionInvalid,
+
+    /// <summary>The server cannot run git (it is not installed, not on the path or too old).</summary>
+    GitUnavailable,
+
+    /// <summary>Git could not read the repository: the location is wrong, access was denied or the transfer failed.</summary>
+    GitAccessFailed,
+
+    /// <summary>A git operation did not finish within the configured time and was stopped.</summary>
+    GitTimeout,
+
+    /// <summary>The stored token of a repository cannot be decrypted, for example because the key ring was lost.</summary>
+    CredentialsUnreadable,
+
+    /// <summary>No file matching the selection changed between the two revisions, so no review is created.</summary>
+    NothingToReview
 }
 
 /// <summary>

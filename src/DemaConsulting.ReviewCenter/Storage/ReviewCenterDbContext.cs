@@ -24,7 +24,7 @@ using Microsoft.EntityFrameworkCore;
 namespace DemaConsulting.ReviewCenter.Storage;
 
 /// <summary>
-///     The Entity Framework Core model of the ReviewCenter database: users, projects, reviews, review files, the
+///     The Entity Framework Core model of the ReviewCenter database: users, the registry of git repositories, projects, reviews, review files, the
 ///     comment threads of a review with their comments, the review checklist (frozen snapshot, section
 ///     applicability and answers), and the reviewer slots with their signatures.
 /// </summary>
@@ -32,7 +32,8 @@ namespace DemaConsulting.ReviewCenter.Storage;
 ///     The model maps the Core entities as they are, so Core stays free of any database library.
 ///     The schema is created with <c>EnsureCreated</c> (see <see cref="DatabaseSetup"/>); there are no
 ///     migrations yet, so a database created before users, threads, checklists, slots or signatures existed does
-///     not gain their tables or columns and must be deleted and recreated. Instances are short-lived and not thread-safe: create one per operation
+///     not gain their tables or columns and must be deleted and recreated (this includes the repository registry and
+///     the repository source columns of reviews and review files). Instances are short-lived and not thread-safe: create one per operation
 ///     through <see cref="IDbContextFactory{TContext}"/>.
 /// </remarks>
 internal sealed class ReviewCenterDbContext : DbContext
@@ -48,6 +49,11 @@ internal sealed class ReviewCenterDbContext : DbContext
     private const int Sha256HexColumnLength = 64;
 
     /// <summary>
+    ///     The width of a column that holds a commit identifier in hexadecimal (40 characters, or 64 for SHA-256 repositories).
+    /// </summary>
+    private const int CommitShaColumnLength = 64;
+
+    /// <summary>
     ///     The width of the column that holds the version label of a checklist.
     /// </summary>
     private const int ChecklistVersionColumnLength = 64;
@@ -61,6 +67,12 @@ internal sealed class ReviewCenterDbContext : DbContext
     ///     The width of the column that holds the meaning text of a signature.
     /// </summary>
     private const int SignatureMeaningColumnLength = 256;
+
+    /// <summary>
+    ///     The width of the column that holds an encrypted repository token; far wider than the encryption of a
+    ///     token of the longest allowed length.
+    /// </summary>
+    private const int EncryptedTokenColumnLength = 4000;
 
     /// <summary>
     ///     Initializes a new instance of the <see cref="ReviewCenterDbContext"/> class.
@@ -132,6 +144,11 @@ internal sealed class ReviewCenterDbContext : DbContext
     public DbSet<AuditEntry> AuditEntries => Set<AuditEntry>();
 
     /// <summary>
+    ///     Gets the table of registered git repositories.
+    /// </summary>
+    public DbSet<RepositoryRecord> Repositories => Set<RepositoryRecord>();
+
+    /// <summary>
     ///     Configures keys, relationships, length limits and conversions.
     /// </summary>
     /// <param name="modelBuilder">The builder used to describe the model.</param>
@@ -160,6 +177,13 @@ internal sealed class ReviewCenterDbContext : DbContext
             review.Property(r => r.Title).IsRequired().HasMaxLength(ReviewLimits.MaxReviewTitleLength);
             review.Property(r => r.State).HasConversion<string>().HasMaxLength(StateColumnLength);
             review.Property(r => r.ContentFingerprint).IsRequired().HasMaxLength(Sha256HexColumnLength);
+
+            // Source of a repository review (all null for an upload): the repository identity is a plain number,
+            // not a foreign key, so the review keeps its reference whatever happens to the registration
+            review.Property(r => r.RepositoryName).HasMaxLength(RepositoryService.MaxNameLength);
+            review.Property(r => r.BaselineSha).HasMaxLength(CommitShaColumnLength);
+            review.Property(r => r.HeadSha).HasMaxLength(CommitShaColumnLength);
+            review.Property(r => r.Selection).HasMaxLength(ReviewLimits.MaxSelectionLength);
             review.HasOne<Project>().WithMany().HasForeignKey(r => r.ProjectId).OnDelete(DeleteBehavior.Cascade);
             review.HasMany(r => r.Files)
                 .WithOne()
@@ -167,7 +191,8 @@ internal sealed class ReviewCenterDbContext : DbContext
                 .OnDelete(DeleteBehavior.Cascade);
         });
 
-        // Review files: the bytes are a BLOB, kept verbatim
+        // Review files: the bytes are BLOBs, kept verbatim. The head columns describe the file at the head (empty for
+        // a deleted file); the baseline columns are null when the file had no baseline
         modelBuilder.Entity<ReviewFile>(file =>
         {
             file.HasKey(f => new { f.ProjectId, f.ReviewId, f.Path });
@@ -175,6 +200,8 @@ internal sealed class ReviewCenterDbContext : DbContext
             file.Property(f => f.Path).HasMaxLength(ReviewLimits.MaxPathLength);
             file.Property(f => f.Content).IsRequired();
             file.Property(f => f.Sha256).IsRequired().HasMaxLength(Sha256HexColumnLength);
+            file.Property(f => f.ChangeKind).HasConversion<string>().HasMaxLength(StateColumnLength);
+            file.Property(f => f.BaselineSha256).HasMaxLength(Sha256HexColumnLength);
         });
 
         // Threads: identity assigned by the database; tied to a file of the review, so a thread can never
@@ -206,6 +233,20 @@ internal sealed class ReviewCenterDbContext : DbContext
             user.Property(u => u.DisplayName).IsRequired().HasMaxLength(ReviewLimits.MaxDisplayNameLength);
             user.Property(u => u.Role).HasConversion<string>().HasMaxLength(StateColumnLength);
             user.Property(u => u.PasswordHash).IsRequired();
+        });
+
+        // Repositories: identity assigned by the database; the name is unique without regard to case (NOCASE); the
+        // token is kept only in encrypted form
+        modelBuilder.Entity<RepositoryRecord>(repository =>
+        {
+            repository.ToTable("Repositories");
+            repository.HasKey(r => r.Id);
+            repository.Property(r => r.Name).IsRequired().HasMaxLength(RepositoryService.MaxNameLength)
+                .UseCollation("NOCASE");
+            repository.HasIndex(r => r.Name).IsUnique();
+            repository.Property(r => r.Location).IsRequired().HasMaxLength(RepositoryService.MaxLocationLength);
+            repository.Property(r => r.Username).HasMaxLength(RepositoryService.MaxUsernameLength);
+            repository.Property(r => r.EncryptedToken).HasMaxLength(EncryptedTokenColumnLength);
         });
 
         // Comments: identity assigned by the database, so it grows with posting order

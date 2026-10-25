@@ -49,3 +49,19 @@ sections:
               - SignIn_ProtectedPage_Anonymous_RedirectsToLogin
               - SignIn_PostWithoutAntiforgeryToken_IsRefusedAndSignsNobodyIn
               - PasswordHasher_Verify_RightAndWrongPassword_OnlyRightSucceeds
+          - id: ReviewCenter-OTS-AspNetCore-DataProtection
+            title: >-
+              ASP.NET Core shall encrypt and decrypt text with keys kept in a key ring in a folder, so that text
+              protected with a purpose can be read again after a restart with the same key ring, and cannot be read
+              with another purpose or another key ring.
+            justification: |
+              The access tokens of git repositories are stored only encrypted. The service depends on the Data
+              Protection of the framework, which is part of the same shared framework as the web platform, to encrypt
+              them, to keep its keys in a folder that survives restarts, and to keep text protected for one purpose
+              unreadable for another. Passing tests of the credential code confirm that the framework does so.
+            tags: [ots]
+            tests:
+              - CredentialProtector_ProtectUnprotect_RoundTripsAndHidesToken
+              - CredentialProtector_PersistedKeyRing_SurvivesRestart
+              - CredentialProtector_Unprotect_OtherKeyRing_ThrowsCredentialsUnreadable
+              - CredentialProtector_Purpose_IsolatesTokensFromOtherUses

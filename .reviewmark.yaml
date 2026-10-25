@@ -210,6 +210,7 @@ reviews:
       - "docs/verification/review-center/hosting/server-host.md"
       - "src/**/Hosting/ServerHost.cs"
       - "src/**/Hosting/ServerHostOptions.cs"
+      - "src/**/Hosting/DataProtectionSettings.cs"
       - "test/**/Hosting/ServerHostTests.cs"
 
   - id: ReviewCenter-Hosting-UserCommand
@@ -376,6 +377,7 @@ reviews:
       - "src/**/Web/ProjectPage.razor"
       - "src/**/Web/ProjectPage.razor.cs"
       - "test/**/Web/ProjectPageTests.cs"
+      - "test/**/Web/ProjectPageRepositoryTests.cs"
 
   - id: ReviewCenter-Web-ReviewPage
     title: Review of ReviewCenter ReviewPage unit implementation
@@ -391,6 +393,7 @@ reviews:
       - "src/**/Web/ReviewPage.razor"
       - "src/**/Web/ReviewPage.razor.cs"
       - "test/**/Web/ReviewPageTests.cs"
+      - "test/**/Web/ReviewPageRepositoryTests.cs"
 
   - id: ReviewCenter-Web-ChecklistPage
     title: Review of ReviewCenter ChecklistPage unit implementation
@@ -481,6 +484,22 @@ reviews:
       - "src/**/Web/AuditPage.razor.cs"
       - "test/**/Web/AuditPageTests.cs"
 
+  - id: ReviewCenter-Web-RepositoriesPage
+    title: Review of ReviewCenter RepositoriesPage unit implementation
+    context:
+      - docs/design/review-center.md
+      - docs/reqstream/review-center.yaml
+      - docs/design/review-center/web.md
+      - docs/reqstream/review-center/web.yaml
+    paths:
+      - "docs/reqstream/review-center/web/repositories-page.yaml"
+      - "docs/design/review-center/web/repositories-page.md"
+      - "docs/verification/review-center/web/repositories-page.md"
+      - "docs/sysml2/model/review-center/web/repositories-page.sysml"
+      - "src/**/Web/RepositoriesPage.razor"
+      - "src/**/Web/RepositoriesPage.razor.cs"
+      - "test/**/Web/RepositoriesPageTests.cs"
+
   # ReviewCenter - Core
   - id: ReviewCenter-Core
     title: Review of ReviewCenter Core subsystem architecture and interfaces
@@ -495,6 +514,7 @@ reviews:
       - "test/**/Core/FakeReviewStore.cs"
       - "test/**/Core/FakeUserStore.cs"
       - "test/**/Core/FakeAuditStore.cs"
+      - "test/**/Core/FakeRepositoryStore.cs"
       - "test/**/Core/AuditTestExtensions.cs"
       - "test/**/Core/TestContent.cs"
 
@@ -547,7 +567,10 @@ reviews:
       - "src/DemaConsulting.ReviewCenter.Core/ReviewFile.cs"
       - "src/DemaConsulting.ReviewCenter.Core/ReviewState.cs"
       - "src/DemaConsulting.ReviewCenter.Core/UploadedFile.cs"
+      - "src/DemaConsulting.ReviewCenter.Core/RepositoryReviewResult.cs"
       - "test/**/Core/ReviewServiceTests.cs"
+      - "test/**/Core/ReviewServiceRepositoryTests.cs"
+      - "test/**/ContentSources/ReviewFromGitTests.cs"
       - "test/**/Core/AuditEventTests.cs"
 
   - id: ReviewCenter-Core-ThreadService
@@ -680,6 +703,54 @@ reviews:
       - "src/DemaConsulting.ReviewCenter.Core/IAuditStore.cs"
       - "test/**/Core/AuditServiceTests.cs"
 
+  # ReviewCenter - Core repositories and file selection
+  - id: ReviewCenter-Core-SelectionMatcher
+    title: Review of ReviewCenter SelectionMatcher unit implementation
+    context:
+      - docs/design/review-center.md
+      - docs/reqstream/review-center.yaml
+      - docs/design/review-center/core.md
+      - docs/reqstream/review-center/core.yaml
+    paths:
+      - "docs/reqstream/review-center/core/selection-matcher.yaml"
+      - "docs/design/review-center/core/selection-matcher.md"
+      - "docs/verification/review-center/core/selection-matcher.md"
+      - "docs/sysml2/model/review-center/core/selection-matcher.sysml"
+      - "src/DemaConsulting.ReviewCenter.Core/SelectionMatcher.cs"
+      - "test/**/Core/SelectionMatcherTests.cs"
+
+  - id: ReviewCenter-Core-RevisionValidator
+    title: Review of ReviewCenter RevisionValidator unit implementation
+    context:
+      - docs/design/review-center.md
+      - docs/reqstream/review-center.yaml
+      - docs/design/review-center/core.md
+      - docs/reqstream/review-center/core.yaml
+    paths:
+      - "docs/reqstream/review-center/core/revision-validator.yaml"
+      - "docs/design/review-center/core/revision-validator.md"
+      - "docs/verification/review-center/core/revision-validator.md"
+      - "docs/sysml2/model/review-center/core/revision-validator.sysml"
+      - "src/DemaConsulting.ReviewCenter.Core/RevisionValidator.cs"
+      - "test/**/Core/RevisionValidatorTests.cs"
+
+  - id: ReviewCenter-Core-RepositoryService
+    title: Review of ReviewCenter RepositoryService unit implementation
+    context:
+      - docs/design/review-center.md
+      - docs/reqstream/review-center.yaml
+      - docs/design/review-center/core.md
+      - docs/reqstream/review-center/core.yaml
+    paths:
+      - "docs/reqstream/review-center/core/repository-service.yaml"
+      - "docs/design/review-center/core/repository-service.md"
+      - "docs/verification/review-center/core/repository-service.md"
+      - "docs/sysml2/model/review-center/core/repository-service.sysml"
+      - "src/DemaConsulting.ReviewCenter.Core/RepositoryService.cs"
+      - "src/DemaConsulting.ReviewCenter.Core/SourceRepository.cs"
+      - "src/DemaConsulting.ReviewCenter.Core/IRepositoryStore.cs"
+      - "test/**/Core/RepositoryServiceTests.cs"
+
   # ReviewCenter - Storage
   - id: ReviewCenter-Storage
     title: Review of ReviewCenter Storage subsystem architecture and interfaces
@@ -719,6 +790,7 @@ reviews:
       - "docs/verification/review-center/storage/review-store.md"
       - "src/**/Storage/ReviewStore.cs"
       - "test/**/Storage/ReviewStoreTests.cs"
+      - "test/**/Storage/ReviewStoreRepositoryTests.cs"
       - "test/**/Storage/ReviewStoreSigningTests.cs"
 
   - id: ReviewCenter-Storage-UserStore
@@ -764,6 +836,84 @@ reviews:
       - "src/**/Storage/DatabaseSetup.cs"
       - "src/**/Storage/DatabaseOptions.cs"
       - "test/**/Storage/DatabaseSetupTests.cs"
+
+  - id: ReviewCenter-Storage-RepositoryStore
+    title: Review of ReviewCenter RepositoryStore unit implementation
+    context:
+      - docs/design/review-center.md
+      - docs/reqstream/review-center.yaml
+      - docs/design/review-center/storage.md
+      - docs/reqstream/review-center/storage.yaml
+    paths:
+      - "docs/reqstream/review-center/storage/repository-store.yaml"
+      - "docs/design/review-center/storage/repository-store.md"
+      - "docs/verification/review-center/storage/repository-store.md"
+      - "docs/sysml2/model/review-center/storage/repository-store.sysml"
+      - "src/**/Storage/RepositoryStore.cs"
+      - "src/**/Storage/RepositoryRecord.cs"
+      - "test/**/Storage/RepositoryStoreTests.cs"
+
+  # ReviewCenter - ContentSources
+  - id: ReviewCenter-ContentSources
+    title: Review of ReviewCenter ContentSources subsystem architecture and interfaces
+    context:
+      - docs/design/review-center.md
+      - docs/reqstream/review-center.yaml
+    paths:
+      - "docs/reqstream/review-center/content-sources.yaml"
+      - "docs/design/review-center/content-sources.md"
+      - "docs/verification/review-center/content-sources.md"
+      - "docs/sysml2/model/review-center/content-sources.sysml"
+      - "test/**/ContentSources/ContentSourcesSubsystemTests.cs"
+      - "test/**/ContentSources/GitTestSupport.cs"
+
+  - id: ReviewCenter-ContentSources-GitRunner
+    title: Review of ReviewCenter GitRunner unit implementation
+    context:
+      - docs/design/review-center.md
+      - docs/reqstream/review-center.yaml
+      - docs/design/review-center/content-sources.md
+      - docs/reqstream/review-center/content-sources.yaml
+    paths:
+      - "docs/reqstream/review-center/content-sources/git-runner.yaml"
+      - "docs/design/review-center/content-sources/git-runner.md"
+      - "docs/verification/review-center/content-sources/git-runner.md"
+      - "docs/sysml2/model/review-center/content-sources/git-runner.sysml"
+      - "src/**/ContentSources/GitRunner.cs"
+      - "src/**/ContentSources/GitOptions.cs"
+      - "test/**/ContentSources/GitRunnerTests.cs"
+
+  - id: ReviewCenter-ContentSources-GitSource
+    title: Review of ReviewCenter GitSource unit implementation
+    context:
+      - docs/design/review-center.md
+      - docs/reqstream/review-center.yaml
+      - docs/design/review-center/content-sources.md
+      - docs/reqstream/review-center/content-sources.yaml
+    paths:
+      - "docs/reqstream/review-center/content-sources/git-source.yaml"
+      - "docs/design/review-center/content-sources/git-source.md"
+      - "docs/verification/review-center/content-sources/git-source.md"
+      - "docs/sysml2/model/review-center/content-sources/git-source.sysml"
+      - "src/**/ContentSources/GitSource.cs"
+      - "src/DemaConsulting.ReviewCenter.Core/IGitRepository.cs"
+      - "test/**/ContentSources/GitSourceTests.cs"
+
+  - id: ReviewCenter-ContentSources-CredentialProtector
+    title: Review of ReviewCenter CredentialProtector unit implementation
+    context:
+      - docs/design/review-center.md
+      - docs/reqstream/review-center.yaml
+      - docs/design/review-center/content-sources.md
+      - docs/reqstream/review-center/content-sources.yaml
+    paths:
+      - "docs/reqstream/review-center/content-sources/credential-protector.yaml"
+      - "docs/design/review-center/content-sources/credential-protector.md"
+      - "docs/verification/review-center/content-sources/credential-protector.md"
+      - "docs/sysml2/model/review-center/content-sources/credential-protector.sysml"
+      - "src/**/ContentSources/CredentialProtector.cs"
+      - "src/DemaConsulting.ReviewCenter.Core/ICredentialProtector.cs"
+      - "test/**/ContentSources/CredentialProtectorTests.cs"
 
   # ReviewCenterPuppet - Specials (separate software system, development tool)
   - id: ReviewCenterPuppet-Architecture
@@ -903,6 +1053,20 @@ reviews:
       - "docs/reqstream/ots/fileassert.yaml"
       - "docs/design/ots/fileassert.md"
       - "docs/verification/ots/fileassert.md"
+
+  - id: OTS-FileSystemGlobbing
+    title: Review of FileSystemGlobbing OTS verification evidence
+    paths:
+      - "docs/reqstream/ots/filesystemglobbing.yaml"
+      - "docs/design/ots/filesystemglobbing.md"
+      - "docs/verification/ots/filesystemglobbing.md"
+
+  - id: OTS-Git
+    title: Review of git OTS verification evidence
+    paths:
+      - "docs/reqstream/ots/git.yaml"
+      - "docs/design/ots/git.md"
+      - "docs/verification/ots/git.md"
 
   - id: OTS-Pandoc
     title: Review of Pandoc OTS verification evidence

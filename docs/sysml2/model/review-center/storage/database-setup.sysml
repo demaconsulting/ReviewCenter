@@ -1,6 +1,6 @@
 package ReviewCenter {
     part def DatabaseSetup {
-        doc /* Reads the database settings, selects the provider and connection, and creates the database on first use. */
+        doc /* Reads the database settings, selects the provider and connection, creates the database on first use, and resolves the data folder that holds the database, the git cache, and the key ring. */
 
         comment sourceRef /* Source: src/DemaConsulting.ReviewCenter/Storage/DatabaseSetup.cs and DatabaseOptions.cs */
         comment testRef /* Test: test/DemaConsulting.ReviewCenter.Tests/Storage/DatabaseSetupTests.cs */

@@ -7,7 +7,8 @@ item are defined in the ASP.NET Core OTS Software Requirements document.
 
 ASP.NET Core (the shared framework with the Kestrel web server and Blazor Server) hosts the ReviewCenter service. It
 must route requests to the configured endpoints, answer them over HTTP, render and drive Razor components, and
-authenticate users with a cookie, authorize requests, protect posts against forgery, and hash passwords. Passing
+authenticate users with a cookie, authorize requests, protect posts against forgery, hash passwords, and encrypt text
+with keys that survive a restart. Passing
 tests confirm the framework is functioning correctly in the way ReviewCenter uses it.
 
 ### Verification Approach
@@ -16,7 +17,7 @@ ASP.NET Core is verified by integration evidence from the project's own test sui
 self-validation mode. Each scenario names a specific test method. Some scenarios run the application in memory
 through the test host, some render a component, and the system-level scenarios start a real server process with the
 `serve` verb and call it over HTTP, which exercises Kestrel. A passing pipeline run for all scenarios constitutes
-evidence that all three requirements are satisfied.
+evidence that all four requirements are satisfied.
 
 ### Test Scenarios
 
@@ -95,3 +96,36 @@ right and a wrong password.
 **Expected**: Only the right password is accepted.
 
 **Requirement coverage**: `ReviewCenter-OTS-AspNetCore-Authentication`.
+
+#### CredentialProtector_ProtectUnprotect_RoundTripsAndHidesToken
+
+**Scenario**: A token is protected with the Data Protection of the framework and unprotected again.
+
+**Expected**: The token is returned unchanged, and the protected text does not contain it.
+
+**Requirement coverage**: `ReviewCenter-OTS-AspNetCore-DataProtection`.
+
+#### CredentialProtector_PersistedKeyRing_SurvivesRestart
+
+**Scenario**: A token is protected with a key ring kept in a folder, and a new protector over the same folder, as
+after a restart, unprotects it.
+
+**Expected**: The token is returned unchanged.
+
+**Requirement coverage**: `ReviewCenter-OTS-AspNetCore-DataProtection`.
+
+#### CredentialProtector_Unprotect_OtherKeyRing_ThrowsCredentialsUnreadable
+
+**Scenario**: Text protected under one key ring is unprotected under another.
+
+**Expected**: The framework cannot decrypt it, and it is reported as unreadable without the text in the message.
+
+**Requirement coverage**: `ReviewCenter-OTS-AspNetCore-DataProtection`.
+
+#### CredentialProtector_Purpose_IsolatesTokensFromOtherUses
+
+**Scenario**: Text protected for the token purpose is unprotected with another purpose on the same key ring.
+
+**Expected**: The framework cannot decrypt it.
+
+**Requirement coverage**: `ReviewCenter-OTS-AspNetCore-DataProtection`.

@@ -6,7 +6,7 @@
 
 The ReviewCenter is an ASP.NET Core web service with a companion command-line interface,
 built on .NET. It is structured as one system containing one top-level unit (`Program`) and
-eight subsystems (`Cli`, `SelfTest`, `Utilities`, `Hosting`, `Identity`, `Web`, `Core`, `Storage`):
+nine subsystems (`Cli`, `SelfTest`, `Utilities`, `Hosting`, `Identity`, `Web`, `Core`, `Storage`, `ContentSources`):
 
 ```mermaid
 flowchart TD
@@ -42,6 +42,7 @@ flowchart TD
         UsersPage
         HistoryPage
         AuditPage
+        RepositoriesPage
     end
     subgraph Core
         Fingerprint
@@ -54,13 +55,22 @@ flowchart TD
         SigningService
         AuditChain
         AuditService
+        RepositoryService
+        SelectionMatcher
+        RevisionValidator
     end
     subgraph Storage
         ReviewCenterDbContext
         ReviewStore
         UserStore
         AuditStore
+        RepositoryStore
         DatabaseSetup
+    end
+    subgraph ContentSources
+        GitRunner
+        GitSource
+        CredentialProtector
     end
     Program --> Context
     Program --> Validation
@@ -85,6 +95,10 @@ flowchart TD
     ServerHost --> UserService
     ServerHost --> SigningService
     ServerHost --> AuditService
+    ServerHost --> RepositoryStore
+    ServerHost --> RepositoryService
+    ServerHost --> GitSource
+    ServerHost --> CredentialProtector
     UserCommand --> Context
     UserCommand --> ServerHost
     UserCommand --> DatabaseSetup
@@ -108,6 +122,7 @@ flowchart TD
     App --> UsersPage
     App --> HistoryPage
     App --> AuditPage
+    App --> RepositoriesPage
     App --> SignIn
     LoginPage --> SignIn
     AccountPage --> SignIn
@@ -129,6 +144,8 @@ flowchart TD
     HistoryPage --> AuditService
     AuditPage --> AuditService
     AuditPage --> UserService
+    RepositoriesPage --> RepositoryService
+    RepositoriesPage --> UserService
     ReviewService --> Fingerprint
     ProjectService --> ReviewStore
     ReviewService --> ReviewStore
@@ -146,6 +163,12 @@ flowchart TD
     UserStore --> ReviewCenterDbContext
     AuditStore --> AuditChain
     AuditStore --> ReviewCenterDbContext
+    RepositoryService --> RepositoryStore
+    RepositoryService --> CredentialProtector
+    RepositoryService --> UserService
+    RepositoryStore --> ReviewCenterDbContext
+    GitSource --> GitRunner
+    GitSource --> RevisionValidator
     DatabaseSetup --> ReviewCenterDbContext
 ```
 
@@ -167,7 +190,8 @@ The `Web` subsystem is a Blazor Server user interface: `App` is the HTML shell a
 `HomePage` is the interactive page served at the root URL, `ProjectsPage`, `ProjectPage`,
 `ReviewPage`, and `ChecklistPage` are the pages for projects, reviews, and review checklists, `LoginPage`,
 `AccountPage`, and `UsersPage` are the pages for signing in, changing one's own password, and managing users, and
-`HistoryPage` and `AuditPage` show the audit trail of a review and of the whole system. A browser
+`HistoryPage` and `AuditPage` show the audit trail of a review and of the whole system, and `RepositoriesPage` lets an
+administrator register git repositories. A browser
 connects to the server,
 receives a server-rendered page, and then upgrades to a live connection over which user
 actions are handled on the server.
@@ -178,7 +202,8 @@ in; `RevalidatingAuthenticationStateProvider` re-checks the user of every open p
 as the cookie check and ends the sign-in state of the page when the user is no longer valid; `PasswordHasher` hashes and
 verifies passwords with the password hasher of the ASP.NET Core shared framework.
 
-The `Core` subsystem holds the domain: projects, reviews of uploaded files, users, the rules that
+The `Core` subsystem holds the domain: projects, reviews of uploaded files or of the changes in a git repository,
+users, the rules that
 protect them, the content fingerprint of a review, the digest of a review record that signatures are bound to, and the
 hash-chained audit trail. It
 depends on no other subsystem and on
@@ -190,16 +215,30 @@ Entity Framework Core. The pages call the Core services and never see the databa
 services reach it through the Core store interfaces, which `ReviewStore`, `UserStore`, and `AuditStore` implement, and
 `ServerHost` wires the pieces together.
 
+The `ContentSources` subsystem reads content from outside the system. Its units run the git command-line tool
+(`GitRunner`), maintain a local mirror of each registered repository and answer the questions the Core contract asks
+(`GitSource`), and encrypt the access tokens of private repositories with the Data Protection system
+(`CredentialProtector`). It implements Core interfaces and nothing depends on it but `ServerHost`. The registry of
+repositories belongs to `Core` (`RepositoryService`, with `SelectionMatcher` and `RevisionValidator`) and `Storage`
+(`RepositoryStore`); only administrators can change it. A review can be created from a repository: the server reads
+the changed files between an optional baseline and a head revision through `GitSource`, filtered by a selection, and
+freezes them in the review.
+
 The system is a single process with one database; there is no separate service tier. Users are local accounts
 with a user name, a display name, a role (Reviewer or Admin), and a password that is stored only as a hash. A user
 signs in on the login page and stays signed in through a cookie; every page except the home page and the login page
-requires a signed-in user, and the users page and the audit page require the Admin role. The first administrator is
-created with the
-`user add` verb. A review can only be created (in the Draft state) from uploaded files. Review comments are implemented
+requires a signed-in user, and the users page, the repositories page, and the audit page require the Admin role. The
+first administrator is created with the
+`user add` verb. A review can be created (in the Draft state) from uploaded files or from a registered git repository; a
+review from a repository covers the files that changed between a baseline and a head revision that match a selection,
+with their baseline and head content frozen, and its record digest binds to the repository, both commits, the
+selection, and every change. Review comments are implemented
 (threads anchored to a file or line range, with replies, resolve, and reopen), and every review has a checklist of
 checks (Pass, Fail, or N/A, with a justification where required) that is frozen when the review is created. The author
 of a comment and the person who saved a checklist answer are the signed-in user (user name and display name at
-that time); the checklist has no thread links, and there is no diff view yet. Reviewers are named for a review in
+that time); the checklist has no thread links, and the review page has no diff highlighting (a modified file has a
+plain Head / Baseline toggle). Reviewers are named
+for a review in
 slots (a primary reviewer and an optional alternate), and a named reviewer signs the review after confirming the
 password again; a signature is bound to a digest of the review record, so it goes out of date when the record changes,
 and a review is Approved only while every slot has a current signature. A review without a slot is In review.
@@ -221,8 +260,9 @@ lock a known user name for a few minutes; a user who is disabled, removed, or ch
 open for up to the revalidation interval (`Auth:RevalidationSeconds`, 30 seconds by default), after which the page is
 replaced by a "Session ended" message, while the page header keeps the old name until the next navigation or reload; a
 password change does not end other sessions of the user; and a database that was created
-before the identity slice, before the signature slice (it has no reviewer slot and signature tables), or before the
-audit trail (it has no audit table) must be
+before the identity slice, before the signature slice (it has no reviewer slot and signature tables), before the
+audit trail (it has no audit table), before the repository registry (it has no `Repositories` table), or before reviews
+from a repository (its reviews have no source columns) must be
 deleted and created again, because there are no migrations.
 The limitations of the audit trail are also deliberate: a failed sign-in on an account that is already locked is not
 recorded, and failed sign-ins for unknown user names are not throttled; a wrong current password when signing or on
@@ -272,7 +312,8 @@ is running.
   manages users. `GET /projects` returns the projects page, `GET /projects/{id}` the page of one project,
   and `GET /projects/{id}/reviews/{reviewId}` the page of one review, and
   `GET /projects/{id}/reviews/{reviewId}/history` the history of one review; these pages show a "does not exist"
-  message when the project or review is unknown. `GET /audit` returns the whole audit trail with the button that
+  message when the project or review is unknown. `GET /repositories` returns the page where an administrator registers
+  git repositories (administrators only). `GET /audit` returns the whole audit trail with the button that
   verifies its hash chain (administrators only).
   Any other path returns the not-found message of the user interface. The client
   script for the live connection is served from `/_framework/blazor.web.js`.
@@ -280,8 +321,8 @@ is running.
   `http://localhost:5000`, which is reachable only from the local machine. TLS termination is
   not performed by the server itself. Authentication is by cookie: the routes `/`, `/login`, and `/health` and the
   static assets are open to anonymous visitors, every other page requires a signed-in user (an anonymous request is
-  redirected to `/login` with the wanted address), and `/users` and `/audit` require the Admin role (another user gets
-  HTTP status
+  redirected to `/login` with the wanted address), and `/users`, `/repositories`, and `/audit` require the Admin role
+  (another user gets HTTP status
   403). The cookie is HTTP-only, belongs to the session of the browser, and expires after a sliding period of
   `Auth:SessionHours` hours (default 8). The cookie is marked secure when the request is HTTPS, so behind a proxy that
   terminates TLS the forwarded headers must be enabled (the environment variable
@@ -305,10 +346,25 @@ is running.
   location prevents the server from starting: an error is reported and the exit code is 1. The
   schema is created, never migrated; the database file of an older schema is not upgraded. A database that was
   created before the identity slice (it has no users and no user name columns), before the signature slice (it
-  has no reviewer slot and signature tables), or before the audit trail (it has no audit table) must be deleted and
+  has no reviewer slot and signature tables), before the audit trail (it has no audit table), before the repository
+  registry (it has no `Repositories` table), or before reviews from a repository (its reviews and files lack the
+  source and change columns) must be deleted and
   created again. The audit table is append-only for the application, but anyone with write access to the database file
   can still change it; the hash chain makes such a change detectable only in the way the design of `AuditChain`
   describes.
+
+**Git repositories and the key ring**: The sources and the secrets of the repository registry.
+
+- *Type*: Git command-line tool, file system, and configuration.
+- *Role*: Consumer (the server runs git and reads and writes the folders).
+- *Contract*: The server runs the installed `git` tool to read registered repositories into a local mirror folder
+  (`Git:CachePath`, by default `git-cache` beside the database; `Git:TimeoutSeconds`, 120 by default). The access
+  token of a private repository is stored encrypted with the Data Protection system, whose key ring is kept in a folder
+  (`DataProtection:KeysPath`, by default `keys` beside the database).
+- *Constraints*: A usable git must be installed, or reading a repository fails with an error that says so. The key ring
+  folder must be writable (otherwise `serve` does not start) and must be kept: losing it makes the stored tokens
+  unreadable. The keys are not encrypted at rest, so the folder must be protected by file permissions and backed up with
+  the database.
 
 **Standard Output**: Normal program output written to `Console.Out`.
 
@@ -399,7 +455,9 @@ is no longer valid or cannot be read, makes the state anonymous, and the `Sessio
 content with the "Session ended" message. The project pages
 work the same way but call `ProjectService` and `ReviewService` in the handlers: a submitted
 review form carries its files to `ReviewService`, which validates them, computes the
-fingerprint with `Fingerprint`, and stores the review through `ReviewStore`. `ReviewPage` calls `ThreadService`
+fingerprint with `Fingerprint`, and stores the review through `ReviewStore`; a form for a review from a repository
+carries the repository, the revisions, and the selection instead, and `ReviewService` reads the changes through
+`IGitRepositoryProvider` (`GitSource`), freezes them in the review, and stores it the same way. `ReviewPage` calls `ThreadService`
 to start, answer, resolve, and reopen comment threads on a file, passing the signed-in user as the author;
 `ThreadService` applies the comment rules and
 stores the threads through `ReviewStore`. `ReviewPage` and `ChecklistPage` call `ChecklistService`, which applies
@@ -439,7 +497,8 @@ result or the reason of a failure is reported through `Context`.
 - Signatures: a signature is bound to the digest of the review record and is never changed or removed; the approval
   of a review is computed from the record and the signatures each time and is never stored.
 - Upload limits: a review accepts at most 200 files, each at most 2 MiB, and 20 MiB in total, with the limits
-  defined once in the Core subsystem.
+  defined once in the Core subsystem; a review from a repository honors the same limits for the files it freezes
+  (counting both the baseline and the head content).
 - Immutability: `Context` properties are set once at construction via `init` accessors and are
   read-only thereafter.
 - Resource lifecycle: `Context` implements `IDisposable`; callers must dispose it to flush and

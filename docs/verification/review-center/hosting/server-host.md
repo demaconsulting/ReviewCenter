@@ -28,6 +28,11 @@ N/A - standard test environment.
   `Auth:RevalidationSeconds` setting.
 - An unsupported database provider and an unusable database location are reported as the error "Failed to prepare
   the database", and `RunAsync` returns exit code 1 for each.
+- The repository registry, the git source, and the token protector are registered as shared instances; the git cache and
+  the Data Protection key ring are placed beside the database unless configured; the key ring is persisted, so a token
+  encrypted before a restart is readable after it.
+- A key ring folder that cannot be written stops the start of the server with an error that names the
+  `DataProtection:KeysPath` setting and the folder.
 
 #### Test Scenarios
 
@@ -92,6 +97,25 @@ identity. This scenario is tested by `ServerHost_AddServices_Configured_Register
 the `SigningService` is taken from the application services twice; both calls return the same instance, and it reports
 no approval for a review that does not exist. This scenario is tested by
 `ServerHost_AddServices_Configured_RegistersSigningService`.
+
+**ServerHost_AddServices_Configured_RegistersRepositoryServicesWithDefaultFolders**: The real pipeline is started on an
+in-memory server with a new database; the `RepositoryService` is taken from the application services twice and is the
+same instance, the git source and the token protector are registered, the git cache path is a `git-cache` folder beside
+the database, a key file exists in a `keys` folder beside the database, and a protected value does not contain the
+token and is unprotected to it. This scenario is tested by
+`ServerHost_AddServices_Configured_RegistersRepositoryServicesWithDefaultFolders`.
+
+**ServerHost_Restart_KeyRingPersisted_TokenStaysReadable**: A token is encrypted with the protector of one application
+instance, which is then disposed; a second instance on the same database decrypts it. This scenario is tested by
+`ServerHost_Restart_KeyRingPersisted_TokenStaysReadable`.
+
+**ServerHost_CreateApplication_KeyRingFolderNotWritable_ThrowsClearError**: The pipeline is built with
+`DataProtection:KeysPath` set to an existing file; an `InvalidOperationException` whose message names the setting and the
+path is thrown. This scenario is tested by `ServerHost_CreateApplication_KeyRingFolderNotWritable_ThrowsClearError`.
+
+**ServerHost_ResolveKeysPath_ConfiguredOrDefault_ChoosesTheFolder**: A configured key ring folder is used as given; a
+missing or blank setting gives a `keys` folder beside the database. This scenario is tested by
+`ServerHost_ResolveKeysPath_ConfiguredOrDefault_ChoosesTheFolder`.
 
 **Audit services**: The registration of the audit store, the shared audit appender, and the audit service in
 `AddServices` is exercised by the sign-in audit tests and the `AuditCommand` tests, which resolve them from the real

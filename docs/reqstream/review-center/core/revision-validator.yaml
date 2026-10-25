@@ -1,0 +1,28 @@
+---
+# Software Unit Requirements for the RevisionValidator Class
+#
+# The RevisionValidator class checks the revision name an author gives, before it can reach git.
+
+sections:
+  - title: RevisionValidator Unit Requirements
+    requirements:
+      - id: ReviewCenter-RevisionValidator-Accept
+        title: >-
+          The RevisionValidator class shall accept a plain branch name, tag name, or commit identifier, up to the
+          length limit inclusive, and return it unchanged.
+        justification: |
+          Authors must be able to name the usual revisions of a repository.
+        tests:
+          - RevisionValidator_Validate_ValidRevision_ReturnsIt
+          - RevisionValidator_Validate_LengthLimit_IsInclusive
+
+      - id: ReviewCenter-RevisionValidator-Refuse
+        title: >-
+          The RevisionValidator class shall refuse a revision that is empty, too long, or not a plain name, such as
+          one that starts with a dash, uses a revision expression, or contains white space or control characters,
+          with a rule violation that names the revision rule.
+        justification: |
+          A revision is handed to git. A value that git could read as an option or as an expression could change what
+          git does, so only plain names pass.
+        tests:
+          - RevisionValidator_Validate_InvalidRevision_ThrowsRevisionInvalid

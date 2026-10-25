@@ -2,7 +2,8 @@
 
 #### Verification Approach
 
-`ProjectPage` is verified with component tests defined in `ProjectPageTests.cs`, which use the bUnit test context
+`ProjectPage` is verified with component tests defined in `ProjectPageTests.cs` and
+`ProjectPageRepositoryTests.cs`, which use the bUnit test context
 to render the real component over real Core services and an in-memory fake store. File selection is simulated the
 way a browser does it, by setting the files of the file input in the test context. Tests locate elements by their
 `data-testid` attributes (the page units share the helper `PageTestBase`) and wait for the asynchronous file
@@ -26,9 +27,56 @@ N/A - standard test environment.
   many files, a file over the size limit, or a total over the size limit) are shown as errors that keep the
   entered values and create nothing.
 - The interactive marker is `true` after the page has rendered on a live connection.
+- The form offers "Upload files" by default and "From a repository", which shows the repository fields instead of
+  the file input with the default selection `**/*`; the repository choice lists only enabled repositories by name
+  (never a location, user name, or token) and is disabled with a hint when none is enabled.
+- A valid repository form creates the review with its source and opens it; without a baseline every file at the head
+  is reviewed; a selection with no changed file shows the nothing-to-review message, a revision that does not exist
+  shows the git error, no chosen repository asks for one, and a repository disabled in the meantime is refused; each
+  creates nothing and keeps the entered values.
+- Skipped links and submodules are shown to the creator before the review is opened.
 
 #### Test Scenarios
 
+**Reviews from a repository** are verified in `ProjectPageRepositoryTests.cs`, with the fake git provider of the
+`Web` tests (`FakeGitRepositoryProvider`) behind the real `RepositoryService` and `ReviewService`.
+
+**ProjectPage_SourceChoice_RepositoryChosen_ShowsRepositoryFieldsInsteadOfUpload**: The upload source is shown first;
+choosing the repository source shows the repository, head, baseline, and selection fields (the selection starts as
+`**/*`) and hides the file input. This scenario is tested by
+`ProjectPage_SourceChoice_RepositoryChosen_ShowsRepositoryFieldsInsteadOfUpload`.
+
+**ProjectPage_RepositorySelect_OffersOnlyEnabledRepositoriesWithoutLocationOrToken**: An enabled and a disabled
+repository exist; only the enabled one is offered, by name, and the page contains neither location, user name, nor
+token. This scenario is tested by
+`ProjectPage_RepositorySelect_OffersOnlyEnabledRepositoriesWithoutLocationOrToken`.
+
+**ProjectPage_SourceChoice_NoEnabledRepository_DisablesRepositorySourceWithHint**: With no enabled repository the
+repository choice is disabled and a hint says why. This scenario is tested by
+`ProjectPage_SourceChoice_NoEnabledRepository_DisablesRepositorySourceWithHint`.
+
+**ProjectPage_CreateForm_FromRepository_CreatesReviewWithSourceAndNavigates**: A valid repository form creates the
+review with its repository, commits, selection, and changes, and navigates to it. This scenario is tested by
+`ProjectPage_CreateForm_FromRepository_CreatesReviewWithSourceAndNavigates`, and without a baseline by
+`ProjectPage_CreateForm_FromRepositoryWithoutBaseline_ReviewsAllFilesAtHead`.
+
+**ProjectPage_CreateForm_EmptySelection_ShowsNothingToReviewAndCreatesNothing**: A selection with no changed file
+shows "Nothing to review: no files matching the selection changed between X and Y" and creates nothing. This
+scenario is tested by `ProjectPage_CreateForm_EmptySelection_ShowsNothingToReviewAndCreatesNothing`.
+
+**ProjectPage_CreateForm_BadRevision_ShowsErrorAndCreatesNothing**: A revision that does not exist shows the error
+and creates nothing. This scenario is tested by `ProjectPage_CreateForm_BadRevision_ShowsErrorAndCreatesNothing`.
+
+**ProjectPage_CreateForm_NoRepositoryChosen_AsksForOne**: Submitting without a repository shows "Choose a
+repository." and creates nothing. This scenario is tested by `ProjectPage_CreateForm_NoRepositoryChosen_AsksForOne`.
+
+**ProjectPage_CreateForm_RepositoryDisabledMeanwhile_ShowsErrorAndCreatesNothing**: A repository disabled after the
+page opened is refused on submit and nothing is created. This scenario is tested by
+`ProjectPage_CreateForm_RepositoryDisabledMeanwhile_ShowsErrorAndCreatesNothing`.
+
+**ProjectPage_CreateForm_SkippedEntries_AreShownBeforeOpeningTheReview**: Skipped entries are listed with a link to
+open the created review, and the page does not navigate until the link is followed. This scenario is tested by
+`ProjectPage_CreateForm_SkippedEntries_AreShownBeforeOpeningTheReview`.
 **ProjectPage_Render_UnknownProject_ShowsNotFound**: The page is rendered for an unknown project; the not-found
 message names the identity and no form is shown. This scenario is tested by
 `ProjectPage_Render_UnknownProject_ShowsNotFound`.

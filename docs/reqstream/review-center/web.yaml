@@ -4,7 +4,8 @@
 # PURPOSE:
 # - Define requirements for the ReviewCenter Web subsystem
 # - The Web subsystem spans the App (App.razor, Routes.razor, MainLayout.razor), HomePage, ProjectsPage, ProjectPage,
-#   ReviewPage, ChecklistPage, LoginPage, AccountPage, and UsersPage units; the App unit includes the SessionGate
+#   ReviewPage, ChecklistPage, LoginPage, AccountPage, UsersPage, AuditPage, and RepositoriesPage units; the App unit
+#   includes the SessionGate
 #   component that replaces an open protected page when the sign-in state of its user ends
 # - Subsystem requirements describe the externally visible behavior of the web user interface
 # - The subsystem tests run over plain HTTP, so they verify what the server renders: the pages, the read path from
@@ -251,3 +252,41 @@ sections:
         tests:
           - AuditPage_Verify_IntactChain_ShowsCountAndFullHeadHash
           - Routes_Render_ReviewerOpensAuditRoute_ShowsAccessDeniedNotTrail
+
+      - id: ReviewCenter-Web-Repositories
+        title: >-
+          The Web subsystem shall let administrators, and nobody else, register, change, disable, and enable git
+          repositories on a repositories page that is reached from the header, and set, replace, or clear the token
+          of a repository without it ever being shown again.
+        justification: |
+          The registry controls what source code the server reads and holds secrets for it. A token that can be read
+          back from a page can be copied or leaked, so it is write-only.
+        children:
+          - ReviewCenter-RepositoriesPage-Display
+          - ReviewCenter-RepositoriesPage-Create
+          - ReviewCenter-RepositoriesPage-Edit
+          - ReviewCenter-RepositoriesPage-Enable
+          - ReviewCenter-RepositoriesPage-Admin
+          - ReviewCenter-App-RepositoriesLink
+        tests:
+          - SignIn_RepositoriesPage_ReviewerAndAdmin_OnlyAdminIsAllowed
+          - RepositoriesPage_CreateForm_WithToken_StoresItWriteOnlyAndClearsFields
+
+      - id: ReviewCenter-Web-RepositoryReviews
+        title: >-
+          The Web subsystem shall let a user create a review from a git repository on the project page, choosing among
+          the enabled repositories by name, with a head revision, an optional baseline revision, and a selection, show
+          the reason when it cannot be created, and show on the review page the change kind of each file, the source,
+          and for a modified file a choice between the Head version and a read-only Baseline version.
+        justification: |
+          Reviewing a change means seeing what it replaces. The page keeps comments on the head version, offers no
+          highlighting of differences, and never shows how the server reaches the repository.
+        children:
+          - ReviewCenter-ProjectPage-SourceChoice
+          - ReviewCenter-ProjectPage-RepositoryForm
+          - ReviewCenter-ProjectPage-RepositoryError
+          - ReviewCenter-ReviewPage-Source
+          - ReviewCenter-ReviewPage-Versions
+        tests:
+          - ProjectPage_CreateForm_FromRepository_CreatesReviewWithSourceAndNavigates
+          - ReviewPage_FileSelect_ModifiedFile_TogglesBetweenHeadAndReadOnlyBaseline

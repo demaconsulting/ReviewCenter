@@ -3,7 +3,7 @@
 #### Verification Approach
 
 `ReviewCenterDbContext` is verified with the unit tests of `ReviewStoreTests.cs`, `ReviewStoreSigningTests.cs`,
-`UserStoreTests.cs`, and
+`UserStoreTests.cs`, `RepositoryStoreTests.cs`, `ReviewStoreRepositoryTests.cs`, and
 `DatabaseSetupTests.cs`, which
 exercise the context through the units that use it. The context has no behavior that can be reached without a
 database, and its job is to produce the right schema, so the tests run against real SQLite database files in a
@@ -30,9 +30,19 @@ be loadable on the test platform.
 - The tables for reviewer slots and signatures are created; the database refuses a slot for a review that does not
   exist, refuses to remove a slot that has a signature, and refuses a second signature of the same slot with the same
   digest; the role, digest, and meaning of a signature are read back as stored.
+- The table for repositories stores every field of a registration including the encrypted token, and its unique index on
+  the name ignores case.
+- The source columns of a review and the change kind and baseline columns of a file are created, stored, and read back
+  as written, with the baseline content as binary data and no value for an uploaded review.
 
 #### Test Scenarios
 
+**ReviewStore_GetReviewAsync_RepositoryReview_ReturnsSourceAndKindsWithoutBytes**: A review from a repository is
+stored and read back with its source columns and the change kind and baseline metadata of every file. This scenario
+is tested by `ReviewStore_GetReviewAsync_RepositoryReview_ReturnsSourceAndKindsWithoutBytes`, the baseline bytes by
+`ReviewStore_GetBaselineContentAsync_StoredFiles_ReturnsBaselineBytesOrNull`, and an uploaded review without these
+values by `ReviewStore_GetRecordAsync_UploadReview_HasUploadSource`; all are defined in
+`ReviewStoreRepositoryTests.cs`.
 **DatabaseSetup_EnsureCreated_MissingFolder_CreatesFolderFileAndTables**: A new database is created and the
 project, review, review file, thread, and comment tables can be queried. This scenario is tested by
 `DatabaseSetup_EnsureCreated_MissingFolder_CreatesFolderFileAndTables`.
@@ -95,6 +105,11 @@ signing that is not allowed, and one signature remains. This scenario is tested 
 **ReviewStore_AddSignatureAsync_CurrentDigest_StoresAndRoundTrips**: A signature is stored and read back with its
 role, its 64-character digest, and its meaning text unchanged, which verifies the signatures table.
 This scenario is tested by `ReviewStore_AddSignatureAsync_CurrentDigest_StoresAndRoundTrips`.
+
+**Repositories table**: The `Repositories` table is exercised by the tests of `RepositoryStore`: a repository round-trips
+with every field, which is tested by `RepositoryStore_AddAsync_Repository_RoundTripsAndAudits`, the encrypted token is
+stored and read back, which is tested by `RepositoryStore_GetEncryptedTokenAsync_ReturnsStoredText`, and the unique index
+on the name ignores case, which is tested by `RepositoryStore_NameOtherCase_ThrowsRepositoryNameTaken`.
 
 **Audit entries table**: The `AuditEntries` table is mapped by `ReviewCenterDbContext` and is exercised by the tests
 of `AuditStore`, which write, read, and verify entries through the real schema; all scenarios of this unit run over a

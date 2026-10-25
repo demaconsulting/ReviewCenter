@@ -98,6 +98,35 @@ sections:
           - ReviewPage_FileSelect_BinaryFile_ShowsBinaryNoticeAndNoContent
           - ReviewPage_FileSelect_InvalidUtf8_ShowsBinaryNotice
 
+      - id: ReviewCenter-ReviewPage-Source
+        title: >-
+          The ReviewPage unit shall show, for a review from a repository, the change kind of each file (Added,
+          Modified, or Deleted) in the file list, and the repository name, the baseline and head commit
+          identifiers, and the selection in the Details section, and shall show none of these for an uploaded
+          review.
+        justification: |
+          Reviewers must see what a review covers - which change, in which repository, between which commits.
+        tests:
+          - ReviewPage_Render_RepositoryReview_ShowsChangeKindPerFile
+          - ReviewPage_Render_RepositoryReview_DetailsShowRepositoryShasAndSelection
+          - ReviewPage_Render_DeletedFile_ListsBaselineSize
+
+      - id: ReviewCenter-ReviewPage-Versions
+        title: >-
+          The ReviewPage unit shall offer for a modified file a choice between the Head version, which is the
+          numbered view with the comment controls, and the Baseline version, which is a read-only numbered view
+          without comment controls, shall show the Head version again when another file is selected, and shall
+          show for a deleted file its baseline content, with no choice and no line comment controls, accepting
+          only a comment on the whole file.
+        justification: |
+          A change is reviewed against what it replaces. Comments belong to the head, which the signature
+          covers; a deleted file has no head lines to comment on. No highlighting of differences keeps the page
+          simple.
+        tests:
+          - ReviewPage_FileSelect_ModifiedFile_TogglesBetweenHeadAndReadOnlyBaseline
+          - ReviewPage_FileSelect_AfterBaselineView_ShowsHeadOfTheNextFile
+          - ReviewPage_FileSelect_DeletedFile_ShowsBaselineAndAcceptsWholeFileCommentOnly
+
       - id: ReviewCenter-ReviewPage-ThreadSummary
         title: >-
           The ReviewPage unit shall show the number of open and of resolved threads of the review (on the filter

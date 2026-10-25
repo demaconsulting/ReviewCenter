@@ -38,16 +38,19 @@ reads the authentication state of the request once, so it keeps showing the name
 served until the next navigation or reload, even after the state of an open page has ended. When nobody is signed in,
 its header shows a "Sign in" link to
 the login page. When a user is signed in, the header shows the display name of the user, a link to the account
-page, a link to the users page and a link to the audit page only when the user is an administrator, and a logout form
+page, a link to the users page, a link to the repositories page and a link to the audit page only when the user is an
+administrator, and a logout form
 that posts to
 `/auth/logout` with an antiforgery token (signing out changes state, so it is a form and not a link). The header
-elements have `data-testid` values: `signin-link`, `current-user`, `account-link`, `users-link`, `audit-link`, and
+elements have `data-testid` values: `signin-link`, `current-user`, `account-link`, `users-link`, `repositories-link`,
+`audit-link`, and
 `logout-button`.
 The layout only shows links; the access rules are enforced by the pages and the authorization of the `Identity`
 subsystem, so a hidden link is a convenience and not a protection.
 
-**SessionGate component**: A wrapper that each of the eight protected pages (`ProjectsPage`, `ProjectPage`,
-`ReviewPage`, `ChecklistPage`, `AccountPage`, `UsersPage`, `HistoryPage`, `AuditPage`) puts around its whole content. It
+**SessionGate component**: A wrapper that each of the nine protected pages (`ProjectsPage`, `ProjectPage`,
+`ReviewPage`, `ChecklistPage`, `AccountPage`, `UsersPage`, `HistoryPage`, `AuditPage`, `RepositoriesPage`) puts around
+its whole content. It
 has one parameter, the
 child content, and holds no state. It is an authorize view: while a user is signed in it renders the child content
 and adds no element of its own, so the markup and the `data-interactive` marker of the page are unchanged. When the
@@ -81,7 +84,7 @@ it, so only a component inside the page can react to the state of that connectio
 - *Parameters*: None (the user comes from the authentication state of the request).
 - *Returns*: The rendered header followed by the page.
 - *Postconditions*: The header shows the sign-in link when nobody is signed in, and otherwise the display name, the
-  account link, the users link for an administrator only, and the logout form.
+  account link, the users link, repositories link, and audit link for an administrator only, and the logout form.
 
 **Render (SessionGate)**: Guards the content of a protected page.
 
@@ -112,5 +115,6 @@ arguments it is called with, and the Puppet acceptance walk exercises the real s
 
 - **ServerHost** — maps `App` as the root component of the server with the interactive server
   render mode.
-- **ProjectsPage**, **ProjectPage**, **ReviewPage**, **ChecklistPage**, **AccountPage**, and **UsersPage** — wrap their
+- **ProjectsPage**, **ProjectPage**, **ReviewPage**, **ChecklistPage**, **AccountPage**, **UsersPage**,
+  **RepositoriesPage** — wrap their
   content in `SessionGate`.

@@ -269,6 +269,24 @@ Verify button of the audit page reports the first broken entry of a tampered cha
 `AuditPage_Verify_TamperedChain_ShowsFirstBadEntry`. No test starts the tool as a process with the `audit verify`
 verb; the dispatch of `Program` to the command is verified by inspection and by the tests of the command.
 
+**Registered git repositories**: A private https repository and a local repository are registered through the
+repository service over a real database. The stored token text differs from the token, the access data holds the
+token, and the real git source resolves a branch and reads a changed file. This scenario is tested by
+`ContentSourcesSubsystem_RegisteredRepository_IsReadThroughTheRealGitSource`. In a second scenario a repository is
+disabled; it is no longer listed as enabled and its access data is refused. This scenario is tested by
+`ContentSourcesSubsystem_DisabledRepository_IsNotAvailableForReading`. A registration is kept after the database is
+reopened, which is tested by `StorageSubsystem_Repositories_PersistAcrossReopen`, and a token stays readable after a
+restart of the server, which is tested by `ServerHost_Restart_KeyRingPersisted_TokenStaysReadable`.
+
+**Review from a git repository**: A review is created from a real temporary git repository (a baseline commit and a
+head commit with an added, a modified, and a deleted file, and a symbolic link that is skipped); it holds both commits
+and the frozen head and baseline content; a further commit is then made in the repository, and the review, its file
+content, and its record digest are unchanged, while a review created afterwards sees the new commit. This scenario is
+tested by `ReviewService_CreateFromRepositoryAsync_RealGit_FreezesChangesAgainstLaterCommits`. A selection that
+matches no changed file is refused with the nothing-to-review message and nothing is created, which is tested by
+`ProjectPage_CreateForm_EmptySelection_ShowsNothingToReviewAndCreatesNothing`. The digest that binds to the source,
+the selection, and each change is tested by `RecordDigest_Compute_SourceChange_ChangesDigest`.
+
 **Persistence across restart**: A project is stored, the server is stopped and started again on the same
 database file, and a signed-in user sees the project on the projects page. This scenario is tested by
 `HostingSubsystem_Startup_DatabaseConfigured_ServesStoredProjectsAfterRestart`.

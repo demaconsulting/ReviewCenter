@@ -10,15 +10,21 @@ conversions. It contains no queries; those belong to `ReviewStore`.
 
 #### Data Model
 
-The context exposes twelve sets and maps the Core types directly, without separate persistence classes.
+The context exposes thirteen sets and maps the Core types directly, without separate persistence classes (the
+repository registry is the one exception, see `Repositories`).
 
 - **Projects** (`Project`): key `Id`, assigned by the database. `Name` is required, at most 100 characters;
   `Description` is required (may be empty), at most 1000; `Created`.
 - **Reviews** (`Review`): key `ProjectId` plus `Id`. `Title` is required, at most 200; `State` is stored as text, at
-  most 32; `ContentFingerprint` is required, at most 64; `Created`. A review belongs to a project and is deleted
-  with it.
+  most 32; `ContentFingerprint` is required, at most 64; `Created`. A review from a repository also has
+  `RepositoryId` (a plain number, not a foreign key, so the review keeps its reference whatever happens to the
+  registration), `RepositoryName` (a display copy, at most the repository name limit), `BaselineSha` and `HeadSha` (at
+  most 64 characters), and `Selection` (at most `ReviewLimits.MaxSelectionLength`); all five are null for an uploaded
+  review. A review belongs to a project and is deleted with it.
 - **ReviewFiles** (`ReviewFile`): key `ProjectId`, `ReviewId`, and `Path`. `Content` is required and stored as a
-  binary column; `Sha256` is required, at most 64; `Size`. A file belongs to a review and is deleted with it.
+  binary column (empty for a deleted file); `Sha256` is required, at most 64; `Size`. `ChangeKind` is stored as text,
+  at most 32 (an uploaded file is `Added`); `BaselineContent` (binary), `BaselineSize`, and `BaselineSha256` (at most
+  64) are null when the file has no baseline. A file belongs to a review and is deleted with it.
 - **Threads** (`ReviewThread`): key `Id`, assigned by the database. `ProjectId`, `ReviewId`, and `FilePath` name
   the file the thread is about and form a relationship to that file, so the database refuses a thread for a file
   that does not exist, and a thread is deleted with its file. `StartLine` and `EndLine` are null for a thread on
@@ -63,6 +69,12 @@ The context exposes twelve sets and maps the Core types directly, without separa
   entry is a snapshot of text that must survive whatever happens to the rows it describes, such as the deletion of a
   whole review. One index on `ProjectId`, `ReviewId`, and `Sequence` serves the history of one review. The mapping has
   no update path, and the application never updates or deletes a row.
+- **Repositories** (`RepositoryRecord`, an internal row type of the unit `RepositoryStore`, not a Core type, because it
+  alone holds the encrypted token): key `Id`, assigned by the database. `Name` is required, at most 40 characters,
+  with the case-insensitive collation of SQLite and a unique index, so a repository name is unique without regard to
+  case; `Location` is required, at most 500; `Username` at most 200 (null for anonymous access); `EncryptedToken` at
+  most 4000 (null when no token is set; the text is the output of the token protector, never the token); `Enabled`;
+  `CreatedAt` and `UpdatedAt`. There is no relationship to another table, and no delete path.
 
 The relationship from a signature to its slot uses the `NoAction` delete behavior, not `Restrict`. SQLite checks a
 `RESTRICT` foreign key immediately, at the statement that deletes the parent row, so deleting a review would fail
@@ -89,7 +101,11 @@ checklist tables, and for the users table and the user name columns of comments,
 database created before the identity slice must be deleted and created again, and its data is not migrated. The same
 holds for the tables of reviewer slots and signatures: a database created before the signature slice does not have
 them and must be deleted and created again. The same holds for the audit table: a database created before the audit
-trail does not have it and must be deleted and created again (there are no migrations). The
+trail does not have it and must be deleted and created again (there are no migrations). The same holds for the
+`Repositories` table: a database created before the repository registry does not have it and must be deleted and
+created again. The same holds for the review columns of a repository review (source columns on a review, change kind
+and baseline columns on a file): a database created before the review-from-git slice does not have them and must be
+deleted and created again (there are no migrations; the development database is simply recreated). The
 checklist keys are what makes "one answer per check" a rule of the database. The section and
 check identifiers are not related to a table of their own: they name entries inside the snapshot, and the service
 checks them.
@@ -113,10 +129,10 @@ mapped constraints surface as database update exceptions to `ReviewStore`.
 - **Core domain types** — `Project`, `Review`, `ReviewFile`, `ReviewState`, `ReviewThread`, `ReviewComment`,
   `ReviewThreadState`, `ReviewChecklist`, `ChecklistSectionState`, `ChecklistAnswer`, `ChecklistOutcome`, `User`,
   `UserRole`, `ReviewerSlot`, `ReviewSignature`, `SlotRole`, `AuditEntry`, `AuditText` (the column limits), and
-  `ReviewLimits`.
+  `ReviewLimits`, and `RepositoryService` (the length limits of the repository columns).
 - **Entity Framework Core** — the context base class and the model configuration API.
 
 #### Callers
 
-- **ReviewStore**, **UserStore**, and **AuditStore** — open a context for each operation.
+- **ReviewStore**, **UserStore**, **AuditStore**, and **RepositoryStore** — open a context for each operation.
 - **DatabaseSetup** — configures the context options and creates the schema.

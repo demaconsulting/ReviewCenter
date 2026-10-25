@@ -115,10 +115,40 @@ public class CoreSubsystemTests
     }
 
     /// <summary>
-    ///     Provides every domain rule, so that a rule added later without a scenario fails the test instead of
-    ///     going unnoticed.
+    ///     Provides every domain rule that the Core services report, so that a rule added later without a scenario
+    ///     fails the test instead of going unnoticed. The rules that only the git content source reports are
+    ///     excluded here; the content sources subsystem and git tests cover them.
     /// </summary>
-    public static TheoryData<DomainRule> AllRules => new(Enum.GetValues<DomainRule>());
+    public static TheoryData<DomainRule> AllRules => new(Enum.GetValues<DomainRule>().Where(rule => !GitSourceRules.Contains(rule)));
+
+    /// <summary>
+    ///     The rules reported only by the git content source (a revision that does not exist, git missing, a failed
+    ///     or timed out git call); they are covered by the tests of the ContentSources subsystem.
+    /// </summary>
+    private static readonly DomainRule[] GitSourceRules =
+    [
+        DomainRule.RevisionNotFound,
+        DomainRule.GitUnavailable,
+        DomainRule.GitAccessFailed,
+        DomainRule.GitTimeout
+    ];
+
+    /// <summary>
+    ///     The rules that the repository registry and the selection and revision checks report.
+    /// </summary>
+    private static readonly DomainRule[] RepositoryRules =
+    [
+        DomainRule.RepositoryNameInvalid,
+        DomainRule.RepositoryNameTaken,
+        DomainRule.RepositoryLocationInvalid,
+        DomainRule.RepositoryCredentialInvalid,
+        DomainRule.RepositoryNotFound,
+        DomainRule.RepositoryDisabled,
+        DomainRule.CredentialsUnreadable,
+        DomainRule.RevisionInvalid,
+        DomainRule.SelectionInvalid,
+        DomainRule.NothingToReview
+    ];
 
     /// <summary>
     ///     Test that each domain rule is reported through the services as a domain rule exception that names
@@ -144,9 +174,7 @@ public class CoreSubsystemTests
         // Act: break the rule
         var signing = new SigningService(store, users, new FixedTimeProvider(_now));
         var exception = await Assert.ThrowsAsync<DomainRuleException>(
-            () => SigningRules.Contains(rule)
-                ? ViolateSigningAsync(rule, signing, checklists, store, root, project.Id)
-                : ViolateAsync(rule, projects, reviews, threads, checklists, users, project.Id));
+            () => ViolateByGroupAsync(rule, signing, checklists, store, root, projects, reviews, threads, users, project.Id));
 
         // Assert: the rule is named, and only the first valid project, review and user exist, with no thread; the
         // only answers are those the re-authentication scenario needs to get as far as the password
@@ -157,6 +185,107 @@ public class CoreSubsystemTests
         Assert.Empty(store.Threads);
         var overall = (await checklists.GetAsync(project.Id, "rev-1", TestContext.Current.CancellationToken))!.Overall;
         Assert.Equal(rule == DomainRule.ReauthenticationFailed ? overall.Total : 0, overall.Answered);
+    }
+
+    /// <summary>
+    ///     Makes a request that breaks the rule through the service group that reports it.
+    /// </summary>
+    /// <param name="rule">The rule to break.</param>
+    /// <param name="signing">The signing service.</param>
+    /// <param name="checklists">The checklist service.</param>
+    /// <param name="store">The store behind the services.</param>
+    /// <param name="root">The user <c>root</c>.</param>
+    /// <param name="projects">The project service.</param>
+    /// <param name="reviews">The review service.</param>
+    /// <param name="threads">The thread service.</param>
+    /// <param name="users">The user service.</param>
+    /// <param name="projectId">The identity of the existing project.</param>
+    /// <returns>A task that fails with the rule violation.</returns>
+    private static Task ViolateByGroupAsync(
+        DomainRule rule,
+        SigningService signing,
+        ChecklistService checklists,
+        FakeReviewStore store,
+        User root,
+        ProjectService projects,
+        ReviewService reviews,
+        ThreadService threads,
+        UserService users,
+        int projectId)
+    {
+        if (SigningRules.Contains(rule))
+        {
+            return ViolateSigningAsync(rule, signing, checklists, store, root, projectId);
+        }
+
+        if (RepositoryRules.Contains(rule))
+        {
+            return ViolateRepositoryAsync(rule, users);
+        }
+
+        return ViolateAsync(rule, projects, reviews, threads, checklists, users, projectId);
+    }
+
+    /// <summary>
+    ///     Makes a request that breaks one rule of the repository registry or of the selection and revision checks.
+    /// </summary>
+    /// <param name="rule">The rule to break; one of <see cref="RepositoryRules"/>.</param>
+    /// <param name="users">The user service, which holds the administrator <c>root</c>.</param>
+    /// <returns>A task that fails with the rule violation.</returns>
+    private static async Task ViolateRepositoryAsync(DomainRule rule, UserService users)
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var protector = new FakeCredentialProtector();
+        var service = new RepositoryService(new FakeRepositoryStore(), protector, users, new FixedTimeProvider(_now));
+        var actor = new Actor("root", "Root");
+        const string location = "https://example.com/org/repo.git";
+        switch (rule)
+        {
+            case DomainRule.RepositoryNameInvalid:
+                await service.CreateAsync(" ", location, null, null, actor, cancellationToken);
+                return;
+            case DomainRule.RepositoryNameTaken:
+                await service.CreateAsync("dup", location, null, null, actor, cancellationToken);
+                await service.CreateAsync("DUP", location, null, null, actor, cancellationToken);
+                return;
+            case DomainRule.RepositoryLocationInvalid:
+                await service.CreateAsync("a", "ftp://example.com/r.git", null, null, actor, cancellationToken);
+                return;
+            case DomainRule.RepositoryCredentialInvalid:
+                await service.CreateAsync("a", "file:///srv/r.git", "svc", "tok", actor, cancellationToken);
+                return;
+            case DomainRule.RepositoryNotFound:
+                await service.SetEnabledAsync(99, false, actor, cancellationToken);
+                return;
+            case DomainRule.RepositoryDisabled:
+                var disabled = await service.CreateAsync("off", location, null, null, actor, cancellationToken);
+                await service.SetEnabledAsync(disabled.Id, false, actor, cancellationToken);
+                await service.GetAccessAsync(disabled.Id, cancellationToken);
+                return;
+            case DomainRule.CredentialsUnreadable:
+                var secret = await service.CreateAsync("tok", location, "svc", "tkn", actor, cancellationToken);
+                protector.Unreadable = true;
+                await service.GetAccessAsync(secret.Id, cancellationToken);
+                return;
+            case DomainRule.RevisionInvalid:
+                RevisionValidator.Validate("--upload-pack=x");
+                return;
+            case DomainRule.NothingToReview:
+                // A repository whose only change is outside the selection
+                var clock = new FixedTimeProvider(_now);
+                var reviewStore = new FakeReviewStore();
+                var project = await new ProjectService(reviewStore, clock).CreateAsync("P", null, cancellationToken);
+                var repository = await service.CreateAsync("repo", location, null, null, actor, cancellationToken);
+                var git = new FakeGitRepositoryProvider();
+                git.Revisions["main"] = "h1";
+                git.Script(null, "h1", [("docs/a.md", ChangeKind.Added, null, "x")]);
+                await new ReviewService(reviewStore, clock, service, git).CreateFromRepositoryAsync(
+                    project.Id, "rev-1", "T", repository.Id, "main", null, "src/**", actor, cancellationToken);
+                return;
+            default:
+                SelectionMatcher.Parse(string.Empty);
+                return;
+        }
     }
 
     /// <summary>

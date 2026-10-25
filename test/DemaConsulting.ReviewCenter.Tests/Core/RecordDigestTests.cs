@@ -116,19 +116,50 @@ public class RecordDigestTests
     /// <param name="answers">The answers.</param>
     /// <param name="sections">The section states.</param>
     /// <param name="threads">The threads.</param>
+    /// <param name="source">The source of the files; an upload when omitted.</param>
     /// <returns>The record.</returns>
     private static ReviewRecord Record(
         string fingerprint = "f1",
         IReadOnlyList<ChecklistAnswer>? answers = null,
         IReadOnlyList<ChecklistSectionState>? sections = null,
-        IReadOnlyList<ReviewThread>? threads = null)
+        IReadOnlyList<ReviewThread>? threads = null,
+        ReviewSource? source = null)
     {
         return new ReviewRecord(
             fingerprint,
             null,
             sections ?? [],
             answers ?? [Answer("REQ-01"), Answer("REQ-02", ChecklistOutcome.NotApplicable, "n/a")],
-            threads ?? [Thread(1), Thread(2, "b.txt", ReviewThreadState.Resolved)]);
+            threads ?? [Thread(1), Thread(2, "b.txt", ReviewThreadState.Resolved)],
+            source ?? ReviewSource.Upload);
+    }
+
+    /// <summary>
+    ///     Builds a repository source.
+    /// </summary>
+    /// <param name="repositoryId">The repository identity.</param>
+    /// <param name="baseline">The baseline commit, or <c>null</c> for none.</param>
+    /// <param name="head">The head commit.</param>
+    /// <param name="selection">The selection text.</param>
+    /// <param name="changes">The changes; a modified and a deleted file when omitted.</param>
+    /// <returns>The source.</returns>
+    private static ReviewSource GitSource(
+        int repositoryId = 7,
+        string? baseline = "base1",
+        string head = "head1",
+        string selection = "**/*",
+        IReadOnlyList<ChangedFile>? changes = null)
+    {
+        return new ReviewSource(
+            repositoryId,
+            baseline,
+            head,
+            selection,
+            changes ??
+            [
+                new ChangedFile("a.txt", ChangeKind.Modified, "bs1", "hs1"),
+                new ChangedFile("b.txt", ChangeKind.Deleted, "bs2", null)
+            ]);
     }
 
     /// <summary>
@@ -173,8 +204,9 @@ public class RecordDigestTests
         // Assert: version line, fingerprint, answers, sections that do not apply, threads
         var expected = string.Join(
             '\n',
-            "ReviewCenter record v1",
+            "ReviewCenter record v2",
             "fingerprint 3:abc",
+            "source upload",
             "answers",
             "answer 6:REQ-01 4:Fail 3:bad",
             "sections",
@@ -212,13 +244,139 @@ public class RecordDigestTests
     public void RecordDigest_Compute_KnownRecord_MatchesKnownValue()
     {
         // Arrange: a record with only a fingerprint
-        var record = new ReviewRecord("abc", null, [], [], []);
+        var record = new ReviewRecord("abc", null, [], [], [], ReviewSource.Upload);
 
         // Act: compute the digest
         var digest = RecordDigest.Compute(record);
 
-        // Assert: the digest of "ReviewCenter record v1\nfingerprint 3:abc\nanswers\nsections\nthreads"
-        Assert.Equal("9755f10e118733d548ae1037dd68b000d6d50ca8b62f53d4411693d85a3fe35a", digest);
+        // Assert: the digest of "ReviewCenter record v2\nfingerprint 3:abc\nsource upload\nanswers\nsections\nthreads"
+        Assert.Equal("fd4f16444ef233068c76aad7bed87b1bafd550c20a0019f576e5cdaaadb9384c", digest);
+    }
+
+    /// <summary>
+    ///     Test that the canonical text of a repository review has exactly the documented shape.
+    /// </summary>
+    [Fact]
+    public void RecordDigest_Canonicalize_GitSource_MatchesDocumentedFormat()
+    {
+        // Arrange: a repository record whose changes are given out of path order
+        var sha1 = new string('a', 40);
+        var sha2 = new string('b', 40);
+        var record = new ReviewRecord(
+            "abc",
+            null,
+            [],
+            [],
+            [],
+            new ReviewSource(
+                7,
+                sha1,
+                sha2,
+                "**/*",
+                [
+                    new ChangedFile("b.txt", ChangeKind.Deleted, "bs2", null),
+                    new ChangedFile("a.txt", ChangeKind.Modified, "bs1", "hs1")
+                ]));
+
+        // Act: build the canonical text
+        var text = RecordDigest.Canonicalize(record);
+
+        // Assert: the source block comes after the fingerprint, with the changes sorted by path
+        var expected = string.Join(
+            '\n',
+            "ReviewCenter record v2",
+            "fingerprint 3:abc",
+            $"source git 7 40:{sha1} 40:{sha2} 4:**/*",
+            "changes",
+            "change 5:a.txt 8:Modified 3:bs1 3:hs1",
+            "change 5:b.txt 7:Deleted 3:bs2 -",
+            "answers",
+            "sections",
+            "threads");
+        Assert.Equal(expected, text);
+        Assert.Equal("7aed146fbc739a9314d432b2b45a843d61da01171ffb767b61671e6a66c2480d", RecordDigest.Compute(record));
+    }
+
+    /// <summary>
+    ///     Test that each part of the source changes the digest, so a signature binds to it.
+    /// </summary>
+    /// <param name="change">The name of the change under test.</param>
+    [Theory]
+    [InlineData("upload-to-git")]
+    [InlineData("repository")]
+    [InlineData("baseline-sha")]
+    [InlineData("baseline-removed")]
+    [InlineData("head-sha")]
+    [InlineData("selection")]
+    [InlineData("kind")]
+    [InlineData("path")]
+    [InlineData("baseline-hash")]
+    [InlineData("head-hash")]
+    [InlineData("change-added")]
+    [InlineData("change-removed")]
+    public void RecordDigest_Compute_SourceChange_ChangesDigest(string change)
+    {
+        // Arrange: a repository record and its digest
+        var before = RecordDigest.Compute(Record(source: GitSource()));
+
+        // Act: change one thing
+        var changed = change switch
+        {
+            "upload-to-git" => Record(),
+            "repository" => Record(source: GitSource(repositoryId: 8)),
+            "baseline-sha" => Record(source: GitSource(baseline: "base2")),
+            "baseline-removed" => Record(source: GitSource(baseline: null)),
+            "head-sha" => Record(source: GitSource(head: "head2")),
+            "selection" => Record(source: GitSource(selection: "src/**")),
+            "kind" => Record(source: GitSource(changes:
+            [
+                new ChangedFile("a.txt", ChangeKind.Added, "bs1", "hs1"),
+                new ChangedFile("b.txt", ChangeKind.Deleted, "bs2", null)
+            ])),
+            "path" => Record(source: GitSource(changes:
+            [
+                new ChangedFile("c.txt", ChangeKind.Modified, "bs1", "hs1"),
+                new ChangedFile("b.txt", ChangeKind.Deleted, "bs2", null)
+            ])),
+            "baseline-hash" => Record(source: GitSource(changes:
+            [
+                new ChangedFile("a.txt", ChangeKind.Modified, "other", "hs1"),
+                new ChangedFile("b.txt", ChangeKind.Deleted, "bs2", null)
+            ])),
+            "head-hash" => Record(source: GitSource(changes:
+            [
+                new ChangedFile("a.txt", ChangeKind.Modified, "bs1", "other"),
+                new ChangedFile("b.txt", ChangeKind.Deleted, "bs2", null)
+            ])),
+            "change-added" => Record(source: GitSource(changes:
+            [
+                new ChangedFile("a.txt", ChangeKind.Modified, "bs1", "hs1"),
+                new ChangedFile("b.txt", ChangeKind.Deleted, "bs2", null),
+                new ChangedFile("c.txt", ChangeKind.Added, null, "hs3")
+            ])),
+            _ => Record(source: GitSource(changes: [new ChangedFile("a.txt", ChangeKind.Modified, "bs1", "hs1")]))
+        };
+
+        // Assert: the digest differs
+        Assert.NotEqual(before, RecordDigest.Compute(changed));
+    }
+
+    /// <summary>
+    ///     Test that the order the changes are given in does not change the digest.
+    /// </summary>
+    [Fact]
+    public void RecordDigest_Compute_ChangeOrder_SameDigest()
+    {
+        // Arrange: the same changes in opposite order
+        var one = Record(source: GitSource());
+        var other = Record(source: GitSource(changes:
+        [
+            new ChangedFile("b.txt", ChangeKind.Deleted, "bs2", null),
+            new ChangedFile("a.txt", ChangeKind.Modified, "bs1", "hs1")
+        ]));
+
+        // Act, Assert: the digests are equal
+        Assert.Equal(RecordDigest.Compute(one), RecordDigest.Compute(other));
     }
 
     /// <summary>

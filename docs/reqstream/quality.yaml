@@ -114,6 +114,7 @@ sections:
           - ReviewCenter-OTS-AspNetCore-Host
           - ReviewCenter-OTS-AspNetCore-Components
           - ReviewCenter-OTS-AspNetCore-Authentication
+          - ReviewCenter-OTS-AspNetCore-DataProtection
 
       - id: Quality-DataStorage
         title: The repository shall rely on Entity Framework Core with SQLite to store projects and reviews.
@@ -151,3 +152,24 @@ sections:
           functionality.
         children:
           - ReviewCenterPuppet-OTS-Playwright-Chromium
+
+      - id: Quality-SourceAccess
+        title: The repository shall rely on the installed git program to read source code from repositories.
+        tags: [quality]
+        justification: |
+          The ContentSources subsystem reads source code by running git. This grouping requirement links the git OTS
+          requirements to the quality root so they participate in orphan detection without being falsely reported as
+          disconnected from tool functionality.
+        children:
+          - ReviewCenter-OTS-Git-Access
+          - ReviewCenter-OTS-Git-Credentials
+
+      - id: Quality-PatternVerification
+        title: The repository shall rely on FileSystemGlobbing to verify the selection pattern matcher in its tests.
+        tags: [quality]
+        justification: |
+          The tests compare the selection pattern matcher with an independent glob library. This grouping requirement
+          links the FileSystemGlobbing OTS requirement to the quality root so it participates in orphan detection
+          without being falsely reported as disconnected from tool functionality.
+        children:
+          - ReviewCenter-OTS-FileSystemGlobbing-Reference

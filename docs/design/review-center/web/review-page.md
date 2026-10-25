@@ -15,7 +15,8 @@ of open threads of each, the thread index of all files, the numbered lines of a 
 threads on that file, which a reader can answer, resolve, and reopen (a resolved thread is a one-line header
 until expanded), and the form that starts a new thread. Last, in a native `<details>` element that is collapsed by
 default, it shows the review's
-identifier, state, content fingerprint, record digest, and the hash of each file. It is a Razor component split into
+identifier, state, content fingerprint, record digest, and the hash of each file; for a review from a repository it
+also shows the repository name, the baseline and head commits, and the selection. It is a Razor component split into
 presentation
 (`ReviewPage.razor`) and behavior (`ReviewPage.razor.cs`). It reads reviews through `ReviewService` and works with
 threads only through `ThreadService`, so every comment rule is applied there. It works with reviewer slots,
@@ -37,6 +38,10 @@ when the project cannot be found).
 
 **SelectedLines**: the lines of the selected file as defined by `FileText`; `null` when no file is selected or the
 file is shown as binary.
+
+**SelectedKind**, **BaselineView**, **BaselineLines**: the change kind of the selected file, whether the read-only
+baseline is shown instead of the head, and the lines of the baseline text (`null` for binary content or when not yet
+loaded). The baseline is loaded the first time it is shown.
 
 **Threads**: all threads of the review, for every file, in creation order. The summary and the per-file counts are
 calculated from this list, and the selected file's threads are the ones with its path.
@@ -84,7 +89,12 @@ Test identifiers: `review-page` (root), `home-link`, `projects-link`, `project-l
 `selected-file-path`, `file-binary-notice`, `file-empty-notice`, `new-thread-form`,
 `thread-start-line-input`, `thread-end-line-input`, `thread-target`, `thread-text-input`, `thread-error`,
 `start-thread-button`, `file-content`, `code-line-{n}`, `line-comment-{n}`, `line-no-{n}`, `line-marker-{n}`,
-`line-text-{n}` (all by 1-based line number), `threads-empty`, `threads-list`, `thread-{id}`,
+`line-text-{n}` (all by 1-based line number), `file-kind-{index}` (the change kind of a file in the list, shown for
+reviews from a repository only), `selected-file-kind`, `file-version-toggle` (shown for a modified file),
+`view-head-button`, `view-baseline-button`, `baseline-note`, `baseline-content`, `baseline-line-{n}`,
+`baseline-line-no-{n}`, `baseline-line-text-{n}`, `baseline-comment-note`, `deleted-comment-note`,
+`review-repository`, `review-baseline-sha`, `review-head-sha`, `review-selection` (in the details of a review from
+a repository), `threads-empty`, `threads-list`, `thread-{id}`,
 `thread-anchor-{id}`, `thread-state-{id}`, `thread-count-{id}`, `thread-expand-{id}` (resolved threads only),
 `thread-toggle-{id}`, `comment-{id}-{n}`, `comment-author-{id}-{n}`,
 `comment-time-{id}-{n}`, `comment-text-{id}-{n}` (by thread identity and the position of the comment in the
@@ -124,6 +134,16 @@ markup. Lines covered by a thread are marked, and a number at the start line of 
 begin there. Every line is a row of the page, so a file with very many lines makes the page large; the upload
 limits bound this (measured: about 3 seconds for 5,000 lines, about 10 seconds for a 2 MiB file of 32,000 short
 lines).
+
+**ShowHead** and **ShowBaselineAsync**: For a modified file, a simple two-button toggle (`Head` and `Baseline`)
+switches between the head view described above, which takes comments, and the frozen baseline, shown as numbered
+lines without comment buttons, markers, or the new-thread form, and with a note that comments are made in the Head
+view. There is no diff highlighting. An added file shows only the head; a deleted file shows its baseline (the
+file has no head) and accepts whole-file comments only, through the same new-thread form with the line fields left
+blank (a note says so, and Core refuses a line range). Selecting another file always starts in its head view. The
+file list shows the change kind (Added, Modified, or Deleted) of each file of a review from a repository, and the
+size of a deleted file is its baseline size. Both the head and the baseline bytes are read from the frozen copies in
+the store, never from the repository.
 
 **CommentOnLine**: Fills the start and end line of the new-thread form with one line number, and makes the form the
 scroll target, because the form sits below the code and the threads.
@@ -209,7 +229,7 @@ raises no other errors of its own.
 
 - **SessionGate** (App) — wraps the whole page content, so the page is replaced by a "Session ended" message when the
   sign-in state of the open page ends.
-- **ReviewService** — reads the review and the bytes of a file.
+- **ReviewService** — reads the review and the head and baseline bytes of a file.
 - **ThreadService** — starts, answers, resolves, reopens, and lists threads, and shapes them for the index.
 - **ChecklistService** — reads the checklist progress for the summary.
 - **SigningService** — computes the approval status (blockers, record digest, next step), lists the users that can

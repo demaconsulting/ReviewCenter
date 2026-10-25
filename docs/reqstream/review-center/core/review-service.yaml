@@ -111,3 +111,82 @@ sections:
         tests:
           - ReviewService_CreateDraftAsync_Review_RecordsReviewCreatedWithFingerprint
           - ReviewService_CreateDraftAsync_SeveralFiles_RecordsPluralCount
+
+      - id: ReviewCenter-ReviewService-FromRepository
+        title: >-
+          The ReviewService class shall create a review from a registered, enabled git repository that covers the
+          files changed between an optional baseline revision and a head revision and matching a selection,
+          freezing in the database, for each file, its path, its change kind (Added, Modified, or Deleted), and
+          its baseline and head content, together with the repository, the two resolved commit identifiers, and
+          the selection text, and shall set the content fingerprint from the files that exist at the head.
+        justification: |
+          A review of a change must keep exactly what was reviewed. Freezing the content and the resolved
+          commits means a later change of the repository, or a moved branch, cannot alter the review, and the
+          fingerprint stays comparable with that of an uploaded review of the same files.
+        tests:
+          - ReviewService_CreateFromRepositoryAsync_Changes_FreezesFilesAndSource
+          - ReviewService_CreateFromRepositoryAsync_Changes_FingerprintCoversHeadFilesOnly
+          - ReviewService_CreateFromRepositoryAsync_Selection_ChoosesFiles
+          - ReviewService_CreateFromRepositoryAsync_SelectionOfDeletedFile_ReviewsIt
+          - ReviewService_CreateFromRepositoryAsync_BlankBaseline_ReviewsAllHeadFilesAsAdded
+          - ReviewService_CreateFromRepositoryAsync_BadRequests_AreRefusedWithTheirRule
+          - ReviewService_CreateFromRepositoryAsync_GitFailure_IsPassedOn
+          - ReviewService_CreateFromRepositoryAsync_DuplicateIdOrUnknownProject_RefusedBeforeOpening
+          - ReviewService_CreateFromRepositoryAsync_WithoutRepositories_Throws
+
+      - id: ReviewCenter-ReviewService-Frozen
+        title: >-
+          The ReviewService class shall read a review created from a repository only from its frozen copies, never
+          from the repository, so that a later commit, a moved branch, or a removed repository changes neither
+          the review, nor its content, nor its record digest.
+        justification: |
+          A signature binds to the record digest. If the review followed the repository, the same signature
+          would cover content nobody has seen.
+        tests:
+          - ReviewService_CreateFromRepositoryAsync_RepositoryChangesLater_ReviewIsUnaffected
+          - ReviewService_CreateFromRepositoryAsync_RealGit_FreezesChangesAgainstLaterCommits
+
+      - id: ReviewCenter-ReviewService-NothingToReview
+        title: >-
+          The ReviewService class shall refuse to create a review from a repository when no changed file matches
+          the selection, storing nothing, and shall say "Nothing to review: no files matching the selection
+          changed between" the baseline and the head.
+        justification: |
+          A review without files has nothing to review. The creator must learn that the selection or the
+          revisions are wrong instead of getting an empty review.
+        tests:
+          - ReviewService_CreateFromRepositoryAsync_NoMatchingChange_RefusesWithNothingToReview
+          - ReviewService_CreateFromRepositoryAsync_NoBaselineNoMatch_NamesBeginningOfHistory
+
+      - id: ReviewCenter-ReviewService-RepositoryLimits
+        title: >-
+          The ReviewService class shall apply the limits of an upload (2 MiB per file, 200 files, 20 MiB in
+          total) to a review from a repository, counting both the baseline and the head content, and shall
+          refuse a review that exceeds them before reading file content.
+        justification: |
+          The frozen copies live in the database and in memory like uploaded files, so the same bounds protect
+          the service, and a refusal before the content is read keeps a huge change from being fetched.
+        tests:
+          - ReviewService_CreateFromRepositoryAsync_FileTooLarge_RefusedBeforeReading
+          - ReviewService_CreateFromRepositoryAsync_TotalTooLarge_RefusedBeforeReading
+          - ReviewService_CreateFromRepositoryAsync_TooManyFiles_Refused
+
+      - id: ReviewCenter-ReviewService-SkippedEntries
+        title: >-
+          The ReviewService class shall leave symbolic links and submodules out of a review from a repository,
+          return them with their reasons to the creator, and count them in the audit entry.
+        justification: |
+          Only regular files can be reviewed. Silently dropping the others would hide parts of the change.
+        tests:
+          - ReviewService_CreateFromRepositoryAsync_SkippedEntries_ReturnedAndCounted
+
+      - id: ReviewCenter-ReviewService-RepositoryAudit
+        title: >-
+          The ReviewService class shall record the creation of a review from a repository in the audit trail, in
+          the same transaction as the review, naming the repository, the baseline and head commits, the number
+          of files by change kind, the number of skipped entries, and the content fingerprint.
+        justification: |
+          The history must show which commits and selection a review covers without opening the review.
+        tests:
+          - ReviewService_CreateFromRepositoryAsync_Changes_AuditDetailDescribesSource
+          - ReviewService_CreateFromRepositoryAsync_SameFilesOtherSource_ChangesDigest

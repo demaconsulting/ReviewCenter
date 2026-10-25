@@ -3,15 +3,17 @@
 ### Verification Approach
 
 The `Core` subsystem is verified by subsystem tests defined in `CoreSubsystemTests.cs`. The tests use the real
-`ProjectService`, `ReviewService`, `ThreadService`, `ChecklistService`, `UserService`, `SigningService`, `Fingerprint`,
-and `RecordDigest` together, with
+`ProjectService`, `ReviewService`, `ThreadService`, `ChecklistService`, `UserService`, `SigningService`,
+`RepositoryService`, `SelectionMatcher`, `RevisionValidator`, `Fingerprint`, and `RecordDigest` together, with
 a fixed clock (a clock the test can move for the lockout) and fakes for the stores (`FakeReviewStore`,
-`FakeUserStore`) and a trivial password hasher (`FakePasswordHasher`) in place of the database and the real hasher,
+`FakeUserStore`, `FakeRepositoryStore`), a trivial password hasher (`FakePasswordHasher`), and a trivial token protector
+(`FakeCredentialProtector`) in place of the database and the real hasher and protector,
 because the subsystem has no dependency on a
-database; the real database is verified in the `Storage` subsystem and the real hasher in the `Identity` subsystem.
+database; the real database is verified in the `Storage` subsystem, the real hasher in the `Identity` subsystem, and the
+real token protector and git in the `ContentSources` subsystem.
 The tests show that the units cooperate as the
 design describes: the services create, store, and read back what the fingerprint algorithm and the rules require.
-The rules and the algorithm themselves are verified in detail by the unit tests of the eight units.
+The rules and the algorithm themselves are verified in detail by the unit tests of the thirteen units.
 
 ### Test Environment
 
@@ -24,8 +26,9 @@ N/A - standard test environment.
   the known answer for the files, every file keeps its own size and SHA-256 hash, and file bytes are returned
   exactly.
 - The same file contents give the same fingerprint when submitted in another order or under other names.
-- Every domain rule (all thirty-three values of `DomainRule`) is reported through the services as a domain rule
-  exception that names it, and nothing is stored.
+- Every domain rule (all forty-seven values of `DomainRule`) is reported as a domain rule exception that names it, and
+  nothing is stored. The four rules that only a real git can raise (`RevisionNotFound`, `GitUnavailable`,
+  `GitAccessFailed`, and `GitTimeout`) are exercised in the `ContentSources` subsystem tests instead.
 - A thread started on a file, with replies, resolved and reopened, is read back with its comments in posting order.
 - A new review has the whole default checklist; an answer and a section that does not apply are recorded, and the
   progress follows them.
@@ -36,7 +39,14 @@ N/A - standard test environment.
   signature makes the review approved, a later change of the record makes it out of date and not approved, and the
   slot can be signed again.
 - Every change made through the services is recorded in the audit trail with the person, the action, and a detail
-  that never holds a password; recorded entries verify as an intact chain.
+  that never holds a password or a token; recorded entries verify as an intact chain.
+- A repository registry that only administrators can change: names, locations, and credentials are validated, tokens are
+  stored encrypted and are never part of a listed registration, and every change is audited without a secret (see the
+  unit tests of `RepositoryService`).
+- A review created from a repository freezes its source and the content of every changed file; a selection with no
+  changed file is refused with `NothingToReview` and stores nothing; the fingerprint covers the files at the head;
+  the record digest differs when the source, the selection, or any change differs; and a later change of the
+  repository does not change the stored review (see the unit tests of `ReviewService` and `RecordDigest`).
 
 ### Test Scenarios
 
@@ -62,10 +72,12 @@ check without a justification; a user with an invalid or taken user name, a blan
 password, a wrong current password, a change of a user that does not exist, or disabling the last enabled
 administrator; a slot for a missing review, a slot with an unknown reviewer or one that does not exist, a change of a
 signed slot, a signing by a user who is not in the slot, a signing that is blocked, a wrong password at a signing, or
-a signing of a record that changed). Each
+a signing of a record that changed; a repository with an invalid name, location, or credential, a name already used,
+an unknown or disabled repository, or a token that cannot be decrypted; a revision that is not a safe name; and a
+selection with no valid pattern; and a selection that matches no changed file). Each
 fails with a `DomainRuleException` that names the rule, and the store holds only the project, review, and
 administrator created
-first. This scenario is tested by `CoreSubsystem_RuleViolation_IsReportedAsDomainRuleAndStoresNothing`.
+first, except that the git-only rules are skipped here. This scenario is tested by `CoreSubsystem_RuleViolation_IsReportedAsDomainRuleAndStoresNothing`.
 
 **CoreSubsystem_ThreadWorkflow_StartReplyResolveReopen_ReadsBackInOrder**: A thread is started on lines 1 to 2 of a
 file of a review, two replies are added, the thread is resolved and read back, then reopened and read back again.

@@ -37,6 +37,15 @@ gets its own empty database, so the schema created at startup would be missing f
 - *Parameters*: `DatabaseOptions options`.
 - *Returns*: `string` — the connection string.
 
+**ResolveDataDirectory**: Returns the folder that holds the database file.
+
+- *Parameters*: `DatabaseOptions options`.
+- *Returns*: `string` — the folder of the data source of the resolved connection string; when the value is empty, an
+  in-memory form, or a `file:` URI, the folder of the default database file.
+- *Preconditions*: `options` is not null (otherwise `ArgumentNullException`).
+- *Notes*: `ServerHost` uses it to place the git cache and the key ring beside the database, so one data folder holds
+  everything that must be kept and backed up together.
+
 **Configure**: Configures a database context options builder for the selected provider.
 
 - *Parameters*: `DbContextOptionsBuilder builder`, `DatabaseOptions options`.
@@ -54,7 +63,8 @@ Checks the provider first, so that an unsupported setting fails before anything 
 folder of the file (not for a `file:` URI) and asks Entity Framework Core to create
 the schema. An existing database is not changed, and no migrations are used. A database created before the tables
 for comment threads existed therefore does not get them and must be deleted and created again; the same holds for a
-database created before the audit trail, which has no `AuditEntries` table.
+database created before the audit trail, which has no `AuditEntries` table, and for a database created before the
+repository registry, which has no `Repositories` table.
 
 #### Error Handling
 
@@ -70,7 +80,8 @@ turns them into one start-up error. Null arguments raise `ArgumentNullException`
 
 #### Callers
 
-- **ServerHost** — configures the context factory and calls `EnsureCreated` while building the application.
+- **ServerHost** — configures the context factory and calls `EnsureCreated` while building the application, and calls
+  `ResolveDataDirectory` to place the git cache and the key ring.
 - **UserCommand** and **AuditCommand** — call `EnsureCreated` before they work, so the first administrator can be
   created in a new database. `AuditCommand` therefore creates an empty database when none exists at the configured
   location.

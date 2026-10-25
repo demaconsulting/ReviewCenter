@@ -160,7 +160,10 @@ internal sealed class ReviewStore(IDbContextFactory<ReviewCenterDbContext> facto
                 ReviewId = f.ReviewId,
                 Path = f.Path,
                 Size = f.Size,
-                Sha256 = f.Sha256
+                Sha256 = f.Sha256,
+                ChangeKind = f.ChangeKind,
+                BaselineSize = f.BaselineSize,
+                BaselineSha256 = f.BaselineSha256
             })
             .ToListAsync(cancellationToken);
         review.Files.AddRange(files);
@@ -190,6 +193,20 @@ internal sealed class ReviewStore(IDbContextFactory<ReviewCenterDbContext> facto
         return await context.ReviewFiles.AsNoTracking()
             .Where(f => f.ProjectId == projectId && f.ReviewId == reviewId && f.Path == path)
             .Select(f => f.Content)
+            .FirstOrDefaultAsync(cancellationToken);
+    }
+
+    /// <inheritdoc />
+    public async Task<byte[]?> GetBaselineContentAsync(
+        int projectId,
+        string reviewId,
+        string path,
+        CancellationToken cancellationToken = default)
+    {
+        await using var context = await factory.CreateDbContextAsync(cancellationToken);
+        return await context.ReviewFiles.AsNoTracking()
+            .Where(f => f.ProjectId == projectId && f.ReviewId == reviewId && f.Path == path)
+            .Select(f => f.BaselineContent)
             .FirstOrDefaultAsync(cancellationToken);
     }
 
@@ -613,13 +630,34 @@ internal sealed class ReviewStore(IDbContextFactory<ReviewCenterDbContext> facto
         string reviewId,
         CancellationToken cancellationToken)
     {
-        var fingerprint = await context.Reviews.AsNoTracking()
+        var header = await context.Reviews.AsNoTracking()
             .Where(r => r.ProjectId == projectId && r.Id == reviewId)
-            .Select(r => r.ContentFingerprint)
+            .Select(r => new { r.ContentFingerprint, r.RepositoryId, r.BaselineSha, r.HeadSha, r.Selection })
             .FirstOrDefaultAsync(cancellationToken);
-        if (fingerprint is null)
+        if (header is null)
         {
             return null;
+        }
+
+        // The source and every change come from the frozen rows (hashes only; no file bytes are loaded)
+        var source = ReviewSource.Upload;
+        if (header.RepositoryId is not null)
+        {
+            var changes = await context.ReviewFiles.AsNoTracking()
+                .Where(f => f.ProjectId == projectId && f.ReviewId == reviewId)
+                .OrderBy(f => f.Path)
+                .Select(f => new { f.Path, f.ChangeKind, f.BaselineSha256, f.Sha256 })
+                .ToListAsync(cancellationToken);
+            source = new ReviewSource(
+                header.RepositoryId,
+                header.BaselineSha,
+                header.HeadSha,
+                header.Selection,
+                changes.Select(c => new ChangedFile(
+                    c.Path,
+                    c.ChangeKind,
+                    c.BaselineSha256,
+                    c.ChangeKind == ChangeKind.Deleted ? null : c.Sha256)).ToList());
         }
 
         var checklist = await context.ReviewChecklists.AsNoTracking()
@@ -635,7 +673,7 @@ internal sealed class ReviewStore(IDbContextFactory<ReviewCenterDbContext> facto
             .Include(t => t.Comments.OrderBy(c => c.Id))
             .OrderBy(t => t.Id)
             .ToListAsync(cancellationToken);
-        return new ReviewRecord(fingerprint, checklist, sections, answers, threads);
+        return new ReviewRecord(header.ContentFingerprint, checklist, sections, answers, threads, source);
     }
 
     /// <summary>

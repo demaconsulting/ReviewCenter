@@ -29,6 +29,20 @@ sections:
         tests:
           - ReviewStore_AddReviewAsync_BinaryCrLfAndEmptyFiles_StoresBytesVerbatim
 
+      - id: ReviewCenter-DbContext-Source
+        title: >-
+          The ReviewCenterDbContext class shall map the source of a review (repository identity and name,
+          baseline and head commit identifiers, selection text) and, for each review file, its change kind and
+          baseline content, size, and hash, as columns that are empty for an uploaded review, and shall keep
+          the baseline content as binary data like the head content.
+        justification: |
+          A review from a repository freezes what it covers in its own rows. Binary columns keep the baseline
+          bytes unchanged, and empty columns let uploaded reviews stay what they were.
+        tests:
+          - ReviewStore_GetReviewAsync_RepositoryReview_ReturnsSourceAndKindsWithoutBytes
+          - ReviewStore_GetBaselineContentAsync_StoredFiles_ReturnsBaselineBytesOrNull
+          - ReviewStore_GetRecordAsync_UploadReview_HasUploadSource
+
       - id: ReviewCenter-DbContext-Integrity
         title: >-
           The ReviewCenterDbContext class shall make the database refuse a review whose project and identifier
@@ -108,3 +122,15 @@ sections:
         tests:
           - AuditStore_Database_DuplicateSequence_IsRefusedByUniqueKey
           - AuditStore_ListAsync_FilterAndCursors_ReturnExpectedEntriesNewestFirst
+
+      - id: ReviewCenter-DbContext-Repositories
+        title: >-
+          The ReviewCenterDbContext class shall map the registered repositories to a table with an identity assigned
+          by the database and a name that is unique regardless of letter case, and shall keep the token only in its
+          encrypted form, so that the database refuses a second repository whose name differs only in letter case.
+        justification: |
+          The database is the last defense against two repositories with the same name, and a token stored only in
+          encrypted form is not readable in a copy of the database.
+        tests:
+          - RepositoryStore_AddAsync_Repository_RoundTripsAndAudits
+          - RepositoryStore_NameOtherCase_ThrowsRepositoryNameTaken

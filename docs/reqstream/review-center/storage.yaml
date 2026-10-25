@@ -3,9 +3,10 @@
 #
 # PURPOSE:
 # - Define requirements for the ReviewCenter Storage subsystem
-# - The Storage subsystem spans the ReviewCenterDbContext, ReviewStore, UserStore, and DatabaseSetup units
+# - The Storage subsystem spans the ReviewCenterDbContext, ReviewStore, UserStore, AuditStore, RepositoryStore, and
+#   DatabaseSetup units
 # - Subsystem requirements describe the externally visible behavior of the persistence of users, projects, reviews,
-#   checklists, comment threads, reviewer slots, and signatures
+#   checklists, comment threads, reviewer slots, signatures, the audit trail, and git repositories
 
 sections:
   - title: Storage Subsystem Requirements
@@ -55,6 +56,7 @@ sections:
           - ReviewCenter-DatabaseSetup-Connection
           - ReviewCenter-DatabaseSetup-Provider
           - ReviewCenter-DatabaseSetup-Create
+          - ReviewCenter-DatabaseSetup-DataDirectory
         tests:
           - StorageSubsystem_ServicesOverDatabase_ReopenedDatabase_KeepsProjectAndReview
           - StorageSubsystem_UnsupportedProvider_Opening_FailsWithClearErrorAndCreatesNothing
@@ -137,7 +139,40 @@ sections:
           - ReviewCenter-AuditStore-Read
           - ReviewCenter-ReviewStore-Audit
           - ReviewCenter-UserStore-Audit
+          - ReviewCenter-RepositoryStore-Audit
           - ReviewCenter-DbContext-AuditEntries
         tests:
           - AuditStore_ConcurrentChangesFromDifferentStores_ProduceLinearChain
           - AuditStore_PublicSurface_OffersNoUpdateOrDelete
+
+      - id: ReviewCenter-Storage-Repositories
+        title: >-
+          The Storage subsystem shall keep the registered git repositories, with their locations, user names, enabled
+          states, and encrypted tokens, in the database file, so that they are all still there, unchanged, when the
+          database is opened again, and shall keep repository names unique regardless of letter case.
+        justification: |
+          The registry must survive a restart, or every stored token would have to be entered again. The token is
+          kept only in its encrypted form, so a copy of the database does not reveal it.
+        children:
+          - ReviewCenter-RepositoryStore-Persist
+          - ReviewCenter-RepositoryStore-Unique
+          - ReviewCenter-RepositoryStore-Token
+          - ReviewCenter-RepositoryStore-Update
+          - ReviewCenter-DbContext-Repositories
+        tests:
+          - StorageSubsystem_Repositories_PersistAcrossReopen
+
+      - id: ReviewCenter-Storage-RepositoryReviews
+        title: >-
+          The Storage subsystem shall keep the source of a review from a repository and, for each file, its change kind
+          and its frozen baseline content in the database file, return them without file content in the review, and
+          return the baseline content of one file on request.
+        justification: |
+          The frozen copies replace the repository for everything that is read later, so they must be stored with the
+          review and read as cheaply as the head content.
+        children:
+          - ReviewCenter-ReviewStore-Source
+          - ReviewCenter-DbContext-Source
+        tests:
+          - ReviewStore_GetReviewAsync_RepositoryReview_ReturnsSourceAndKindsWithoutBytes
+          - ReviewStore_GetBaselineContentAsync_StoredFiles_ReturnsBaselineBytesOrNull

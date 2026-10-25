@@ -6,7 +6,8 @@
 
 `ProjectPage` is the page at `/projects/{id}`. Its responsibilities are to show one project and its reviews, each with
 its approval status, and to
-create a review from files selected in the browser, enforcing the upload limits while the files are read. It requires
+create a review, either from files selected in the browser (enforcing the upload limits while the files are read) or
+from the changes in a registered git repository. It requires
 a signed-in user. It is a
 Razor component split into presentation (`ProjectPage.razor`) and behavior (`ProjectPage.razor.cs`).
 
@@ -28,14 +29,29 @@ a current signature), filled while loading.
 
 **ErrorMessage**: the message of the last rejected selection or submission.
 
+**Repositories**, **FromRepository**: the enabled repositories (`RepositorySummary` values from
+`RepositoryService.ListEnabledAsync`, which carry no location and no token) and whether the form creates the review
+from a repository. **RepositoryIdText**, **HeadRevision**, **BaselineRevision**, **Selection**: the repository form
+values; the selection starts as `**/*`. **Busy**: set while a creation runs, so a second submit is ignored.
+**CreatedReview**, **SkippedEntries**: the review just created from a repository and the entries that were skipped,
+shown before the review is opened.
+
 **InteractiveMarker**: as for the other pages.
 
 Test identifiers: `project-page` (root), `home-link`, `projects-link`, `project-loading`, `project-not-found`,
 `project-name`, `project-description`, `reviews-list`, `reviews-empty`, `review-row-{id}`, `review-link-{id}`,
 `review-title-{id}`, `review-state-{id}`, `review-approval-{id}`, `new-review-form`, `review-id-input`,
-`review-title-input`,
+`review-title-input`, `review-source` (the source choice), `source-upload-radio`, `source-repository-radio`,
+`no-repository-hint`, `repository-select`, `head-revision-input`, `baseline-revision-input`, `selection-input`,
 `review-files-input`, `selected-files-list`, `selected-file-{index}`, `selected-file-path-{index}`,
-`selected-file-size-{index}`, `review-error`, and `create-review-button`.
+`selected-file-size-{index}`, `review-error`, `create-review-button`, `review-created`, `skipped-entries-list`,
+`skipped-entry-{index}`, and `open-created-review-link`.
+
+The form offers one choice, "Upload files" (the default) or "From a repository", and shows only the fields of the
+chosen source, so the page stays short. The repository choice is disabled, with a hint, when no repository is
+enabled. The repository fields are the repository (a drop-down of enabled repositories by name), the head revision,
+the optional baseline revision (blank: every file at the head counts as added), and the selection (a text area with
+one pattern per line, `!` to exclude).
 
 #### Key Methods
 
@@ -69,6 +85,17 @@ rejection does nothing and leaves the rejection reason visible, rather than repl
   values and files are kept and the message is shown. The handler first asks for the current user, so an ended
   sign-in state is refused with a message and no review is created.
 
+For the repository source the handler calls `ReviewService.CreateFromRepositoryAsync` with the chosen repository,
+the head and baseline revisions, and the selection. A missing choice of repository is reported as "Choose a
+repository." A refusal (an unknown revision, a selection that matches no change, which reads "Nothing to review: no
+files matching the selection changed between X and Y", a repository disabled in the meantime, a limit) is shown in
+`review-error` with every value kept, and no review exists. When the creation skipped symbolic links or submodules,
+the page does not navigate at once: it shows `review-created` with the list of skipped entries and a link to open the
+review, because these entries are not stored with the review and this is the only time to tell the creator.
+
+**ChooseSource**: Switches between the two sources and clears the message; the repository source cannot be chosen
+when no repository is enabled.
+
 **OnAfterRender**: Marks the page interactive after the first render on a live connection.
 
 #### Error Handling
@@ -83,6 +110,7 @@ an upload limit is shown as an error message. Other exceptions are not handled b
   sign-in state of the open page ends.
 - **ProjectService** — reads the project.
 - **ReviewService** — lists and creates reviews.
+- **RepositoryService** — lists the enabled repositories for the drop-down (names only, never a location or token).
 - **SigningService** — computes whether each review is approved.
 - **ReviewLimits** (Core) — the upload limits.
 - **ASP.NET Core Blazor components** — the component base class, file input, navigation, the authorization

@@ -36,6 +36,10 @@ package ReviewCenter {
         expose StorageSubsystem;
     }
 
+    view ContentSourcesView {
+        expose ContentSourcesSubsystem;
+    }
+
     view SelfTestView {
         expose SelfTestSubsystem;
     }

@@ -54,3 +54,13 @@ sections:
           A new installation must work on first start without manual database setup.
         tests:
           - DatabaseSetup_EnsureCreated_MissingFolder_CreatesFolderFileAndTables
+
+      - id: ReviewCenter-DatabaseSetup-DataDirectory
+        title: >-
+          The DatabaseSetup class shall give the folder of the configured database file, or the folder of the default
+          database file when the settings name no usable file, as the base for the other data of the server.
+        justification: |
+          The encryption keys and the git cache belong with the database, so that moving or backing up the data folder
+          keeps them together, without further configuration.
+        tests:
+          - DatabaseSetup_ResolveDataDirectory_Configured_IsFolderOfTheDatabaseFile

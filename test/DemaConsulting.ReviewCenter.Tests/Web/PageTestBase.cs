@@ -61,18 +61,22 @@ public abstract class PageTestBase : BunitContext
         Store = store;
         var clock = new FixedTimeProvider(new DateTimeOffset(2025, 3, 4, 5, 6, 7, TimeSpan.Zero));
         Projects = new ProjectService(store, clock);
-        Reviews = new ReviewService(store, clock);
         Threads = new ThreadService(store, clock);
         Checklists = new ChecklistService(store, clock);
         AuditStore = new FakeAuditStore(clock);
         Audit = new AuditService(AuditStore);
         Users = new UserService(new FakeUserStore(), new FakePasswordHasher(), clock, Audit);
+        RepositoryStore = new FakeRepositoryStore();
+        Repositories = new RepositoryService(RepositoryStore, new FakeCredentialProtector(), Users, clock);
+        Git = new FakeGitRepositoryProvider();
+        Reviews = new ReviewService(store, clock, Repositories, Git);
         Services.AddSingleton(Audit);
         Services.AddSingleton(Projects);
         Services.AddSingleton(Reviews);
         Services.AddSingleton(Threads);
         Services.AddSingleton(Checklists);
         Services.AddSingleton(Users);
+        Services.AddSingleton(Repositories);
         Signing = new SigningService(store, Users, clock);
         Services.AddSingleton(Signing);
         Services.AddSingleton<AuthenticationStateProvider>(_authentication);
@@ -94,6 +98,16 @@ public abstract class PageTestBase : BunitContext
     ///     Gets the in-memory audit store behind the audit service, for arranging and tampering with entries.
     /// </summary>
     internal FakeAuditStore AuditStore { get; }
+
+    /// <summary>
+    ///     Gets the in-memory store behind the repository service, for arranging and inspecting registrations.
+    /// </summary>
+    internal FakeRepositoryStore RepositoryStore { get; }
+
+    /// <summary>
+    ///     Gets the scripted git provider behind the review service, for arranging repository reviews.
+    /// </summary>
+    internal FakeGitRepositoryProvider Git { get; }
 
     /// <summary>
     ///     Gets the audit service the pages use.
@@ -124,6 +138,11 @@ public abstract class PageTestBase : BunitContext
     ///     Gets the user service the pages use.
     /// </summary>
     protected UserService Users { get; }
+
+    /// <summary>
+    ///     Gets the repository service the pages use.
+    /// </summary>
+    protected RepositoryService Repositories { get; }
 
     /// <summary>
     ///     Gets the signing service the pages use.

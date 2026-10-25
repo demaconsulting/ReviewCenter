@@ -42,17 +42,35 @@ public sealed class ReviewService
     private readonly TimeProvider _timeProvider;
 
     /// <summary>
+    ///     The repository registry, or <c>null</c> when reviews cannot be created from repositories.
+    /// </summary>
+    private readonly RepositoryService? _repositories;
+
+    /// <summary>
+    ///     Opens sessions on git repositories, or <c>null</c> when reviews cannot be created from repositories.
+    /// </summary>
+    private readonly IGitRepositoryProvider? _git;
+
+    /// <summary>
     ///     Initializes a new instance of the <see cref="ReviewService"/> class.
     /// </summary>
     /// <param name="store">The store that persists reviews. Must not be null.</param>
     /// <param name="timeProvider">The clock used for creation times; injected so tests control time. Must not be null.</param>
-    /// <exception cref="ArgumentNullException">Thrown when an argument is null.</exception>
-    public ReviewService(IReviewStore store, TimeProvider timeProvider)
+    /// <param name="repositories">The repository registry; needed only by <see cref="CreateFromRepositoryAsync"/>.</param>
+    /// <param name="git">The git access; needed only by <see cref="CreateFromRepositoryAsync"/>.</param>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="store"/> or <paramref name="timeProvider"/> is null.</exception>
+    public ReviewService(
+        IReviewStore store,
+        TimeProvider timeProvider,
+        RepositoryService? repositories = null,
+        IGitRepositoryProvider? git = null)
     {
         ArgumentNullException.ThrowIfNull(store);
         ArgumentNullException.ThrowIfNull(timeProvider);
         _store = store;
         _timeProvider = timeProvider;
+        _repositories = repositories;
+        _git = git;
     }
 
     /// <summary>
@@ -100,17 +118,7 @@ public sealed class ReviewService
 
         // The project must exist, and the id must be free within it. The store backs the id check up
         // with a uniqueness constraint, which covers two requests racing past this check
-        if (await _store.GetProjectAsync(projectId, cancellationToken) is null)
-        {
-            throw new DomainRuleException(DomainRule.ProjectNotFound, $"Project {projectId} does not exist.");
-        }
-
-        if (await _store.ReviewExistsAsync(projectId, id!, cancellationToken))
-        {
-            throw new DomainRuleException(
-                DomainRule.ReviewIdDuplicate,
-                $"A review with the id '{id}' already exists in this project.");
-        }
+        await EnsureProjectAndFreeIdAsync(projectId, id!, cancellationToken);
 
         // Keep the bytes verbatim and record the size and hash of each file alongside them
         var reviewFiles = files
@@ -137,13 +145,7 @@ public sealed class ReviewService
             Files = reviewFiles,
 
             // The checklist is frozen now: later changes of the default never alter this review's checks
-            Checklist = new ReviewChecklist
-            {
-                ProjectId = projectId,
-                ReviewId = id!,
-                Version = DefaultChecklist.Version,
-                Definition = DefaultChecklist.Current.ToJson()
-            }
+            Checklist = NewChecklist(projectId, id!)
         };
 
         await _store.AddReviewAsync(
@@ -156,6 +158,152 @@ public sealed class ReviewService
                 id),
             cancellationToken);
         return review;
+    }
+
+    /// <summary>
+    ///     Creates a review in the draft state from the files that changed between two revisions of a registered
+    ///     repository.
+    /// </summary>
+    /// <param name="projectId">The identity of the owning project.</param>
+    /// <param name="id">The review identifier; same rules as for <see cref="CreateDraftAsync"/>.</param>
+    /// <param name="title">The title; same rules as for <see cref="CreateDraftAsync"/>.</param>
+    /// <param name="repositoryId">The identity of an enabled registered repository.</param>
+    /// <param name="headRevision">The head revision: a branch, tag or commit name (see <see cref="RevisionValidator"/>).</param>
+    /// <param name="baselineRevision">
+    ///     The baseline revision, or <c>null</c> or white space to review every file at the head as added.
+    /// </param>
+    /// <param name="selection">
+    ///     The file selection: patterns, one per line (see <see cref="SelectionMatcher"/>). Only changed files that
+    ///     match are reviewed.
+    /// </param>
+    /// <param name="actor">The signed-in user creating the review; recorded in the audit trail. Must not be null.</param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <returns>The created review and the entries that were skipped (symbolic links, submodules, unusable paths).</returns>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="actor"/> is null.</exception>
+    /// <exception cref="InvalidOperationException">Thrown when the service was created without repository access.</exception>
+    /// <exception cref="DomainRuleException">
+    ///     Thrown when a rule is violated (see <see cref="DomainRule"/>), among them
+    ///     <see cref="DomainRule.NothingToReview"/> when no file matching the selection changed; nothing is stored then.
+    /// </exception>
+    /// <remarks>
+    ///     The server fetches the repository, resolves both revisions to commits, lists the changes, keeps those that
+    ///     match the selection and reads both sides of each file. The review then holds frozen copies of all of it
+    ///     (paths, change kinds, baseline and head bytes, both commits and the selection); nothing reads the repository
+    ///     again. The fingerprint covers the files that exist at the head (added and modified), so it equals the
+    ///     ReviewMark fingerprint of those files.
+    /// </remarks>
+    public async Task<RepositoryReviewResult> CreateFromRepositoryAsync(
+        int projectId,
+        string? id,
+        string? title,
+        int repositoryId,
+        string? headRevision,
+        string? baselineRevision,
+        string? selection,
+        Actor actor,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(actor);
+        if (_repositories is null || _git is null)
+        {
+            throw new InvalidOperationException("This service was created without access to repositories.");
+        }
+
+        // Validate everything that needs no I/O first so a bad request fails fast and cheaply
+        ValidateId(id);
+        var trimmedTitle = ValidateTitle(title);
+        var head = RevisionValidator.Validate(headRevision?.Trim());
+        var baseline = string.IsNullOrWhiteSpace(baselineRevision) ? null : RevisionValidator.Validate(baselineRevision.Trim());
+        var patterns = SelectionMatcher.Parse(selection ?? string.Empty);
+        var selectionText = string.Join('\n', patterns.Select(p => (p.Exclude ? "!" : string.Empty) + p.Text));
+        if (selectionText.Length > ReviewLimits.MaxSelectionLength)
+        {
+            throw new DomainRuleException(
+                DomainRule.SelectionInvalid,
+                $"The selection must not be longer than {ReviewLimits.MaxSelectionLength} characters.");
+        }
+
+        await EnsureProjectAndFreeIdAsync(projectId, id!, cancellationToken);
+        var access = await _repositories.GetAccessAsync(repositoryId, cancellationToken);
+
+        // Everything that needs the repository happens inside the session; afterwards nothing reads it again
+        string headSha;
+        string? baselineSha;
+        List<ReviewFile> files;
+        List<SkippedEntry> skipped;
+        await using (var session = await _git.OpenAsync(access, cancellationToken))
+        {
+            headSha = await session.ResolveRevisionAsync(head, cancellationToken);
+            baselineSha = baseline is null ? null : await session.ResolveRevisionAsync(baseline, cancellationToken);
+
+            // Deleted files are matched by their path like any other
+            var changeSet = await session.ListChangesAsync(baselineSha, headSha, cancellationToken);
+            var selected = changeSet.Changes
+                .Where(change => SelectionMatcher.IsMatch(change.Path, patterns))
+                .OrderBy(change => change.Path, StringComparer.Ordinal)
+                .ToList();
+            skipped = changeSet.Skipped
+                .Where(entry => SelectionMatcher.IsMatch(entry.Path, patterns))
+                .OrderBy(entry => entry.Path, StringComparer.Ordinal)
+                .ToList();
+            if (selected.Count == 0)
+            {
+                throw new DomainRuleException(
+                    DomainRule.NothingToReview,
+                    "Nothing to review: no files matching the selection changed between " +
+                    $"{baseline ?? "the beginning of the history"} and {head}");
+            }
+
+            if (selected.Count > ReviewLimits.MaxFileCount)
+            {
+                throw new DomainRuleException(
+                    DomainRule.TooManyFiles,
+                    $"A review can have at most {ReviewLimits.MaxFileCount} files; the selection matches {selected.Count}.");
+            }
+
+            // The limits are checked from the sizes first, so a huge file is never read
+            await CheckSizesAsync(session, selected, cancellationToken);
+            files = [];
+            foreach (var change in selected)
+            {
+                files.Add(await ReadFileAsync(session, projectId, id!, change, cancellationToken));
+            }
+        }
+
+        // Only files that exist at the head take part in the fingerprint, as in the ReviewMark checkout
+        var review = new Review
+        {
+            ProjectId = projectId,
+            Id = id!,
+            Title = trimmedTitle,
+            State = ReviewState.Draft,
+            Created = _timeProvider.GetUtcNow(),
+            ContentFingerprint = Fingerprint.Compute(files.Where(f => f.ChangeKind != ChangeKind.Deleted).Select(f => f.Sha256)),
+            RepositoryId = access.RepositoryId,
+            RepositoryName = access.Name,
+            BaselineSha = baselineSha,
+            HeadSha = headSha,
+            Selection = selectionText,
+            Files = files,
+            Checklist = NewChecklist(projectId, id!)
+        };
+
+        // The title is shortened so the SHAs and the fingerprint always fit in the audit detail
+        var added = files.Count(f => f.ChangeKind == ChangeKind.Added);
+        var modified = files.Count(f => f.ChangeKind == ChangeKind.Modified);
+        var deleted = files.Count(f => f.ChangeKind == ChangeKind.Deleted);
+        await _store.AddReviewAsync(
+            review,
+            AuditDraft.By(
+                actor,
+                "review.created",
+                $"review '{AuditText.Clean(trimmedTitle, 60)}' from repository '{access.Name}', baseline {baselineSha ?? "none"}, head {headSha}, " +
+                $"{files.Count} file{(files.Count == 1 ? string.Empty : "s")}: {added} added, {modified} modified, {deleted} deleted, " +
+                $"{skipped.Count} skipped, fingerprint {review.ContentFingerprint}",
+                projectId,
+                id),
+            cancellationToken);
+        return new RepositoryReviewResult(review, skipped);
     }
 
     /// <summary>
@@ -196,6 +344,144 @@ public sealed class ReviewService
         CancellationToken cancellationToken = default)
     {
         return _store.GetFileContentAsync(projectId, reviewId, path, cancellationToken);
+    }
+
+    /// <summary>
+    ///     Reads the exact baseline bytes of one file of a repository review.
+    /// </summary>
+    /// <param name="projectId">The project identity.</param>
+    /// <param name="reviewId">The review identifier.</param>
+    /// <param name="path">The file path within the review.</param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <returns>The frozen baseline bytes, or <c>null</c> when the file does not exist or has no baseline.</returns>
+    public Task<byte[]?> GetBaselineContentAsync(
+        int projectId,
+        string reviewId,
+        string path,
+        CancellationToken cancellationToken = default)
+    {
+        return _store.GetBaselineContentAsync(projectId, reviewId, path, cancellationToken);
+    }
+
+    /// <summary>
+    ///     Checks that the project exists and the review id is still free in it.
+    /// </summary>
+    /// <param name="projectId">The project identity.</param>
+    /// <param name="id">The review identifier.</param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <returns>A task that completes when both checks pass.</returns>
+    /// <exception cref="DomainRuleException">Thrown with <see cref="DomainRule.ProjectNotFound"/> or <see cref="DomainRule.ReviewIdDuplicate"/>.</exception>
+    private async Task EnsureProjectAndFreeIdAsync(int projectId, string id, CancellationToken cancellationToken)
+    {
+        if (await _store.GetProjectAsync(projectId, cancellationToken) is null)
+        {
+            throw new DomainRuleException(DomainRule.ProjectNotFound, $"Project {projectId} does not exist.");
+        }
+
+        if (await _store.ReviewExistsAsync(projectId, id, cancellationToken))
+        {
+            throw new DomainRuleException(
+                DomainRule.ReviewIdDuplicate,
+                $"A review with the id '{id}' already exists in this project.");
+        }
+    }
+
+    /// <summary>
+    ///     Builds the frozen copy of the current default checklist for a new review.
+    /// </summary>
+    /// <param name="projectId">The project identity.</param>
+    /// <param name="reviewId">The review identifier.</param>
+    /// <returns>The checklist; later changes of the default never alter it.</returns>
+    private static ReviewChecklist NewChecklist(int projectId, string reviewId)
+    {
+        return new ReviewChecklist
+        {
+            ProjectId = projectId,
+            ReviewId = reviewId,
+            Version = DefaultChecklist.Version,
+            Definition = DefaultChecklist.Current.ToJson()
+        };
+    }
+
+    /// <summary>
+    ///     Checks the size limits of the selected changes from the blob sizes, without reading any content.
+    /// </summary>
+    /// <param name="session">The open repository session.</param>
+    /// <param name="changes">The selected changes.</param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <returns>A task that completes when all limits hold.</returns>
+    /// <exception cref="DomainRuleException">Thrown with <see cref="DomainRule.FileTooLarge"/> or <see cref="DomainRule.TotalSizeExceeded"/>.</exception>
+    private static async Task CheckSizesAsync(
+        IGitRepository session,
+        IReadOnlyList<GitChange> changes,
+        CancellationToken cancellationToken)
+    {
+        long total = 0;
+        foreach (var change in changes)
+        {
+            foreach (var (blob, side) in new[] { (change.BaselineBlobSha, "baseline"), (change.HeadBlobSha, "head") })
+            {
+                if (blob is null)
+                {
+                    continue;
+                }
+
+                var size = await session.GetBlobSizeAsync(blob, cancellationToken);
+                if (size > ReviewLimits.MaxFileSizeBytes)
+                {
+                    throw new DomainRuleException(
+                        DomainRule.FileTooLarge,
+                        $"The {side} of the file '{change.Path}' is larger than the limit of {ReviewLimits.MaxFileSizeBytes / 1024 / 1024} MiB.");
+                }
+
+                total += size;
+                if (total > ReviewLimits.MaxTotalSizeBytes)
+                {
+                    throw new DomainRuleException(
+                        DomainRule.TotalSizeExceeded,
+                        $"The files together (both sides of each change) are larger than the limit of {ReviewLimits.MaxTotalSizeBytes / 1024 / 1024} MiB.");
+                }
+            }
+        }
+    }
+
+    /// <summary>
+    ///     Reads both sides of one changed file and builds its review file.
+    /// </summary>
+    /// <param name="session">The open repository session.</param>
+    /// <param name="projectId">The project identity.</param>
+    /// <param name="reviewId">The review identifier.</param>
+    /// <param name="change">The change.</param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <returns>
+    ///     The file; a deleted file has empty head content, size and hash, and carries the baseline columns instead.
+    /// </returns>
+    private static async Task<ReviewFile> ReadFileAsync(
+        IGitRepository session,
+        int projectId,
+        string reviewId,
+        GitChange change,
+        CancellationToken cancellationToken)
+    {
+        byte[]? baseline = change.BaselineBlobSha is null
+            ? null
+            : await session.ReadBlobAsync(change.BaselineBlobSha, ReviewLimits.MaxFileSizeBytes, cancellationToken);
+        byte[] head = change.HeadBlobSha is null
+            ? []
+            : await session.ReadBlobAsync(change.HeadBlobSha, ReviewLimits.MaxFileSizeBytes, cancellationToken);
+        return new ReviewFile
+        {
+            ProjectId = projectId,
+            ReviewId = reviewId,
+            Path = change.Path,
+            Content = head,
+            Size = head.Length,
+            Sha256 = change.HeadBlobSha is null ? string.Empty : Fingerprint.ComputeFileHash(head),
+            ChangeKind = change.Kind,
+            BaselineContent = baseline,
+            BaselineSize = baseline?.Length,
+            BaselineSha256 = baseline is null ? null : Fingerprint.ComputeFileHash(baseline)
+        };
     }
 
     /// <summary>

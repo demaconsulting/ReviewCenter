@@ -184,7 +184,12 @@
                     var fileIndex = index;
                     <li class="file-row @(file.Path == SelectedPath ? "selected" : null)" data-testid="file-row-@index">
                         <div class="path" data-testid="file-path-@index">@file.Path</div>
-                        <div class="muted file-size"><span data-testid="file-size-@index">@file.Size</span> bytes &middot; <span data-testid="file-open-threads-@index">@OpenThreadLabel(file.Path)</span></div>
+                        <div class="muted file-size">
+                            @if (Review.IsFromRepository)
+                            {
+                                <span class="badge" data-testid="file-kind-@index">@file.ChangeKind</span>
+                            }
+                            <span data-testid="file-size-@index">@DisplaySize(file)</span> bytes &middot; <span data-testid="file-open-threads-@index">@OpenThreadLabel(file.Path)</span></div>
                         <button type="button" data-testid="file-select-@index" aria-label="View @file.Path" @onclick="() => SelectFileAsync(fileIndex)">View</button>
                     </li>
                 }
@@ -253,7 +258,48 @@
                 <h2>File content</h2>
                 <p class="path" data-testid="selected-file-path">@SelectedPath</p>
 
-                @if (SelectedLines is null)
+                @if (Review.IsFromRepository)
+                {
+                    <p class="muted" data-testid="selected-file-kind">@SelectedKind</p>
+                }
+
+                @if (SelectedKind == ChangeKind.Modified)
+                {
+                    <div class="index-filters" role="group" aria-label="Which version of the file to show" data-testid="file-version-toggle">
+                        <button type="button" class="secondary" aria-pressed="@(BaselineView ? "false" : "true")"
+                                data-testid="view-head-button" @onclick="ShowHead">Head</button>
+                        <button type="button" class="secondary" aria-pressed="@(BaselineView ? "true" : "false")"
+                                data-testid="view-baseline-button" @onclick="ShowBaselineAsync">Baseline</button>
+                    </div>
+                }
+
+                @if (BaselineView)
+                {
+                    <p class="notice" data-testid="baseline-note">@(SelectedKind == ChangeKind.Deleted ? "Deleted file; this is its content at the baseline." : "Baseline (read-only). Switch to Head to comment.")</p>
+                    @if (BaselineLines is null)
+                    {
+                        <p class="notice" data-testid="file-binary-notice">This is a binary file; its content is not shown.</p>
+                    }
+                    else if (BaselineLines.Count == 0)
+                    {
+                        <p class="notice" data-testid="file-empty-notice">This file is empty.</p>
+                    }
+                    else
+                    {
+                        <div class="code" data-testid="baseline-content">
+                            @for (var number = 1; number <= BaselineLines.Count; number++)
+                            {
+                                <div class="code-line" data-testid="baseline-line-@number">
+                                    <span class="gutter">
+                                        <span class="line-no" data-testid="baseline-line-no-@number">@number</span>
+                                    </span>
+                                    <span class="line-text" data-testid="baseline-line-text-@number">@BaselineLines[number - 1]</span>
+                                </div>
+                            }
+                        </div>
+                    }
+                }
+                else if (SelectedLines is null)
                 {
                     <p class="notice" data-testid="file-binary-notice">This is a binary file; its content is not shown.</p>
                 }
@@ -355,7 +401,19 @@
 
             <section class="card">
                 <h2>New thread</h2>
+                @if (BaselineView && SelectedKind != ChangeKind.Deleted)
+                {
+                    <p class="muted" data-testid="baseline-comment-note">Comments are written on the Head version. Switch to Head to comment.</p>
+                }
+                else
+                {
                 <form data-testid="new-thread-form" novalidate @onsubmit="StartThreadAsync">
+                    @if (SelectedKind == ChangeKind.Deleted)
+                    {
+                        <p class="muted hint" data-testid="deleted-comment-note">This file was deleted, so a comment applies to the whole file.</p>
+                    }
+                    else
+                    {
                     <div class="line-fields">
                         <div class="field">
                             <label for="thread-start-line">Start line (optional)</label>
@@ -368,6 +426,7 @@
                                    data-testid="thread-end-line-input" @bind="NewEndLine" @bind:event="oninput" />
                         </div>
                     </div>
+                    }
                     <p class="muted hint" data-testid="thread-target">@NewThreadTarget().</p>
                     <div class="field">
                         <label for="thread-text">Comment</label>
@@ -380,6 +439,7 @@
                     }
                     <button type="submit" data-testid="start-thread-button">Start thread</button>
                 </form>
+                }
             </section>
         }
 
@@ -392,6 +452,17 @@
                 <dd><span class="badge" data-testid="review-state">@Review.State</span></dd>
                 <dt>Fingerprint</dt>
                 <dd class="hash" data-testid="review-fingerprint">@Review.ContentFingerprint</dd>
+                @if (Review.IsFromRepository)
+                {
+                    <dt>Repository</dt>
+                    <dd data-testid="review-repository">@Review.RepositoryName</dd>
+                    <dt>Baseline</dt>
+                    <dd class="hash" data-testid="review-baseline-sha">@(Review.BaselineSha ?? "none")</dd>
+                    <dt>Head</dt>
+                    <dd class="hash" data-testid="review-head-sha">@Review.HeadSha</dd>
+                    <dt>Selection</dt>
+                    <dd class="selection-text" data-testid="review-selection">@Review.Selection</dd>
+                }
                 @if (Approval is not null)
                 {
                     <dt>Record digest</dt>

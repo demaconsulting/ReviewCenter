@@ -216,6 +216,61 @@ public class StorageSubsystemTests
     }
 
     /// <summary>
+    ///     Test that a repository registered through the service, with its encrypted token and its disabled state,
+    ///     is still there after the database is closed and opened again.
+    /// </summary>
+    [Fact]
+    public async Task StorageSubsystem_Repositories_PersistAcrossReopen()
+    {
+        // Arrange: a new database file
+        var options = new DatabaseOptions { ConnectionString = TestDatabase.NewConnectionString() };
+        var admin = new Actor("root", "Root");
+        int id;
+
+        // Act: register a private repository, disable it, then close the database
+        var first = Open(options);
+        using (first.Provider)
+        {
+            var users = NewUserService(first.Provider);
+            await users.CreateAsync("root", "Root", UserRole.Admin, "correct horse battery", TestContext.Current.CancellationToken);
+            var service = NewRepositoryService(first.Provider, users);
+            var created = await service.CreateAsync(
+                "private", "https://example.com/r.git", "svc", "tkn-Persist", admin, TestContext.Current.CancellationToken);
+            id = created.Id;
+            await service.SetEnabledAsync(id, false, admin, TestContext.Current.CancellationToken);
+        }
+
+        // Act: open the same database again and read the registry
+        var second = Open(options);
+        using (second.Provider)
+        {
+            var service = NewRepositoryService(second.Provider, NewUserService(second.Provider));
+            var listed = Assert.Single(await service.ListAsync(admin, TestContext.Current.CancellationToken));
+            var offered = await service.ListEnabledAsync(TestContext.Current.CancellationToken);
+
+            // Assert: the registration, the token flag and the disabled state survived; nothing is offered to users
+            Assert.Equal(("private", "svc", true, false), (listed.Name, listed.Username, listed.HasToken, listed.Enabled));
+            Assert.Empty(offered);
+        }
+    }
+
+    /// <summary>
+    ///     Creates the repository service over the real database, with a fake token protector.
+    /// </summary>
+    /// <param name="provider">The provider that owns the database factory.</param>
+    /// <param name="users">The user service that re-checks the administrator.</param>
+    /// <returns>The service.</returns>
+    private static RepositoryService NewRepositoryService(ServiceProvider provider, UserService users)
+    {
+        var factory = provider.GetRequiredService<IDbContextFactory<ReviewCenterDbContext>>();
+        return new RepositoryService(
+            new RepositoryStore(factory, new AuditAppender(TimeProvider.System)),
+            new FakeCredentialProtector(),
+            users,
+            new FixedTimeProvider(_now));
+    }
+
+    /// <summary>
     ///     Test that a reviewer slot and its signature written through the services are still there, and still
     ///     current, after the database is closed and opened again, and that the review is then approved.
     /// </summary>

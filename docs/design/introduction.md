@@ -21,7 +21,7 @@ does not restate requirements; it explains how they are realized.
 Local items:
 
 - **ReviewCenter**: the distributed software system. It is divided into the Program unit and the
-  Cli, Hosting, Identity, Web, Core, Storage, SelfTest, and Utilities subsystems.
+  Cli, Hosting, Identity, Web, Core, Storage, ContentSources, SelfTest, and Utilities subsystems.
 - **ReviewCenterPuppet**: a separate software system, a development tool that is built and reviewed
   in this repository but is not part of the distributed ReviewCenter package. It has no
   subsystems; its units are PuppetProgram, ControlChannel, BrowserDaemon, SelectorResolver, and
@@ -48,7 +48,7 @@ OTS items:
 The following topics are out of scope:
 
 - Design documents are not produced for the test projects or build pipeline CI configuration
-- Subsystems of the target architecture that are not implemented yet (Api, ContentSources, Evidence,
+- Subsystems of the target architecture that are not implemented yet (Api, Evidence,
   Messaging) have no design documents yet
 - The internal design of OTS software items is excluded; only integration and usage design is documented
 
@@ -75,15 +75,19 @@ The ReviewCenter system is divided as follows:
 - **Web** (subsystem): the Blazor Server user interface; contains the App unit (HTML shell, router, page frame, and the
   SessionGate that replaces an open page when its user is no longer signed in),
   the HomePage unit, the ProjectsPage, ProjectPage, ReviewPage, and ChecklistPage units, the LoginPage,
-  AccountPage, and UsersPage units, and the HistoryPage and AuditPage units
+  AccountPage, and UsersPage units, the HistoryPage and AuditPage units, and the RepositoriesPage unit
 - **Core** (subsystem): the domain model and rules for projects, reviews, review comments, review checklists,
-  users, reviewer signatures, and the hash-chained audit trail, free of web and
+  users, reviewer signatures, the hash-chained audit trail, and the registry of git repositories, free of web and
   database technology; contains the Fingerprint, RecordDigest, AuditChain, AuditService, ProjectService,
-  ReviewService, ThreadService, ChecklistService, UserService, and SigningService units
+  ReviewService, ThreadService, ChecklistService, UserService, SigningService, RepositoryService, SelectionMatcher,
+  and RevisionValidator units
 - **Storage** (subsystem): persistence of projects, reviews, comment threads, checklists, users, reviewer slots,
-  signatures, and the audit trail in a database
+  signatures, the audit trail, and the registered repositories in a database
   through Entity
-  Framework Core; contains the ReviewCenterDbContext, ReviewStore, UserStore, AuditStore, and DatabaseSetup units
+  Framework Core; contains the ReviewCenterDbContext, ReviewStore, UserStore, AuditStore, RepositoryStore, and
+  DatabaseSetup units
+- **ContentSources** (subsystem): reads content from outside the system, currently from git repositories, and protects
+  the access tokens of private repositories; contains the GitRunner, GitSource, and CredentialProtector units
 - **SelfTest** (subsystem): self-validation; contains the Validation unit
 - **Utilities** (subsystem): shared helpers; contains the PathHelpers unit
 
@@ -91,8 +95,8 @@ The ReviewCenterPuppet system is a flat set of units that drive one persistent h
 invocation, against a ReviewCenter server and write screenshots.
 
 The model is deliberately partial. It covers only the items that are implemented so far: the Program unit, the
-Cli, Hosting, Identity, Web, Core, Storage, SelfTest, and Utilities subsystems, and the Puppet system. The Api,
-ContentSources, Evidence, and Messaging subsystems of the target architecture (`architecture.md`) are planned and
+Cli, Hosting, Identity, Web, Core, Storage, ContentSources, SelfTest, and Utilities subsystems, and the Puppet system.
+The Api, Evidence, and Messaging subsystems of the target architecture (`architecture.md`) are planned and
 deferred; they will be added to the model, with their requirements and design documents, as they are implemented.
 
 ## Folder Layout
@@ -104,6 +108,7 @@ deferred; they will be added to the model, with their requirements and design do
     - **Identity/** - local accounts, cookie sign-in, and authorization subsystem
     - **Web/** - Blazor Server user interface subsystem (Razor components)
     - **Storage/** - database persistence subsystem
+    - **ContentSources/** - git content source and token protection subsystem
     - **SelfTest/** - self-validation subsystem
     - **Utilities/** - shared utilities subsystem
   - **DemaConsulting.ReviewCenter.Core/** - source of the Core subsystem, in a project of its own (see below)

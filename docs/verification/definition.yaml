@@ -10,6 +10,7 @@ resource-path:
   - docs/verification/review-center/web
   - docs/verification/review-center/core
   - docs/verification/review-center/storage
+  - docs/verification/review-center/content-sources
   - docs/verification/review-center-puppet
   - docs/verification/ots
   - docs/template
@@ -41,6 +42,7 @@ input-files:
   - docs/verification/review-center/web/login-page.md
   - docs/verification/review-center/web/account-page.md
   - docs/verification/review-center/web/users-page.md
+  - docs/verification/review-center/web/repositories-page.md
   - docs/verification/review-center/core.md
   - docs/verification/review-center/core/fingerprint.md
   - docs/verification/review-center/core/project-service.md
@@ -50,11 +52,19 @@ input-files:
   - docs/verification/review-center/core/user-service.md
   - docs/verification/review-center/core/record-digest.md
   - docs/verification/review-center/core/signing-service.md
+  - docs/verification/review-center/core/selection-matcher.md
+  - docs/verification/review-center/core/revision-validator.md
+  - docs/verification/review-center/core/repository-service.md
   - docs/verification/review-center/storage.md
   - docs/verification/review-center/storage/review-center-db-context.md
   - docs/verification/review-center/storage/review-store.md
   - docs/verification/review-center/storage/user-store.md
   - docs/verification/review-center/storage/database-setup.md
+  - docs/verification/review-center/storage/repository-store.md
+  - docs/verification/review-center/content-sources.md
+  - docs/verification/review-center/content-sources/git-runner.md
+  - docs/verification/review-center/content-sources/git-source.md
+  - docs/verification/review-center/content-sources/credential-protector.md
   - docs/verification/review-center-puppet.md
   - docs/verification/review-center-puppet/puppet-program.md
   - docs/verification/review-center-puppet/control-channel.md
@@ -67,6 +77,8 @@ input-files:
   - docs/verification/ots/bunit.md
   - docs/verification/ots/efcore.md
   - docs/verification/ots/fileassert.md
+  - docs/verification/ots/filesystemglobbing.md
+  - docs/verification/ots/git.md
   - docs/verification/ots/pandoc.md
   - docs/verification/ots/playwright.md
   - docs/verification/ots/reqstream.md

@@ -1,0 +1,67 @@
+---
+# Software Unit Requirements for the RepositoriesPage Component
+#
+# The RepositoriesPage component lets administrators register, change, disable, and enable the git repositories that
+# reviews can be created from. The token is write-only on this page.
+
+sections:
+  - title: RepositoriesPage Unit Requirements
+    requirements:
+      - id: ReviewCenter-RepositoriesPage-Display
+        title: >-
+          The RepositoriesPage component shall list every repository with its name, location, user name, enabled
+          state, and whether it has a token, never showing a token, and shall offer no way to delete a repository.
+        justification: |
+          Administrators need to see what is registered and whether a token is set, but a token shown on a page can
+          be copied, shoulder-surfed, and logged. A repository is retired by disabling it.
+        tests:
+          - RepositoriesPage_Render_Repositories_ShowsTokenStateOnlyAndNoDelete
+
+      - id: ReviewCenter-RepositoriesPage-Create
+        title: >-
+          The RepositoriesPage component shall register a repository from a form with a name, a location, an optional
+          user name, and an optional token, empty the token field afterwards, and show a rule violation without
+          creating anything.
+        justification: |
+          Registering a repository is how an administrator makes a source reachable. A token must not stay in the form
+          after it is saved.
+        tests:
+          - RepositoriesPage_CreateForm_WithToken_StoresItWriteOnlyAndClearsFields
+          - RepositoriesPage_CreateForm_InvalidLocation_ShowsErrorAndCreatesNothing
+
+      - id: ReviewCenter-RepositoriesPage-Edit
+        title: >-
+          The RepositoriesPage component shall let an administrator change the name, location, and user name of a
+          repository and keep, replace, or clear its token, never showing the stored token, and let the
+          administrator cancel without any change.
+        justification: |
+          Locations move and tokens expire. The stored token cannot be read back, so keeping, replacing, and
+          clearing are the only operations that make sense for it.
+        tests:
+          - RepositoriesPage_Edit_KeepToken_ChangesFieldsAndKeepsToken
+          - RepositoriesPage_Edit_ReplaceToken_StoresNewTokenWriteOnly
+          - RepositoriesPage_Edit_ClearToken_RemovesToken
+          - RepositoriesPage_Edit_Cancel_ClosesFormAndChangesNothing
+
+      - id: ReviewCenter-RepositoriesPage-Enable
+        title: >-
+          The RepositoriesPage component shall let an administrator disable a repository and enable it again.
+        justification: |
+          Disabling stops the use of a repository at once, for example after a token was exposed, and keeps the
+          reviews made from it.
+        tests:
+          - RepositoriesPage_ToggleEnabled_Repository_DisablesAndEnablesAgain
+
+      - id: ReviewCenter-RepositoriesPage-Admin
+        title: >-
+          The RepositoriesPage component shall be available only to enabled administrators, shall check on every
+          action that the user is still an enabled administrator, and shall replace the page with a message that the
+          session has ended, or refuse the action with an error and change nothing, when the user no longer is.
+        justification: |
+          The registry controls what the server reads and holds secrets. An open page keeps its state for a while
+          after a user is demoted, disabled, or signed out.
+        tests:
+          - SignIn_RepositoriesPage_ReviewerAndAdmin_OnlyAdminIsAllowed
+          - RepositoriesPage_Action_SignedInAdminLaterDemoted_IsRefusedWithError
+          - RepositoriesPage_Revalidation_AdminDemoted_PageShowsSessionEndedAndNoActions
+          - RepositoriesPage_Action_SessionEndedBeforePageKnows_ShowsClearErrorAndChangesNothing

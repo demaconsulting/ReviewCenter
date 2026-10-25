@@ -115,3 +115,30 @@ sections:
         tests:
           - AuditCommand_Run_IntactTrail_ReportsEntryCountWithExitCodeZero
           - AuditCommand_Run_TamperedEntry_ReportsFirstBadEntryWithExitCodeOne
+
+      - id: ReviewCenter-Hosting-RepositoryServices
+        title: >-
+          The Hosting subsystem shall make the repository registry, the credential protector, and the git content
+          source available to the pages, keeping the key ring and the git cache in folders that default to folders
+          beside the database file, so that a token entered before a restart is still readable after it.
+        justification: |
+          The pages can only register and use repositories when the server connects the registry to the database, the
+          key ring, and git. Defaults beside the database mean a new installation works without configuration.
+        children:
+          - ReviewCenter-ServerHost-RepositoryServices
+          - ReviewCenter-ServerHost-KeyRing
+        tests:
+          - ServerHost_AddServices_Configured_RegistersRepositoryServicesWithDefaultFolders
+          - ServerHost_Restart_KeyRingPersisted_TokenStaysReadable
+
+      - id: ReviewCenter-Hosting-KeyRingFailure
+        title: >-
+          The Hosting subsystem shall report a key ring folder that cannot be written as an error that names the folder
+          and its setting, without starting to serve requests.
+        justification: |
+          A key ring that cannot be saved would silently lose every stored token at the next restart. Stopping
+          immediately with a clear message lets the operator fix the setting.
+        children:
+          - ReviewCenter-ServerHost-KeyRingFailure
+        tests:
+          - ServerHost_CreateApplication_KeyRingFolderNotWritable_ThrowsClearError

@@ -20,6 +20,10 @@ includes:
   - docs/reqstream/review-center/self-test/validation.yaml
   - docs/reqstream/review-center/utilities.yaml
   - docs/reqstream/review-center/utilities/path-helpers.yaml
+  - docs/reqstream/review-center/content-sources.yaml
+  - docs/reqstream/review-center/content-sources/git-runner.yaml
+  - docs/reqstream/review-center/content-sources/git-source.yaml
+  - docs/reqstream/review-center/content-sources/credential-protector.yaml
   - docs/reqstream/review-center/hosting.yaml
   - docs/reqstream/review-center/hosting/server-host.yaml
   - docs/reqstream/review-center/hosting/user-command.yaml
@@ -36,6 +40,7 @@ includes:
   - docs/reqstream/review-center/web/users-page.yaml
   - docs/reqstream/review-center/web/history-page.yaml
   - docs/reqstream/review-center/web/audit-page.yaml
+  - docs/reqstream/review-center/web/repositories-page.yaml
   - docs/reqstream/review-center/core.yaml
   - docs/reqstream/review-center/core/fingerprint.yaml
   - docs/reqstream/review-center/core/project-service.yaml
@@ -47,11 +52,15 @@ includes:
   - docs/reqstream/review-center/core/signing-service.yaml
   - docs/reqstream/review-center/core/audit-chain.yaml
   - docs/reqstream/review-center/core/audit-service.yaml
+  - docs/reqstream/review-center/core/selection-matcher.yaml
+  - docs/reqstream/review-center/core/revision-validator.yaml
+  - docs/reqstream/review-center/core/repository-service.yaml
   - docs/reqstream/review-center/storage.yaml
   - docs/reqstream/review-center/storage/review-center-db-context.yaml
   - docs/reqstream/review-center/storage/review-store.yaml
   - docs/reqstream/review-center/storage/user-store.yaml
   - docs/reqstream/review-center/storage/audit-store.yaml
+  - docs/reqstream/review-center/storage/repository-store.yaml
   - docs/reqstream/review-center/storage/database-setup.yaml
   - docs/reqstream/review-center/platform-requirements.yaml
   - docs/reqstream/review-center-puppet.yaml
@@ -75,3 +84,5 @@ includes:
   - docs/reqstream/ots/weasyprint.yaml
   - docs/reqstream/ots/fileassert.yaml
   - docs/reqstream/ots/sysml2tools.yaml
+  - docs/reqstream/ots/git.yaml
+  - docs/reqstream/ots/filesystemglobbing.yaml

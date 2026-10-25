@@ -19,11 +19,16 @@
 // SOFTWARE.
 
 using System.Data.Common;
+using System.Security.Cryptography;
 using DemaConsulting.ReviewCenter.Cli;
+using DemaConsulting.ReviewCenter.ContentSources;
 using DemaConsulting.ReviewCenter.Core;
 using DemaConsulting.ReviewCenter.Identity;
 using DemaConsulting.ReviewCenter.Storage;
 using DemaConsulting.ReviewCenter.Web;
+using Microsoft.AspNetCore.DataProtection;
+using Microsoft.AspNetCore.DataProtection.KeyManagement;
+using Microsoft.AspNetCore.DataProtection.Repositories;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 
@@ -126,6 +131,7 @@ internal static class ServerHost
         // start-up with a clear message instead of failing on the first page request
         InitializeDatabase(app);
         ValidateAuthOptions(app);
+        ValidateDataProtection(app);
 
         // Authentication and authorization must run before the endpoints they protect, and antiforgery
         // after them and before the Razor component and form endpoints it protects
@@ -166,7 +172,9 @@ internal static class ServerHost
     ///     The database is chosen by the <c>Database</c> configuration section (appsettings.json or environment
     ///     variables). Options are read lazily so that callers adjusting the configuration afterwards take
     ///     effect, and the Core services are shared by all browser sessions. <see cref="UserService"/> must stay
-    ///     a single instance because it serializes the changes to users.
+    ///     a single instance because it serializes the changes to users. The repository registry, the credential
+    ///     protector (Data Protection with a persisted key ring) and the git content source are registered here too;
+    ///     the <c>DataProtection</c> and <c>Git</c> sections default to folders beside the database.
     /// </remarks>
     public static void AddServices(IServiceCollection services, IConfiguration configuration)
     {
@@ -191,7 +199,44 @@ internal static class ServerHost
         services.AddSingleton<ChecklistService>();
         services.AddSingleton<UserService>();
         services.AddSingleton<SigningService>();
+
+        // The repository registry and the git content source. Tokens are encrypted with Data Protection, whose key
+        // ring is persisted in a folder so that the tokens survive a restart
+        services.AddOptions<DataProtectionSettings>().Bind(configuration.GetSection(DataProtectionSettings.SectionName));
+        services.AddOptions<GitOptions>()
+            .Bind(configuration.GetSection(GitOptions.SectionName))
+            .PostConfigure<IOptions<DatabaseOptions>>((git, database) =>
+            {
+                if (string.IsNullOrWhiteSpace(git.CachePath))
+                {
+                    git.CachePath = Path.Combine(DatabaseSetup.ResolveDataDirectory(database.Value), "git-cache");
+                }
+            });
+        services.AddDataProtection().SetApplicationName("DemaConsulting.ReviewCenter");
+        services.AddOptions<KeyManagementOptions>()
+            .Configure<IOptions<DataProtectionSettings>, IOptions<DatabaseOptions>, ILoggerFactory>(
+                (keys, settings, database, loggerFactory) =>
+                    keys.XmlRepository = new FileSystemXmlRepository(
+                        new DirectoryInfo(ResolveKeysPath(settings.Value, database.Value)),
+                        loggerFactory));
+        services.AddSingleton<ICredentialProtector, CredentialProtector>();
+        services.AddSingleton<IRepositoryStore, RepositoryStore>();
+        services.AddSingleton<RepositoryService>();
+        services.AddSingleton(provider => provider.GetRequiredService<IOptions<GitOptions>>().Value);
+        services.AddSingleton<GitRunner>();
+        services.AddSingleton<IGitRepositoryProvider, GitSource>();
     }
+
+    /// <summary>
+    ///     Works out the folder of the Data Protection key ring.
+    /// </summary>
+    /// <param name="settings">The configured settings.</param>
+    /// <param name="database">The database options, whose folder is the default base.</param>
+    /// <returns>The absolute folder: the configured one, or <c>keys</c> beside the database.</returns>
+    internal static string ResolveKeysPath(DataProtectionSettings settings, DatabaseOptions database) =>
+        string.IsNullOrWhiteSpace(settings.KeysPath)
+            ? Path.Combine(DatabaseSetup.ResolveDataDirectory(database), "keys")
+            : Path.GetFullPath(settings.KeysPath);
 
     /// <summary>
     ///     Logs a failed best-effort audit entry; the user never sees the failure.
@@ -319,6 +364,87 @@ internal static class ServerHost
         {
             ((IDisposable)app).Dispose();
             throw new InvalidOperationException($"Invalid sign-in settings: {ex.Message}", ex);
+        }
+    }
+
+    /// <summary>
+    ///     Checks that the Data Protection key ring folder is writable and that a token can be encrypted and read back.
+    /// </summary>
+    /// <param name="app">The built application whose services provide the settings and the protector.</param>
+    /// <exception cref="InvalidOperationException">
+    ///     Thrown when the key ring cannot be written; the application is disposed before the exception is thrown.
+    ///     The message names the folder and the <c>DataProtection:KeysPath</c> setting.
+    /// </exception>
+    /// <remarks>
+    ///     A key ring that cannot be saved would silently fall back to keys that are lost at the next restart,
+    ///     and every stored token would become unreadable, so the server refuses to start instead.
+    /// </remarks>
+    private static void ValidateDataProtection(WebApplication app)
+    {
+        var settings = app.Services.GetRequiredService<IOptions<DataProtectionSettings>>().Value;
+        var database = app.Services.GetRequiredService<IOptions<DatabaseOptions>>().Value;
+        var folder = ResolveKeysPath(settings, database);
+        try
+        {
+            Directory.CreateDirectory(folder);
+            if (!OperatingSystem.IsWindows())
+            {
+                // The keys decrypt the stored tokens: only the server account may read them
+                File.SetUnixFileMode(folder, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+            }
+
+            var probe = Path.Combine(folder, $".probe-{Guid.NewGuid():N}.tmp");
+            File.WriteAllText(probe, "probe");
+            File.Delete(probe);
+
+            var protector = app.Services.GetRequiredService<ICredentialProtector>();
+            ProbeRoundTrip(protector);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or CryptographicException
+                                       or DomainRuleException or ArgumentException or NotSupportedException)
+        {
+            ((IDisposable)app).Dispose();
+            var cause = ex.InnerException is null ? string.Empty : $" ({ex.InnerException.Message})";
+            throw new InvalidOperationException(
+                $"The Data Protection key ring folder '{folder}' is not writable: {ex.Message}{cause} " +
+                "Set DataProtection:KeysPath to a folder the server can write to and keep.",
+                ex);
+        }
+    }
+
+    /// <summary>
+    ///     Encrypts and decrypts a probe value, which creates the first key in the key ring. A failure is tried
+    ///     once more after a short pause, because a freshly written key file can be briefly locked by a virus
+    ///     scanner or the indexer; a folder that really cannot be written fails both times.
+    /// </summary>
+    /// <param name="protector">The credential protector to probe.</param>
+    private static void ProbeRoundTrip(ICredentialProtector protector)
+    {
+        for (var attempt = 1; attempt < 3; attempt++)
+        {
+            try
+            {
+                RoundTrip(protector);
+                return;
+            }
+            catch (Exception ex) when (ex is IOException or CryptographicException or DomainRuleException)
+            {
+                Thread.Sleep(300);
+            }
+        }
+
+        RoundTrip(protector);
+    }
+
+    /// <summary>
+    ///     Encrypts and decrypts the probe value once.
+    /// </summary>
+    /// <param name="protector">The credential protector to probe.</param>
+    private static void RoundTrip(ICredentialProtector protector)
+    {
+        if (protector.Unprotect(protector.Protect("probe")) != "probe")
+        {
+            throw new CryptographicException("The probe value did not survive a round trip.");
         }
     }
 
