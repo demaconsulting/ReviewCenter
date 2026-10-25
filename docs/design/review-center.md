@@ -82,7 +82,8 @@ flowchart TD
     UserCommand --> UserService
     SignIn --> UserService
     RevalidatingAuthenticationStateProvider --> SignIn
-    RevalidatingAuthenticationStateProvider --> UserService    PasswordHasher --> UserService
+    RevalidatingAuthenticationStateProvider --> UserService
+    PasswordHasher --> UserService
     App --> HomePage
     App --> ProjectsPage
     App --> ProjectPage
