@@ -58,14 +58,18 @@ sections:
           The ServerHost class shall set up cookie sign-in with a session cookie that is HttpOnly, SameSite Lax,
           and Secure when the request is over HTTPS, lasting the number of hours set in Auth:SessionHours (8 by
           default), shall fail with an error that names Auth:SessionHours when that value is not a positive
-          number, shall require a signed-in user for all pages except the home page and the login page, and shall
-          map the sign-in and sign-out endpoints, keeping the /health route open to everyone.
+          number, shall fail with an error that names Auth:RevalidationSeconds when that value, the seconds
+          between two checks of the user of an open page (30 by default), is below 5, shall require a signed-in
+          user for all pages except the home page and the login page, and shall map the sign-in and sign-out
+          endpoints, keeping the /health route open to everyone.
         justification: |
           The composition root is the one place where authentication is connected to the pages. A wrong session
-          length must stop the server at start-up with a clear message, and the pages must be closed by default so
-          that a new page cannot be left open by mistake.
+          length or check interval must stop the server at start-up with a clear message, a too short interval
+          would turn the check of open pages into constant database load, and the pages must be closed by
+          default so that a new page cannot be left open by mistake.
         tests:
           - ServerHost_CreateApplication_NonPositiveSessionHours_ThrowsClearError
+          - ServerHost_CreateApplication_RevalidationSecondsBelowMinimum_ThrowsClearError
           - ServerHost_CreateApplication_HealthRoute_Returns200Healthy
           - SignIn_PublicPage_Anonymous_IsServed
           - SignIn_ProtectedPage_Anonymous_RedirectsToLogin

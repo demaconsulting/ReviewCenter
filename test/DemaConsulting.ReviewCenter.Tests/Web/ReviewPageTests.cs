@@ -657,6 +657,35 @@ public class ReviewPageTests : PageTestBase
     }
 
     /// <summary>
+    ///     Test that resolving and reopening a thread after the session ended, but before the page learned of it,
+    ///     shows a clear message and leaves the thread state, and so the approval state, unchanged.
+    /// </summary>
+    [Fact]
+    public async Task ReviewPage_ResolveAndReopen_SessionEndedBeforePageKnows_ShowsClearErrorAndChangesNothing()
+    {
+        // Arrange: an open thread and a resolved thread on the selected file
+        var projectId = await CreateReviewAsync(new UploadedFile("a.txt", TestContent.A));
+        var open = await Threads.StartThreadAsync(projectId, "REV-1", "a.txt", null, null, TestActors.Ann, "Open one", TestContext.Current.CancellationToken);
+        var resolved = await Threads.StartThreadAsync(projectId, "REV-1", "a.txt", null, null, TestActors.Ann, "Resolved one", TestContext.Current.CancellationToken);
+        await Threads.ResolveAsync(projectId, "REV-1", resolved.Id, TestContext.Current.CancellationToken);
+        var cut = RenderPage(projectId);
+        await cut.Find("[data-testid='file-select-0']").ClickAsync();
+        await cut.Find($"[data-testid='thread-expand-{resolved.Id}']").ClickAsync();
+        SignOutQuietly();
+
+        // Act: resolve the open thread, and reopen the resolved one
+        await cut.Find($"[data-testid='thread-toggle-{open.Id}']").ClickAsync();
+        await cut.Find($"[data-testid='thread-toggle-{resolved.Id}']").ClickAsync();
+
+        // Assert: each shows why nothing was saved, and both threads keep their state
+        Assert.Contains("no longer signed in", cut.Find($"[data-testid='reply-error-{open.Id}']").TextContent, StringComparison.Ordinal);
+        Assert.Contains("no longer signed in", cut.Find($"[data-testid='reply-error-{resolved.Id}']").TextContent, StringComparison.Ordinal);
+        var stored = (await Threads.ListAsync(projectId, "REV-1", TestContext.Current.CancellationToken)).ToDictionary(thread => thread.Id);
+        Assert.Equal(ReviewThreadState.Open, stored[open.Id].State);
+        Assert.Equal(ReviewThreadState.Resolved, stored[resolved.Id].State);
+    }
+
+    /// <summary>
     ///     Test that author and comment text containing markup are shown as plain text.
     /// </summary>
     [Fact]
@@ -1357,5 +1386,68 @@ public class ReviewPageTests : PageTestBase
                 testId is not null && System.Text.RegularExpressions.Regex.IsMatch(testId, "^[a-z0-9]+(?:[-.][a-z0-9]+)*$"),
                 $"A <{element.LocalName}> has no kebab-case data-testid (found '{testId}').");
         }
+    }
+
+    /// <summary>
+    ///     Test that when the user of an open review page is disabled, the page stops showing its content and
+    ///     actions, and nothing the stale page could still send is stored.
+    /// </summary>
+    [Fact]
+    public async Task ReviewPage_Revalidation_UserDisabled_PageStopsShowingAndAcceptingActions()
+    {
+        // Arrange: a signable review open for ann, whose session is re-checked every 100 ms
+        var (projectId, slotId, _) = await CreateSignableAsync();
+        UseRevalidation(TimeSpan.FromMilliseconds(100));
+        SignInAs("ann", "Ann");
+        var cut = RenderPage(projectId);
+        await cut.Find("[data-testid='file-select-0']").ClickAsync();
+        var threadForm = cut.Find("[data-testid='new-thread-form']");
+        var signForm = cut.Find($"[data-testid='sign-form-{slotId}']");
+        var threadText = cut.Find("[data-testid='thread-text-input']");
+        await threadText.InputAsync("Typed before the session ended");
+        Assert.NotEmpty(cut.FindAll("[data-testid='review-page']"));
+
+        // Act: an administrator disables ann, and the next check ends the session
+        await Users.SetEnabledAsync("ann", false, TestContext.Current.CancellationToken);
+        await cut.WaitForAssertionAsync(
+            () => Assert.NotEmpty(cut.FindAll("[data-testid='session-ended']")),
+            TimeSpan.FromSeconds(10));
+
+        // Assert: the page, its forms and the typed text are gone
+        Assert.Empty(cut.FindAll("[data-testid='review-page']"));
+        Assert.Empty(cut.FindAll("[data-testid='new-thread-form']"));
+        Assert.Empty(cut.FindAll($"[data-testid='sign-form-{slotId}']"));
+        Assert.Empty(cut.FindAll($"[data-testid='sign-button-{slotId}']"));
+        Assert.DoesNotContain("Typed before the session ended", cut.Markup, StringComparison.Ordinal);
+
+        // Act: the stale forms are submitted anyway
+        _ = await Record.ExceptionAsync(() => threadForm.SubmitAsync());
+        _ = await Record.ExceptionAsync(() => signForm.SubmitAsync());
+
+        // Assert: nothing was stored
+        Assert.Empty(await Threads.ListAsync(projectId, "REV-1", TestContext.Current.CancellationToken));
+        Assert.Empty(await Store.ListSignaturesAsync(projectId, "REV-1", TestContext.Current.CancellationToken));
+    }
+
+    /// <summary>
+    ///     Test that an action sent after the session ended, but before the page learned of it, shows a clear
+    ///     message and stores nothing, instead of failing the page.
+    /// </summary>
+    [Fact]
+    public async Task ReviewPage_StartThread_SessionEndedBeforePageKnows_ShowsClearErrorAndStoresNothing()
+    {
+        // Arrange: a selected file with text typed, and then the session ends without the page being told
+        var projectId = await CreateReviewAsync(new UploadedFile("a.txt", TestContent.A));
+        var cut = RenderPage(projectId);
+        await cut.Find("[data-testid='file-select-0']").ClickAsync();
+        await cut.Find("[data-testid='thread-text-input']").InputAsync("Please check");
+        SignOutQuietly();
+
+        // Act: the thread is started
+        await cut.Find("[data-testid='new-thread-form']").SubmitAsync();
+
+        // Assert: the page shows why nothing was saved, and no thread exists
+        Assert.Contains("no longer signed in", cut.Find("[data-testid='thread-error']").TextContent, StringComparison.Ordinal);
+        Assert.Empty(await Threads.ListAsync(projectId, "REV-1", TestContext.Current.CancellationToken));
     }
 }

@@ -270,6 +270,20 @@ reviews:
       - "src/**/Identity/AuthOptions.cs"
       - "test/**/Identity/SignInTests.cs"
 
+  - id: ReviewCenter-Identity-RevalidatingAuthenticationStateProvider
+    title: Review of ReviewCenter RevalidatingAuthenticationStateProvider unit implementation
+    context:
+      - docs/design/review-center.md
+      - docs/reqstream/review-center.yaml
+      - docs/design/review-center/identity.md
+      - docs/reqstream/review-center/identity.yaml
+    paths:
+      - "docs/reqstream/review-center/identity/revalidating-authentication-state-provider.yaml"
+      - "docs/design/review-center/identity/revalidating-authentication-state-provider.md"
+      - "docs/verification/review-center/identity/revalidating-authentication-state-provider.md"
+      - "src/**/Identity/RevalidatingAuthenticationStateProvider.cs"
+      - "test/**/Identity/RevalidatingAuthenticationStateProviderTests.cs"
+
   # ReviewCenter - Web
   - id: ReviewCenter-Web
     title: Review of ReviewCenter Web subsystem architecture and interfaces
@@ -299,6 +313,7 @@ reviews:
       - "src/**/Web/_Imports.razor"
       - "src/**/Web/MainLayout.razor"
       - "src/**/Web/MainLayout.razor.cs"
+      - "src/**/Web/SessionGate.razor"
       - "test/**/Web/AppTests.cs"
 
   - id: ReviewCenter-Web-HomePage

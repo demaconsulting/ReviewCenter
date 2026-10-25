@@ -34,17 +34,21 @@ subsystem): `projects-page` (root), `home-link`, `projects-list`, `projects-empt
 **CreateProjectAsync**: Handles submission of the form.
 
 - *Postconditions*: On success the project is created, the form is cleared, the error is removed, and the list is
-  reloaded. On a rule violation the entered values are kept and the message of the violation is shown.
+  reloaded. On a rule violation the entered values are kept and the message of the violation is shown. The handler
+  first asks for the current user, so an ended sign-in state is refused with a message and nothing is created.
 
 **OnAfterRender**: Marks the page interactive after the first render on a live connection, as `HomePage` does.
 
 #### Error Handling
 
-A `DomainRuleException` from `ProjectService` is caught and its message shown in the page; no other exception is
+A `DomainRuleException` from `ProjectService`, or from the check of the current user, is caught and its message shown
+in the page; no other exception is
 handled by the page. The inputs carry the maximum lengths as a convenience; the service remains the authority.
 
 #### Dependencies
 
+- **SessionGate** (App) — wraps the whole page content, so the page is replaced by a "Session ended" message when the
+  sign-in state of the open page ends.
 - **ProjectService** — creates and lists projects.
 - **ASP.NET Core Blazor components** — the component base class, events, the authorization attribute, and the
   interactive server render mode.

@@ -39,5 +39,10 @@ is stored and listed, with no error. This scenario is tested by
 error that mentions the name is shown and no project is stored. This scenario is tested by
 `ProjectsPage_CreateForm_BlankName_ShowsErrorAndCreatesNothing`.
 
+**ProjectsPage_CreateForm_SessionEndedBeforePageKnows_ShowsClearErrorAndCreatesNothing**: A name is entered, and the
+sign-in state ends without the page being told; the form is submitted. An error says that the user is no longer signed
+in, and no project is stored. This scenario is tested by
+`ProjectsPage_CreateForm_SessionEndedBeforePageKnows_ShowsClearErrorAndCreatesNothing`.
+
 **ProjectsPage_AfterRender_Interactive_SetsMarker**: The page is rendered; its root element has
 `data-interactive` equal to `true`. This scenario is tested by `ProjectsPage_AfterRender_Interactive_SetsMarker`.

@@ -19,7 +19,9 @@
 // SOFTWARE.
 
 using DemaConsulting.ReviewCenter.Core;
+using DemaConsulting.ReviewCenter.Identity;
 using Microsoft.AspNetCore.Components;
+using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.Components.Forms;
 
 namespace DemaConsulting.ReviewCenter.Web;
@@ -73,6 +75,12 @@ public partial class ProjectPage : ComponentBase
     /// </summary>
     [Inject]
     private SigningService SigningService { get; set; } = null!;
+
+    /// <summary>
+    ///     Gets or sets the authentication state of the current user, supplied by dependency injection.
+    /// </summary>
+    [Inject]
+    private AuthenticationStateProvider AuthenticationState { get; set; } = null!;
 
     /// <summary>
     ///     Gets or sets the navigation manager, supplied by dependency injection; used to open the new review.
@@ -277,7 +285,8 @@ public partial class ProjectPage : ComponentBase
     /// <returns>A task that completes when the submission has been handled.</returns>
     /// <remarks>
     ///     On a rule violation (duplicate id, no files, duplicate paths and so on) the form keeps what was
-    ///     entered and the message is shown. On success the browser is taken to the new review.
+    ///     entered and the message is shown. On success the browser is taken to the new review. The submission
+    ///     is refused, with a message, when the sign-in state of the page has already ended.
     /// </remarks>
     private async Task CreateReviewAsync()
     {
@@ -290,6 +299,8 @@ public partial class ProjectPage : ComponentBase
         Review review;
         try
         {
+            // The service takes no actor yet; asking for one refuses an ended sign-in state
+            _ = await AuthenticationState.GetActorAsync();
             review = await ReviewService.CreateDraftAsync(ProjectId, ReviewId, ReviewTitle, SelectedFiles);
         }
         catch (DomainRuleException ex)

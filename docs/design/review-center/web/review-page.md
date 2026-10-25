@@ -100,7 +100,9 @@ the previous review, its file content, or a half-typed comment. Each file's `Vie
 `View {path}` so that screen-reader users can tell the buttons apart.
 
 **RefreshAsync**: Reloads everything the record depends on: the threads, the checklist, the approval, the
-candidates for a slot, and the user name of the signed-in user. It runs when the page loads and after every change
+candidates for a slot, and the user name of the signed-in user. The user name is read straight from the authentication
+state, not through `GetActorAsync`, so that a reload that meets an ended sign-in state does not fail; the page is replaced
+by the session-ended message instead. It runs when the page loads and after every change
 made on the page (starting, replying, resolving, reopening, and every slot or signing action), and when a file is
 selected, so the badge, the next-step sentence, the slot status, and the digest always describe the record as it
 now is.
@@ -194,11 +196,18 @@ the page loads and after each change.
 
 A review that does not exist is shown as a message on the page. A file that has disappeared from the store since
 the page loaded is shown as empty text rather than failing the connection. Comment, slot, and signing rule violations
-are shown as messages next to the control that caused them and never end the connection. The page raises no other
-errors of its own.
+are shown as messages next to the control that caused them and never end the connection. An action that meets an
+authentication state that has already ended (the user was disabled, removed, or changed since the page was opened,
+and the page has not yet been replaced) is refused by `GetActorAsync` with a rule violation, which the same handlers
+show as the message "You are no longer signed in, so nothing was saved. Reload the page to sign in again." The handlers
+that change something without a service that takes an actor (resolving and reopening a thread) ask for the actor first
+for the same reason. The page
+raises no other errors of its own.
 
 #### Dependencies
 
+- **SessionGate** (App) — wraps the whole page content, so the page is replaced by a "Session ended" message when the
+  sign-in state of the open page ends.
 - **ReviewService** — reads the review and the bytes of a file.
 - **ThreadService** — starts, answers, resolves, reopens, and lists threads, and shapes them for the index.
 - **ChecklistService** — reads the checklist progress for the summary.

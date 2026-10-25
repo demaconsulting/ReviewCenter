@@ -28,9 +28,12 @@ protected pages are redirected.
 **Claims**: the principal in the cookie has three claims: the user name (the name claim), the display name, and the
 role (the role claim). It never has the password or its hash.
 
-**AuthOptions** (supporting type): a settings object bound from the `Auth` configuration section, with one setting,
-`SessionHours` (`int`, default 8, must be greater than 0): how many hours a sign-in lasts without activity. The
-section is read from `appsettings.json` and from environment variables such as `Auth__SessionHours`.
+**AuthOptions** (supporting type): a settings object bound from the `Auth` configuration section, with two settings.
+`SessionHours` (`int`, default 8, must be greater than 0): how many hours a sign-in lasts without activity.
+`RevalidationSeconds` (`int`, default 30, must be at least 5, the constant `MinimumRevalidationSeconds`): how many
+seconds pass between two checks of the signed-in user by an open page; it is also the longest time a disabled, removed,
+or changed user can keep an open page. The section is read from `appsettings.json` and from environment variables such
+as `Auth__SessionHours` and `Auth__RevalidationSeconds`.
 
 **Cookie settings**: `HttpOnly`; `SameSite=Lax`; secure policy `SameAsRequest`, so the cookie is `Secure` for an https
 request and also works on plain http during development; a session cookie (not persistent); a sliding expiry of
@@ -44,14 +47,20 @@ request and also works on plain http during development; a session cookie (not p
 - *Returns*: `IServiceCollection` — the same collection.
 - *Preconditions*: Neither argument is null.
 - *Postconditions*: The cookie scheme is the default scheme, the cookie has the settings above, the `Auth` options are
-  bound and validated, and authorization is registered.
+  bound and validated, authorization is registered, and `RevalidatingAuthenticationStateProvider` is registered as the
+  scoped authentication state provider.
+
+The provider is registered with a plain `AddScoped`, not `TryAddScoped`: the Razor components registration of the
+framework registers its own default provider with `TryAdd`, and the host calls `AddSignIn` after it, so the last
+registration is the one that wins. That ordering is a dependency of the host and is commented in the code.
 
 An anonymous request for a protected page is redirected to `LoginPath` (the original address travels in the standard
 `ReturnUrl` query value). A signed-in user without the needed role does not get a redirect: the access-denied
 redirect is replaced by HTTP status 403 with a short "Access denied" page that links back to `/projects`. No
 fallback authorization policy is set, so static assets, `/health`,
-`/`, and `/login` stay anonymous and each protected page declares its own requirement. The session length is taken
-from the options when the cookie options are first needed, and an invalid value is reported when the server starts.
+`/`, and `/login` stay anonymous and each protected page declares its own requirement. The session length and the
+revalidation interval are taken from the options when they are first needed, and an invalid value (a session length
+that is not above 0, or a revalidation interval below 5 seconds) is reported when the server starts.
 
 **MapSignIn**: Maps the two endpoints.
 
@@ -87,35 +96,51 @@ it again because the form value is client-supplied.
 - *Parameters*: `AuthenticationStateProvider provider` — the authentication state of the page (it works in a
   statically rendered page and on the live connection).
 - *Returns*: `Task<Actor>` — the user name (from the name claim) and the display name (from the display-name claim).
-- *Postconditions*: The result always comes from the authentication state, never from a form value.
+- *Postconditions*: The result always comes from the authentication state, never from a form value. When the state has
+  no authenticated user or lacks a claim, the method throws `DomainRuleException` with the rule `ActorNotAllowed`.
+
+**IsCurrent**: The single rule that decides whether a signed-in principal still matches the stored user.
+
+- *Parameters*: `ClaimsPrincipal? principal`, `User? user` — the user as stored now, or null when there is none.
+- *Returns*: `bool` — `true` only when both are present, the user is enabled, and the role and the display name in the
+  principal equal the stored ones.
+- *Postconditions*: Pure; nothing is changed.
 
 **Principal validation**: On every request that carries the cookie, the cookie is checked against the user store
-(`UserService.GetAsync`). The cookie is rejected, and removed, when the user no longer exists, is disabled, or when
-the role or the display name in the cookie differs from the stored one; the user then has to sign in again and gets
-the current values. A changed password does not reject cookies, so it does not end other sessions of the user.
+(`UserService.GetAsync`) with `IsCurrent`. The cookie is rejected, and removed, when the user no longer exists, is
+disabled, or when the role or the display name in the cookie differs from the stored one; the user then has to sign in
+again and gets the current values. A changed password does not reject cookies, so it does not end other sessions of the
+user. The periodic check of an open page (see the `RevalidatingAuthenticationStateProvider` design) uses the same
+`IsCurrent`, so the cookie and an open page cannot drift apart.
 
 #### Error Handling
 
-Null arguments raise `ArgumentNullException`. `GetActorAsync` raises `InvalidOperationException` ("Nobody is signed
-in.") when the state has no authenticated user or lacks a claim; a protected page cannot be reached anonymously, so
-this signals a programming error. Rule failures of the login are not errors: they are the generic failure redirect.
-An invalid `SessionHours` value makes the options validation fail, which `ServerHost` reports when the server
-starts. The login and logout endpoints do not log the password or the hash.
+Null arguments raise `ArgumentNullException`. `GetActorAsync` raises a `DomainRuleException` with the rule
+`ActorNotAllowed` and the message "You are no longer signed in, so nothing was saved. Reload the page to sign in
+again." when the state has no authenticated user or lacks a claim. That is a rule violation, not a programming error,
+because an open page can lose its user between two clicks (the state ends when the user is disabled, removed, or
+changed), and the pages already show a rule violation as a message next to the control that was used instead of failing.
+Rule failures of the login are not errors: they are the generic failure redirect.
+An invalid `SessionHours` or `RevalidationSeconds` value makes the options validation fail, which `ServerHost` reports
+when the server starts. The login and logout endpoints do not log the password or the hash.
 
 #### Dependencies
 
 - **UserService** (Core) — checks the password and reads the user for the per-request validation.
-- **Actor** and **UserRole** (Core) — the type produced for the pages and the role names of the claims.
+- **Actor**, **User**, **UserRole**, and **DomainRuleException** (Core) — the type produced for the pages, the user
+  that `IsCurrent` compares with, the role names of the claims, and the refusal of `GetActorAsync`.
+- **RevalidatingAuthenticationStateProvider** (Identity) — registered by `AddSignIn`; it calls `IsCurrent`.
 - **ASP.NET Core shared framework** — cookie authentication, authorization, antiforgery, and the Blazor
   authentication state; see the ASP.NET Core integration design in the OTS chapter.
 
 #### Callers
 
-- **ServerHost** — calls `AddSignIn` while registering the services and `MapSignIn` while mapping the endpoints, and
-  enables the authentication and authorization middleware.
+- **ServerHost** — calls `AddSignIn` while registering the services (after the Razor components) and `MapSignIn`
+  while mapping the endpoints, and enables the authentication and authorization middleware.
+- **RevalidatingAuthenticationStateProvider** — calls `IsCurrent`.
 - **LoginPage** — posts its form to `/auth/login` and uses `SafeReturnUrl`.
 - **App** (`MainLayout`) — posts its logout form to `/auth/logout`, and reads the signed-in user for the header.
-- **ReviewPage**, **ChecklistPage**, and **AccountPage** — call `GetActorAsync` (the account page to know whose
-  password to change). **ProjectsPage**, **ProjectPage**, **ReviewPage**, **ChecklistPage**, and **AccountPage**
+- **ReviewPage**, **ChecklistPage**, **AccountPage**, and **UsersPage** — call `GetActorAsync` (the account page to know
+  whose password to change). **ProjectsPage**, **ProjectPage**, **ReviewPage**, **ChecklistPage**, and **AccountPage**
   require a signed-in user, and **UsersPage** requires the role `Admin`, through authorization attributes that this
   unit's registration makes effective.

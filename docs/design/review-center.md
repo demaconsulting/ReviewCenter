@@ -27,6 +27,7 @@ flowchart TD
     subgraph Identity
         PasswordHasher
         SignIn
+        RevalidatingAuthenticationStateProvider
     end
     subgraph Web
         App
@@ -80,6 +81,8 @@ flowchart TD
     UserCommand --> DatabaseSetup
     UserCommand --> UserService
     SignIn --> UserService
+    RevalidatingAuthenticationStateProvider --> SignIn
+    RevalidatingAuthenticationStateProvider --> UserService
     PasswordHasher --> UserService
     App --> HomePage
     App --> ProjectsPage
@@ -143,7 +146,9 @@ actions are handled on the server.
 
 The `Identity` subsystem is the web side of local accounts: `SignIn` configures cookie authentication and
 authorization, checks a password through `UserService`, signs the user in and out, and tells the pages who is signed
-in; `PasswordHasher` hashes and verifies passwords with the password hasher of the ASP.NET Core shared framework.
+in; `RevalidatingAuthenticationStateProvider` re-checks the user of every open page at a fixed interval with the same rule
+as the cookie check and ends the sign-in state of the page when the user is no longer valid; `PasswordHasher` hashes and
+verifies passwords with the password hasher of the ASP.NET Core shared framework.
 
 The `Core` subsystem holds the domain: projects, reviews of uploaded files, users, the rules that
 protect them, the content fingerprint of a review, and the digest of a review record that signatures are bound to. It
@@ -170,8 +175,10 @@ and a review is Approved only while every slot has a current signature. A review
 hash-chained audit trail of the architecture, author signatures, rejecting or withdrawing a signature, and a second
 factor are deferred to later slices; a signed slot cannot be reassigned.
 The limitations of the identity slice are deliberate: lockout after failed sign-ins is per user name, so anyone can
-lock a known user name for a few minutes; a page that is already open keeps the authentication state it started with
-until it is reloaded; a password change does not end other sessions of the user; and a database that was created
+lock a known user name for a few minutes; a user who is disabled, removed, or changed can keep a page that is already
+open for up to the revalidation interval (`Auth:RevalidationSeconds`, 30 seconds by default), after which the page is
+replaced by a "Session ended" message, while the page header keeps the old name until the next navigation or reload; a
+password change does not end other sessions of the user; and a database that was created
 before the identity slice or before the signature slice (it has no reviewer slot and signature tables) must be
 deleted and created again.
 
@@ -219,10 +226,11 @@ is running.
   static assets are open to anonymous visitors, every other page requires a signed-in user (an anonymous request is
   redirected to `/login` with the wanted address), and `/users` requires the Admin role (another user gets HTTP status
   403). The cookie is HTTP-only, belongs to the session of the browser, and expires after a sliding period of
-  `Auth:SessionHours` hours (default 8). It is marked secure when the request is HTTPS, so behind a proxy that
+  `Auth:SessionHours` hours (default 8). The cookie is marked secure when the request is HTTPS, so behind a proxy that
   terminates TLS the forwarded headers must be enabled (the environment variable
   `ASPNETCORE_FORWARDEDHEADERS_ENABLED` set to `true`). The server must still not be exposed to untrusted networks
-  without TLS, because the password of a sign-in is sent in the request.
+  without TLS, because the password of a sign-in is sent in the request. An open page re-checks its user every
+  `Auth:RevalidationSeconds` seconds (default 30, at least 5; a smaller value stops the start-up with an error).
 
 **Database**: The persistent store of projects, reviews, and users.
 
@@ -325,7 +333,10 @@ are sent back. A request for `/health` is answered directly by `ServerHost`. A r
 passes the authorization of the `Identity` subsystem: an anonymous visitor is redirected to `/login`; the
 form of `LoginPage` is posted to `/auth/login`, where `SignIn` asks `UserService` to check the password and, on
 success, sets the authentication cookie. On every later request `SignIn` validates the cookie against the stored user,
-so a disabled or changed user is signed out. The project pages
+so a disabled or changed user is signed out. A page that stays open makes no request, so the scoped
+`RevalidatingAuthenticationStateProvider` of that page re-reads the user at the configured interval and, when the user
+is no longer valid or cannot be read, makes the state anonymous, and the `SessionGate` of the page replaces the page
+content with the "Session ended" message. The project pages
 work the same way but call `ProjectService` and `ReviewService` in the handlers: a submitted
 review form carries its files to `ReviewService`, which validates them, computes the
 fingerprint with `Fingerprint`, and stores the review through `ReviewStore`. `ReviewPage` calls `ThreadService`

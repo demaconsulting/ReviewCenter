@@ -93,6 +93,26 @@ public class ProjectsPageTests : PageTestBase
     }
 
     /// <summary>
+    ///     Test that a project submitted after the session ended, but before the page learned of it, shows a clear
+    ///     message and creates nothing.
+    /// </summary>
+    [Fact]
+    public async Task ProjectsPage_CreateForm_SessionEndedBeforePageKnows_ShowsClearErrorAndCreatesNothing()
+    {
+        // Arrange: a filled-in form, and then the session ends without the page being told
+        var cut = Render<ProjectsPage>();
+        await cut.Find("[data-testid='project-name-input']").InputAsync("Apollo");
+        SignOutQuietly();
+
+        // Act: submit the form
+        await cut.Find("[data-testid='new-project-form']").SubmitAsync();
+
+        // Assert: the page says why nothing was saved, and no project exists
+        Assert.Contains("no longer signed in", cut.Find("[data-testid='project-error']").TextContent, StringComparison.Ordinal);
+        Assert.Empty(await Projects.ListAsync(TestContext.Current.CancellationToken));
+    }
+
+    /// <summary>
     ///     Test that submitting a blank name shows the validation message and creates nothing.
     /// </summary>
     [Fact]

@@ -1,0 +1,51 @@
+---
+# Software Unit Requirements for the RevalidatingAuthenticationStateProvider Unit
+#
+# The RevalidatingAuthenticationStateProvider unit re-checks the signed-in user of an open interactive page against
+# the user store at a fixed interval and ends the sign-in state of that page when the user is no longer valid.
+
+sections:
+  - title: RevalidatingAuthenticationStateProvider Unit Requirements
+    requirements:
+      - id: ReviewCenter-RevalidatingAuthenticationStateProvider-Revalidate
+        title: >-
+          The RevalidatingAuthenticationStateProvider unit shall, at the configured interval, read the signed-in
+          user of an open page from the user store again, shall keep the sign-in state only while that user
+          exists, is enabled, and has the same role and display name as at sign-in, and shall otherwise make the
+          sign-in state of the page anonymous.
+        justification: |
+          A page that stays open makes no request, so the check of the session cookie never runs for it. Without
+          a periodic check, a user who was disabled, removed, or given another role would keep seeing and
+          changing review data on a page that was opened earlier.
+        tests:
+          - RevalidatingAuthenticationStateProvider_IsCurrentAsync_EnabledUserSameRole_ReturnsTrue
+          - RevalidatingAuthenticationStateProvider_IsCurrentAsync_UserDisabled_ReturnsFalse
+          - RevalidatingAuthenticationStateProvider_IsCurrentAsync_UserDeleted_ReturnsFalse
+          - RevalidatingAuthenticationStateProvider_IsCurrentAsync_RoleChanged_ReturnsFalse
+          - RevalidatingAuthenticationStateProvider_IsCurrentAsync_DisplayNameChanged_ReturnsFalse
+          - RevalidatingAuthenticationStateProvider_IsCurrentAsync_NoNameClaim_ReturnsFalse
+          - RevalidatingAuthenticationStateProvider_Loop_UserDisabled_StateBecomesAnonymous
+          - RevalidatingAuthenticationStateProvider_Loop_UserStaysValid_StateStaysAuthenticated
+
+      - id: ReviewCenter-RevalidatingAuthenticationStateProvider-FailClosed
+        title: >-
+          The RevalidatingAuthenticationStateProvider unit shall make the sign-in state of the page anonymous
+          when the user cannot be read from the user store, and shall record the failure in the log with the user
+          name and no secret.
+        justification: |
+          A user whose account cannot be checked must not go on acting. Ending the page on a failed check loses
+          what was typed on it, but never lets an unverifiable user keep a page open.
+        tests:
+          - RevalidatingAuthenticationStateProvider_IsCurrentAsync_LookupThrows_ReturnsFalseFailClosed
+          - RevalidatingAuthenticationStateProvider_Loop_LookupFails_StateBecomesAnonymous
+
+      - id: ReviewCenter-RevalidatingAuthenticationStateProvider-Shutdown
+        title: >-
+          The RevalidatingAuthenticationStateProvider unit shall stop checking when its page is closed, and shall
+          not treat a check that was cancelled by the closing as a failure of the user.
+        justification: |
+          Closing a page is normal. Reporting it as a failed check would log an error for every closed page and
+          would try to end the sign-in state of a page that no longer exists.
+        tests:
+          - RevalidatingAuthenticationStateProvider_IsCurrentAsync_CancelledLookup_ThrowsTaskCanceledWithToken
+          - RevalidatingAuthenticationStateProvider_Dispose_StopsLoop

@@ -43,8 +43,9 @@ settings that let a caller adjust the build.
 
 Anchors the content root at the application directory; clears the default logging providers
 and adds the console provider only when the context is not silent; registers Blazor Server
-components; registers the persistence and the Core services with `AddServices`; registers cookie sign-in with
-`SignIn.AddSignIn`; applies the options callback; loads static web assets
+components; registers the persistence and the Core services with `AddServices`; registers cookie sign-in, and with it
+the revalidating authentication state provider of open pages, with `SignIn.AddSignIn` (after the Razor components, so
+that its provider replaces the framework default); applies the options callback; loads static web assets
 when enabled; builds the application; calls `InitializeDatabase` and `ValidateAuthOptions`; adds authentication,
 authorization, and request forgery protection, in that order, ahead of the endpoints they protect; maps static assets
 when enabled; maps `/health` to a plain-text 200 response; maps the login and logout endpoints with
@@ -89,7 +90,8 @@ build with the native library removed (exit code 1 and the message above); no au
   inner exception.
 
 The options are validated when they are first read, so reading them at start-up turns an invalid value (such as a
-session length that is not positive) into one clear start-up message rather than a failure at the first sign-in.
+session length that is not positive, or an interval for the re-check of open pages below 5 seconds) into one clear
+start-up message, which names the setting, rather than a failure at the first sign-in.
 
 **RunAsync**: Builds and runs the web server until it is stopped.
 

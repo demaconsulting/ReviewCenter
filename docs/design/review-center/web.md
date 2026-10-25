@@ -5,8 +5,9 @@
 ### Overview
 
 The `Web` subsystem is the Blazor Server user interface of ReviewCenter. It owns what a browser
-shows and how it responds to user actions. It contains nine units: `App`, the HTML shell, the URL router, and the
-page frame with the sign-in header; `HomePage`, the interactive landing page served at the root URL; `ProjectsPage`,
+shows and how it responds to user actions. It contains nine units: `App`, the HTML shell, the URL router, the
+page frame with the sign-in header, and the `SessionGate` that replaces an open page when its user is no longer
+signed in; `HomePage`, the interactive landing page served at the root URL; `ProjectsPage`,
 `ProjectPage`, `ReviewPage`, and `ChecklistPage`, the pages for projects, reviews, and review checklists; and
 `LoginPage`, `AccountPage`, and `UsersPage`, the pages for signing in, changing one's own password, and managing
 users. The subsystem
@@ -134,10 +135,33 @@ page frame (`MainLayout` in the `App` unit) shows the display name of the signed
 page and, for an administrator, the users page, and a logout button, or a link to the login page when nobody is signed
 in. The pages that record something on behalf of a person (`ReviewPage` and `ChecklistPage`) get the signed-in user
 from the authentication state and pass it to Core as an `Actor`; there is no field in which a person could type
-another name. A page that is already open keeps the authentication state it started with until it is reloaded.
-`UsersPage` therefore re-checks the stored user before every action, so a user who is no longer an enabled
-administrator is refused at once. Other open pages (`ReviewPage`, `ChecklistPage`) still act for the original user
-until reloaded, and what they record is attributed to that user (a known limitation).
+another name. A page that is already open makes no request, so the cookie check does not reach it; the
+`RevalidatingAuthenticationStateProvider` of the `Identity` subsystem re-reads the user at a fixed interval and ends the
+authentication state of the page when the user is no longer valid (see *Open pages and the end of a session* below).
+`UsersPage` also re-checks the stored user before every action, so a user who is no longer an enabled
+administrator is refused at once, and so does the signing of a review in Core. The other actions keep acting for the
+original user until the next check, which is at most one revalidation interval, and what they record is attributed to
+that user. Every action that changes something (creating a project or a review, starting, answering, resolving, and
+reopening a thread, answering checklist checks, changing reviewer slots, signing, changing a password, and the user
+administration actions) first asks `GetActorAsync` for the current user, even where its Core service takes no actor yet,
+so an action that meets an authentication state that has already ended is refused with a message and saves nothing.
+
+#### Open pages and the end of a session
+
+Each protected page opts in to interactive rendering on its own, so each page is a root component of its own live
+connection, while `App`, `Routes`, and `MainLayout` are served as static markup once. Neither the router nor the
+header can react when the authentication state of an open page ends; only a component inside the page can. The
+`SessionGate` component of the `App` unit therefore wraps the content of each of the six protected pages
+(`ProjectsPage`, `ProjectPage`, `ReviewPage`, `ChecklistPage`, `AccountPage`, `UsersPage`). While a user is signed in it
+adds no element, so the markup and the `data-interactive` marker of the page do not change. When the state becomes
+anonymous, it removes the page content, and with it every handler, and shows a "Session ended" message with a link to
+the login page that returns to the same page. `HomePage` and `LoginPage` are open to anonymous visitors, have no
+protected actions, and are not wrapped. A test renders every protected page signed out and fails for a page that
+lacks the gate.
+
+The header keeps showing the old name and the Logout button until the next navigation or reload, because the layout
+reads the state once. This is documented behavior, not a defect: the page body, which holds the data and the actions,
+is what ends.
 
 The pages enforce nothing that Core does not also enforce, with one exception: the file input of
 `ProjectPage` checks the upload limits (file count, size of each file, total size) from the
@@ -174,7 +198,9 @@ every interactive element.
 
 #### Limitations
 
-A circuit (the live connection of an open page) keeps the authentication state it started with until the page is
-reloaded; only the user administration actions of `UsersPage` are re-checked against the stored user. A password
-change does not end other sessions of the user. The lockout after failed sign-ins is per user
+An open page checks its user at an interval (`Auth:RevalidationSeconds`, 30 seconds by default), not continuously, so a
+user who is disabled, removed, or changed can keep an open page for up to one interval; signing and the user
+administration actions re-check the stored user on every action. A password change does not end other sessions of
+the user. A check that cannot read the user ends the page (fail closed), which loses what was typed on it. The header
+is not updated until the next navigation or reload. The lockout after failed sign-ins is per user
 name (see the `Identity` subsystem design).

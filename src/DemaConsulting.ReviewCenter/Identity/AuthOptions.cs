@@ -25,8 +25,8 @@ namespace DemaConsulting.ReviewCenter.Identity;
 /// </summary>
 /// <remarks>
 ///     The settings are bound by the options system, so they can come from <c>appsettings.json</c>
-///     or from environment variables such as <c>Auth__SessionHours</c>. The type is a plain settings
-///     holder and is not thread-safe while it is being bound.
+///     or from environment variables such as <c>Auth__SessionHours</c> and <c>Auth__RevalidationSeconds</c>.
+///     The type is a plain settings holder and is not thread-safe while it is being bound.
 /// </remarks>
 internal sealed class AuthOptions
 {
@@ -39,4 +39,22 @@ internal sealed class AuthOptions
     ///     Gets or sets how many hours a sign-in lasts without activity (a sliding window); must be greater than 0.
     /// </summary>
     public int SessionHours { get; set; } = 8;
+
+    /// <summary>
+    ///     The smallest accepted value of <see cref="RevalidationSeconds"/>.
+    /// </summary>
+    /// <remarks>
+    ///     A shorter interval would turn the re-check into constant database load for no practical gain.
+    /// </remarks>
+    public const int MinimumRevalidationSeconds = 5;
+
+    /// <summary>
+    ///     Gets or sets how many seconds pass between two checks of the signed-in user by an open page; must be
+    ///     at least <see cref="MinimumRevalidationSeconds"/>.
+    /// </summary>
+    /// <remarks>
+    ///     An open page cannot see changes made to the user after the page was loaded until the next check, so
+    ///     this is also the longest time a disabled, removed or changed user can keep an open page.
+    /// </remarks>
+    public int RevalidationSeconds { get; set; } = 30;
 }

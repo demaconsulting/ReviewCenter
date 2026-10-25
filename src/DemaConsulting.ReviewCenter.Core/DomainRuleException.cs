@@ -125,7 +125,7 @@ public enum DomainRule
     /// <summary>The slot has a signature and can no longer be changed or removed.</summary>
     SlotSigned,
 
-    /// <summary>The signed-in user is not allowed to make the change: the account is gone or disabled, or the user is not in the slot.</summary>
+    /// <summary>The signed-in user is not allowed to make the change: the account is gone or disabled, the user is not in the slot, or nobody is signed in any more.</summary>
     ActorNotAllowed,
 
     /// <summary>The review cannot be signed now: the slot is already signed, or the checklist or threads block it.</summary>

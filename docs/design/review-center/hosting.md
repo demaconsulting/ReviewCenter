@@ -118,7 +118,8 @@ database operation opens its own short-lived context from the factory. The regis
 
 The database is created right after the application is built, before the first request, so that a
 problem with the settings or the file system stops the start-up with one clear message rather than
-failing on the first page request. The sign-in settings (`Auth:SessionHours`) are validated at the same point, for the
+failing on the first page request. The sign-in settings (`Auth:SessionHours` and `Auth:RevalidationSeconds`) are
+validated at the same point, for the
 same reason: an invalid value stops the start-up with the message "Invalid sign-in settings: ...", instead of
 failing at the first sign-in.
 

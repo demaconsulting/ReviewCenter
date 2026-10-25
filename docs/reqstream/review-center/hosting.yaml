@@ -55,17 +55,21 @@ sections:
 
       - id: ReviewCenter-Hosting-Authentication
         title: >-
-          The Hosting subsystem shall set up cookie sign-in for the pages with a configurable session length,
+          The Hosting subsystem shall set up cookie sign-in for the pages with a configurable session length and
+          a configurable interval, with a minimum of 5 seconds, at which open pages re-check their user,
           requiring a signed-in user for every page except the home page and the login page, while the /health
           URL stays open to everyone.
         justification: |
           Review data must only be reached by identified users, but probes and the login page must work without
-          signing in. Closing every other page by default means a new page cannot be left open by mistake.
+          signing in. Closing every other page by default means a new page cannot be left open by mistake, and a
+          wrong interval must stop the server at start-up instead of loading the database or leaving open
+          pages unchecked.
         children:
           - ReviewCenter-ServerHost-Authentication
         tests:
           - HostingSubsystem_Startup_DatabaseConfigured_ServesStoredProjectsAfterRestart
           - ServerHost_CreateApplication_NonPositiveSessionHours_ThrowsClearError
+          - ServerHost_CreateApplication_RevalidationSecondsBelowMinimum_ThrowsClearError
 
       - id: ReviewCenter-Hosting-UserAdd
         title: >-

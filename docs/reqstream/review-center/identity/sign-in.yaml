@@ -93,20 +93,37 @@ sections:
 
       - id: ReviewCenter-SignIn-SessionValidation
         title: >-
-          The SignIn unit shall reject the session cookie of a user who was disabled or whose role changed after
-          the sign-in.
+          The SignIn unit shall consider a signed-in user valid only while that user exists, is enabled, and has
+          the same role and display name as at sign-in, using this one rule for every check, and shall reject the
+          session cookie of a user who is not valid.
         justification: |
-          Disabling a user or changing a role must take effect at once, not when the cookie runs out.
+          Disabling a user or changing a role must take effect at once, not when the cookie runs out. One rule for
+          the cookie and for open pages means a page that is already open cannot be treated more leniently than a
+          new request.
         tests:
           - SignIn_Session_UserDisabledAfterLogin_IsRejected
           - SignIn_Session_RoleChangedAfterLogin_IsRejected
+          - SignIn_IsCurrent_StoredUserVersusPrincipal_FollowsTheRule
+          - SignIn_IsCurrent_MissingPrincipalUserOrClaims_ReturnsFalse
+
+      - id: ReviewCenter-SignIn-RevalidationSetting
+        title: >-
+          The SignIn unit shall read the number of seconds between two checks of the signed-in user by an open
+          page from the Auth:RevalidationSeconds setting, with 30 seconds as the default.
+        justification: |
+          How long a disabled or changed user can keep an open page is the time between two checks. An operator
+          must be able to trade a shorter window against more reads of the user store, and the default must be
+          usable without any setting.
+        tests:
+          - AuthOptions_RevalidationSeconds_Default_IsThirtyWithMinimumFive
 
       - id: ReviewCenter-SignIn-Actor
         title: >-
           The SignIn unit shall provide the signed-in user as an actor, with user name and display name, and shall
-          fail when nobody is signed in.
+          refuse with a message that the user is no longer signed in, saving nothing, when nobody is signed in.
         justification: |
           The services that record who acted take the person from the sign-in, so nobody can act in the name of
-          somebody else.
+          somebody else. An open page can lose its user between two clicks, so the refusal must be a message the
+          page can show instead of a failure of the whole page.
         tests:
           - SignIn_GetActorAsync_SignedInAndAnonymous_ReturnsActorOrThrows

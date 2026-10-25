@@ -35,6 +35,11 @@ N/A - standard test environment (temporary SQLite databases are created by the t
   afterwards, both pages present it as In review and the review page shows the signature as out of date.
 - The `Web` subsystem's pages are presented to a signed-in user; the sign-in itself is verified in the `Identity`
   subsystem.
+- When the sign-in state of an open page ends, the page is replaced by the "Session ended" message and offers no
+  actions. This needs the live state of a page, which plain HTTP requests do not have, so it is verified at unit level
+  by the component tests of `SessionGate`, `ReviewPage`, and `UsersPage` (see the children of the requirement
+  `ReviewCenter-Web-SessionEnd` in `web.yaml`), together with the `Identity` subsystem test of the provider that ends
+  the state.
 - Every interactive element of every page has a `data-testid`.
 
 ### Test Scenarios

@@ -319,7 +319,11 @@ public partial class ReviewPage : ComponentBase
         Checklist = await ChecklistService.GetAsync(ProjectId, ReviewId);
         Approval = await SigningService.GetApprovalAsync(ProjectId, ReviewId);
         Candidates = await SigningService.ListCandidatesAsync();
-        CurrentUsername = (await AuthenticationState.GetActorAsync()).Username;
+
+        // Read the user name from the state, not from GetActorAsync: when the sign-in state of an open page has
+        // just ended, this reload must not fail; the page is replaced by the session-ended message instead
+        var principal = (await AuthenticationState.GetAuthenticationStateAsync()).User;
+        CurrentUsername = principal.Identity?.IsAuthenticated == true ? principal.Identity.Name ?? string.Empty : string.Empty;
     }
 
     /// <summary>
@@ -523,10 +527,16 @@ public partial class ReviewPage : ComponentBase
     /// </summary>
     /// <param name="thread">The thread as shown.</param>
     /// <returns>A task that completes when the state is stored or the problem is shown.</returns>
+    /// <remarks>
+    ///     Refused, with a message, when the sign-in state of the page has already ended. Resolving or reopening
+    ///     changes the approval state, so it must not run for a user who is no longer signed in.
+    /// </remarks>
     private async Task ToggleThreadAsync(ReviewThread thread)
     {
         try
         {
+            // The service takes no actor yet; asking for one refuses an ended sign-in state
+            _ = await AuthenticationState.GetActorAsync();
             if (thread.State == ReviewThreadState.Open)
             {
                 await ThreadService.ResolveAsync(ProjectId, ReviewId, thread.Id);

@@ -19,7 +19,9 @@
 // SOFTWARE.
 
 using DemaConsulting.ReviewCenter.Core;
+using DemaConsulting.ReviewCenter.Identity;
 using Microsoft.AspNetCore.Components;
+using Microsoft.AspNetCore.Components.Authorization;
 
 namespace DemaConsulting.ReviewCenter.Web;
 
@@ -45,6 +47,12 @@ public partial class ProjectsPage : ComponentBase
     /// </summary>
     [Inject]
     private ProjectService ProjectService { get; set; } = null!;
+
+    /// <summary>
+    ///     Gets or sets the authentication state of the current user, supplied by dependency injection.
+    /// </summary>
+    [Inject]
+    private AuthenticationStateProvider AuthenticationState { get; set; } = null!;
 
     /// <summary>
     ///     Gets the projects shown in the list.
@@ -108,12 +116,15 @@ public partial class ProjectsPage : ComponentBase
     /// <returns>A task that completes when the submission has been handled.</returns>
     /// <remarks>
     ///     On success the form is cleared and any earlier error is removed. On a rule violation the form
-    ///     keeps what was typed so that the operator can correct it, and the message is shown.
+    ///     keeps what was typed so that the operator can correct it, and the message is shown. The submission
+    ///     is refused, with a message, when the sign-in state of the page has already ended.
     /// </remarks>
     private async Task CreateProjectAsync()
     {
         try
         {
+            // The service takes no actor yet; asking for one refuses an ended sign-in state
+            _ = await AuthenticationState.GetActorAsync();
             await ProjectService.CreateAsync(NewName, NewDescription);
         }
         catch (DomainRuleException ex)

@@ -6,7 +6,10 @@
    AuthorizeRouteView applies the [Authorize] rules of a page also when the user navigates inside an open
    interactive circuit, where the endpoint check does not run (RouteView would ignore them). A signed-out
    user is pointed to the login page; a signed-in user without the needed role sees the same "Access denied"
-   explanation as the endpoint check gives. *@
+   explanation as the endpoint check gives.
+
+   In production this component is rendered statically, so it only decides for the first request of a page.
+   An open page whose user is disabled, removed or changed is handled by SessionGate inside the page. *@
 @using Microsoft.AspNetCore.Components.Authorization
 @inject NavigationManager Navigation
 <Router AppAssembly="typeof(Routes).Assembly">

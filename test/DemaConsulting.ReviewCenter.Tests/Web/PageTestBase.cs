@@ -25,8 +25,10 @@ using DemaConsulting.ReviewCenter.Identity;
 using DemaConsulting.ReviewCenter.Tests.Core;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Components.Authorization;
+using Microsoft.AspNetCore.Components.Server;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace DemaConsulting.ReviewCenter.Tests.Web;
 
@@ -44,6 +46,11 @@ public abstract class PageTestBase : BunitContext
     ///     The authentication state the pages read.
     /// </summary>
     private readonly TestAuthenticationStateProvider _authentication = new();
+
+    /// <summary>
+    ///     Whether <see cref="UseRevalidation"/> replaced the authentication state provider.
+    /// </summary>
+    private bool _revalidating;
 
     /// <summary>
     ///     Initializes a new instance of the <see cref="PageTestBase"/> class and registers the services.
@@ -118,6 +125,13 @@ public abstract class PageTestBase : BunitContext
     /// <param name="role">The role of the user.</param>
     protected void SignInAs(string username, string displayName, UserRole role = UserRole.Reviewer)
     {
+        if (_revalidating)
+        {
+            ((ServerAuthenticationStateProvider)Services.GetRequiredService<AuthenticationStateProvider>())
+                .SetAuthenticationState(Task.FromResult(Create(username, displayName, role)));
+            return;
+        }
+
         _authentication.Change(username, displayName, role);
     }
 
@@ -126,7 +140,59 @@ public abstract class PageTestBase : BunitContext
     /// </summary>
     protected void SignOut()
     {
+        if (_revalidating)
+        {
+            ((ServerAuthenticationStateProvider)Services.GetRequiredService<AuthenticationStateProvider>())
+                .SetAuthenticationState(Task.FromResult(new AuthenticationState(new ClaimsPrincipal(new ClaimsIdentity()))));
+            return;
+        }
+
         _authentication.SignOut();
+    }
+
+    /// <summary>
+    ///     Makes the pages see nobody signed in, without telling the components that listen: the short time in
+    ///     which an open page still shows its actions although the session has ended.
+    /// </summary>
+    protected void SignOutQuietly()
+    {
+        _authentication.SignOutQuietly();
+    }
+
+    /// <summary>
+    ///     Replaces the authentication state provider by the real <see cref="RevalidatingAuthenticationStateProvider"/>,
+    ///     so that the page ends its session when the user in the store is no longer valid.
+    /// </summary>
+    /// <param name="interval">The time between two checks; short so that a test does not have to wait long.</param>
+    /// <remarks>
+    ///     Call this before the first render and before <see cref="SignInAs"/>: nobody is signed in until then. The
+    ///     provider is created by the container, which also disposes it (and so stops its loop) with the context.
+    /// </remarks>
+    protected void UseRevalidation(TimeSpan interval)
+    {
+        Services.RemoveAll<AuthenticationStateProvider>();
+        Services.AddSingleton<AuthenticationStateProvider>(_ =>
+            new RevalidatingAuthenticationStateProvider(NullLoggerFactory.Instance, Users, interval));
+        _revalidating = true;
+    }
+
+    /// <summary>
+    ///     Builds the state of a signed-in user with the claims the application issues.
+    /// </summary>
+    /// <param name="username">The user name.</param>
+    /// <param name="displayName">The display name.</param>
+    /// <param name="role">The role of the user.</param>
+    /// <returns>The state.</returns>
+    private static AuthenticationState Create(string username, string displayName, UserRole role)
+    {
+        var identity = new ClaimsIdentity(
+            [
+                new Claim(ClaimTypes.Name, username),
+                new Claim(SignIn.DisplayNameClaimType, displayName),
+                new Claim(ClaimTypes.Role, role.ToString())
+            ],
+            "Test");
+        return new AuthenticationState(new ClaimsPrincipal(identity));
     }
 
     /// <summary>
@@ -146,15 +212,25 @@ public abstract class PageTestBase : BunitContext
         }
 
         /// <summary>
-        ///     Signs everybody out.
+        ///     Signs everybody out and tells the components that listen.
         /// </summary>
         public void SignOut()
+        {
+            _state = new AuthenticationState(new ClaimsPrincipal(new ClaimsIdentity()));
+            NotifyAuthenticationStateChanged(Task.FromResult(_state));
+        }
+
+        /// <summary>
+        ///     Signs everybody out without telling the components that listen, as in the short time before an
+        ///     open page learns that its session has ended.
+        /// </summary>
+        public void SignOutQuietly()
         {
             _state = new AuthenticationState(new ClaimsPrincipal(new ClaimsIdentity()));
         }
 
         /// <summary>
-        ///     Changes the signed-in user.
+        ///     Changes the signed-in user and tells the components that listen.
         /// </summary>
         /// <param name="username">The user name.</param>
         /// <param name="displayName">The display name.</param>
@@ -162,25 +238,7 @@ public abstract class PageTestBase : BunitContext
         public void Change(string username, string displayName, UserRole role)
         {
             _state = Create(username, displayName, role);
-        }
-
-        /// <summary>
-        ///     Builds the state of a signed-in user with the claims the application issues.
-        /// </summary>
-        /// <param name="username">The user name.</param>
-        /// <param name="displayName">The display name.</param>
-        /// <param name="role">The role of the user.</param>
-        /// <returns>The state.</returns>
-        private static AuthenticationState Create(string username, string displayName, UserRole role)
-        {
-            var identity = new ClaimsIdentity(
-                [
-                    new Claim(ClaimTypes.Name, username),
-                    new Claim(SignIn.DisplayNameClaimType, displayName),
-                    new Claim(ClaimTypes.Role, role.ToString())
-                ],
-                "Test");
-            return new AuthenticationState(new ClaimsPrincipal(identity));
+            NotifyAuthenticationStateChanged(Task.FromResult(_state));
         }
     }
 }

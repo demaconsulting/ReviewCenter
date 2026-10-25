@@ -12,13 +12,17 @@
    content fingerprint, record digest and per-file SHA-256 hashes are last, in a Details section that is collapsed. All file
    and comment text is rendered as plain text. Every interactive element and every key value carries a stable
    kebab-case data-testid (file rows carry the list index, line and thread elements the line number or thread
-   id), and the data-interactive marker on the root flips to "true" once the live circuit is connected. *@
+   id), and the data-interactive marker on the root flips to "true" once the live circuit is connected.
+
+   The page body is inside SessionGate, which replaces it with a "Session ended" message when the user is no longer
+   valid while the page is open. *@
 @page "/projects/{ProjectId:int}/reviews/{ReviewId}"
 @rendermode InteractiveServer
 @attribute [Authorize]
 
 <PageTitle>@(Review?.Id ?? "Review") - ReviewCenter</PageTitle>
 
+<SessionGate>
 <main class="page" data-testid="review-page" data-interactive="@InteractiveMarker">
     <nav class="breadcrumb">
         <a href="/" data-testid="home-link">ReviewCenter</a>
@@ -401,3 +405,4 @@
         </details>
     }
 </main>
+</SessionGate>

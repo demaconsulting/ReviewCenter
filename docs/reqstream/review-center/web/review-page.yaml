@@ -148,6 +148,7 @@ sections:
           - ReviewPage_StartThread_WholeFile_CreatesThreadAndClearsText
           - ReviewPage_StartThread_LineRangeAndSingleLine_AnchorLines
           - ReviewPage_StartThread_InvalidInput_ShowsErrorAndKeepsValues
+          - ReviewPage_StartThread_SessionEndedBeforePageKnows_ShowsClearErrorAndStoresNothing
           - ReviewPage_StartThread_BinaryFile_WholeFileAllowedAndRangeRefused
 
       - id: ReviewCenter-ReviewPage-ThreadShow

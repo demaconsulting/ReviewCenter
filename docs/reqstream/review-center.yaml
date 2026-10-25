@@ -344,19 +344,25 @@ sections:
         title: >-
           The tool shall let a user sign in at /login with the user name and password of a local account that is
           enabled, keep the user signed in with a session cookie for the configured number of hours, let the
-          user sign out, and answer every failed sign-in with the same message, so that it does not reveal
-          whether the account exists.
+          user sign out, answer every failed sign-in with the same message, so that it does not reveal whether
+          the account exists, and end the session, including every page that is open, when the account is
+          disabled, removed, or changed, within the configured number of seconds for an open page.
         tags: [system]
         justification: |
           Review actions are only trustworthy when they are attributable, which needs a verified identity. A
           local account with a password needs no external service, and one answer for every failure does not
-          help someone who is guessing user names.
+          help someone who is guessing user names. Disabling a user or changing a role must also stop a page that
+          the user already has open, not only the next request, so open pages re-check the user at a configurable
+          interval.
         children:
           - ReviewCenter-Identity-Login
           - ReviewCenter-Identity-Session
+          - ReviewCenter-Identity-CircuitSession
           - ReviewCenter-Web-SignIn
+          - ReviewCenter-Web-SessionEnd
         tests:
           - IdentitySubsystem_SignInJourney_LoginUseAndLogout_WorksEndToEnd
+          - IdentitySubsystem_Revalidation_UserDisabledAfterSignIn_OpenSessionIsNoLongerValid
 
       - id: ReviewCenter-System-Authorization
         title: >-

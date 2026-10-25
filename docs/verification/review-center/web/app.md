@@ -25,6 +25,11 @@ N/A - standard test environment.
 - The layout header shows the display name of the signed-in user with the links to the account page and the logout
   button, and the link to the users page only for an administrator; for nobody signed in it shows only the link to
   the login page.
+- The page frame component `SessionGate` shows its content while somebody is signed in, shows the "Session ended"
+  message with a link to the login page that returns to the page, and none of the content, when nobody is, and
+  replaces the content by the message when the sign-in state becomes anonymous while the page is open.
+- Every protected page (projects, project, review, checklist, account, and users) is wrapped in the gate, so none
+  shows data or actions to a user who is signed out.
 
 #### Test Scenarios
 
@@ -61,3 +66,20 @@ is tested by `MainLayout_Render_SignedInUser_ShowsNameAccountAndLogout`.
 **MainLayout_Render_NobodySignedIn_ShowsSignInLink**: `MainLayout` is rendered with nobody signed in; the header
 shows the sign-in link to `/login` and no user name and no logout button. This scenario is tested by
 `MainLayout_Render_NobodySignedIn_ShowsSignInLink`.
+
+**SessionGate_Render_SignedInUser_ShowsContent**: `SessionGate` is rendered around some content for a signed-in user;
+the content is shown and no session-ended message. This scenario is tested by
+`SessionGate_Render_SignedInUser_ShowsContent`.
+
+**SessionGate_Render_Anonymous_ShowsSessionEndedWithLoginLinkAndNoContent**: Nobody is signed in and the page is at
+`/projects/1`; the gate shows the "Session ended" heading and a login link that returns to `/projects/1`, and none of
+its content. This scenario is tested by `SessionGate_Render_Anonymous_ShowsSessionEndedWithLoginLinkAndNoContent`.
+
+**SessionGate_Render_StateBecomesAnonymous_ReplacesContentWithMessage**: A gate shows its content; the sign-in state
+then ends; the content is replaced by the message. This scenario is tested by
+`SessionGate_Render_StateBecomesAnonymous_ReplacesContentWithMessage`.
+
+**SessionGate_Render_EveryProtectedPageSignedOut_ShowsSessionEndedAndNoPage**: A theory over the projects, project,
+review, checklist, account, and users pages; each is rendered with nobody signed in, and each shows the message and
+not its own root element. This scenario is tested by
+`SessionGate_Render_EveryProtectedPageSignedOut_ShowsSessionEndedAndNoPage`.

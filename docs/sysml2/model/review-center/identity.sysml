@@ -1,6 +1,6 @@
 package ReviewCenter {
     part def IdentitySubsystem {
-        doc /* Local accounts and sign-in: password hashing, cookie authentication with a per-request check of the user, the login and logout endpoints, a safe return address, the role-based authorization of pages, and the signed-in user as the actor of review actions. */
+        doc /* Local accounts and sign-in: password hashing, cookie authentication with a per-request check of the user, the login and logout endpoints, a safe return address, the role-based authorization of pages, the periodic re-check of the user of every open page, and the signed-in user as the actor of review actions. */
 
         comment testRef /* Test: test/DemaConsulting.ReviewCenter.Tests/Identity/IdentitySubsystemTests.cs */
         comment designRef /* Design: docs/design/review-center/identity.md */
@@ -9,5 +9,6 @@ package ReviewCenter {
 
         part passwordHasher : PasswordHasher;
         part signIn : SignIn;
+        part revalidatingAuthenticationStateProvider : RevalidatingAuthenticationStateProvider;
     }
 }

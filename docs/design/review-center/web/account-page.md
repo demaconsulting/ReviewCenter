@@ -42,16 +42,19 @@ The user name comes from `SignIn.GetActorAsync`, and the change is made by `User
 
 **OnAfterRender**: Marks the page interactive after the first render on a live connection, as `HomePage` does.
 
-Other sessions of the user stay signed in after the change, and an open page keeps the authentication state it
-started with until it is reloaded (see the `Identity` design).
+Other sessions of the user stay signed in after the change. An open page of the user that was disabled, removed, or
+changed ends at the next revalidation of the open page (see the `Identity` design).
 
 #### Error Handling
 
-A `DomainRuleException` from `UserService` is caught and its message shown in the page; no other exception is handled
+A `DomainRuleException` from `UserService`, or from `GetActorAsync` when the sign-in state of the open page has already
+ended, is caught and its message shown in the page; no other exception is handled
 by the page. The new password inputs carry the maximum length as a convenience; the service remains the authority.
 
 #### Dependencies
 
+- **SessionGate** (App) — wraps the whole page content, so the page is replaced by a "Session ended" message when the
+  sign-in state of the open page ends.
 - **UserService** — changes the password.
 - **SignIn** — `GetActorAsync` supplies the user name from the authentication state.
 - **ASP.NET Core Blazor components** — the component base class, events, authorization attribute, and the interactive

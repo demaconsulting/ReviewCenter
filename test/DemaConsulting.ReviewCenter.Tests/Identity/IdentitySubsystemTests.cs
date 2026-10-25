@@ -19,7 +19,10 @@
 // SOFTWARE.
 
 using System.Net;
+using System.Security.Claims;
 using DemaConsulting.ReviewCenter.Core;
+using DemaConsulting.ReviewCenter.Identity;
+using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace DemaConsulting.ReviewCenter.Tests.Identity;
@@ -60,5 +63,40 @@ public class IdentitySubsystemTests
         var stored = await users.GetAsync("ann", TestContext.Current.CancellationToken);
         Assert.NotNull(stored);
         Assert.DoesNotContain(TestBrowser.Password, stored.PasswordHash, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    ///     Test that the sign-in state of an open page (a circuit) is checked against the real user store: the
+    ///     provider that a circuit resolves is ours (not the framework default), keeps a valid user, and ends
+    ///     the session of a user who was disabled after signing in.
+    /// </summary>
+    [Fact]
+    public async Task IdentitySubsystem_Revalidation_UserDisabledAfterSignIn_OpenSessionIsNoLongerValid()
+    {
+        // Arrange: the real pipeline with one user, and the provider of a new scope, as a circuit gets it
+        await using var app = await TestWebApp.StartAsync(new CapturingLoggerProvider(), "serve", "--silent");
+        var users = app.Services.GetRequiredService<UserService>();
+        await users.CreateAsync("ann", "Ann Example", UserRole.Reviewer, TestBrowser.Password, TestContext.Current.CancellationToken);
+        using var scope = app.Services.CreateScope();
+        var resolved = scope.ServiceProvider.GetRequiredService<AuthenticationStateProvider>();
+        var provider = Assert.IsType<RevalidatingAuthenticationStateProvider>(resolved);
+        var identity = new ClaimsIdentity(
+            [
+                new Claim(ClaimTypes.Name, "ann"),
+                new Claim(SignIn.DisplayNameClaimType, "Ann Example"),
+                new Claim(ClaimTypes.Role, nameof(UserRole.Reviewer))
+            ],
+            "Test");
+        provider.SetAuthenticationState(Task.FromResult(new AuthenticationState(new ClaimsPrincipal(identity))));
+
+        // Act: check while the user is valid, disable the user through the real service, and check again
+        var state = await provider.GetAuthenticationStateAsync();
+        var before = await provider.IsCurrentAsync(state, TestContext.Current.CancellationToken);
+        await users.SetEnabledAsync("ann", false, TestContext.Current.CancellationToken);
+        var after = await provider.IsCurrentAsync(state, TestContext.Current.CancellationToken);
+
+        // Assert: valid before, no longer valid after
+        Assert.True(before);
+        Assert.False(after);
     }
 }
