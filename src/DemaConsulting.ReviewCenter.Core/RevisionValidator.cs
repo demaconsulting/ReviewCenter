@@ -75,6 +75,7 @@ public static class RevisionValidator
             return false;
         }
 
+        // The first character must be a letter or digit, which also refuses the bare "@" (git's HEAD synonym).
         if (!char.IsAsciiLetterOrDigit(revision[0])
             || revision.Any(c => !char.IsAsciiLetterOrDigit(c) && "._/+@#-".IndexOf(c, StringComparison.Ordinal) < 0))
         {

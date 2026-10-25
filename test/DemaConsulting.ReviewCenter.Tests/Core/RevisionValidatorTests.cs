@@ -66,6 +66,8 @@ public class RevisionValidatorTests
     [InlineData("a..b")]
     [InlineData("a...b")]
     [InlineData("x@{1}")]
+    [InlineData("@")]
+    [InlineData("@{u}")]
     [InlineData("HEAD~1")]
     [InlineData("HEAD^")]
     [InlineData("v^")]
