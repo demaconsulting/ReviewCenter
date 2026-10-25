@@ -10,6 +10,8 @@ package ReviewCenter {
      * and draft reviews of uploaded files, which are stored in a database together
      * with a content fingerprint of each review. Every change is recorded in a
      * hash-chained audit trail that makes later edits of the history evident.
+     * Administrators register git repositories, with access tokens that are stored
+     * encrypted, as the sources of review content.
      */
 
     part def ReviewCenterSystem {
@@ -29,5 +31,6 @@ package ReviewCenter {
         part identity : IdentitySubsystem;
         part core : CoreSubsystem;
         part storage : StorageSubsystem;
+        part contentSources : ContentSourcesSubsystem;
     }
 }

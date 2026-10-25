@@ -4,9 +4,9 @@
 # PURPOSE:
 # - Define requirements for the ReviewCenter Core subsystem
 # - The Core subsystem spans the Fingerprint, ProjectService, ReviewService, ThreadService, ChecklistService,
-#   UserService, RecordDigest, and SigningService units, with the domain types they share (project, review, review
-#   file, thread, comment, checklist, user, role, actor, reviewer slot, signature, upload, limits, rule exception,
-#   and store interfaces)
+#   UserService, RecordDigest, SigningService, RepositoryService, SelectionMatcher, and RevisionValidator units, with
+#   the domain types they share (project, review, review file, thread, comment, checklist, user, role, actor, reviewer
+#   slot, signature, upload, limits, repository, rule exception, and store interfaces)
 # - Subsystem requirements describe the externally visible behavior of the domain model and its rules
 
 sections:
@@ -195,6 +195,45 @@ sections:
           - ReviewCenter-SigningService-Audit
           - ReviewCenter-UserService-Audit
           - ReviewCenter-UserService-SignInAudit
+          - ReviewCenter-RepositoryService-Audit
         tests:
           - AuditService_RecordAsync_Draft_StoresEntryThatVerifies
           - UserService_AdministrationEvents_AreRecordedWithoutPasswords
+
+      - id: ReviewCenter-Core-Repositories
+        title: >-
+          The Core subsystem shall keep a registry of git repositories, with a name, a location, an optional user name,
+          and an optional token that is stored only encrypted and is never given back, managed by administrators only,
+          disabled instead of deleted, and report each violation of its rules as a domain rule exception that names
+          the rule, without storing anything.
+        justification: |
+          The registry decides what source code the server reads and holds secrets for it. Its rules must hold
+          whichever user interface or store is used, and the token must stay write-only.
+        children:
+          - ReviewCenter-RepositoryService-Name
+          - ReviewCenter-RepositoryService-Location
+          - ReviewCenter-RepositoryService-Credentials
+          - ReviewCenter-RepositoryService-Token
+          - ReviewCenter-RepositoryService-Admin
+          - ReviewCenter-RepositoryService-Disable
+          - ReviewCenter-RepositoryService-Access
+        tests:
+          - CoreSubsystem_RuleViolation_IsReportedAsDomainRuleAndStoresNothing
+
+      - id: ReviewCenter-Core-FileSelection
+        title: >-
+          The Core subsystem shall check a revision given by a user, and match repository paths against include and
+          exclude selection patterns that support the common glob syntax, reporting an invalid revision or pattern
+          as a domain rule exception that names the rule.
+        justification: |
+          Revisions and patterns come from users and are passed on to git and to the file walk. Checking them in
+          one place keeps option-like text away from git and keeps a pattern from using unbounded resources.
+        children:
+          - ReviewCenter-RevisionValidator-Accept
+          - ReviewCenter-RevisionValidator-Refuse
+          - ReviewCenter-SelectionMatcher-Match
+          - ReviewCenter-SelectionMatcher-Parse
+          - ReviewCenter-SelectionMatcher-Bounded
+          - ReviewCenter-SelectionMatcher-Compatibility
+        tests:
+          - CoreSubsystem_RuleViolation_IsReportedAsDomainRuleAndStoresNothing

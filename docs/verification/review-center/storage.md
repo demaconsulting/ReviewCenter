@@ -3,9 +3,11 @@
 ### Verification Approach
 
 The `Storage` subsystem is verified by subsystem tests defined in `StorageSubsystemTests.cs`. The tests build the
-real `DatabaseSetup`, `ReviewCenterDbContext`, `ReviewStore`, and `UserStore` over a real SQLite database file, and
+real `DatabaseSetup`, `ReviewCenterDbContext`, `ReviewStore`, `UserStore`, and `RepositoryStore` over a real SQLite
+database file, and
 run the real
-`ProjectService`, `ReviewService`, `ThreadService`, `ChecklistService`, `UserService`, and `SigningService` of the `Core`
+`ProjectService`, `ReviewService`, `ThreadService`, `ChecklistService`, `UserService`, `SigningService`, and
+`RepositoryService` of the `Core`
 subsystem over
 them, so that
 the subsystem is
@@ -13,8 +15,9 @@ verified in the way
 the application uses it. Each test uses a new database file in a private temporary folder, supplied by the test
 helper `TestDatabase`. The units are verified in detail by their own unit tests, which also use real SQLite
 databases; no database substitute is used anywhere, because the behavior of the database (keys, constraints,
-ordering, and binary content) is part of what is verified. The only substitute is the fast test password hasher of
-the user scenario, because the strength of the real hasher is not what the subsystem proves.
+ordering, and binary content) is part of what is verified. The only substitutes are the fast test password hasher of
+the user scenario, because the strength of the real hasher is not what the subsystem proves, and a trivial token
+protector in the repository scenario, because the encryption is verified in the `ContentSources` subsystem.
 
 ### Test Environment
 
@@ -37,6 +40,8 @@ The native SQLite library must be loadable on the test platform (it is supplied 
   is closed and opened again, and the signature is still current, so the review is still approved.
 - A review for a project that does not exist is refused, by the services and by the database itself, and the stored
   data is unchanged.
+- A registered repository with its token flag and its disabled state, written through the service, is still present after
+  the database is closed and opened again, and a disabled repository is not offered for selection.
 - An unsupported provider is refused with an error that names it, and no database is created.
 - Every audited change is stored together with its audit entry; changes made at the same moment through different
   stores give one linear, intact chain, and the audit store offers no update or delete.
@@ -71,6 +76,12 @@ alternate reviewer signs it with the correct password; the database is closed an
 again: the review is approved, the single slot is signed by the alternate reviewer at the saved time, and the
 signature is current for the unchanged record. This scenario is tested by
 `StorageSubsystem_Signatures_PersistAcrossReopenAndStayCurrent`.
+
+**StorageSubsystem_Repositories_PersistAcrossReopen**: An administrator is created over a new database and a private
+repository with a user name and a token is registered through `RepositoryService`, then disabled; the database is
+closed and opened again. The repository is listed with its name, user name, the token flag set, and the disabled
+state, and no repository is offered for selection. This scenario is tested by
+`StorageSubsystem_Repositories_PersistAcrossReopen`.
 
 **StorageSubsystem_UnsupportedProvider_Opening_FailsWithClearErrorAndCreatesNothing**: A database is opened with
 the provider name `Oracle` and a new file path; an `InvalidOperationException` that names the provider is thrown

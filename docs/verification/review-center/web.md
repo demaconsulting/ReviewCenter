@@ -37,9 +37,10 @@ N/A - standard test environment (temporary SQLite databases are created by the t
   subsystem.
 - When the sign-in state of an open page ends, the page is replaced by the "Session ended" message and offers no
   actions. This needs the live state of a page, which plain HTTP requests do not have, so it is verified at unit level
-  by the component tests of `SessionGate`, `ReviewPage`, and `UsersPage` (see the children of the requirement
+  by the component tests of `SessionGate`, `ReviewPage`, `UsersPage`, and `RepositoriesPage` (see the children of the requirement
   `ReviewCenter-Web-SessionEnd` in `web.yaml`), together with the `Identity` subsystem test of the provider that ends
   the state.
+- A user with the Admin role who opens `/repositories` is shown the page of the registry; a reviewer is refused.
 - Every interactive element of every page has a `data-testid`.
 
 ### Test Scenarios
@@ -87,10 +88,17 @@ and the review page shows "Signature out of date". This scenario is tested by
 `WebSubsystem_SignedReview_ApprovalIsPresentedAndGoesOutOfDateWhenRecordChanges`.
 
 **WebSubsystem_AllPages_EveryInteractiveElementHasTestId**: A user with the Admin role is signed in, and every route
-(home, login, account, users, projects, a project, a missing project, a review, a missing review, a checklist) is
+(home, login, account, users, repositories, a project, a missing project, a review, a missing review, a checklist) is
 requested over the in-memory server; every link, button, visible input, select, and text area in each response has a
 `data-testid` in kebab-case. This scenario is tested by
 `WebSubsystem_AllPages_EveryInteractiveElementHasTestId`.
+
+**Repositories page**: The page of the repository registry is verified by its unit tests, which render it with the
+component test host. It lists repositories with the token state only and no delete control, which is tested by
+`RepositoriesPage_Render_Repositories_ShowsTokenStateOnlyAndNoDelete`, and it stores a token without ever showing it,
+which is tested by `RepositoriesPage_CreateForm_WithToken_StoresItWriteOnlyAndClearsFields`. A reviewer who requests the
+route is refused and an administrator receives the page, which is tested by
+`SignIn_RepositoriesPage_ReviewerAndAdmin_OnlyAdminIsAllowed` in the `Identity` subsystem tests.
 
 **Audit pages**: The history and audit pages are verified by their unit tests, which render them with the component
 test host. The history page shows only the entries of its review, newest first, which is tested by

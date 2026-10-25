@@ -1,0 +1,42 @@
+---
+# git OTS Software Requirements
+#
+# Requirements for the git program that the ContentSources subsystem runs to read source code from repositories.
+
+sections:
+  - title: OTS Software Requirements
+    sections:
+      - title: git Requirements
+        requirements:
+          - id: ReviewCenter-OTS-Git-Access
+            title: >-
+              git shall mirror a repository, resolve a revision to a commit, list the files of a commit and the
+              files that changed between two commits, and give the content of a file, when it is run as a child
+              process without a shell.
+            justification: |
+              The ContentSources subsystem reads source code through the git program installed on the server, so
+              that it behaves like the git the developers use and needs no git library. The service depends on git
+              to fetch into a bare mirror, to resolve branch, tag, and commit names, to compare commits with rename
+              detection, and to return the exact bytes of a file. Passing tests that run the real program against
+              real repositories confirm that it does so. The program is not distributed with the service; the
+              operator installs it.
+            tags: [ots]
+            tests:
+              - GitRunner_RunAsync_RealGit_ReturnsOutputAndExitCode
+              - GitSource_ResolveRevision_BranchTagAndId_ResolveAndBadOnesAreRefused
+              - GitSource_ListChanges_BetweenCommits_ListsChangesAndSkipsSpecialEntries
+              - GitSource_ListChanges_NoBaseline_ListsEveryFileAsAdded
+              - GitSource_ReadBlob_ReadsExactBytesAndEnforcesTheLimit
+          - id: ReviewCenter-OTS-Git-Credentials
+            title: >-
+              git shall send credentials that it is given in its process environment as an HTTP header to an https
+              server, without storing them in the repository or its configuration.
+            justification: |
+              Tokens must reach the server without appearing in a command line, a URL, or the mirror on disk. The
+              service depends on git reading its configuration from the environment of the process, so a token
+              exists only for the lifetime of the git process. Passing tests confirm that a server receives the
+              header and that the mirror never holds the token.
+            tags: [ots]
+            tests:
+              - GitRunner_RunCheckedAsync_RefusedCredentials_SendsHeaderAndHidesSecret
+              - GitSource_Mirror_NeverStoresTheToken

@@ -517,7 +517,84 @@ server writes an error message and exits with a non-zero exit code. Database mig
 release: the tables are created only when the database is new. **A database file created by an earlier build, before
 user accounts, reviewer signatures, or the audit trail existed, does not have the tables and columns that are
 needed, and the pages cannot work with it: delete the file (or point `Database:ConnectionString` at a new one) and
-start again, then create the first administrator.** Do this only with development data.
+start again, then create the first administrator.** Do this only with development data. The repository registry is
+another new table, so a development database created before it existed must be recreated in the same way.
+
+## Repositories and Credentials
+
+Administrators register the git repositories that reviews will be made from. This release provides the registry and the
+git access; creating a review from a repository follows in a later release, and reviews are still made from uploaded
+files.
+
+### Prerequisite
+
+ReviewCenter reads repositories with the installed `git` program, which must be on the `PATH` of the account that runs
+the server (git 2.31 or later). If git is missing or too old, an operation that needs it fails with a message that says
+so; the rest of the server works.
+
+### The Repositories Page (Administrators)
+
+An administrator sees a **Repositories** link in the page header, next to **Users** and **Audit**. It opens
+`/repositories`. Other users do not get the page.
+
+- **Add repository**: enter a name (letters, digits, dot, underscore, and hyphen, up to 40 characters, unique without
+  regard to case), a location, and for a private repository a user name and an access token. The location is an
+  `https://`, `http://`, or `file://` URL, or an absolute local path. A user name or token is accepted only with an
+  `https://` location, because the token must not travel in clear text.
+- **List**: shows each repository with its location, user name, enabled state, and "token set" or "no token". The
+  token itself is never shown.
+- **Edit**: change the name, location, or user name, and choose what happens to the token: keep the stored token,
+  replace it (type the new one), or clear it.
+- **Disable and enable**: a disabled repository cannot be read and is not offered to users. A repository cannot be
+  deleted.
+
+Every change is recorded in the audit trail without the token. Users who are not administrators are only offered the
+names of enabled repositories, never the location or the credentials.
+
+### How the Token Is Protected
+
+The token is encrypted with ASP.NET Core Data Protection before it is stored in the database, so a copy of the database
+alone does not expose it. The key ring that decrypts it is kept in a separate folder. When git runs, the token is passed
+only in the environment of the git process (never on the command line and never in a file), and the token and its
+encoded forms are removed from every error message and log line. Git never asks for a password interactively.
+
+- **Back up the key ring** (the `DataProtection:KeysPath` folder) separately from the database. If it is lost, the
+  stored tokens become unreadable, and an administrator must enter them again.
+- **The keys are not encrypted at rest.** On Linux the server creates the folder readable only by its own account;
+  keep it that way. Anyone who can read both the key folder and the database can read the tokens.
+- **The first start of this version signs every user out once**, because the cookie keys now persist in the key folder.
+- The server checks at start that the key folder can be written; if it cannot, it refuses to start and names the
+  folder.
+
+| Setting                   | Environment variable       | Meaning                                                 |
+| ------------------------- | -------------------------- | ------------------------------------------------------- |
+| `DataProtection:KeysPath` | `DataProtection__KeysPath` | Key ring folder (default `keys` beside the database)    |
+| `Git:CachePath`           | `Git__CachePath`           | Mirror folder (default `git-cache` beside the database) |
+| `Git:TimeoutSeconds`      | `Git__TimeoutSeconds`      | Time limit of every git call in seconds (default 120)   |
+
+### How Repositories Are Read
+
+ReviewCenter keeps a bare mirror of each repository in the cache folder (`repo-{id}`) and fetches before it reads. One
+operation at a time runs on a repository. A revision (a branch, a tag, or a commit) is validated before it reaches git:
+a revision that starts with `-` or contains a space or a control character is refused. A revision that git does not
+know gives a clear "unknown revision" message. The changed files between two revisions are listed with a rename counted
+as a delete and an add; without a baseline revision every file of the revision is listed. Symbolic links and submodules
+are skipped with a note, and the per-file and total size limits are the same as for an upload, checked before a file is
+read. A call that runs longer than `Git:TimeoutSeconds` is stopped together with its child processes.
+
+### Selecting Files
+
+The files of a review are chosen with patterns, one per line (up to 100 lines of up to 400 characters):
+
+- `*` matches any characters within one folder level, and `**` as a whole segment matches any number of folders.
+- `?` matches exactly one character.
+- A line that starts with `!` excludes; the last matching line decides, so a later include adds a path back.
+- A trailing `/` means everything below that folder. A leading `./` or `/` is dropped.
+- Matching is case-sensitive. A pattern with `\`, an empty segment, or a `.` or `..` segment is refused.
+
+These patterns work like the file lists of the ReviewMark tool with a few deliberate differences:
+matching is case-sensitive, `?` is a wildcard, `\` is not accepted, and an empty selection is an error instead of
+meaning all files.
 
 ## Self-Validation
 

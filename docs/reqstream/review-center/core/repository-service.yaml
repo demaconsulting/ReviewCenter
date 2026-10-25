@@ -1,0 +1,103 @@
+---
+# Software Unit Requirements for the RepositoryService Class
+#
+# The RepositoryService class keeps the global registry of git repositories that reviews can be created from, and the
+# access tokens of those repositories. It is administered by administrators only.
+
+sections:
+  - title: RepositoryService Unit Requirements
+    requirements:
+      - id: ReviewCenter-RepositoryService-Name
+        title: >-
+          The RepositoryService class shall register a repository under a name of 1 to 40 letters, digits, dots,
+          underscores, and dashes that starts with a letter or digit, refuse any other name, and refuse a second
+          repository whose name differs from an existing one only in letter case.
+        justification: |
+          The name is what users see and choose, so it must be short, plain, and unambiguous.
+        tests:
+          - RepositoryService_CreateAsync_InvalidName_ThrowsRepositoryNameInvalid
+          - RepositoryService_CreateAsync_NameLimitsAndDuplicate_AreEnforced
+
+      - id: ReviewCenter-RepositoryService-Location
+        title: >-
+          The RepositoryService class shall accept as the location of a repository an https, http, or file URL or an
+          absolute local path, and shall refuse an empty or too long location, a location that git could read as an
+          option or a helper, any other form (including ssh and git addresses), and a location that carries
+          credentials of its own.
+        justification: |
+          The location is handed to git and fetched by the server. Only the forms that the server can use safely are
+          allowed, and credentials belong in the token, where they are protected, not in the location, where they
+          would be shown.
+        tests:
+          - RepositoryService_CreateAsync_AllowedLocation_Registers
+          - RepositoryService_CreateAsync_AbsoluteLocalPath_Registers
+          - RepositoryService_CreateAsync_InvalidLocation_ThrowsRepositoryLocationInvalid
+
+      - id: ReviewCenter-RepositoryService-Credentials
+        title: >-
+          The RepositoryService class shall accept a user name and a token only for an https location, refuse a token
+          without a user name, and refuse a user name or token with characters or a length that is not allowed.
+        justification: |
+          A credential that cannot work, or that could change the meaning of a header, must be reported when it is
+          entered, not when a review is created.
+        tests:
+          - RepositoryService_CreateAsync_InvalidCredentials_ThrowsRepositoryCredentialInvalid
+
+      - id: ReviewCenter-RepositoryService-Token
+        title: >-
+          The RepositoryService class shall store a token only encrypted, let an update keep, replace, or clear it,
+          never give it back to a caller that shows or changes the registry, and never show it in the text form of
+          any value it hands out.
+        justification: |
+          The token is write-only: an administrator can set it, but nobody, including an administrator, can read it
+          back through the registry, so it cannot leak through a page or a log.
+        tests:
+          - RepositoryService_CreateAsync_WithToken_StoresItEncryptedAndWriteOnly
+          - RepositoryService_NoOpChanges_AreNotAudited
+          - RepositoryService_UpdateAsync_InvalidRequests_ThrowRules
+          - RepositoryService_TokenTypes_ToStringHidesToken
+
+      - id: ReviewCenter-RepositoryService-Admin
+        title: >-
+          The RepositoryService class shall let only an enabled administrator list the whole registry, register,
+          change, enable, and disable repositories, checking the acting user again on every call, and shall refuse
+          any other user, an unknown user, and a disabled user.
+        justification: |
+          The registry holds the locations and tokens through which the server reads source code, so changing it
+          is an administrator's duty. An open page keeps its state for a while after a user is demoted, so the check
+          is made again each time.
+        tests:
+          - RepositoryService_AdminOnly_RefusesOtherActors
+
+      - id: ReviewCenter-RepositoryService-Audit
+        title: >-
+          The RepositoryService class shall record the creation, the change, the disabling, and the enabling of a
+          repository in the audit trail with the names of the fields that changed, never with a token or other secret,
+          and shall record nothing for a request that changes nothing.
+        justification: |
+          Who made source code reachable through the server, and who changed that, must be traceable, but the audit
+          trail must never become a place where secrets are kept.
+        tests:
+          - RepositoryService_Changes_AreAuditedWithoutSecrets
+          - RepositoryService_NoOpChanges_AreNotAudited
+
+      - id: ReviewCenter-RepositoryService-Disable
+        title: >-
+          The RepositoryService class shall disable a repository instead of deleting it, offer ordinary users only
+          the name of the enabled repositories, and refuse access to a disabled repository.
+        justification: |
+          Reviews made from a repository keep their reference to it, so it is never deleted, and disabling it is how
+          an administrator stops its use.
+        tests:
+          - RepositoryService_DisabledRepository_IsNotSelectable
+
+      - id: ReviewCenter-RepositoryService-Access
+        title: >-
+          The RepositoryService class shall give the git layer the location, the user name, and the decrypted token
+          of an enabled repository, and shall report that the credentials cannot be read, without naming any secret,
+          when the stored token cannot be decrypted.
+        justification: |
+          The server must be able to use the token, and when the key ring was lost the administrator must be told to
+          enter the token again.
+        tests:
+          - RepositoryService_GetAccessAsync_UnreadableToken_ThrowsCredentialsUnreadable

@@ -219,6 +219,7 @@ public class SignInTests
     [InlineData("/projects/1/reviews/1/checklist")]
     [InlineData("/account")]
     [InlineData("/users")]
+    [InlineData("/repositories")]
     public async Task SignIn_ProtectedPage_Anonymous_RedirectsToLogin(string route)
     {
         // Arrange: an application and a visitor who is not signed in
@@ -270,6 +271,27 @@ public class SignInTests
         // Act: both request the page
         var forReviewer = await reviewer.Client.GetAsync("/users", TestContext.Current.CancellationToken);
         var forAdmin = await admin.Client.GetAsync("/users", TestContext.Current.CancellationToken);
+
+        // Assert: the reviewer is forbidden with an explanation, the administrator is served
+        Assert.Equal(HttpStatusCode.Forbidden, forReviewer.StatusCode);
+        Assert.Contains("Access denied", await forReviewer.Content.ReadAsStringAsync(TestContext.Current.CancellationToken), StringComparison.Ordinal);
+        Assert.Equal(HttpStatusCode.OK, forAdmin.StatusCode);
+    }
+
+    /// <summary>
+    ///     Test that the repository registry page is for administrators only.
+    /// </summary>
+    [Fact]
+    public async Task SignIn_RepositoriesPage_ReviewerAndAdmin_OnlyAdminIsAllowed()
+    {
+        // Arrange: an application with a reviewer and an administrator, each signed in
+        await using var app = await StartAsync();
+        using var reviewer = await TestBrowser.SignedInAsync(app, "rev");
+        using var admin = await TestBrowser.SignedInAsync(app, "adm", UserRole.Admin);
+
+        // Act: both request the page
+        var forReviewer = await reviewer.Client.GetAsync("/repositories", TestContext.Current.CancellationToken);
+        var forAdmin = await admin.Client.GetAsync("/repositories", TestContext.Current.CancellationToken);
 
         // Assert: the reviewer is forbidden with an explanation, the administrator is served
         Assert.Equal(HttpStatusCode.Forbidden, forReviewer.StatusCode);

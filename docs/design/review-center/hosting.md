@@ -46,9 +46,10 @@ documented with `ServerHost` as a supporting type, `UserCommand`, and `AuditComm
 
 - *Type*: In-process .NET static method.
 - *Role*: Provider.
-- *Contract*: Registers the database settings and context factory, the clock, the stores, the password hasher, and the
-  Core services in a service collection built from a configuration. It is shared by the server, `UserCommand`, and
-  `AuditCommand`.
+- *Contract*: Registers the database settings and context factory, the clock, the stores, the password hasher, the Core
+  services, and the git content source (its settings, the key ring of the Data Protection system, the token protector,
+  and the repository registry) in a service collection built from a configuration. It is shared by the server,
+  `UserCommand`, and `AuditCommand`.
 - *Constraints*: None.
 
 **UserCommand.Run**: Creates a user from the command line.
@@ -95,13 +96,28 @@ the server.
 - *Type*: In-process .NET types.
 - *Role*: Consumer.
 
-**Storage and Core (consumed)**: `DatabaseSetup`, `ReviewCenterDbContext`, `ReviewStore`, `UserStore`, `AuditStore`, and
-`AuditAppender` of the
+**Storage and Core (consumed)**: `DatabaseSetup`, `ReviewCenterDbContext`, `ReviewStore`, `UserStore`, `AuditStore`,
+`RepositoryStore`, and `AuditAppender` of the
 `Storage` subsystem, and `ProjectService`, `ReviewService`, `ThreadService`, `ChecklistService`, `UserService`,
-`SigningService`, `AuditService`, and the store and hasher interfaces of the `Core` subsystem.
+`SigningService`, `AuditService`, `RepositoryService`, and the store and hasher interfaces of the `Core` subsystem.
 
 - *Type*: In-process .NET types.
 - *Role*: Consumer.
+
+**ContentSources (consumed)**: `GitOptions`, `GitRunner`, `GitSource`, and `CredentialProtector` of the
+`ContentSources` subsystem.
+
+- *Type*: In-process .NET types.
+- *Role*: Consumer.
+
+**Data protection settings**: The `DataProtection` configuration section.
+
+- *Type*: Configuration (`appsettings.json` and environment variables).
+- *Role*: Consumer.
+- *Contract*: `KeysPath` is the folder of the key ring that protects the stored repository tokens (empty for a `keys`
+  folder beside the database). The `Git` section sets `CachePath` (empty for a `git-cache` folder beside the database)
+  and `TimeoutSeconds` (120 by default) of the git content source.
+- *Constraints*: The server refuses to start when the key ring folder cannot be written.
 
 ### Design
 
@@ -128,7 +144,9 @@ the Core hasher interface, and the seven Core services (`ProjectService`, `Revie
 `ChecklistService`, `UserService`, `SigningService`, and `AuditService`) as singletons shared by all browser
 connections. `AuditService` is created with a hook that writes a warning to the log when an event cannot be recorded
 (the failure is never shown to the user), and `UserService` receives it so that failed sign-ins and lockouts are
-recorded. The
+recorded. `RepositoryStore` (as the Core repository store interface), `CredentialProtector` (as the Core token
+protector), `RepositoryService`, `GitRunner`, and `GitSource` (as the Core git provider interface) are registered as
+singletons in the same way, together with the `Git` and `DataProtection` settings. The
 services hold no per-user state, and every
 database operation opens its own short-lived context from the factory. The registration is the public method
 `AddServices`, so that `UserCommand` and `AuditCommand` build exactly the same services.
@@ -139,6 +157,19 @@ failing on the first page request. The sign-in settings (`Auth:SessionHours` and
 validated at the same point, for the
 same reason: an invalid value stops the start-up with the message "Invalid sign-in settings: ...", instead of
 failing at the first sign-in.
+
+The key ring of the Data Protection system is persisted in a folder, because the stored repository tokens are
+encrypted with it: with the default in-memory or profile-bound key ring, a restart or a move to another account could
+leave every token unreadable. The folder is `DataProtection:KeysPath`, or a `keys` folder beside the database. Like the
+database, the folder is checked once at start-up (`ValidateDataProtection`), by writing and deleting a probe file and
+by encrypting and decrypting a test value, so that a folder that cannot be written stops the start-up with one clear message
+naming the setting. The check is part of `CreateApplication`, so it applies to the `serve` verb only; the command-line
+verbs register the same services but do not need the key ring unless a token is read. Three consequences are
+documented for the administrator (see the `ContentSources` design and the user guide): losing or replacing the key
+ring makes the stored tokens unreadable and they must be entered again; the keys are not encrypted at rest, so the
+folder must be protected with file permissions and backed up with the database; and persisting the key ring changes
+the keys of the sign-in cookies once, so users sign in again after the first start. The git cache folder is resolved
+the same way (`Git:CachePath`, or `git-cache` beside the database) and is created by the git source when first used.
 
 `UserCommand` does not start a server. It builds the configuration the same way (the same `appsettings.json` and
 environment), registers the services with `AddServices`, creates the database if needed, and calls

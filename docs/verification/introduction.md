@@ -43,6 +43,11 @@ This document covers the verification design for the following software items:
     - **UsersPage** — user administration page
     - **HistoryPage** — audit history of one review
     - **AuditPage** — whole audit trail and chain verification for administrators
+    - **RepositoriesPage** — git repository registry administration page
+  - **ContentSources** subsystem
+    - **GitRunner** — safe git child-process runner
+    - **GitSource** — git implementation of the repository provider
+    - **CredentialProtector** — token encryption through Data Protection
   - **Core** subsystem
     - **Fingerprint** — ReviewMark-compatible content fingerprint
     - **RecordDigest** — digest of a review record that a signature binds to
@@ -54,11 +59,15 @@ This document covers the verification design for the following software items:
     - **ChecklistService** — review checklist rules, default checklist, and progress
     - **UserService** — user, password, lockout, and last administrator rules
     - **SigningService** — reviewer slot, re-authenticated signature, and approval rules
+    - **SelectionMatcher** — include and exclude pattern matching for file selection
+    - **RevisionValidator** — git revision name validation
+    - **RepositoryService** — repository registry rules
   - **Storage** subsystem
     - **ReviewCenterDbContext** — database schema mapping
     - **ReviewStore** — database implementation of the store interface
     - **UserStore** — database implementation of the user store interface
     - **AuditStore** — database implementation of the audit store interface and the shared audit appender
+    - **RepositoryStore** — database implementation of the repository store interface
     - **DatabaseSetup** — provider selection, connection resolution, and database creation
   - **SelfTest** subsystem
     - **Validation** — self-validation test runner
@@ -100,14 +109,16 @@ The following topics are out of scope:
 ## Folder Layout
 
 The test folder structure mirrors the source subsystem breakdown. The Core subsystem has its own source project
-but its tests are in the main test project, in the `Core/` folder, next to the `Storage/`, `Identity/`, `Web/`, and
-`Hosting/` folders:
+but its tests are in the main test project, in the `Core/` folder, next to the `Storage/`, `ContentSources/`,
+`Identity/`, `Web/`,
+and `Hosting/` folders:
 
 ```text
 test/
 ├── DemaConsulting.ReviewCenter.Tests/         — unit, subsystem, and integration tests of ReviewCenter
 │   ├── Core/                                  — Core unit and subsystem tests
 │   ├── Storage/                               — Storage unit and subsystem tests
+│   ├── ContentSources/                        — ContentSources unit and subsystem tests
 │   ├── Identity/                              — Identity unit and subsystem tests
 │   ├── Web/                                   — Web unit and subsystem tests
 │   └── Hosting/                               — Hosting unit and subsystem tests

@@ -54,6 +54,13 @@
     <PackageReference Include="Microsoft.AspNetCore.TestHost" Version="10.0.13" />
   </ItemGroup>
 
+  <!-- Differential Test Dependency -->
+  <ItemGroup>
+    <!-- The globbing library that ReviewMark uses; only the tests reference it, to check that the file selection
+         matcher agrees with it for the syntax both support -->
+    <PackageReference Include="Microsoft.Extensions.FileSystemGlobbing" Version="10.0.13" />
+  </ItemGroup>
+
   <!-- Code Analysis Dependencies -->
   <ItemGroup>
     <!-- Analyzer packages use child-element form to configure both PrivateAssets and IncludeAssets:

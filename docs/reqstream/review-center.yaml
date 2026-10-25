@@ -515,3 +515,63 @@ sections:
         tests:
           - AuditCommand_Run_IntactTrail_ReportsEntryCountWithExitCodeZero
           - AuditPage_Verify_TamperedChain_ShowsFirstBadEntry
+
+      - id: ReviewCenter-System-GitRepositories
+        title: >-
+          The tool shall let administrators, and nobody else, register git repositories by name and location, with an
+          optional user name and token, change them, and disable and enable them, keep them across restarts, and
+          offer only the names of the enabled repositories to other users.
+        tags: [system]
+        justification: |
+          Reviews are made from source code in git repositories. The registry decides which repositories the server
+          may read, so administrators control it, and a repository is disabled, not deleted, so that the reviews
+          made from it keep their reference.
+        children:
+          - ReviewCenter-Core-Repositories
+          - ReviewCenter-Storage-Repositories
+          - ReviewCenter-Web-Repositories
+          - ReviewCenter-Hosting-RepositoryServices
+        tests:
+          - RepositoriesPage_CreateForm_WithToken_StoresItWriteOnlyAndClearsFields
+          - StorageSubsystem_Repositories_PersistAcrossReopen
+
+      - id: ReviewCenter-System-GitContent
+        title: >-
+          The tool shall read the source code of a registered repository through the git program installed on the
+          server, without a shell, keeping a bare mirror of each repository, check that a revision exists, list the
+          files of a revision and the files that changed against an earlier revision (a rename being a deletion and
+          an addition), skip symbolic links and submodules, enforce size limits, and report a missing git program, an
+          unknown revision, a failed authentication, and a timeout as clear errors.
+        tags: [system]
+        justification: |
+          Formal reviews compare file sets with earlier revisions. Using the installed git keeps the behavior the
+          same as the developers see, and running it without a shell, with limits, and with clear errors keeps a
+          hostile repository or a broken installation from harming the server or leaving the user guessing.
+        children:
+          - ReviewCenter-ContentSources-GitAccess
+          - ReviewCenter-ContentSources-Mirror
+          - ReviewCenter-ContentSources-Revisions
+          - ReviewCenter-ContentSources-Changes
+          - ReviewCenter-ContentSources-Content
+          - ReviewCenter-ContentSources-Errors
+          - ReviewCenter-ContentSources-DisabledRepository
+          - ReviewCenter-Core-FileSelection
+        tests:
+          - ContentSourcesSubsystem_RegisteredRepository_IsReadThroughTheRealGitSource
+          - ContentSourcesSubsystem_DisabledRepository_IsNotAvailableForReading
+
+      - id: ReviewCenter-System-Credentials
+        title: >-
+          The tool shall keep the access tokens of repositories only encrypted with a key ring that survives restarts,
+          hand a token to git only through the environment of the git process, never in its arguments, the logs, the
+          pages, or the audit trail, and refuse to start when the key ring cannot be saved.
+        tags: [system]
+        justification: |
+          A token gives access to source code. It must not be readable in a copy of the database, in a process list,
+          in a log, or on a page, and the keys must not be lost silently at a restart.
+        children:
+          - ReviewCenter-ContentSources-Credentials
+          - ReviewCenter-Hosting-KeyRingFailure
+        tests:
+          - CredentialProtector_ProtectUnprotect_RoundTripsAndHidesToken
+          - ServerHost_Restart_KeyRingPersisted_TokenStaysReadable

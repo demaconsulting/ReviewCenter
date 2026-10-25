@@ -65,6 +65,29 @@ public class DatabaseSetupTests
     }
 
     /// <summary>
+    ///     Test that the data directory is the folder of the configured database file, and the default folder when
+    ///     nothing usable is configured.
+    /// </summary>
+    [Fact]
+    public void DatabaseSetup_ResolveDataDirectory_Configured_IsFolderOfTheDatabaseFile()
+    {
+        // Arrange: a plain path, a full connection string, an empty value and an in-memory value
+        var folder = Path.Combine(Path.GetTempPath(), "rc-data-dir");
+        var plain = new DatabaseOptions { ConnectionString = Path.Combine(folder, "a.db") };
+        var full = new DatabaseOptions { ConnectionString = $"Data Source={Path.Combine(folder, "b.db")};Pooling=False" };
+        var empty = new DatabaseOptions { ConnectionString = string.Empty };
+        var memory = new DatabaseOptions { ConnectionString = "Data Source=:memory:" };
+        var defaultFolder = Path.GetDirectoryName(Path.GetFullPath(DatabaseSetup.GetDefaultDatabasePath()));
+
+        // Act and Assert: the folder of the file, or the default folder
+        Assert.Equal(folder, DatabaseSetup.ResolveDataDirectory(plain));
+        Assert.Equal(folder, DatabaseSetup.ResolveDataDirectory(full));
+        Assert.Equal(defaultFolder, DatabaseSetup.ResolveDataDirectory(empty));
+        Assert.Equal(defaultFolder, DatabaseSetup.ResolveDataDirectory(memory));
+        Assert.Throws<ArgumentNullException>(() => DatabaseSetup.ResolveDataDirectory(null!));
+    }
+
+    /// <summary>
     ///     Test that an empty connection string selects the default database file.
     /// </summary>
     [Fact]

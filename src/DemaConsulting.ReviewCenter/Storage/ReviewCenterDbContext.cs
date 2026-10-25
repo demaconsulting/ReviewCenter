@@ -24,7 +24,7 @@ using Microsoft.EntityFrameworkCore;
 namespace DemaConsulting.ReviewCenter.Storage;
 
 /// <summary>
-///     The Entity Framework Core model of the ReviewCenter database: users, projects, reviews, review files, the
+///     The Entity Framework Core model of the ReviewCenter database: users, the registry of git repositories, projects, reviews, review files, the
 ///     comment threads of a review with their comments, the review checklist (frozen snapshot, section
 ///     applicability and answers), and the reviewer slots with their signatures.
 /// </summary>
@@ -32,7 +32,7 @@ namespace DemaConsulting.ReviewCenter.Storage;
 ///     The model maps the Core entities as they are, so Core stays free of any database library.
 ///     The schema is created with <c>EnsureCreated</c> (see <see cref="DatabaseSetup"/>); there are no
 ///     migrations yet, so a database created before users, threads, checklists, slots or signatures existed does
-///     not gain their tables or columns and must be deleted and recreated. Instances are short-lived and not thread-safe: create one per operation
+///     not gain their tables or columns and must be deleted and recreated (this includes the repository registry). Instances are short-lived and not thread-safe: create one per operation
 ///     through <see cref="IDbContextFactory{TContext}"/>.
 /// </remarks>
 internal sealed class ReviewCenterDbContext : DbContext
@@ -61,6 +61,12 @@ internal sealed class ReviewCenterDbContext : DbContext
     ///     The width of the column that holds the meaning text of a signature.
     /// </summary>
     private const int SignatureMeaningColumnLength = 256;
+
+    /// <summary>
+    ///     The width of the column that holds an encrypted repository token; far wider than the encryption of a
+    ///     token of the longest allowed length.
+    /// </summary>
+    private const int EncryptedTokenColumnLength = 4000;
 
     /// <summary>
     ///     Initializes a new instance of the <see cref="ReviewCenterDbContext"/> class.
@@ -130,6 +136,11 @@ internal sealed class ReviewCenterDbContext : DbContext
     ///     Gets the table of audit entries.
     /// </summary>
     public DbSet<AuditEntry> AuditEntries => Set<AuditEntry>();
+
+    /// <summary>
+    ///     Gets the table of registered git repositories.
+    /// </summary>
+    public DbSet<RepositoryRecord> Repositories => Set<RepositoryRecord>();
 
     /// <summary>
     ///     Configures keys, relationships, length limits and conversions.
@@ -206,6 +217,20 @@ internal sealed class ReviewCenterDbContext : DbContext
             user.Property(u => u.DisplayName).IsRequired().HasMaxLength(ReviewLimits.MaxDisplayNameLength);
             user.Property(u => u.Role).HasConversion<string>().HasMaxLength(StateColumnLength);
             user.Property(u => u.PasswordHash).IsRequired();
+        });
+
+        // Repositories: identity assigned by the database; the name is unique without regard to case (NOCASE); the
+        // token is kept only in encrypted form
+        modelBuilder.Entity<RepositoryRecord>(repository =>
+        {
+            repository.ToTable("Repositories");
+            repository.HasKey(r => r.Id);
+            repository.Property(r => r.Name).IsRequired().HasMaxLength(RepositoryService.MaxNameLength)
+                .UseCollation("NOCASE");
+            repository.HasIndex(r => r.Name).IsUnique();
+            repository.Property(r => r.Location).IsRequired().HasMaxLength(RepositoryService.MaxLocationLength);
+            repository.Property(r => r.Username).HasMaxLength(RepositoryService.MaxUsernameLength);
+            repository.Property(r => r.EncryptedToken).HasMaxLength(EncryptedTokenColumnLength);
         });
 
         // Comments: identity assigned by the database, so it grows with posting order

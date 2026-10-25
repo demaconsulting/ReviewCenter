@@ -46,7 +46,8 @@ and adds the console provider only when the context is not silent; registers Bla
 components; registers the persistence and the Core services with `AddServices`; registers cookie sign-in, and with it
 the revalidating authentication state provider of open pages, with `SignIn.AddSignIn` (after the Razor components, so
 that its provider replaces the framework default); applies the options callback; loads static web assets
-when enabled; builds the application; calls `InitializeDatabase` and `ValidateAuthOptions`; adds authentication,
+when enabled; builds the application; calls `InitializeDatabase`, `ValidateAuthOptions`, and
+`ValidateDataProtection`; adds authentication,
 authorization, and request forgery protection, in that order, ahead of the endpoints they protect; maps static assets
 when enabled; maps `/health` to a plain-text 200 response; maps the login and logout endpoints with
 `SignIn.MapSignIn`; maps `App` with the interactive
@@ -61,12 +62,19 @@ server render mode; and registers the start-up log callback.
   `DatabaseSetup.Configure`, `TimeProvider.System`, one `AuditAppender`, `ReviewStore`, `UserStore`, and `AuditStore` as
   the Core store interfaces, `PasswordHasher` as the Core hasher interface, and `ProjectService`, `ReviewService`,
   `ThreadService`, `ChecklistService`, `UserService`, `SigningService`, and `AuditService` as singletons are registered.
-  `AuditService` gets a hook that logs a warning when an event cannot be recorded.
+  `AuditService` gets a hook that logs a warning when an event cannot be recorded. The `DataProtection` and `Git`
+  settings are bound (an empty `Git:CachePath` becomes a `git-cache` folder beside the database, through
+  `DatabaseSetup.ResolveDataDirectory`), the Data Protection system is registered with the application name
+  `DemaConsulting.ReviewCenter` and a file system key ring in the folder from `ResolveKeysPath`, and `RepositoryStore`,
+  `CredentialProtector`, `RepositoryService`, `GitRunner`, and `GitSource` are registered as singletons, the first
+  two and the last as the Core interfaces `IRepositoryStore`, `ICredentialProtector`, and `IGitRepositoryProvider`.
 
 The method is shared with `UserCommand` and `AuditCommand`, so that the command line works with exactly the services of
 the server. `UserService` must remain a single instance, because it serializes the changes to users in the process;
 `SigningService` must remain a single instance for the same reason, because it serializes the changes to reviewer
-slots and signatures with one gate. `AuditAppender` must remain a single instance, because its gate is what serializes
+slots and signatures with one gate. `RepositoryService` must remain a single instance for the same reason, because it
+serializes the changes to repositories. `AuditAppender` must remain a single instance, because its gate is what
+serializes
 every audited change of all stores in the process (the database write lock serializes other processes).
 
 **InitializeDatabase**: Creates the database for a built application.
@@ -95,6 +103,28 @@ The options are validated when they are first read, so reading them at start-up 
 session length that is not positive, or an interval for the re-check of open pages below 5 seconds) into one clear
 start-up message, which names the setting, rather than a failure at the first sign-in.
 
+**ResolveKeysPath**: Chooses the folder of the Data Protection key ring.
+
+- *Parameters*: `DataProtectionSettings settings` — holds `KeysPath`; `DatabaseOptions database` — locates the
+  database.
+- *Returns*: `string` — the configured `KeysPath` made absolute, or the `keys` folder in the folder of the database
+  file.
+- *Notes*: Internal, so that tests check the choice without starting the server.
+
+**ValidateDataProtection**: Checks the key ring folder of a built application once.
+
+- *Parameters*: `WebApplication app` — supplies the settings and the Data Protection provider.
+- *Returns*: `void`.
+- *Postconditions*: The folder exists (on a system other than Windows with the Unix mode that only the owner can use),
+  a probe file can be written and deleted in it, and a test value can be protected and unprotected; otherwise the
+  application is disposed and an `InvalidOperationException` is thrown whose message names the folder and says "Set
+  DataProtection:KeysPath to a folder the server can write to and keep."
+
+Runs after `ValidateAuthOptions` in `CreateApplication`, so it applies to the `serve` verb only. The folder, write, and
+round trip failures (I/O, access, cryptographic, domain rule, argument, and not-supported errors) all become that one
+message, so an administrator gets a clear start-up error instead of failing at the first token. The keys in the folder
+are not encrypted at rest.
+
 **RunAsync**: Builds and runs the web server until it is stopped.
 
 - *Parameters*: `Context context` — parsed context; `CancellationToken cancellationToken` —
@@ -122,7 +152,7 @@ caller has requested cancellation is treated as a normal stop and returns 0; an
 `InvalidOperationException` from building, which is how a database that cannot be prepared and invalid sign-in
 settings are reported, is
 written through `Context.WriteError` as is ("Failed to prepare the database: {detail}" or "Invalid sign-in
-settings: {detail}") and returns 1; and an
+settings: {detail}", or "The Data Protection key ring folder '{path}' is not writable: ...") and returns 1; and an
 `IOException`, which Kestrel uses to report an address that is in use or not bindable, is
 reported as "Failed to start the server on {url}: {detail}" through `Context.WriteError` and
 returns 1. Any other exception propagates to the caller (`Program.Main`). The application is
@@ -132,10 +162,12 @@ always disposed.
 
 - **Context** — supplies `Urls` and `Silent`, and receives start-up error reports.
 - **App** — the root component mapped as the user interface.
-- **DatabaseSetup**, **ReviewCenterDbContext**, **ReviewStore**, **UserStore**, **AuditStore**, **AuditAppender** — the
-  database configuration, context, and stores registered for the pages.
+- **DatabaseSetup**, **ReviewCenterDbContext**, **ReviewStore**, **UserStore**, **AuditStore**, **AuditAppender**,
+  **RepositoryStore** — the database configuration, context, and stores registered for the pages.
 - **ProjectService**, **ReviewService**, **ThreadService**, **ChecklistService**, **UserService**, **SigningService**,
-  **AuditService** — the Core services registered for the pages.
+  **AuditService**, **RepositoryService** — the Core services registered for the pages.
+- **GitOptions**, **GitRunner**, **GitSource**, **CredentialProtector** — the git content source and the token protector.
+- **ASP.NET Core Data Protection** — the key ring and the protection of tokens.
 - **PasswordHasher**, **SignIn** — the password hasher registered for the Core, and the cookie sign-in, authorization,
   and login and logout endpoints.
 - **ASP.NET Core shared framework** — `WebApplication`, Kestrel, endpoint routing, authentication, authorization,

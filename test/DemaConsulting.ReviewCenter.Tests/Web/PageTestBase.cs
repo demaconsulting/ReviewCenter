@@ -73,6 +73,9 @@ public abstract class PageTestBase : BunitContext
         Services.AddSingleton(Threads);
         Services.AddSingleton(Checklists);
         Services.AddSingleton(Users);
+        RepositoryStore = new FakeRepositoryStore();
+        Repositories = new RepositoryService(RepositoryStore, new FakeCredentialProtector(), Users, clock);
+        Services.AddSingleton(Repositories);
         Signing = new SigningService(store, Users, clock);
         Services.AddSingleton(Signing);
         Services.AddSingleton<AuthenticationStateProvider>(_authentication);
@@ -94,6 +97,11 @@ public abstract class PageTestBase : BunitContext
     ///     Gets the in-memory audit store behind the audit service, for arranging and tampering with entries.
     /// </summary>
     internal FakeAuditStore AuditStore { get; }
+
+    /// <summary>
+    ///     Gets the in-memory store behind the repository service, for arranging and inspecting registrations.
+    /// </summary>
+    internal FakeRepositoryStore RepositoryStore { get; }
 
     /// <summary>
     ///     Gets the audit service the pages use.
@@ -124,6 +132,11 @@ public abstract class PageTestBase : BunitContext
     ///     Gets the user service the pages use.
     /// </summary>
     protected UserService Users { get; }
+
+    /// <summary>
+    ///     Gets the repository service the pages use.
+    /// </summary>
+    protected RepositoryService Repositories { get; }
 
     /// <summary>
     ///     Gets the signing service the pages use.

@@ -1,0 +1,23 @@
+---
+# FileSystemGlobbing OTS Software Requirements
+#
+# Requirements for the Microsoft.Extensions.FileSystemGlobbing library, which the tests use as a reference for the
+# selection pattern matcher. The library is not part of the distributed tool.
+
+sections:
+  - title: OTS Software Requirements
+    sections:
+      - title: FileSystemGlobbing Requirements
+        requirements:
+          - id: ReviewCenter-OTS-FileSystemGlobbing-Reference
+            title: >-
+              Microsoft.Extensions.FileSystemGlobbing shall match paths against glob patterns for the common syntax,
+              so that it serves as an independent reference for the selection matcher of the tool.
+            justification: |
+              Users expect include and exclude patterns to behave as the glob patterns they know. The tests compare
+              the matcher of the tool with this widely used library on the common syntax, which finds a deviation
+              that tests written by the same author could miss. The library is used by the tests only and is not
+              part of the distributed tool.
+            tags: [ots]
+            tests:
+              - SelectionMatcher_IsMatch_CommonSyntax_AgreesWithFileSystemGlobbing

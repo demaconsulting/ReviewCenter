@@ -74,6 +74,9 @@ the short hash (8 hexadecimal characters) of the trimmed text (see `AuditChain`)
 | `user.role-changed` | `user 'bob': Reviewer -> Admin` |
 | `user.password-set-by-admin` | `user 'bob'` |
 | `user.password-changed` | `user 'bob'` (the actor is the user who changed their own password) |
+| `repository.created` | `repository 'name', location 'L', user name set` (or `none`), `token set` (or `none`) |
+| `repository.updated` | `repository 'name'`, a colon, then the changes, such as `location`, `token replaced` |
+| `repository.enabled`, `repository.disabled` | `repository 'name'` |
 | `auth.sign-in` | `signed in` |
 | `auth.sign-out` | `signed out` |
 | `auth.sign-in-failed` | `wrong password`, `account disabled`, or `unknown user` |

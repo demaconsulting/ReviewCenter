@@ -269,6 +269,15 @@ Verify button of the audit page reports the first broken entry of a tampered cha
 `AuditPage_Verify_TamperedChain_ShowsFirstBadEntry`. No test starts the tool as a process with the `audit verify`
 verb; the dispatch of `Program` to the command is verified by inspection and by the tests of the command.
 
+**Registered git repositories**: A private https repository and a local repository are registered through the
+repository service over a real database. The stored token text differs from the token, the access data holds the
+token, and the real git source resolves a branch and reads a changed file. This scenario is tested by
+`ContentSourcesSubsystem_RegisteredRepository_IsReadThroughTheRealGitSource`. In a second scenario a repository is
+disabled; it is no longer listed as enabled and its access data is refused. This scenario is tested by
+`ContentSourcesSubsystem_DisabledRepository_IsNotAvailableForReading`. A registration is kept after the database is
+reopened, which is tested by `StorageSubsystem_Repositories_PersistAcrossReopen`, and a token stays readable after a
+restart of the server, which is tested by `ServerHost_Restart_KeyRingPersisted_TokenStaysReadable`.
+
 **Persistence across restart**: A project is stored, the server is stopped and started again on the same
 database file, and a signed-in user sees the project on the projects page. This scenario is tested by
 `HostingSubsystem_Startup_DatabaseConfigured_ServesStoredProjectsAfterRestart`.

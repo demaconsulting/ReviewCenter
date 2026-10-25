@@ -1,0 +1,257 @@
+// Copyright (c) DEMA Consulting
+// 
+// Permission is hereby granted, free of charge, to any person obtaining a copy
+// of this software and associated documentation files (the "Software"), to deal
+// in the Software without restriction, including without limitation the rights
+// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the Software is
+// furnished to do so, subject to the following conditions:
+// 
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
+// 
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+// SOFTWARE.
+
+using DemaConsulting.ReviewCenter.Core;
+
+namespace DemaConsulting.ReviewCenter.Tests.Core;
+
+/// <summary>
+///     In-memory <see cref="IRepositoryStore"/> used to test <see cref="RepositoryService"/> without a database.
+/// </summary>
+/// <remarks>
+///     Like the real store it keeps names unique without regard to case, keeps the encrypted token apart from the
+///     <see cref="SourceRepository"/> read model and returns new objects on every read.
+/// </remarks>
+internal sealed class FakeRepositoryStore : IRepositoryStore
+{
+    /// <summary>
+    ///     The stored registrations with their encrypted tokens.
+    /// </summary>
+    private readonly List<(SourceRepository Repository, string? EncryptedToken)> _items = [];
+
+    /// <summary>
+    ///     Gets the audit drafts received so far, in the order the changes were made.
+    /// </summary>
+    public List<AuditDraft> Audits { get; } = [];
+
+    /// <summary>
+    ///     Reads the encrypted token as stored, for asserting that the plain token never reached the store.
+    /// </summary>
+    /// <param name="id">The repository identity.</param>
+    /// <returns>The stored text, or <c>null</c> when there is none.</returns>
+    public string? StoredToken(int id) => _items.First(item => item.Repository.Id == id).EncryptedToken;
+
+    /// <inheritdoc />
+    public Task<SourceRepository> AddAsync(
+        NewRepository repository,
+        Func<SourceRepository, AuditDraft> audit,
+        CancellationToken cancellationToken = default)
+    {
+        if (_items.Any(item => string.Equals(item.Repository.Name, repository.Name, StringComparison.OrdinalIgnoreCase)))
+        {
+            throw new DomainRuleException(DomainRule.RepositoryNameTaken, $"The repository name '{repository.Name}' is taken.");
+        }
+
+        var stored = new SourceRepository(
+            _items.Count + 1,
+            repository.Name,
+            repository.Location,
+            repository.Username,
+            repository.EncryptedToken is not null,
+            true,
+            repository.CreatedAt,
+            repository.CreatedAt);
+        _items.Add((stored, repository.EncryptedToken));
+        Audits.Add(audit(stored));
+        return Task.FromResult(stored);
+    }
+
+    /// <inheritdoc />
+    public Task<SourceRepository?> GetAsync(int id, CancellationToken cancellationToken = default)
+    {
+        var item = _items.FirstOrDefault(i => i.Repository.Id == id);
+        return Task.FromResult(item.Repository is null ? null : item.Repository with { });
+    }
+
+    /// <inheritdoc />
+    public Task<string?> GetEncryptedTokenAsync(int id, CancellationToken cancellationToken = default)
+    {
+        var item = _items.FirstOrDefault(i => i.Repository?.Id == id);
+        return Task.FromResult(item.EncryptedToken);
+    }
+
+    /// <inheritdoc />
+    public Task<IReadOnlyList<SourceRepository>> ListAsync(CancellationToken cancellationToken = default)
+    {
+        IReadOnlyList<SourceRepository> list = _items
+            .Select(item => item.Repository)
+            .OrderBy(r => r.Name, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        return Task.FromResult(list);
+    }
+
+    /// <inheritdoc />
+    public Task<SourceRepository> UpdateAsync(
+        int id,
+        RepositoryUpdate update,
+        AuditDraft audit,
+        CancellationToken cancellationToken = default)
+    {
+        var index = _items.FindIndex(i => i.Repository.Id == id);
+        if (index < 0)
+        {
+            throw new DomainRuleException(DomainRule.RepositoryNotFound, "The repository does not exist.");
+        }
+
+        if (_items.Any(i => i.Repository.Id != id
+            && string.Equals(i.Repository.Name, update.Name, StringComparison.OrdinalIgnoreCase)))
+        {
+            throw new DomainRuleException(DomainRule.RepositoryNameTaken, $"The repository name '{update.Name}' is taken.");
+        }
+
+        var (current, token) = _items[index];
+        token = update.Token.Action switch
+        {
+            TokenAction.Replace => update.Token.Token,
+            TokenAction.Clear => null,
+            _ => token
+        };
+        var stored = current with
+        {
+            Name = update.Name,
+            Location = update.Location,
+            Username = update.Username,
+            Enabled = update.Enabled,
+            HasToken = token is not null,
+            UpdatedAt = update.UpdatedAt
+        };
+        _items[index] = (stored, token);
+        Audits.Add(audit);
+        return Task.FromResult(stored);
+    }
+}
+
+/// <summary>
+///     A reversible <see cref="ICredentialProtector"/> for tests: not secure, but it never returns the plain text
+///     and can be told to fail like a lost key ring.
+/// </summary>
+internal sealed class FakeCredentialProtector : ICredentialProtector
+{
+    /// <summary>
+    ///     The prefix that marks a protected text.
+    /// </summary>
+    private const string Prefix = "protected:";
+
+    /// <summary>
+    ///     Gets or sets a value indicating whether <see cref="Unprotect"/> fails as if the key ring was lost.
+    /// </summary>
+    public bool Unreadable { get; set; }
+
+    /// <inheritdoc />
+    public string Protect(string plainText) => Prefix + Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(plainText));
+
+    /// <inheritdoc />
+    public string Unprotect(string protectedText)
+    {
+        if (Unreadable || !protectedText.StartsWith(Prefix, StringComparison.Ordinal))
+        {
+            throw new DomainRuleException(DomainRule.CredentialsUnreadable, "The token cannot be decrypted.");
+        }
+
+        return System.Text.Encoding.UTF8.GetString(Convert.FromBase64String(protectedText[Prefix.Length..]));
+    }
+}
+
+/// <summary>
+///     An in-memory <see cref="IGitRepositoryProvider"/> that serves scripted revisions, changes and blobs, so the
+///     Core and Web tests do not need git.
+/// </summary>
+internal sealed class FakeGitRepositoryProvider : IGitRepositoryProvider
+{
+    /// <summary>
+    ///     Gets the commit each known revision name resolves to.
+    /// </summary>
+    public Dictionary<string, string> Revisions { get; } = new(StringComparer.Ordinal);
+
+    /// <summary>
+    ///     Gets the scripted changes by baseline and head commit; the baseline is an empty text for none.
+    /// </summary>
+    public Dictionary<(string Baseline, string Head), GitChangeSet> Changes { get; } = [];
+
+    /// <summary>
+    ///     Gets the blob contents by blob identifier.
+    /// </summary>
+    public Dictionary<string, byte[]> Blobs { get; } = new(StringComparer.Ordinal);
+
+    /// <summary>
+    ///     Gets the access data of every <see cref="OpenAsync"/> call, in order.
+    /// </summary>
+    public List<RepositoryAccess> Opened { get; } = [];
+
+    /// <summary>
+    ///     Gets or sets the exception <see cref="OpenAsync"/> throws, or <c>null</c> to succeed.
+    /// </summary>
+    public Exception? OpenFailure { get; set; }
+
+    /// <inheritdoc />
+    public Task<IGitRepository> OpenAsync(RepositoryAccess access, CancellationToken cancellationToken = default)
+    {
+        Opened.Add(access);
+        if (OpenFailure is not null)
+        {
+            throw OpenFailure;
+        }
+
+        return Task.FromResult<IGitRepository>(new Session(this));
+    }
+
+    /// <summary>
+    ///     A session over the scripted data.
+    /// </summary>
+    /// <param name="owner">The provider that holds the data.</param>
+    private sealed class Session(FakeGitRepositoryProvider owner) : IGitRepository
+    {
+        /// <inheritdoc />
+        public Task<string> ResolveRevisionAsync(string revision, CancellationToken cancellationToken = default)
+        {
+            RevisionValidator.Validate(revision);
+            return owner.Revisions.TryGetValue(revision, out var sha)
+                ? Task.FromResult(sha)
+                : throw new DomainRuleException(DomainRule.RevisionNotFound, $"The revision '{revision}' was not found.");
+        }
+
+        /// <inheritdoc />
+        public Task<GitChangeSet> ListChangesAsync(
+            string? baselineSha,
+            string headSha,
+            CancellationToken cancellationToken = default)
+        {
+            return Task.FromResult(owner.Changes[(baselineSha ?? string.Empty, headSha)]);
+        }
+
+        /// <inheritdoc />
+        public Task<long> GetBlobSizeAsync(string blobSha, CancellationToken cancellationToken = default)
+        {
+            return Task.FromResult((long)owner.Blobs[blobSha].Length);
+        }
+
+        /// <inheritdoc />
+        public Task<byte[]> ReadBlobAsync(string blobSha, long maxBytes, CancellationToken cancellationToken = default)
+        {
+            var bytes = owner.Blobs[blobSha];
+            return bytes.Length > maxBytes
+                ? throw new DomainRuleException(DomainRule.GitAccessFailed, "The file is too large.")
+                : Task.FromResult(bytes);
+        }
+
+        /// <inheritdoc />
+        public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+    }
+}

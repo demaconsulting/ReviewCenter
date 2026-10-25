@@ -1,0 +1,399 @@
+// Copyright (c) DEMA Consulting
+// 
+// Permission is hereby granted, free of charge, to any person obtaining a copy
+// of this software and associated documentation files (the "Software"), to deal
+// in the Software without restriction, including without limitation the rights
+// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the Software is
+// furnished to do so, subject to the following conditions:
+// 
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
+// 
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+// SOFTWARE.
+
+using System.Diagnostics;
+using System.Net;
+using System.Net.Sockets;
+using System.Text;
+using DemaConsulting.ReviewCenter.ContentSources;
+using DemaConsulting.ReviewCenter.Core;
+
+namespace DemaConsulting.ReviewCenter.Tests.ContentSources;
+
+/// <summary>
+///     Tests for <see cref="GitRunner"/>: how git is started (no shell, curated environment, the token only in the
+///     environment), redaction, time limits and the clear errors for a missing or unusable git.
+/// </summary>
+public class GitRunnerTests
+{
+    /// <summary>
+    ///     A token used to check that it never leaks.
+    /// </summary>
+    private const string Secret = "tkn-S3cr3t.value";
+
+    /// <summary>
+    ///     A user name used with the token.
+    /// </summary>
+    private const string User = "svc-user";
+
+    /// <summary>
+    ///     Creates the options with a cache folder and a short time limit.
+    /// </summary>
+    /// <param name="cache">The cache folder.</param>
+    /// <param name="timeoutSeconds">The time limit.</param>
+    /// <returns>The options.</returns>
+    private static GitOptions Options(string cache, int timeoutSeconds = 30) =>
+        new() { CachePath = cache, TimeoutSeconds = timeoutSeconds };
+
+    /// <summary>
+    ///     Test that the argument list is used (no shell string), the credentials are not in the arguments and the
+    ///     token reaches git only through the environment of the child process.
+    /// </summary>
+    [Fact]
+    public void GitRunner_BuildStartInfo_TokenOnlyInEnvironment()
+    {
+        // Arrange: a runner and access with credentials
+        using var cache = new TempFolder();
+        var runner = new GitRunner(Options(cache.Path));
+        var access = new RepositoryAccess(1, "repo", "https://example.com/org/repo.git", User, Secret);
+        var base64 = Convert.ToBase64String(Encoding.UTF8.GetBytes($"{User}:{Secret}"));
+
+        // Act: build the process description of a fetch
+        var info = runner.BuildStartInfo(["fetch", "--prune", "origin"], access);
+
+        // Assert: no shell, no prompt, arguments in a list, and the secrets only in the environment
+        Assert.False(info.UseShellExecute);
+        Assert.Equal(string.Empty, info.Arguments);
+        var arguments = string.Join(' ', info.ArgumentList);
+        Assert.DoesNotContain(Secret, arguments, StringComparison.Ordinal);
+        Assert.DoesNotContain(base64, arguments, StringComparison.Ordinal);
+        Assert.DoesNotContain($"{User}:{Secret}", arguments, StringComparison.Ordinal);
+        Assert.Contains("fetch", info.ArgumentList);
+        Assert.Equal("0", info.Environment["GIT_TERMINAL_PROMPT"]);
+        Assert.Equal("1", info.Environment["GIT_CONFIG_COUNT"]);
+        Assert.Equal("http.https://example.com/org/repo.git.extraHeader", info.Environment["GIT_CONFIG_KEY_0"]);
+        Assert.Equal("Authorization: Basic " + base64, info.Environment["GIT_CONFIG_VALUE_0"]);
+        Assert.DoesNotContain(info.Environment, pair => pair.Key.StartsWith("GIT_CONFIG_KEY_", StringComparison.Ordinal) && pair.Value!.Contains(Secret, StringComparison.Ordinal));
+    }
+
+    /// <summary>
+    ///     Test that no credential variables are set for anonymous access and that the environment is curated: git
+    ///     cannot read the system or user configuration and no askpass program runs.
+    /// </summary>
+    [Fact]
+    public void GitRunner_BuildStartInfo_Anonymous_HasCuratedEnvironment()
+    {
+        // Arrange: a runner and anonymous access
+        using var cache = new TempFolder();
+        var runner = new GitRunner(Options(cache.Path));
+        var access = new RepositoryAccess(1, "repo", "https://example.com/org/repo.git", null, null);
+
+        // Act: build the process description
+        var info = runner.BuildStartInfo(["ls-remote", "origin"], access);
+
+        // Assert: no credentials, and the curated settings are present
+        Assert.False(info.Environment.ContainsKey("GIT_CONFIG_COUNT"));
+        Assert.DoesNotContain(info.Environment, pair => pair.Value?.Contains("Authorization", StringComparison.Ordinal) == true);
+        Assert.Equal("0", info.Environment["GIT_TERMINAL_PROMPT"]);
+        Assert.Equal("1", info.Environment["GIT_CONFIG_NOSYSTEM"]);
+        Assert.Equal(string.Empty, info.Environment["GIT_ASKPASS"]);
+        Assert.Equal("file:http:https", info.Environment["GIT_ALLOW_PROTOCOL"]);
+        Assert.StartsWith(Path.GetFullPath(cache.Path), info.Environment["HOME"], StringComparison.Ordinal);
+        Assert.Contains("-c", info.ArgumentList);
+        Assert.Contains("protocol.ext.allow=never", info.ArgumentList);
+        Assert.Contains("credential.helper=", info.ArgumentList);
+        Assert.DoesNotContain(info.Environment, pair => pair.Key.StartsWith("GIT_DIR", StringComparison.Ordinal));
+    }
+
+    /// <summary>
+    ///     Test that a secret is removed from text in every form git might print it: the token, the user and
+    ///     token, the base64 header value and the user information of a URL.
+    /// </summary>
+    /// <param name="text">The text git printed.</param>
+    [Theory]
+    [InlineData("fatal: bad token tkn-S3cr3t.value here")]
+    [InlineData("remote: svc-user:tkn-S3cr3t.value rejected")]
+    [InlineData("Authorization: Basic c3ZjLXVzZXI6dGtuLVMzY3IzdC52YWx1ZQ==")]
+    [InlineData("fatal: unable to access 'https://svc-user:tkn-S3cr3t.value@example.com/r.git/'")]
+    [InlineData("fatal: unable to access 'https://other:pw@example.com/r.git/'")]
+    public void GitRunner_Redact_RemovesEverySecretForm(string text)
+    {
+        // Arrange: nothing beyond the text
+
+        // Act: redact it
+        var redacted = GitRunner.Redact(text, User, Secret);
+
+        // Assert: no secret remains
+        Assert.DoesNotContain(Secret, redacted, StringComparison.Ordinal);
+        Assert.DoesNotContain("c3ZjLXVzZXI6dGtu", redacted, StringComparison.Ordinal);
+        Assert.DoesNotContain("pw@", redacted, StringComparison.Ordinal);
+        Assert.Contains("***", redacted, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    ///     Test that a URL-escaped token is redacted too, and that missing text or secrets are handled.
+    /// </summary>
+    [Fact]
+    public void GitRunner_Redact_EdgeCases()
+    {
+        // Arrange: a token with characters that a URL escapes
+        const string token = "a b/c+d";
+
+        // Act: redact the escaped and raw forms, null text and no credentials
+        var escaped = GitRunner.Redact($"url {Uri.EscapeDataString(token)} end", User, token);
+        var raw = GitRunner.Redact($"url {token} end", User, token);
+        var none = GitRunner.Redact(null, User, token);
+        var anonymous = GitRunner.Redact("plain text", null, null);
+
+        // Assert: secrets are masked, null becomes empty and plain text is untouched
+        Assert.DoesNotContain("a%20b", escaped, StringComparison.Ordinal);
+        Assert.DoesNotContain(token, raw, StringComparison.Ordinal);
+        Assert.Equal(string.Empty, none);
+        Assert.Equal("plain text", anonymous);
+    }
+
+    /// <summary>
+    ///     Test that failures are described without secrets and authentication failures get a clear message.
+    /// </summary>
+    [Fact]
+    public void GitRunner_FailureFor_DescribesFailuresClearly()
+    {
+        // Arrange: access and two failed results
+        var access = new RepositoryAccess(1, "my-repo", "https://example.com/r.git", User, Secret);
+        var denied = new GitResult(128, [], "fatal: Authentication failed for 'https://example.com/r.git/'");
+        var notFound = new GitResult(128, [], "fatal: repository 'https://example.com/r.git/' not found\nmore");
+        var empty = new GitResult(3, [], string.Empty);
+        var longText = new GitResult(1, [], new string('x', 1000));
+
+        // Act: describe them
+        var deniedError = GitRunner.FailureFor(denied, access);
+        var notFoundError = GitRunner.FailureFor(notFound, access);
+        var emptyError = GitRunner.FailureFor(empty, access);
+        var longError = GitRunner.FailureFor(longText, access);
+
+        // Assert: the repository is named, the first line is used and the length is limited
+        Assert.Equal(DomainRule.GitAccessFailed, deniedError.Rule);
+        Assert.Contains("'my-repo'", deniedError.Message, StringComparison.Ordinal);
+        Assert.Contains("denied", deniedError.Message, StringComparison.Ordinal);
+        Assert.Contains("not found", notFoundError.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("more", notFoundError.Message, StringComparison.Ordinal);
+        Assert.Contains("code 3", emptyError.Message, StringComparison.Ordinal);
+        Assert.True(longError.Message.Length < 400);
+    }
+
+    /// <summary>
+    ///     Test that a missing git executable gives the clear "git is not available" error.
+    /// </summary>
+    [Fact]
+    public async Task GitRunner_RunAsync_MissingGit_ThrowsGitUnavailable()
+    {
+        // Arrange: a runner that starts an executable that does not exist
+        using var cache = new TempFolder();
+        var runner = new GitRunner(Options(cache.Path), "rc-no-such-git-executable");
+
+        // Act: run any command
+        var exception = await Assert.ThrowsAsync<DomainRuleException>(
+            () => runner.RunAsync(["status"], null, 1024, TestContext.Current.CancellationToken));
+
+        // Assert: the rule is named and the message tells the administrator what to do
+        Assert.Equal(DomainRule.GitUnavailable, exception.Rule);
+        Assert.Contains("git", exception.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
+    ///     Test that a git older than the minimum version is refused as unavailable.
+    /// </summary>
+    [Fact]
+    public async Task GitRunner_RunAsync_OldGit_ThrowsGitUnavailable()
+    {
+        // Arrange: a fake git executable that reports an old version
+        using var cache = new TempFolder();
+        var script = OperatingSystem.IsWindows()
+            ? Path.Combine(cache.Path, "old-git.cmd")
+            : Path.Combine(cache.Path, "old-git.sh");
+        await File.WriteAllTextAsync(
+            script,
+            OperatingSystem.IsWindows() ? "@echo git version 2.30.0\r\n" : "#!/bin/sh\necho git version 2.30.0\n",
+            TestContext.Current.CancellationToken);
+        if (!OperatingSystem.IsWindows())
+        {
+            File.SetUnixFileMode(script, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+        }
+
+        var runner = new GitRunner(Options(cache.Path), script);
+
+        // Act: run any command
+        var exception = await Assert.ThrowsAsync<DomainRuleException>(
+            () => runner.RunAsync(["status"], null, 1024, TestContext.Current.CancellationToken));
+
+        // Assert: the rule is named
+        Assert.Equal(DomainRule.GitUnavailable, exception.Rule);
+    }
+
+    /// <summary>
+    ///     Test that a real git call returns its output and a failing call returns its exit code and error text.
+    /// </summary>
+    [Fact]
+    public async Task GitRunner_RunAsync_RealGit_ReturnsOutputAndExitCode()
+    {
+        // Arrange: a runner over the installed git
+        Assert.SkipWhen(!GitTestSupport.Available, GitTestSupport.MissingMessage);
+        using var cache = new TempFolder();
+        var runner = new GitRunner(Options(cache.Path));
+        var cancellationToken = TestContext.Current.CancellationToken;
+
+        // Act: ask for the version and run a command that fails
+        var version = await runner.RunAsync(["--version"], null, 1024, cancellationToken);
+        var failure = await runner.RunAsync(["rev-parse", "--git-dir", Path.Combine(cache.Path, "missing")], null, 1024, cancellationToken);
+
+        // Assert: output on success, a non-zero code and text on failure
+        Assert.Equal(0, version.ExitCode);
+        Assert.StartsWith("git version", Encoding.UTF8.GetString(version.Output), StringComparison.Ordinal);
+        Assert.NotEqual(0, failure.ExitCode);
+        Assert.NotEmpty(failure.Error);
+    }
+
+    /// <summary>
+    ///     Test that output beyond the cap stops the call with an error instead of filling memory.
+    /// </summary>
+    [Fact]
+    public async Task GitRunner_RunAsync_OutputOverCap_ThrowsGitAccessFailed()
+    {
+        // Arrange: a runner over the installed git and a cap smaller than its version text
+        Assert.SkipWhen(!GitTestSupport.Available, GitTestSupport.MissingMessage);
+        using var cache = new TempFolder();
+        var runner = new GitRunner(Options(cache.Path));
+
+        // Act: run a command whose output is larger than the cap
+        var exception = await Assert.ThrowsAsync<DomainRuleException>(
+            () => runner.RunAsync(["help", "-a"], null, 10, TestContext.Current.CancellationToken));
+
+        // Assert: the rule is named
+        Assert.Equal(DomainRule.GitAccessFailed, exception.Rule);
+    }
+
+    /// <summary>
+    ///     Test that a call that never finishes is stopped at the time limit with the timeout error.
+    /// </summary>
+    [Fact]
+    public async Task GitRunner_RunAsync_ServerThatNeverAnswers_ThrowsGitTimeoutAndStopsGit()
+    {
+        // Arrange: a server that accepts connections and never answers, and a one-second limit
+        Assert.SkipWhen(!GitTestSupport.Available, GitTestSupport.MissingMessage);
+        using var cache = new TempFolder();
+        using var listener = new TcpListener(IPAddress.Loopback, 0);
+        listener.Start();
+        var port = ((IPEndPoint)listener.LocalEndpoint).Port;
+        var accepted = new List<TcpClient>();
+        using var stop = new CancellationTokenSource();
+        var acceptLoop = Task.Run(
+            async () =>
+            {
+                try
+                {
+                    while (!stop.IsCancellationRequested)
+                    {
+                        accepted.Add(await listener.AcceptTcpClientAsync(stop.Token));
+                    }
+                }
+                catch (OperationCanceledException)
+                {
+                    // The test is over
+                }
+            },
+            CancellationToken.None);
+        var runner = new GitRunner(Options(cache.Path, 1));
+        var access = new RepositoryAccess(1, "slow", $"http://127.0.0.1:{port}/r.git", null, null);
+        var timer = Stopwatch.StartNew();
+
+        // Act: list the remote refs
+        var exception = await Assert.ThrowsAsync<DomainRuleException>(
+            () => runner.RunAsync(["ls-remote", access.Location], access, 1024, TestContext.Current.CancellationToken));
+        timer.Stop();
+        await stop.CancelAsync();
+        listener.Stop();
+        await acceptLoop;
+        foreach (var client in accepted)
+        {
+            client.Dispose();
+        }
+
+        // Assert: the timeout rule is named and the call ended soon after the limit
+        Assert.Equal(DomainRule.GitTimeout, exception.Rule);
+        Assert.True(timer.Elapsed < TimeSpan.FromSeconds(30), $"The call took {timer.Elapsed}.");
+    }
+
+    /// <summary>
+    ///     Test that git sends the token as a basic authorization header to the server, that the server's refusal
+    ///     is reported as a denied access, and that neither the token nor its encodings appear in the error.
+    /// </summary>
+    [Fact]
+    public async Task GitRunner_RunCheckedAsync_RefusedCredentials_SendsHeaderAndHidesSecret()
+    {
+        // Arrange: a server that records the request and answers 401, and access with credentials
+        Assert.SkipWhen(!GitTestSupport.Available, GitTestSupport.MissingMessage);
+        using var cache = new TempFolder();
+        using var listener = new TcpListener(IPAddress.Loopback, 0);
+        listener.Start();
+        var port = ((IPEndPoint)listener.LocalEndpoint).Port;
+        var requests = new List<string>();
+        using var stop = new CancellationTokenSource();
+        var serveLoop = Task.Run(
+            async () =>
+            {
+                try
+                {
+                    while (!stop.IsCancellationRequested)
+                    {
+                        using var client = await listener.AcceptTcpClientAsync(stop.Token);
+                        var stream = client.GetStream();
+                        var buffer = new byte[8192];
+                        var read = await stream.ReadAsync(buffer, stop.Token);
+                        lock (requests)
+                        {
+                            requests.Add(Encoding.ASCII.GetString(buffer, 0, read));
+                        }
+
+                        var response = "HTTP/1.1 401 Unauthorized\r\nWWW-Authenticate: Basic realm=\"test\"\r\nContent-Length: 0\r\nConnection: close\r\n\r\n";
+                        await stream.WriteAsync(Encoding.ASCII.GetBytes(response), stop.Token);
+                    }
+                }
+                catch (Exception ex) when (ex is OperationCanceledException or IOException or ObjectDisposedException or SocketException)
+                {
+                    // The test is over
+                }
+            },
+            CancellationToken.None);
+        var runner = new GitRunner(Options(cache.Path));
+        var location = $"http://127.0.0.1:{port}/org/r.git";
+        var access = new RepositoryAccess(1, "private", location, User, Secret);
+        var base64 = Convert.ToBase64String(Encoding.UTF8.GetBytes($"{User}:{Secret}"));
+
+        // Act: list the remote refs with the credentials
+        var exception = await Assert.ThrowsAsync<DomainRuleException>(
+            () => runner.RunCheckedAsync(["ls-remote", location], access, 1024, TestContext.Current.CancellationToken));
+        await stop.CancelAsync();
+        listener.Stop();
+        await serveLoop;
+
+        // Assert: git sent the header, the refusal is a denied access and no secret is in the message
+        string[] seen;
+        lock (requests)
+        {
+            seen = [.. requests];
+        }
+
+        Assert.Contains(seen, request => request.Contains("Authorization: Basic " + base64, StringComparison.OrdinalIgnoreCase));
+        Assert.Equal(DomainRule.GitAccessFailed, exception.Rule);
+        Assert.DoesNotContain(Secret, exception.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain(base64, exception.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain(Secret, exception.ToString(), StringComparison.Ordinal);
+    }
+}

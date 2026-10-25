@@ -1,0 +1,78 @@
+---
+# Software Unit Requirements for the GitRunner Class
+#
+# The GitRunner class runs the installed git program on behalf of the ContentSources subsystem: without a shell, with
+# a curated environment, with the token only in the environment of the child process, with a time limit and a cap on
+# the output, and with every secret removed from what comes back.
+
+sections:
+  - title: GitRunner Unit Requirements
+    requirements:
+      - id: ReviewCenter-GitRunner-NoShell
+        title: >-
+          The GitRunner class shall run git as a separate program with every argument passed on its own, never
+          through a shell, and with an environment that holds only what git needs, with prompts turned off and the
+          system and user configuration ignored, so that a call can neither ask for input nor pick up a helper, a
+          hook, or credentials from elsewhere.
+        justification: |
+          The locations, revisions, and names that reach git come from users. Passing them as separate arguments
+          keeps them from being read as shell syntax, and a curated environment keeps the result of a call the same
+          on every server and keeps a call from hanging on a prompt.
+        tests:
+          - GitRunner_BuildStartInfo_Anonymous_HasCuratedEnvironment
+          - GitRunner_RunAsync_RealGit_ReturnsOutputAndExitCode
+
+      - id: ReviewCenter-GitRunner-TokenEnvironment
+        title: >-
+          The GitRunner class shall pass an access token to git only in the environment of the child process,
+          never in an argument, a URL, a file, or a credential helper.
+        justification: |
+          The arguments of a process are visible to other processes of the server, and a URL is written to
+          configuration files and logs. The environment of the child process is the one place that is not.
+        tests:
+          - GitRunner_BuildStartInfo_TokenOnlyInEnvironment
+          - GitRunner_RunCheckedAsync_RefusedCredentials_SendsHeaderAndHidesSecret
+
+      - id: ReviewCenter-GitRunner-Redaction
+        title: >-
+          The GitRunner class shall remove every form of the token, of the encoded header that carries it, and of the
+          credentials of a URL from all text that comes back from git before the text can reach a message or a log.
+        justification: |
+          Git echoes URLs and sometimes headers in its error output. A secret that reaches a message is shown to
+          users and written to logs.
+        tests:
+          - GitRunner_Redact_RemovesEverySecretForm
+          - GitRunner_Redact_EdgeCases
+
+      - id: ReviewCenter-GitRunner-Timeout
+        title: >-
+          The GitRunner class shall stop a git call that does not finish within the configured time, together with
+          every process it started, and report a timeout.
+        justification: |
+          A server that never answers must not hold a request, or a lock on a repository, for ever, and a stopped
+          git must not leave helper processes running.
+        tests:
+          - GitRunner_RunAsync_ServerThatNeverAnswers_ThrowsGitTimeoutAndStopsGit
+
+      - id: ReviewCenter-GitRunner-OutputLimit
+        title: >-
+          The GitRunner class shall stop reading the output of a git call that exceeds the cap given for the call
+          and report an access failure.
+        justification: |
+          The output of git depends on a repository that other people control, so the memory a call may use must be
+          bounded.
+        tests:
+          - GitRunner_RunAsync_OutputOverCap_ThrowsGitAccessFailed
+
+      - id: ReviewCenter-GitRunner-Errors
+        title: >-
+          The GitRunner class shall report a clear error when git is not installed or is older than the supported
+          version, and shall describe a failed call, including refused credentials, without any secret.
+        justification: |
+          An operator must be able to tell a missing or old git from a wrong location or a refused token, and the
+          message must be safe to show to the user.
+        tests:
+          - GitRunner_RunAsync_MissingGit_ThrowsGitUnavailable
+          - GitRunner_RunAsync_OldGit_ThrowsGitUnavailable
+          - GitRunner_FailureFor_DescribesFailuresClearly
+          - GitRunner_RunCheckedAsync_RefusedCredentials_SendsHeaderAndHidesSecret

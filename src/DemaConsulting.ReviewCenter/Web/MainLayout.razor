@@ -1,7 +1,7 @@
 @* MainLayout: the frame around every page (part of the App unit).
 
    It is static server-side rendered markup, so it never needs a live connection. The header shows who is
-   signed in (display name, an Account link, Users and Audit links for administrators and a Logout button) or a Sign in
+   signed in (display name, an Account link, Users, Repositories and Audit links for administrators and a Logout button) or a Sign in
    link when nobody is. Logout is a form that posts to /auth/logout with an antiforgery token, because signing
    out changes state and must not be triggered by a plain link. *@
 @inherits LayoutComponentBase
@@ -18,6 +18,7 @@
         @if (IsAdmin)
         {
             <a href="/users" data-testid="users-link">Users</a>
+            <a href="/repositories" data-testid="repositories-link">Repositories</a>
             <a href="/audit" data-testid="audit-link">Audit</a>
         }
         <form method="post" action="/auth/logout">

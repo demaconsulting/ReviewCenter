@@ -19,9 +19,12 @@ checklist for each review, reviewer slots with re-authenticated signatures, and 
 comment, checklist answer, and signature is recorded under the signed-in user. Review states beyond Draft are still
 under development.
 
-> **Warning: databases created by an earlier build must be recreated.** The audit trail adds a table that an earlier
-> development database does not have, and the database is created by `EnsureCreated` without migrations. Delete the
-> old database file before starting this version (development databases only).
+> **Warning: databases created by an earlier build must be recreated.** The repository registry adds a table that an
+> earlier development database does not have, and the database is created by `EnsureCreated` without migrations. Delete
+> the old database file before starting this version (development databases only). The server also keeps a Data
+> Protection key ring in a `keys` folder beside the database (see
+> [Repositories and Credentials](#repositories-and-credentials)); starting this version once signs everybody out,
+> because the cookie keys now persist in that folder.
 
 ## Features
 
@@ -61,6 +64,14 @@ The current release provides:
   hashes; a History page for each review is open to every signed-in user, and administrators see the whole trail at
   `/audit` and can verify the chain there or with `reviewcenter audit verify` (see
   [Audit Trail](#audit-trail))
+- **Repositories and Credentials**: an administrator registers git repositories at `/repositories` (an https, http, or
+  file location or a local path, with an optional user name and access token for private repositories); the token is
+  encrypted before it is stored, is write-only in the page (only "token set" or "no token" is shown), and reaches git
+  only through the environment of the git process; a repository can be disabled and enabled but not deleted; ordinary
+  users can only see the names of enabled repositories. ReviewCenter reads repositories with the installed `git`
+  (on the `PATH`), into a bare mirror cache, and can validate a revision, list the files changed between two
+  revisions, and read a file with the same size limits as an upload; review creation from a repository follows in a
+  later release (see [Repositories and Credentials](#repositories-and-credentials))
 - **Persistent Storage**: users, projects, reviews, the uploaded file contents, the comment threads, the
   checklists, the reviewer slots and signatures, and the audit trail are kept in a SQLite database file
   (default `reviewcenter.db` in the per-user application data folder, see
@@ -307,6 +318,40 @@ review has been approved.
 Sign-in, sign-out, failed sign-in, and lockout entries are recorded on a best-effort basis in their own transaction;
 if that cannot be stored, the sign-in itself is not blocked, and the failure is logged.
 
+## Repositories and Credentials
+
+Administrators open **Repositories** in the page header (`/repositories`) to register the git repositories that reviews
+will be made from. A repository has a name (letters, digits, dot, underscore, and hyphen), a location (an `https://`,
+`http://`, or `file://` URL, or an absolute local path), and, for a private repository, a user name and an access token.
+A user name or token is accepted only with an `https://` location. A repository can be disabled and enabled again; it
+cannot be deleted, so that earlier work keeps its reference. A disabled repository cannot be read. Signed-in users who
+are not administrators can only be offered the names of enabled repositories, never the location or the credentials.
+
+The token is **write-only**: it is typed into a password field, encrypted with ASP.NET Core Data Protection, and never
+shown again. The list shows only "token set" or "no token". When you edit a repository you choose to keep, replace, or
+clear the token. At run time the token is passed to `git` only in the environment of the git process (never on the
+command line), and it is removed from every error message and log line. Git itself must be installed and on the `PATH`
+(version 2.31 or later). If git is missing, too old, cannot sign in, does not know a revision, or takes too long, the
+error message says so.
+
+Repositories are read into a bare mirror under the git cache folder, one folder for each repository, and one operation
+at a time runs on a repository. Revisions are validated before they reach git (for example `--upload-pack=x`, `-x`, or
+a name with a space is refused). The files of a review are chosen with patterns, one per line, as in the
+[ReviewMark][link-reviewmark] file lists: `*` stays in one folder, `**` spans folders, `!` excludes, and `?` matches one
+character. Matching is case-sensitive.
+
+| Setting                   | Environment variable       | Meaning                                                 |
+| ------------------------- | -------------------------- | ------------------------------------------------------- |
+| `DataProtection:KeysPath` | `DataProtection__KeysPath` | Key ring folder (default `keys` beside the database)    |
+| `Git:CachePath`           | `Git__CachePath`           | Mirror folder (default `git-cache` beside the database) |
+| `Git:TimeoutSeconds`      | `Git__TimeoutSeconds`      | Time limit of every git call in seconds (default 120)   |
+
+> **Warning: back up the key ring, and protect it.** The tokens are only as safe as the key ring folder. The keys are
+> **not** encrypted at rest, so on Linux protect the folder with file permissions (the server creates it readable only
+> by its own account) and keep it out of the database backup. If the key ring is lost, every stored token becomes
+> unreadable and an administrator must enter the tokens again. The server checks at start that the folder can be
+> written and refuses to start with a clear message if it cannot.
+
 ## Data Location and Database Settings
 
 ReviewCenter keeps its data in one SQLite database file, which is created (with its folder and tables) on first
@@ -365,6 +410,9 @@ non-zero exit code.
 - **Comments are not live**: comments posted by other people appear when you reload the page or take an action on it.
 - **Upload limits**: at most 200 files per review, 2 MiB per file, and 20 MiB per review. Only the file name of each
   uploaded file is kept, so two files with the same name cannot be in one review.
+- **Repositories are not used by reviews yet**: this release registers repositories and reads them through git, but
+  reviews are still made from uploaded files. There is no Linux or Windows secret store for the key ring, no
+  credential helper or SSH key support, and no repository deletion.
 - **No database migrations**: the database tables are created when the database file is new; a later release that
   changes the tables will need a migration step. A database file created by an earlier version, before users,
   comments, checklists, reviewer signatures, or the audit trail existed, does not have the tables or columns that are
@@ -442,6 +490,7 @@ Generated documentation includes:
 
 Planned but not yet implemented:
 
+- Creating reviews from a repository revision and its changed files
 - The remaining review features of the ReviewCenter web service: review states beyond Draft
 - External anchoring, export, and retention of the audit trail
 - Password reset, multi-factor sign-in, and external identity providers

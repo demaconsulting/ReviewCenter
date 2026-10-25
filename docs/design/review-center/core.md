@@ -10,20 +10,25 @@ that protect them, the content fingerprint that identifies a review's files and 
 hash-chained audit trail of everything that happens. It
 is
 deliberately free of web and database technology so that the rules can be reviewed and tested on their own. It
-contains ten units: `Fingerprint`, the content fingerprint algorithm; `RecordDigest`, the digest of a review
+contains thirteen units: `Fingerprint`, the content fingerprint algorithm; `RecordDigest`, the digest of a review
 record that a signature binds to; `AuditChain`, the audit entry types, their hash, and the verifier of the chain;
 `AuditService`, the recording, reading, and verification of the audit trail; `ProjectService`, the rules
 for projects; `ReviewService`, the rules for reviews; `ThreadService`, the rules for review comments;
-`ChecklistService`, the rules for the review checklist; `UserService`, the rules for users; and `SigningService`, the
-rules for reviewer slots and signatures. The
+`ChecklistService`, the rules for the review checklist; `UserService`, the rules for users; `SigningService`, the
+rules for reviewer slots and signatures; `RepositoryService`, the registry of git repositories that reviews can be
+created from, with their credentials; `SelectionMatcher`, the file pattern language that selects the files of a
+repository; and `RevisionValidator`, the check that a revision name cannot be taken for an option or an expression. The
 domain types (`Project`, `Review`, `ReviewFile`, `ReviewState`, `UploadedFile`, `ReviewThread`, `ReviewComment`,
 `ReviewThreadState`, the checklist types, `User`, `UserRole`, `Actor`, the signing types `ReviewerSlot`,
-`ReviewSignature`, `SlotRole`, `ReviewRecord`, and `ReviewApproval`, and the audit types `AuditEntry`, `AuditDraft`,
-and `AuditVerificationResult`), the text and line definition
+`ReviewSignature`, `SlotRole`, `ReviewRecord`, and `ReviewApproval`, the audit types `AuditEntry`, `AuditDraft`,
+and `AuditVerificationResult`, and the repository types `SourceRepository`, `RepositorySummary`, `NewRepository`,
+`RepositoryUpdate`, `TokenChange`, and `TokenAction`, and the git contract types `RepositoryAccess`, `GitChange`,
+`ChangeKind`, `SkippedEntry`, and `GitChangeSet`), the text and line definition
 (`FileText`), the limits
 (`ReviewLimits`), the rule failure type
 (`DomainRuleException` with the `DomainRule` enumeration), and the interfaces (`IReviewStore`, `IUserStore`,
-`IAuditStore`, and `IPasswordHasher`) are
+`IAuditStore`, `IRepositoryStore`, `ICredentialProtector`, `IGitRepositoryProvider`, `IGitRepository`, and
+`IPasswordHasher`) are
 supporting types, documented with the unit that owns them.
 
 ### Interfaces
@@ -95,6 +100,54 @@ used by the `Web` and `Identity` subsystems and by the `Hosting` subsystem.
 - *Contract*: Hash a password and verify a password against a hash.
 - *Constraints*: The hash is not reversible and contains its own salt.
 
+**RepositoryService**: The operations used by the `Web` subsystem to administer the registry of git repositories, and
+by the `Hosting` subsystem to hand a registered repository to the git source.
+
+- *Type*: In-process .NET class.
+- *Role*: Provider.
+- *Contract*: An administrator registers a repository (name, location, optional user name and token), changes its
+  name, location, user name, or token, and enables or disables it; administrators list all repositories; any
+  signed-in user lists the enabled ones by name. Every change takes the `Actor`, checks again that the actor is an
+  enabled administrator, and is recorded in the audit trail without any secret. The access data needed to read a
+  repository, including the decrypted token, is available only inside the assembly.
+- *Constraints*: The token is write-only: no operation returns it, and the read model has no member for it.
+
+**IRepositoryStore**: The store interface the subsystem requires for registered repositories.
+
+- *Type*: In-process .NET interface.
+- *Role*: Consumer (implemented by `RepositoryStore` in the `Storage` subsystem).
+- *Contract*: Add a repository, read one, list all, read the encrypted token of one, and update one with a token
+  action (keep, replace, or clear). Every change takes an `AuditDraft` (or a function that builds one from the stored
+  entity) that the store appends to the audit trail in the same transaction.
+- *Constraints*: A name that exists, without regard to case, fails with a `DomainRuleException` for
+  `RepositoryNameTaken`. The store sees only encrypted token text.
+
+**ICredentialProtector**: The token protection interface the subsystem requires.
+
+- *Type*: In-process .NET interface.
+- *Role*: Consumer (implemented by `CredentialProtector` in the `ContentSources` subsystem).
+- *Contract*: Protect a token into text that is safe to store and unprotect that text again.
+- *Constraints*: Text that cannot be decrypted fails with a `DomainRuleException` for `CredentialsUnreadable`.
+
+**IGitRepositoryProvider and IGitRepository**: The git access interfaces the subsystem defines.
+
+- *Type*: In-process .NET interfaces.
+- *Role*: Consumer (implemented by `GitSource` in the `ContentSources` subsystem).
+- *Contract*: Open a registered repository from a `RepositoryAccess` to get a session; the session resolves a revision
+  name to a commit id, lists the files that changed between two commits (or all files when there is no baseline),
+  reads the size of a blob, and reads a blob with a byte limit. Disposing the session releases the repository.
+- *Constraints*: A session never exposes the token, and only commit and blob ids that are valid hexadecimal object
+  names are accepted.
+
+**SelectionMatcher and RevisionValidator**: Pure functions for the file patterns and the revision names that the
+review creation of a later slice uses.
+
+- *Type*: In-process static .NET classes.
+- *Role*: Provider.
+- *Contract*: Parse the text of a file selection into patterns and decide whether a path is selected; check a revision
+  name.
+- *Constraints*: Invalid input fails with a `DomainRuleException` for `SelectionInvalid` or `RevisionInvalid`.
+
 **ReviewLimits**: The limits of the system as constants (see the `ProjectService` and `UserService` units).
 
 - *Type*: In-process .NET constants.
@@ -161,6 +214,19 @@ message and keep the entered values, and there is a single, easily tested path f
 | `SigningNotAllowed` | The slot is already signed for this record, or a blocker remains (checks, failures, threads) |
 | `ReauthenticationFailed` | The password given with a signature is wrong, or the user is locked out |
 | `RecordChanged` | The record changed after the signer saw it, so the digest differs |
+| `RepositoryNameInvalid` | The name is not 1 to 40 of letters, digits, `.`, `_`, `-`, starting with a letter or digit |
+| `RepositoryNameTaken` | A repository with that name (without regard to case) exists |
+| `RepositoryLocationInvalid` | The location is empty, too long, or not an `https`, `http`, or `file` URL or path |
+| `RepositoryCredentialInvalid` | A user name or token is given for a location that is not `https`, or is invalid |
+| `RepositoryNotFound` | A change or an access names a repository that does not exist |
+| `RepositoryDisabled` | A disabled repository is opened for reading |
+| `RevisionInvalid` | A revision name has a form that could be an option or an expression (see RevisionValidator) |
+| `RevisionNotFound` | The revision does not exist in the repository |
+| `SelectionInvalid` | The file selection is empty, has too many or too long lines, or has a pattern that is refused |
+| `GitUnavailable` | The server cannot run git, or the installed git is too old |
+| `GitAccessFailed` | Git cannot read the repository (denied, missing, over a size limit, or another failure) |
+| `GitTimeout` | A git operation did not finish within the configured time and was stopped |
+| `CredentialsUnreadable` | A stored token cannot be decrypted, for example after the key ring changed |
 
 The checklist of a review is the copy of the default checklist that the review received when it was created, so
 changing the default never changes an existing review (see `ChecklistService`). The name saved with an answer or
@@ -184,3 +250,13 @@ best-effort basis. The chain detects an edit, a deletion, an insertion, or a reo
 history. It does not detect the removal of the newest entries, or a complete rewrite by someone with write access to
 the database, unless the head hash was recorded elsewhere, and this version has no external anchoring. See the
 `AuditChain` and `AuditService` units for the encoding, the verification, the action codes, and the known limitations.
+
+The registry of git repositories is a fourth kind of record, and the first that does not describe a review. A
+repository is registered by an administrator with a location and, for a private `https` repository, a user name and an
+access token. The token is secret, so the subsystem treats it differently from every other field: `RepositoryService`
+encrypts it through `ICredentialProtector` before it reaches the store, the read model has no member that could carry
+it, and only an internal operation of the service decrypts it, at the moment a repository is opened. Its audit entry
+says only whether a token is set or was replaced or cleared. The reading of the repository itself is behind the
+`IGitRepositoryProvider` contract, implemented in the `ContentSources` subsystem, so the rules stay free of processes
+and of the file system. Repositories are never deleted, only disabled, so the name of a repository that reviews were
+created from stays meaningful.

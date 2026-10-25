@@ -240,8 +240,12 @@ It is a minimal helper and is kept as small and simple as possible; see
 18. **Database migrations deferred**: no EF migrations for now; the schema is created directly. There will be an
     explicit `migrate` CLI verb later. Tests run on SQLite only. Reason: the product is pre-release, so there is no
     deployed data to upgrade.
-19. **Git credentials**: configured per project in the UI and encrypted at rest with ASP.NET Data Protection, with the
-    key ring stored outside the DB. Reason: a database leak alone must not expose repository credentials.
+19. **Git credentials**: kept in an admin-only repository registry (a repository has a location and an optional user
+    name and token; projects pick a registered repository), encrypted at rest with ASP.NET Data Protection, with the
+    key ring stored outside the DB. The token is write-only in the UI and reaches git only through the environment of
+    the git child process. The key ring is not encrypted at rest, so its folder must be protected by file permissions,
+    and losing it makes the stored tokens unreadable. Reason: a database leak alone must not expose repository
+    credentials.
 20. **Hosting**: single instance behind a reverse proxy that terminates TLS. Re-authentication is application-level,
     so the proxy does not affect it. Forwarded headers must be configured so redirect URLs and cookies use the public
     HTTPS origin. Database backups are the operator's responsibility. Logging is structured only. Reason: this
@@ -278,8 +282,13 @@ The architecture above is the target design. Only the first two slices are imple
 - **Temporary limitation**: there is no authentication; the server has a single anonymous operator. Identity (decisions
   on roles and sign-off) comes in a later slice, and the server must only be exposed on `localhost` or a trusted
   network until then.
-- **Planned and deferred**: Api, Identity, ContentSources, Evidence, Messaging, the review lifecycle beyond `Draft`,
-  and the rest of Core and Storage (checklists, reviewers, audit trail). They have no code, requirements,
+- **Implemented, slice 7a-1 (git content source)**: the repository registry (`RepositoryService`, admin-only
+  `/repositories` page, write-only encrypted tokens, disable and enable only), the file selection patterns
+  (`SelectionMatcher`), revision validation (`RevisionValidator`), and the ContentSources subsystem (`GitRunner`,
+  `GitSource`, `CredentialProtector`), which reads repositories through the installed git into bare mirrors. Reviews do
+  not use it yet. The Data Protection key ring and the git cache are kept beside the database by default.
+- **Planned and deferred**: Api, Evidence, Messaging, the review lifecycle beyond `Draft`, creating reviews from a
+  repository, and the rest of Core and Storage. They have no code, requirements,
   design documents, or verification documents yet, so the SysML2 model and the design documentation describe the
   implemented items only and are deliberately partial.
 - **Pipeline**: the CI/release pipeline builds net10.0 only and publishes the self-contained win-x64 and linux-x64

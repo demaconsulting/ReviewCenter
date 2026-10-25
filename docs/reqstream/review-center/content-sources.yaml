@@ -1,0 +1,118 @@
+---
+# ContentSources Subsystem Requirements
+#
+# PURPOSE:
+# - Define requirements for the ReviewCenter ContentSources subsystem
+# - The ContentSources subsystem spans the GitRunner, GitSource, and CredentialProtector units: it reads the content
+#   of registered git repositories through the installed git program and keeps the access tokens encrypted
+# - Subsystem requirements describe the externally visible behavior of reading a repository; the subsystem tests
+#   run the real git program against a temporary repository
+
+sections:
+  - title: ContentSources Subsystem Requirements
+    requirements:
+      - id: ReviewCenter-ContentSources-GitAccess
+        title: >-
+          The ContentSources subsystem shall read a registered repository through the installed git program, run
+          without a shell, in a curated environment, with a time limit on every call that stops git and everything
+          it started, and with a limit on the output it accepts.
+        justification: |
+          Locations and revisions come from users and repositories are controlled by other people. Running git in a
+          controlled way, with bounds on time and size, keeps a hostile or broken repository from running code,
+          hanging a request, or exhausting the memory of the server.
+        children:
+          - ReviewCenter-GitRunner-NoShell
+          - ReviewCenter-GitRunner-Timeout
+          - ReviewCenter-GitRunner-OutputLimit
+        tests:
+          - ContentSourcesSubsystem_RegisteredRepository_IsReadThroughTheRealGitSource
+
+      - id: ReviewCenter-ContentSources-Mirror
+        title: >-
+          The ContentSources subsystem shall keep one local bare mirror per registered repository that is current each
+          time the repository is opened, and shall let only one session at a time use the mirror of a repository.
+        justification: |
+          Reading from a local mirror is fast and works the same for every kind of location, and following the
+          remote means a review always sees the current state. One session at a time keeps a fetch from changing the
+          mirror under a reader.
+        children:
+          - ReviewCenter-GitSource-Mirror
+          - ReviewCenter-GitSource-Serialization
+        tests:
+          - ContentSourcesSubsystem_RegisteredRepository_IsReadThroughTheRealGitSource
+
+      - id: ReviewCenter-ContentSources-Revisions
+        title: >-
+          The ContentSources subsystem shall resolve a branch, a tag, or a commit identifier of a repository to a
+          commit, and refuse a revision that does not exist.
+        justification: |
+          A review is made of exact commits, and the user must be told when the name they gave matches nothing.
+        children:
+          - ReviewCenter-GitSource-Revision
+        tests:
+          - ContentSourcesSubsystem_RegisteredRepository_IsReadThroughTheRealGitSource
+
+      - id: ReviewCenter-ContentSources-Changes
+        title: >-
+          The ContentSources subsystem shall list the files that changed between a baseline and a head commit, or all
+          files of the head commit when there is no baseline, report a rename as a deletion and an addition, and
+          leave out symbolic links and submodules.
+        justification: |
+          A review covers what changed, or the whole head. Only plain files can be reviewed byte for byte.
+        children:
+          - ReviewCenter-GitSource-Changes
+          - ReviewCenter-GitSource-SpecialEntries
+        tests:
+          - ContentSourcesSubsystem_RegisteredRepository_IsReadThroughTheRealGitSource
+
+      - id: ReviewCenter-ContentSources-Content
+        title: >-
+          The ContentSources subsystem shall read the content of a file of a commit as exactly the bytes the
+          repository stores, and shall refuse a file larger than the limit of the caller.
+        justification: |
+          The fingerprint of a review is calculated over the bytes, so they must not be converted, and the size limit
+          protects the server.
+        children:
+          - ReviewCenter-GitSource-Content
+        tests:
+          - ContentSourcesSubsystem_RegisteredRepository_IsReadThroughTheRealGitSource
+
+      - id: ReviewCenter-ContentSources-Credentials
+        title: >-
+          The ContentSources subsystem shall keep the access token of a repository encrypted, readable again after a
+          restart with the same key ring, report credentials that cannot be read instead of using a wrong value, give
+          the token to git only through the environment of the child process, and remove every form of the token from
+          the messages and the log.
+        justification: |
+          A token is a secret that grants access to source code. It must not be readable in a copy of the database, in
+          the process list, in the cache folder, or in any message, while the server must still be able to use it.
+        children:
+          - ReviewCenter-CredentialProtector-Encrypt
+          - ReviewCenter-CredentialProtector-Persistence
+          - ReviewCenter-CredentialProtector-Unreadable
+          - ReviewCenter-CredentialProtector-Isolation
+          - ReviewCenter-GitRunner-TokenEnvironment
+          - ReviewCenter-GitRunner-Redaction
+        tests:
+          - ContentSourcesSubsystem_RegisteredRepository_IsReadThroughTheRealGitSource
+
+      - id: ReviewCenter-ContentSources-Errors
+        title: >-
+          The ContentSources subsystem shall report a clear, secret-free error that names the cause when git is not
+          installed or too old, when a revision does not exist, when access is refused or the location cannot be
+          read, and when a call runs out of time.
+        justification: |
+          Operators and users must be able to tell a missing program from a wrong location, a refused token, or a
+          slow server, and must be able to act on the message.
+        children:
+          - ReviewCenter-GitRunner-Errors
+        tests:
+          - ContentSourcesSubsystem_RegisteredRepository_IsReadThroughTheRealGitSource
+
+      - id: ReviewCenter-ContentSources-DisabledRepository
+        title: >-
+          The ContentSources subsystem shall not give access to a repository that is disabled in the registry.
+        justification: |
+          Disabling a repository is how an administrator stops its use, for example after a token was exposed.
+        tests:
+          - ContentSourcesSubsystem_DisabledRepository_IsNotAvailableForReading

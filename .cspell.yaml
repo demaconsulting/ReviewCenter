@@ -73,6 +73,23 @@ words:
   - LOCALAPPDATA
   - FORWARDEDHEADERS
   - NOCASE
+  - askpass
+  - fsmonitor
+  - NOSYSTEM
+  - filesystemglobbing
+  - srcmode
+  - dstmode
+  - srcsha
+  - dstsha
+  - FFFD
+  - ciphertext
+  - cacheinfo
+  - gpgsign
+  - PATHEXT
+  - quotepath
+  - SYSTEMDRIVE
+  - USERPROFILE
+  - windir
   - stylesheet
   - ümlaut
   - Weasyprint

@@ -5,13 +5,14 @@
 ### Overview
 
 The `Web` subsystem is the Blazor Server user interface of ReviewCenter. It owns what a browser
-shows and how it responds to user actions. It contains eleven units: `App`, the HTML shell, the URL router, the
+shows and how it responds to user actions. It contains twelve units: `App`, the HTML shell, the URL router, the
 page frame with the sign-in header, and the `SessionGate` that replaces an open page when its user is no longer
 signed in; `HomePage`, the interactive landing page served at the root URL; `ProjectsPage`,
 `ProjectPage`, `ReviewPage`, and `ChecklistPage`, the pages for projects, reviews, and review checklists;
 `LoginPage`, `AccountPage`, and `UsersPage`, the pages for signing in, changing one's own password, and managing
-users; and `HistoryPage` and `AuditPage`, the pages that show the history of a review and let an administrator
-verify the audit trail. The subsystem
+users; `HistoryPage` and `AuditPage`, the pages that show the history of a review and let an administrator
+verify the audit trail; and `RepositoriesPage`, the page where an administrator registers the git repositories that
+reviews can be created from. The subsystem
 does not start or configure the server; the `Hosting` subsystem maps `App` as the root
 component of the server and supplies the endpoints around it, and the `Identity` subsystem supplies the sign-in and
 the authorization the pages rely on. The pages use the `Core` subsystem for
@@ -89,6 +90,16 @@ pages for projects, reviews, and review checklists.
 - *Constraints*: Requires the role `Admin`, which is re-checked against the stored user on load and on every
   verification. It is reached from the Audit link of the page frame, which only an administrator sees.
 
+**Repositories route** (`GET /repositories`): The page where an administrator manages the registered git repositories.
+
+- *Type*: HTTP `GET`, followed by a live Blazor connection for interactivity.
+- *Role*: Provider.
+- *Contract*: Lists the registered repositories with their location, user name, whether a token is set, and whether
+  they are enabled; offers to add a repository, to edit one (name, location, user name, and keeping, replacing, or
+  clearing the token), and to disable or enable one. A token is never shown. There is no delete.
+- *Constraints*: Requires the role `Admin`, which is re-checked against the stored user before every action. It is
+  reached from the Repositories link of the page frame, which only an administrator sees.
+
 **Unknown routes**: Any other URL.
 
 - *Type*: HTTP `GET`.
@@ -133,15 +144,15 @@ address), and on the ASP.NET Core Blazor components framework.
 
 #### Pages and domain access
 
-`ProjectsPage`, `ProjectPage`, `ReviewPage`, `ChecklistPage`, `AccountPage`, `UsersPage`, `HistoryPage`, and
-`AuditPage` follow the pattern of
+`ProjectsPage`, `ProjectPage`, `ReviewPage`, `ChecklistPage`, `AccountPage`, `UsersPage`, `HistoryPage`,
+`AuditPage`, and `RepositoriesPage` follow the pattern of
 `HomePage`: a Razor
 presentation file and a code-behind file, interactive server rendering, and the `data-interactive`
 marker. They obtain `ProjectService`, `ReviewService`, and the other Core services they need (`ReviewPage`:
 `ThreadService`, `ChecklistService`, and `SigningService`; `ProjectPage`: also `SigningService`; `ChecklistPage`:
 `ChecklistService`; `AccountPage` and `UsersPage`:
 `UserService`; `HistoryPage` and `AuditPage`: `AuditService`, and `AuditPage` also the user store through
-`UserService`) from the service container and call them
+`UserService`; `RepositoriesPage`: `RepositoryService` and `UserService`) from the service container and call them
 from their handlers. Each page loads its data when it is created, so a connection that is
 established after the server-rendered snapshot shows current data. A rule violation reported by
 Core as a `DomainRuleException` is shown as an error message next to the form, with the entered
@@ -152,17 +163,20 @@ by `@onsubmit`, so Enter submits them and tests can submit them without a button
 #### Authorization and the signed-in user
 
 Every page except the home page and the login page requires a signed-in user, declared on the page with an
-authorization attribute; `UsersPage` and `AuditPage` require the role `Admin`. The checks are made by the
+authorization attribute; `UsersPage`, `AuditPage`, and `RepositoriesPage` require the role `Admin`. The checks are made
+by the
 authorization of the `Identity` subsystem before the page is rendered, so a page never shows data to an anonymous
 visitor. The page frame (`MainLayout` in the `App` unit) shows the display name of the signed-in user with links to
-the account page and, for an administrator, the users page and the audit page, and a logout button, or a link to the
+the account page and, for an administrator, the users page, the repositories page, and the audit page, and a logout
+button, or a link to the
 login page when nobody is signed in. The pages that record something on behalf of a person (`ReviewPage` and
 `ChecklistPage`) get the signed-in user
 from the authentication state and pass it to Core as an `Actor`; there is no field in which a person could type
 another name. A page that is already open makes no request, so the cookie check does not reach it; the
 `RevalidatingAuthenticationStateProvider` of the `Identity` subsystem re-reads the user at a fixed interval and ends the
 authentication state of the page when the user is no longer valid (see *Open pages and the end of a session* below).
-`UsersPage` also re-checks the stored user before every action, and `AuditPage` on load and before every
+`UsersPage` also re-checks the stored user before every action, `RepositoriesPage` does the same, and `AuditPage` on
+load and before every
 verification, so a user who is no longer an enabled
 administrator is refused at once, and so does the signing of a review in Core. The other actions keep acting for the
 original user until the next check, which is at most one revalidation interval, and what they record is attributed to
@@ -176,9 +190,9 @@ so an action that meets an authentication state that has already ended is refuse
 Each protected page opts in to interactive rendering on its own, so each page is a root component of its own live
 connection, while `App`, `Routes`, and `MainLayout` are served as static markup once. Neither the router nor the
 header can react when the authentication state of an open page ends; only a component inside the page can. The
-`SessionGate` component of the `App` unit therefore wraps the content of each of the eight protected pages
+`SessionGate` component of the `App` unit therefore wraps the content of each of the nine protected pages
 (`ProjectsPage`, `ProjectPage`, `ReviewPage`, `ChecklistPage`, `AccountPage`, `UsersPage`, `HistoryPage`,
-`AuditPage`). While a user is signed in it
+`AuditPage`, `RepositoriesPage`). While a user is signed in it
 adds no element, so the markup and the `data-interactive` marker of the page do not change. When the state becomes
 anonymous, it removes the page content, and with it every handler, and shows a "Session ended" message with a link to
 the login page that returns to the same page. `HomePage` and `LoginPage` are open to anonymous visitors, have no
@@ -222,6 +236,15 @@ was checked (the chain is intact, or the first entry that no longer fits) and sh
 administrator can record it elsewhere: the verification alone cannot tell that the newest entries were removed. The
 history link in the title row of the review page is shown to every signed-in user, and the audit link of the page
 frame only to an administrator, which is a convenience and not the protection: the page has its own authorization.
+
+#### Repositories
+
+`RepositoriesPage` administers the registry and contains no rules: the name, location, and credential rules and the
+encryption of the token are in `RepositoryService`. The page's part is to collect the input, pass it with the actor,
+and show the result or the refusal next to the control that was used. The token is write-only on the page: the token
+fields are password inputs, the values are cleared right after every attempt, and the list shows only "token set" or
+"no token". Because a stored token cannot be read back, editing offers three explicit choices (keep, replace, or
+clear), and the default is to keep. Repositories can be disabled but not deleted.
 
 #### Test identifiers
 

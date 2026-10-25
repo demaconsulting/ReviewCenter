@@ -139,6 +139,37 @@ internal static class DatabaseSetup
     }
 
     /// <summary>
+    ///     Gets the folder that holds the database file, the base of the default key ring and git cache folders.
+    /// </summary>
+    /// <param name="options">The configured options. Must not be null.</param>
+    /// <returns>
+    ///     The absolute folder of the database file, or the folder of the default database when the options name no
+    ///     usable file (an in-memory database or a <c>file:</c> URI).
+    /// </returns>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="options"/> is null.</exception>
+    public static string ResolveDataDirectory(DatabaseOptions options)
+    {
+        ArgumentNullException.ThrowIfNull(options);
+
+        string? dataSource = null;
+        try
+        {
+            dataSource = new SqliteConnectionStringBuilder(ResolveConnectionString(options)).DataSource;
+        }
+        catch (InvalidOperationException)
+        {
+            // An unsupported (in-memory) configuration is reported where the database is opened; here the default will do
+        }
+
+        if (string.IsNullOrEmpty(dataSource) || dataSource.StartsWith("file:", StringComparison.OrdinalIgnoreCase))
+        {
+            dataSource = GetDefaultDatabasePath();
+        }
+
+        return Path.GetDirectoryName(Path.GetFullPath(dataSource))!;
+    }
+
+    /// <summary>
     ///     Selects the database provider and connection on a context options builder.
     /// </summary>
     /// <param name="builder">The builder to configure. Must not be null.</param>

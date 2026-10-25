@@ -80,3 +80,12 @@ sections:
           The link must not invite other users to a page they cannot open.
         tests:
           - MainLayout_Render_SignedInUser_ShowsNameAccountAndLogout
+
+      - id: ReviewCenter-App-RepositoriesLink
+        title: >-
+          The App unit shall show a link to the repositories page in the header only while an enabled administrator is
+          signed in.
+        justification: |
+          The link must not invite other users to a page they cannot open.
+        tests:
+          - MainLayout_Render_SignedInUser_ShowsNameAccountAndLogout

@@ -22,6 +22,8 @@ N/A - standard test environment.
   the same logger providers.
 - The database is created for a configured location, the stored data is served again by a second host on the
   same database (to a signed-in user), and an unsupported database provider ends the run with exit code 1.
+- The repository registry and the git source are registered, and a stored token stays readable after a restart because
+  the key ring is persisted; the behavior is verified in the unit tests of `ServerHost`.
 
 ### Test Scenarios
 
@@ -48,6 +50,14 @@ is tested by
 `ServerHost.RunAsync` with an unsupported database provider; it returns 1 and the context records the failure,
 and no unhandled exception escapes. This scenario is tested by
 `HostingSubsystem_Startup_UnsupportedDatabaseProvider_FailsWithExitCodeOne`.
+
+**Repository services and the key ring**: The registration of the repository registry, the git source, and the token
+protector, the default folders beside the database, the persistence of the key ring so that a token stays readable after
+a restart, and the clear error for a key ring folder that cannot be written are verified by the unit tests of
+`ServerHost`: `ServerHost_AddServices_Configured_RegistersRepositoryServicesWithDefaultFolders`,
+`ServerHost_Restart_KeyRingPersisted_TokenStaysReadable`,
+`ServerHost_CreateApplication_KeyRingFolderNotWritable_ThrowsClearError`, and
+`ServerHost_ResolveKeysPath_ConfiguredOrDefault_ChoosesTheFolder`.
 
 **Audit verify verb**: The `AuditCommand` unit tests run the verb over a real database. An intact trail gives the
 entry count and exit code 0, which is tested by `AuditCommand_Run_IntactTrail_ReportsEntryCountWithExitCodeZero`, and

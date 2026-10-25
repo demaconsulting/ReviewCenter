@@ -23,6 +23,8 @@ be loadable on the test platform.
   names it, before anything is created.
 - An in-memory database setting is refused with a message that asks for a file path.
 - Creation makes the missing folder, the file, and the tables.
+- The data folder is the folder of the configured database file, or the default database folder when the setting is empty
+  or names an in-memory or `file:` data source; a null argument is refused.
 
 #### Test Scenarios
 
@@ -61,6 +63,11 @@ by `DatabaseSetup_EnsureCreated_UnsupportedProvider_ThrowsAndCreatesNothing`.
 **DatabaseSetup_EnsureCreated_MissingFolder_CreatesFolderFileAndTables**: Creation with a database path in a
 missing folder makes the folder, the file, and the tables. This scenario is tested by
 `DatabaseSetup_EnsureCreated_MissingFolder_CreatesFolderFileAndTables`.
+
+**DatabaseSetup_ResolveDataDirectory_Configured_IsFolderOfTheDatabaseFile**: A plain path and a full connection string
+give the folder of the database file; an empty setting and an in-memory data source give the default database folder; a
+null argument raises `ArgumentNullException`. This scenario is tested by
+`DatabaseSetup_ResolveDataDirectory_Configured_IsFolderOfTheDatabaseFile`.
 
 **Audit table**: The database created by `EnsureCreated` includes the `AuditEntries` table, as the tests of
 `AuditStore` and `AuditCommand` rely on it. There are no migrations, so a database created before this table existed

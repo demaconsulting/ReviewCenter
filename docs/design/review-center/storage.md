@@ -9,11 +9,11 @@ signatures, and the hash-chained audit trail in a relational
 database through Entity
 Framework Core. It
 implements the store interfaces of the `Core` subsystem and owns everything about the database: the schema, the
-choice of provider, the location of the data, and the creation of the database. It contains five units:
+choice of provider, the location of the data, and the creation of the database. It contains six units:
 `ReviewCenterDbContext`, the mapping of the domain types to tables; `ReviewStore`, the implementation of the
 review store interface; `UserStore`, the implementation of the user store interface; `AuditStore`, the implementation
-of the audit store interface together with the `AuditAppender` that serializes and chains the entries; and
-`DatabaseSetup`, the
+of the audit store interface together with the `AuditAppender` that serializes and chains the entries;
+`RepositoryStore`, the implementation of the repository store interface; and `DatabaseSetup`, the
 provider selection, connection string resolution, and database
 creation, together with its options type `DatabaseOptions`. The types of the subsystem are internal to the
 application; the rest of the system sees only the Core store interfaces.
@@ -58,6 +58,17 @@ application; the rest of the system sees only the Core store interfaces.
   the hash of its predecessor. There is no operation to update or delete an entry.
 - *Constraints*: Appends from every store are serialized by one process-wide gate and by the database write lock.
 
+**RepositoryStore (as IRepositoryStore)**: The persistence operations for the registry of git repositories.
+
+- *Type*: In-process .NET class implementing the Core interface.
+- *Role*: Provider.
+- *Contract*: Stores a repository, reads one or lists all (by name, without regard to case), reads the encrypted token
+  of one, and updates one with a token action (keep, replace, or clear). A name that exists, in any capitalization,
+  raises a `DomainRuleException` for `RepositoryNameTaken`, and an update of an unknown repository one for
+  `RepositoryNotFound`. Each change is stored together with its audit entry in one transaction.
+- *Constraints*: Every operation uses its own short-lived database context, so it is safe for concurrent use. The
+  store holds and returns only encrypted token text, and the read model has no token member.
+
 **Database settings**: The `Database` configuration section.
 
 - *Type*: Configuration (`appsettings.json` and environment variables).
@@ -70,8 +81,9 @@ application; the rest of the system sees only the Core store interfaces.
 
 - *Type*: In-process .NET static methods.
 - *Role*: Provider.
-- *Contract*: Configures the database context for the selected provider and connection string, and creates the
-  database folder, file, and tables when they do not exist.
+- *Contract*: Configures the database context for the selected provider and connection string, creates the
+  database folder, file, and tables when they do not exist, and names the folder that holds the data, so that other
+  server-side data (the git cache and the key ring) can be placed beside the database.
 - *Constraints*: Raises `InvalidOperationException` for an unsupported provider; file system and database
   failures propagate to the caller.
 
@@ -92,14 +104,15 @@ with migrations. This is adequate while there is no released schema to upgrade: 
 tables, and an existing database is left alone. The cost is that a database created by an earlier version is
 never altered, so a change of the schema needs a migration strategy before the first release that must keep
 data. This is a known limitation, recorded as an open decision in `architecture.md` and not yet resolved. It
-already matters five times: the tables for comment threads were added after the first schema, the tables for review
+already matters six times: the tables for comment threads were added after the first schema, the tables for review
 checklists after those, the users table and the user name columns of comments, answers, and section decisions
-after those, the tables of reviewer slots and signatures after those, and the audit table after those, so a database
+after those, the tables of reviewer slots and signatures after those, the audit table after those, and the
+`Repositories` table after that, so a database
 created before them does not
 have them and the pages fail until the
 database file is deleted (or a new one is
 named) and created again. Databases created before the identity slice must be deleted and recreated, and so must
-databases created before the signature slice and before the audit trail; there is no
+databases created before the signature slice, before the audit trail, and before the repository registry; there is no
 migration of their data, and no data of a released version is
 affected. A
 second limitation is that two processes starting at the same moment on a brand-new database file can collide
@@ -108,7 +121,16 @@ while creating it; a single service instance per database is assumed.
 **Data location**: By default the database is the file `reviewcenter.db` in the `ReviewCenter` folder of the
 per-user application data folder of the operating system. If the operating system reports no such folder (for
 example for a service account without a profile), the file is placed in a `data` folder next to the executable.
-The folder is created when needed.
+The folder is created when needed. The same folder is the default home of the git cache (`git-cache`) and of the
+Data Protection key ring (`keys`), both resolved by `Hosting` from the folder of the database file (see the
+`DatabaseSetup` unit), so backing up the data folder covers the database and the key that decrypts the stored
+tokens.
+
+**Repositories and the token**: The `Repositories` table holds the registered git repositories. The token is stored
+only as the encrypted text produced by `ICredentialProtector`; the store never sees a plain token, and the read model
+that leaves the store has a flag (`HasToken`) instead of a member for the text. Name uniqueness is enforced by a
+unique index with the case-insensitive collation of SQLite, and a violation is translated to `RepositoryNameTaken`;
+like the other stores, the translation is SQLite specific. Repositories are never deleted.
 
 **Context lifetime and concurrency**: Blazor Server connections are long-lived and concurrent, and a database
 context is not thread-safe. The store therefore obtains a new context from a context factory for every

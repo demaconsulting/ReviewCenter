@@ -4,7 +4,8 @@
 # PURPOSE:
 # - Define requirements for the ReviewCenter Web subsystem
 # - The Web subsystem spans the App (App.razor, Routes.razor, MainLayout.razor), HomePage, ProjectsPage, ProjectPage,
-#   ReviewPage, ChecklistPage, LoginPage, AccountPage, and UsersPage units; the App unit includes the SessionGate
+#   ReviewPage, ChecklistPage, LoginPage, AccountPage, UsersPage, AuditPage, and RepositoriesPage units; the App unit
+#   includes the SessionGate
 #   component that replaces an open protected page when the sign-in state of its user ends
 # - Subsystem requirements describe the externally visible behavior of the web user interface
 # - The subsystem tests run over plain HTTP, so they verify what the server renders: the pages, the read path from
@@ -251,3 +252,22 @@ sections:
         tests:
           - AuditPage_Verify_IntactChain_ShowsCountAndFullHeadHash
           - Routes_Render_ReviewerOpensAuditRoute_ShowsAccessDeniedNotTrail
+
+      - id: ReviewCenter-Web-Repositories
+        title: >-
+          The Web subsystem shall let administrators, and nobody else, register, change, disable, and enable git
+          repositories on a repositories page that is reached from the header, and set, replace, or clear the token
+          of a repository without it ever being shown again.
+        justification: |
+          The registry controls what source code the server reads and holds secrets for it. A token that can be read
+          back from a page can be copied or leaked, so it is write-only.
+        children:
+          - ReviewCenter-RepositoriesPage-Display
+          - ReviewCenter-RepositoriesPage-Create
+          - ReviewCenter-RepositoriesPage-Edit
+          - ReviewCenter-RepositoriesPage-Enable
+          - ReviewCenter-RepositoriesPage-Admin
+          - ReviewCenter-App-RepositoriesLink
+        tests:
+          - SignIn_RepositoriesPage_ReviewerAndAdmin_OnlyAdminIsAllowed
+          - RepositoriesPage_CreateForm_WithToken_StoresItWriteOnlyAndClearsFields

@@ -1,0 +1,59 @@
+---
+# Software Unit Requirements for the RepositoryStore Class
+#
+# The RepositoryStore class persists the registry of git repositories: the registration, the encrypted token, and the
+# audit entry of each change, which is stored in the same transaction as the change.
+
+sections:
+  - title: RepositoryStore Unit Requirements
+    requirements:
+      - id: ReviewCenter-RepositoryStore-Persist
+        title: >-
+          The RepositoryStore class shall store a repository with every field and an identity assigned by the
+          database, read it back unchanged, and list the repositories ordered by name without regard to letter case.
+        justification: |
+          The registry must survive a restart, and the page that shows it needs a stable order.
+        tests:
+          - RepositoryStore_AddAsync_Repository_RoundTripsAndAudits
+          - RepositoryStore_ListAsync_OrdersByNameIgnoringCase
+
+      - id: ReviewCenter-RepositoryStore-Unique
+        title: >-
+          The RepositoryStore class shall refuse a repository name that is already used, regardless of letter case,
+          when adding and when renaming, reporting that the name is taken and leaving the data and the audit trail
+          unchanged.
+        justification: |
+          The database is the last defense against two repositories with the same name when two requests overlap.
+        tests:
+          - RepositoryStore_NameOtherCase_ThrowsRepositoryNameTaken
+
+      - id: ReviewCenter-RepositoryStore-Token
+        title: >-
+          The RepositoryStore class shall keep the encrypted token apart from the data it shows, return it only
+          through a dedicated read, and keep, replace, or clear it as an update asks.
+        justification: |
+          A token that is part of every read could reach a page by mistake. Keeping it behind one dedicated read makes
+          the ways to reach it few and easy to review.
+        tests:
+          - RepositoryStore_GetEncryptedTokenAsync_ReturnsStoredText
+          - RepositoryStore_UpdateAsync_TokenActions_KeepReplaceClear
+          - RepositoryStore_ReadModel_HasNoTokenMember
+
+      - id: ReviewCenter-RepositoryStore-Update
+        title: >-
+          The RepositoryStore class shall change and disable a repository in place, deleting nothing, and report an
+          unknown repository by its rule.
+        justification: |
+          Reviews made from a repository keep their reference to it, so a registration is retired by disabling it.
+        tests:
+          - RepositoryStore_UpdateAsync_DisableAndUnknown
+
+      - id: ReviewCenter-RepositoryStore-Audit
+        title: >-
+          The RepositoryStore class shall store each change of the registry together with its audit entry in one
+          transaction, so that both or neither are stored.
+        justification: |
+          An entry without its change, or a change without its entry, would make the history untrue.
+        tests:
+          - RepositoryStore_AddAsync_Repository_RoundTripsAndAudits
+          - RepositoryStore_NameOtherCase_ThrowsRepositoryNameTaken

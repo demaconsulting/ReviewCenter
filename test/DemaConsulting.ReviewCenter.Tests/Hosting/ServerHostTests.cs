@@ -19,8 +19,10 @@
 // SOFTWARE.
 
 using DemaConsulting.ReviewCenter.Cli;
+using DemaConsulting.ReviewCenter.ContentSources;
 using DemaConsulting.ReviewCenter.Core;
 using DemaConsulting.ReviewCenter.Hosting;
+using DemaConsulting.ReviewCenter.Storage;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.Configuration;
@@ -290,6 +292,119 @@ public class ServerHostTests
         // Assert: it is a singleton and answers for a review that does not exist
         Assert.Same(signing, app.Services.GetRequiredService<SigningService>());
         Assert.Null(await signing.GetApprovalAsync(1, "nope", TestContext.Current.CancellationToken));
+    }
+
+    /// <summary>
+    ///     Test that the host registers the repository registry and the git source, with the key ring and the git
+    ///     cache folder placed beside the database by default.
+    /// </summary>
+    [Fact]
+    public async Task ServerHost_AddServices_Configured_RegistersRepositoryServicesWithDefaultFolders()
+    {
+        // Arrange: start the real pipeline on a throwaway database
+        var connectionString = TestDatabase.NewConnectionString();
+        var logs = new CapturingLoggerProvider();
+        await using var app = await TestWebApp.StartAsync(logs, connectionString, ["serve", "--silent"]);
+        var database = new DatabaseOptions { ConnectionString = connectionString };
+        var folder = DatabaseSetup.ResolveDataDirectory(database);
+
+        // Act: resolve the services and protect a value
+        var service = app.Services.GetRequiredService<RepositoryService>();
+        var provider = app.Services.GetRequiredService<IGitRepositoryProvider>();
+        var protector = app.Services.GetRequiredService<ICredentialProtector>();
+        var cipher = protector.Protect("tkn-Host");
+
+        // Assert: registered as singletons, folders beside the database, the key ring persisted and the token encrypted
+        Assert.Same(service, app.Services.GetRequiredService<RepositoryService>());
+        Assert.NotNull(provider);
+        Assert.Equal(Path.Combine(folder, "git-cache"), app.Services.GetRequiredService<GitOptions>().CachePath);
+        Assert.NotEmpty(Directory.GetFiles(Path.Combine(folder, "keys"), "key-*.xml"));
+        Assert.DoesNotContain("tkn-Host", cipher, StringComparison.Ordinal);
+        Assert.Equal("tkn-Host", protector.Unprotect(cipher));
+    }
+
+    /// <summary>
+    ///     Test that a token encrypted before a restart is readable after it, because the key ring is persisted.
+    /// </summary>
+    [Fact]
+    public async Task ServerHost_Restart_KeyRingPersisted_TokenStaysReadable()
+    {
+        // Arrange: a database shared by two instances, and a token encrypted by the first
+        var connectionString = TestDatabase.NewConnectionString();
+        var logs = new CapturingLoggerProvider();
+        string cipher;
+        await using (var first = await TestWebApp.StartAsync(logs, connectionString, ["serve", "--silent"]))
+        {
+            cipher = first.Services.GetRequiredService<ICredentialProtector>().Protect("tkn-Restart");
+        }
+
+        // Act: start a second instance and read the token
+        await using var second = await TestWebApp.StartAsync(logs, connectionString, ["serve", "--silent"]);
+        var plain = second.Services.GetRequiredService<ICredentialProtector>().Unprotect(cipher);
+
+        // Assert: readable
+        Assert.Equal("tkn-Restart", plain);
+    }
+
+    /// <summary>
+    ///     Test that a key ring folder that cannot be written stops the start with an error naming the setting,
+    ///     instead of silently using keys that would be lost at the next restart.
+    /// </summary>
+    [Fact]
+    public void ServerHost_CreateApplication_KeyRingFolderNotWritable_ThrowsClearError()
+    {
+        // Arrange: a key ring "folder" that is an existing file
+        var file = Path.Combine(Path.GetTempPath(), "ReviewCenterTests-" + Guid.NewGuid().ToString("N") + ".keys");
+        File.WriteAllText(file, "not a folder");
+        using var context = Context.Create(["serve", "--silent"]);
+        var options = new ServerHostOptions
+        {
+            MapStaticAssets = false,
+            ConfigureBuilder = builder =>
+            {
+                builder.WebHost.UseTestServer();
+                builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
+                {
+                    ["Database:ConnectionString"] = TestDatabase.NewConnectionString(),
+                    ["DataProtection:KeysPath"] = file
+                });
+            }
+        };
+
+        try
+        {
+            // Act: create the application
+            var exception = Assert.Throws<InvalidOperationException>(() => ServerHost.CreateApplication(context, options));
+
+            // Assert: the message names the setting and the folder
+            Assert.Contains("DataProtection:KeysPath", exception.Message, StringComparison.Ordinal);
+            Assert.Contains(file, exception.Message, StringComparison.Ordinal);
+        }
+        finally
+        {
+            File.Delete(file);
+        }
+    }
+
+    /// <summary>
+    ///     Test that the key ring folder is the configured one, or <c>keys</c> beside the database.
+    /// </summary>
+    [Fact]
+    public void ServerHost_ResolveKeysPath_ConfiguredOrDefault_ChoosesTheFolder()
+    {
+        // Arrange: a database and a configured folder
+        var folder = Path.Combine(Path.GetTempPath(), "rc-keys-test");
+        var database = new DatabaseOptions { ConnectionString = Path.Combine(folder, "x.db") };
+
+        // Act: resolve with and without a configured folder
+        var configured = ServerHost.ResolveKeysPath(new DataProtectionSettings { KeysPath = Path.Combine(folder, "custom") }, database);
+        var fallback = ServerHost.ResolveKeysPath(new DataProtectionSettings(), database);
+        var blank = ServerHost.ResolveKeysPath(new DataProtectionSettings { KeysPath = "  " }, database);
+
+        // Assert: configured wins; otherwise keys beside the database
+        Assert.Equal(Path.Combine(folder, "custom"), configured);
+        Assert.Equal(Path.Combine(folder, "keys"), fallback);
+        Assert.Equal(Path.Combine(folder, "keys"), blank);
     }
 
     /// <summary>

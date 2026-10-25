@@ -23,7 +23,8 @@ N/A - standard test environment.
   message and not the page, an administrator sees the page, and a signed-out user opening a protected route sees
   a link to the login page (returning to the requested page) and not the page.
 - The layout header shows the display name of the signed-in user with the links to the account page and the logout
-  button, and the link to the users page only for an administrator; for nobody signed in it shows only the link to
+  button, and the links to the users, repositories, and audit pages only for an administrator; for nobody signed in it
+  shows only the link to
   the login page.
 - The page frame component `SessionGate` shows its content while somebody is signed in, shows the "Session ended"
   message with a link to the login page that returns to the page, and none of the content, when nobody is, and
@@ -85,5 +86,6 @@ not its own root element. This scenario is tested by
 `SessionGate_Render_EveryProtectedPageSignedOut_ShowsSessionEndedAndNoPage`.
 
 **MainLayout_Render_SignedInUser_ShowsNameAccountAndLogout**: The layout is rendered for a reviewer and for an
-administrator; the audit link to `/audit` is shown to the administrator only. This scenario is tested by
+administrator; the repositories link to `/repositories` and the audit link to `/audit` are shown to the administrator
+only. This scenario is tested by
 `MainLayout_Render_SignedInUser_ShowsNameAccountAndLogout`.

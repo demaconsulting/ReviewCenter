@@ -281,7 +281,7 @@ public partial class WebSubsystemTests
             "/login",
             "/account",
             "/users",
-            "/projects",
+            "/repositories",
             $"/projects/{project.Id}",
             "/projects/9999",
             $"/projects/{project.Id}/reviews/rev-1",

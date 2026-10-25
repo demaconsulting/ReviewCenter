@@ -108,3 +108,15 @@ sections:
         tests:
           - AuditStore_Database_DuplicateSequence_IsRefusedByUniqueKey
           - AuditStore_ListAsync_FilterAndCursors_ReturnExpectedEntriesNewestFirst
+
+      - id: ReviewCenter-DbContext-Repositories
+        title: >-
+          The ReviewCenterDbContext class shall map the registered repositories to a table with an identity assigned
+          by the database and a name that is unique regardless of letter case, and shall keep the token only in its
+          encrypted form, so that the database refuses a second repository whose name differs only in letter case.
+        justification: |
+          The database is the last defense against two repositories with the same name, and a token stored only in
+          encrypted form is not readable in a copy of the database.
+        tests:
+          - RepositoryStore_AddAsync_Repository_RoundTripsAndAudits
+          - RepositoryStore_NameOtherCase_ThrowsRepositoryNameTaken
