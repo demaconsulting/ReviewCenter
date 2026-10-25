@@ -50,9 +50,10 @@ that `GetAccessAsync` returns always belong to the same version of a registratio
 - *Postconditions*: When nothing changed, the registration is returned and no audit entry is written. Otherwise one
   `repository.updated` entry lists the changed fields.
 - *Algorithm*: Re-check the actor; validate the new values as for creation (a `Replace` with an empty token is
-  `RepositoryCredentialInvalid`, and so is a new token equal to the new name or user name); then, under the semaphore,
-  when the stored token is kept and the name or the user name changes, decrypt the stored token and refuse the change
-  with `RepositoryCredentialInvalid` if it equals the new name or user name (a stored token that cannot be decrypted is
+  `RepositoryCredentialInvalid`, and so is a new token equal to the new name, user name, or location); then, under the
+  semaphore, when the stored token is kept and the name, the user name, or the location changes, decrypt the stored
+  token and refuse the change with `RepositoryCredentialInvalid` if it equals the new name, user name, or location (a
+  stored token that cannot be decrypted is
   not compared); compare with the stored registration to build a list of changes from the items "name",
   "location", "user name", "token replaced", and "token cleared" (the last only when a token existed); store through the
   store with the audit detail `repository 'N': <changes>`.
@@ -94,8 +95,9 @@ lists the
 - *Credentials*: a user name or token is accepted only for an `https://` location (so a loopback `http://` location
   never carries a token; it is refused with `RepositoryCredentialInvalid`). A token needs a user name. The user
   name has at most 200 characters, no `:`, and no control characters; the token has at most 1000 characters and no white
-  space or control characters. A token must also differ from the repository name and from
-  the user name (exact, case-sensitive comparison), because those two are written to audit entries and messages. All of
+  space or control characters. A token must also differ from the repository name, from
+  the user name, and from the location (exact, case-sensitive comparison; the location is compared as stored, which is
+  the trimmed input), because those are written to audit entries and messages. All of
   these are `RepositoryCredentialInvalid`, with a message that does not contain the token.
 
 #### Error Handling

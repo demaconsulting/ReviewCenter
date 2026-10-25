@@ -579,9 +579,9 @@ An administrator sees a **Repositories** link in the page header, next to **User
 
 - **Add repository**: enter a name (letters, digits, dot, underscore, and hyphen, up to 40 characters, unique without
   regard to case), a location, and for a private repository a user name and an access token. The token must not be the
-  same text as the repository name or the user name (compared exactly, with case), because those appear in messages and
-  in the audit trail; the same applies when you edit a repository and replace the token, or rename the repository or
-  the user while keeping a stored token. The location is an
+  same text as the repository name, the user name, or the location (compared exactly, with case), because those appear
+  in messages and in the audit trail; the same applies when you edit a repository and replace the token, or change the
+  name, the user, or the location while keeping a stored token. The location is an
   `https://` or `file://` URL, an `http://` URL for the local machine only (`localhost`, `127.0.0.1`, or `[::1]`;
   plain `http://` to any other host is refused because it can be tampered with), or an absolute local path. A user name
   or token is accepted only with an `https://` location, because the token must not travel in clear text; so a

@@ -33,7 +33,7 @@ namespace DemaConsulting.ReviewCenter.Core;
 ///     <para>
 ///         The token is write-only. It is encrypted before it is stored, it can be kept, replaced or cleared but
 ///         never read back through this class, and it appears in no audit entry or message; it must also differ from
-///         the repository name and the user name (case-sensitive), which do appear there; only
+///         the repository name, the user name and the location (case-sensitive), which do appear there; only
 ///         <see cref="GetAccessAsync"/>, which is internal to Core, decrypts it, for the git layer. Registrations
 ///         are audited (<c>repository.created</c>, <c>repository.updated</c>, <c>repository.disabled</c>,
 ///         <c>repository.enabled</c>) with the changed field names, never their secret values. Changes run one at
@@ -150,7 +150,7 @@ public sealed class RepositoryService
         var cleanToken = string.IsNullOrEmpty(token) ? null : ValidateToken(token);
         if (cleanToken is not null)
         {
-            ValidateTokenIsNotPublic(cleanToken, cleanName, cleanUser);
+            ValidateTokenIsNotPublic(cleanToken, cleanName, cleanUser, cleanLocation);
         }
 
         ValidateCredentialCombination(isHttps, cleanUser, cleanToken is not null);
@@ -216,7 +216,7 @@ public sealed class RepositoryService
             }
 
             var validToken = ValidateToken(token.Token);
-            ValidateTokenIsNotPublic(validToken, cleanName, cleanUser);
+            ValidateTokenIsNotPublic(validToken, cleanName, cleanUser, cleanLocation);
             encrypted = _protector.Protect(validToken);
         }
 
@@ -233,9 +233,10 @@ public sealed class RepositoryService
             ValidateCredentialCombination(isHttps, cleanUser, hasToken);
             if (token.Action == TokenAction.Keep && current.HasToken
                 && (!string.Equals(current.Name, cleanName, StringComparison.Ordinal)
+                    || !string.Equals(current.Location, cleanLocation, StringComparison.Ordinal)
                     || !string.Equals(current.Username, cleanUser, StringComparison.Ordinal)))
             {
-                await ValidateKeptTokenAsync(id, cleanName, cleanUser, cancellationToken);
+                await ValidateKeptTokenAsync(id, cleanName, cleanUser, cleanLocation, cancellationToken);
             }
 
             var changes = new List<string>();
@@ -407,18 +408,20 @@ public sealed class RepositoryService
     }
 
     /// <summary>
-    ///     Checks that the stored token, which is kept, is not the same text as the new name or user name.
+    ///     Checks that the stored token, which is kept, is not the same text as the new name, user name or location.
     /// </summary>
     /// <param name="id">The repository identity.</param>
     /// <param name="name">The new repository name.</param>
     /// <param name="username">The new user name, or <c>null</c>.</param>
+    /// <param name="location">The new (normalized) location.</param>
     /// <param name="cancellationToken">Cancels the operation.</param>
     /// <returns>A task that completes when the check is done.</returns>
     /// <exception cref="DomainRuleException">
-    ///     Thrown with <see cref="DomainRule.RepositoryCredentialInvalid"/> when the kept token equals the name or user
-    ///     name. A token that cannot be decrypted cannot be compared and is no obstacle: it is useless until replaced.
+    ///     Thrown with <see cref="DomainRule.RepositoryCredentialInvalid"/> when the kept token equals the name, user
+    ///     name or location. A token that cannot be decrypted cannot be compared and is no obstacle: it is useless
+    ///     until replaced.
     /// </exception>
-    private async Task ValidateKeptTokenAsync(int id, string name, string? username, CancellationToken cancellationToken)
+    private async Task ValidateKeptTokenAsync(int id, string name, string? username, string location, CancellationToken cancellationToken)
     {
         var encrypted = await _store.GetEncryptedTokenAsync(id, cancellationToken);
         if (encrypted is null)
@@ -436,22 +439,25 @@ public sealed class RepositoryService
             return;
         }
 
-        ValidateTokenIsNotPublic(stored, name, username);
+        ValidateTokenIsNotPublic(stored, name, username, location);
     }
 
     /// <summary>
-    ///     Checks that a token is not the same text as the repository name or the user name, because those are
-    ///     written to audit entries and messages.
+    ///     Checks that a token is not the same text as the repository name, the user name or the location, because
+    ///     those are written to audit entries and messages.
     /// </summary>
     /// <param name="token">The token.</param>
     /// <param name="name">The repository name.</param>
     /// <param name="username">The user name, or <c>null</c>.</param>
+    /// <param name="location">The location as stored (trimmed; the trimmed input is the same text).</param>
     /// <exception cref="DomainRuleException">Thrown with <see cref="DomainRule.RepositoryCredentialInvalid"/> when it is the same text.</exception>
-    private static void ValidateTokenIsNotPublic(string token, string name, string? username)
+    private static void ValidateTokenIsNotPublic(string token, string name, string? username, string location)
     {
-        if (string.Equals(token, name, StringComparison.Ordinal) || string.Equals(token, username, StringComparison.Ordinal))
+        if (string.Equals(token, name, StringComparison.Ordinal)
+            || string.Equals(token, username, StringComparison.Ordinal)
+            || string.Equals(token, location, StringComparison.Ordinal))
         {
-            throw CredentialInvalid("A token must not be the same as the repository name or the user name, because those are shown in messages and the audit trail.");
+            throw CredentialInvalid("A token must not be the same as the repository name, the user name or the location, because those are shown in messages and the audit trail.");
         }
     }
 

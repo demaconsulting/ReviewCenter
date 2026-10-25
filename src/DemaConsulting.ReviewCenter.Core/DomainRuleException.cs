@@ -146,7 +146,7 @@ public enum DomainRule
     /// <summary>The location of a repository is empty, too long, not a supported form or carries credentials of its own.</summary>
     RepositoryLocationInvalid,
 
-    /// <summary>The user name or token of a repository is not valid, a token is given for a location that cannot use one, or a token is the same text as the repository name or the user name.</summary>
+    /// <summary>The user name or token of a repository is not valid, a token is given for a location that cannot use one, or a token is the same text as the repository name, the user name or the location.</summary>
     RepositoryCredentialInvalid,
 
     /// <summary>The referenced repository does not exist.</summary>

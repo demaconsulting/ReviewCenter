@@ -344,7 +344,7 @@ location. A repository can be disabled and enabled again; it
 cannot be deleted, so that earlier work keeps its reference. A disabled repository cannot be read. Signed-in users who
 are not administrators can only be offered the names of enabled repositories, never the location or the credentials; a
 git error that is shown to them names the repository instead of its location. A token must not be the same text as the
-repository name or the user name.
+repository name, the user name, or the location.
 
 The token is **write-only**: it is typed into a password field, encrypted with ASP.NET Core Data Protection, and never
 shown again. The list shows only "token set" or "no token". When you edit a repository you choose to keep, replace, or
