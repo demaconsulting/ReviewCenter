@@ -33,7 +33,7 @@
 
     <section class="card">
         <h2>Verification</h2>
-        <p class="muted">Checks that no entry of the trail was changed, removed, added or reordered.</p>
+        <p class="muted">Checks that no entry in the middle of the trail was changed, removed, inserted or reordered. It cannot detect removal of the newest entries or a complete rewrite unless you recorded the head hash elsewhere.</p>
         <button type="button" data-testid="audit-verify" @onclick="VerifyAsync">Verify chain</button>
         @if (Result is not null)
         {

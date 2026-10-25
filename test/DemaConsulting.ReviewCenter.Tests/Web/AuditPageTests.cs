@@ -247,6 +247,8 @@ public class AuditPageTests : PageTestBase
         // Assert
         Assert.Contains("Administrator rights are required", cut.Find("[data-testid='audit-error']").TextContent, StringComparison.Ordinal);
         Assert.Empty(cut.FindAll("[data-testid='audit-result']"));
+        Assert.Empty(cut.FindAll("[data-testid='audit-table']"));
+        Assert.Empty(cut.FindAll("[data-testid='audit-row']"));
         Assert.Equal(readsBefore, AuditStore.ReadAfterCalls);
     }
 

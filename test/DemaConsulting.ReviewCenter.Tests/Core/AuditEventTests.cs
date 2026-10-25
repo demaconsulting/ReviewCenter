@@ -250,7 +250,7 @@ public class AuditEventTests
         Assert.Equal(["checklist.answered", "checklist.answered", "checklist.applicability-changed", "checklist.applicability-changed"], drafts.Select(d => d.Action));
         Assert.Equal($"item {firstItem}: Pass", drafts[0].Detail);
         Assert.Equal($"item {firstItem}: Fail; justification sha256 {AuditText.ShortHash(Justification)}", drafts[1].Detail);
-        Assert.Equal($"section {sectionId}: not applicable, reason: Not relevant", drafts[2].Detail);
+        Assert.Equal($"section {sectionId}: not applicable, reason sha256 {AuditText.ShortHash("Not relevant")}", drafts[2].Detail);
         Assert.Equal($"section {sectionId}: applicable", drafts[3].Detail);
         Assert.All(drafts, d => Assert.DoesNotContain("hunter2", d.Detail, StringComparison.Ordinal));
         Assert.All(drafts, d => Assert.Equal((fixture.ProjectId, "rev-1"), (d.ProjectId, d.ReviewId)));

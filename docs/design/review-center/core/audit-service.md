@@ -68,7 +68,7 @@ the short hash (8 hexadecimal characters) of the trimmed text (see `AuditChain`)
 | `thread.replied` | `thread {id}, comment {cid}, text sha256 {8 hex}` |
 | `thread.resolved`, `thread.reopened` | `thread {id}` |
 | `checklist.answered` | `item {id}: {Outcome}`, plus `; justification sha256 {8 hex}` when there is one |
-| `checklist.applicability-changed` | `section {id}: applicable` or `section {id}: not applicable, reason: {reason}` |
+| `checklist.applicability-changed` | `section {id}:` then `applicable` or `not applicable, reason sha256 {hex}` |
 | `user.created` | `user 'bob', role Reviewer` |
 | `user.enabled`, `user.disabled` | `user 'bob'` |
 | `user.role-changed` | `user 'bob': Reviewer -> Admin` |
@@ -138,7 +138,6 @@ sign-in event can be missing from the trail when the write fails. Null arguments
   flooding of the trail for existing accounts. Failed attempts for unknown user names (recorded as `unknown user`) are
   not throttled in this slice, so an unauthenticated caller can grow the trail; rate limiting is a later hardening
   step.
-- The justification given for marking a checklist section not applicable is stored in full in the entry detail.
 - A wrong *current* password typed on the signing dialog or on the account page appears as `auth.sign-in-failed`,
   because it passes through the same failure path of `UserService`; the action code does not tell where it happened.
 - The trail has no export and no retention or archiving function in this slice.

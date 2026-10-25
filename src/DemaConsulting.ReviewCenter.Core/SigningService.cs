@@ -424,7 +424,7 @@ public sealed class SigningService
     }
 
     /// <summary>
-    ///     Words the members of a slot for the audit trail.
+    ///     Writes the members of a slot for the audit trail.
     /// </summary>
     /// <param name="primaryUserId">The primary reviewer.</param>
     /// <param name="alternateUserId">The alternate reviewer, or <c>null</c>.</param>

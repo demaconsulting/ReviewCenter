@@ -479,8 +479,8 @@ head hash is a manual step, and it is most useful after important events such as
   recorded without throttling, so the trail can grow quickly if someone guesses user names.
 - A wrong current password at a signature or on the account page is recorded as `auth.sign-in-failed`, because it is
   checked in the same way as a sign-in and counts toward the same lockout.
-- Comments and justifications are recorded only as a short digest, but the reason given for marking a checklist section
-  not applicable is recorded in full in the entry detail.
+- Comments, justifications, and the reason for marking a checklist section not applicable are recorded only as a short
+  digest, never as text.
 - There is no export and no retention or archiving of the trail, and no external anchoring.
 - The audit trail is a new table. A development database created before it existed must be recreated (see the next
   section).

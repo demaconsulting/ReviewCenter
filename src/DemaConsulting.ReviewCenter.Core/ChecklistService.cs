@@ -136,7 +136,7 @@ public sealed class ChecklistService
                 "checklist.applicability-changed",
                 applicable
                     ? $"section {sectionId}: applicable"
-                    : $"section {sectionId}: not applicable, reason: {trimmedReason}",
+                    : $"section {sectionId}: not applicable, reason sha256 {AuditText.ShortHash(trimmedReason)}",
                 projectId,
                 reviewId),
             cancellationToken);

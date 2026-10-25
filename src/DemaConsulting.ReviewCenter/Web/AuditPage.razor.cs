@@ -161,6 +161,8 @@ public partial class AuditPage : ComponentBase
         ErrorMessage = null;
         if (!await RequireAdministratorAsync())
         {
+            // A refusal must leave nothing of the trail on screen
+            Page = null;
             return;
         }
 

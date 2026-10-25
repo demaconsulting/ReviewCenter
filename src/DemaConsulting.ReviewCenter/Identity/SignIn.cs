@@ -198,10 +198,10 @@ internal static class SignIn
                     return Results.BadRequest();
                 }
 
-                // The actor is read before the cookie is cleared; nobody signed in means nothing to record
+                // The actor is read and the entry recorded before the cookie is cleared; nobody signed in means
+                // nothing to record
                 var username = http.User.Identity?.IsAuthenticated == true ? http.User.Identity.Name : null;
                 var displayName = http.User.FindFirstValue(DisplayNameClaimType);
-                await http.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
                 if (!string.IsNullOrEmpty(username) && !string.IsNullOrEmpty(displayName))
                 {
                     await audit.TryRecordAsync(
@@ -209,6 +209,7 @@ internal static class SignIn
                         http.RequestAborted);
                 }
 
+                await http.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
                 return Results.LocalRedirect("/");
             });
 
