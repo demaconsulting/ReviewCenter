@@ -45,6 +45,8 @@ handled by the page. The inputs carry the maximum lengths as a convenience; the 
 
 #### Dependencies
 
+- **SessionGate** (App) — wraps the whole page content, so the page is replaced by a "Session ended" message when the
+  sign-in state of the open page ends.
 - **ProjectService** — creates and lists projects.
 - **ASP.NET Core Blazor components** — the component base class, events, the authorization attribute, and the
   interactive server render mode.

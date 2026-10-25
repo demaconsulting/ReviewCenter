@@ -77,6 +77,8 @@ an upload limit is shown as an error message. Other exceptions are not handled b
 
 #### Dependencies
 
+- **SessionGate** (App) — wraps the whole page content, so the page is replaced by a "Session ended" message when the
+  sign-in state of the open page ends.
 - **ProjectService** — reads the project.
 - **ReviewService** — lists and creates reviews.
 - **SigningService** — computes whether each review is approved.

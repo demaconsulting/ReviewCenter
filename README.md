@@ -204,10 +204,15 @@ Rules:
 - **Last administrator**: the last enabled administrator cannot be disabled or demoted.
 - **Sign-in session**: a session cookie that lasts 8 hours of activity by default; change it with the `Auth` setting
   below.
+- **Open pages**: a page that stays open re-checks its user every 30 seconds by default. When the user was disabled,
+  removed, or had the name or role changed, the page is replaced by a "Session ended" message with a link to sign in
+  again. If the user cannot be checked (for example the database is unavailable), the session is treated as ended.
+  Change the interval with the `Auth` setting below.
 
-| Setting             | Environment variable | Meaning                                                  |
-| ------------------- | -------------------- | -------------------------------------------------------- |
-| `Auth:SessionHours` | `Auth__SessionHours` | Hours of sign-in session (default 8; must be above 0)    |
+| Setting                    | Environment variable        | Meaning                                                   |
+| -------------------------- | --------------------------- | --------------------------------------------------------- |
+| `Auth:SessionHours`        | `Auth__SessionHours`        | Hours of sign-in session (default 8; above 0)             |
+| `Auth:RevalidationSeconds` | `Auth__RevalidationSeconds` | Seconds between open-page checks (default 30; at least 5) |
 
 The sign-in cookie is marked Secure when the request arrives over HTTPS. Behind a reverse proxy that ends TLS, set
 `ASPNETCORE_FORWARDEDHEADERS_ENABLED=true` so that the server sees the original HTTPS scheme and marks the cookie
@@ -269,10 +274,12 @@ non-zero exit code.
   behind a reverse proxy) when the server is reachable from other machines.
 - **Lockout is per user name**: repeated failed sign-ins lock the user name, not the source address, so someone who
   guesses wrongly on purpose can keep a user locked out for 5 minutes at a time.
-- **Sessions are not cut short at once**: a page that is already open keeps its sign-in state until it is reloaded,
-  and changing a password does not end the user's other sessions. Disabling a user or changing a role takes effect
-  on the next page load. The exception is user administration: every action there is re-checked and refused for a
-  user who is no longer an enabled administrator.
+- **Sessions are not cut short at once**: a user who is disabled, removed, or changed is signed out of an open page
+  only at its next check, so for up to the interval (30 seconds by default; `Auth:RevalidationSeconds`) the open
+  page still accepts actions that are not re-checked, such as answering checks and adding comments and threads.
+  Signing, changing reviewer slots, and user administration re-check the account on every action and are refused at
+  once. The name in the page header stays the same until you navigate or reload the page, and changing a password
+  does not end the user's other sessions.
 - **Checklists are fixed per review**: every review gets a copy of the default checklist when it is created and
   keeps it; there is no project-level checklist editor or import yet. Checklist answers are not linked to comment
   threads.
@@ -280,10 +287,6 @@ non-zero exit code.
   can be changed.
 - **Signed slots cannot be changed**: a reviewer slot that has any signature cannot be reassigned or removed; to
   change the reviewers after a signature, add a new slot. Anyone who is signed in can add and change unsigned slots.
-- **A disabled user can keep acting on an open page**: a user disabled while a page is open can keep answering
-  checks and adding comments and threads on that page until it is reloaded. Signing and changing reviewer slots
-  re-check the account and are refused for a disabled user. Revalidating the sign-in state of open pages is planned
-  as a separate follow-up.
 - **No tamper-evident audit trail yet**: signatures are kept and never changed by the application, but the history is
   not yet protected by a hash chain, so a person with direct access to the database file could alter it undetected.
   A hash-chained audit trail is planned for a later release.

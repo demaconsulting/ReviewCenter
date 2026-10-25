@@ -52,9 +52,12 @@ sections:
       - id: ReviewCenter-UsersPage-AdminCheck
         title: >-
           The UsersPage unit shall refuse every create or change action, showing an error and changing nothing,
-          when the signed-in user is no longer an enabled administrator in the user store.
+          when the signed-in user is no longer an enabled administrator in the user store, or nobody is signed in
+          any more.
         justification: |
-          An open page keeps the sign-in state it started with, so a user who was demoted or disabled after
-          opening the page must not be able to go on managing users.
+          An open page can keep the sign-in state it started with for up to one revalidation interval, so a user
+          who was demoted or disabled after opening the page must not be able to go on managing users in that
+          time. The check is made on every action, so it does not wait for the next revalidation.
         tests:
           - UsersPage_Action_SignedInAdminLaterDemoted_IsRefusedWithError
+          - UsersPage_Action_SessionEndedBeforePageKnows_ShowsClearErrorAndChangesNothing

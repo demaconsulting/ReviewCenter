@@ -319,7 +319,11 @@ public partial class ReviewPage : ComponentBase
         Checklist = await ChecklistService.GetAsync(ProjectId, ReviewId);
         Approval = await SigningService.GetApprovalAsync(ProjectId, ReviewId);
         Candidates = await SigningService.ListCandidatesAsync();
-        CurrentUsername = (await AuthenticationState.GetActorAsync()).Username;
+
+        // Read the user name from the state, not from GetActorAsync: when the sign-in state of an open page has
+        // just ended, this reload must not fail; the page is replaced by the session-ended message instead
+        var principal = (await AuthenticationState.GetAuthenticationStateAsync()).User;
+        CurrentUsername = principal.Identity?.IsAuthenticated == true ? principal.Identity.Name ?? string.Empty : string.Empty;
     }
 
     /// <summary>

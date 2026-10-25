@@ -53,8 +53,10 @@ administrator is refused by Core and shown as a message.
 Every change reloads the list, whether or not it succeeded, so the rows show what is stored, and clears the unsaved
 role choices. Every change first goes through one shared step (`RunAsync`) that reads the signed-in user from the
 authentication state and looks the user up in the user store; unless that user is enabled and has the `Admin` role,
-the action is not run, nothing is reloaded, and the message "Administrator rights are required." is shown. This is
-needed because an open page keeps the principal it started with.
+the action is not run, nothing is reloaded, and the message "Administrator rights are required." is shown. This check is
+kept on every action although the page itself is replaced when the sign-in state ends (see `SessionGate`), because an
+open page can keep its state for up to one revalidation interval after the user was demoted or disabled. When the state
+has already ended, `GetActorAsync` refuses with a rule violation, which `RunAsync` catches and shows as a message.
 
 **OnAfterRender**: Marks the page interactive after the first render on a live connection.
 
@@ -65,11 +67,14 @@ checked against the stored user (see the `Identity` design).
 
 A `DomainRuleException` from `UserService` is caught and its message shown in the page; no other exception is handled
 by the page. An action by a signed-in user who is no longer an enabled administrator is refused with the message
-"Administrator rights are required." The inputs carry the maximum lengths as a convenience; the service remains the
-authority. Passwords are never shown or logged.
+"Administrator rights are required." A state that has already ended is shown with the message of the refusal ("You are
+no longer signed in, so nothing was saved. Reload the page to sign in again."). The inputs carry the maximum lengths as
+a convenience; the service remains the authority. Passwords are never shown or logged.
 
 #### Dependencies
 
+- **SessionGate** (App) — wraps the whole page content, so the page is replaced by a "Session ended" message when the
+  sign-in state of the open page ends.
 - **UserService** — lists, creates, and changes users, and looks up the signed-in user.
 - **AuthenticationStateProvider** (ASP.NET Core) — gives the signed-in user; read through the `Identity` helper that
   turns it into an `Actor`.

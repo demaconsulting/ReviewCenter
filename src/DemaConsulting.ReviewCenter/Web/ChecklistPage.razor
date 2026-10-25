@@ -7,13 +7,17 @@
    with Pass / Fail / N/A buttons. Fail and N/A ask for a justification next to the buttons. Every interactive
    element and every key value carries a stable kebab-case data-testid (section and check ids are lower-cased,
    for example "check-pass-req-01"), and the data-interactive marker on the root flips to "true" once the live
-   circuit is connected. *@
+   circuit is connected.
+
+   The page body is inside SessionGate, which replaces it with a "Session ended" message when the user is no longer
+   valid while the page is open. *@
 @page "/projects/{ProjectId:int}/reviews/{ReviewId}/checklist"
 @rendermode InteractiveServer
 @attribute [Authorize]
 
 <PageTitle>Checklist - @(Review?.Id ?? "Review") - ReviewCenter</PageTitle>
 
+<SessionGate>
 <main class="page" data-testid="checklist-page" data-interactive="@InteractiveMarker">
     <nav class="breadcrumb">
         <a href="/" data-testid="home-link">ReviewCenter</a>
@@ -171,3 +175,4 @@
         </ul>
     }
 </main>
+</SessionGate>

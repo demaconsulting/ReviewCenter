@@ -1,8 +1,9 @@
 ---
 # Software Unit Requirements for the App Unit
 #
-# The App unit is the HTML shell (App.razor) and the router (Routes.razor) that select the
-# page for a requested URL.
+# The App unit is the HTML shell (App.razor), the router (Routes.razor), the header layout (MainLayout.razor), and the
+# SessionGate component that selects the page for a requested URL and keeps an open protected page from showing
+# data after the sign-in state of its user has ended.
 
 sections:
   - title: App Unit Requirements
@@ -53,3 +54,20 @@ sections:
           - Routes_Render_ReviewerOpensUsersRoute_ShowsAccessDeniedNotUserList
           - Routes_Render_AdminOpensUsersRoute_ShowsUsersPage
           - Routes_Render_AnonymousOpensProjectsRoute_ShowsLoginLinkNotPage
+
+      - id: ReviewCenter-App-SessionGate
+        title: >-
+          The App unit shall show the content of a protected page only while a user is signed in, and shall
+          replace the whole page, as soon as the sign-in state of the open page ends, with a message that the
+          session has ended and a link to the login page that returns to the same page, leaving no page content
+          and no control on the page.
+        justification: |
+          The header and the router are served once and cannot react when the sign-in state of an open page
+          ends. Only a component inside the page can. Without it, ending the sign-in state of a user who was
+          disabled, removed, or changed would change nothing the user sees, and the page would go on showing
+          review data and offering actions.
+        tests:
+          - SessionGate_Render_SignedInUser_ShowsContent
+          - SessionGate_Render_Anonymous_ShowsSessionEndedWithLoginLinkAndNoContent
+          - SessionGate_Render_StateBecomesAnonymous_ReplacesContentWithMessage
+          - SessionGate_Render_EveryProtectedPageSignedOut_ShowsSessionEndedAndNoPage

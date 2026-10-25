@@ -26,7 +26,10 @@ N/A - standard test environment (temporary SQLite databases are created by the t
   administrator.
 - Signing out ends the session.
 - A session ends when its user is disabled or its role changes.
-- The actor is built from the signed-in user, and asking for it without a signed-in user is an error.
+- The actor is built from the signed-in user, and asking for it without a signed-in user is refused with a message
+  that says nothing was saved.
+- The cookie check and the re-check of open pages share one rule, and the interval of the re-check has a default of
+  30 seconds and a minimum of 5.
 - The login page shows the error only after a failed sign-in, and carries only a safe return URL.
 
 #### Test Scenarios
@@ -85,8 +88,22 @@ old cookie is no longer accepted, so the users page redirects to the login page.
 
 **SignIn_GetActorAsync_SignedInAndAnonymous_ReturnsActorOrThrows**: The actor is requested from an authentication
 state with a signed-in user and from one with nobody; the first gives the user name and display name of the user and
-the second throws an `InvalidOperationException`. This scenario is tested by
+the second throws a `DomainRuleException` of the rule `ActorNotAllowed` whose message says that nothing was saved and
+that the page must be reloaded. This scenario is tested by
 `SignIn_GetActorAsync_SignedInAndAnonymous_ReturnsActorOrThrows`.
+
+**SignIn_IsCurrent_StoredUserVersusPrincipal_FollowsTheRule**: The shared rule is called with a stored user and a
+principal; an enabled user with the same role and display name is current, and a disabled user, another role, or
+another display name is not. This scenario is tested by `SignIn_IsCurrent_StoredUserVersusPrincipal_FollowsTheRule`.
+
+**SignIn_IsCurrent_MissingPrincipalUserOrClaims_ReturnsFalse**: The shared rule is called with a missing principal, a
+missing stored user, and a principal without the role claim or without the user name claim; each is not current. This
+scenario is tested by `SignIn_IsCurrent_MissingPrincipalUserOrClaims_ReturnsFalse`.
+
+**AuthOptions_RevalidationSeconds_Default_IsThirtyWithMinimumFive**: The default of the re-check interval of open pages
+is 30 seconds, and the minimum that the options accept is 5 seconds. The refusal of a smaller value at start-up is
+verified by the `Hosting` unit test `ServerHost_CreateApplication_RevalidationSecondsBelowMinimum_ThrowsClearError`.
+This scenario is tested by `AuthOptions_RevalidationSeconds_Default_IsThirtyWithMinimumFive`.
 
 **SignIn_AddSignIn_NullArguments_Throw**: The registration method is called with null arguments; an
 `ArgumentNullException` is thrown. This scenario is tested by `SignIn_AddSignIn_NullArguments_Throw`.

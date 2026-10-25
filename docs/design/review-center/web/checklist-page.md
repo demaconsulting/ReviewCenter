@@ -91,11 +91,15 @@ appears when this page is next loaded or changed; nothing is pushed.
 #### Error Handling
 
 A review that does not exist, and a review without a checklist, are shown as messages on the page. Checklist rule
-violations are shown as messages next to the control that caused them and never end the connection. The page raises
+violations, and the refusal of an action whose sign-in state has already ended ("You are no longer signed in, so nothing
+was saved. Reload the page to sign in again."), are shown as messages next to the control that caused them and never end
+the connection. The page raises
 no other errors of its own.
 
 #### Dependencies
 
+- **SessionGate** (App) — wraps the whole page content, so the page is replaced by a "Session ended" message when the
+  sign-in state of the open page ends.
 - **ReviewService** — reads the review.
 - **ChecklistService** — reads the checklist and records answers and section decisions.
 - **ProjectService** — reads the name of the owning project for the breadcrumb.

@@ -4,7 +4,8 @@
 # PURPOSE:
 # - Define requirements for the ReviewCenter Web subsystem
 # - The Web subsystem spans the App (App.razor, Routes.razor, MainLayout.razor), HomePage, ProjectsPage, ProjectPage,
-#   ReviewPage, ChecklistPage, LoginPage, AccountPage, and UsersPage units
+#   ReviewPage, ChecklistPage, LoginPage, AccountPage, and UsersPage units; the App unit includes the SessionGate
+#   component that replaces an open protected page when the sign-in state of its user ends
 # - Subsystem requirements describe the externally visible behavior of the web user interface
 # - The subsystem tests run over plain HTTP, so they verify what the server renders: the pages, the read path from
 #   the database, and the initial not-yet-interactive marker. Behavior that needs a live connection (forms,
@@ -177,6 +178,26 @@ sections:
         tests:
           - IdentitySubsystem_SignInJourney_LoginUseAndLogout_WorksEndToEnd
           - WebSubsystem_AllPages_EveryInteractiveElementHasTestId
+
+      - id: ReviewCenter-Web-SessionEnd
+        title: >-
+          The Web subsystem shall make an open protected page, when its user is no longer valid, stop showing
+          data and stop offering actions by replacing the page with a message that the session has ended and a
+          link to the login page, and shall, until then, refuse every action of a user administration page that
+          is no longer made by an enabled administrator.
+        justification: |
+          A page that stays open makes no request, so a user who was disabled, removed, or given another role
+          would otherwise keep seeing and changing review data until the page is reloaded. The page is replaced
+          once the sign-in state of the page ends, which happens at most one revalidation interval after the
+          change; the header is served once and keeps the old name until the next navigation. The component tests
+          of the page units cover the live pages, because ending an open page needs a live connection.
+        children:
+          - ReviewCenter-App-SessionGate
+          - ReviewCenter-UsersPage-AdminCheck
+        tests:
+          - ReviewPage_Revalidation_UserDisabled_PageStopsShowingAndAcceptingActions
+          - UsersPage_Revalidation_AdminDemoted_PageShowsSessionEndedAndNoActions
+          - SessionGate_Render_EveryProtectedPageSignedOut_ShowsSessionEndedAndNoPage
 
       - id: ReviewCenter-Web-TestIds
         title: >-

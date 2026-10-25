@@ -12,6 +12,7 @@ includes:
   - docs/reqstream/review-center/identity.yaml
   - docs/reqstream/review-center/identity/password-hasher.yaml
   - docs/reqstream/review-center/identity/sign-in.yaml
+  - docs/reqstream/review-center/identity/revalidating-authentication-state-provider.yaml
   - docs/reqstream/review-center/program.yaml
   - docs/reqstream/review-center/cli.yaml
   - docs/reqstream/review-center/cli/context.yaml

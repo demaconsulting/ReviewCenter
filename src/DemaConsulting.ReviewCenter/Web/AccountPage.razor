@@ -2,13 +2,17 @@
 
    Presentation only; state and event handling live in AccountPage.razor.cs. Every interactive element and
    every key value carries a stable kebab-case data-testid, and the data-interactive marker on the root flips
-   to "true" once the live circuit is connected. *@
+   to "true" once the live circuit is connected.
+
+   The page body is inside SessionGate, which replaces it with a "Session ended" message when the user is no longer
+   valid while the page is open. *@
 @page "/account"
 @rendermode InteractiveServer
 @attribute [Authorize]
 
 <PageTitle>Account - ReviewCenter</PageTitle>
 
+<SessionGate>
 <main class="page" data-testid="account-page" data-interactive="@InteractiveMarker">
     <nav class="breadcrumb">
         <a href="/" data-testid="home-link">ReviewCenter</a>
@@ -49,3 +53,4 @@
         </form>
     </section>
 </main>
+</SessionGate>

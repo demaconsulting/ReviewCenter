@@ -228,6 +228,35 @@ public class ServerHostTests
     }
 
     /// <summary>
+    ///     Test that a re-check interval below the minimum stops the build with an error naming the setting.
+    /// </summary>
+    [Fact]
+    public void ServerHost_CreateApplication_RevalidationSecondsBelowMinimum_ThrowsClearError()
+    {
+        // Arrange: configuration with a re-check interval of 4 seconds
+        using var context = Context.Create(["serve", "--silent"]);
+        var options = new ServerHostOptions
+        {
+            MapStaticAssets = false,
+            ConfigureBuilder = builder =>
+            {
+                builder.WebHost.UseTestServer();
+                builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
+                {
+                    ["Database:ConnectionString"] = TestDatabase.NewConnectionString(),
+                    ["Auth:RevalidationSeconds"] = "4"
+                });
+            }
+        };
+
+        // Act: create the application
+        var exception = Assert.Throws<InvalidOperationException>(() => ServerHost.CreateApplication(context, options));
+
+        // Assert: the message names the setting
+        Assert.Contains("Auth:RevalidationSeconds", exception.Message, StringComparison.Ordinal);
+    }
+
+    /// <summary>
     ///     Test that the host registers the user service next to the other domain services.
     /// </summary>
     [Fact]

@@ -187,4 +187,103 @@ public class AppTests : PageTestBase
             "/login?ReturnUrl=" + Uri.EscapeDataString("/projects"),
             cut.Find("[data-testid='access-denied-login-link']").GetAttribute("href"));
     }
+
+    /// <summary>
+    ///     Test that the session gate shows its content, and nothing of its own, while the user is signed in.
+    /// </summary>
+    [Fact]
+    public void SessionGate_Render_SignedInUser_ShowsContent()
+    {
+        // Arrange: a signed-in user (the default)
+
+        // Act: render the gate around some content
+        var cut = Render<SessionGate>(parameters => parameters.AddChildContent("<p data-testid=\"inner\">Inside</p>"));
+
+        // Assert: the content is shown and the session-ended message is not
+        Assert.Equal("Inside", cut.Find("[data-testid='inner']").TextContent);
+        Assert.Empty(cut.FindAll("[data-testid='session-ended']"));
+    }
+
+    /// <summary>
+    ///     Test that the session gate shows the session-ended message with a login link that returns to the page,
+    ///     and none of its content, when nobody is signed in.
+    /// </summary>
+    [Fact]
+    public void SessionGate_Render_Anonymous_ShowsSessionEndedWithLoginLinkAndNoContent()
+    {
+        // Arrange: nobody is signed in and the page is at /projects/1
+        SignOut();
+        Services.GetRequiredService<NavigationManager>().NavigateTo("/projects/1");
+
+        // Act: render the gate around some content
+        var cut = Render<SessionGate>(parameters => parameters.AddChildContent("<p data-testid=\"inner\">Inside</p>"));
+
+        // Assert: the message names what happened, the link returns to this page, and the content is gone
+        Assert.Contains("Session ended", cut.Find("[data-testid='session-ended'] h1").TextContent, StringComparison.Ordinal);
+        Assert.Equal(
+            "/login?ReturnUrl=" + Uri.EscapeDataString("/projects/1"),
+            cut.Find("[data-testid='session-ended-login-link']").GetAttribute("href"));
+        Assert.Empty(cut.FindAll("[data-testid='inner']"));
+    }
+
+    /// <summary>
+    ///     Test that an open gate replaces its content by the session-ended message when the sign-in state of the
+    ///     page becomes anonymous.
+    /// </summary>
+    [Fact]
+    public void SessionGate_Render_StateBecomesAnonymous_ReplacesContentWithMessage()
+    {
+        // Arrange: a signed-in user and a gate that shows its content
+        var cut = Render<SessionGate>(parameters => parameters.AddChildContent("<p data-testid=\"inner\">Inside</p>"));
+        Assert.NotEmpty(cut.FindAll("[data-testid='inner']"));
+
+        // Act: the sign-in state ends
+        SignOut();
+
+        // Assert: the content is replaced by the message
+        cut.WaitForAssertion(() =>
+        {
+            Assert.NotEmpty(cut.FindAll("[data-testid='session-ended']"));
+            Assert.Empty(cut.FindAll("[data-testid='inner']"));
+        });
+    }
+
+    /// <summary>
+    ///     Test that every protected page is wrapped in the session gate, so that none is left showing data or
+    ///     actions to somebody who is no longer signed in.
+    /// </summary>
+    /// <param name="page">The page to render.</param>
+    /// <param name="rootTestId">The test id of the root element of the page.</param>
+    [Theory]
+    [InlineData("ProjectsPage", "projects-page")]
+    [InlineData("ProjectPage", "project-page")]
+    [InlineData("ReviewPage", "review-page")]
+    [InlineData("ChecklistPage", "checklist-page")]
+    [InlineData("AccountPage", "account-page")]
+    [InlineData("UsersPage", "users-page")]
+    public void SessionGate_Render_EveryProtectedPageSignedOut_ShowsSessionEndedAndNoPage(string page, string rootTestId)
+    {
+        // Arrange: nobody is signed in
+        SignOut();
+        JSInterop.Mode = JSRuntimeMode.Loose;
+        var noParameters = new Dictionary<string, object>();
+        var projectParameters = new Dictionary<string, object> { ["ProjectId"] = 1 };
+        var reviewParameters = new Dictionary<string, object> { ["ProjectId"] = 1, ["ReviewId"] = "REV-1" };
+        var (type, parameters) = page switch
+        {
+            "ProjectsPage" => (typeof(ProjectsPage), noParameters),
+            "ProjectPage" => (typeof(ProjectPage), projectParameters),
+            "ReviewPage" => (typeof(ReviewPage), reviewParameters),
+            "ChecklistPage" => (typeof(ChecklistPage), reviewParameters),
+            "AccountPage" => (typeof(AccountPage), noParameters),
+            _ => (typeof(UsersPage), noParameters)
+        };
+
+        // Act: render the page
+        var cut = Render<DynamicComponent>(p => p.Add(c => c.Type, type).Add(c => c.Parameters, parameters));
+
+        // Assert: the session-ended message is shown instead of the page
+        Assert.NotEmpty(cut.FindAll("[data-testid='session-ended']"));
+        Assert.Empty(cut.FindAll($"[data-testid='{rootTestId}']"));
+    }
 }

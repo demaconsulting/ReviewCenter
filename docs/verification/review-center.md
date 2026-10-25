@@ -63,6 +63,9 @@ loopback TCP ports.
   second user with the same user name is refused; a missing password gives an error and exit code 1.
 - A user signs in with the user name and password, uses the protected pages as that user, and signs out; only
   signed-in users reach the protected pages, and only administrators reach the users page.
+- An open page re-checks its user at a fixed interval; when the user is disabled, removed, or changed, the page
+  stops showing and accepting actions and shows a message that the session ended, and a user who cannot be checked is
+  treated as signed out.
 - Review comments (threads, replies, and resolve state) are presented by the review page and are kept after the
   database is reopened; each is attributed to the signed-in user.
 - The review checklist (answers, applicability, and the frozen snapshot) is presented by the checklist and review
@@ -211,6 +214,11 @@ by `IdentitySubsystem_SignInJourney_LoginUseAndLogout_WorksEndToEnd`. In a secon
 redirects an anonymous request to the login page, and the users page is refused to a reviewer and served to an
 administrator. These scenarios are tested by `SignIn_ProtectedPage_Anonymous_RedirectsToLogin` and
 `SignIn_UsersPage_ReviewerAndAdmin_OnlyAdminIsAllowed`.
+
+**Open session ends**: A user is signed in on the real pipeline and the authentication state provider of a new scope
+(a circuit) is checked; the user is valid. The user is then disabled through the user service and the check is
+repeated; the user is no longer valid, which is what makes an open page show the "Session ended" message. This
+scenario is tested by `IdentitySubsystem_Revalidation_UserDisabledAfterSignIn_OpenSessionIsNoLongerValid`.
 
 **Users and passwords**: Users are created, signed in with in any case of the user name, locked after repeated
 failures, and protected against the loss of the last administrator through the domain service, and users and

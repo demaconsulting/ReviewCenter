@@ -69,9 +69,10 @@ The ReviewCenter system is divided as follows:
 - **Cli** (subsystem): argument parsing and output; contains the Context unit
 - **Hosting** (subsystem): builds and runs the ASP.NET Core web host for the `serve` verb and creates users for the
   `user add` verb; contains the ServerHost and UserCommand units
-- **Identity** (subsystem): the web side of local accounts, cookie sign-in and authorization; contains the
-  PasswordHasher and SignIn units
-- **Web** (subsystem): the Blazor Server user interface; contains the App unit (HTML shell and router),
+- **Identity** (subsystem): the web side of local accounts, cookie sign-in and authorization, and the periodic re-check
+  of the user of an open page; contains the PasswordHasher, SignIn, and RevalidatingAuthenticationStateProvider units
+- **Web** (subsystem): the Blazor Server user interface; contains the App unit (HTML shell, router, page frame, and the
+  SessionGate that replaces an open page when its user is no longer signed in),
   the HomePage unit, the ProjectsPage, ProjectPage, ReviewPage, and ChecklistPage units, and the LoginPage,
   AccountPage, and UsersPage units
 - **Core** (subsystem): the domain model and rules for projects, reviews, review comments, review checklists,

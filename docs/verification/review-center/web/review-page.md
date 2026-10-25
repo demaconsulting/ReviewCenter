@@ -70,6 +70,10 @@ N/A - standard test environment.
 - Thread and comment text is shown as plain text, never as markup, and every interactive control, including every
   control of the Reviewers card, has a `data-testid`.
 - The interactive marker is `true` after the page has rendered on a live connection.
+- When the user of the open page is disabled, the page is replaced by the "Session ended" message: its forms, the
+  typed text, and the sign form are gone, and a stale submission of the thread form or the sign form stores nothing. A
+  thread started after the session ended, before the page learned of it, shows an error that says the user is no
+  longer signed in and stores nothing.
 
 #### Test Scenarios
 
@@ -267,3 +271,14 @@ card has a `data-testid`. This scenario is tested by
 
 **ReviewPage_AfterRender_Interactive_SetsMarker**: The page is rendered; its root element has `data-interactive`
 equal to `true`. This scenario is tested by `ReviewPage_AfterRender_Interactive_SetsMarker`.
+
+**ReviewPage_Revalidation_UserDisabled_PageStopsShowingAndAcceptingActions**: A signable review is open for a user
+whose sign-in state is re-checked every 100 milliseconds, with a file selected and text typed. The user is disabled;
+within the limit of 10 seconds the "Session ended" message appears, and the page, the thread form, the sign form and
+button, and the typed text are gone. Submitting the stale thread form and sign form stores no thread and no signature.
+This scenario is tested by `ReviewPage_Revalidation_UserDisabled_PageStopsShowingAndAcceptingActions`.
+
+**ReviewPage_StartThread_SessionEndedBeforePageKnows_ShowsClearErrorAndStoresNothing**: A file is selected and text is
+typed, and the sign-in state ends without the page being told; the thread form is submitted. The thread error says
+that the user is no longer signed in, and no thread exists. This scenario is tested by
+`ReviewPage_StartThread_SessionEndedBeforePageKnows_ShowsClearErrorAndStoresNothing`.

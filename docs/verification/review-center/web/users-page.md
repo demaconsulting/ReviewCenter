@@ -25,6 +25,9 @@ N/A - standard test environment.
 - Disabling or demoting the last enabled administrator is refused with an error.
 - An action is refused with an error, and changes nothing, when the signed-in administrator was demoted or disabled
   after the page was opened.
+- When the sign-in state of the open page ends because the administrator was demoted, the page is replaced by the
+  "Session ended" message and offers no actions; an action sent after the session ended, before the page learned of
+  it, shows an error that says the user is no longer signed in and changes nothing.
 
 #### Test Scenarios
 
@@ -62,3 +65,14 @@ administrator. This scenario is tested by `UsersPage_LastAdmin_DisableOrDemote_I
 administrator opens the page; that administrator is then demoted, and the disable button of the reviewer is used; an
 error that mentions the administrator is shown, and the reviewer stays enabled. This scenario is tested by
 `UsersPage_Action_SignedInAdminLaterDemoted_IsRefusedWithError`.
+
+**UsersPage_Revalidation_AdminDemoted_PageShowsSessionEndedAndNoActions**: Two administrators and a reviewer exist and
+one administrator has the page open, with the sign-in state re-checked every 100 milliseconds; that administrator is
+demoted. Within the limit of 10 seconds the "Session ended" message appears, the page and the user controls are gone,
+a click on the stale button changes nothing, and the reviewer is still enabled. This scenario is tested by
+`UsersPage_Revalidation_AdminDemoted_PageShowsSessionEndedAndNoActions`.
+
+**UsersPage_Action_SessionEndedBeforePageKnows_ShowsClearErrorAndChangesNothing**: An administrator has the page open
+and the sign-in state ends without the page being told; the disable button of a user is used. The error area says that
+the user is no longer signed in, and the user is still enabled. This scenario is tested by
+`UsersPage_Action_SessionEndedBeforePageKnows_ShowsClearErrorAndChangesNothing`.

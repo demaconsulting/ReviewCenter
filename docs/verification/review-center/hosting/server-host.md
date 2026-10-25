@@ -24,6 +24,8 @@ N/A - standard test environment.
   against it; data
   survives a second application instance on the same file. The signing service is a single shared instance.
 - A session length that is not positive is reported with an error that names the `Auth:SessionHours` setting.
+- A re-check interval of open pages below 5 seconds is reported with an error that names the
+  `Auth:RevalidationSeconds` setting.
 - An unsupported database provider and an unusable database location are reported as the error "Failed to prepare
   the database", and `RunAsync` returns exit code 1 for each.
 
@@ -76,6 +78,11 @@ is an existing folder; it returns 1, and the context holds the error. This scena
 **ServerHost_CreateApplication_NonPositiveSessionHours_ThrowsClearError**: The pipeline is built with the setting
 `Auth:SessionHours` set to 0; an `InvalidOperationException` whose message names the setting is thrown. This scenario
 is tested by `ServerHost_CreateApplication_NonPositiveSessionHours_ThrowsClearError`.
+
+**ServerHost_CreateApplication_RevalidationSecondsBelowMinimum_ThrowsClearError**: The pipeline is built with the
+setting `Auth:RevalidationSeconds` set to 4, below the minimum of 5; an `InvalidOperationException` whose message names
+the setting is thrown. This scenario is tested by
+`ServerHost_CreateApplication_RevalidationSecondsBelowMinimum_ThrowsClearError`.
 
 **ServerHost_AddServices_Configured_RegistersUserService**: The real pipeline is started on an in-memory server and
 a user is created through the `UserService` taken from the application services; the user is stored with a database

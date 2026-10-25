@@ -338,7 +338,8 @@ public class SignInTests
     }
 
     /// <summary>
-    ///     Test that the actor is built from the claims of the signed-in user, and that nobody signed in is an error.
+    ///     Test that the actor is built from the claims of the signed-in user, and that nobody signed in is a
+    ///     rule violation the page can show.
     /// </summary>
     [Fact]
     public async Task SignIn_GetActorAsync_SignedInAndAnonymous_ReturnsActorOrThrows()
@@ -357,9 +358,72 @@ public class SignInTests
         var actor = await signedIn.GetActorAsync();
         var exception = await Record.ExceptionAsync(() => anonymous.GetActorAsync());
 
-        // Assert: the actor carries the user name and display name; anonymous is refused
+        // Assert: the actor carries the user name and display name; anonymous is refused with a rule violation
+        // (not a fault) so that a page shows the message instead of failing
         Assert.Equal(new Actor("ann", "Ann"), actor);
-        Assert.IsType<InvalidOperationException>(exception);
+        var violation = Assert.IsType<DomainRuleException>(exception);
+        Assert.Equal(DomainRule.ActorNotAllowed, violation.Rule);
+        Assert.Contains("no longer signed in", violation.Message, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    ///     Test that the shared rule accepts a principal only when the stored user is enabled and the role and
+    ///     display name are unchanged.
+    /// </summary>
+    [Theory]
+    [InlineData(true, UserRole.Reviewer, "Ann", "Reviewer", "Ann", true)]
+    [InlineData(true, UserRole.Admin, "Ann", "Admin", "Ann", true)]
+    [InlineData(false, UserRole.Reviewer, "Ann", "Reviewer", "Ann", false)]
+    [InlineData(true, UserRole.Admin, "Ann", "Reviewer", "Ann", false)]
+    [InlineData(true, UserRole.Reviewer, "Ann", "Admin", "Ann", false)]
+    [InlineData(true, UserRole.Reviewer, "Ann B.", "Reviewer", "Ann", false)]
+    public void SignIn_IsCurrent_StoredUserVersusPrincipal_FollowsTheRule(
+        bool enabled, UserRole storedRole, string storedName, string claimRole, string claimName, bool expected)
+    {
+        // Arrange: a stored user and a principal issued with the given claims
+        var user = new User { Id = 1, Username = "ann", DisplayName = storedName, Role = storedRole, Enabled = enabled };
+        var principal = PrincipalWith(claimRole, claimName);
+
+        // Act: apply the rule
+        var current = SignIn.IsCurrent(principal, user);
+
+        // Assert: only an enabled, unchanged user is current
+        Assert.Equal(expected, current);
+    }
+
+    /// <summary>
+    ///     Test that the shared rule refuses a missing principal, a missing user, and a principal without the
+    ///     role or display name claim.
+    /// </summary>
+    [Fact]
+    public void SignIn_IsCurrent_MissingPrincipalUserOrClaims_ReturnsFalse()
+    {
+        // Arrange: a valid stored user, and principals that lack one claim each
+        var user = new User { Id = 1, Username = "ann", DisplayName = "Ann", Role = UserRole.Reviewer, Enabled = true };
+        var noRole = new System.Security.Claims.ClaimsPrincipal(new System.Security.Claims.ClaimsIdentity(
+            [new System.Security.Claims.Claim(SignIn.DisplayNameClaimType, "Ann")], "test"));
+        var noName = new System.Security.Claims.ClaimsPrincipal(new System.Security.Claims.ClaimsIdentity(
+            [new System.Security.Claims.Claim(System.Security.Claims.ClaimTypes.Role, "Reviewer")], "test"));
+
+        // Act and assert: each is refused
+        Assert.False(SignIn.IsCurrent(null, user));
+        Assert.False(SignIn.IsCurrent(PrincipalWith("Reviewer", "Ann"), null));
+        Assert.False(SignIn.IsCurrent(noRole, user));
+        Assert.False(SignIn.IsCurrent(noName, user));
+    }
+
+    /// <summary>
+    ///     Test that the check interval of open pages defaults to 30 seconds and that its minimum is 5.
+    /// </summary>
+    [Fact]
+    public void AuthOptions_RevalidationSeconds_Default_IsThirtyWithMinimumFive()
+    {
+        // Arrange: default settings
+        var options = new AuthOptions();
+
+        // Act and assert: the default and the minimum
+        Assert.Equal(30, options.RevalidationSeconds);
+        Assert.Equal(5, AuthOptions.MinimumRevalidationSeconds);
     }
 
     /// <summary>
@@ -399,6 +463,23 @@ public class SignInTests
         Assert.Equal("Invalid user name or password.", failed.QuerySelector("[data-testid='login-error']")?.TextContent);
         Assert.Equal("/projects/1", failed.QuerySelector("input[name='returnUrl']")?.GetAttribute("value"));
         Assert.Equal("/", hostile.QuerySelector("input[name='returnUrl']")?.GetAttribute("value"));
+    }
+
+    /// <summary>
+    ///     Builds a principal with the claims the application issues, for the given role and display name.
+    /// </summary>
+    /// <param name="role">The role claim value.</param>
+    /// <param name="displayName">The display name claim value.</param>
+    /// <returns>The principal.</returns>
+    private static System.Security.Claims.ClaimsPrincipal PrincipalWith(string role, string displayName)
+    {
+        return new System.Security.Claims.ClaimsPrincipal(new System.Security.Claims.ClaimsIdentity(
+            [
+                new System.Security.Claims.Claim(System.Security.Claims.ClaimTypes.Name, "ann"),
+                new System.Security.Claims.Claim(SignIn.DisplayNameClaimType, displayName),
+                new System.Security.Claims.Claim(System.Security.Claims.ClaimTypes.Role, role)
+            ],
+            "test"));
     }
 
     /// <summary>

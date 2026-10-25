@@ -39,7 +39,8 @@ namespace DemaConsulting.ReviewCenter.Identity;
 ///     authentication cookie. Both endpoints require the antiforgery token. One generic failure redirect covers
 ///     an unknown user, a wrong password, a disabled account and a lockout, so the response does not reveal
 ///     which accounts exist. On every request the cookie is checked against the user store, so a disabled or
-///     changed account has to sign in again. The class is stateless and therefore thread-safe.
+///     changed account has to sign in again; an open page is checked by the same rule, <see cref="IsCurrent"/>,
+///     every <see cref="AuthOptions.RevalidationSeconds"/>. The class is stateless and therefore thread-safe.
 /// </remarks>
 internal static class SignIn
 {
@@ -84,6 +85,10 @@ internal static class SignIn
     ///     it also works on plain http during development); it is a session cookie whose ticket slides over
     ///     <see cref="AuthOptions.SessionHours"/>. An anonymous request for a protected page is redirected to
     ///     <see cref="LoginPath"/>; a signed-in user without the needed role gets a 403 with a short "Access denied" page.
+    ///     The registration of <see cref="RevalidatingAuthenticationStateProvider"/> replaces the framework default and
+    ///     therefore has to be made after the Razor components are added. The settings are checked when they are first
+    ///     used (at start-up): <see cref="AuthOptions.SessionHours"/> must be above 0 and
+    ///     <see cref="AuthOptions.RevalidationSeconds"/> at least <see cref="AuthOptions.MinimumRevalidationSeconds"/>.
     /// </remarks>
     public static IServiceCollection AddSignIn(this IServiceCollection services, IConfiguration configuration)
     {
@@ -92,7 +97,15 @@ internal static class SignIn
 
         services.AddOptions<AuthOptions>()
             .Bind(configuration.GetSection(AuthOptions.SectionName))
-            .Validate(options => options.SessionHours > 0, "Auth:SessionHours must be greater than 0.");
+            .Validate(options => options.SessionHours > 0, "Auth:SessionHours must be greater than 0.")
+            .Validate(
+                options => options.RevalidationSeconds >= AuthOptions.MinimumRevalidationSeconds,
+                $"Auth:RevalidationSeconds must be at least {AuthOptions.MinimumRevalidationSeconds}.");
+
+        // An open page (circuit) re-checks its user through this provider. A plain AddScoped is needed, not
+        // TryAddScoped: AddRazorComponents().AddInteractiveServerComponents() registers the framework default with
+        // TryAdd, and the host calls AddSignIn after it, so this last registration is the one that wins
+        services.AddScoped<AuthenticationStateProvider, RevalidatingAuthenticationStateProvider>();
 
         services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
             .AddCookie(cookie =>
@@ -216,7 +229,16 @@ internal static class SignIn
     /// </summary>
     /// <param name="provider">The authentication state provider of the page. Must not be null.</param>
     /// <returns>The actor built from the claims of the current user.</returns>
-    /// <exception cref="InvalidOperationException">Thrown when nobody is signed in (a protected page was reached anonymously).</exception>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="provider"/> is null.</exception>
+    /// <exception cref="DomainRuleException">
+    ///     Thrown with <see cref="DomainRule.ActorNotAllowed"/> when nobody is signed in. This is what an action
+    ///     on an open page meets when the sign-in state ended (the user was disabled, removed or changed) before
+    ///     the page was replaced; the page shows the message next to the control that was used instead of failing.
+    /// </exception>
+    /// <remarks>
+    ///     A rule violation, not a programming error, because an open page can legitimately lose its user between
+    ///     two clicks. The method reads the state of the provider and changes nothing.
+    /// </remarks>
     public static async Task<Actor> GetActorAsync(this AuthenticationStateProvider provider)
     {
         ArgumentNullException.ThrowIfNull(provider);
@@ -226,7 +248,9 @@ internal static class SignIn
         var displayName = principal.FindFirstValue(DisplayNameClaimType);
         if (string.IsNullOrEmpty(username) || string.IsNullOrEmpty(displayName))
         {
-            throw new InvalidOperationException("Nobody is signed in.");
+            throw new DomainRuleException(
+                DomainRule.ActorNotAllowed,
+                "You are no longer signed in, so nothing was saved. Reload the page to sign in again.");
         }
 
         return new Actor(username, displayName);
@@ -267,14 +291,33 @@ internal static class SignIn
         var username = principal?.Identity?.Name;
         var user = username is null ? null : await users.GetAsync(username, context.HttpContext.RequestAborted);
 
-        if (principal is null
-            || user is null
-            || !user.Enabled
-            || principal.FindFirstValue(ClaimTypes.Role) != user.Role.ToString()
-            || principal.FindFirstValue(DisplayNameClaimType) != user.DisplayName)
+        // The same rule decides for open pages (see RevalidatingAuthenticationStateProvider)
+        if (!IsCurrent(principal, user))
         {
             context.RejectPrincipal();
             await context.HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
         }
+    }
+
+    /// <summary>
+    ///     Decides whether a signed-in principal still matches the stored user it was issued for.
+    /// </summary>
+    /// <param name="principal">The signed-in principal; may be null.</param>
+    /// <param name="user">The user as stored now, or <c>null</c> when there is no such user.</param>
+    /// <returns>
+    ///     <c>true</c> only when both are present, the user is enabled, and the role and display name in the
+    ///     principal are equal to the stored ones; otherwise <c>false</c>.
+    /// </returns>
+    /// <remarks>
+    ///     This is the single rule behind both the cookie check on each request and the periodic check of an open
+    ///     page, so the two cannot drift apart. A changed role or display name counts as not current so that
+    ///     the user signs in again and gets the current values. The method is pure and thread-safe.
+    /// </remarks>
+    internal static bool IsCurrent(ClaimsPrincipal? principal, User? user)
+    {
+        return principal is not null
+            && user is { Enabled: true }
+            && principal.FindFirstValue(ClaimTypes.Role) == user.Role.ToString()
+            && principal.FindFirstValue(DisplayNameClaimType) == user.DisplayName;
     }
 }

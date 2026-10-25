@@ -231,6 +231,56 @@ public class UsersPageTests : PageTestBase
     }
 
     /// <summary>
+    ///     Test that the page of an administrator who was demoted ends its session when the sign-in state is
+    ///     re-checked, so the page and its actions are gone, and nothing is changed.
+    /// </summary>
+    [Fact]
+    public async Task UsersPage_Revalidation_AdminDemoted_PageShowsSessionEndedAndNoActions()
+    {
+        // Arrange: two administrators and a reviewer; one administrator has the page open, re-checked every 100 ms
+        await Users.CreateAsync("root", "Root", UserRole.Admin, Password, TestContext.Current.CancellationToken);
+        await Users.CreateAsync("boss", "Boss", UserRole.Admin, Password, TestContext.Current.CancellationToken);
+        var ann = await Users.CreateAsync("ann", "Ann", UserRole.Reviewer, Password, TestContext.Current.CancellationToken);
+        UseRevalidation(TimeSpan.FromMilliseconds(100));
+        SignInAs("root", "Root", UserRole.Admin);
+        var cut = Render<UsersPage>();
+        var toggle = cut.Find($"[data-testid='user-toggle-enabled-{ann.Id}']");
+
+        // Act: root is demoted, and the next check ends the session
+        await Users.SetRoleAsync("root", UserRole.Reviewer, TestContext.Current.CancellationToken);
+        await cut.WaitForAssertionAsync(
+            () => Assert.NotEmpty(cut.FindAll("[data-testid='session-ended']")),
+            TimeSpan.FromSeconds(10));
+        _ = await Record.ExceptionAsync(() => toggle.ClickAsync());
+
+        // Assert: the page and its actions are gone, and ann is unchanged
+        Assert.Empty(cut.FindAll("[data-testid='users-page']"));
+        Assert.Empty(cut.FindAll($"[data-testid='user-toggle-enabled-{ann.Id}']"));
+        Assert.True((await Users.GetAsync("ann", TestContext.Current.CancellationToken))?.Enabled);
+    }
+
+    /// <summary>
+    ///     Test that an action sent after the session ended, but before the page learned of it, shows a clear
+    ///     message instead of failing the page, and changes nothing.
+    /// </summary>
+    [Fact]
+    public async Task UsersPage_Action_SessionEndedBeforePageKnows_ShowsClearErrorAndChangesNothing()
+    {
+        // Arrange: an administrator with the page open, then the session ends without the page being told
+        await SignInAsNewAdminAsync();
+        var ann = await Users.CreateAsync("ann", "Ann", UserRole.Reviewer, Password, TestContext.Current.CancellationToken);
+        var cut = Render<UsersPage>();
+        SignOutQuietly();
+
+        // Act: try to disable a user
+        await cut.Find($"[data-testid='user-toggle-enabled-{ann.Id}']").ClickAsync();
+
+        // Assert: a message says why, and ann is unchanged
+        Assert.Contains("no longer signed in", cut.Find("[data-testid='users-error']").TextContent, StringComparison.Ordinal);
+        Assert.True((await Users.GetAsync("ann", TestContext.Current.CancellationToken))?.Enabled);
+    }
+
+    /// <summary>
     ///     Creates an enabled administrator in the user store and signs in as that user.
     /// </summary>
     /// <param name="username">The user name of the administrator.</param>

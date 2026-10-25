@@ -190,7 +190,32 @@ instead.
 The sign-in is kept in a session cookie that lasts 8 hours of activity by default and is gone when the browser is
 closed. Change the length with the `Auth:SessionHours` setting (environment variable `Auth__SessionHours`), a number
 of hours above 0; the server does not start when the value is not valid. Disabling a user or changing the role of a
-user takes effect the next time that user loads a page.
+user takes effect the next time that user loads a page, and on a page that is already open at its next check (see
+Session Ended on an Open Page).
+
+| Setting                    | Environment variable        | Meaning                                       |
+| -------------------------- | --------------------------- | --------------------------------------------- |
+| `Auth:SessionHours`        | `Auth__SessionHours`        | Hours of sign-in session (default 8; > 0)     |
+| `Auth:RevalidationSeconds` | `Auth__RevalidationSeconds` | Seconds between open-page checks (default 30) |
+
+### Session Ended on an Open Page
+
+A page that you leave open checks every 30 seconds by default that you are still allowed to use it. Change the
+interval with the `Auth:RevalidationSeconds` setting (environment variable `Auth__RevalidationSeconds`), a number of
+seconds that is at least 5; the server does not start when the value is lower. The check ends your session when your
+user was disabled or removed, or when your user name, display name, or role was changed. When that happens the page
+content is replaced by a **Session ended** message with a link to sign in again, and the page no longer shows data or
+accepts actions. If the check cannot be completed, for example because the database cannot be read, the session is
+treated as ended too, so a user who cannot be verified is never kept signed in.
+
+Some things to know:
+
+- The check is periodic, so for up to one interval after a change the open page still shows its content and accepts
+  actions that are not re-checked, such as answering a checklist check or adding a comment. Signing a review and
+  every action on the Users page check the account again each time and are refused at once.
+- The page header, which shows your display name, keeps the old name until you navigate to another page or reload.
+  Anything you typed on the page that ended is lost, because the page content is replaced.
+- Use the link in the message to sign in again, and you return to the page you were on.
 
 ### Password Rules and Lockout
 
@@ -264,11 +289,10 @@ on the page, and nothing is created.
   sets a new password for a user who forgot it.
 - The lockout counts failures per user name, not per source address, so someone can keep a user name locked by
   guessing wrongly on purpose.
-- A page that is already open keeps its sign-in state until it is reloaded (the user management page is the
-  exception: it refuses every action once you are no longer an enabled administrator, although an action that was
-  already in progress at that moment can still finish), and changing a password does not end the user's other
-  sessions. Opening a page that needs a role from an already open page is checked against the role you had when
-  the page was opened.
+- The sign-in state of an open page is re-checked only every `Auth:RevalidationSeconds` seconds (30 by default), so a
+  disabled or changed user can still use some actions of an open page for up to that long; see Session Ended on an
+  Open Page. Changing a password does not end the user's other sessions. Opening a page that needs a role from an
+  already open page is checked against the role you had when the page was opened.
 
 ## Review Comments
 
@@ -371,9 +395,10 @@ a changed answer), and "Not signed" otherwise. A review is **Approved** when it 
 signed for the current record; it goes back to In review when a change makes a signature out of date. The reviewer then
 signs the new record again; the earlier signatures stay as history.
 
-A user who is disabled while a page is open can keep answering checks and adding comments and threads on that page
-until it is reloaded. Signing and changing reviewer slots check the account again and are refused for a disabled
-user. A separate follow-up will revalidate the sign-in state of open pages.
+A user who is disabled while a page is open is signed out of that page at its next check (every 30 seconds by
+default), and the page is replaced by the Session ended message. Until then the page can still accept actions that are
+not re-checked, such as answering checks and adding comments and threads. Signing and changing reviewer slots check
+the account again on every action and are refused for a disabled user at once.
 
 Approved is computed each time from the record and the signatures; it is not a stored state of the review. The
 signature history is not yet protected by a hash-chained audit trail; that is planned for a later release.

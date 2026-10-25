@@ -29,8 +29,9 @@ This document covers the verification design for the following software items:
   - **Identity** subsystem
     - **PasswordHasher** — password hashing and verification
     - **SignIn** — cookie sign-in, authorization, and the signed-in actor
+    - **RevalidatingAuthenticationStateProvider** — periodic re-check of the user of an open page
   - **Web** subsystem
-    - **App** — HTML shell and router
+    - **App** — HTML shell, router, page frame, and the session gate
     - **HomePage** — home page component
     - **ProjectsPage** — projects list and creation page
     - **ProjectPage** — project page with review creation from uploaded files

@@ -1,0 +1,41 @@
+@* SessionGate: wraps the content of a protected page and replaces it with a "Session ended" message as soon as the
+   signed-in state of the open page becomes anonymous (part of the App unit).
+
+   Each interactive page is its own root component of the circuit, so neither the layout nor the router can react
+   when the sign-in state of an open page ends (see RevalidatingAuthenticationStateProvider); only a component
+   inside the page can. While the user is signed in the gate adds no element of its own, so the markup of the
+   page, including its data-interactive marker, is unchanged. When the state ends, the page content and with it
+   every event handler is removed, so nothing more can be shown or saved from that page, and the user is pointed
+   to the login page. *@
+@using Microsoft.AspNetCore.Components.Authorization
+@inject NavigationManager Navigation
+<AuthorizeView>
+    <Authorized>
+        @ChildContent
+    </Authorized>
+    <NotAuthorized>
+        <main class="page" data-testid="session-ended">
+            <h1>Session ended</h1>
+            <p>
+                You are no longer signed in: your account was disabled, removed, or changed.
+                Nothing you do on this page is saved. Sign in again to continue.
+            </p>
+            <p>
+                <a href="@LoginLink" data-testid="session-ended-login-link">Go to the login page</a>
+            </p>
+        </main>
+    </NotAuthorized>
+</AuthorizeView>
+
+@code {
+    /// <summary>
+    ///     Gets or sets the page content that is shown only while the user is signed in.
+    /// </summary>
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    /// <summary>
+    ///     Gets the login page address that returns to the page the user was on.
+    /// </summary>
+    private string LoginLink => "/login?ReturnUrl=" + Uri.EscapeDataString("/" + Navigation.ToBaseRelativePath(Navigation.Uri));
+}

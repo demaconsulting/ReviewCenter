@@ -3,10 +3,11 @@
 #
 # PURPOSE:
 # - Define requirements for the ReviewCenter Identity subsystem
-# - The Identity subsystem spans PasswordHasher.cs (the password hash adapter) and the sign-in code (cookie
-#   sign-in, the login and logout endpoints, the authorization policy, and the actor of the signed-in user)
-# - Subsystem requirements describe the externally visible behavior of signing in, authorization, and the
-#   identity of the person who acts
+# - The Identity subsystem spans PasswordHasher.cs (the password hash adapter), the sign-in code (cookie
+#   sign-in, the login and logout endpoints, the authorization policy, and the actor of the signed-in user), and
+#   RevalidatingAuthenticationStateProvider.cs (the periodic re-check of the user of an open page)
+# - Subsystem requirements describe the externally visible behavior of signing in, authorization, the end of
+#   open pages of a user who is no longer valid, and the identity of the person who acts
 
 sections:
   - title: Identity Subsystem Requirements
@@ -61,7 +62,8 @@ sections:
       - id: ReviewCenter-Identity-Actor
         title: >-
           The Identity subsystem shall provide the signed-in user as the actor, with user name and display name,
-          for the services that record who acted, and shall fail when nobody is signed in.
+          for the services that record who acted, and shall refuse the action with a message, saving nothing, when
+          nobody is signed in.
         justification: |
           Taking the person who acts from the sign-in, and never from a form field, means nobody can act in the
           name of somebody else, and an action without a user cannot be recorded by mistake.
@@ -69,3 +71,23 @@ sections:
           - ReviewCenter-SignIn-Actor
         tests:
           - IdentitySubsystem_SignInJourney_LoginUseAndLogout_WorksEndToEnd
+
+      - id: ReviewCenter-Identity-CircuitSession
+        title: >-
+          The Identity subsystem shall check, at an interval set in Auth:RevalidationSeconds (30 seconds by
+          default), that the user of every open interactive page still exists, is enabled, and has the same role
+          and display name as at sign-in, using the same rule as for the session cookie, and shall end the
+          sign-in state of that page when the user is not valid or cannot be read.
+        justification: |
+          A page that stays open makes no request, so the check of the session cookie never reaches it. Without
+          a periodic check a user who was disabled, removed, or given another role would keep seeing and changing
+          review data until the page is reloaded. The check fails closed, so a user who cannot be verified does
+          not keep a page. The interval is the longest time such a user can keep an open page.
+        children:
+          - ReviewCenter-RevalidatingAuthenticationStateProvider-Revalidate
+          - ReviewCenter-RevalidatingAuthenticationStateProvider-FailClosed
+          - ReviewCenter-RevalidatingAuthenticationStateProvider-Shutdown
+          - ReviewCenter-SignIn-SessionValidation
+          - ReviewCenter-SignIn-RevalidationSetting
+        tests:
+          - IdentitySubsystem_Revalidation_UserDisabledAfterSignIn_OpenSessionIsNoLongerValid

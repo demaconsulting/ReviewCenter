@@ -1358,4 +1358,67 @@ public class ReviewPageTests : PageTestBase
                 $"A <{element.LocalName}> has no kebab-case data-testid (found '{testId}').");
         }
     }
+
+    /// <summary>
+    ///     Test that when the user of an open review page is disabled, the page stops showing its content and
+    ///     actions, and nothing the stale page could still send is stored.
+    /// </summary>
+    [Fact]
+    public async Task ReviewPage_Revalidation_UserDisabled_PageStopsShowingAndAcceptingActions()
+    {
+        // Arrange: a signable review open for ann, whose session is re-checked every 100 ms
+        var (projectId, slotId, _) = await CreateSignableAsync();
+        UseRevalidation(TimeSpan.FromMilliseconds(100));
+        SignInAs("ann", "Ann");
+        var cut = RenderPage(projectId);
+        await cut.Find("[data-testid='file-select-0']").ClickAsync();
+        var threadForm = cut.Find("[data-testid='new-thread-form']");
+        var signForm = cut.Find($"[data-testid='sign-form-{slotId}']");
+        var threadText = cut.Find("[data-testid='thread-text-input']");
+        await threadText.InputAsync("Typed before the session ended");
+        Assert.NotEmpty(cut.FindAll("[data-testid='review-page']"));
+
+        // Act: an administrator disables ann, and the next check ends the session
+        await Users.SetEnabledAsync("ann", false, TestContext.Current.CancellationToken);
+        await cut.WaitForAssertionAsync(
+            () => Assert.NotEmpty(cut.FindAll("[data-testid='session-ended']")),
+            TimeSpan.FromSeconds(10));
+
+        // Assert: the page, its forms and the typed text are gone
+        Assert.Empty(cut.FindAll("[data-testid='review-page']"));
+        Assert.Empty(cut.FindAll("[data-testid='new-thread-form']"));
+        Assert.Empty(cut.FindAll($"[data-testid='sign-form-{slotId}']"));
+        Assert.Empty(cut.FindAll($"[data-testid='sign-button-{slotId}']"));
+        Assert.DoesNotContain("Typed before the session ended", cut.Markup, StringComparison.Ordinal);
+
+        // Act: the stale forms are submitted anyway
+        _ = await Record.ExceptionAsync(() => threadForm.SubmitAsync());
+        _ = await Record.ExceptionAsync(() => signForm.SubmitAsync());
+
+        // Assert: nothing was stored
+        Assert.Empty(await Threads.ListAsync(projectId, "REV-1", TestContext.Current.CancellationToken));
+        Assert.Empty(await Store.ListSignaturesAsync(projectId, "REV-1", TestContext.Current.CancellationToken));
+    }
+
+    /// <summary>
+    ///     Test that an action sent after the session ended, but before the page learned of it, shows a clear
+    ///     message and stores nothing, instead of failing the page.
+    /// </summary>
+    [Fact]
+    public async Task ReviewPage_StartThread_SessionEndedBeforePageKnows_ShowsClearErrorAndStoresNothing()
+    {
+        // Arrange: a selected file with text typed, and then the session ends without the page being told
+        var projectId = await CreateReviewAsync(new UploadedFile("a.txt", TestContent.A));
+        var cut = RenderPage(projectId);
+        await cut.Find("[data-testid='file-select-0']").ClickAsync();
+        await cut.Find("[data-testid='thread-text-input']").InputAsync("Please check");
+        SignOutQuietly();
+
+        // Act: the thread is started
+        await cut.Find("[data-testid='new-thread-form']").SubmitAsync();
+
+        // Assert: the page shows why nothing was saved, and no thread exists
+        Assert.Contains("no longer signed in", cut.Find("[data-testid='thread-error']").TextContent, StringComparison.Ordinal);
+        Assert.Empty(await Threads.ListAsync(projectId, "REV-1", TestContext.Current.CancellationToken));
+    }
 }
