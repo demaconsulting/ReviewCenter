@@ -459,12 +459,34 @@ public sealed class RepositoryService
             return;
         }
 
-        if (name.Contains(token, StringComparison.Ordinal)
-            || (username is not null && username.Contains(token, StringComparison.Ordinal))
-            || location.Contains(token, StringComparison.Ordinal))
+        if (IsContained(token, StringComparison.Ordinal, name, username, location))
         {
             throw CredentialInvalid("A token must not be contained in the repository name, the user name or the location, because those are shown in messages and the audit trail.");
         }
+
+        // The percent-escaped form (a URL carries it so) is rejected too; the case of the hex digits does not matter
+        var escaped = Uri.EscapeDataString(token);
+        if (!string.Equals(escaped, token, StringComparison.Ordinal)
+            && IsContained(escaped, StringComparison.OrdinalIgnoreCase, name, username, location))
+        {
+            throw CredentialInvalid("A token must not be contained in the repository name, the user name or the location, because those are shown in messages and the audit trail.");
+        }
+    }
+
+    /// <summary>
+    ///     Checks whether a text is contained in the repository name, the user name or the location.
+    /// </summary>
+    /// <param name="text">The (non-empty) text to look for.</param>
+    /// <param name="comparison">How the texts are compared.</param>
+    /// <param name="name">The repository name.</param>
+    /// <param name="username">The user name, or <c>null</c>.</param>
+    /// <param name="location">The location.</param>
+    /// <returns><c>true</c> when the text is contained in one of them.</returns>
+    private static bool IsContained(string text, StringComparison comparison, string name, string? username, string location)
+    {
+        return name.Contains(text, comparison)
+            || (username is not null && username.Contains(text, comparison))
+            || location.Contains(text, comparison);
     }
 
     /// <summary>

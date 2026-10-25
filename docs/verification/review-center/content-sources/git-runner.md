@@ -60,6 +60,14 @@ error; nothing of the location or of its user information remains. This scenario
 **GitRunner_Redact_NoLocation_LeavesTextAlone**: Without a location nothing is replaced, and text that does not contain
 the location is unchanged. This scenario is tested by `GitRunner_Redact_NoLocation_LeavesTextAlone`.
 
+**GitRunner_BuildError_SecretAcrossTheCut_LeavesNoFragment**: A token that starts before the 8 KiB cut of the standard
+error and ends after it is redacted before the cut; no part of it (4 or more characters) remains. This scenario is
+tested by `GitRunner_BuildError_SecretAcrossTheCut_LeavesNoFragment`.
+
+**GitRunner_ReadTailAsync_SecretCutAtBufferStart_LeavesNoFragment**: A long error made of a token repeated, read through
+the bounded buffer, leaves only masks and separators even though the buffer starts inside a token. This scenario is
+tested by `GitRunner_ReadTailAsync_SecretCutAtBufferStart_LeavesNoFragment`.
+
 **GitRunner_FailureFor_DescribesFailuresClearly**: A failure is described with the repository name and the redacted first
 line of the error, and an authentication failure says access was denied and what an administrator must check. This
 scenario is tested by `GitRunner_FailureFor_DescribesFailuresClearly`.

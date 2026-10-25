@@ -50,7 +50,8 @@ that `GetAccessAsync` returns always belong to the same version of a registratio
 - *Postconditions*: When nothing changed, the registration is returned and no audit entry is written. Otherwise one
   `repository.updated` entry lists the changed fields.
 - *Algorithm*: Re-check the actor; validate the new values as for creation (a `Replace` with an empty token is
-  `RepositoryCredentialInvalid`, and so is a new token contained in the new name, user name, or location); then, under
+  `RepositoryCredentialInvalid`, and so is a new token contained in the new name, user name, or location, or whose
+  percent-escaped form is, compared ignoring case, so `%2f` and `%2F` are the same); then, under
   the semaphore, when the stored token is kept and the name, the user name, or the location changes, decrypt the stored
   token and refuse the change with `RepositoryCredentialInvalid` if it is contained in the new name, user name, or
   location (a stored token that cannot be decrypted is not compared); compare with the stored registration to build a

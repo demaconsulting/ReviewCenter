@@ -36,6 +36,13 @@ namespace DemaConsulting.ReviewCenter.ContentSources;
 internal sealed record GitResult(int ExitCode, byte[] Output, string Error);
 
 /// <summary>
+///     The retained end of the standard error of a git call, before redaction.
+/// </summary>
+/// <param name="Bytes">The retained bytes.</param>
+/// <param name="Dropped">Whether earlier bytes were dropped to stay within the limit.</param>
+internal sealed record CapturedError(byte[] Bytes, bool Dropped);
+
+/// <summary>
 ///     Runs the installed git program safely: no shell, a curated environment, a time limit on every call and the
 ///     token only in the environment of the child process.
 /// </summary>
@@ -63,9 +70,21 @@ internal sealed class GitRunner
     private static readonly Version MinimumVersion = new(2, 31);
 
     /// <summary>
-    ///     How much of the end of standard error is kept, in bytes.
+    ///     How much of the end of standard error is kept in a result, in bytes.
     /// </summary>
     private const int MaxErrorBytes = 8 * 1024;
+
+    /// <summary>
+    ///     How much of the end of standard error is retained while reading, in bytes: far more than
+    ///     <see cref="MaxErrorBytes"/>, so redaction sees the text around the cut.
+    /// </summary>
+    private const int RetainedErrorBytes = 64 * 1024;
+
+    /// <summary>
+    ///     How many of the first characters of the retained error are set aside when earlier output was dropped; more
+    ///     than the longest secret form (an escaped token of 1000 characters is at most 12000 characters).
+    /// </summary>
+    private const int DroppedMarginChars = 16 * 1024;
 
     /// <summary>
     ///     The most standard output a call reads when the caller names no cap, in bytes.
@@ -463,7 +482,7 @@ internal sealed class GitRunner
         {
             await process.WaitForExitAsync(timeout.Token);
             var output = await outputTask;
-            var error = await errorTask;
+            var captured = await errorTask;
             if (exceeded)
             {
                 throw new DomainRuleException(DomainRule.GitAccessFailed, "Git returned more data than the server accepts.");
@@ -472,7 +491,7 @@ internal sealed class GitRunner
             return new GitResult(
                 process.ExitCode,
                 output,
-                Redact(Encoding.UTF8.GetString(error), access?.Username, access?.Token, access?.Location, access?.Name));
+                BuildError(captured, access?.Username, access?.Token, access?.Location, access?.Name));
         }
         catch (OperationCanceledException)
         {
@@ -562,26 +581,70 @@ internal sealed class GitRunner
     }
 
     /// <summary>
-    ///     Reads standard error, keeping only the last <see cref="MaxErrorBytes"/> bytes.
+    ///     Reads standard error, keeping only the last <see cref="RetainedErrorBytes"/> bytes.
     /// </summary>
     /// <param name="stream">The error stream.</param>
     /// <param name="cancellationToken">Cancels the read.</param>
-    /// <returns>The tail of the error output.</returns>
-    private static async Task<byte[]> ReadTailAsync(Stream stream, CancellationToken cancellationToken)
+    /// <returns>The retained end of the error output, and whether earlier output was dropped.</returns>
+    internal static async Task<CapturedError> ReadTailAsync(Stream stream, CancellationToken cancellationToken)
     {
         var tail = new List<byte>();
+        var dropped = false;
         var chunk = new byte[4096];
         int read;
         while ((read = await stream.ReadAsync(chunk, cancellationToken)) > 0)
         {
             tail.AddRange(chunk.AsSpan(0, read).ToArray());
-            if (tail.Count > MaxErrorBytes)
+            if (tail.Count > RetainedErrorBytes)
             {
-                tail.RemoveRange(0, tail.Count - MaxErrorBytes);
+                tail.RemoveRange(0, tail.Count - RetainedErrorBytes);
+                dropped = true;
             }
         }
 
-        return tail.ToArray();
+        return new CapturedError(tail.ToArray(), dropped);
+    }
+
+    /// <summary>
+    ///     Turns the captured standard error into the text of a result: the whole captured text is redacted first and
+    ///     only then cut to the last <see cref="MaxErrorBytes"/> bytes, so a secret that crosses the cut cannot leave
+    ///     a fragment behind.
+    /// </summary>
+    /// <param name="captured">The captured end of standard error.</param>
+    /// <param name="username">The user name of the credentials, or <c>null</c>.</param>
+    /// <param name="token">The token of the credentials, or <c>null</c>.</param>
+    /// <param name="location">The registered location of the repository, or <c>null</c>.</param>
+    /// <param name="name">The repository name, or <c>null</c>.</param>
+    /// <returns>The redacted text, at most <see cref="MaxErrorBytes"/> bytes in UTF-8.</returns>
+    /// <remarks>
+    ///     When earlier output was dropped while reading, a secret may start before the first retained byte, and the
+    ///     redaction of the whole text leaves its first part. That part is within the first
+    ///     <see cref="DroppedMarginChars"/> characters (more than any secret form is long), so the text is redacted a
+    ///     second time without them and only the end that both passes share is kept: it is redacted correctly
+    ///     whatever the redaction shrank the text to.
+    /// </remarks>
+    internal static string BuildError(CapturedError captured, string? username, string? token, string? location, string? name)
+    {
+        var text = Encoding.UTF8.GetString(captured.Bytes);
+        var redacted = Redact(text, username, token, location, name);
+        if (captured.Dropped)
+        {
+            var inner = Redact(text[Math.Min(DroppedMarginChars, text.Length)..], username, token, location, name);
+            var shared = 0;
+            while (shared < inner.Length
+                && shared < redacted.Length
+                && inner[inner.Length - 1 - shared] == redacted[redacted.Length - 1 - shared])
+            {
+                shared++;
+            }
+
+            redacted = redacted[^shared..];
+        }
+
+        var encoded = Encoding.UTF8.GetBytes(redacted);
+        return encoded.Length <= MaxErrorBytes
+            ? redacted
+            : Encoding.UTF8.GetString(encoded, encoded.Length - MaxErrorBytes, MaxErrorBytes);
     }
 
     /// <summary>

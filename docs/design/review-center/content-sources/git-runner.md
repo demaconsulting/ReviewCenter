@@ -19,8 +19,12 @@ account, and to give back the result with every secret removed. It also owns the
 
 **GitResult** (supporting type): the exit code, the standard output as bytes, and the standard error as redacted text.
 
-**Constants**: the default output limit of a command (64 MiB), the number of bytes of error output that are kept (the
-last 8 KiB), and the mask `***` that replaces a secret.
+**Constants**: the default output limit of a command (64 MiB), the number of bytes of error output that are kept in a
+result (the last 8 KiB), the number retained while reading (the last 64 KiB), and the mask `***` that replaces a secret.
+Standard error is redacted (location, user information, and secrets) as a whole and only then cut to the last 8 KiB, so
+a secret that crosses the cut cannot leave a fragment. When the 64 KiB buffer dropped earlier output, a secret cut at
+its start would leave a fragment, so the text is redacted a second time without its first 16 K characters (more than
+any secret form is long) and only the end that both passes share is kept.
 
 **State**: whether the git version was checked. The check is made once, before the first command, and a failed check is
 repeated at the next call.

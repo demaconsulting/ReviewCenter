@@ -160,6 +160,55 @@ public class GitRunnerTests
     }
 
     /// <summary>
+    ///     Test that a secret that crosses the 8 KiB cut of the standard error is redacted before the cut, so no part
+    ///     of it (neither the part before the cut nor the part after it) is left in the result.
+    /// </summary>
+    [Fact]
+    public void GitRunner_BuildError_SecretAcrossTheCut_LeavesNoFragment()
+    {
+        // Arrange: more than 8 KiB of text with the token starting before the cut and ending after it
+        const string token = "Zq7Rk9Wm2Xv4Bn8Lp3Hd";
+        var text = new string('a', 3000) + token + new string('b', 8192 - token.Length / 2);
+        var captured = new CapturedError(Encoding.UTF8.GetBytes(text), false);
+
+        // Act: build the error text
+        var error = GitRunner.BuildError(captured, User, token, null, null);
+
+        // Assert: the cut is inside the token, the result is at most 8 KiB, and no fragment of 4 or more characters remains
+        Assert.True(Encoding.UTF8.GetByteCount(error) <= 8192);
+        Assert.Contains("***", error, StringComparison.Ordinal);
+        for (var length = 4; length <= token.Length; length++)
+        {
+            for (var start = 0; start + length <= token.Length; start++)
+            {
+                Assert.DoesNotContain(token.Substring(start, length), error, StringComparison.Ordinal);
+            }
+        }
+    }
+
+    /// <summary>
+    ///     Test that a long standard error, read through the bounded buffer, never leaves a fragment of a secret that
+    ///     was cut at the start of the buffer, even when redaction makes the text much shorter than the cap.
+    /// </summary>
+    [Fact]
+    public async Task GitRunner_ReadTailAsync_SecretCutAtBufferStart_LeavesNoFragment()
+    {
+        // Arrange: about 200 KiB made of a 1000-character token repeated, so the buffer start lands inside one
+        var random = new Random(7);
+        var token = new string(Enumerable.Range(0, 1000).Select(_ => (char)('A' + random.Next(26))).ToArray());
+        var stream = new MemoryStream(Encoding.UTF8.GetBytes(string.Join(' ', Enumerable.Repeat(token, 200))));
+
+        // Act: read the tail and build the error text
+        var captured = await GitRunner.ReadTailAsync(stream, TestContext.Current.CancellationToken);
+        var error = GitRunner.BuildError(captured, User, token, null, null);
+
+        // Assert: earlier text was dropped, and only masks and separators are left
+        Assert.True(captured.Dropped);
+        Assert.NotEmpty(error);
+        Assert.All(error, c => Assert.True(c is '*' or ' '));
+    }
+
+    /// <summary>
     ///     Test that failures are described without secrets and authentication failures get a clear message.
     /// </summary>
     [Fact]

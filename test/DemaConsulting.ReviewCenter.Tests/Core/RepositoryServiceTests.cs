@@ -843,6 +843,82 @@ public class RepositoryServiceTests
     }
 
     /// <summary>
+    ///     Test that a token whose percent-escaped form is contained in the location (in either hex letter case) is
+    ///     refused when a repository is registered, without the token in the message, and that a token whose escaped
+    ///     form is not contained is allowed.
+    /// </summary>
+    /// <param name="location">The location.</param>
+    /// <param name="refused">Whether the registration must be refused.</param>
+    [Theory]
+    [InlineData("https://example.com/p%40ss%2Fword/r.git", true)]
+    [InlineData("https://example.com/p%40ss%2fword/r.git", true)]
+    [InlineData("https://example.com/P%40SS%2FWORD/r.git", true)]
+    [InlineData("https://example.com/p%40ss/r.git", false)]
+    public async Task RepositoryService_CreateAsync_EscapedTokenContainedInLocation_ThrowsRepositoryCredentialInvalid(
+        string location,
+        bool refused)
+    {
+        // Arrange: a fixture and a token that is changed by percent-escaping
+        var f = await CreateAsync();
+        var cancellationToken = TestContext.Current.CancellationToken;
+        const string token = "p@ss/word";
+
+        // Act: register the repository
+        var attempt = () => f.Service.CreateAsync("repo", location, "svc", token, _admin, cancellationToken);
+
+        // Assert: refused with the credential rule and nothing stored, or registered
+        if (refused)
+        {
+            var exception = await Assert.ThrowsAsync<DomainRuleException>(attempt);
+            Assert.Equal(DomainRule.RepositoryCredentialInvalid, exception.Rule);
+            Assert.DoesNotContain(token, exception.Message, StringComparison.Ordinal);
+            Assert.DoesNotContain("p%40ss", exception.Message, StringComparison.OrdinalIgnoreCase);
+            Assert.Empty(f.Store.Audits);
+        }
+        else
+        {
+            Assert.True((await attempt()).HasToken);
+        }
+    }
+
+    /// <summary>
+    ///     Test that an update that replaces or keeps a token is refused when the percent-escaped form of the token is
+    ///     contained in the new location (either hex letter case); nothing is changed.
+    /// </summary>
+    [Fact]
+    public async Task RepositoryService_UpdateAsync_EscapedTokenContainedInLocation_ThrowsRepositoryCredentialInvalid()
+    {
+        // Arrange: a private repository whose stored token changes when escaped
+        var f = await CreateAsync();
+        var cancellationToken = TestContext.Current.CancellationToken;
+        const string location = "https://example.com/r.git";
+        const string token = "p@ss/word";
+        var created = await f.Service.CreateAsync("repo", location, "svc", token, _admin, cancellationToken);
+        var before = f.Store.StoredToken(created.Id);
+
+        // Act: keep the token and replace it with another that escapes the same way, while the location holds the escaped form
+        var kept = await Assert.ThrowsAsync<DomainRuleException>(
+            () => f.Service.UpdateAsync(created.Id, "repo", "https://example.com/p%40ss%2Fword.git", "svc", TokenChange.Keep, _admin, cancellationToken));
+        var keptLower = await Assert.ThrowsAsync<DomainRuleException>(
+            () => f.Service.UpdateAsync(created.Id, "repo", "https://example.com/p%40ss%2fword.git", "svc", TokenChange.Keep, _admin, cancellationToken));
+        var replaced = await Assert.ThrowsAsync<DomainRuleException>(
+            () => f.Service.UpdateAsync(created.Id, "repo", "https://example.com/n%40w%2fT0ken.git", "svc", TokenChange.Replace("n@w/T0ken"), _admin, cancellationToken));
+        var unchanged = await f.Service.GetAccessAsync(created.Id, cancellationToken);
+
+        // Assert: all are refused with the credential rule, without the token in the message, and nothing changed
+        foreach (var exception in new[] { kept, keptLower, replaced })
+        {
+            Assert.Equal(DomainRule.RepositoryCredentialInvalid, exception.Rule);
+            Assert.DoesNotContain(token, exception.Message, StringComparison.Ordinal);
+            Assert.DoesNotContain("n@w/T0ken", exception.Message, StringComparison.Ordinal);
+        }
+
+        Assert.Equal(before, f.Store.StoredToken(created.Id));
+        Assert.Equal(location, unchanged.Location);
+        Assert.Single(f.Store.Audits);
+    }
+
+    /// <summary>
     ///     Test that renaming a repository whose stored token can no longer be decrypted is not blocked by the
     ///     comparison (the token cannot be compared and is useless until replaced), and that clearing the token
     ///     while renaming to the old token text is allowed.

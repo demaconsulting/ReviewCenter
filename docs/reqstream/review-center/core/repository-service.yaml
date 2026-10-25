@@ -43,8 +43,9 @@ sections:
           The RepositoryService class shall accept a user name and a token only for an https location, refuse a token
           without a user name, refuse a user name or token with characters or a length that is not allowed, and refuse a
           token that is contained in (is a substring of, compared ordinally, with case) the repository name, the user
-          name, or the location, when it is registered, when it replaces the stored token, and when the name, the user,
-          or the location is changed while the stored token is kept.
+          name, or the location (its percent-escaped form too, whatever the case of the hex digits), when it is
+          registered, when it replaces the stored token, and when the name, the user, or the location is changed while
+          the stored token is kept.
         justification: |
           A credential that cannot work, or that could change the meaning of a header, must be reported when it is
           entered, not when a review is created. The repository name, the user name, and the location are written to
@@ -60,6 +61,8 @@ sections:
           - RepositoryService_CreateAsync_TokenContainedInNameUserOrLocation_ThrowsRepositoryCredentialInvalid
           - RepositoryService_UpdateAsync_NewTokenContainedInNameUserOrLocation_ThrowsRepositoryCredentialInvalid
           - RepositoryService_UpdateAsync_KeepTokenContainedInNewNameUserOrLocation_ThrowsRepositoryCredentialInvalid
+          - RepositoryService_CreateAsync_EscapedTokenContainedInLocation_ThrowsRepositoryCredentialInvalid
+          - RepositoryService_UpdateAsync_EscapedTokenContainedInLocation_ThrowsRepositoryCredentialInvalid
           - RepositoryService_UpdateAsync_KeepUnreadableOrClearedToken_DoesNotCompare
 
       - id: ReviewCenter-RepositoryService-Token

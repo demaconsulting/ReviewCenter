@@ -28,7 +28,8 @@ N/A - standard test environment.
 - A token that cannot be decrypted is reported by repository name and without the stored text.
 - A token contained in (a substring of, compared with case) the repository name, the user name, or the location is
   refused when registering and when updating (with a new token, or with the stored token kept while the name, user
-  name, or location changes to hold it); a different case is accepted.
+  name, or location changes to hold it); a different case is accepted. The percent-escaped form of the token is
+  refused too, whatever the case of the hex digits.
 - The access data is one consistent version of the registration, even when an update runs at the same time.
 - Null arguments are refused.
 
@@ -125,6 +126,16 @@ update, keeping the stored token while the name, the user name, or the location 
 as a part is refused with `RepositoryCredentialInvalid` (the service decrypts the stored token under its lock to
 compare), the message has no token, and nothing changes. This scenario is tested by
 `RepositoryService_UpdateAsync_KeepTokenContainedInNewNameUserOrLocation_ThrowsRepositoryCredentialInvalid`.
+
+**RepositoryService_CreateAsync_EscapedTokenContainedInLocation_ThrowsRepositoryCredentialInvalid**: A token whose
+percent-escaped form (either hex letter case) is part of the location is refused with `RepositoryCredentialInvalid`,
+with nothing stored or audited and without the token in the message. This scenario is tested by
+`RepositoryService_CreateAsync_EscapedTokenContainedInLocation_ThrowsRepositoryCredentialInvalid`.
+
+**RepositoryService_UpdateAsync_EscapedTokenContainedInLocation_ThrowsRepositoryCredentialInvalid**: On update, a new or
+kept token whose percent-escaped form is part of the new location is refused with `RepositoryCredentialInvalid`, and
+nothing changes. This scenario is tested by
+`RepositoryService_UpdateAsync_EscapedTokenContainedInLocation_ThrowsRepositoryCredentialInvalid`.
 
 **RepositoryService_UpdateAsync_KeepUnreadableOrClearedToken_DoesNotCompare**: A kept token that cannot be decrypted
 cannot be compared and does not block a rename, and clearing the token while renaming to its old text is allowed. This

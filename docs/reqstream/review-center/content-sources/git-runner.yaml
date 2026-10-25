@@ -38,7 +38,8 @@ sections:
           The GitRunner class shall remove every form of the token, of the encoded header that carries it, and of the
           credentials of a URL from all text that comes back from git, and shall replace the location of the
           repository (a URL or a local path, in every form git prints it) by the repository name, before the text can
-          reach a message or a log.
+          reach a message or a log. The text is redacted whole before it is cut to its last 8 KiB, so no part of a
+          secret that crosses the cut is left.
         justification: |
           Git echoes URLs and sometimes headers in its error output. A secret that reaches a message is shown to
           users and written to logs, and the location of a repository is information for administrators only, so an
@@ -48,6 +49,8 @@ sections:
           - GitRunner_Redact_EdgeCases
           - GitRunner_Redact_ReplacesLocationWithName
           - GitRunner_Redact_NoLocation_LeavesTextAlone
+          - GitRunner_BuildError_SecretAcrossTheCut_LeavesNoFragment
+          - GitRunner_ReadTailAsync_SecretCutAtBufferStart_LeavesNoFragment
 
       - id: ReviewCenter-GitRunner-Timeout
         title: >-
