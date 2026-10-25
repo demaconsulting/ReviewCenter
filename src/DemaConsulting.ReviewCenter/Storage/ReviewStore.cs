@@ -18,6 +18,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
+using System.Data;
 using DemaConsulting.ReviewCenter.Core;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
@@ -31,7 +32,8 @@ namespace DemaConsulting.ReviewCenter.Storage;
 ///     Each operation uses its own short-lived context from the factory, so the store is safe for
 ///     concurrent use by all browser sessions. Read operations are untracked, and listing a review
 ///     never loads file bytes. The checklist snapshot is stored in the same transaction as its review.
-///     Answers and section states are replaced in place (one row per check or section). A uniqueness violation on the review key is translated to a
+///     Answers and section states are replaced in place (one row per check or section). Slots are plain rows;
+///     signatures are only ever inserted, inside a transaction that rechecks the record digest. A uniqueness violation on the review key is translated to a
 ///     <see cref="DomainRuleException"/> so callers see the same error as for the service pre-check.
 /// </remarks>
 /// <param name="factory">The factory that creates a context per operation.</param>
@@ -339,6 +341,238 @@ internal sealed class ReviewStore(IDbContextFactory<ReviewCenterDbContext> facto
             context.ChangeTracker.Clear();
             await UpdateAnswerAsync(context, answer, cancellationToken);
         }
+    }
+
+    /// <inheritdoc />
+    public async Task<ReviewRecord?> GetRecordAsync(
+        int projectId,
+        string reviewId,
+        CancellationToken cancellationToken = default)
+    {
+        await using var context = await factory.CreateDbContextAsync(cancellationToken);
+
+        // A read transaction, so the parts of the record come from one state of the database
+        await using var transaction = await context.Database.BeginTransactionAsync(
+            IsolationLevel.RepeatableRead,
+            cancellationToken);
+        return await LoadRecordAsync(context, projectId, reviewId, cancellationToken);
+    }
+
+    /// <inheritdoc />
+    public async Task<ReviewSnapshot?> GetSnapshotAsync(
+        int projectId,
+        string reviewId,
+        CancellationToken cancellationToken = default)
+    {
+        await using var context = await factory.CreateDbContextAsync(cancellationToken);
+
+        // One read transaction for the record, the slots and the signatures: a writer cannot commit a change
+        // between the reads (SQLite keeps the reader's view stable until the transaction ends)
+        await using var transaction = await context.Database.BeginTransactionAsync(
+            IsolationLevel.RepeatableRead,
+            cancellationToken);
+        var record = await LoadRecordAsync(context, projectId, reviewId, cancellationToken);
+        if (record is null)
+        {
+            return null;
+        }
+
+        var slots = await context.ReviewerSlots.AsNoTracking()
+            .Where(s => s.ProjectId == projectId && s.ReviewId == reviewId)
+            .OrderBy(s => s.Id)
+            .ToListAsync(cancellationToken);
+        var signatures = await context.Signatures.AsNoTracking()
+            .Where(s => s.ProjectId == projectId && s.ReviewId == reviewId)
+            .OrderBy(s => s.Id)
+            .ToListAsync(cancellationToken);
+        return new ReviewSnapshot(record, slots, signatures);
+    }
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<ReviewerSlot>> ListSlotsAsync(
+        int projectId,
+        string reviewId,
+        CancellationToken cancellationToken = default)
+    {
+        await using var context = await factory.CreateDbContextAsync(cancellationToken);
+        return await context.ReviewerSlots.AsNoTracking()
+            .Where(s => s.ProjectId == projectId && s.ReviewId == reviewId)
+            .OrderBy(s => s.Id)
+            .ToListAsync(cancellationToken);
+    }
+
+    /// <inheritdoc />
+    public async Task<ReviewerSlot> AddSlotAsync(ReviewerSlot slot, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(slot);
+
+        await using var context = await factory.CreateDbContextAsync(cancellationToken);
+
+        // Insert a fresh entity so that the database always assigns the identity, whatever the caller supplied
+        var entity = new ReviewerSlot
+        {
+            ProjectId = slot.ProjectId,
+            ReviewId = slot.ReviewId,
+            PrimaryUserId = slot.PrimaryUserId,
+            AlternateUserId = slot.AlternateUserId
+        };
+        context.ReviewerSlots.Add(entity);
+        await context.SaveChangesAsync(cancellationToken);
+        return entity;
+    }
+
+    /// <inheritdoc />
+    public async Task<bool> UpdateSlotAsync(
+        int projectId,
+        string reviewId,
+        int slotId,
+        int primaryUserId,
+        int? alternateUserId,
+        CancellationToken cancellationToken = default)
+    {
+        await using var context = await factory.CreateDbContextAsync(cancellationToken);
+        var rows = await context.ReviewerSlots
+            .Where(s => s.Id == slotId && s.ProjectId == projectId && s.ReviewId == reviewId)
+            .ExecuteUpdateAsync(
+                s => s.SetProperty(x => x.PrimaryUserId, primaryUserId)
+                    .SetProperty(x => x.AlternateUserId, alternateUserId),
+                cancellationToken);
+        return rows > 0;
+    }
+
+    /// <inheritdoc />
+    public async Task<bool> RemoveSlotAsync(
+        int projectId,
+        string reviewId,
+        int slotId,
+        CancellationToken cancellationToken = default)
+    {
+        await using var context = await factory.CreateDbContextAsync(cancellationToken);
+
+        // The foreign key from the signatures makes the database refuse to remove a slot that was signed
+        var rows = await context.ReviewerSlots
+            .Where(s => s.Id == slotId && s.ProjectId == projectId && s.ReviewId == reviewId)
+            .ExecuteDeleteAsync(cancellationToken);
+        return rows > 0;
+    }
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<ReviewSignature>> ListSignaturesAsync(
+        int projectId,
+        string reviewId,
+        CancellationToken cancellationToken = default)
+    {
+        await using var context = await factory.CreateDbContextAsync(cancellationToken);
+        return await context.Signatures.AsNoTracking()
+            .Where(s => s.ProjectId == projectId && s.ReviewId == reviewId)
+            .OrderBy(s => s.Id)
+            .ToListAsync(cancellationToken);
+    }
+
+    /// <inheritdoc />
+    public async Task<ReviewSignature> AddSignatureAsync(
+        ReviewSignature signature,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(signature);
+
+        await using var context = await factory.CreateDbContextAsync(cancellationToken);
+
+        // Serializable makes SQLite take the write lock when the transaction begins, so no other writer can change
+        // the record between the digest check below and the insert
+        await using var transaction = await context.Database.BeginTransactionAsync(
+            IsolationLevel.Serializable,
+            cancellationToken);
+
+        // Recompute the digest from what is stored right now, with the same code the service used
+        var record = await LoadRecordAsync(context, signature.ProjectId, signature.ReviewId, cancellationToken)
+                     ?? throw new DomainRuleException(
+                         DomainRule.ReviewNotFound,
+                         $"Review '{signature.ReviewId}' does not exist.");
+        if (RecordDigest.Compute(record) != signature.RecordDigest)
+        {
+            throw new DomainRuleException(
+                DomainRule.RecordChanged,
+                "The record changed while you were signing. Review it and try again.");
+        }
+
+        var slotExists = await context.ReviewerSlots.AnyAsync(
+            s => s.Id == signature.SlotId && s.ProjectId == signature.ProjectId && s.ReviewId == signature.ReviewId,
+            cancellationToken);
+        if (!slotExists)
+        {
+            throw new DomainRuleException(
+                DomainRule.SlotNotFound,
+                $"Slot {signature.SlotId} does not exist in this review.");
+        }
+
+        // Insert a fresh entity so that the database always assigns the identity
+        var entity = new ReviewSignature
+        {
+            ProjectId = signature.ProjectId,
+            ReviewId = signature.ReviewId,
+            SlotId = signature.SlotId,
+            UserId = signature.UserId,
+            DisplayName = signature.DisplayName,
+            Role = signature.Role,
+            SignedAt = signature.SignedAt,
+            RecordDigest = signature.RecordDigest,
+            Meaning = signature.Meaning
+        };
+        context.Signatures.Add(entity);
+        try
+        {
+            await context.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException ex) when (IsDuplicateKey(ex))
+        {
+            // The unique index on (slot, digest) stopped a second signature of the same record from the same slot
+            throw new DomainRuleException(
+                DomainRule.SigningNotAllowed,
+                "This slot already has a signature of the current record.");
+        }
+
+        await transaction.CommitAsync(cancellationToken);
+        return entity;
+    }
+
+    /// <summary>
+    ///     Reads the record a signature covers, in one context so the parts are consistent with each other.
+    /// </summary>
+    /// <param name="context">The context to read with; inside a transaction opened by the caller.</param>
+    /// <param name="projectId">The project identity.</param>
+    /// <param name="reviewId">The review identifier.</param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <returns>The record, or <c>null</c> when the review does not exist.</returns>
+    private static async Task<ReviewRecord?> LoadRecordAsync(
+        ReviewCenterDbContext context,
+        int projectId,
+        string reviewId,
+        CancellationToken cancellationToken)
+    {
+        var fingerprint = await context.Reviews.AsNoTracking()
+            .Where(r => r.ProjectId == projectId && r.Id == reviewId)
+            .Select(r => r.ContentFingerprint)
+            .FirstOrDefaultAsync(cancellationToken);
+        if (fingerprint is null)
+        {
+            return null;
+        }
+
+        var checklist = await context.ReviewChecklists.AsNoTracking()
+            .FirstOrDefaultAsync(c => c.ProjectId == projectId && c.ReviewId == reviewId, cancellationToken);
+        var sections = await context.ChecklistSectionStates.AsNoTracking()
+            .Where(s => s.ProjectId == projectId && s.ReviewId == reviewId)
+            .ToListAsync(cancellationToken);
+        var answers = await context.ChecklistAnswers.AsNoTracking()
+            .Where(a => a.ProjectId == projectId && a.ReviewId == reviewId)
+            .ToListAsync(cancellationToken);
+        var threads = await context.Threads.AsNoTracking()
+            .Where(t => t.ProjectId == projectId && t.ReviewId == reviewId)
+            .Include(t => t.Comments.OrderBy(c => c.Id))
+            .OrderBy(t => t.Id)
+            .ToListAsync(cancellationToken);
+        return new ReviewRecord(fingerprint, checklist, sections, answers, threads);
     }
 
     /// <summary>

@@ -772,9 +772,9 @@ public class ReviewPageTests : PageTestBase
             projectId, "REV-1", "a.txt", null, null, TestActors.Ann, "Done", TestContext.Current.CancellationToken);
         await Threads.ResolveAsync(projectId, "REV-1", thread.Id, TestContext.Current.CancellationToken);
 
-        // Act, Assert: one sentence says that nothing is left
+        // Act, Assert: one sentence says that only the reviewer slot is missing
         Assert.Equal(
-            "Checklist complete and all threads resolved.",
+            "Add a reviewer slot.",
             RenderPage(projectId).Find("[data-testid='next-step']").TextContent);
     }
 
@@ -986,6 +986,370 @@ public class ReviewPageTests : PageTestBase
 
         // Assert: there are many, and each has a kebab-case test id
         Assert.True(elements.Count > 10);
+        foreach (var element in elements)
+        {
+            var testId = element.GetAttribute("data-testid");
+            Assert.True(
+                testId is not null && System.Text.RegularExpressions.Regex.IsMatch(testId, "^[a-z0-9]+(?:[-.][a-z0-9]+)*$"),
+                $"A <{element.LocalName}> has no kebab-case data-testid (found '{testId}').");
+        }
+    }
+
+    /// <summary>
+    ///     The password every user of the signing tests has.
+    /// </summary>
+    private const string SigningPassword = "correct horse battery";
+
+    /// <summary>
+    ///     Creates the users ann, bob and cyd, each with the signing password.
+    /// </summary>
+    /// <returns>The identities of the users by user name.</returns>
+    private async Task<Dictionary<string, int>> CreateUsersAsync()
+    {
+        var ids = new Dictionary<string, int>();
+        foreach (var (username, name) in new[] { ("ann", "Ann"), ("bob", "Bob"), ("cyd", "Cyd") })
+        {
+            ids[username] = (await Users.CreateAsync(username, name, UserRole.Reviewer, SigningPassword, TestContext.Current.CancellationToken)).Id;
+        }
+
+        return ids;
+    }
+
+    /// <summary>
+    ///     Answers every check of <c>REV-1</c> as Pass.
+    /// </summary>
+    /// <param name="projectId">The project identity.</param>
+    /// <returns>A task that completes when every check is answered.</returns>
+    private async Task AnswerAllAsync(int projectId)
+    {
+        foreach (var item in DefaultChecklist.Current.Sections.SelectMany(section => section.Items))
+        {
+            await Checklists.SetAnswerAsync(
+                projectId, "REV-1", item.Id, ChecklistOutcome.Pass, null, TestActors.Ann, TestContext.Current.CancellationToken);
+        }
+    }
+
+    /// <summary>
+    ///     Creates a review that can be signed, with one slot of ann (primary) and bob (alternate).
+    /// </summary>
+    /// <returns>The project identity, the slot identity and the user identities.</returns>
+    private async Task<(int ProjectId, int SlotId, Dictionary<string, int> Ids)> CreateSignableAsync()
+    {
+        var ids = await CreateUsersAsync();
+        var projectId = await CreateReviewAsync(new UploadedFile("a.txt", TestContent.A));
+        await AnswerAllAsync(projectId);
+        var slot = await Signing.AddSlotAsync(
+            TestActors.Ann, projectId, "REV-1", ids["ann"], ids["bob"], TestContext.Current.CancellationToken);
+        return (projectId, slot.Id, ids);
+    }
+
+    /// <summary>
+    ///     Test that a review without slots shows an empty Reviewers card with the add form, and is In review.
+    /// </summary>
+    [Fact]
+    public async Task ReviewPage_Render_NoSlots_ShowsEmptyReviewersCardAndInReviewBadge()
+    {
+        // Arrange: a review without slots
+        var projectId = await CreateReviewAsync(new UploadedFile("a.txt", TestContent.A));
+
+        // Act: render the page
+        var cut = RenderPage(projectId);
+
+        // Assert: the card says so, offers the add form, and the review is In review
+        Assert.NotNull(cut.Find("[data-testid='reviewers-card']"));
+        Assert.NotNull(cut.Find("[data-testid='slots-empty']"));
+        Assert.NotNull(cut.Find("[data-testid='slot-add-form']"));
+        Assert.Equal("In review", cut.Find("[data-testid='review-approval']").TextContent);
+    }
+
+    /// <summary>
+    ///     Test that a slot is added through the page and shows primary, alternate and "Not signed".
+    /// </summary>
+    [Fact]
+    public async Task ReviewPage_AddSlot_PrimaryAndAlternate_ShowsSlotNotSigned()
+    {
+        // Arrange: users and a review
+        var ids = await CreateUsersAsync();
+        var projectId = await CreateReviewAsync(new UploadedFile("a.txt", TestContent.A));
+        var cut = RenderPage(projectId);
+
+        // Act: choose primary and alternate and add the slot
+        await cut.Find("[data-testid='new-slot-primary-select']").ChangeAsync(ids["bob"].ToString());
+        await cut.Find("[data-testid='new-slot-alternate-select']").ChangeAsync(ids["cyd"].ToString());
+        await cut.Find("[data-testid='slot-add-form']").SubmitAsync();
+
+        // Assert: the slot is shown and stored
+        var slot = Assert.Single((await Signing.GetApprovalAsync(projectId, "REV-1", TestContext.Current.CancellationToken))!.Slots);
+        Assert.Equal("Slot 1", cut.Find($"[data-testid='slot-label-{slot.SlotId}']").TextContent);
+        Assert.Equal("Bob", cut.Find($"[data-testid='slot-primary-{slot.SlotId}']").TextContent);
+        Assert.Equal("Cyd", cut.Find($"[data-testid='slot-alternate-{slot.SlotId}']").TextContent);
+        Assert.Equal("Not signed", cut.Find($"[data-testid='slot-status-{slot.SlotId}']").TextContent);
+        Assert.Empty(cut.FindAll("[data-testid='slots-empty']"));
+    }
+
+    /// <summary>
+    ///     Test that adding a slot without a primary, or with the same user twice, shows the reason.
+    /// </summary>
+    [Fact]
+    public async Task ReviewPage_AddSlot_InvalidChoices_ShowsErrorAndAddsNothing()
+    {
+        // Arrange: users and a review
+        var ids = await CreateUsersAsync();
+        var projectId = await CreateReviewAsync(new UploadedFile("a.txt", TestContent.A));
+        var cut = RenderPage(projectId);
+
+        // Act, Assert: no primary
+        await cut.Find("[data-testid='slot-add-form']").SubmitAsync();
+        Assert.NotEmpty(cut.Find("[data-testid='new-slot-error']").TextContent);
+
+        // Act, Assert: the same user as primary and alternate
+        await cut.Find("[data-testid='new-slot-primary-select']").ChangeAsync(ids["bob"].ToString());
+        await cut.Find("[data-testid='new-slot-alternate-select']").ChangeAsync(ids["bob"].ToString());
+        await cut.Find("[data-testid='slot-add-form']").SubmitAsync();
+        Assert.NotEmpty(cut.Find("[data-testid='new-slot-error']").TextContent);
+        Assert.Empty((await Signing.GetApprovalAsync(projectId, "REV-1", TestContext.Current.CancellationToken))!.Slots);
+    }
+
+    /// <summary>
+    ///     Test that an unsigned slot can be changed and removed through the page.
+    /// </summary>
+    [Fact]
+    public async Task ReviewPage_EditAndRemoveSlot_Unsigned_ChangesAndRemoves()
+    {
+        // Arrange: a slot of ann and bob
+        var (projectId, slotId, ids) = await CreateSignableAsync();
+        var cut = RenderPage(projectId);
+
+        // Act: make cyd the primary and drop the alternate
+        await cut.Find($"[data-testid='slot-primary-select-{slotId}']").ChangeAsync(ids["cyd"].ToString());
+        await cut.Find($"[data-testid='slot-alternate-select-{slotId}']").ChangeAsync(string.Empty);
+        await cut.Find($"[data-testid='slot-save-{slotId}']").ClickAsync();
+
+        // Assert: the slot shows the change
+        Assert.Equal("Cyd", cut.Find($"[data-testid='slot-primary-{slotId}']").TextContent);
+        Assert.Equal("None", cut.Find($"[data-testid='slot-alternate-{slotId}']").TextContent);
+
+        // Act: remove it
+        await cut.Find($"[data-testid='slot-remove-{slotId}']").ClickAsync();
+
+        // Assert: it is gone
+        Assert.Empty(cut.FindAll($"[data-testid='slot-{slotId}']"));
+        Assert.NotNull(cut.Find("[data-testid='slots-empty']"));
+    }
+
+    /// <summary>
+    ///     Test that a user occupying a slot of a review that cannot be signed sees the blockers and no sign
+    ///     form, and that a user who is not in the slot sees neither.
+    /// </summary>
+    [Fact]
+    public async Task ReviewPage_Render_BlockedReview_ShowsBlockersInsteadOfSignForm()
+    {
+        // Arrange: a slot of ann and bob on a review with unanswered checks and an open thread
+        var ids = await CreateUsersAsync();
+        var projectId = await CreateReviewAsync(new UploadedFile("a.txt", TestContent.A));
+        await Threads.StartThreadAsync(projectId, "REV-1", "a.txt", null, null, TestActors.Bob, "Open", TestContext.Current.CancellationToken);
+        var slot = await Signing.AddSlotAsync(
+            TestActors.Ann, projectId, "REV-1", ids["ann"], ids["bob"], TestContext.Current.CancellationToken);
+
+        // Act: render as ann (the primary)
+        var cut = RenderPage(projectId);
+
+        // Assert: the blockers are listed and there is no sign form
+        var blockers = cut.Find($"[data-testid='sign-blockers-{slot.Id}']").TextContent;
+        Assert.Contains("58 checklist checks are unanswered", blockers, StringComparison.Ordinal);
+        Assert.Contains("1 thread is open", blockers, StringComparison.Ordinal);
+        Assert.Empty(cut.FindAll($"[data-testid='sign-form-{slot.Id}']"));
+
+        // Act: render as cyd, who is not in the slot
+        SignInAs("cyd", "Cyd");
+        var other = RenderPage(projectId);
+
+        // Assert: neither blockers nor sign form
+        Assert.Empty(other.FindAll($"[data-testid='sign-blockers-{slot.Id}']"));
+        Assert.Empty(other.FindAll($"[data-testid='sign-form-{slot.Id}']"));
+    }
+
+    /// <summary>
+    ///     Test that a user who is not in the slot of a signable review sees no sign form.
+    /// </summary>
+    [Fact]
+    public async Task ReviewPage_Render_SignableReview_NonOccupantSeesNoSignForm()
+    {
+        // Arrange: a signable review of ann and bob, viewed by cyd
+        var (projectId, slotId, _) = await CreateSignableAsync();
+        SignInAs("cyd", "Cyd");
+
+        // Act: render the page
+        var cut = RenderPage(projectId);
+
+        // Assert: no sign form
+        Assert.Empty(cut.FindAll($"[data-testid='sign-form-{slotId}']"));
+        Assert.Empty(cut.FindAll($"[data-testid='sign-button-{slotId}']"));
+    }
+
+    /// <summary>
+    ///     Test that a wrong password is refused with the generic message, signs nothing, and neither the typed
+    ///     password nor any value is left in the page.
+    /// </summary>
+    [Fact]
+    public async Task ReviewPage_Sign_WrongPassword_ShowsGenericErrorAndKeepsNoPassword()
+    {
+        // Arrange: a signable review viewed by ann, who types a wrong password
+        var (projectId, slotId, _) = await CreateSignableAsync();
+        var cut = RenderPage(projectId);
+        Assert.Equal(SigningService.MeaningText, cut.Find($"[data-testid='sign-meaning-{slotId}']").TextContent);
+        Assert.Equal("password", cut.Find($"[data-testid='sign-password-{slotId}']").GetAttribute("type"));
+        await cut.Find($"[data-testid='sign-password-{slotId}']").InputAsync("wrong secret value");
+
+        // Act: sign
+        await cut.Find($"[data-testid='sign-form-{slotId}']").SubmitAsync();
+
+        // Assert: the generic message, no signature, and the typed value is nowhere in the markup
+        Assert.Equal("The password is incorrect.", cut.Find($"[data-testid='sign-error-{slotId}']").TextContent);
+        Assert.Equal("Not signed", cut.Find($"[data-testid='slot-status-{slotId}']").TextContent);
+        Assert.Empty(await Store.ListSignaturesAsync(projectId, "REV-1", TestContext.Current.CancellationToken));
+        Assert.DoesNotContain("wrong secret value", cut.Markup, StringComparison.Ordinal);
+        Assert.Empty(cut.Find($"[data-testid='sign-password-{slotId}']").GetAttribute("value") ?? string.Empty);
+    }
+
+    /// <summary>
+    ///     Test that signing with the right password records the signature, shows who signed and when, approves
+    ///     the review, and locks the slot against changes.
+    /// </summary>
+    [Fact]
+    public async Task ReviewPage_Sign_CorrectPassword_ApprovesReviewAndLocksSlot()
+    {
+        // Arrange: a signable review viewed by ann
+        var (projectId, slotId, ids) = await CreateSignableAsync();
+        var cut = RenderPage(projectId);
+        await cut.Find($"[data-testid='sign-password-{slotId}']").InputAsync(SigningPassword);
+
+        // Act: sign
+        await cut.Find($"[data-testid='sign-form-{slotId}']").SubmitAsync();
+
+        // Assert: signed, approved and the typed password is gone
+        Assert.Equal("Signed by Ann on 2025-03-04 05:06 UTC", cut.Find($"[data-testid='slot-status-{slotId}']").TextContent);
+        Assert.Equal("Approved", cut.Find("[data-testid='review-approval']").TextContent);
+        Assert.Equal("Approved. Every reviewer slot has a current signature.", cut.Find("[data-testid='next-step']").TextContent);
+        Assert.DoesNotContain(SigningPassword, cut.Markup, StringComparison.Ordinal);
+
+        // Assert: the slot cannot be changed or signed again from the page
+        Assert.Empty(cut.FindAll($"[data-testid='slot-save-{slotId}']"));
+        Assert.Empty(cut.FindAll($"[data-testid='slot-remove-{slotId}']"));
+        Assert.Empty(cut.FindAll($"[data-testid='sign-form-{slotId}']"));
+        var signature = Assert.Single(await Store.ListSignaturesAsync(projectId, "REV-1", TestContext.Current.CancellationToken));
+        Assert.Equal((ids["ann"], SlotRole.Primary), (signature.UserId, signature.Role));
+    }
+
+    /// <summary>
+    ///     Test that a change to the record after signing shows the signature as out of date, takes the approval
+    ///     away and offers to sign again.
+    /// </summary>
+    [Fact]
+    public async Task ReviewPage_Render_RecordChangedAfterSigning_ShowsOutOfDateAndInReview()
+    {
+        // Arrange: a signed slot
+        var (projectId, slotId, _) = await CreateSignableAsync();
+        var cut = RenderPage(projectId);
+        await cut.Find($"[data-testid='sign-password-{slotId}']").InputAsync(SigningPassword);
+        await cut.Find($"[data-testid='sign-form-{slotId}']").SubmitAsync();
+
+        // Act: a comment changes the record, and the page is opened again
+        await Threads.StartThreadAsync(projectId, "REV-1", "a.txt", null, null, TestActors.Bob, "Late", TestContext.Current.CancellationToken);
+        await Threads.ResolveAsync(
+            projectId, "REV-1", (await Threads.ListAsync(projectId, "REV-1", TestContext.Current.CancellationToken)).Single().Id, TestContext.Current.CancellationToken);
+        var reopened = RenderPage(projectId);
+
+        // Assert: out of date and In review, the slot is still locked, and signing again is offered
+        Assert.Equal("Signature out of date", reopened.Find($"[data-testid='slot-status-{slotId}']").TextContent);
+        Assert.Equal("In review", reopened.Find("[data-testid='review-approval']").TextContent);
+        Assert.Empty(reopened.FindAll($"[data-testid='slot-save-{slotId}']"));
+        Assert.NotNull(reopened.Find($"[data-testid='sign-form-{slotId}']"));
+    }
+
+    /// <summary>
+    ///     Test that signing a record that changed since the page was drawn is refused and signs nothing.
+    /// </summary>
+    [Fact]
+    public async Task ReviewPage_Sign_RecordChangedSincePageDrawn_IsRefused()
+    {
+        // Arrange: a signable review drawn for ann, then changed by somebody else
+        var (projectId, slotId, _) = await CreateSignableAsync();
+        var cut = RenderPage(projectId);
+        await Threads.StartThreadAsync(projectId, "REV-1", "a.txt", null, null, TestActors.Bob, "Late", TestContext.Current.CancellationToken);
+        await Threads.ResolveAsync(
+            projectId, "REV-1", (await Threads.ListAsync(projectId, "REV-1", TestContext.Current.CancellationToken)).Single().Id, TestContext.Current.CancellationToken);
+        await cut.Find($"[data-testid='sign-password-{slotId}']").InputAsync(SigningPassword);
+
+        // Act: sign what was on screen
+        await cut.Find($"[data-testid='sign-form-{slotId}']").SubmitAsync();
+
+        // Assert: refused with the reason, nothing stored
+        Assert.Contains("changed", cut.Find($"[data-testid='sign-error-{slotId}']").TextContent, StringComparison.Ordinal);
+        Assert.Empty(await Store.ListSignaturesAsync(projectId, "REV-1", TestContext.Current.CancellationToken));
+    }
+
+    /// <summary>
+    ///     Test that the full record digest is in the collapsed details, shortened on screen with the whole value
+    ///     in the title.
+    /// </summary>
+    [Fact]
+    public async Task ReviewPage_Render_Details_ShowShortDigestWithFullValueInTitle()
+    {
+        // Arrange: a review
+        var projectId = await CreateReviewAsync(new UploadedFile("a.txt", TestContent.A));
+        var approval = await Signing.GetApprovalAsync(projectId, "REV-1", TestContext.Current.CancellationToken);
+
+        // Act: render the page
+        var cut = RenderPage(projectId);
+
+        // Assert: inside the details, 16 characters shown and all 64 in the title
+        var digest = cut.Find("[data-testid='review-details'] [data-testid='record-digest']");
+        Assert.Equal(approval!.Digest[..16], digest.TextContent);
+        Assert.Equal(approval.Digest, digest.GetAttribute("title"));
+        Assert.Equal(64, approval.Digest.Length);
+    }
+
+    /// <summary>
+    ///     Test that a user-controlled display name is shown as plain text in the Reviewers card.
+    /// </summary>
+    [Fact]
+    public async Task ReviewPage_Render_SlotDisplayName_IsShownAsPlainText()
+    {
+        // Arrange: the signed-in user, and a user whose display name looks like markup, in a slot
+        await CreateUsersAsync();
+        var user = await Users.CreateAsync("eve", "<b>Eve</b>", UserRole.Reviewer, SigningPassword, TestContext.Current.CancellationToken);
+        var projectId = await CreateReviewAsync(new UploadedFile("a.txt", TestContent.A));
+        var slot = await Signing.AddSlotAsync(TestActors.Ann, projectId, "REV-1", user.Id, null, TestContext.Current.CancellationToken);
+
+        // Act: render the page
+        var cut = RenderPage(projectId);
+
+        // Assert: the text is the literal name and no element was created from it
+        var primary = cut.Find($"[data-testid='slot-primary-{slot.Id}']");
+        Assert.Equal("<b>Eve</b>", primary.TextContent);
+        Assert.Empty(primary.QuerySelectorAll("b"));
+    }
+
+    /// <summary>
+    ///     Test that every interactive element of the Reviewers card, in all its variants, has a kebab-case
+    ///     <c>data-testid</c>.
+    /// </summary>
+    [Fact]
+    public async Task ReviewPage_Render_ReviewersCard_EveryInteractiveElementHasTestId()
+    {
+        // Arrange: one slot ready to sign with an error shown, and one signed by bob
+        var (projectId, slotId, ids) = await CreateSignableAsync();
+        await Signing.AddSlotAsync(TestActors.Ann, projectId, "REV-1", ids["cyd"], null, TestContext.Current.CancellationToken);
+        var cut = RenderPage(projectId);
+        await cut.Find($"[data-testid='sign-form-{slotId}']").SubmitAsync();
+        await cut.Find("[data-testid='slot-add-form']").SubmitAsync();
+
+        // Act: collect the interactive elements inside the card
+        var elements = cut.Find("[data-testid='reviewers-card']").QuerySelectorAll("a, button, input, select, textarea");
+
+        // Assert: there are many, and each has a kebab-case test id
+        Assert.True(elements.Length > 8);
         foreach (var element in elements)
         {
             var testId = element.GetAttribute("data-testid");

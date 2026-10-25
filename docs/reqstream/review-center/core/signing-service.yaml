@@ -1,0 +1,132 @@
+---
+# Software Unit Requirements for the SigningService Class
+#
+# The SigningService class manages the reviewer slots of a review, decides whether a review can be signed, signs it for
+# a reviewer after the reviewer confirms the password again, and computes whether each slot, and the review, has a
+# current signature.
+
+sections:
+  - title: SigningService Unit Requirements
+    requirements:
+      - id: ReviewCenter-SigningService-Slots
+        title: >-
+          The SigningService class shall let a review have any number of reviewer slots, including none, each
+          with a primary reviewer and an optional alternate, numbered in the order in which they were added, none
+          of them signed when added, and shall reject a slot in a review that does not exist.
+        justification: |
+          A review is approved by the reviewers who are named for it. A slot names the person responsible and
+          optionally a stand-in, and a review that has not yet named anybody is simply not approved yet.
+        tests:
+          - SigningService_AddSlotAsync_Valid_AddsNumberedUnsignedSlot
+          - SigningService_AddSlotAsync_MissingReview_ThrowsReviewNotFound
+          - SigningService_GetApprovalAsync_NoSlots_NotApprovedAndAsksForSlot
+
+      - id: ReviewCenter-SigningService-SlotUsers
+        title: >-
+          The SigningService class shall require that the primary reviewer and the alternate of a slot are
+          existing, enabled users, that they are different users, and that no user is in two slots of one review,
+          and shall offer only enabled users, without their passwords, as candidates.
+        justification: |
+          A signature must come from a known, active person. One person holding two slots would let a single
+          reviewer fill every place that is meant to bring independent reviewers.
+        tests:
+          - SigningService_AddSlotAsync_SameUserTwice_ThrowsSlotUserInvalid
+          - SigningService_AddSlotAsync_UserInOtherSlot_ThrowsSlotUserInvalid
+          - SigningService_AddSlotAsync_UnknownOrDisabledUser_ThrowsSlotUserInvalid
+          - SigningService_UpdateSlotAsync_KeepOwnUsers_Succeeds
+          - SigningService_ListCandidatesAsync_ReturnsEnabledUsersOnly
+
+      - id: ReviewCenter-SigningService-SlotEdit
+        title: >-
+          The SigningService class shall let a slot that has never been signed be changed or removed, shall refuse
+          to change or remove a slot that has any signature, current or out of date, and shall reject a slot that
+          does not exist in the review.
+        justification: |
+          A signature must always point to a slot that still says who the signer was. Allowing a signed slot to be
+          reassigned or removed would let the record claim that someone else approved.
+        tests:
+          - SigningService_UpdateAndRemoveSlotAsync_Unsigned_Succeed
+          - SigningService_UpdateAndRemoveSlotAsync_Signed_ThrowsSlotSigned
+          - SigningService_UpdateAndRemoveSlotAsync_UnknownSlot_ThrowsSlotNotFound
+
+      - id: ReviewCenter-SigningService-Actor
+        title: >-
+          The SigningService class shall allow a slot to be added, changed, removed, or signed only for a
+          signed-in user that still exists and is enabled, and shall allow a slot to be signed only by its
+          primary reviewer or its alternate.
+        justification: |
+          The page shows who is signed in, but the rules must hold even if the page or a browser session is out of
+          date. A user who has been disabled since signing in must not be able to change or approve a review, and
+          a signature is only meaningful when the signer is the person the slot names.
+        tests:
+          - SigningService_AddSlotAsync_ActorDisabledOrUnknown_ThrowsActorNotAllowed
+          - SigningService_SignAsync_ActorDisabled_ThrowsActorNotAllowed
+          - SigningService_SignAsync_NotInSlot_ThrowsActorNotAllowed
+
+      - id: ReviewCenter-SigningService-Blockers
+        title: >-
+          The SigningService class shall refuse to sign a review while a check in a section that applies is
+          unanswered, a check is answered Fail, or a thread is open, shall list each of these as a blocker, and
+          shall not count a check answered Fail in a section that does not apply.
+        justification: |
+          A signature says the reviewer approves the record. That is not true while checks are unanswered, a check
+          has failed, or a discussion is still open, and a failed check in a section that was excluded is not part
+          of what is being approved.
+        tests:
+          - SigningService_SignAsync_Blocker_ThrowsSigningNotAllowedAndListsBlocker
+          - SigningService_GetApprovalAsync_NotApplicableSectionFail_DoesNotBlock
+
+      - id: ReviewCenter-SigningService-Sign
+        title: >-
+          The SigningService class shall store a signature for a primary reviewer or an alternate of a slot that
+          records the slot, the user, the display name at that time, the role, the time, the digest of the record,
+          and the fixed meaning text, and shall never change or remove a signature that has been stored.
+        justification: |
+          The signature is the evidence of who approved which record and when. Keeping every signature unchanged
+          means the history of approvals stays reliable after the record changes and is signed again.
+        tests:
+          - SigningService_SignAsync_PrimaryWithPassword_StoresSignatureAndApproves
+          - SigningService_SignAsync_Alternate_RecordsAlternateRole
+          - SigningService_SignAsync_RecordChangedAfterSigning_OutOfDateThenResignable
+
+      - id: ReviewCenter-SigningService-Reauthenticate
+        title: >-
+          The SigningService class shall store a signature only after the signer has given the password of the
+          account again, shall report a wrong password and a locked account in the same way, and shall count wrong
+          passwords toward the same lockout as signing in.
+        justification: |
+          A signature must come from the person, not from a session left open at a desk. Reusing the sign-in
+          check gives the same protection against guessing, and one generic answer gives an attacker nothing more
+          than the login page does.
+        tests:
+          - SigningService_SignAsync_WrongPassword_ThrowsReauthenticationFailed
+          - SigningService_SignAsync_RepeatedWrongPassword_LocksOutLikeLogin
+
+      - id: ReviewCenter-SigningService-Current
+        title: >-
+          The SigningService class shall store a signature only for the digest of the record that the signer
+          saw, and shall refuse with a message that the record changed when the record is not that one any more,
+          and shall refuse to sign a slot that already has a signature for the current record.
+        justification: |
+          A reviewer who signs a page that is out of date would approve content they have not seen. Signing what
+          was seen keeps the signature honest, and a second signature for the same record would add nothing.
+        tests:
+          - SigningService_SignAsync_StaleExpectedDigest_ThrowsRecordChanged
+          - SigningService_SignAsync_AlreadySignedCurrent_ThrowsSigningNotAllowed
+
+      - id: ReviewCenter-SigningService-Status
+        title: >-
+          The SigningService class shall give for a review the digest of its record, for each slot whether it is
+          not signed, signed with a current signature (naming the signer and time), or out of date because it was
+          signed only for an earlier record, whether the review is approved, which requires at least one slot and
+          every slot to have a current signature, the blockers, and one sentence naming the next step, and shall
+          give nothing for a review that does not exist.
+        justification: |
+          Approval has to follow the record. Computing it from the signatures and the record each time means a
+          change to the record can never leave a review looking approved, and nothing about the status can be
+          stored out of step with the record.
+        tests:
+          - SigningService_GetApprovalAsync_TwoSlots_ApprovedOnlyWhenBothSigned
+          - SigningService_SignAsync_RecordChangedAfterSigning_OutOfDateThenResignable
+          - SigningService_GetApprovalAsync_NoSlots_NotApprovedAndAsksForSlot
+          - SigningService_GetApprovalAsync_MissingReview_ReturnsNull

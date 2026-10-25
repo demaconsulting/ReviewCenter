@@ -4,7 +4,8 @@
 # PURPOSE:
 # - Define requirements for the ReviewCenter Storage subsystem
 # - The Storage subsystem spans the ReviewCenterDbContext, ReviewStore, UserStore, and DatabaseSetup units
-# - Subsystem requirements describe the externally visible behavior of the persistence of users, projects, and reviews
+# - Subsystem requirements describe the externally visible behavior of the persistence of users, projects, reviews,
+#   checklists, comment threads, reviewer slots, and signatures
 
 sections:
   - title: Storage Subsystem Requirements
@@ -100,3 +101,21 @@ sections:
           - ReviewCenter-DbContext-Checklist
         tests:
           - StorageSubsystem_Checklist_PersistsSnapshotAnswersAndSectionsAcrossReopen
+
+      - id: ReviewCenter-Storage-Signatures
+        title: >-
+          The Storage subsystem shall keep the reviewer slots of each review and the signatures made for them in
+          the database file, so that they are all still there, unchanged, when the database is opened again, and
+          a signature is still current for a record that has not changed, and shall never let a signature be
+          stored for a record that has changed or a signed slot be deleted.
+        justification: |
+          Signatures are the evidence that a review was approved and must outlive the process that created them.
+          The database itself must refuse a signature of a stale record and the deletion of a signed slot, so
+          that the evidence cannot be broken by overlapping requests.
+        children:
+          - ReviewCenter-ReviewStore-Slots
+          - ReviewCenter-ReviewStore-Record
+          - ReviewCenter-ReviewStore-Signatures
+          - ReviewCenter-DbContext-Signatures
+        tests:
+          - StorageSubsystem_Signatures_PersistAcrossReopenAndStayCurrent

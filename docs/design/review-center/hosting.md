@@ -85,8 +85,8 @@ the server.
 - *Role*: Consumer.
 
 **Storage and Core (consumed)**: `DatabaseSetup`, `ReviewCenterDbContext`, `ReviewStore`, and `UserStore` of the
-`Storage` subsystem, and `ProjectService`, `ReviewService`, `ThreadService`, `ChecklistService`, `UserService`, and the
-store and hasher interfaces of the `Core` subsystem.
+`Storage` subsystem, and `ProjectService`, `ReviewService`, `ThreadService`, `ChecklistService`, `UserService`,
+`SigningService`, and the store and hasher interfaces of the `Core` subsystem.
 
 - *Type*: In-process .NET types.
 - *Role*: Consumer.
@@ -110,9 +110,9 @@ The persistence registration binds the `Database` configuration section (`appset
 environment variables such as `Database__Provider` and `Database__ConnectionString`) to the options type
 of the `Storage` subsystem, registers a `ReviewCenterDbContext` factory configured by `DatabaseSetup`,
 and registers `TimeProvider.System`, `ReviewStore` and `UserStore` as the Core store interfaces, `PasswordHasher` as
-the Core hasher interface, and the five Core services (`ProjectService`, `ReviewService`, `ThreadService`,
-`ChecklistService`, and `UserService`) as singletons shared by all browser connections. The services hold no
-per-user state, and every
+the Core hasher interface, and the six Core services (`ProjectService`, `ReviewService`, `ThreadService`,
+`ChecklistService`, `UserService`, and `SigningService`) as singletons shared by all browser connections. The
+services hold no per-user state, and every
 database operation opens its own short-lived context from the factory. The registration is the public method
 `AddServices`, so that `UserCommand` builds exactly the same services.
 

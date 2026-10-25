@@ -5,9 +5,11 @@
 ReviewCenter is a web-based formal code review service with a companion command-line
 interface. The service is an ASP.NET Core Blazor Server application started with the `serve`
 verb. The current release lets you sign in, create projects and draft reviews made from uploaded files, shows the
-content fingerprint of each review, lets you discuss the files in threaded comments, and gives each review a
-checklist, with every action recorded under the signed-in user; the remaining review
-features (reviewers, sign-off) are still under development. The command-line interface is documented in
+content fingerprint of each review, lets you discuss the files in threaded comments, gives each review a
+checklist, and lets reviewers sign a review with their password, with every action recorded under the signed-in
+user; the remaining review
+features (review states beyond Draft, a tamper-evident audit trail) are still under development. The command-line
+interface is documented in
 this guide. A separate development tool,
 Puppet, is described near the end of this guide.
 
@@ -330,9 +332,56 @@ The checklist of a review is fixed when the review is created: a later release w
 does not change reviews that already exist. Checklist answers are not linked to comment threads. The checklist
 page is made for narrow screens too.
 
+## Review Signatures
+
+A review is approved when its reviewers have signed it. The review page shows an **Approved** or **In review** badge
+next to the review title, and a **Reviewers** card with the reviewer slots. The project page shows the same badge for
+each review.
+
+**Reviewer slots.** A slot has a primary reviewer and, optionally, an alternate reviewer, chosen from the enabled
+users. Either of the two can sign the slot. A review can have any number of slots, or none; a review without a slot
+stays In review and its next step says "Add a reviewer slot.". Any signed-in user can add a slot (open **Add a slot**,
+choose the reviewers and press **Add slot**) and change or remove a slot (open **Change reviewers**, then **Save** or
+**Remove**). A user can be in only one slot of
+a review, and the primary and the alternate must be different users. A slot that has been signed can no longer be
+changed or removed, even if its signature is out of date; to change the reviewers, add a new slot.
+
+**Signing.** The reviewer of a slot sees a signing form on the slot, if the review can be signed. The form shows
+the statement of the signature, "I have reviewed this record and approve it.", and asks you to confirm your password.
+Enter your password and press **Sign**. The password is checked like at sign-in, so wrong passwords count toward the
+same lockout, and it is never stored or shown. A review can be signed only when:
+
+- it has a checklist, and every check of an applicable section is answered;
+- no check of an applicable section is answered Fail; and
+- no thread is open.
+
+While one of these holds back the signature, the slot lists what is left instead of the form (for example "2 threads
+are open"). Each signature records your name, your role in the slot (primary or alternate), the UTC time, and the
+statement.
+
+**What a signature covers.** A signature is bound to the record as it was when you signed. The record is the content
+fingerprint of the files, every checklist answer with its justification, every section marked as not applicable with its
+reason, and every comment thread with its comments. The **Record digest** in the Details section (shortened; the full
+value is its tooltip) identifies that record. Who answered a check, and when, is not part of it. If the record changes
+while you are signing, the signature is refused and you are asked to review it and try again.
+
+**Out of date and Approved.** A slot shows "Signed by *name* on *date* UTC" while it has a signature of the current
+record, "Signature out of date" when it has signatures but the record has changed since (for example a new comment or
+a changed answer), and "Not signed" otherwise. A review is **Approved** when it has at least one slot and every slot is
+signed for the current record; it goes back to In review when a change makes a signature out of date. The reviewer then
+signs the new record again; the earlier signatures stay as history.
+
+A user who is disabled while a page is open can keep answering checks and adding comments and threads on that page
+until it is reloaded. Signing and changing reviewer slots check the account again and are refused for a disabled
+user. A separate follow-up will revalidate the sign-in state of open pages.
+
+Approved is computed each time from the record and the signatures; it is not a stored state of the review. The
+signature history is not yet protected by a hash-chained audit trail; that is planned for a later release.
+
 ## Database
 
-ReviewCenter keeps users, projects, reviews, file contents, comment threads, and checklists in a SQLite database
+ReviewCenter keeps users, projects, reviews, file contents, comment threads, checklists, and reviewer slots and
+signatures in a SQLite database
 file. On first start
 it creates the
 folder, the file, and the tables. The default file is `reviewcenter.db` in the `ReviewCenter` folder of the
@@ -359,9 +408,9 @@ Database__ConnectionString=/srv/reviewcenter/reviews.db reviewcenter serve
 If the database cannot be prepared (for example the provider is not supported or the location cannot be used), the
 server writes an error message and exits with a non-zero exit code. Database migrations are not provided in this
 release: the tables are created only when the database is new. **A database file created by an earlier build, before
-user accounts existed, does not have the tables and columns that are needed, and the pages cannot work with it:
-delete the file (or point `Database:ConnectionString` at a new one) and start again, then create the first
-administrator.** Do this only with development data.
+user accounts or reviewer signatures existed, does not have the tables and columns that are needed, and the pages
+cannot work with it: delete the file (or point `Database:ConnectionString` at a new one) and start again, then create
+the first administrator.** Do this only with development data.
 
 ## Self-Validation
 

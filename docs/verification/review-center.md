@@ -67,6 +67,9 @@ loopback TCP ports.
   database is reopened; each is attributed to the signed-in user.
 - The review checklist (answers, applicability, and the frozen snapshot) is presented by the checklist and review
   pages and is kept after the database is reopened.
+- Reviewer slots and signatures are presented by the review and project pages: a review is Approved only while every
+  slot has a signature of the current record, a change of the record makes a signature out of date, and slots and
+  signatures are kept after the database is reopened.
 - A database setting that cannot be used stops the server with an error and a non-zero exit code.
 - Every interactive element of the home page carries a `data-testid`, and the same holds for every other page.
 
@@ -222,6 +225,14 @@ the unanswered checks as the next step. This scenario is tested by
 applicability of a section are stored over a real database; the database is closed and opened again, and all of it
 is read back. This scenario is tested by
 `StorageSubsystem_Checklist_PersistsSnapshotAnswersAndSectionsAcrossReopen`.
+
+**Review signatures**: A reviewer slot and a signature are created through the domain services over the real
+pipeline; the review page presents the review as Approved after the signing, and as In review with a slot whose
+signature is out of date once the record changes, and the project page shows the same status. This scenario is tested
+by `WebSubsystem_SignedReview_ApprovalIsPresentedAndGoesOutOfDateWhenRecordChanges`. In a second scenario a slot and
+its signature are stored over a real database; the database is closed and opened again, the signature is still
+current, and the review is approved. This scenario is tested by
+`StorageSubsystem_Signatures_PersistAcrossReopenAndStayCurrent`.
 
 **Persistence across restart**: A project is stored, the server is stopped and started again on the same
 database file, and a signed-in user sees the project on the projects page. This scenario is tested by

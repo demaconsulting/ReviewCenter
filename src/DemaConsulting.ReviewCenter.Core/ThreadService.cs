@@ -251,11 +251,15 @@ public sealed class ThreadService
     ///     The checklist progress of the review, or <c>null</c> when the review has no checklist (the wording
     ///     then depends on the threads alone).
     /// </param>
+    /// <param name="failedChecks">
+    ///     The number of checks answered Fail; each one blocks signing, so it is named in the sentence. Ignored
+    ///     without a checklist. Zero (the default) leaves the wording as it was before signing existed.
+    /// </param>
     /// <returns>
-    ///     One short sentence: the number of unanswered checks and open threads, that the checklist is complete,
-    ///     that all threads are resolved, or (without a checklist and without threads) to start a discussion.
+    ///     One short sentence: the number of unanswered checks, failed checks and open threads, that the checklist
+    ///     is complete, that all threads are resolved, or (without a checklist and without threads) to start a discussion.
     /// </returns>
-    public static string NextStep(IEnumerable<ReviewThread> threads, ChecklistProgress? checklist = null)
+    public static string NextStep(IEnumerable<ReviewThread> threads, ChecklistProgress? checklist = null, int failedChecks = 0)
     {
         ArgumentNullException.ThrowIfNull(threads);
 
@@ -278,18 +282,28 @@ public sealed class ThreadService
             };
         }
 
-        // With a checklist the unanswered checks come first, then the open threads
+        // With a checklist the unanswered checks come first, then failed checks, then the open threads
         var unanswered = checklist.Value.Unanswered;
-        var checks = unanswered == 1 ? "1 checklist check unanswered" : $"{unanswered} checklist checks unanswered";
-        var threadsToResolve = open == 1 ? "1 open thread to resolve" : $"{open} open threads to resolve";
+        var parts = new List<string>();
         if (unanswered > 0)
         {
-            return open > 0 ? $"{checks}, {threadsToResolve}." : $"{checks}.";
+            parts.Add(unanswered == 1 ? "1 checklist check unanswered" : $"{unanswered} checklist checks unanswered");
+        }
+
+        if (failedChecks > 0)
+        {
+            parts.Add(failedChecks == 1 ? "1 check answered Fail" : $"{failedChecks} checks answered Fail");
         }
 
         if (open > 0)
         {
-            return $"Checklist complete; {threadsToResolve}.";
+            parts.Add(open == 1 ? "1 open thread to resolve" : $"{open} open threads to resolve");
+        }
+
+        if (parts.Count > 0)
+        {
+            var sentence = string.Join(", ", parts);
+            return unanswered > 0 ? $"{sentence}." : $"Checklist complete; {sentence}.";
         }
 
         return all.Count > 0 ? "Checklist complete and all threads resolved." : "Checklist complete.";

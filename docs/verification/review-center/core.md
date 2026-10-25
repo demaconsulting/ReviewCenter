@@ -3,14 +3,15 @@
 ### Verification Approach
 
 The `Core` subsystem is verified by subsystem tests defined in `CoreSubsystemTests.cs`. The tests use the real
-`ProjectService`, `ReviewService`, `ThreadService`, `ChecklistService`, `UserService`, and `Fingerprint` together, with
+`ProjectService`, `ReviewService`, `ThreadService`, `ChecklistService`, `UserService`, `SigningService`, `Fingerprint`,
+and `RecordDigest` together, with
 a fixed clock (a clock the test can move for the lockout) and fakes for the stores (`FakeReviewStore`,
 `FakeUserStore`) and a trivial password hasher (`FakePasswordHasher`) in place of the database and the real hasher,
 because the subsystem has no dependency on a
 database; the real database is verified in the `Storage` subsystem and the real hasher in the `Identity` subsystem.
 The tests show that the units cooperate as the
 design describes: the services create, store, and read back what the fingerprint algorithm and the rules require.
-The rules and the algorithm themselves are verified in detail by the unit tests of the six units.
+The rules and the algorithm themselves are verified in detail by the unit tests of the eight units.
 
 ### Test Environment
 
@@ -23,7 +24,7 @@ N/A - standard test environment.
   the known answer for the files, every file keeps its own size and SHA-256 hash, and file bytes are returned
   exactly.
 - The same file contents give the same fingerprint when submitted in another order or under other names.
-- Every domain rule (all twenty-five values of `DomainRule`) is reported through the services as a domain rule
+- Every domain rule (all thirty-three values of `DomainRule`) is reported through the services as a domain rule
   exception that names it, and nothing is stored.
 - A thread started on a file, with replies, resolved and reopened, is read back with its comments in posting order.
 - A new review has the whole default checklist; an answer and a section that does not apply are recorded, and the
@@ -31,6 +32,9 @@ N/A - standard test environment.
 - A user is created and signs in regardless of the case of the user name; repeated failures lock the account and the
   lockout ends on time; a changed password replaces the old one; and the last enabled administrator cannot be
   demoted.
+- A review with a reviewer slot, answered completely and without open threads, is signed with the password; the
+  signature makes the review approved, a later change of the record makes it out of date and not approved, and the
+  slot can be signed again.
 
 ### Test Scenarios
 
@@ -54,7 +58,9 @@ anchor on a missing file or beyond the end of the file, or a reply to a thread t
 checklist answer for a missing checklist, for a check that is not in the checklist, or a failed
 check without a justification; a user with an invalid or taken user name, a blank display name, or a too short
 password, a wrong current password, a change of a user that does not exist, or disabling the last enabled
-administrator). Each
+administrator; a slot for a missing review, a slot with an unknown reviewer or one that does not exist, a change of a
+signed slot, a signing by a user who is not in the slot, a signing that is blocked, a wrong password at a signing, or
+a signing of a record that changed). Each
 fails with a `DomainRuleException` that names the rule, and the store holds only the project, review, and
 administrator created
 first. This scenario is tested by `CoreSubsystem_RuleViolation_IsReportedAsDomainRuleAndStoresNothing`.
@@ -77,3 +83,10 @@ reviewer signs in with the user name in another case. Five wrong passwords then 
 password is refused; after five minutes on the movable clock the right password signs in again. The password is
 changed with the current one and the new one works. Demoting the only administrator is refused with `LastAdmin`.
 This scenario is tested by `CoreSubsystem_UsersWorkflow_CreateSignInLockoutAndLastAdmin`.
+
+**CoreSubsystem_Signatures_SignChangeOutOfDateAndResign_FollowsTheRecord**: A review has one slot of two users. Its
+status is blocked while the checks are unanswered; after all checks are answered it has no blockers. Signing with a
+wrong password is refused with `ReauthenticationFailed`; signing with the right one approves the review. A thread is
+then opened and resolved, which changes the record: the slot is out of date, the review is not approved, and the
+digest differs. The alternate signs the new record, and the review is approved again with the alternate as signer.
+This scenario is tested by `CoreSubsystem_Signatures_SignChangeOutOfDateAndResign_FollowsTheRecord`.

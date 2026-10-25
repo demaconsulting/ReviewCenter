@@ -1,0 +1,370 @@
+// Copyright (c) DEMA Consulting
+// 
+// Permission is hereby granted, free of charge, to any person obtaining a copy
+// of this software and associated documentation files (the "Software"), to deal
+// in the Software without restriction, including without limitation the rights
+// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the Software is
+// furnished to do so, subject to the following conditions:
+// 
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
+// 
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+// SOFTWARE.
+
+using System.Security.Cryptography;
+using System.Text;
+using DemaConsulting.ReviewCenter.Core;
+
+namespace DemaConsulting.ReviewCenter.Tests.Core;
+
+/// <summary>
+///     Unit tests for <see cref="RecordDigest"/>: the canonical text and the digest over it.
+/// </summary>
+public class RecordDigestTests
+{
+    /// <summary>
+    ///     The instant used for the times in the baseline record.
+    /// </summary>
+    private static readonly DateTimeOffset _time = new(2025, 3, 4, 5, 6, 7, TimeSpan.Zero);
+
+    /// <summary>
+    ///     Builds a comment.
+    /// </summary>
+    /// <param name="id">The storage identity, which must not matter.</param>
+    /// <param name="text">The comment text.</param>
+    /// <param name="author">The display name of the author.</param>
+    /// <returns>The comment.</returns>
+    private static ReviewComment Comment(int id, string text = "Please fix", string author = "Ann")
+    {
+        return new ReviewComment
+        {
+            Id = id,
+            ThreadId = 1,
+            Author = author,
+            AuthorUsername = author.ToLowerInvariant(),
+            Text = text,
+            Created = _time
+        };
+    }
+
+    /// <summary>
+    ///     Builds a thread.
+    /// </summary>
+    /// <param name="id">The storage identity, which must not matter.</param>
+    /// <param name="path">The file path.</param>
+    /// <param name="state">The thread state.</param>
+    /// <param name="comments">The comments in posting order.</param>
+    /// <returns>The thread.</returns>
+    private static ReviewThread Thread(
+        int id,
+        string path = "a.txt",
+        ReviewThreadState state = ReviewThreadState.Open,
+        params ReviewComment[] comments)
+    {
+        return new ReviewThread
+        {
+            Id = id,
+            ProjectId = 1,
+            ReviewId = "rev-1",
+            FilePath = path,
+            StartLine = 1,
+            EndLine = 2,
+            State = state,
+            Created = _time,
+            Comments = comments.Length == 0 ? [Comment(id * 10)] : [.. comments]
+        };
+    }
+
+    /// <summary>
+    ///     Builds an answer.
+    /// </summary>
+    /// <param name="item">The check id.</param>
+    /// <param name="outcome">The outcome.</param>
+    /// <param name="justification">The justification.</param>
+    /// <param name="by">Who answered; must not matter.</param>
+    /// <returns>The answer.</returns>
+    private static ChecklistAnswer Answer(
+        string item,
+        ChecklistOutcome outcome = ChecklistOutcome.Pass,
+        string? justification = null,
+        string by = "Ann")
+    {
+        return new ChecklistAnswer
+        {
+            ProjectId = 1,
+            ReviewId = "rev-1",
+            ItemId = item,
+            Outcome = outcome,
+            Justification = justification,
+            AnsweredBy = by,
+            AnsweredByUsername = by.ToLowerInvariant(),
+            AnsweredAt = _time
+        };
+    }
+
+    /// <summary>
+    ///     Builds a record from its parts, defaulting to a small baseline.
+    /// </summary>
+    /// <param name="fingerprint">The content fingerprint.</param>
+    /// <param name="answers">The answers.</param>
+    /// <param name="sections">The section states.</param>
+    /// <param name="threads">The threads.</param>
+    /// <returns>The record.</returns>
+    private static ReviewRecord Record(
+        string fingerprint = "f1",
+        IReadOnlyList<ChecklistAnswer>? answers = null,
+        IReadOnlyList<ChecklistSectionState>? sections = null,
+        IReadOnlyList<ReviewThread>? threads = null)
+    {
+        return new ReviewRecord(
+            fingerprint,
+            null,
+            sections ?? [],
+            answers ?? [Answer("REQ-01"), Answer("REQ-02", ChecklistOutcome.NotApplicable, "n/a")],
+            threads ?? [Thread(1), Thread(2, "b.txt", ReviewThreadState.Resolved)]);
+    }
+
+    /// <summary>
+    ///     Builds a section state.
+    /// </summary>
+    /// <param name="id">The section id.</param>
+    /// <param name="applicable">Whether the section applies.</param>
+    /// <param name="reason">The reason it does not.</param>
+    /// <returns>The section state.</returns>
+    private static ChecklistSectionState Section(string id, bool applicable, string? reason)
+    {
+        return new ChecklistSectionState
+        {
+            ProjectId = 1,
+            ReviewId = "rev-1",
+            SectionId = id,
+            Applicable = applicable,
+            Reason = reason,
+            SetBy = "Ann",
+            SetByUsername = "ann",
+            SetAt = _time
+        };
+    }
+
+    /// <summary>
+    ///     Test that the canonical text of a small record has exactly the documented shape.
+    /// </summary>
+    [Fact]
+    public void RecordDigest_Canonicalize_SmallRecord_MatchesDocumentedFormat()
+    {
+        // Arrange: a record with one answer, one section that does not apply and one thread with one comment
+        var record = Record(
+            "abc",
+            [Answer("REQ-01", ChecklistOutcome.Fail, "bad")],
+            [Section("DES", false, "none"), Section("DOC", true, null)],
+            [Thread(7)]);
+        var ticks = _time.UtcTicks;
+
+        // Act: build the canonical text
+        var text = RecordDigest.Canonicalize(record);
+
+        // Assert: version line, fingerprint, answers, sections that do not apply, threads
+        var expected = string.Join(
+            '\n',
+            "ReviewCenter record v1",
+            "fingerprint 3:abc",
+            "answers",
+            "answer 6:REQ-01 4:Fail 3:bad",
+            "sections",
+            "not-applicable 3:DES 4:none",
+            "threads",
+            $"thread 5:a.txt 1 2 4:Open {ticks}",
+            $"comment 3:Ann 3:ann 10:Please fix {ticks}");
+        Assert.Equal(expected, text);
+    }
+
+    /// <summary>
+    ///     Test that the digest is the SHA-256 of the canonical text as lowercase hexadecimal, and is stable.
+    /// </summary>
+    [Fact]
+    public void RecordDigest_Compute_SameRecord_IsStableSha256OfCanonicalText()
+    {
+        // Arrange: a record
+        var record = Record();
+
+        // Act: compute twice
+        var first = RecordDigest.Compute(record);
+        var second = RecordDigest.Compute(Record());
+
+        // Assert: the same value, 64 lowercase hex characters, equal to the SHA-256 of the text
+        var expected = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(RecordDigest.Canonicalize(record)))).ToLowerInvariant();
+        Assert.Equal(first, second);
+        Assert.Equal(expected, first);
+        Assert.Matches("^[0-9a-f]{64}$", first);
+    }
+
+    /// <summary>
+    ///     Test that a known record has a known digest, so a change of the format is noticed.
+    /// </summary>
+    [Fact]
+    public void RecordDigest_Compute_KnownRecord_MatchesKnownValue()
+    {
+        // Arrange: a record with only a fingerprint
+        var record = new ReviewRecord("abc", null, [], [], []);
+
+        // Act: compute the digest
+        var digest = RecordDigest.Compute(record);
+
+        // Assert: the digest of "ReviewCenter record v1\nfingerprint 3:abc\nanswers\nsections\nthreads"
+        Assert.Equal("9755f10e118733d548ae1037dd68b000d6d50ca8b62f53d4411693d85a3fe35a", digest);
+    }
+
+    /// <summary>
+    ///     Test that every thing the digest covers changes it.
+    /// </summary>
+    /// <param name="change">The name of the change under test.</param>
+    [Theory]
+    [InlineData("fingerprint")]
+    [InlineData("answer-outcome")]
+    [InlineData("answer-justification")]
+    [InlineData("answer-added")]
+    [InlineData("section-not-applicable")]
+    [InlineData("section-reason")]
+    [InlineData("thread-added")]
+    [InlineData("thread-state")]
+    [InlineData("thread-anchor")]
+    [InlineData("thread-path")]
+    [InlineData("comment-text")]
+    [InlineData("comment-author")]
+    [InlineData("comment-added")]
+    public void RecordDigest_Compute_CoveredChange_ChangesDigest(string change)
+    {
+        // Arrange: a baseline record with a section that does not apply, and the digest of it
+        var baseSections = new[] { Section("DES", false, "none") };
+        var baseline = Record(sections: baseSections);
+        var before = RecordDigest.Compute(baseline);
+
+        // Act: apply one change
+        var changed = change switch
+        {
+            "fingerprint" => Record("f2", sections: baseSections),
+            "answer-outcome" => Record(
+                answers: [Answer("REQ-01", ChecklistOutcome.Fail, "x"), Answer("REQ-02", ChecklistOutcome.NotApplicable, "n/a")],
+                sections: baseSections),
+            "answer-justification" => Record(
+                answers: [Answer("REQ-01"), Answer("REQ-02", ChecklistOutcome.NotApplicable, "other")],
+                sections: baseSections),
+            "answer-added" => Record(
+                answers: [Answer("REQ-01"), Answer("REQ-02", ChecklistOutcome.NotApplicable, "n/a"), Answer("REQ-03")],
+                sections: baseSections),
+            "section-not-applicable" => Record(sections: [.. baseSections, Section("DOC", false, "none")]),
+            "section-reason" => Record(sections: [Section("DES", false, "different")]),
+            "thread-added" => Record(sections: baseSections, threads: [Thread(1), Thread(2, "b.txt", ReviewThreadState.Resolved), Thread(3)]),
+            "thread-state" => Record(sections: baseSections, threads: [Thread(1, state: ReviewThreadState.Resolved), Thread(2, "b.txt", ReviewThreadState.Resolved)]),
+            "thread-anchor" => Record(sections: baseSections, threads: [WithLines(Thread(1), 3, 4), Thread(2, "b.txt", ReviewThreadState.Resolved)]),
+            "thread-path" => Record(sections: baseSections, threads: [Thread(1, "c.txt"), Thread(2, "b.txt", ReviewThreadState.Resolved)]),
+            "comment-text" => Record(sections: baseSections, threads: [Thread(1, comments: Comment(10, "Changed")), Thread(2, "b.txt", ReviewThreadState.Resolved)]),
+            "comment-author" => Record(sections: baseSections, threads: [Thread(1, comments: Comment(10, author: "Bob")), Thread(2, "b.txt", ReviewThreadState.Resolved)]),
+            _ => Record(sections: baseSections, threads: [Thread(1, "a.txt", ReviewThreadState.Open, Comment(10), Comment(11, "More")), Thread(2, "b.txt", ReviewThreadState.Resolved)])
+        };
+
+        // Assert: the digest differs
+        Assert.NotEqual(before, RecordDigest.Compute(changed));
+    }
+
+    /// <summary>
+    ///     Test that the order of threads and answers, and the storage identities, do not change the digest.
+    /// </summary>
+    [Fact]
+    public void RecordDigest_Compute_ReorderedAndRenumbered_SameDigest()
+    {
+        // Arrange: a record and the same content with another row order and other storage identities
+        var one = Record(
+            answers: [Answer("REQ-01"), Answer("REQ-02")],
+            threads: [Thread(1), Thread(2, "b.txt", ReviewThreadState.Resolved)]);
+        var other = Record(
+            answers: [Answer("REQ-02"), Answer("REQ-01")],
+            threads: [Thread(90, "b.txt", ReviewThreadState.Resolved, Comment(900)), Thread(80, comments: Comment(800))]);
+
+        // Act, Assert: the digests are equal
+        Assert.Equal(RecordDigest.Compute(one), RecordDigest.Compute(other));
+    }
+
+    /// <summary>
+    ///     Test that the order of the comments of a thread matters.
+    /// </summary>
+    [Fact]
+    public void RecordDigest_Compute_CommentOrder_ChangesDigest()
+    {
+        // Arrange: two threads with the same two comments in opposite order
+        var first = Record(threads: [Thread(1, "a.txt", ReviewThreadState.Open, Comment(1, "one"), Comment(2, "two"))]);
+        var second = Record(threads: [Thread(1, "a.txt", ReviewThreadState.Open, Comment(1, "two"), Comment(2, "one"))]);
+
+        // Act, Assert: the digests differ
+        Assert.NotEqual(RecordDigest.Compute(first), RecordDigest.Compute(second));
+    }
+
+    /// <summary>
+    ///     Test that who answered a check, and when, is not covered, and that a section that applies adds nothing.
+    /// </summary>
+    [Fact]
+    public void RecordDigest_Compute_AnsweredByAndApplicableSection_NotCovered()
+    {
+        // Arrange: the same answers given by somebody else, and an extra section that applies
+        var one = Record(answers: [Answer("REQ-01", by: "Ann")]);
+        var other = Record(answers: [Answer("REQ-01", by: "Bob")], sections: [Section("DES", true, null)]);
+
+        // Act, Assert: the digests are equal
+        Assert.Equal(RecordDigest.Compute(one), RecordDigest.Compute(other));
+    }
+
+    /// <summary>
+    ///     Test that text cannot imitate the delimiters: two different records never share a canonical text.
+    /// </summary>
+    [Fact]
+    public void RecordDigest_Compute_TextWithDelimiters_DoesNotCollide()
+    {
+        // Arrange: one comment whose text contains a line break and a fake comment line, versus two comments
+        var tricky = Record(threads: [Thread(1, comments: Comment(1, "a\ncomment 3:Ann 3:ann 1:b 1"))]);
+        var plain = Record(threads: [Thread(1, "a.txt", ReviewThreadState.Open, Comment(1, "a"), Comment(2, "b"))]);
+
+        // Act, Assert: the digests differ
+        Assert.NotEqual(RecordDigest.Compute(tricky), RecordDigest.Compute(plain));
+    }
+
+    /// <summary>
+    ///     Test that a null record is refused.
+    /// </summary>
+    [Fact]
+    public void RecordDigest_Compute_NullRecord_Throws()
+    {
+        // Arrange, Act, Assert: null is refused
+        Assert.Throws<ArgumentNullException>(() => RecordDigest.Compute(null!));
+        Assert.Throws<ArgumentNullException>(() => RecordDigest.Canonicalize(null!));
+    }
+
+    /// <summary>
+    ///     Copies a thread with another line range.
+    /// </summary>
+    /// <param name="thread">The thread.</param>
+    /// <param name="start">The first line.</param>
+    /// <param name="end">The last line.</param>
+    /// <returns>The copy.</returns>
+    private static ReviewThread WithLines(ReviewThread thread, int start, int end)
+    {
+        return new ReviewThread
+        {
+            Id = thread.Id,
+            ProjectId = thread.ProjectId,
+            ReviewId = thread.ReviewId,
+            FilePath = thread.FilePath,
+            StartLine = start,
+            EndLine = end,
+            State = thread.State,
+            Created = thread.Created,
+            Comments = thread.Comments
+        };
+    }
+}

@@ -545,6 +545,39 @@ reviews:
       - "src/DemaConsulting.ReviewCenter.Core/IPasswordHasher.cs"
       - "test/**/Core/UserServiceTests.cs"
 
+  - id: ReviewCenter-Core-RecordDigest
+    title: Review of ReviewCenter RecordDigest unit implementation
+    context:
+      - docs/design/review-center.md
+      - docs/reqstream/review-center.yaml
+      - docs/design/review-center/core.md
+      - docs/reqstream/review-center/core.yaml
+    paths:
+      - "docs/reqstream/review-center/core/record-digest.yaml"
+      - "docs/design/review-center/core/record-digest.md"
+      - "docs/verification/review-center/core/record-digest.md"
+      - "src/DemaConsulting.ReviewCenter.Core/RecordDigest.cs"
+      - "src/DemaConsulting.ReviewCenter.Core/ReviewRecord.cs"
+      - "test/**/Core/RecordDigestTests.cs"
+
+  - id: ReviewCenter-Core-SigningService
+    title: Review of ReviewCenter SigningService unit implementation
+    context:
+      - docs/design/review-center.md
+      - docs/reqstream/review-center.yaml
+      - docs/design/review-center/core.md
+      - docs/reqstream/review-center/core.yaml
+    paths:
+      - "docs/reqstream/review-center/core/signing-service.yaml"
+      - "docs/design/review-center/core/signing-service.md"
+      - "docs/verification/review-center/core/signing-service.md"
+      - "src/DemaConsulting.ReviewCenter.Core/SigningService.cs"
+      - "src/DemaConsulting.ReviewCenter.Core/ReviewerSlot.cs"
+      - "src/DemaConsulting.ReviewCenter.Core/ReviewSignature.cs"
+      - "src/DemaConsulting.ReviewCenter.Core/SlotRole.cs"
+      - "src/DemaConsulting.ReviewCenter.Core/ReviewApproval.cs"
+      - "test/**/Core/SigningServiceTests.cs"
+
   # ReviewCenter - Storage
   - id: ReviewCenter-Storage
     title: Review of ReviewCenter Storage subsystem architecture and interfaces
@@ -584,6 +617,7 @@ reviews:
       - "docs/verification/review-center/storage/review-store.md"
       - "src/**/Storage/ReviewStore.cs"
       - "test/**/Storage/ReviewStoreTests.cs"
+      - "test/**/Storage/ReviewStoreSigningTests.cs"
 
   - id: ReviewCenter-Storage-UserStore
     title: Review of ReviewCenter UserStore unit implementation

@@ -108,7 +108,34 @@ public enum DomainRule
     UserNotFound,
 
     /// <summary>The change would leave the system without an enabled administrator.</summary>
-    LastAdmin
+    LastAdmin,
+
+    /// <summary>The referenced review does not exist.</summary>
+    ReviewNotFound,
+
+    /// <summary>The referenced reviewer slot does not exist in the review.</summary>
+    SlotNotFound,
+
+    /// <summary>
+    ///     The users chosen for a slot are not valid: a user does not exist or is disabled, the primary and
+    ///     alternate are the same user, or a user is already in another slot of the review.
+    /// </summary>
+    SlotUserInvalid,
+
+    /// <summary>The slot has a signature and can no longer be changed or removed.</summary>
+    SlotSigned,
+
+    /// <summary>The signed-in user is not allowed to make the change: the account is gone or disabled, or the user is not in the slot.</summary>
+    ActorNotAllowed,
+
+    /// <summary>The review cannot be signed now: the slot is already signed, or the checklist or threads block it.</summary>
+    SigningNotAllowed,
+
+    /// <summary>The password given to confirm a signature is wrong (or the account is locked, disabled or unknown).</summary>
+    ReauthenticationFailed,
+
+    /// <summary>The review record changed after the signer last saw it, so the signature was not stored.</summary>
+    RecordChanged
 }
 
 /// <summary>

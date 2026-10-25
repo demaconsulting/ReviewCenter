@@ -185,6 +185,7 @@ internal static class ServerHost
         services.AddSingleton<ThreadService>();
         services.AddSingleton<ChecklistService>();
         services.AddSingleton<UserService>();
+        services.AddSingleton<SigningService>();
     }
 
     /// <summary>

@@ -571,6 +571,30 @@ public class ThreadServiceTests
     }
 
     /// <summary>
+    ///     Test that checks answered Fail are named in the next step, before the open threads.
+    /// </summary>
+    /// <param name="unanswered">The number of unanswered checks.</param>
+    /// <param name="failed">The number of checks answered Fail.</param>
+    /// <param name="open">The number of open threads.</param>
+    /// <param name="expected">The expected sentence.</param>
+    [Theory]
+    [InlineData(0, 1, 0, "Checklist complete; 1 check answered Fail.")]
+    [InlineData(0, 3, 2, "Checklist complete; 3 checks answered Fail, 2 open threads to resolve.")]
+    [InlineData(4, 1, 0, "4 checklist checks unanswered, 1 check answered Fail.")]
+    public void ThreadService_NextStep_WithFailedChecks_NamesThemBeforeThreads(
+        int unanswered, int failed, int open, string expected)
+    {
+        // Arrange: the requested open threads
+        var threads = Enumerable.Range(0, open).Select(i => MakeThread(i, ReviewThreadState.Open, 0)).ToList();
+
+        // Act: word the next step
+        var sentence = ThreadService.NextStep(threads, new ChecklistProgress(58 - unanswered, 58), failed);
+
+        // Assert: failed checks are named
+        Assert.Equal(expected, sentence);
+    }
+
+    /// <summary>
     ///     Test that the constructor refuses a missing store or clock.
     /// </summary>
     [Fact]

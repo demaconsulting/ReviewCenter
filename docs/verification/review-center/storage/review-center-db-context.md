@@ -2,7 +2,8 @@
 
 #### Verification Approach
 
-`ReviewCenterDbContext` is verified with the unit tests of `ReviewStoreTests.cs`, `UserStoreTests.cs`, and
+`ReviewCenterDbContext` is verified with the unit tests of `ReviewStoreTests.cs`, `ReviewStoreSigningTests.cs`,
+`UserStoreTests.cs`, and
 `DatabaseSetupTests.cs`, which
 exercise the context through the units that use it. The context has no behavior that can be reached without a
 database, and its job is to produce the right schema, so the tests run against real SQLite database files in a
@@ -26,6 +27,9 @@ be loadable on the test platform.
   section and one answer per check.
 - The comments, answers, and section states keep the user name of the person who made them next to the display name.
 - The table for users stores every field of a user, and its unique index on the user name ignores case.
+- The tables for reviewer slots and signatures are created; the database refuses a slot for a review that does not
+  exist, refuses to remove a slot that has a signature, and refuses a second signature of the same slot with the same
+  digest; the role, digest, and meaning of a signature are read back as stored.
 
 #### Test Scenarios
 
@@ -74,3 +78,20 @@ tested by `UserStore_AddAsync_User_RoundTripsEveryField`.
 existing one only in case is refused by the unique index and reported as taken, and a lookup in another case finds
 the original user. This scenario is tested by
 `UserStore_AddAsync_UsernameOtherCase_ThrowsUserNameTakenAndLookupIgnoresCase`.
+
+**ReviewStore_AddSlotAsync_UnknownReview_IsRefusedByDatabase**: A slot for a review that does not exist is refused
+by the database (the foreign key to the review is enforced) and nothing is stored. This scenario is tested by
+`ReviewStore_AddSlotAsync_UnknownReview_IsRefusedByDatabase`.
+
+**ReviewStore_RemoveSlotAsync_SignedSlot_IsRefusedByDatabase**: A slot that has a signature is deleted; the database
+refuses it through the foreign key from the signature to the slot (which uses the no-action delete behavior), and the
+slot and the signature remain. This scenario is tested by `ReviewStore_RemoveSlotAsync_SignedSlot_IsRefusedByDatabase`.
+
+**ReviewStore_AddSignatureAsync_SameSlotAndDigestTwice_ThrowsSigningNotAllowed**: A slot is signed twice with the same
+digest; the unique index on the slot and the digest refuses the second signature, which the store reports as a
+signing that is not allowed, and one signature remains. This scenario is tested by
+`ReviewStore_AddSignatureAsync_SameSlotAndDigestTwice_ThrowsSigningNotAllowed`.
+
+**ReviewStore_AddSignatureAsync_CurrentDigest_StoresAndRoundTrips**: A signature is stored and read back with its
+role, its 64-character digest, and its meaning text unchanged, which verifies the signatures table.
+This scenario is tested by `ReviewStore_AddSignatureAsync_CurrentDigest_StoresAndRoundTrips`.

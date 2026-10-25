@@ -57,6 +57,8 @@ words:
   - tabindex
   - reviewcenter
   - reanswer
+  - reauthentication
+  - resignable
   - upserts
   - reqdoc
   - reqimp

@@ -34,18 +34,20 @@ This document covers the verification design for the following software items:
     - **HomePage** — home page component
     - **ProjectsPage** — projects list and creation page
     - **ProjectPage** — project page with review creation from uploaded files
-    - **ReviewPage** — review, fingerprint, files, file content, and comment threads page
+    - **ReviewPage** — review, fingerprint, files, file content, comment threads, reviewers, and signatures page
     - **ChecklistPage** — review checklist page
     - **LoginPage** — sign-in page
     - **AccountPage** — password change page of the signed-in user
     - **UsersPage** — user administration page
   - **Core** subsystem
     - **Fingerprint** — ReviewMark-compatible content fingerprint
+    - **RecordDigest** — digest of a review record that a signature binds to
     - **ProjectService** — project rules
     - **ReviewService** — review rules
     - **ThreadService** — review comment rules
     - **ChecklistService** — review checklist rules, default checklist, and progress
     - **UserService** — user, password, lockout, and last administrator rules
+    - **SigningService** — reviewer slot, re-authenticated signature, and approval rules
   - **Storage** subsystem
     - **ReviewCenterDbContext** — database schema mapping
     - **ReviewStore** — database implementation of the store interface

@@ -30,6 +30,9 @@ N/A - standard test environment (temporary SQLite databases are created by the t
   the summary, and the per-file open count are correct, and the Details section is collapsed.
 - The review page links the checklist page and shows its progress; the checklist page presents the answers stored
   through the Core service, also when requested again.
+- A review with a reviewer slot that was signed through the Core service is presented as Approved by the review page
+  and the project page, with the signer and the record digest on the review page; when the record changes
+  afterwards, both pages present it as In review and the review page shows the signature as out of date.
 - The `Web` subsystem's pages are presented to a signed-in user; the sign-in itself is verified in the `Identity`
   subsystem.
 - Every interactive element of every page has a `data-testid`.
@@ -64,8 +67,19 @@ is collapsed. This scenario is tested by
 real pipeline and two checks are answered, one Pass and one Fail with a justification. The checklist page is
 requested twice and the review page once. Both loads of the checklist page say "56 checks unanswered.", show the
 section progress "2 of 8", the pressed Pass button, and the saved justification; the review page shows "2 of 58
-checks answered", a link to the checklist page, and "56 checklist checks unanswered." as the next step. This
+checks answered", a link to the checklist page, and "56 checklist checks unanswered, 1 check answered Fail." as the
+next step. This
 scenario is tested by `WebSubsystem_ChecklistPage_AnsweredChecksSurviveReload`.
+
+**WebSubsystem_SignedReview_ApprovalIsPresentedAndGoesOutOfDateWhenRecordChanges**: The pipeline is started in memory
+on a temporary database, and a second user, a project, and a review with every check answered Pass are created
+through the real Core services, with one reviewer slot of the signed-in user (primary) and the second user
+(alternate). The review page shows the badge "In review" and the sign form of the slot. The second user signs
+through `SigningService` with the digest read from the service; the review page then shows "Approved", the status
+"Signed by Bob on ..." and the full record digest in the title of the Details element, and the project page shows
+"Approved" for the review. A thread is then started, which changes the record; both pages show "In review" again
+and the review page shows "Signature out of date". This scenario is tested by
+`WebSubsystem_SignedReview_ApprovalIsPresentedAndGoesOutOfDateWhenRecordChanges`.
 
 **WebSubsystem_AllPages_EveryInteractiveElementHasTestId**: A user with the Admin role is signed in, and every route
 (home, login, account, users, projects, a project, a missing project, a review, a missing review, a checklist) is

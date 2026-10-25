@@ -90,3 +90,53 @@ sections:
           - ReviewStore_SetChecklistAnswer_UpsertsSingleRowPerItem
           - ReviewStore_SetChecklistSectionState_UpsertsSingleRowPerSection
           - ReviewStore_ChecklistRows_RoundTripOutcomeAndTimestamps
+
+      - id: ReviewCenter-ReviewStore-Slots
+        title: >-
+          The ReviewStore class shall add a reviewer slot to a review and assign its identifier, ignoring any
+          identifier supplied by the caller, list the slots of one review in the order they were added while
+          keeping the slots of different reviews apart, refuse a slot for a review that does not exist, change
+          the reviewers of a slot, remove a slot, and report an update or removal of a slot that does not exist
+          in the stated review as not found.
+        justification: |
+          A review is signed by the reviewers of its slots. Pages show the slots of exactly one review in a
+          stable order, and a slot of a review that does not exist or an identifier chosen by a caller would
+          corrupt the record.
+        tests:
+          - ReviewStore_AddSlotAsync_TwoSlots_AssignsIdsAndListsInOrderPerReview
+          - ReviewStore_AddSlotAsync_UnknownReview_IsRefusedByDatabase
+          - ReviewStore_UpdateAndRemoveSlotAsync_ExistingAndUnknown_ChangesOrReturnsFalse
+
+      - id: ReviewCenter-ReviewStore-Record
+        title: >-
+          The ReviewStore class shall read, as one consistent snapshot, the record of a review that a signature
+          covers - its content fingerprint, its checklist, the states of its sections, its answers, and its
+          threads with their comments in posting order - and return nothing for a review that does not exist.
+        justification: |
+          A signature binds a reviewer to exactly one state of the record. Reading the parts one after the other
+          could mix two states, so the record is read as a whole. A review that does not exist has no record.
+        tests:
+          - ReviewStore_GetRecordAsync_StoredReview_CarriesFingerprintAnswersThreadsAndComments
+          - ReviewStore_GetRecordAsync_UnknownReview_ReturnsNull
+          - ReviewStore_GetSnapshotAsync_SignedReview_CarriesRecordSlotsAndSignatures
+          - ReviewStore_GetSnapshotAsync_UnknownReview_ReturnsNull
+
+      - id: ReviewCenter-ReviewStore-Signatures
+        title: >-
+          The ReviewStore class shall keep signatures append-only, offering only to add a signature and to list
+          the signatures of one review in the order they were added. It shall store every value of a signature
+          and assign its identifier. It shall refuse a signature, store nothing, and report that the record
+          changed when the digest of the signature is not the digest of the record stored at that moment, even
+          when another request changes the record at the same time. It shall refuse a second signature of the
+          same slot with the same digest as a signing that is not allowed, and refuse a signature for a slot or
+          a review that does not exist.
+        justification: |
+          A signature is evidence that a reviewer approved one exact record. It must never change or disappear,
+          and it must never be stored for a record other than the one it names. The check and the insert must not
+          be separated by another change, and a double submit must not store the same signature twice.
+        tests:
+          - ReviewStore_AddSignatureAsync_CurrentDigest_StoresAndRoundTrips
+          - ReviewStore_AddSignatureAsync_StaleDigest_ThrowsRecordChangedAndStoresNothing
+          - ReviewStore_AddSignatureAsync_SameSlotAndDigestTwice_ThrowsSigningNotAllowed
+          - ReviewStore_AddSignatureAsync_UnknownSlotOrReview_IsRefused
+          - ReviewStore_SerializableTransaction_TakesWriteLockAtBegin

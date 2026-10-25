@@ -194,7 +194,69 @@ public partial class WebSubsystemTests
         // Assert: the review page links the checklist and names the unanswered checks as the next step
         Assert.Equal("2 of 58 checks answered", reviewPage.QuerySelector("[data-testid='checklist-progress-summary']")?.TextContent);
         Assert.Equal(route, reviewPage.QuerySelector("[data-testid='checklist-link']")?.GetAttribute("href"));
-        Assert.Equal("56 checklist checks unanswered.", reviewPage.QuerySelector("[data-testid='next-step']")?.TextContent);
+        Assert.Equal("56 checklist checks unanswered, 1 check answered Fail.", reviewPage.QuerySelector("[data-testid='next-step']")?.TextContent);
+    }
+
+    /// <summary>
+    ///     Test that slots and signatures created through the domain services are presented by the review page
+    ///     and the project page through the real pipeline: Approved after signing, and In review with an
+    ///     out-of-date signature once the record changes.
+    /// </summary>
+    [Fact]
+    public async Task WebSubsystem_SignedReview_ApprovalIsPresentedAndGoesOutOfDateWhenRecordChanges()
+    {
+        // Arrange: start the real pipeline with two users, a review with every check answered, and one slot
+        var logs = new CapturingLoggerProvider();
+        await using var app = await TestWebApp.StartAsync(logs, "serve", "--silent");
+        using var browser = await TestBrowser.SignedInAsync(app, "ann");
+        var client = browser.Client;
+        var users = app.Services.GetRequiredService<UserService>();
+        var ann = (await users.GetAsync("ann", TestContext.Current.CancellationToken))!;
+        var bob = await users.CreateAsync("bob", "Bob", UserRole.Reviewer, TestBrowser.Password, TestContext.Current.CancellationToken);
+        var project = await app.Services.GetRequiredService<ProjectService>()
+            .CreateAsync("Apollo", null, TestContext.Current.CancellationToken);
+        await app.Services.GetRequiredService<ReviewService>().CreateDraftAsync(
+            project.Id, "rev-1", "First review", [new("a.txt", TestContent.A)], TestContext.Current.CancellationToken);
+        var checklists = app.Services.GetRequiredService<ChecklistService>();
+        foreach (var item in DefaultChecklist.Current.Sections.SelectMany(section => section.Items))
+        {
+            await checklists.SetAnswerAsync(
+                project.Id, "rev-1", item.Id, ChecklistOutcome.Pass, null, TestActors.Ann, TestContext.Current.CancellationToken);
+        }
+
+        var signing = app.Services.GetRequiredService<SigningService>();
+        var slot = await signing.AddSlotAsync(
+            TestActors.Ann, project.Id, "rev-1", ann.Id, bob.Id, TestContext.Current.CancellationToken);
+        var route = $"/projects/{project.Id}/reviews/rev-1";
+
+        // Act, Assert: before signing, the page offers the sign form and the review is In review
+        var before = await ParseAsync(client, route);
+        Assert.Equal("In review", before.QuerySelector("[data-testid='review-approval']")?.TextContent);
+        Assert.NotNull(before.QuerySelector($"[data-testid='sign-form-{slot.Id}']"));
+
+        // Act: bob signs with his password, for the digest read from the service
+        var approval = (await signing.GetApprovalAsync(project.Id, "rev-1", TestContext.Current.CancellationToken))!;
+        await signing.SignAsync(
+            TestActors.Bob, project.Id, "rev-1", slot.Id, approval.Digest, TestBrowser.Password, TestContext.Current.CancellationToken);
+
+        // Assert: both pages show the approval, and the review page the full digest in the details
+        var signed = await ParseAsync(client, route);
+        var list = await ParseAsync(client, $"/projects/{project.Id}");
+        Assert.Equal("Approved", signed.QuerySelector("[data-testid='review-approval']")?.TextContent);
+        Assert.StartsWith("Signed by Bob on ", signed.QuerySelector($"[data-testid='slot-status-{slot.Id}']")?.TextContent, StringComparison.Ordinal);
+        Assert.Equal(approval.Digest, signed.QuerySelector("[data-testid='record-digest']")?.GetAttribute("title"));
+        Assert.Equal("Approved", list.QuerySelector("[data-testid='review-approval-rev-1']")?.TextContent);
+
+        // Act: a new thread changes the record
+        await app.Services.GetRequiredService<ThreadService>().StartThreadAsync(
+            project.Id, "rev-1", "a.txt", null, null, TestActors.Ann, "Late remark", TestContext.Current.CancellationToken);
+
+        // Assert: the signature is out of date and the review is In review again
+        var changed = await ParseAsync(client, route);
+        var changedList = await ParseAsync(client, $"/projects/{project.Id}");
+        Assert.Equal("Signature out of date", changed.QuerySelector($"[data-testid='slot-status-{slot.Id}']")?.TextContent);
+        Assert.Equal("In review", changed.QuerySelector("[data-testid='review-approval']")?.TextContent);
+        Assert.Equal("In review", changedList.QuerySelector("[data-testid='review-approval-rev-1']")?.TextContent);
     }
 
     /// <summary>

@@ -74,11 +74,12 @@ The ReviewCenter system is divided as follows:
 - **Web** (subsystem): the Blazor Server user interface; contains the App unit (HTML shell and router),
   the HomePage unit, the ProjectsPage, ProjectPage, ReviewPage, and ChecklistPage units, and the LoginPage,
   AccountPage, and UsersPage units
-- **Core** (subsystem): the domain model and rules for projects, reviews, review comments, review checklists, and
-  users, free of web and
-  database technology; contains the Fingerprint, ProjectService, ReviewService, ThreadService, ChecklistService, and
-  UserService units
-- **Storage** (subsystem): persistence of projects, reviews, comment threads, checklists, and users in a database
+- **Core** (subsystem): the domain model and rules for projects, reviews, review comments, review checklists,
+  users, and reviewer signatures, free of web and
+  database technology; contains the Fingerprint, RecordDigest, ProjectService, ReviewService, ThreadService,
+  ChecklistService, UserService, and SigningService units
+- **Storage** (subsystem): persistence of projects, reviews, comment threads, checklists, users, reviewer slots, and
+  signatures in a database
   through Entity
   Framework Core; contains the ReviewCenterDbContext, ReviewStore, UserStore, and DatabaseSetup units
 - **SelfTest** (subsystem): self-validation; contains the Validation unit

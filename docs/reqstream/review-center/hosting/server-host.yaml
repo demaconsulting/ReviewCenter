@@ -41,7 +41,8 @@ sections:
       - id: ReviewCenter-ServerHost-Database
         title: >-
           The ServerHost class shall read the Database settings, register the database store and the project,
-          review, and user services for the pages, and create the database when the application is built.
+          review, user, and signing services for the pages, and create the database when the application is
+          built.
         justification: |
           The composition root is the one place that connects the pages to the database. Creating the database
           while building the application means a ready database exists before the first request and a failure
@@ -50,6 +51,7 @@ sections:
           - ServerHost_CreateApplication_DatabaseConfigured_CreatesFileAndServesDomainServices
           - ServerHost_CreateApplication_RestartedOnSameDatabase_KeepsData
           - ServerHost_AddServices_Configured_RegistersUserService
+          - ServerHost_AddServices_Configured_RegistersSigningService
 
       - id: ReviewCenter-ServerHost-Authentication
         title: >-

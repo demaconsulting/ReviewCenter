@@ -4,7 +4,8 @@
 
 #### Purpose
 
-`ProjectPage` is the page at `/projects/{id}`. Its responsibilities are to show one project and its reviews, and to
+`ProjectPage` is the page at `/projects/{id}`. Its responsibilities are to show one project and its reviews, each with
+its approval status, and to
 create a review from files selected in the browser, enforcing the upload limits while the files are read. It requires
 a signed-in user. It is a
 Razor component split into presentation (`ProjectPage.razor`) and behavior (`ProjectPage.razor.cs`).
@@ -18,6 +19,9 @@ The page instance is created per browser connection, so its state is per user.
 **Loaded**, **Project**, **Reviews**: whether loading finished, the project (`null` when it does not exist), and
 its reviews.
 
+**ApprovedReviews**: the identifiers of the reviews that are approved (at least one reviewer slot, and every slot has
+a current signature), filled while loading.
+
 **ReviewId**, **ReviewTitle**: the values typed into the form.
 
 **SelectedFiles**: the files read from the file input, as `UploadedFile` values held in memory.
@@ -28,14 +32,19 @@ its reviews.
 
 Test identifiers: `project-page` (root), `home-link`, `projects-link`, `project-loading`, `project-not-found`,
 `project-name`, `project-description`, `reviews-list`, `reviews-empty`, `review-row-{id}`, `review-link-{id}`,
-`review-title-{id}`, `review-state-{id}`, `new-review-form`, `review-id-input`, `review-title-input`,
+`review-title-{id}`, `review-state-{id}`, `review-approval-{id}`, `new-review-form`, `review-id-input`,
+`review-title-input`,
 `review-files-input`, `selected-files-list`, `selected-file-{index}`, `selected-file-path-{index}`,
 `selected-file-size-{index}`, `review-error`, and `create-review-button`.
 
 #### Key Methods
 
-**OnParametersSetAsync**: Loads the project and its reviews; a project that does not exist leaves `Project` null and
-the page shows a message. When the project identity differs from the one already loaded (the router reuses the
+**OnParametersSetAsync**: Loads the project and its reviews, then asks `SigningService.GetApprovalAsync` once for each
+review to learn whether it is approved (N+1 lookups, accepted because the list of reviews of a project is short); a
+project that does not exist leaves `Project` null and
+the page shows a message. Each review row shows, next to its state, a badge that reads "Approved" when the review is
+in `ApprovedReviews` and "In review" otherwise; a review without slots is therefore In review. When the project
+identity differs from the one already loaded (the router reuses the
 component), it first discards the previous project's data, form values, selected files and error, so files chosen
 for one project can never be submitted into another.
 
@@ -70,6 +79,7 @@ an upload limit is shown as an error message. Other exceptions are not handled b
 
 - **ProjectService** — reads the project.
 - **ReviewService** — lists and creates reviews.
+- **SigningService** — computes whether each review is approved.
 - **ReviewLimits** (Core) — the upload limits.
 - **ASP.NET Core Blazor components** — the component base class, file input, navigation, the authorization
   attribute, and the interactive

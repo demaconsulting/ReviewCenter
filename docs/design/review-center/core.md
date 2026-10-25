@@ -5,14 +5,18 @@
 ### Overview
 
 The `Core` subsystem is the domain of ReviewCenter: projects, reviews of uploaded files, comment threads on
-those files, the review checklist, local user accounts, the rules that protect them, and the content fingerprint
-that identifies a review's files. It is
+those files, the review checklist, local user accounts, reviewer slots with re-authenticated signatures, the rules
+that protect them, and the content fingerprint that identifies a review's files and the digest of a review record. It
+is
 deliberately free of web and database technology so that the rules can be reviewed and tested on their own. It
-contains six units: `Fingerprint`, the content fingerprint algorithm; `ProjectService`, the rules
+contains eight units: `Fingerprint`, the content fingerprint algorithm; `RecordDigest`, the digest of a review
+record that a signature binds to; `ProjectService`, the rules
 for projects; `ReviewService`, the rules for reviews; `ThreadService`, the rules for review comments;
-`ChecklistService`, the rules for the review checklist; and `UserService`, the rules for users. The
+`ChecklistService`, the rules for the review checklist; `UserService`, the rules for users; and `SigningService`, the
+rules for reviewer slots and signatures. The
 domain types (`Project`, `Review`, `ReviewFile`, `ReviewState`, `UploadedFile`, `ReviewThread`, `ReviewComment`,
-`ReviewThreadState`, the checklist types, `User`, `UserRole`, and `Actor`), the text and line definition
+`ReviewThreadState`, the checklist types, `User`, `UserRole`, `Actor`, and the signing types `ReviewerSlot`,
+`ReviewSignature`, `SlotRole`, `ReviewRecord`, and `ReviewApproval`), the text and line definition
 (`FileText`), the limits
 (`ReviewLimits`), the rule failure type
 (`DomainRuleException` with the `DomainRule` enumeration), and the interfaces (`IReviewStore`, `IUserStore`, and
@@ -21,8 +25,8 @@ supporting types, documented with the unit that owns them.
 
 ### Interfaces
 
-**ProjectService, ReviewService, ThreadService, ChecklistService, and UserService**: The operations used by the `Web`
-and `Identity` subsystems and by the `Hosting` subsystem.
+**ProjectService, ReviewService, ThreadService, ChecklistService, UserService, and SigningService**: The operations
+used by the `Web` and `Identity` subsystems and by the `Hosting` subsystem.
 
 - *Type*: In-process .NET classes.
 - *Role*: Provider.
@@ -32,6 +36,9 @@ and `Identity` subsystems and by the `Hosting` subsystem.
   checklist of a review with its progress, set whether a section applies, and answer a check; create a user, check a
   user name and password, list and read users, enable and disable a user, set the role of a user, and change a
   password. Posting a comment or saving a checklist decision takes the signed-in user (an `Actor`), never free text.
+  Add, change, and remove a reviewer slot of a review, sign a slot with the password entered again, read the
+  approval status of a review (its slots, blockers, record digest, and next step), and list the users that can be
+  chosen for a slot. `RecordDigest` calculates the digest of a record.
   Posted comments are
   immutable: there is no operation to edit or delete one. Rule violations are reported as a
   `DomainRuleException` that carries a `DomainRule` value and a message suitable for display to the user.
@@ -45,11 +52,15 @@ and `Identity` subsystems and by the `Hosting` subsystem.
 - *Contract*: Add and read projects; check, add, read, and list reviews; read one file's content; add a thread with
   its first comment; add a comment to a thread of a review; set the state of a thread; list the threads of a review
   with their comments; read the checklist snapshot, the section states, and the answers of a review; set the
-  state of a section and the answer to a check.
+  state of a section and the answer to a check; read the whole record of a review in one operation; add, list,
+  update, and remove reviewer slots; and add and list signatures.
 - *Constraints*: A review is added with all its files, and its checklist snapshot, in one operation, and an attempt
   to add a review whose
   identifier already exists in the project fails with a `DomainRuleException` for `ReviewIdDuplicate`. A thread is
   added with its first comment in one operation. Setting a section state or an answer replaces the earlier one.
+  There is no operation to change or delete a signature. A signature is added only if the digest of the record is
+  still the digest it carries, checked inside one transaction, and fails with a `DomainRuleException` for
+  `RecordChanged` otherwise.
 
 **IUserStore**: The store interface the subsystem requires for users.
 
@@ -125,8 +136,26 @@ message and keep the entered values, and there is a single, easily tested path f
 | `CurrentPasswordIncorrect` | The current password given when changing a password is wrong, or the user is locked out |
 | `UserNotFound` | A change names a user that does not exist |
 | `LastAdmin` | A change would disable or demote the last enabled administrator |
+| `ReviewNotFound` | A slot or signature names a review that does not exist in the project |
+| `SlotNotFound` | A slot change or signature names a slot that is not part of the review |
+| `SlotUserInvalid` | A reviewer is not an enabled user, primary and alternate are the same, or a user is in two slots |
+| `SlotSigned` | A slot that has any signature is changed or removed |
+| `ActorNotAllowed` | The acting user is gone or disabled, or signs a slot of which they are not a reviewer |
+| `SigningNotAllowed` | The slot is already signed for this record, or a blocker remains (checks, failures, threads) |
+| `ReauthenticationFailed` | The password given with a signature is wrong, or the user is locked out |
+| `RecordChanged` | The record changed after the signer saw it, so the digest differs |
 
 The checklist of a review is the copy of the default checklist that the review received when it was created, so
 changing the default never changes an existing review (see `ChecklistService`). The name saved with an answer or
 section decision is the display name of the signed-in user, saved together with the user name, like the author of a
-comment. The earlier rules for a free text author or name no longer exist, because nobody types an author.
+comment. The earlier rules for a free text author or name no longer exist, because nobody types an author. The
+checklist snapshot, section states, and answers are part of the record that a signature binds to, so they are read
+together with the threads (see `RecordDigest`).
+
+Signing is a second kind of record beside the discussion. A review has reviewer slots, each with a primary and an
+optional alternate reviewer, and a slot is signed by one of the two after the password is entered again. A signature is
+bound to the digest of the record (the fingerprint, the answers, the sections that do not apply, and the threads with
+their comments) and is current only while that digest is unchanged. Slots and signatures are never edited into a
+different meaning: a signed slot cannot be changed or removed, a signature is never changed or deleted, and the
+status of a review (Approved or In review) is computed from the record and the signatures each time and never stored.
+The tamper-evident (hash-chained) audit trail of the history is not part of the system yet.

@@ -42,6 +42,7 @@ internal sealed class TestStore : IDisposable
     public TestStore()
     {
         var options = new DatabaseOptions { ConnectionString = TestDatabase.NewConnectionString() };
+        ConnectionString = options.ConnectionString;
         _provider = new ServiceCollection()
             .AddDbContextFactory<ReviewCenterDbContext>(builder => DatabaseSetup.Configure(builder, options))
             .BuildServiceProvider();
@@ -49,6 +50,11 @@ internal sealed class TestStore : IDisposable
         DatabaseSetup.EnsureCreated(factory, options);
         Store = new ReviewStore(factory);
     }
+
+    /// <summary>
+    ///     Gets the connection string of the database file, for tests that need a second connection.
+    /// </summary>
+    public string ConnectionString { get; }
 
     /// <summary>
     ///     Gets the store under test.

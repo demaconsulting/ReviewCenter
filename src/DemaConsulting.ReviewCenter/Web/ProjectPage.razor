@@ -47,6 +47,7 @@
                             <a href="/projects/@ProjectId/reviews/@review.Id" data-testid="review-link-@review.Id">@review.Id</a>
                             <span data-testid="review-title-@review.Id">@review.Title</span>
                             <span class="badge" data-testid="review-state-@review.Id">@review.State</span>
+                            <span class="badge @(IsApproved(review.Id) ? "approved" : null)" data-testid="review-approval-@review.Id">@(IsApproved(review.Id) ? "Approved" : "In review")</span>
                         </li>
                     }
                 </ul>

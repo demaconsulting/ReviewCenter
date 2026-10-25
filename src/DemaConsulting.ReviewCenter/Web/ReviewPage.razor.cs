@@ -34,7 +34,8 @@ namespace DemaConsulting.ReviewCenter.Web;
 /// <remarks>
 ///     The page reads reviews through <see cref="ReviewService"/> and reads and changes threads through
 ///     <see cref="ThreadService"/> only (plus the checklist progress, read through <see cref="ChecklistService"/>
-///     for the checklist card and the next-step line); the rules live there and a violation is shown next to the form that
+///     for the checklist card, and the reviewer slots, signatures and approval status, read and changed through
+///     <see cref="SigningService"/>); the rules live there and a violation is shown next to the form that
 ///     caused it. File bytes are loaded one file at a time when the operator selects it, never with the file
 ///     list. A file is shown as numbered lines only when it is valid UTF-8 without NUL bytes (see
 ///     <see cref="FileText"/>); anything else is reported as a binary file rather than rendered as garbage.
@@ -95,6 +96,12 @@ public partial class ReviewPage : ComponentBase
     private ChecklistService ChecklistService { get; set; } = null!;
 
     /// <summary>
+    ///     Gets or sets the service that manages reviewer slots and signatures, supplied by dependency injection.
+    /// </summary>
+    [Inject]
+    private SigningService SigningService { get; set; } = null!;
+
+    /// <summary>
     ///     Gets or sets the service that reads projects, supplied by dependency injection.
     /// </summary>
     [Inject]
@@ -146,6 +153,66 @@ public partial class ReviewPage : ComponentBase
     ///     Gets the checklist state of the review, or <c>null</c> when the review has no checklist.
     /// </summary>
     private ChecklistState? Checklist { get; set; }
+
+    /// <summary>
+    ///     Gets the approval status of the review (slots, record digest, blockers), or <c>null</c> before it is loaded.
+    /// </summary>
+    private ReviewApproval? Approval { get; set; }
+
+    /// <summary>
+    ///     Gets the users that can be chosen for a slot.
+    /// </summary>
+    private IReadOnlyList<SlotMember> Candidates { get; set; } = [];
+
+    /// <summary>
+    ///     Gets the user name of the signed-in user, used to tell which slots the user occupies.
+    /// </summary>
+    private string CurrentUsername { get; set; } = string.Empty;
+
+    /// <summary>
+    ///     Gets or sets the primary reviewer chosen in the add-slot form (a user id, or blank).
+    /// </summary>
+    private string NewSlotPrimary { get; set; } = string.Empty;
+
+    /// <summary>
+    ///     Gets or sets the alternate reviewer chosen in the add-slot form (a user id, or blank for none).
+    /// </summary>
+    private string NewSlotAlternate { get; set; } = string.Empty;
+
+    /// <summary>
+    ///     Gets the message of the last failed attempt to add a slot, or <c>null</c>.
+    /// </summary>
+    private string? NewSlotError { get; set; }
+
+    /// <summary>
+    ///     Gets the primary reviewer chosen for each slot being edited, by slot identity.
+    /// </summary>
+    private Dictionary<int, string> SlotPrimaryChoices { get; } = [];
+
+    /// <summary>
+    ///     Gets the alternate reviewer chosen for each slot being edited, by slot identity.
+    /// </summary>
+    private Dictionary<int, string> SlotAlternateChoices { get; } = [];
+
+    /// <summary>
+    ///     Gets the message of the last failed slot change for each slot, by slot identity.
+    /// </summary>
+    private Dictionary<int, string> SlotErrors { get; } = [];
+
+    /// <summary>
+    ///     Gets the password typed into each sign form, by slot identity; removed after every attempt.
+    /// </summary>
+    private Dictionary<int, string> SignPasswords { get; } = [];
+
+    /// <summary>
+    ///     Gets the message of the last failed signing attempt for each slot, by slot identity.
+    /// </summary>
+    private Dictionary<int, string> SignErrors { get; } = [];
+
+    /// <summary>
+    ///     Gets or sets a counter that makes the browser build a fresh, empty password field after each attempt.
+    /// </summary>
+    private int PasswordKey { get; set; }
 
     /// <summary>
     ///     Gets or sets the text of the first line field of the new-thread form (blank for the whole file).
@@ -217,7 +284,17 @@ public partial class ReviewPage : ComponentBase
         SelectedLines = null;
         Threads = [];
         Checklist = null;
+        Approval = null;
+        Candidates = [];
         ClearNewThreadForm();
+        NewSlotPrimary = string.Empty;
+        NewSlotAlternate = string.Empty;
+        NewSlotError = null;
+        SlotPrimaryChoices.Clear();
+        SlotAlternateChoices.Clear();
+        SlotErrors.Clear();
+        SignPasswords.Clear();
+        SignErrors.Clear();
         ReplyTexts.Clear();
         ReplyErrors.Clear();
         IndexFilter = ReviewThreadState.Open;
@@ -227,9 +304,22 @@ public partial class ReviewPage : ComponentBase
 
         Review = await ReviewService.GetAsync(ProjectId, ReviewId);
         ProjectName = (await ProjectService.GetAsync(ProjectId))?.Name;
+        await RefreshAsync();
+        Loaded = true;
+    }
+
+    /// <summary>
+    ///     Reloads everything the record depends on: the threads, the checklist, the approval status and the users
+    ///     that can fill a slot.
+    /// </summary>
+    /// <returns>A task that completes when everything is loaded.</returns>
+    private async Task RefreshAsync()
+    {
         Threads = await ThreadService.ListAsync(ProjectId, ReviewId);
         Checklist = await ChecklistService.GetAsync(ProjectId, ReviewId);
-        Loaded = true;
+        Approval = await SigningService.GetApprovalAsync(ProjectId, ReviewId);
+        Candidates = await SigningService.ListCandidatesAsync();
+        CurrentUsername = (await AuthenticationState.GetActorAsync()).Username;
     }
 
     /// <summary>
@@ -293,7 +383,7 @@ public partial class ReviewPage : ComponentBase
         SelectedLines = text is null ? null : FileText.SplitLines(text);
         FocusedThreadId = null;
         ClearNewThreadForm();
-        Threads = await ThreadService.ListAsync(ProjectId, ReviewId);
+        await RefreshAsync();
 
         // The code is the reviewer's task, so bring it to the top of the window
         _scrollTarget = "selected-file-path";
@@ -401,7 +491,7 @@ public partial class ReviewPage : ComponentBase
         NewText = string.Empty;
         NewStartLine = string.Empty;
         NewEndLine = string.Empty;
-        Threads = await ThreadService.ListAsync(ProjectId, ReviewId);
+        await RefreshAsync();
     }
 
     /// <summary>
@@ -425,7 +515,7 @@ public partial class ReviewPage : ComponentBase
 
         ReplyErrors.Remove(threadId);
         ReplyTexts.Remove(threadId);
-        Threads = await ThreadService.ListAsync(ProjectId, ReviewId);
+        await RefreshAsync();
     }
 
     /// <summary>
@@ -454,7 +544,204 @@ public partial class ReviewPage : ComponentBase
         }
 
         ReplyErrors.Remove(thread.Id);
-        Threads = await ThreadService.ListAsync(ProjectId, ReviewId);
+        await RefreshAsync();
+    }
+
+    /// <summary>
+    ///     Adds a reviewer slot from the add-slot form.
+    /// </summary>
+    /// <returns>A task that completes when the slot is stored or the problem is shown.</returns>
+    private async Task AddSlotAsync()
+    {
+        if (ParseUserId(NewSlotPrimary) is not { } primary)
+        {
+            NewSlotError = "Choose a primary reviewer.";
+            return;
+        }
+
+        try
+        {
+            await SigningService.AddSlotAsync(
+                await AuthenticationState.GetActorAsync(), ProjectId, ReviewId, primary, ParseUserId(NewSlotAlternate));
+        }
+        catch (DomainRuleException ex)
+        {
+            NewSlotError = ex.Message;
+            return;
+        }
+
+        NewSlotError = null;
+        NewSlotPrimary = string.Empty;
+        NewSlotAlternate = string.Empty;
+        await RefreshAsync();
+    }
+
+    /// <summary>
+    ///     Saves the primary and alternate chosen for an unsigned slot.
+    /// </summary>
+    /// <param name="slot">The slot as shown.</param>
+    /// <returns>A task that completes when the change is stored or the problem is shown.</returns>
+    private async Task SaveSlotAsync(SlotStatus slot)
+    {
+        try
+        {
+            if (ParseUserId(PrimaryChoice(slot)) is not { } primary)
+            {
+                throw new DomainRuleException(DomainRule.SlotUserInvalid, "Choose a primary reviewer.");
+            }
+
+            await SigningService.UpdateSlotAsync(
+                await AuthenticationState.GetActorAsync(), ProjectId, ReviewId, slot.SlotId, primary, ParseUserId(AlternateChoice(slot)));
+        }
+        catch (DomainRuleException ex)
+        {
+            SlotErrors[slot.SlotId] = ex.Message;
+            return;
+        }
+
+        SlotErrors.Remove(slot.SlotId);
+        SlotPrimaryChoices.Remove(slot.SlotId);
+        SlotAlternateChoices.Remove(slot.SlotId);
+        await RefreshAsync();
+    }
+
+    /// <summary>
+    ///     Removes an unsigned slot.
+    /// </summary>
+    /// <param name="slotId">The identity of the slot.</param>
+    /// <returns>A task that completes when the slot is removed or the problem is shown.</returns>
+    private async Task RemoveSlotAsync(int slotId)
+    {
+        try
+        {
+            await SigningService.RemoveSlotAsync(await AuthenticationState.GetActorAsync(), ProjectId, ReviewId, slotId);
+        }
+        catch (DomainRuleException ex)
+        {
+            SlotErrors[slotId] = ex.Message;
+            return;
+        }
+
+        SlotErrors.Remove(slotId);
+        await RefreshAsync();
+    }
+
+    /// <summary>
+    ///     Signs the review for a slot with the typed password, for the record digest that was on screen.
+    /// </summary>
+    /// <param name="slotId">The identity of the slot.</param>
+    /// <returns>A task that completes when the signature is stored or the problem is shown.</returns>
+    /// <remarks>
+    ///     The password is cleared after every attempt, whatever its outcome, and the field is rebuilt empty. It is
+    ///     only passed to the service, never kept, logged or rendered.
+    /// </remarks>
+    private async Task SignAsync(int slotId)
+    {
+        try
+        {
+            await SigningService.SignAsync(
+                await AuthenticationState.GetActorAsync(),
+                ProjectId,
+                ReviewId,
+                slotId,
+                Approval!.Digest,
+                SignPasswords.GetValueOrDefault(slotId));
+            SignErrors.Remove(slotId);
+        }
+        catch (DomainRuleException ex)
+        {
+            SignErrors[slotId] = ex.Message;
+        }
+        finally
+        {
+            SignPasswords.Remove(slotId);
+            PasswordKey++;
+        }
+
+        await RefreshAsync();
+    }
+
+    /// <summary>
+    ///     Gets the primary reviewer currently chosen in the edit fields of a slot.
+    /// </summary>
+    /// <param name="slot">The slot.</param>
+    /// <returns>The chosen user id as text; the stored primary until the operator changes it.</returns>
+    private string PrimaryChoice(SlotStatus slot)
+    {
+        return SlotPrimaryChoices.GetValueOrDefault(slot.SlotId) ?? slot.Primary.UserId.ToString(CultureInfo.InvariantCulture);
+    }
+
+    /// <summary>
+    ///     Gets the alternate reviewer currently chosen in the edit fields of a slot.
+    /// </summary>
+    /// <param name="slot">The slot.</param>
+    /// <returns>The chosen user id as text, or blank for none; the stored alternate until the operator changes it.</returns>
+    private string AlternateChoice(SlotStatus slot)
+    {
+        return SlotAlternateChoices.GetValueOrDefault(slot.SlotId)
+               ?? slot.Alternate?.UserId.ToString(CultureInfo.InvariantCulture) ?? string.Empty;
+    }
+
+    /// <summary>
+    ///     Tells whether the signed-in user is the primary or the alternate of a slot.
+    /// </summary>
+    /// <param name="slot">The slot.</param>
+    /// <returns><c>true</c> when the user occupies the slot.</returns>
+    private bool IsOccupant(SlotStatus slot)
+    {
+        return string.Equals(slot.Primary.Username, CurrentUsername, StringComparison.OrdinalIgnoreCase)
+               || (slot.Alternate is not null
+                   && string.Equals(slot.Alternate.Username, CurrentUsername, StringComparison.OrdinalIgnoreCase));
+    }
+
+    /// <summary>
+    ///     Words the status of a slot.
+    /// </summary>
+    /// <param name="slot">The slot.</param>
+    /// <returns>"Not signed", "Signed by Ann on 2026-01-02 03:04 UTC" or "Signature out of date".</returns>
+    private static string SlotStatusLabel(SlotStatus slot)
+    {
+        return slot.State switch
+        {
+            SlotSignatureState.Signed => $"Signed by {slot.SignerName} on {FormatTime(slot.SignedAt!.Value)}",
+            SlotSignatureState.OutOfDate => "Signature out of date",
+            _ => "Not signed"
+        };
+    }
+
+    /// <summary>
+    ///     Gets the extra CSS class of a slot's status badge.
+    /// </summary>
+    /// <param name="slot">The slot.</param>
+    /// <returns>The class name, or null for none.</returns>
+    private static string? SlotBadgeClass(SlotStatus slot)
+    {
+        return slot.State switch
+        {
+            SlotSignatureState.Signed => "approved",
+            SlotSignatureState.OutOfDate => "outdated",
+            _ => null
+        };
+    }
+
+    /// <summary>
+    ///     Parses the user id of a user selection.
+    /// </summary>
+    /// <param name="text">The option value.</param>
+    /// <returns>The user id, or <c>null</c> when nobody is chosen.</returns>
+    private static int? ParseUserId(string text)
+    {
+        return int.TryParse(text, NumberStyles.Integer, CultureInfo.InvariantCulture, out var id) ? id : null;
+    }
+
+    /// <summary>
+    ///     Shortens a record digest for display; the full value stays available in the details.
+    /// </summary>
+    /// <param name="digest">The full digest.</param>
+    /// <returns>The first 16 characters.</returns>
+    private static string ShortDigest(string digest)
+    {
+        return digest.Length > 16 ? digest[..16] : digest;
     }
 
     /// <summary>

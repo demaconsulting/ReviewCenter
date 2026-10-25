@@ -1,0 +1,61 @@
+---
+# Software Unit Requirements for the RecordDigest Class
+#
+# The RecordDigest class calculates the digest of a review record: the value a signature binds itself to. The digest
+# is a SHA-256 hash of a canonical text of the fingerprint, the checklist answers, the sections that do not apply, and
+# the threads with their comments.
+
+sections:
+  - title: RecordDigest Unit Requirements
+    requirements:
+      - id: ReviewCenter-RecordDigest-Format
+        title: >-
+          The RecordDigest class shall calculate the digest of a review record as the SHA-256 hash, written as 64
+          lowercase hexadecimal characters, of a canonical text that is built in one documented way, so that the
+          same record always gives the same digest, and shall reject a missing record.
+        justification: |
+          A signature is only evidence if the same record can be recognized later. Fixing the text that is hashed,
+          and checking it against a known answer, means a change of the format cannot go unnoticed and make every
+          earlier signature look out of date.
+        tests:
+          - RecordDigest_Canonicalize_SmallRecord_MatchesDocumentedFormat
+          - RecordDigest_Compute_SameRecord_IsStableSha256OfCanonicalText
+          - RecordDigest_Compute_KnownRecord_MatchesKnownValue
+          - RecordDigest_Compute_NullRecord_Throws
+
+      - id: ReviewCenter-RecordDigest-Coverage
+        title: >-
+          The RecordDigest class shall give a different digest when the content fingerprint, the outcome or
+          justification of a check, an answered check, a section marked as not applicable or its reason, a thread
+          or its file, range, or state, or the author, text, or order of a comment, or a new comment, changes.
+        justification: |
+          A signature approves what the reviewer saw. Anything the reviewer relied on must change the digest, or a
+          signature could stay current after the content, the answers, or the discussion it approved had changed.
+        tests:
+          - RecordDigest_Compute_CoveredChange_ChangesDigest
+          - RecordDigest_Compute_CommentOrder_ChangesDigest
+
+      - id: ReviewCenter-RecordDigest-Independence
+        title: >-
+          The RecordDigest class shall give the same digest for the same record whatever the order in which its
+          threads, answers, and sections are given and whatever identities the storage has given them, and shall
+          not change when a check holds the same outcome and justification given by someone else, or when a
+          section that applies is recorded as applying.
+        justification: |
+          The digest describes the review, not how it is stored or who last touched it. Without this, reading the
+          record in another order, or confirming an answer that was already given, would wrongly invalidate
+          signatures.
+        tests:
+          - RecordDigest_Compute_ReorderedAndRenumbered_SameDigest
+          - RecordDigest_Compute_AnsweredByAndApplicableSection_NotCovered
+
+      - id: ReviewCenter-RecordDigest-Unambiguous
+        title: >-
+          The RecordDigest class shall give different digests for two records that differ only in where text
+          ends and the next value begins, so that no text of a comment, justification, or name can imitate the
+          structure of the digest.
+        justification: |
+          Comment text is typed by users. If a text could contain what looks like the next field, two different
+          records could share a digest, and a signature could be reused for a record it never covered.
+        tests:
+          - RecordDigest_Compute_TextWithDelimiters_DoesNotCollide

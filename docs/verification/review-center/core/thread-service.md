@@ -125,5 +125,11 @@ open threads, and resolved threads: only checks, one check, checks with open thr
 a complete checklist with open threads, with only resolved threads, and with no threads each give the matching
 sentence. This scenario is tested by `ThreadService_NextStep_WithChecklist_CombinesChecksAndThreads`.
 
+**ThreadService_NextStep_WithFailedChecks_NamesThemBeforeThreads**: A theory over the number of unanswered checks,
+checks answered Fail, and open threads: a complete checklist with one failed check, with three failed checks and two
+open threads, and four unanswered checks with one failed check each give the matching sentence, with the failed
+checks named before the open threads. This scenario is tested by
+`ThreadService_NextStep_WithFailedChecks_NamesThemBeforeThreads`.
+
 **ThreadService_Constructor_NullArguments_Throws**: A null store and a null clock are rejected with
 `ArgumentNullException`. This scenario is tested by `ThreadService_Constructor_NullArguments_Throws`.

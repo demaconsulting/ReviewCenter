@@ -63,6 +63,8 @@ public abstract class PageTestBase : BunitContext
         Services.AddSingleton(Threads);
         Services.AddSingleton(Checklists);
         Services.AddSingleton(Users);
+        Signing = new SigningService(store, Users, clock);
+        Services.AddSingleton(Signing);
         Services.AddSingleton<AuthenticationStateProvider>(_authentication);
 
         // bUnit pre-registers placeholder authorization services that throw when used; replace them with the
@@ -102,6 +104,11 @@ public abstract class PageTestBase : BunitContext
     ///     Gets the user service the pages use.
     /// </summary>
     protected UserService Users { get; }
+
+    /// <summary>
+    ///     Gets the signing service the pages use.
+    /// </summary>
+    protected SigningService Signing { get; }
 
     /// <summary>
     ///     Makes the pages see another signed-in user.

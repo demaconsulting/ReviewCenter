@@ -320,6 +320,26 @@ sections:
           - WebSubsystem_ChecklistPage_AnsweredChecksSurviveReload
           - StorageSubsystem_Checklist_PersistsSnapshotAnswersAndSectionsAcrossReopen
 
+      - id: ReviewCenter-System-Signatures
+        title: >-
+          The tool shall let reviewers be named for a review in slots with a primary reviewer and an optional
+          alternate, let a named reviewer sign the review when nothing blocks it by confirming the password again,
+          keep every signature in the database across restarts, and show on the review and in the list of reviews
+          whether it is Approved or In review, where a review is approved only while every slot has signed the
+          record as it is now.
+        tags: [system]
+        justification: |
+          A formal review ends with the approval of the named reviewers. The approval must be tied to the exact
+          record that was reviewed, so that a later change to the checklist answers or the discussion cannot
+          leave an approval standing for content nobody approved.
+        children:
+          - ReviewCenter-Web-Signatures
+          - ReviewCenter-Core-Signatures
+          - ReviewCenter-Storage-Signatures
+        tests:
+          - WebSubsystem_SignedReview_ApprovalIsPresentedAndGoesOutOfDateWhenRecordChanges
+          - StorageSubsystem_Signatures_PersistAcrossReopenAndStayCurrent
+
       - id: ReviewCenter-System-Login
         title: >-
           The tool shall let a user sign in at /login with the user name and password of a local account that is
