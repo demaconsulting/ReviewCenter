@@ -231,7 +231,7 @@ message and keep the entered values, and there is a single, easily tested path f
 | `RecordChanged` | The record changed after the signer saw it, so the digest differs |
 | `RepositoryNameInvalid` | The name is not 1 to 40 of letters, digits, `.`, `_`, `-`, starting with a letter or digit |
 | `RepositoryNameTaken` | A repository with that name (without regard to case) exists |
-| `RepositoryLocationInvalid` | The location is empty, too long, or not an `https`, `http`, or `file` URL or path |
+| `RepositoryLocationInvalid` | Location is empty, too long, or not an `https`, local `http`, or `file` URL or path |
 | `RepositoryCredentialInvalid` | Invalid credential, non-`https` location, or token equal to the name or user name |
 | `RepositoryNotFound` | A change or an access names a repository that does not exist |
 | `RepositoryDisabled` | A disabled repository is opened for reading |

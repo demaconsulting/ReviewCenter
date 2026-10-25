@@ -582,8 +582,10 @@ An administrator sees a **Repositories** link in the page header, next to **User
   same text as the repository name or the user name (compared exactly, with case), because those appear in messages and
   in the audit trail; the same applies when you edit a repository and replace the token, or rename the repository or
   the user while keeping a stored token. The location is an
-  `https://`, `http://`, or `file://` URL, or an absolute local path. A user name or token is accepted only with an
-  `https://` location, because the token must not travel in clear text. The location must not contain a user name or
+  `https://` or `file://` URL, an `http://` URL for the local machine only (`localhost`, `127.0.0.1`, or `[::1]`;
+  plain `http://` to any other host is refused because it can be tampered with), or an absolute local path. A user name
+  or token is accepted only with an `https://` location, because the token must not travel in clear text; so a
+  loopback `http://` repository is always anonymous. The location must not contain a user name or
   password, a query string, or a fragment; enter the credentials in their own fields.
 - **List**: shows each repository with its location, user name, enabled state, and "token set" or "no token". The
   token itself is never shown.

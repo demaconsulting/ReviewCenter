@@ -337,9 +337,10 @@ if that cannot be stored, the sign-in itself is not blocked, and the failure is 
 ## Repositories and Credentials
 
 Administrators open **Repositories** in the page header (`/repositories`) to register the git repositories that reviews
-will be made from. A repository has a name (letters, digits, dot, underscore, and hyphen), a location (an `https://`,
-`http://`, or `file://` URL, or an absolute local path), and, for a private repository, a user name and an access token.
-A user name or token is accepted only with an `https://` location. A repository can be disabled and enabled again; it
+will be made from. A repository has a name (letters, digits, dot, underscore, and hyphen), a location (an `https://` or
+`file://` URL, an `http://` URL for `localhost`, `127.0.0.1`, or `[::1]` only, or an absolute local path), and, for a
+private repository, a user name and an access token. A user name or token is accepted only with an `https://`
+location. A repository can be disabled and enabled again; it
 cannot be deleted, so that earlier work keeps its reference. A disabled repository cannot be read. Signed-in users who
 are not administrators can only be offered the names of enabled repositories, never the location or the credentials; a
 git error that is shown to them names the repository instead of its location. A token must not be the same text as the

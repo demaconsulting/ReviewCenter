@@ -119,8 +119,8 @@ public sealed class RepositoryService
     ///     letter or digit; unique without regard to case.
     /// </param>
     /// <param name="location">
-    ///     The location: an <c>https://</c>, <c>http://</c> or <c>file://</c> URL without embedded credentials, or an
-    ///     absolute local path.
+    ///     The location: an <c>https://</c>, <c>http://</c> (only for localhost, 127.0.0.1 or [::1]) or <c>file://</c>
+    ///     URL without embedded credentials, or an absolute local path.
     /// </param>
     /// <param name="username">The user name for a private https repository, or <c>null</c> or white space for none.</param>
     /// <param name="token">The token for a private https repository (needs a user name), or <c>null</c> or empty for none.</param>
@@ -532,6 +532,11 @@ public sealed class RepositoryService
                 throw LocationInvalid($"The location has no host name. {forms}");
             }
 
+            if (uri.Scheme == Uri.UriSchemeHttp && !IsLoopbackHost(uri.Host))
+            {
+                throw LocationInvalid("Plain http:// locations are only allowed for localhost; use https://.");
+            }
+
             isHttps = uri.Scheme == Uri.UriSchemeHttps;
             return trimmed;
         }
@@ -543,6 +548,17 @@ public sealed class RepositoryService
 
         return trimmed;
     }
+
+    /// <summary>
+    ///     Tells whether a parsed URL host is exactly a loopback host (never a look-alike such as
+    ///     <c>localhost.example.com</c>).
+    /// </summary>
+    /// <param name="host">The host as normalized by <see cref="Uri"/> (lower case; IPv6 in brackets).</param>
+    /// <returns><c>true</c> for <c>localhost</c>, <c>127.0.0.1</c> and <c>[::1]</c>.</returns>
+    private static bool IsLoopbackHost(string host) =>
+        host.Equals("localhost", StringComparison.OrdinalIgnoreCase)
+        || host.Equals("127.0.0.1", StringComparison.Ordinal)
+        || host.Equals("[::1]", StringComparison.Ordinal);
 
     /// <summary>
     ///     Validates and normalizes a user name.

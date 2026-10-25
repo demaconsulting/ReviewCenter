@@ -85,9 +85,14 @@ lists the
 - *Location*: 1 to 500 characters, no control characters, not starting with `-`. Either an `https://`, `http://`, or
   `file://` address that is a valid absolute address without white space, without user information, without a query
   string or fragment, and (except for
-  `file`) with a host, or a fully qualified local path. SSH and scp-style addresses are refused
+  `file`) with a host, or a fully qualified local path. A plain `http://` address is accepted only when the host, as
+  parsed by `Uri`, is exactly `localhost` (any letter case), `127.0.0.1`, or `[::1]`; names that only resemble one,
+  such as
+  `localhost.example.com` or `127.0.0.1.example.com` are refused, because plain http can be tampered with. The check
+  runs for both create and update. SSH and scp-style addresses are refused
   (`RepositoryLocationInvalid`).
-- *Credentials*: a user name or token is accepted only for an `https://` location. A token needs a user name. The user
+- *Credentials*: a user name or token is accepted only for an `https://` location (so a loopback `http://` location
+  never carries a token; it is refused with `RepositoryCredentialInvalid`). A token needs a user name. The user
   name has at most 200 characters, no `:`, and no control characters; the token has at most 1000 characters and no white
   space or control characters. A token must also differ from the repository name and from
   the user name (exact, case-sensitive comparison), because those two are written to audit entries and messages. All of

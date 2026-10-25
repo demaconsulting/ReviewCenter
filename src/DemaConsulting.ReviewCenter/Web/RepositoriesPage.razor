@@ -126,7 +126,7 @@
                 <input id="new-repository-location" type="text" maxlength="@RepositoryService.MaxLocationLength"
                        autocomplete="off"
                        data-testid="new-repository-location-input" @bind="NewLocation" @bind:event="oninput" />
-                <p class="muted hint">An https://, http:// or file:// URL, or an absolute path on the server. Do not put a password in the location.</p>
+                <p class="muted hint">An https:// or file:// URL, an http:// URL for localhost only, or an absolute path on the server. Do not put a password in the location.</p>
             </div>
             <div class="field">
                 <label for="new-repository-username">User name (private repositories only)</label>

@@ -58,6 +58,22 @@ host, use an unsupported scheme, or
 are SSH or scp-style addresses or relative paths are refused with `RepositoryLocationInvalid`. This scenario is tested by
 `RepositoryService_CreateAsync_InvalidLocation_ThrowsRepositoryLocationInvalid`.
 
+**RepositoryService_CreateAndUpdate_LoopbackHttpLocation_Accepted**: An `http://` location whose host is `localhost`
+(in any letter case), `127.0.0.1`, or `[::1]`, with or without a port, is accepted when a repository is registered and
+when an existing one is changed. This scenario is tested by
+`RepositoryService_CreateAndUpdate_LoopbackHttpLocation_Accepted`.
+
+**RepositoryService_CreateAndUpdate_NonLoopbackHttpLocation_ThrowsRepositoryLocationInvalid**: An `http://` location
+with another host (a public name, a private address, a global IPv6 address, or a look-alike such as
+`localhost.evil.com`, `127.0.0.1.evil.com`, or `localhost.`) is refused with `RepositoryLocationInvalid` and a message
+that names https, on create and on update, with nothing changed; the same host over `https://` is accepted. This
+scenario is tested by `RepositoryService_CreateAndUpdate_NonLoopbackHttpLocation_ThrowsRepositoryLocationInvalid`.
+
+**RepositoryService_CreateAndUpdate_LoopbackHttpWithCredentials_ThrowsRepositoryCredentialInvalid**: A user name and
+token on a loopback `http://` location are still refused with `RepositoryCredentialInvalid`, on create and on update,
+so a token is never sent over plain http. This scenario is tested by
+`RepositoryService_CreateAndUpdate_LoopbackHttpWithCredentials_ThrowsRepositoryCredentialInvalid`.
+
 **RepositoryService_CreateAsync_InvalidCredentials_ThrowsRepositoryCredentialInvalid**: A user name or token for a
 location that is not `https`, a token without a user name, a user name with `:` or control characters, and a token
 that is

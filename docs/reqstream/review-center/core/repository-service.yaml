@@ -20,18 +20,23 @@ sections:
 
       - id: ReviewCenter-RepositoryService-Location
         title: >-
-          The RepositoryService class shall accept as the location of a repository an https, http, or file URL or an
-          absolute local path, and shall refuse an empty or too long location, a location that git could read as an
-          option or a helper, any other form (including ssh and git addresses), and a location that carries
-          credentials of its own, in the user information, the query string, or a fragment.
+          The RepositoryService class shall accept as the location of a repository an https URL, an http URL whose
+          host is exactly localhost, 127.0.0.1, or [::1], a file URL, or an absolute local path, and shall refuse,
+          when a repository is registered and when it is changed, an http URL with any other host (including a
+          host that only starts or ends like a loopback host), an empty or too long location, a location that git
+          could read as an option or a helper, any other form (including ssh and git addresses), and a location that
+          carries credentials of its own, in the user information, the query string, or a fragment.
         justification: |
           The location is handed to git and fetched by the server. Only the forms that the server can use safely are
           allowed, and credentials belong in the token, where they are protected, not in the location, where they
-          would be shown.
+          would be shown. Plain http to a remote host can be tampered with on the way, so it is allowed only for the
+          local machine, where tests and local git servers use it.
         tests:
           - RepositoryService_CreateAsync_AllowedLocation_Registers
           - RepositoryService_CreateAsync_AbsoluteLocalPath_Registers
           - RepositoryService_CreateAsync_InvalidLocation_ThrowsRepositoryLocationInvalid
+          - RepositoryService_CreateAndUpdate_LoopbackHttpLocation_Accepted
+          - RepositoryService_CreateAndUpdate_NonLoopbackHttpLocation_ThrowsRepositoryLocationInvalid
 
       - id: ReviewCenter-RepositoryService-Credentials
         title: >-
@@ -46,6 +51,7 @@ sections:
           and messages, so a token with the same text would put the secret there.
         tests:
           - RepositoryService_CreateAsync_InvalidCredentials_ThrowsRepositoryCredentialInvalid
+          - RepositoryService_CreateAndUpdate_LoopbackHttpWithCredentials_ThrowsRepositoryCredentialInvalid
           - RepositoryService_CreateAsync_TokenEqualsNameOrUsername_ThrowsRepositoryCredentialInvalid
           - RepositoryService_UpdateAsync_TokenEqualsNameOrUsername_ThrowsRepositoryCredentialInvalid
           - RepositoryService_UpdateAsync_KeepUnreadableOrClearedToken_DoesNotCompare

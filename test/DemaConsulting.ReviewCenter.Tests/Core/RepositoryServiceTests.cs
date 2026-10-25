@@ -220,6 +220,99 @@ public class RepositoryServiceTests
     }
 
     /// <summary>
+    ///     Test that a plain http location is registered only for a loopback host, in any letter case and with or
+    ///     without a port.
+    /// </summary>
+    /// <param name="location">The loopback http location.</param>
+    [Theory]
+    [InlineData("http://localhost/r.git")]
+    [InlineData("http://LOCALHOST:8080/r.git")]
+    [InlineData("HTTP://LocalHost:8080/r.git")]
+    [InlineData("http://127.0.0.1:8080/r.git")]
+    [InlineData("http://[::1]:8080/r.git")]
+    [InlineData("http://[::1]/r.git")]
+    public async Task RepositoryService_CreateAndUpdate_LoopbackHttpLocation_Accepted(string location)
+    {
+        // Arrange: a fixture with a repository at an https location
+        var f = await CreateAsync();
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var existing = await f.Service.CreateAsync("old", "https://example.com/r.git", null, null, _admin, cancellationToken);
+
+        // Act: register a new repository and move the existing one to the loopback location
+        var created = await f.Service.CreateAsync("loop", location, null, null, _admin, cancellationToken);
+        var updated = await f.Service.UpdateAsync(existing.Id, "old", location, null, TokenChange.Keep, _admin, cancellationToken);
+
+        // Assert: both are stored as entered
+        Assert.Equal(location, created.Location);
+        Assert.Equal(location, updated.Location);
+    }
+
+    /// <summary>
+    ///     Test that a plain http location with any other host, including hosts that only look like a loopback host,
+    ///     is refused with the location rule when a repository is registered or changed, while https is unaffected.
+    /// </summary>
+    /// <param name="location">The non-loopback http location.</param>
+    [Theory]
+    [InlineData("http://example.com/r.git")]
+    [InlineData("http://localhost.evil.com/r.git")]
+    [InlineData("http://127.0.0.1.evil.com/r.git")]
+    [InlineData("http://evil.com.localhost.evil.com/r.git")]
+    [InlineData("http://notlocalhost/r.git")]
+    [InlineData("http://10.0.0.5/r.git")]
+    [InlineData("http://192.168.1.10:8080/r.git")]
+    [InlineData("http://[2001:db8::1]/r.git")]
+    [InlineData("http://localhost.:8080/r.git")]
+    [InlineData("HTTP://EXAMPLE.COM/r.git")]
+    public async Task RepositoryService_CreateAndUpdate_NonLoopbackHttpLocation_ThrowsRepositoryLocationInvalid(string location)
+    {
+        // Arrange: a fixture with a repository at an https location
+        var f = await CreateAsync();
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var existing = await f.Service.CreateAsync("old", "https://example.com/r.git", null, null, _admin, cancellationToken);
+
+        // Act: register a new repository and change the existing one to the location
+        var create = await Assert.ThrowsAsync<DomainRuleException>(
+            () => f.Service.CreateAsync("new", location, null, null, _admin, cancellationToken));
+        var update = await Assert.ThrowsAsync<DomainRuleException>(
+            () => f.Service.UpdateAsync(existing.Id, "old", location, null, TokenChange.Keep, _admin, cancellationToken));
+        var https = await f.Service.CreateAsync(
+            "secure", location.Replace("http://", "https://", StringComparison.OrdinalIgnoreCase), null, null, _admin, cancellationToken);
+
+        // Assert: both are refused with the location rule and a message that names https, nothing changed, and the
+        // same host over https is accepted
+        Assert.Equal(DomainRule.RepositoryLocationInvalid, create.Rule);
+        Assert.Equal(DomainRule.RepositoryLocationInvalid, update.Rule);
+        Assert.Contains("https://", create.Message, StringComparison.Ordinal);
+        Assert.Contains("https://", update.Message, StringComparison.Ordinal);
+        Assert.Equal("https://example.com/r.git", (await f.Service.GetAccessAsync(existing.Id, cancellationToken)).Location);
+        Assert.Equal(2, (await f.Store.ListAsync(cancellationToken)).Count);
+        Assert.StartsWith("https://", https.Location, StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
+    ///     Test that credentials still need an https location: a user name and token on a loopback http location are
+    ///     refused with the credential rule, on create and on update.
+    /// </summary>
+    [Fact]
+    public async Task RepositoryService_CreateAndUpdate_LoopbackHttpWithCredentials_ThrowsRepositoryCredentialInvalid()
+    {
+        // Arrange: a private repository at an https location
+        var f = await CreateAsync();
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var existing = await f.Service.CreateAsync("old", "https://example.com/r.git", "svc", Secret, _admin, cancellationToken);
+
+        // Act: register a private repository at a loopback http location and move the existing one there
+        var create = await Assert.ThrowsAsync<DomainRuleException>(
+            () => f.Service.CreateAsync("new", "http://127.0.0.1:8080/r.git", "svc", "tok-1234", _admin, cancellationToken));
+        var update = await Assert.ThrowsAsync<DomainRuleException>(
+            () => f.Service.UpdateAsync(existing.Id, "old", "http://127.0.0.1:8080/r.git", "svc", TokenChange.Keep, _admin, cancellationToken));
+
+        // Assert: both are refused with the credential rule
+        Assert.Equal(DomainRule.RepositoryCredentialInvalid, create.Rule);
+        Assert.Equal(DomainRule.RepositoryCredentialInvalid, update.Rule);
+    }
+
+    /// <summary>
     ///     Test that credentials that do not fit the location or each other are refused.
     /// </summary>
     /// <param name="location">The location.</param>
@@ -229,7 +322,7 @@ public class RepositoryServiceTests
     [InlineData("https://example.com/r.git", null, "tok")]
     [InlineData("https://example.com/r.git", "a:b", "tok")]
     [InlineData("https://example.com/r.git", "svc", "has space")]
-    [InlineData("http://example.com/r.git", "svc", "tok")]
+    [InlineData("http://localhost:8080/r.git", "svc", "tok")]
     [InlineData("file:///srv/r.git", "svc", null)]
     public async Task RepositoryService_CreateAsync_InvalidCredentials_ThrowsRepositoryCredentialInvalid(
         string location,
