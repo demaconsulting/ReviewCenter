@@ -48,6 +48,8 @@ input-files:
   - docs/design/review-center/core/thread-service.md
   - docs/design/review-center/core/checklist-service.md
   - docs/design/review-center/core/user-service.md
+  - docs/design/review-center/core/record-digest.md
+  - docs/design/review-center/core/signing-service.md
   - docs/design/review-center/storage.md
   - docs/design/review-center/storage/review-center-db-context.md
   - docs/design/review-center/storage/review-store.md

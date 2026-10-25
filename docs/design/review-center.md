@@ -46,6 +46,8 @@ flowchart TD
         ThreadService
         ChecklistService
         UserService
+        RecordDigest
+        SigningService
     end
     subgraph Storage
         ReviewCenterDbContext
@@ -72,6 +74,7 @@ flowchart TD
     ServerHost --> ThreadService
     ServerHost --> ChecklistService
     ServerHost --> UserService
+    ServerHost --> SigningService
     UserCommand --> Context
     UserCommand --> ServerHost
     UserCommand --> DatabaseSetup
@@ -94,9 +97,11 @@ flowchart TD
     ProjectsPage --> ProjectService
     ProjectPage --> ProjectService
     ProjectPage --> ReviewService
+    ProjectPage --> SigningService
     ReviewPage --> ReviewService
     ReviewPage --> ThreadService
     ReviewPage --> ChecklistService
+    ReviewPage --> SigningService
     ReviewPage --> SignIn
     ChecklistPage --> ReviewService
     ChecklistPage --> ChecklistService
@@ -107,6 +112,10 @@ flowchart TD
     ThreadService --> ReviewStore
     ChecklistService --> ReviewStore
     UserService --> UserStore
+    SigningService --> ReviewStore
+    SigningService --> UserService
+    SigningService --> RecordDigest
+    ReviewStore --> RecordDigest
     ReviewStore --> ReviewCenterDbContext
     UserStore --> ReviewCenterDbContext
     DatabaseSetup --> ReviewCenterDbContext
@@ -137,7 +146,8 @@ authorization, checks a password through `UserService`, signs the user in and ou
 in; `PasswordHasher` hashes and verifies passwords with the password hasher of the ASP.NET Core shared framework.
 
 The `Core` subsystem holds the domain: projects, reviews of uploaded files, users, the rules that
-protect them, and the content fingerprint of a review. It depends on no other subsystem and on
+protect them, the content fingerprint of a review, and the digest of a review record that signatures are bound to. It
+depends on no other subsystem and on
 no library beyond the .NET runtime, and it defines the store interfaces and the password hasher interface that the
 `Storage` and `Identity` subsystems implement. The `Storage` subsystem keeps projects, reviews, and users in a
 database through
@@ -153,11 +163,17 @@ requires a signed-in user, and the users page requires the Admin role. The first
 (threads anchored to a file or line range, with replies, resolve, and reopen), and every review has a checklist of
 checks (Pass, Fail, or N/A, with a justification where required) that is frozen when the review is created. The author
 of a comment and the person who saved a checklist answer are the signed-in user (user name and display name at
-that time); the checklist has no thread links, and there is no diff view or sign-off workflow yet.
+that time); the checklist has no thread links, and there is no diff view yet. Reviewers are named for a review in
+slots (a primary reviewer and an optional alternate), and a named reviewer signs the review after confirming the
+password again; a signature is bound to a digest of the review record, so it goes out of date when the record changes,
+and a review is Approved only while every slot has a current signature. A review without a slot is In review. The
+hash-chained audit trail of the architecture, author signatures, rejecting or withdrawing a signature, and a second
+factor are deferred to later slices; a signed slot cannot be reassigned.
 The limitations of the identity slice are deliberate: lockout after failed sign-ins is per user name, so anyone can
 lock a known user name for a few minutes; a page that is already open keeps the authentication state it started with
 until it is reloaded; a password change does not end other sessions of the user; and a database that was created
-before the identity slice must be deleted and created again.
+before the identity slice or before the signature slice (it has no reviewer slot and signature tables) must be
+deleted and created again.
 
 ## External Interfaces
 
@@ -223,7 +239,8 @@ is running.
 - *Constraints*: The location must be writable. An unsupported provider or an unusable
   location prevents the server from starting: an error is reported and the exit code is 1. The
   schema is created, never migrated; the database file of an older schema is not upgraded. A database that was
-  created before the identity slice (it has no users and no user name columns) must be deleted and created again.
+  created before the identity slice (it has no users and no user name columns) or before the signature slice (it
+  has no reviewer slot and signature tables) must be deleted and created again.
 
 **Standard Output**: Normal program output written to `Console.Out`.
 
@@ -315,7 +332,11 @@ fingerprint with `Fingerprint`, and stores the review through `ReviewStore`. `Re
 to start, answer, resolve, and reopen comment threads on a file, passing the signed-in user as the author;
 `ThreadService` applies the comment rules and
 stores the threads through `ReviewStore`. `ReviewPage` and `ChecklistPage` call `ChecklistService`, which applies
-the checklist rules and stores answers, saved on behalf of the signed-in user, through `ReviewStore`. `AccountPage` and
+the checklist rules and stores answers, saved on behalf of the signed-in user, through `ReviewStore`. `ReviewPage`
+calls `SigningService` to add, change, and remove reviewer slots and to sign: the service checks the rules, asks
+`UserService` to check the password again, takes the digest of the record from `RecordDigest`, and stores the
+signature through `ReviewStore`, which checks the digest once more inside the database transaction. `ProjectPage`
+calls `SigningService` to show whether each review is Approved. `AccountPage` and
 `UsersPage` call `UserService`, which stores users through `UserStore`. When the server is
 stopped, `ServerHost.RunAsync` returns 0; if the server cannot start, including because the
 database cannot be used, it reports the reason
@@ -339,10 +360,13 @@ result or the reason of a failure is reported through `Context`.
   are sent in sign-in requests.
 - Persistence: the database provider is selected by configuration, and only SQLite is supported. The schema is
   created at start-up and not migrated (see the Storage subsystem design); a database created before the identity
-  slice must be deleted and created again.
+  slice or before the signature slice must be deleted and created again.
 - Authentication: passwords are stored only as salted hashes and never logged or shown; five consecutive wrong
   passwords lock a user name for 5 minutes (per user name, not per source); the last enabled administrator cannot be
-  disabled or demoted.
+  disabled or demoted. A signature asks for the password again through the same check, so wrong passwords at a
+  signature count toward the same lockout.
+- Signatures: a signature is bound to the digest of the review record and is never changed or removed; the approval
+  of a review is computed from the record and the signatures each time and is never stored.
 - Upload limits: a review accepts at most 200 files, each at most 2 MiB, and 20 MiB in total, with the limits
   defined once in the Core subsystem.
 - Immutability: `Context` properties are set once at construction via `init` accessors and are

@@ -103,11 +103,13 @@ sections:
       - id: ReviewCenter-ThreadService-NextStep
         title: >-
           The ThreadService class shall give, for the threads of a review and optionally the progress of its
-          checklist, one short sentence naming the next action: the number of unanswered checklist checks, the
-          number of open threads to resolve, both when both apply, that the checklist is complete, or that all
-          threads are resolved, and, when there are no threads and no checklist, to start a discussion.
+          checklist and the number of checks answered Fail, one short sentence naming the next action: the number
+          of unanswered checklist checks, the number of checks answered Fail, the number of open threads to
+          resolve, all of them that apply, that the checklist is complete, or that all threads are resolved, and,
+          when there are no threads and no checklist, to start a discussion.
         justification: |
           A reader should not have to count threads or checks to know what to do next; one sentence says it.
         tests:
           - ThreadService_NextStep_NoThreadsOpenAndAllResolved_NamesNextAction
           - ThreadService_NextStep_WithChecklist_CombinesChecksAndThreads
+          - ThreadService_NextStep_WithFailedChecks_NamesThemBeforeThreads

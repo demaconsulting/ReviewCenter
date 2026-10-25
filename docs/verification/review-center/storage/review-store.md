@@ -2,10 +2,12 @@
 
 #### Verification Approach
 
-`ReviewStore` is verified with unit tests defined in `ReviewStoreTests.cs`. The tests use the real store over a real
+`ReviewStore` is verified with unit tests defined in `ReviewStoreTests.cs` (projects, reviews, threads, and
+checklists) and `ReviewStoreSigningTests.cs` (reviewer slots, the record, and signatures). The tests use the real
+store over a real
 SQLite database file that each test class instance creates in a private temporary folder and deletes afterward.
-Real SQLite is used because ordering, keys, constraints, and binary content are the behavior under test. No
-mocking is applied.
+Real SQLite is used because ordering, keys, constraints, transactions, and binary content are the behavior under test.
+No mocking is applied.
 
 #### Test Environment
 
@@ -32,8 +34,68 @@ be loadable on the test platform.
 - Answering a check again, or setting a section's applicability again, replaces the earlier row, so there is one
   row per check and per section; outcome, display name, user name, and time are read back as saved, and only for
   their own review.
+- Reviewer slots are stored with database-assigned identities (a supplied identity is ignored), listed only for their
+  own review in the order they were added, and refused for an unknown review; a slot can be updated and removed, and
+  an unknown slot, or a slot reached through another review, is reported as not found.
+- The record of a review carries its fingerprint, section states, answers, and threads with their comments in posting
+  order, changes when a comment is added, and is none for an unknown review.
+- A signature is stored with every value and read back; a digest that is not the digest of the stored record, whether
+  made up or stale because the record changed, is refused as a changed record and nothing is stored; the same slot
+  and digest a second time is refused as a signing that is not allowed; an unknown slot or review is refused; the
+  database refuses to remove a slot that has a signature.
+- A transaction begun at the `Serializable` level takes the write lock of SQLite at the begin, so a second writer is
+  refused while it is open.
 
 #### Test Scenarios
+
+**ReviewStore_AddSlotAsync_TwoSlots_AssignsIdsAndListsInOrderPerReview**: Two slots, one carrying an identity that
+must be ignored, are added to one review and a third to another review; the first review lists its two slots in the
+order added with database-assigned identities and the stored primary and alternate users (none for the second slot's
+alternate). This scenario is tested by `ReviewStore_AddSlotAsync_TwoSlots_AssignsIdsAndListsInOrderPerReview`.
+
+**ReviewStore_AddSlotAsync_UnknownReview_IsRefusedByDatabase**: A slot for a review that does not exist is added; a
+`DbUpdateException` is thrown. This scenario is tested by `ReviewStore_AddSlotAsync_UnknownReview_IsRefusedByDatabase`.
+
+**ReviewStore_UpdateAndRemoveSlotAsync_ExistingAndUnknown_ChangesOrReturnsFalse**: A slot is updated and its users are
+read back; an unknown slot and a slot through another review report false for update and for removal; the slot is
+then removed and no slot is listed. This scenario is tested by
+`ReviewStore_UpdateAndRemoveSlotAsync_ExistingAndUnknown_ChangesOrReturnsFalse`.
+
+**ReviewStore_GetRecordAsync_StoredReview_CarriesFingerprintAnswersThreadsAndComments**: A review with an answer, a
+section marked not applicable, and a thread with a comment is read as a record, which carries the fingerprint, the
+answer, the section state, and the comment; after another comment is added the digest of the record differs. This
+scenario is tested by `ReviewStore_GetRecordAsync_StoredReview_CarriesFingerprintAnswersThreadsAndComments`.
+
+**ReviewStore_GetRecordAsync_UnknownReview_ReturnsNull**: The record of an unknown review is requested; it is null.
+This scenario is tested by `ReviewStore_GetRecordAsync_UnknownReview_ReturnsNull`.
+
+**ReviewStore_AddSignatureAsync_CurrentDigest_StoresAndRoundTrips**: A slot is signed with the current digest; the
+signature is stored with a database-assigned identity and listed with the slot, user, display name, role, time, digest,
+and meaning unchanged. This scenario is tested by `ReviewStore_AddSignatureAsync_CurrentDigest_StoresAndRoundTrips`.
+
+**ReviewStore_AddSignatureAsync_StaleDigest_ThrowsRecordChangedAndStoresNothing**: A signature is added with a digest
+that was made up, and with a digest that was current until a thread was added; each throws a `DomainRuleException` for
+`RecordChanged` and no signature is listed. This scenario is tested by
+`ReviewStore_AddSignatureAsync_StaleDigest_ThrowsRecordChangedAndStoresNothing`.
+
+**ReviewStore_AddSignatureAsync_SameSlotAndDigestTwice_ThrowsSigningNotAllowed**: A slot is signed and then signed
+again with the same digest; the second attempt throws a `DomainRuleException` for `SigningNotAllowed` and one
+signature remains. This scenario is tested by
+`ReviewStore_AddSignatureAsync_SameSlotAndDigestTwice_ThrowsSigningNotAllowed`.
+
+**ReviewStore_AddSignatureAsync_UnknownSlotOrReview_IsRefused**: A signature for a slot that does not exist, and one
+for a review that does not exist, are added with the current digest; they throw a `DomainRuleException` for
+`SlotNotFound` and for `ReviewNotFound`. This scenario is tested by
+`ReviewStore_AddSignatureAsync_UnknownSlotOrReview_IsRefused`.
+
+**ReviewStore_RemoveSlotAsync_SignedSlot_IsRefusedByDatabase**: A signed slot is removed; the database refuses it with
+a `SqliteException`, and the slot and its signature remain. This scenario is tested by
+`ReviewStore_RemoveSlotAsync_SignedSlot_IsRefusedByDatabase`.
+
+**ReviewStore_SerializableTransaction_TakesWriteLockAtBegin**: One connection begins a `Serializable` transaction and
+does nothing else; a second connection with a short timeout tries to write and fails with SQLite error 5 (busy),
+which shows that the write lock is taken at the begin, as `AddSignatureAsync` relies on. This scenario is tested by
+`ReviewStore_SerializableTransaction_TakesWriteLockAtBegin`.
 
 **ReviewStore_AddReview_WithChecklist_StoresSnapshotAtomically**: A review carrying a checklist snapshot is stored
 and the snapshot is read back with the default version and a definition that parses to the default checklist. This

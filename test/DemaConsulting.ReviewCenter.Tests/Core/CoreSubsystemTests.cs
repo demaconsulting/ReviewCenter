@@ -136,24 +136,122 @@ public class CoreSubsystemTests
         var threads = new ThreadService(store, new FixedTimeProvider(_now));
         var checklists = new ChecklistService(store, new FixedTimeProvider(_now));
         var users = new UserService(new FakeUserStore(), new FakePasswordHasher(), new FixedTimeProvider(_now));
-        await users.CreateAsync("root", "Root", UserRole.Admin, ValidPassword, TestContext.Current.CancellationToken);
+        var root = await users.CreateAsync("root", "Root", UserRole.Admin, ValidPassword, TestContext.Current.CancellationToken);
         var project = await projects.CreateAsync("Apollo", null, TestContext.Current.CancellationToken);
         await reviews.CreateDraftAsync(
             project.Id, "rev-1", "First", [new("a.txt", TestContent.A)], TestContext.Current.CancellationToken);
 
         // Act: break the rule
+        var signing = new SigningService(store, users, new FixedTimeProvider(_now));
         var exception = await Assert.ThrowsAsync<DomainRuleException>(
-            () => ViolateAsync(rule, projects, reviews, threads, checklists, users, project.Id));
+            () => SigningRules.Contains(rule)
+                ? ViolateSigningAsync(rule, signing, checklists, store, root, project.Id)
+                : ViolateAsync(rule, projects, reviews, threads, checklists, users, project.Id));
 
-        // Assert: the rule is named, and only the first valid project, review and user exist, with no thread or answer
+        // Assert: the rule is named, and only the first valid project, review and user exist, with no thread; the
+        // only answers are those the re-authentication scenario needs to get as far as the password
         Assert.Equal(rule, exception.Rule);
         Assert.Single(await projects.ListAsync(TestContext.Current.CancellationToken));
         Assert.Single(await users.ListAsync(TestContext.Current.CancellationToken));
         Assert.Single(store.Reviews);
         Assert.Empty(store.Threads);
-        Assert.Equal(
-            0,
-            (await checklists.GetAsync(project.Id, "rev-1", TestContext.Current.CancellationToken))!.Overall.Answered);
+        var overall = (await checklists.GetAsync(project.Id, "rev-1", TestContext.Current.CancellationToken))!.Overall;
+        Assert.Equal(rule == DomainRule.ReauthenticationFailed ? overall.Total : 0, overall.Answered);
+    }
+
+    /// <summary>
+    ///     The rules that the signing service reports; <see cref="ViolateSigningAsync"/> breaks these.
+    /// </summary>
+    private static readonly DomainRule[] SigningRules =
+    [
+        DomainRule.ReviewNotFound,
+        DomainRule.SlotNotFound,
+        DomainRule.SlotUserInvalid,
+        DomainRule.SlotSigned,
+        DomainRule.ActorNotAllowed,
+        DomainRule.SigningNotAllowed,
+        DomainRule.ReauthenticationFailed,
+        DomainRule.RecordChanged
+    ];
+
+    /// <summary>
+    ///     Makes a request that breaks one rule of the signing service, against a store that holds the review
+    ///     <c>rev-1</c> and the user <c>root</c>.
+    /// </summary>
+    /// <param name="rule">The rule to break; one of <see cref="SigningRules"/>.</param>
+    /// <param name="signing">The signing service.</param>
+    /// <param name="checklists">The checklist service.</param>
+    /// <param name="store">The store behind the services.</param>
+    /// <param name="root">The user <c>root</c>.</param>
+    /// <param name="projectId">The identity of the existing project.</param>
+    /// <returns>A task that fails with the rule violation.</returns>
+    private static async Task ViolateSigningAsync(
+        DomainRule rule,
+        SigningService signing,
+        ChecklistService checklists,
+        FakeReviewStore store,
+        User root,
+        int projectId)
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var actor = new Actor("root", "Root");
+        switch (rule)
+        {
+            case DomainRule.ReviewNotFound:
+                await signing.AddSlotAsync(actor, projectId, "no-such-review", root.Id, null, cancellationToken);
+                return;
+            case DomainRule.SlotNotFound:
+                await signing.RemoveSlotAsync(actor, projectId, "rev-1", 99, cancellationToken);
+                return;
+            case DomainRule.SlotUserInvalid:
+                await signing.AddSlotAsync(actor, projectId, "rev-1", root.Id, root.Id, cancellationToken);
+                return;
+            case DomainRule.ActorNotAllowed:
+                await signing.AddSlotAsync(new Actor("ghost", "Ghost"), projectId, "rev-1", root.Id, null, cancellationToken);
+                return;
+        }
+
+        // The rest need a slot of root and the digest of the record as it is
+        var slot = await signing.AddSlotAsync(actor, projectId, "rev-1", root.Id, null, cancellationToken);
+        var digest = (await signing.GetApprovalAsync(projectId, "rev-1", cancellationToken))!.Digest;
+        switch (rule)
+        {
+            case DomainRule.RecordChanged:
+                await signing.SignAsync(actor, projectId, "rev-1", slot.Id, new string('0', 64), ValidPassword, cancellationToken);
+                return;
+            case DomainRule.SigningNotAllowed:
+                // The checklist is unanswered
+                await signing.SignAsync(actor, projectId, "rev-1", slot.Id, digest, ValidPassword, cancellationToken);
+                return;
+            case DomainRule.SlotSigned:
+                // A signature stored directly (the store does not judge blockers), then the slot is removed
+                await store.AddSignatureAsync(
+                    new ReviewSignature
+                    {
+                        ProjectId = projectId,
+                        ReviewId = "rev-1",
+                        SlotId = slot.Id,
+                        UserId = root.Id,
+                        DisplayName = "Root",
+                        Role = SlotRole.Primary,
+                        SignedAt = _now,
+                        RecordDigest = digest,
+                        Meaning = SigningService.MeaningText
+                    },
+                    cancellationToken);
+                await signing.RemoveSlotAsync(actor, projectId, "rev-1", slot.Id, cancellationToken);
+                return;
+            default:
+                // Re-authentication: answer every check so that only the password stands in the way
+                foreach (var item in DefaultChecklist.Current.Sections.SelectMany(section => section.Items))
+                {
+                    await checklists.SetAnswerAsync(projectId, "rev-1", item.Id, ChecklistOutcome.Pass, null, actor, cancellationToken);
+                }
+
+                digest = (await signing.GetApprovalAsync(projectId, "rev-1", cancellationToken))!.Digest;
+                await signing.SignAsync(actor, projectId, "rev-1", slot.Id, digest, "wrong password here", cancellationToken);
+                return;
+        }
     }
 
     /// <summary>
@@ -351,5 +449,66 @@ public class CoreSubsystemTests
         Assert.NotNull(unlocked);
         Assert.NotNull(changed);
         Assert.Equal(DomainRule.LastAdmin, lastAdmin.Rule);
+    }
+
+    /// <summary>
+    ///     Test the signing workflow: a reviewer slot is added, the review is blocked until the checklist is answered,
+    ///     a wrong password is refused, a reviewer signs, a change to the record makes the signature out of date, and
+    ///     the alternate signs the new record.
+    /// </summary>
+    [Fact]
+    public async Task CoreSubsystem_Signatures_SignChangeOutOfDateAndResign_FollowsTheRecord()
+    {
+        // Arrange: the services over one store with two users, a review, and one slot of ann and bob
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var store = new FakeReviewStore();
+        var projects = new ProjectService(store, new FixedTimeProvider(_now));
+        var reviews = new ReviewService(store, new FixedTimeProvider(_now));
+        var threads = new ThreadService(store, new FixedTimeProvider(_now));
+        var checklists = new ChecklistService(store, new FixedTimeProvider(_now));
+        var users = new UserService(new FakeUserStore(), new FakePasswordHasher(), new FixedTimeProvider(_now));
+        var signing = new SigningService(store, users, new FixedTimeProvider(_now));
+        var ann = await users.CreateAsync("ann", "Ann", UserRole.Reviewer, ValidPassword, cancellationToken);
+        var bob = await users.CreateAsync("bob", "Bob", UserRole.Reviewer, ValidPassword, cancellationToken);
+        var project = await projects.CreateAsync("Apollo", null, cancellationToken);
+        await reviews.CreateDraftAsync(project.Id, "rev-1", "First", [new("a.txt", TestContent.A)], cancellationToken);
+        var annActor = new Actor("ann", "Ann");
+        var bobActor = new Actor("bob", "Bob");
+        var slot = await signing.AddSlotAsync(annActor, project.Id, "rev-1", ann.Id, bob.Id, cancellationToken);
+
+        // Act: read the blocked status, answer every check, then sign with a wrong and with the right password
+        var blocked = await signing.GetApprovalAsync(project.Id, "rev-1", cancellationToken);
+        foreach (var item in DefaultChecklist.Current.Sections.SelectMany(section => section.Items))
+        {
+            await checklists.SetAnswerAsync(project.Id, "rev-1", item.Id, ChecklistOutcome.Pass, null, annActor, cancellationToken);
+        }
+
+        var ready = await signing.GetApprovalAsync(project.Id, "rev-1", cancellationToken);
+        var wrong = await Assert.ThrowsAsync<DomainRuleException>(() => signing.SignAsync(
+            annActor, project.Id, "rev-1", slot.Id, ready!.Digest, "wrong password here", cancellationToken));
+        await signing.SignAsync(annActor, project.Id, "rev-1", slot.Id, ready!.Digest, ValidPassword, cancellationToken);
+        var approved = await signing.GetApprovalAsync(project.Id, "rev-1", cancellationToken);
+
+        // Act: a comment is posted and resolved, so the record changes; the alternate then signs the new record
+        var thread = await threads.StartThreadAsync(
+            project.Id, "rev-1", "a.txt", null, null, bobActor, "One more thing", cancellationToken);
+        await threads.ResolveAsync(project.Id, "rev-1", thread.Id, cancellationToken);
+        var outOfDate = await signing.GetApprovalAsync(project.Id, "rev-1", cancellationToken);
+        await signing.SignAsync(bobActor, project.Id, "rev-1", slot.Id, outOfDate!.Digest, ValidPassword, cancellationToken);
+        var resigned = await signing.GetApprovalAsync(project.Id, "rev-1", cancellationToken);
+
+        // Assert: blocked until answered, wrong password refused, approved after signing, out of date after the
+        // change, and approved again by the alternate with both signatures kept
+        Assert.False(blocked!.IsApproved);
+        Assert.NotEmpty(blocked.Blockers);
+        Assert.Empty(ready.Blockers);
+        Assert.Equal(DomainRule.ReauthenticationFailed, wrong.Rule);
+        Assert.True(approved!.IsApproved);
+        Assert.False(outOfDate.IsApproved);
+        Assert.Equal(SlotSignatureState.OutOfDate, outOfDate.Slots.Single().State);
+        Assert.NotEqual(ready.Digest, outOfDate.Digest);
+        Assert.True(resigned!.IsApproved);
+        Assert.Equal("Bob", resigned.Slots.Single().SignerName);
+        Assert.Equal(2, (await store.ListSignaturesAsync(project.Id, "rev-1", cancellationToken)).Count);
     }
 }

@@ -17,7 +17,8 @@ N/A - standard test environment.
 
 - All component tests pass with zero failures.
 - An unknown project shows a not-found message and no form; a known project shows its name and description and
-  its reviews with link, title, and state, or an empty message.
+  its reviews with link, title, state, and an Approved or In review badge, or an empty message. A review whose every
+  slot has a current signature is Approved; a review without slots or with an unsigned slot is In review.
 - Selected files are listed with names and sizes, and a new selection replaces the previous one; reusing the page
   for another project shows that project and discards the previous form values and selection.
 - A valid form creates the review with the exact bytes and the correct fingerprint and opens the review page.
@@ -37,8 +38,13 @@ reviews; the name, the description, and the empty message are shown. This scenar
 `ProjectPage_Render_ProjectWithoutReviews_ShowsNameAndEmptyMessage`.
 
 **ProjectPage_Render_ProjectWithReview_ListsReviewWithLinkTitleAndState**: The page is rendered for a project with
-a review; the review is listed with a link to its page, its title, and the state "Draft". This scenario is tested
+a review; the review is listed with a link to its page, its title, the state "Draft", and the badge "In review" (it has
+no reviewer slot). This scenario is tested
 by `ProjectPage_Render_ProjectWithReview_ListsReviewWithLinkTitleAndState`.
+
+**ProjectPage_Render_SignedAndUnsignedReviews_ShowApprovedOrInReview**: A project has one review whose only slot was
+signed with the right password and one review without slots; the first is listed as "Approved" and the second as "In
+review". This scenario is tested by `ProjectPage_Render_SignedAndUnsignedReviews_ShowApprovedOrInReview`.
 
 **ProjectPage_FileInput_FilesSelected_ListsNamesAndSizes**: Two files are chosen; each is listed with its name and
 size in bytes. This scenario is tested by `ProjectPage_FileInput_FilesSelected_ListsNamesAndSizes`.

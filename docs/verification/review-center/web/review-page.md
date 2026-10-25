@@ -5,7 +5,9 @@
 `ReviewPage` is verified with component tests defined in `ReviewPageTests.cs`, which use the bUnit test context to
 render the real component over real Core services and an in-memory fake store holding a review of known files.
 The signed-in user is supplied by a test authentication state in `PageTestBase`: the user `ann` (display name "Ann")
-unless a test signs in as someone else.
+unless a test signs in as someone else. The signing tests also create real users (with a password) through
+`UserService`, and the page uses the real `SigningService` over the same fake store, so signatures and passwords are
+checked by the same code as in production.
 Tests locate elements by their `data-testid` attributes (the page units share the helper `PageTestBase`) and
 compare the shown values with the known hashes and fingerprint. The real database is covered by the `Storage`
 subsystem and the integration tests of the `Web` subsystem.
@@ -18,8 +20,10 @@ N/A - standard test environment.
 
 - All component tests pass with zero failures.
 - An unknown review shows a not-found message and no details.
-- A known review shows its title and next-step line, lists every file with path and size, and keeps its identifier,
-  state, the known fingerprint, and the SHA-256 hash of each file in a Details section that is collapsed by
+- A known review shows its title with an Approved or In review badge, its next-step line, lists every file with path
+  and size, and keeps its identifier,
+  state, the known fingerprint, the record digest (the first 16 characters shown and all 64 in the title), and the
+  SHA-256 hash of each file in a Details section that is collapsed by
   default and comes after the files and the thread index; each file's View button has an accessible name that
   includes the file path.
 - Reusing the page for another review shows the new review and clears the previously selected file.
@@ -36,9 +40,24 @@ N/A - standard test environment.
   keeps what was typed. The page has no field for an author.
 - A reply is added to a thread under the signed-in user; a blank reply shows a message in that thread.
 - Resolve and reopen change the thread state and the summary; the next-step line follows the threads and the
-  unanswered checks of the checklist.
+  unanswered checks of the checklist, asks for a reviewer slot when only that is missing, and says that the review is
+  approved once every slot is signed.
 - A review with a checklist shows a card with its progress and a link to the checklist page; a review without one
   shows no card.
+- The Reviewers card is shown for every review. Without slots it says so and offers the add form, and the review is
+  In review. A slot is added with its primary and alternate and listed as "Slot 1" with "Not signed"; a missing
+  primary or the same user twice shows a message and adds nothing; an unsigned slot can be changed and removed. A
+  slot that has a signature, current or out of date, offers neither change nor removal. A user-controlled display
+  name is shown as plain text.
+- A user who occupies a slot of a review that cannot be signed sees the blockers instead of the sign form; a user who
+  does not occupy the slot sees neither. For a signable review the occupant sees the meaning text and a password
+  field of type password.
+- A wrong password shows only the generic message, stores no signature, and the typed password appears nowhere in
+  the page; the right password records the signature, shows who signed and when, shows the review as Approved with
+  the Approved next-step sentence, and removes the sign form and the slot controls. A change to the record after
+  signing shows the signature as out of date and the review as In review, with the slot still locked and the sign
+  form offered again. Signing a record that changed since the page was drawn is refused with a message and stores
+  nothing.
 - The thread index shows the open threads by default and can show all or only resolved threads, each row with file,
   anchor, state, number of comments, first author, and last activity, and an accessible name that states the same
   facts; choosing a row selects its file, highlights
@@ -48,8 +67,8 @@ N/A - standard test environment.
   bring the new-thread form into view.
 - A resolved thread is a one-line header that expands and collapses on request, an open thread is expanded, and
   resolving a thread collapses it.
-- Thread and comment text is shown as plain text, never as markup, and every interactive control has a
-  `data-testid`.
+- Thread and comment text is shown as plain text, never as markup, and every interactive control, including every
+  control of the Reviewers card, has a `data-testid`.
 - The interactive marker is `true` after the page has rendered on a live connection.
 
 #### Test Scenarios
@@ -77,7 +96,7 @@ only the checks are named again. This scenario is tested by `ReviewPage_Render_N
 
 **ReviewPage_Render_NextStep_IncludesChecklistProgress**: A check is answered and a section is marked not
 applicable; the line counts the remaining unanswered checks (52). When everything that applies is answered and the
-thread is resolved, the line says the checklist is complete and all threads are resolved. This scenario is tested by
+thread is resolved, no reviewer slot exists and the line is "Add a reviewer slot.". This scenario is tested by
 `ReviewPage_Render_NextStep_IncludesChecklistProgress`.
 
 **ReviewPage_Render_NewReview_ShowsChecklistProgressAndLink**: A review with two answered checks is rendered; the
@@ -187,6 +206,64 @@ This scenario is tested by `ReviewPage_Render_ThreadText_IsShownAsPlainText`.
 **ReviewPage_Render_ThreadControls_EveryInteractiveElementHasTestId**: Every button, input, and text area of the
 thread controls and the thread index (with an open and a resolved thread) has a `data-testid`. This scenario is
 tested by `ReviewPage_Render_ThreadControls_EveryInteractiveElementHasTestId`.
+
+**ReviewPage_Render_NoSlots_ShowsEmptyReviewersCardAndInReviewBadge**: A review without slots is rendered; the
+Reviewers card, its empty message, and the add form are shown, and the badge reads "In review". This scenario is
+tested by `ReviewPage_Render_NoSlots_ShowsEmptyReviewersCardAndInReviewBadge`.
+
+**ReviewPage_AddSlot_PrimaryAndAlternate_ShowsSlotNotSigned**: A primary and an alternate are chosen and the add
+form is submitted; the slot is listed as "Slot 1" with both names and "Not signed", it is stored, and the empty
+message is gone. This scenario is tested by `ReviewPage_AddSlot_PrimaryAndAlternate_ShowsSlotNotSigned`.
+
+**ReviewPage_AddSlot_InvalidChoices_ShowsErrorAndAddsNothing**: The add form is submitted without a primary, and
+then with the same user as primary and alternate; each time a message is shown and no slot is stored. This scenario
+is tested by `ReviewPage_AddSlot_InvalidChoices_ShowsErrorAndAddsNothing`.
+
+**ReviewPage_EditAndRemoveSlot_Unsigned_ChangesAndRemoves**: The primary of an unsigned slot is changed and its
+alternate dropped, and Save shows the change ("None" for the alternate); Remove then removes the slot and the empty
+message returns. This scenario is tested by `ReviewPage_EditAndRemoveSlot_Unsigned_ChangesAndRemoves`.
+
+**ReviewPage_Render_BlockedReview_ShowsBlockersInsteadOfSignForm**: A slot is rendered for a review with unanswered
+checks and an open thread; its primary sees the blockers (naming both) and no sign form, and a user who is not in
+the slot sees neither. This scenario is tested by `ReviewPage_Render_BlockedReview_ShowsBlockersInsteadOfSignForm`.
+
+**ReviewPage_Render_SignableReview_NonOccupantSeesNoSignForm**: A signable review is rendered for a user who is not
+in the slot; there is no sign form and no Sign button. This scenario is tested by
+`ReviewPage_Render_SignableReview_NonOccupantSeesNoSignForm`.
+
+**ReviewPage_Sign_WrongPassword_ShowsGenericErrorAndKeepsNoPassword**: The occupant sees the meaning text and a
+password field of type password, types a wrong password, and signs; the generic message "The password is
+incorrect." is shown, the slot is still "Not signed", no signature is stored, and neither the typed value nor a
+field value is in the markup. This scenario is tested by
+`ReviewPage_Sign_WrongPassword_ShowsGenericErrorAndKeepsNoPassword`.
+
+**ReviewPage_Sign_CorrectPassword_ApprovesReviewAndLocksSlot**: The occupant signs with the right password; the slot
+shows "Signed by Ann on" the time, the badge reads "Approved", the next step is "Approved. Every reviewer slot has a
+current signature.", the password is nowhere in the markup, the Save, Remove, and sign controls are gone, and the
+stored signature belongs to the user in the primary role. This scenario is tested by
+`ReviewPage_Sign_CorrectPassword_ApprovesReviewAndLocksSlot`.
+
+**ReviewPage_Render_RecordChangedAfterSigning_ShowsOutOfDateAndInReview**: A slot is signed, a thread is then
+started and resolved through the service, and the page is rendered again; the slot shows "Signature out of date", the
+badge reads "In review", the slot has no Save or Remove, and the sign form is offered again. This scenario is tested
+by `ReviewPage_Render_RecordChangedAfterSigning_ShowsOutOfDateAndInReview`.
+
+**ReviewPage_Sign_RecordChangedSincePageDrawn_IsRefused**: A signable page is drawn, the record is changed through
+the service, and the occupant signs with the right password; the message says the record changed and no signature is
+stored. This scenario is tested by `ReviewPage_Sign_RecordChangedSincePageDrawn_IsRefused`.
+
+**ReviewPage_Render_Details_ShowShortDigestWithFullValueInTitle**: Inside the Details element, the record digest
+shows its first 16 characters, and its title holds the full 64-character digest computed by the service. This
+scenario is tested by `ReviewPage_Render_Details_ShowShortDigestWithFullValueInTitle`.
+
+**ReviewPage_Render_SlotDisplayName_IsShownAsPlainText**: A user whose display name is `<b>Eve</b>` is the primary
+of a slot; the card shows the literal text and creates no element. This scenario is tested by
+`ReviewPage_Render_SlotDisplayName_IsShownAsPlainText`.
+
+**ReviewPage_Render_ReviewersCard_EveryInteractiveElementHasTestId**: With a slot ready to sign (its sign error
+shown), a second slot, and an add-form error, every link, button, input, select, and text area inside the Reviewers
+card has a `data-testid`. This scenario is tested by
+`ReviewPage_Render_ReviewersCard_EveryInteractiveElementHasTestId`.
 
 **ReviewPage_AfterRender_Interactive_SetsMarker**: The page is rendered; its root element has `data-interactive`
 equal to `true`. This scenario is tested by `ReviewPage_AfterRender_Interactive_SetsMarker`.

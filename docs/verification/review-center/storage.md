@@ -5,7 +5,8 @@
 The `Storage` subsystem is verified by subsystem tests defined in `StorageSubsystemTests.cs`. The tests build the
 real `DatabaseSetup`, `ReviewCenterDbContext`, `ReviewStore`, and `UserStore` over a real SQLite database file, and
 run the real
-`ProjectService`, `ReviewService`, `ThreadService`, `ChecklistService`, and `UserService` of the `Core` subsystem over
+`ProjectService`, `ReviewService`, `ThreadService`, `ChecklistService`, `UserService`, and `SigningService` of the `Core`
+subsystem over
 them, so that
 the subsystem is
 verified in the way
@@ -32,6 +33,8 @@ The native SQLite library must be loadable on the test platform (it is supplied 
   opened again; the user signs in with the changed password only.
 - The checklist snapshot of a review, its answers, and its section decisions, written through the services, are
   still present after the database is closed and opened again.
+- A reviewer slot and the signature made for it, written through the services, are still present after the database
+  is closed and opened again, and the signature is still current, so the review is still approved.
 - A review for a project that does not exist is refused, by the services and by the database itself, and the stored
   data is unchanged.
 - An unsupported provider is refused with an error that names it, and no database is created.
@@ -59,6 +62,13 @@ services over a new database, one check is answered Fail with a justification, a
 applicable with a reason; the database is closed and opened again. The checklist is read with the default
 version, the answer with its justification, the reason of the section, and the progress 1 of 53. This scenario is
 tested by `StorageSubsystem_Checklist_PersistsSnapshotAnswersAndSectionsAcrossReopen`.
+
+**StorageSubsystem_Signatures_PersistAcrossReopenAndStayCurrent**: Two reviewers and a review with every check
+answered Pass are created through the services over a new database; a slot is added through `SigningService` and the
+alternate reviewer signs it with the correct password; the database is closed and opened again. The approval is read
+again: the review is approved, the single slot is signed by the alternate reviewer at the saved time, and the
+signature is current for the unchanged record. This scenario is tested by
+`StorageSubsystem_Signatures_PersistAcrossReopenAndStayCurrent`.
 
 **StorageSubsystem_UnsupportedProvider_Opening_FailsWithClearErrorAndCreatesNothing**: A database is opened with
 the provider name `Oracle` and a new file path; an `InvalidOperationException` that names the provider is thrown

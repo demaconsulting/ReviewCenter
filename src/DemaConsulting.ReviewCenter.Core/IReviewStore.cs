@@ -213,4 +213,102 @@ public interface IReviewStore
     /// <param name="cancellationToken">Cancels the operation.</param>
     /// <returns>A task that completes when the answer is stored.</returns>
     Task SetChecklistAnswerAsync(ChecklistAnswer answer, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    ///     Reads a consistent snapshot of everything a signature covers (see <see cref="ReviewRecord"/>).
+    /// </summary>
+    /// <param name="projectId">The project identity.</param>
+    /// <param name="reviewId">The review identifier.</param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <returns>The record, or <c>null</c> when the review does not exist.</returns>
+    Task<ReviewRecord?> GetRecordAsync(int projectId, string reviewId, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    ///     Lists the reviewer slots of a review.
+    /// </summary>
+    /// <param name="projectId">The project identity.</param>
+    /// <param name="reviewId">The review identifier.</param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <returns>The slots ordered by identity (creation order); empty when there are none.</returns>
+    Task<IReadOnlyList<ReviewerSlot>> ListSlotsAsync(
+        int projectId,
+        string reviewId,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    ///     Stores a new reviewer slot and assigns its identity.
+    /// </summary>
+    /// <param name="slot">The slot to store. Must not be null; its <see cref="ReviewerSlot.Id"/> is ignored and the review must exist.</param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <returns>The stored slot, including the assigned identity.</returns>
+    Task<ReviewerSlot> AddSlotAsync(ReviewerSlot slot, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    ///     Changes the primary and alternate reviewer of a slot.
+    /// </summary>
+    /// <param name="projectId">The project identity.</param>
+    /// <param name="reviewId">The review identifier.</param>
+    /// <param name="slotId">The slot identity; the slot must belong to the given review.</param>
+    /// <param name="primaryUserId">The new primary reviewer.</param>
+    /// <param name="alternateUserId">The new alternate reviewer, or <c>null</c> for none.</param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <returns><c>true</c> when the slot exists in that review; otherwise <c>false</c>.</returns>
+    Task<bool> UpdateSlotAsync(
+        int projectId,
+        string reviewId,
+        int slotId,
+        int primaryUserId,
+        int? alternateUserId,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    ///     Removes a reviewer slot.
+    /// </summary>
+    /// <param name="projectId">The project identity.</param>
+    /// <param name="reviewId">The review identifier.</param>
+    /// <param name="slotId">The slot identity; the slot must belong to the given review.</param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <returns><c>true</c> when the slot existed and was removed; otherwise <c>false</c>.</returns>
+    /// <remarks>
+    ///     A slot that has a signature cannot be removed; the store refuses with a database error. The service
+    ///     checks first and gives the operator a clear message.
+    /// </remarks>
+    Task<bool> RemoveSlotAsync(
+        int projectId,
+        string reviewId,
+        int slotId,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    ///     Lists the signatures of a review, including out-of-date ones.
+    /// </summary>
+    /// <param name="projectId">The project identity.</param>
+    /// <param name="reviewId">The review identifier.</param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <returns>The signatures ordered by identity (signing order); empty when there are none.</returns>
+    Task<IReadOnlyList<ReviewSignature>> ListSignaturesAsync(
+        int projectId,
+        string reviewId,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    ///     Appends a signature, provided the review record still has the digest the signer signed.
+    /// </summary>
+    /// <param name="signature">The signature to store. Must not be null; its <see cref="ReviewSignature.Id"/> is ignored.</param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <returns>The stored signature, including the assigned identity.</returns>
+    /// <remarks>
+    ///     This is the only way a signature is stored, and there is deliberately no method to change or delete
+    ///     one (signatures are append-only). The store recomputes the digest of the record inside the same
+    ///     transaction as the insert, so a comment or answer that arrives while signing cannot slip in
+    ///     between the check and the insert.
+    /// </remarks>
+    /// <exception cref="DomainRuleException">
+    ///     Thrown with <see cref="DomainRule.RecordChanged"/> when the digest of the record now differs from
+    ///     <see cref="ReviewSignature.RecordDigest"/>, with <see cref="DomainRule.ReviewNotFound"/> when the
+    ///     review does not exist, with <see cref="DomainRule.SlotNotFound"/> when the slot is not part of the review,
+    ///     and with <see cref="DomainRule.SigningNotAllowed"/> when the slot already has a signature of this digest.
+    ///     Nothing is stored then.
+    /// </exception>
+    Task<ReviewSignature> AddSignatureAsync(ReviewSignature signature, CancellationToken cancellationToken = default);
 }

@@ -246,6 +246,24 @@ public class ServerHostTests
     }
 
     /// <summary>
+    ///     Test that the host registers the signing service next to the other domain services.
+    /// </summary>
+    [Fact]
+    public async Task ServerHost_AddServices_Configured_RegistersSigningService()
+    {
+        // Arrange: start the real pipeline on an in-memory server
+        var logs = new CapturingLoggerProvider();
+        await using var app = await TestWebApp.StartAsync(logs, "serve", "--silent");
+
+        // Act: resolve the service
+        var signing = app.Services.GetRequiredService<SigningService>();
+
+        // Assert: it is a singleton and answers for a review that does not exist
+        Assert.Same(signing, app.Services.GetRequiredService<SigningService>());
+        Assert.Null(await signing.GetApprovalAsync(1, "nope", TestContext.Current.CancellationToken));
+    }
+
+    /// <summary>
     ///     Test that a database failure at start-up is reported as an error with exit code 1 instead of an
     ///     unhandled exception. No port is bound, because the failure happens before the server starts.
     /// </summary>

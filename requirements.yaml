@@ -39,6 +39,8 @@ includes:
   - docs/reqstream/review-center/core/thread-service.yaml
   - docs/reqstream/review-center/core/checklist-service.yaml
   - docs/reqstream/review-center/core/user-service.yaml
+  - docs/reqstream/review-center/core/record-digest.yaml
+  - docs/reqstream/review-center/core/signing-service.yaml
   - docs/reqstream/review-center/storage.yaml
   - docs/reqstream/review-center/storage/review-center-db-context.yaml
   - docs/reqstream/review-center/storage/review-store.yaml

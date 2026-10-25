@@ -130,6 +130,25 @@ sections:
         tests:
           - WebSubsystem_ChecklistPage_AnsweredChecksSurviveReload
 
+      - id: ReviewCenter-Web-Signatures
+        title: >-
+          The Web subsystem shall show on the review page a Reviewers card with the reviewer slots and their
+          signature status, where a reviewer who occupies a slot signs the review after confirming the password,
+          the approval status of the review (Approved or In review) next to its title, and the record digest in
+          the Details section, and shall show the approval status of each review on the project page.
+        justification: |
+          Re-authenticated signatures are what turns a reviewed record into an approved one. The subsystem test
+          covers what the pages show from the database: the sign form, the approval after a signature, and the
+          approval going out of date when the record changes; adding slots and signing need a live connection and
+          are verified by the component tests of the page units.
+        children:
+          - ReviewCenter-ReviewPage-Reviewers
+          - ReviewCenter-ReviewPage-Sign
+          - ReviewCenter-ReviewPage-Digest
+          - ReviewCenter-ProjectPage-Approval
+        tests:
+          - WebSubsystem_SignedReview_ApprovalIsPresentedAndGoesOutOfDateWhenRecordChanges
+
       - id: ReviewCenter-Web-SignIn
         title: >-
           The Web subsystem shall show in the page header the name of the signed-in user with a link to the
@@ -171,3 +190,4 @@ sections:
         tests:
           - WebSubsystem_AllPages_EveryInteractiveElementHasTestId
           - ReviewPage_Render_ThreadControls_EveryInteractiveElementHasTestId
+          - ReviewPage_Render_ReviewersCard_EveryInteractiveElementHasTestId

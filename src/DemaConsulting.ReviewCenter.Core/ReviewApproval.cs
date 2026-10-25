@@ -1,0 +1,86 @@
+// Copyright (c) DEMA Consulting
+// 
+// Permission is hereby granted, free of charge, to any person obtaining a copy
+// of this software and associated documentation files (the "Software"), to deal
+// in the Software without restriction, including without limitation the rights
+// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the Software is
+// furnished to do so, subject to the following conditions:
+// 
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
+// 
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+// SOFTWARE.
+
+namespace DemaConsulting.ReviewCenter.Core;
+
+/// <summary>
+///     A user as shown in a reviewer slot, without anything secret.
+/// </summary>
+/// <remarks>
+///     The view models of the signing feature carry this record instead of <see cref="User"/>, so a password
+///     hash can never reach a page.
+/// </remarks>
+/// <param name="UserId">The identity of the user.</param>
+/// <param name="Username">The user name.</param>
+/// <param name="DisplayName">The display name.</param>
+public sealed record SlotMember(int UserId, string Username, string DisplayName);
+
+/// <summary>
+///     Whether a reviewer slot holds a signature for the record as it is now.
+/// </summary>
+public enum SlotSignatureState
+{
+    /// <summary>The slot has no signature.</summary>
+    NotSigned,
+
+    /// <summary>The slot has a signature of the current record.</summary>
+    Signed,
+
+    /// <summary>The slot has signatures, but none of the record as it is now.</summary>
+    OutOfDate
+}
+
+/// <summary>
+///     The status of one reviewer slot.
+/// </summary>
+/// <param name="SlotId">The identity of the slot.</param>
+/// <param name="Number">The position of the slot among the slots of the review, starting at 1 ("Slot 1").</param>
+/// <param name="Primary">The primary reviewer.</param>
+/// <param name="Alternate">The alternate reviewer, or <c>null</c> when the slot has none.</param>
+/// <param name="State">Whether the slot has a current signature.</param>
+/// <param name="SignerName">The display name of the signer of the current signature; <c>null</c> unless <see cref="State"/> is <see cref="SlotSignatureState.Signed"/>.</param>
+/// <param name="SignedAt">The time of the current signature; <c>null</c> unless <see cref="State"/> is <see cref="SlotSignatureState.Signed"/>.</param>
+public sealed record SlotStatus(
+    int SlotId,
+    int Number,
+    SlotMember Primary,
+    SlotMember? Alternate,
+    SlotSignatureState State,
+    string? SignerName,
+    DateTimeOffset? SignedAt);
+
+/// <summary>
+///     The approval status of a review: its slots, the current record digest and what blocks signing.
+/// </summary>
+/// <remarks>
+///     The status is computed on demand from the stored record, slots and signatures and is never stored, so it
+///     cannot disagree with them. It is an immutable value holder and is safe to share between threads.
+/// </remarks>
+/// <param name="IsApproved"><c>true</c> when the review has at least one slot and every slot has a current signature.</param>
+/// <param name="Digest">The digest of the review record as it is now.</param>
+/// <param name="Slots">The slots in creation order.</param>
+/// <param name="Blockers">The plain-language reasons the review cannot be signed yet; empty when it can be.</param>
+/// <param name="NextStep">One short sentence that words what to do next.</param>
+public sealed record ReviewApproval(
+    bool IsApproved,
+    string Digest,
+    IReadOnlyList<SlotStatus> Slots,
+    IReadOnlyList<string> Blockers,
+    string NextStep);

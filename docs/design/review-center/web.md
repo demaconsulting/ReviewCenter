@@ -44,7 +44,8 @@ pages for projects, reviews, and review checklists.
 - *Role*: Provider.
 - *Contract*: `/projects` lists the projects and has a form to create one; `/projects/{id}` shows a
   project with its reviews and a form that creates a review from selected files; the review route shows
-  the review, its fingerprint, its files, the content of a selected file, and the progress of its checklist;
+  the review, its fingerprint, its files, the content of a selected file, the progress of its checklist, its
+  reviewer slots with their signature status, and an Approved or In review badge, and lets a reviewer sign;
   the checklist route shows the checklist, where each check is answered. A project or review that
   does not exist is reported on the page itself.
 - *Constraints*: Every page carries the same `data-interactive` marker as the home page. Every page requires a
@@ -114,7 +115,8 @@ address), and on the ASP.NET Core Blazor components framework.
 `HomePage`: a Razor
 presentation file and a code-behind file, interactive server rendering, and the `data-interactive`
 marker. They obtain `ProjectService`, `ReviewService`, and the other Core services they need (`ReviewPage`:
-`ThreadService` and `ChecklistService`; `ChecklistPage`: `ChecklistService`; `AccountPage` and `UsersPage`:
+`ThreadService`, `ChecklistService`, and `SigningService`; `ProjectPage`: also `SigningService`; `ChecklistPage`:
+`ChecklistService`; `AccountPage` and `UsersPage`:
 `UserService`) from the service container and call them
 from their handlers. Each page loads its data when it is created, so a connection that is
 established after the server-rendered snapshot shows current data. A rule violation reported by
@@ -146,6 +148,20 @@ Upload paths are the file name only. A browser file input does not expose folder
 `ProjectPage` records each selected file under its browser file name; two selected files with
 the same name are therefore refused by Core as a duplicate path. Directory-structured uploads are
 a later feature.
+
+#### Slots and signatures
+
+The review page shows the reviewer slots of a review and lets a reviewer sign. The page contains no signing rules:
+the approval status, the blockers, the record digest, and every refusal come from `SigningService` in Core. The
+page's part is to ask for the approval and display it (the Approved or In review badge next to the title, the status
+of each slot, and the digest in the Details section), to offer the controls that fit the signed-in user (slot
+changes only for a slot without a signature; the sign form only to a user who occupies a slot that is not currently
+signed, or the list of blockers while the review cannot be signed), and to pass the user's input to Core.
+Signing re-authenticates the user: the form asks for the password, which the page holds only in a component field
+while it is typed, passes to `SigningService.SignAsync`, and clears in a `finally` block after every attempt; it is
+never rendered back into the page. The page also passes the record digest it displayed, so a signature always covers
+the record the reader saw, and a record that changed since the page was drawn is refused. The project page shows the
+approval status of every listed review, one lookup per review.
 
 #### Test identifiers
 

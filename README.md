@@ -14,11 +14,11 @@ comments on code blocks and files, project-specific pass/fail/N/A checklists, pr
 reviewers, and re-authenticated electronic sign-off.
 
 The `serve` verb runs ReviewCenter as an ASP.NET Core Blazor Server web application with sign-in, a home page, a
-health endpoint, projects, draft reviews made from uploaded files, threaded review comments on those files, and a
-checklist for each review. Every comment and checklist answer is recorded under the signed-in user.
-Reviewers and sign-off are still under development.
+health endpoint, projects, draft reviews made from uploaded files, threaded review comments on those files, a
+checklist for each review, and reviewer slots with re-authenticated signatures. Every comment, checklist answer, and
+signature is recorded under the signed-in user. Review states beyond Draft are still under development.
 
-> **Warning: databases created by an earlier build must be recreated.** The user accounts add tables and columns
+> **Warning: databases created by an earlier build must be recreated.** The reviewer slots and signatures add tables
 > that an earlier development database does not have, and the database is created by `EnsureCreated` without
 > migrations. Delete the old database file before starting this version (development databases only).
 
@@ -47,9 +47,15 @@ The current release provides:
   with a summary such as "37 of 58 checks answered") shows the sections with their progress, one section open at a
   time, and a Pass, Fail, or N/A choice for each check, recorded under the signed-in user; a Fail or N/A needs a
   justification, a section can be marked not applicable with a reason, and a "next unanswered check" button leads
-  you on; the review page's next-step line counts the unanswered checks together with the open threads
-- **Persistent Storage**: users, projects, reviews, the uploaded file contents, the comment threads, and the
-  checklists are kept in a SQLite database file
+  you on; the review page's next-step line counts the unanswered checks and the checks answered Fail together with
+  the open threads
+- **Reviewer Slots and Signatures**: a review has any number of reviewer slots, each with a primary and an optional
+  alternate reviewer; either can sign the slot after entering their password again; a signature is bound to the
+  exact record that was reviewed (the content fingerprint, the checklist answers, and the threads with their
+  comments), so a later change makes it out of date and the slot can be signed again; the review page and the
+  project page show the review as Approved or In review (see [Reviewers and Signatures](#reviewers-and-signatures))
+- **Persistent Storage**: users, projects, reviews, the uploaded file contents, the comment threads, the
+  checklists, and the reviewer slots and signatures are kept in a SQLite database file
   (default `reviewcenter.db` in the per-user application data folder, see
   [Data Location](#data-location-and-database-settings))
 - **Standardized Command-Line Interface**: Context class handling common arguments
@@ -207,6 +213,30 @@ The sign-in cookie is marked Secure when the request arrives over HTTPS. Behind 
 `ASPNETCORE_FORWARDEDHEADERS_ENABLED=true` so that the server sees the original HTTPS scheme and marks the cookie
 Secure.
 
+## Reviewers and Signatures
+
+A review is approved by its reviewers signing it. On the review page, any signed-in user can add a reviewer slot,
+choosing a primary reviewer and, optionally, an alternate from the enabled users. A review can have any number of
+slots, and none at all. A user can sit in only one slot of a review, and the primary and the alternate of a slot
+must be different users.
+
+A reviewer signs a slot, as primary or as alternate, by entering their own password again and pressing the sign
+button. A signature records who signed, in which role, when, the text "I have reviewed this record and approve it.",
+and a digest of the record at that moment. The digest covers the content fingerprint of the files, every checklist
+answer and justification, every section marked not applicable with its reason, and every comment thread with its
+comments. It does not cover who answered a check or when. A wrong password at a signature counts toward the same
+lockout as a wrong password at sign-in.
+
+A review can be signed only when it has a checklist, every check of an applicable section is answered, no such check
+is answered Fail, and no thread is open; the page lists what is blocking. The review is **Approved** when it has at
+least one slot and every slot has a signature of the record as it is now; otherwise it is **In review**. When
+anything the digest covers changes, for example a new comment or a changed answer, the signatures no longer match:
+the slots show "Signature out of date", the review is In review again, and the reviewers sign again. Earlier
+signatures are kept. A slot that has any signature, current or out of date, cannot be changed or removed.
+
+If the record changes while a reviewer is signing, the signature is refused and the page asks the reviewer to review
+the record again.
+
 ## Data Location and Database Settings
 
 ReviewCenter keeps its data in one SQLite database file, which is created (with its folder and tables) on first
@@ -248,13 +278,20 @@ non-zero exit code.
   threads.
 - **Comments cannot be edited or deleted**: a posted comment is permanent; only the thread state (open or resolved)
   can be changed.
+- **Signed slots cannot be changed**: a reviewer slot that has any signature cannot be reassigned or removed; to
+  change the reviewers after a signature, add a new slot. Anyone who is signed in can add and change unsigned slots.
+- **No tamper-evident audit trail yet**: signatures are kept and never changed by the application, but the history is
+  not yet protected by a hash chain, so a person with direct access to the database file could alter it undetected.
+  A hash-chained audit trail is planned for a later release.
+- **Approval is computed**: the Approved or In review status is calculated from the record and its signatures each
+  time it is shown; it is not a stored review state, and the review state is still Draft.
 - **Comments are not live**: comments posted by other people appear when you reload the page or take an action on it.
 - **Upload limits**: at most 200 files per review, 2 MiB per file, and 20 MiB per review. Only the file name of each
   uploaded file is kept, so two files with the same name cannot be in one review.
 - **No database migrations**: the database tables are created when the database file is new; a later release that
   changes the tables will need a migration step. A database file created by an earlier version, before users,
-  comments, or checklists existed, does not have the tables or columns that are needed, so **delete it and start
-  again** (development databases only).
+  comments, checklists, or reviewer signatures existed, does not have the tables or columns that are needed, so
+  **delete it and start again** (development databases only).
 
 ## Error Handling
 
@@ -328,8 +365,8 @@ Generated documentation includes:
 
 Planned but not yet implemented:
 
-- The remaining review features of the ReviewCenter web service: reviewers, sign-off,
-  and review states beyond Draft
+- The remaining review features of the ReviewCenter web service: review states beyond Draft, and a hash-chained
+  audit trail of the review history
 - Password reset, multi-factor sign-in, and external identity providers
 - EF Core database migrations with an explicit `migrate` command, and further database providers
   (PostgreSQL, SQL Server)

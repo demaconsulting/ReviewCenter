@@ -35,14 +35,17 @@ sections:
 
       - id: ReviewCenter-ReviewPage-NextStep
         title: >-
-          The ReviewPage unit shall show one short sentence at the top of the page, derived from the threads and
-          the progress of the review's checklist, that tells the reader what to do next, and keep it current
-          after every change.
+          The ReviewPage unit shall show one short sentence at the top of the page, derived from the threads, the
+          progress of the review's checklist, and the reviewer slots and signatures, that tells the reader what to
+          do next (including "Add a reviewer slot." when the review has no slot and "Approved. Every reviewer
+          slot has a current signature." once the review is approved), and keep it current after every change.
         justification: |
-          The reader should see what is expected of them without working it out from counts.
+          The reader should see what is expected of them without working it out from counts. The wording comes
+          from the signing rules, so the page and the approval can never disagree.
         tests:
           - ReviewPage_Render_NextStep_FollowsThreadState
           - ReviewPage_Render_NextStep_IncludesChecklistProgress
+          - ReviewPage_Sign_CorrectPassword_ApprovesReviewAndLocksSlot
 
       - id: ReviewCenter-ReviewPage-Checklist
         title: >-
@@ -172,6 +175,61 @@ sections:
           - ReviewPage_Reply_ValidAndBlank_AppendsCommentOrShowsErrorInThread
           - ReviewPage_Reply_NoAuthorField_AuthorCannotBeChosen
           - ReviewPage_ResolveAndReopen_Toggle_ChangesStateAndSummary
+
+      - id: ReviewCenter-ReviewPage-Reviewers
+        title: >-
+          The ReviewPage unit shall show a Reviewers card that lists the reviewer slots of the review as "Slot N"
+          with the primary reviewer, the alternate reviewer ("None" when there is none), and the signature status
+          ("Not signed", "Signed by {name} on {UTC time}", or "Signature out of date"); let a signed-in user add a
+          slot by choosing enabled users as primary and alternate, and change or remove a slot that has no
+          signature, showing the reason next to the control when a change is refused; offer no change or removal
+          for a slot that has a signature; show the display names as plain text; and show next to the review title
+          a badge that reads Approved or In review.
+        justification: |
+          Approval of a review is by named people. The reviewer must see who has to sign, who has signed and
+          whether a signature still covers the current record. A slot that carries a signature is part of the
+          approval history and must not be edited away from the page. Display names are chosen by users, so they
+          must never be able to change the page.
+        tests:
+          - ReviewPage_Render_NoSlots_ShowsEmptyReviewersCardAndInReviewBadge
+          - ReviewPage_AddSlot_PrimaryAndAlternate_ShowsSlotNotSigned
+          - ReviewPage_AddSlot_InvalidChoices_ShowsErrorAndAddsNothing
+          - ReviewPage_EditAndRemoveSlot_Unsigned_ChangesAndRemoves
+          - ReviewPage_Sign_CorrectPassword_ApprovesReviewAndLocksSlot
+          - ReviewPage_Render_RecordChangedAfterSigning_ShowsOutOfDateAndInReview
+          - ReviewPage_Render_SlotDisplayName_IsShownAsPlainText
+
+      - id: ReviewCenter-ReviewPage-Sign
+        title: >-
+          The ReviewPage unit shall offer the signed-in user who is the primary or the alternate reviewer of a slot
+          that is not currently signed a form with the meaning of the signature and a password field, and sign the
+          slot for the record that was on screen when the password is correct; instead of the form it shall list
+          what blocks signing while the review cannot be signed; it shall show no form to anybody else; it shall
+          answer a wrong password with the generic message only and never show the typed password; it shall refuse
+          to sign when the record has changed since the page was drawn; and after a signature it shall show the
+          slot as signed and locked, and the review as Approved when every slot is signed.
+        justification: |
+          A signature is a statement by one person about one exact record. Asking again for the password proves
+          that the person at the keyboard is the reviewer, signing what was shown prevents approving something
+          that was never seen, and listing the blockers tells the reviewer what is left to do. The page only
+          collects the password and passes it on, so it holds no signing rules of its own.
+        tests:
+          - ReviewPage_Render_BlockedReview_ShowsBlockersInsteadOfSignForm
+          - ReviewPage_Render_SignableReview_NonOccupantSeesNoSignForm
+          - ReviewPage_Sign_WrongPassword_ShowsGenericErrorAndKeepsNoPassword
+          - ReviewPage_Sign_CorrectPassword_ApprovesReviewAndLocksSlot
+          - ReviewPage_Render_RecordChangedAfterSigning_ShowsOutOfDateAndInReview
+          - ReviewPage_Sign_RecordChangedSincePageDrawn_IsRefused
+
+      - id: ReviewCenter-ReviewPage-Digest
+        title: >-
+          The ReviewPage unit shall show the record digest of the review in the Details section, as its first 16
+          characters with the full 64-character value in the title of the element.
+        justification: |
+          The digest identifies the exact record that signatures cover. It is needed rarely and must stay out of
+          the way, yet it must be available in full to anyone who wants to compare it.
+        tests:
+          - ReviewPage_Render_Details_ShowShortDigestWithFullValueInTitle
 
       - id: ReviewCenter-ReviewPage-Interactive
         title: >-

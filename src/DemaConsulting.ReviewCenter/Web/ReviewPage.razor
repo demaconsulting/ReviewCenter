@@ -1,12 +1,15 @@
 @* ReviewPage: the view of one review at "/projects/{id}/reviews/{reviewId}", with its comment threads.
 
    Presentation only; state and event handling live in ReviewPage.razor.cs. From the top it shows the title, a
-   one-sentence next step (checklist and threads), the checklist progress with a link to the checklist page, the
+   one-sentence next step (checklist, threads and signatures) under an Approved / In review badge, the checklist
+   progress with a link to the checklist page, the Reviewers card (slots with primary, alternate and signature
+   status; an occupant of a slot signs there after confirming the password, or sees what blocks signing; an
+   unsigned slot can be changed or removed and slots can be added), the
    list of files with size and open-thread count, the thread index of all files
    (filter All/Open/Resolved, default Open; choosing a row selects the file and highlights the lines), and for
    the selected file: the text as numbered lines (or a notice for binary files), a form that starts a thread,
    and the threads of that file (a resolved thread is a one-line header until expanded). The review id, state,
-   content fingerprint and per-file SHA-256 hashes are last, in a Details section that is collapsed. All file
+   content fingerprint, record digest and per-file SHA-256 hashes are last, in a Details section that is collapsed. All file
    and comment text is rendered as plain text. Every interactive element and every key value carries a stable
    kebab-case data-testid (file rows carry the list index, line and thread elements the line number or thread
    id), and the data-interactive marker on the root flips to "true" once the live circuit is connected. *@
@@ -35,9 +38,15 @@
     }
     else
     {
-        <h1 data-testid="review-title">@Review.Title</h1>
+        <div class="title-row">
+            <h1 data-testid="review-title">@Review.Title</h1>
+            @if (Approval is not null)
+            {
+                <span class="badge @(Approval.IsApproved ? "approved" : null)" data-testid="review-approval">@(Approval.IsApproved ? "Approved" : "In review")</span>
+            }
+        </div>
 
-        <p class="status" data-testid="next-step">@ThreadService.NextStep(Threads, Checklist?.Overall)</p>
+        <p class="status" data-testid="next-step">@Approval?.NextStep</p>
 
         @if (Checklist is not null)
         {
@@ -45,6 +54,119 @@
                 <h2>Checklist</h2>
                 <p data-testid="checklist-progress-summary">@ChecklistSummary()</p>
                 <a class="action" href="/projects/@ProjectId/reviews/@ReviewId/checklist" data-testid="checklist-link">Open checklist</a>
+            </section>
+        }
+
+        @if (Approval is not null)
+        {
+            <section class="card" data-testid="reviewers-card">
+                <h2>Reviewers</h2>
+                @if (Approval.Slots.Count == 0)
+                {
+                    <p class="muted" data-testid="slots-empty">No reviewer slots yet.</p>
+                }
+                @foreach (var slot in Approval.Slots)
+                {
+                    var slotId = slot.SlotId;
+                    var occupant = IsOccupant(slot);
+                    <div class="slot" data-testid="slot-@slotId">
+                        <h3 data-testid="slot-label-@slotId">Slot @slot.Number</h3>
+                        <p class="muted">Primary: <span data-testid="slot-primary-@slotId">@slot.Primary.DisplayName</span>
+                            &middot; Alternate: <span data-testid="slot-alternate-@slotId">@(slot.Alternate?.DisplayName ?? "None")</span></p>
+                        <p><span class="badge @SlotBadgeClass(slot)" data-testid="slot-status-@slotId">@SlotStatusLabel(slot)</span></p>
+
+                        @if (slot.State == SlotSignatureState.NotSigned)
+                        {
+                            <details class="slot-edit">
+                                <summary>Change reviewers</summary>
+                                <select aria-label="Primary reviewer of slot @slot.Number" data-testid="slot-primary-select-@slotId"
+                                        value="@PrimaryChoice(slot)" @onchange="e => SlotPrimaryChoices[slotId] = e.Value?.ToString() ?? string.Empty">
+                                    @foreach (var candidate in Candidates)
+                                    {
+                                        <option value="@candidate.UserId">@candidate.DisplayName (@candidate.Username)</option>
+                                    }
+                                </select>
+                                <select aria-label="Alternate reviewer of slot @slot.Number" data-testid="slot-alternate-select-@slotId"
+                                        value="@AlternateChoice(slot)" @onchange="e => SlotAlternateChoices[slotId] = e.Value?.ToString() ?? string.Empty">
+                                    <option value="">No alternate</option>
+                                    @foreach (var candidate in Candidates)
+                                    {
+                                        <option value="@candidate.UserId">@candidate.DisplayName (@candidate.Username)</option>
+                                    }
+                                </select>
+                                <button type="button" class="secondary" data-testid="slot-save-@slotId"
+                                        aria-label="Save slot @slot.Number" @onclick="() => SaveSlotAsync(slot)">Save</button>
+                                <button type="button" class="secondary" data-testid="slot-remove-@slotId"
+                                        aria-label="Remove slot @slot.Number" @onclick="() => RemoveSlotAsync(slotId)">Remove</button>
+                            </details>
+                        }
+
+                        @if (SlotErrors.TryGetValue(slotId, out var slotError))
+                        {
+                            <p class="error" role="alert" data-testid="slot-error-@slotId">@slotError</p>
+                        }
+
+                        @if (occupant && slot.State != SlotSignatureState.Signed)
+                        {
+                            @if (Approval.Blockers.Count > 0)
+                            {
+                                <div data-testid="sign-blockers-@slotId">
+                                    <p>This review cannot be signed yet:</p>
+                                    <ul>
+                                        @foreach (var blocker in Approval.Blockers)
+                                        {
+                                            <li>@blocker</li>
+                                        }
+                                    </ul>
+                                </div>
+                            }
+                            else
+                            {
+                                <form data-testid="sign-form-@slotId" novalidate @onsubmit="() => SignAsync(slotId)">
+                                    <p class="muted" data-testid="sign-meaning-@slotId">@SigningService.MeaningText</p>
+                                    <div class="field">
+                                        <label for="sign-password-@slotId">Confirm your password to sign</label>
+                                        <input id="sign-password-@slotId" type="password" autocomplete="current-password"
+                                               data-testid="sign-password-@slotId" @key="@($"{slotId}-{PasswordKey}")"
+                                               @oninput="e => SignPasswords[slotId] = e.Value?.ToString() ?? string.Empty" />
+                                    </div>
+                                    @if (SignErrors.TryGetValue(slotId, out var signError))
+                                    {
+                                        <p class="error" role="alert" data-testid="sign-error-@slotId">@signError</p>
+                                    }
+                                    <button type="submit" data-testid="sign-button-@slotId">Sign</button>
+                                </form>
+                            }
+                        }
+                    </div>
+                }
+
+                <form class="slot-add" data-testid="slot-add-form" novalidate @onsubmit="AddSlotAsync">
+                    <details open="@(Approval.Slots.Count == 0 || NewSlotError is not null)">
+                    <summary>Add a slot</summary>
+                    <select aria-label="Primary reviewer of the new slot" data-testid="new-slot-primary-select"
+                            value="@NewSlotPrimary" @onchange="e => NewSlotPrimary = e.Value?.ToString() ?? string.Empty">
+                        <option value="">Choose a primary reviewer</option>
+                        @foreach (var candidate in Candidates)
+                        {
+                            <option value="@candidate.UserId">@candidate.DisplayName (@candidate.Username)</option>
+                        }
+                    </select>
+                    <select aria-label="Alternate reviewer of the new slot" data-testid="new-slot-alternate-select"
+                            value="@NewSlotAlternate" @onchange="e => NewSlotAlternate = e.Value?.ToString() ?? string.Empty">
+                        <option value="">No alternate</option>
+                        @foreach (var candidate in Candidates)
+                        {
+                            <option value="@candidate.UserId">@candidate.DisplayName (@candidate.Username)</option>
+                        }
+                    </select>
+                    @if (NewSlotError is not null)
+                    {
+                        <p class="error" role="alert" data-testid="new-slot-error">@NewSlotError</p>
+                    }
+                    <button type="submit" data-testid="new-slot-add-button">Add slot</button>
+                    </details>
+                </form>
             </section>
         }
 
@@ -265,6 +387,11 @@
                 <dd><span class="badge" data-testid="review-state">@Review.State</span></dd>
                 <dt>Fingerprint</dt>
                 <dd class="hash" data-testid="review-fingerprint">@Review.ContentFingerprint</dd>
+                @if (Approval is not null)
+                {
+                    <dt>Record digest</dt>
+                    <dd class="hash" data-testid="record-digest" title="@Approval.Digest">@ShortDigest(Approval.Digest)</dd>
+                }
                 @for (var index = 0; index < Review.Files.Count; index++)
                 {
                     <dt data-testid="file-hash-path-@index">@Review.Files[index].Path</dt>

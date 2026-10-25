@@ -26,6 +26,18 @@ sections:
         tests:
           - ProjectPage_Render_ProjectWithReview_ListsReviewWithLinkTitleAndState
 
+      - id: ReviewCenter-ProjectPage-Approval
+        title: >-
+          The ProjectPage unit shall show next to the state of each listed review a badge that reads Approved when
+          the review has at least one reviewer slot and every slot has a current signature, and In review
+          otherwise.
+        justification: |
+          Users scan the project page to see which reviews are finished. The approval status is computed from the
+          current record, so a review whose record changed after signing is shown as In review again.
+        tests:
+          - ProjectPage_Render_ProjectWithReview_ListsReviewWithLinkTitleAndState
+          - ProjectPage_Render_SignedAndUnsignedReviews_ShowApprovedOrInReview
+
       - id: ReviewCenter-ProjectPage-Selection
         title: >-
           The ProjectPage unit shall list the name and size of each file the user selects for a new review, and

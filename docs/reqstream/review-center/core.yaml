@@ -3,9 +3,10 @@
 #
 # PURPOSE:
 # - Define requirements for the ReviewCenter Core subsystem
-# - The Core subsystem spans the Fingerprint, ProjectService, ReviewService, ThreadService, ChecklistService, and
-#   UserService units, with the domain types they share (project, review, review file, thread, comment,
-#   checklist, user, role, actor, upload, limits, rule exception, and store interfaces)
+# - The Core subsystem spans the Fingerprint, ProjectService, ReviewService, ThreadService, ChecklistService,
+#   UserService, RecordDigest, and SigningService units, with the domain types they share (project, review, review
+#   file, thread, comment, checklist, user, role, actor, reviewer slot, signature, upload, limits, rule exception,
+#   and store interfaces)
 # - Subsystem requirements describe the externally visible behavior of the domain model and its rules
 
 sections:
@@ -139,3 +140,31 @@ sections:
           - ReviewCenter-UserService-NotFound
         tests:
           - CoreSubsystem_UsersWorkflow_CreateSignInLockoutAndLastAdmin
+
+      - id: ReviewCenter-Core-Signatures
+        title: >-
+          The Core subsystem shall let a review have reviewer slots with a primary reviewer and an optional
+          alternate, let a reviewer sign the review only when nothing blocks it and only after confirming the
+          password again, bind each signature to a digest of the review record, keep every signature unchanged,
+          and show a signature as out of date, and the review as not approved, as soon as the record changes
+          until every slot has signed the new record.
+        justification: |
+          A signature is only worth something if it says who approved which content. Binding it to a digest of
+          the record, and computing the approval from the record each time, means an approval can never outlive
+          the content it approved, and asking for the password again shows the approval came from the person.
+        children:
+          - ReviewCenter-RecordDigest-Format
+          - ReviewCenter-RecordDigest-Coverage
+          - ReviewCenter-RecordDigest-Independence
+          - ReviewCenter-RecordDigest-Unambiguous
+          - ReviewCenter-SigningService-Slots
+          - ReviewCenter-SigningService-SlotUsers
+          - ReviewCenter-SigningService-SlotEdit
+          - ReviewCenter-SigningService-Actor
+          - ReviewCenter-SigningService-Blockers
+          - ReviewCenter-SigningService-Sign
+          - ReviewCenter-SigningService-Reauthenticate
+          - ReviewCenter-SigningService-Current
+          - ReviewCenter-SigningService-Status
+        tests:
+          - CoreSubsystem_Signatures_SignChangeOutOfDateAndResign_FollowsTheRecord

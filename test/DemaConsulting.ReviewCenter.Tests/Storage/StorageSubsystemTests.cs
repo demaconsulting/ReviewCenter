@@ -216,6 +216,60 @@ public class StorageSubsystemTests
     }
 
     /// <summary>
+    ///     Test that a reviewer slot and its signature written through the services are still there, and still
+    ///     current, after the database is closed and opened again, and that the review is then approved.
+    /// </summary>
+    [Fact]
+    public async Task StorageSubsystem_Signatures_PersistAcrossReopenAndStayCurrent()
+    {
+        // Arrange: a new database file
+        var options = new DatabaseOptions { ConnectionString = TestDatabase.NewConnectionString() };
+        int projectId;
+
+        // Act: create a review with every check answered and one slot, sign it, then close the database
+        var first = Open(options);
+        using (first.Provider)
+        {
+            var users = NewUserService(first.Provider);
+            var ann = await users.CreateAsync("ann", "Ann", UserRole.Reviewer, "correct horse battery", TestContext.Current.CancellationToken);
+            var bob = await users.CreateAsync("bob", "Bob", UserRole.Reviewer, "correct horse battery", TestContext.Current.CancellationToken);
+            var project = await first.Projects.CreateAsync("Apollo", null, TestContext.Current.CancellationToken);
+            projectId = project.Id;
+            await first.Reviews.CreateDraftAsync(
+                projectId, "rev-1", "First", [new("a.txt", TestContent.A)], TestContext.Current.CancellationToken);
+            var checklists = new ChecklistService(first.Store, new FixedTimeProvider(_now));
+            foreach (var item in DefaultChecklist.Current.Sections.SelectMany(section => section.Items))
+            {
+                await checklists.SetAnswerAsync(
+                    projectId, "rev-1", item.Id, ChecklistOutcome.Pass, null, TestActors.Ann, TestContext.Current.CancellationToken);
+            }
+
+            var signing = new SigningService(first.Store, users, new FixedTimeProvider(_now));
+            var slot = await signing.AddSlotAsync(
+                TestActors.Ann, projectId, "rev-1", ann.Id, bob.Id, TestContext.Current.CancellationToken);
+            var approval = await signing.GetApprovalAsync(projectId, "rev-1", TestContext.Current.CancellationToken);
+            await signing.SignAsync(
+                TestActors.Bob, projectId, "rev-1", slot.Id, approval!.Digest, "correct horse battery", TestContext.Current.CancellationToken);
+        }
+
+        // Act: open the same database again and read the approval
+        var second = Open(options);
+        using (second.Provider)
+        {
+            var signing = new SigningService(second.Store, NewUserService(second.Provider), new FixedTimeProvider(_now));
+            var approval = await signing.GetApprovalAsync(projectId, "rev-1", TestContext.Current.CancellationToken);
+
+            // Assert: the signature survived, belongs to the alternate, and is still current for the same record
+            Assert.NotNull(approval);
+            Assert.True(approval.IsApproved);
+            var status = Assert.Single(approval.Slots);
+            Assert.Equal(SlotSignatureState.Signed, status.State);
+            Assert.Equal("Bob", status.SignerName);
+            Assert.Equal(_now, status.SignedAt);
+        }
+    }
+
+    /// <summary>
     ///     Builds a user service over the database of a provider.
     /// </summary>
     /// <param name="provider">The provider that owns the database factory.</param>

@@ -2,7 +2,7 @@
 # Software Unit Requirements for the ReviewCenterDbContext Class
 #
 # The ReviewCenterDbContext class is the Entity Framework Core model that maps projects, reviews, review
-# files, threads, comments, checklists, and users to database tables.
+# files, threads, comments, checklists, users, reviewer slots, and signatures to database tables.
 
 sections:
   - title: ReviewCenterDbContext Unit Requirements
@@ -78,3 +78,20 @@ sections:
         tests:
           - UserStore_AddAsync_UsernameOtherCase_ThrowsUserNameTakenAndLookupIgnoresCase
           - UserStore_AddAsync_User_RoundTripsEveryField
+
+      - id: ReviewCenter-DbContext-Signatures
+        title: >-
+          The ReviewCenterDbContext class shall map reviewer slots and signatures to tables in which a slot and
+          a signature belong to a review, and a signature belongs to a slot, so that the database refuses a slot
+          or a signature for a review that does not exist, refuses to delete a slot that has a signature, and
+          refuses a second signature of the same slot with the same digest. A signature shall be stored and read
+          back with its role, digest, and meaning unchanged.
+        justification: |
+          A signature is evidence and must not lose the slot it was made for. Having the database enforce the
+          relationships and the uniqueness keeps the record consistent when two requests overlap or a programming
+          error occurs.
+        tests:
+          - ReviewStore_AddSlotAsync_UnknownReview_IsRefusedByDatabase
+          - ReviewStore_RemoveSlotAsync_SignedSlot_IsRefusedByDatabase
+          - ReviewStore_AddSignatureAsync_SameSlotAndDigestTwice_ThrowsSigningNotAllowed
+          - ReviewStore_AddSignatureAsync_CurrentDigest_StoresAndRoundTrips

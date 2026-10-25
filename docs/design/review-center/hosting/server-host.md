@@ -59,10 +59,12 @@ server render mode; and registers the start-up log callback.
 - *Postconditions*: The `Database` options, a `ReviewCenterDbContext` factory configured by
   `DatabaseSetup.Configure`, `TimeProvider.System`, `ReviewStore` and `UserStore` as the Core store interfaces,
   `PasswordHasher` as the Core hasher interface, and `ProjectService`, `ReviewService`, `ThreadService`,
-  `ChecklistService`, and `UserService` as singletons are registered.
+  `ChecklistService`, `UserService`, and `SigningService` as singletons are registered.
 
 The method is shared with `UserCommand`, so that the command line creates users with exactly the services of the
-server. `UserService` must remain a single instance, because it serializes the changes to users in the process.
+server. `UserService` must remain a single instance, because it serializes the changes to users in the process;
+`SigningService` must remain a single instance for the same reason, because it serializes the changes to reviewer
+slots and signatures with one gate.
 
 **InitializeDatabase**: Creates the database for a built application.
 
@@ -128,8 +130,8 @@ always disposed.
 - **App** — the root component mapped as the user interface.
 - **DatabaseSetup**, **ReviewCenterDbContext**, **ReviewStore**, **UserStore** — the database configuration, context,
   and stores registered for the pages.
-- **ProjectService**, **ReviewService**, **ThreadService**, **ChecklistService**, **UserService** — the Core services
-  registered for the pages.
+- **ProjectService**, **ReviewService**, **ThreadService**, **ChecklistService**, **UserService**, **SigningService** —
+  the Core services registered for the pages.
 - **PasswordHasher**, **SignIn** — the password hasher registered for the Core, and the cookie sign-in, authorization,
   and login and logout endpoints.
 - **ASP.NET Core shared framework** — `WebApplication`, Kestrel, endpoint routing, authentication, authorization,

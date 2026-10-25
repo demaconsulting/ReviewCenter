@@ -69,6 +69,12 @@ public partial class ProjectPage : ComponentBase
     private ReviewService ReviewService { get; set; } = null!;
 
     /// <summary>
+    ///     Gets or sets the service that computes the approval status of a review, supplied by dependency injection.
+    /// </summary>
+    [Inject]
+    private SigningService SigningService { get; set; } = null!;
+
+    /// <summary>
     ///     Gets or sets the navigation manager, supplied by dependency injection; used to open the new review.
     /// </summary>
     [Inject]
@@ -88,6 +94,11 @@ public partial class ProjectPage : ComponentBase
     ///     Gets the reviews of the project.
     /// </summary>
     private IReadOnlyList<Review> Reviews { get; set; } = [];
+
+    /// <summary>
+    ///     Gets the identifiers of the reviews that are approved (every slot has a current signature).
+    /// </summary>
+    private HashSet<string> ApprovedReviews { get; } = [];
 
     /// <summary>
     ///     Gets or sets the review id typed into the form.
@@ -146,7 +157,28 @@ public partial class ProjectPage : ComponentBase
 
         Project = await ProjectService.GetAsync(ProjectId);
         Reviews = Project is null ? [] : await ReviewService.ListAsync(ProjectId);
+
+        // One approval lookup per review; the list of reviews of a project is short
+        ApprovedReviews.Clear();
+        foreach (var id in Reviews.Select(review => review.Id))
+        {
+            if ((await SigningService.GetApprovalAsync(ProjectId, id))?.IsApproved == true)
+            {
+                ApprovedReviews.Add(id);
+            }
+        }
+
         Loaded = true;
+    }
+
+    /// <summary>
+    ///     Tells whether a review is approved.
+    /// </summary>
+    /// <param name="reviewId">The review identifier.</param>
+    /// <returns><c>true</c> when the review has at least one slot and every slot has a current signature.</returns>
+    private bool IsApproved(string reviewId)
+    {
+        return ApprovedReviews.Contains(reviewId);
     }
 
     /// <summary>

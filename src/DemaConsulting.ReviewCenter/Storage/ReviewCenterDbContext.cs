@@ -25,14 +25,14 @@ namespace DemaConsulting.ReviewCenter.Storage;
 
 /// <summary>
 ///     The Entity Framework Core model of the ReviewCenter database: users, projects, reviews, review files, the
-///     comment threads of a review with their comments, and the review checklist (frozen snapshot, section
-///     applicability and answers).
+///     comment threads of a review with their comments, the review checklist (frozen snapshot, section
+///     applicability and answers), and the reviewer slots with their signatures.
 /// </summary>
 /// <remarks>
 ///     The model maps the Core entities as they are, so Core stays free of any database library.
 ///     The schema is created with <c>EnsureCreated</c> (see <see cref="DatabaseSetup"/>); there are no
-///     migrations yet, so a database created before users, threads or checklists existed does not gain their
-///     tables or columns and must be deleted and recreated. Instances are short-lived and not thread-safe: create one per operation
+///     migrations yet, so a database created before users, threads, checklists, slots or signatures existed does
+///     not gain their tables or columns and must be deleted and recreated. Instances are short-lived and not thread-safe: create one per operation
 ///     through <see cref="IDbContextFactory{TContext}"/>.
 /// </remarks>
 internal sealed class ReviewCenterDbContext : DbContext
@@ -56,6 +56,11 @@ internal sealed class ReviewCenterDbContext : DbContext
     ///     The width of a column that holds a checklist section or check identifier.
     /// </summary>
     private const int ChecklistIdColumnLength = 32;
+
+    /// <summary>
+    ///     The width of the column that holds the meaning text of a signature.
+    /// </summary>
+    private const int SignatureMeaningColumnLength = 256;
 
     /// <summary>
     ///     Initializes a new instance of the <see cref="ReviewCenterDbContext"/> class.
@@ -110,6 +115,16 @@ internal sealed class ReviewCenterDbContext : DbContext
     ///     Gets the users table.
     /// </summary>
     public DbSet<User> Users => Set<User>();
+
+    /// <summary>
+    ///     Gets the table of reviewer slots.
+    /// </summary>
+    public DbSet<ReviewerSlot> ReviewerSlots => Set<ReviewerSlot>();
+
+    /// <summary>
+    ///     Gets the table of signatures.
+    /// </summary>
+    public DbSet<ReviewSignature> Signatures => Set<ReviewSignature>();
 
     /// <summary>
     ///     Configures keys, relationships, length limits and conversions.
@@ -240,6 +255,40 @@ internal sealed class ReviewCenterDbContext : DbContext
                 .WithMany()
                 .HasForeignKey(a => new { a.ProjectId, a.ReviewId })
                 .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // Reviewer slots: identity assigned by the database; they hold user identities only and go away with
+        // the review
+        modelBuilder.Entity<ReviewerSlot>(slot =>
+        {
+            slot.HasKey(s => s.Id);
+            slot.Property(s => s.ReviewId).HasMaxLength(ReviewLimits.MaxReviewIdLength);
+            slot.HasOne<Review>()
+                .WithMany()
+                .HasForeignKey(s => new { s.ProjectId, s.ReviewId })
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // Signatures: append-only (nothing in the application updates or deletes a row). A slot with a signature
+        // cannot be deleted (the foreign key to the slot is checked at the end of the statement, so deleting a whole
+        // review still cascades), and the unique index stops a double submit from storing the same signature twice
+        modelBuilder.Entity<ReviewSignature>(signature =>
+        {
+            signature.HasKey(s => s.Id);
+            signature.Property(s => s.ReviewId).HasMaxLength(ReviewLimits.MaxReviewIdLength);
+            signature.Property(s => s.DisplayName).IsRequired().HasMaxLength(ReviewLimits.MaxDisplayNameLength);
+            signature.Property(s => s.Role).HasConversion<string>().HasMaxLength(StateColumnLength);
+            signature.Property(s => s.RecordDigest).IsRequired().HasMaxLength(Sha256HexColumnLength);
+            signature.Property(s => s.Meaning).IsRequired().HasMaxLength(SignatureMeaningColumnLength);
+            signature.HasIndex(s => new { s.SlotId, s.RecordDigest }).IsUnique();
+            signature.HasOne<Review>()
+                .WithMany()
+                .HasForeignKey(s => new { s.ProjectId, s.ReviewId })
+                .OnDelete(DeleteBehavior.Cascade);
+            signature.HasOne<ReviewerSlot>()
+                .WithMany()
+                .HasForeignKey(s => s.SlotId)
+                .OnDelete(DeleteBehavior.NoAction);
         });
     }
 }

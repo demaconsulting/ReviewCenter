@@ -108,7 +108,39 @@ public class ProjectPageTests : PageTestBase
         Assert.Equal($"/projects/{project.Id}/reviews/REV-1", link.GetAttribute("href"));
         Assert.Equal("First review", cut.Find("[data-testid='review-title-REV-1']").TextContent);
         Assert.Equal("Draft", cut.Find("[data-testid='review-state-REV-1']").TextContent);
+        Assert.Equal("In review", cut.Find("[data-testid='review-approval-REV-1']").TextContent);
         Assert.Empty(cut.FindAll("[data-testid='reviews-empty']"));
+    }
+
+    /// <summary>
+    ///     Test that a review whose every slot has a current signature is listed as Approved, and one without
+    ///     slots or with an unsigned slot as In review.
+    /// </summary>
+    [Fact]
+    public async Task ProjectPage_Render_SignedAndUnsignedReviews_ShowApprovedOrInReview()
+    {
+        // Arrange: two reviews, one fully signed by its only slot, one without slots
+        var ann = await Users.CreateAsync("ann", "Ann", UserRole.Reviewer, "correct horse battery", TestContext.Current.CancellationToken);
+        var project = await Projects.CreateAsync("Apollo", null, TestContext.Current.CancellationToken);
+        await Reviews.CreateDraftAsync(project.Id, "REV-1", "Signed", [new("a.txt", TestContent.A)], TestContext.Current.CancellationToken);
+        await Reviews.CreateDraftAsync(project.Id, "REV-2", "Open", [new("a.txt", TestContent.A)], TestContext.Current.CancellationToken);
+        foreach (var item in DefaultChecklist.Current.Sections.SelectMany(section => section.Items))
+        {
+            await Checklists.SetAnswerAsync(
+                project.Id, "REV-1", item.Id, ChecklistOutcome.Pass, null, TestActors.Ann, TestContext.Current.CancellationToken);
+        }
+
+        var slot = await Signing.AddSlotAsync(TestActors.Ann, project.Id, "REV-1", ann.Id, null, TestContext.Current.CancellationToken);
+        var approval = await Signing.GetApprovalAsync(project.Id, "REV-1", TestContext.Current.CancellationToken);
+        await Signing.SignAsync(
+            TestActors.Ann, project.Id, "REV-1", slot.Id, approval!.Digest, "correct horse battery", TestContext.Current.CancellationToken);
+
+        // Act: render the page
+        var cut = RenderPage(project.Id);
+
+        // Assert: the badges follow the approval
+        Assert.Equal("Approved", cut.Find("[data-testid='review-approval-REV-1']").TextContent);
+        Assert.Equal("In review", cut.Find("[data-testid='review-approval-REV-2']").TextContent);
     }
 
     /// <summary>

@@ -10,7 +10,7 @@ conversions. It contains no queries; those belong to `ReviewStore`.
 
 #### Data Model
 
-The context exposes nine sets and maps the Core types directly, without separate persistence classes.
+The context exposes eleven sets and maps the Core types directly, without separate persistence classes.
 
 - **Projects** (`Project`): key `Id`, assigned by the database. `Name` is required, at most 100 characters;
   `Description` is required (may be empty), at most 1000; `Created`.
@@ -43,22 +43,43 @@ The context exposes nine sets and maps the Core types directly, without separate
   lookup by user name
   ignores case; `DisplayName` is required, at most 100; `Role` is stored as text, at most 32; `Enabled`;
   `PasswordHash` is required; `FailedLoginCount`; `LockoutUntil` (null when the user is not locked out); `Created`.
+- **ReviewerSlots** (`ReviewerSlot`): key `Id`, assigned by the database. `ProjectId` and `ReviewId` relate the slot
+  to its review, so the database refuses a slot for a review that does not exist, and a slot is deleted with its
+  review. `PrimaryUserId` and `AlternateUserId` (null when there is no alternate) hold user identities only; they are
+  not relationships, so a slot never depends on the users table.
+- **Signatures** (`ReviewSignature`): key `Id`, assigned by the database. `ProjectId` and `ReviewId` relate the
+  signature to its review, and a signature is deleted with its review. `SlotId` relates the signature to its slot
+  (see below). `UserId` is the identity of the signer; `DisplayName` (the name at the time) is required, at most 100;
+  `Role` (the role in the slot, primary or alternate) is stored as text, at most 32; `SignedAt`; `RecordDigest` is
+  required, at most 64 (a SHA-256 value written in hexadecimal); `Meaning` is required, at most 256. A unique index
+  on `SlotId` plus `RecordDigest` allows one signature of a record per slot. Signatures are append-only: the mapping
+  has no update path and the application never updates or deletes a row.
+
+The relationship from a signature to its slot uses the `NoAction` delete behavior, not `Restrict`. SQLite checks a
+`RESTRICT` foreign key immediately, at the statement that deletes the parent row, so deleting a review would fail
+when its cascade removes the slots before it removes the signatures. A `NO ACTION` foreign key is checked at the end
+of the statement, when the signatures of the deleted review are gone too, so deleting a whole review still works,
+while a direct delete of a slot that has a signature is still refused. The test
+`ReviewStore_RemoveSlotAsync_SignedSlot_IsRefusedByDatabase` shows the refusal.
 
 The limits of project, review, path, author, user name, display name, and comment columns use the constants of
 `ReviewLimits`, so the schema
 and the rules cannot drift apart. The widths that are a property of the storage representation rather than of a
-rule - the state name and the role name (32) and a SHA-256 value written in hexadecimal (64) - are named constants of
+rule - the state name and the role name (32), a SHA-256 value written in hexadecimal (64), and the meaning text of a
+signature (256) - are named constants of
 the unit.
 The
 composite key of a review (project and review identifier) makes the review identifier unique within a project and
 allows the same identifier in two projects. The composite key of a file makes its path unique within a review.
-These keys are what enforces uniqueness in the database even when two requests race; the only separate unique index
-is the one on the user name. The state is stored by name, so adding states later does not change the meaning of
-stored rows. The
+These keys are what enforces uniqueness in the database even when two requests race; the only separate unique indexes
+are the one on the user name and the one on the slot and digest of a signature. The state is stored by name, so
+adding states later does not change the meaning of stored rows. The
 tables of threads and comments are new: a database created before they existed does not have them and is not
 altered, so it must be deleted and created again (see the `Storage` design). The same holds for the three
 checklist tables, and for the users table and the user name columns of comments, answers, and section decisions: a
-database created before the identity slice must be deleted and created again, and its data is not migrated. The
+database created before the identity slice must be deleted and created again, and its data is not migrated. The same
+holds for the tables of reviewer slots and signatures: a database created before the signature slice does not have
+them and must be deleted and created again. The
 checklist keys are what makes "one answer per check" a rule of the database. The section and
 check identifiers are not related to a table of their own: they name entries inside the snapshot, and the service
 checks them.
@@ -81,7 +102,7 @@ mapped constraints surface as database update exceptions to `ReviewStore`.
 
 - **Core domain types** — `Project`, `Review`, `ReviewFile`, `ReviewState`, `ReviewThread`, `ReviewComment`,
   `ReviewThreadState`, `ReviewChecklist`, `ChecklistSectionState`, `ChecklistAnswer`, `ChecklistOutcome`, `User`,
-  `UserRole`, and `ReviewLimits`.
+  `UserRole`, `ReviewerSlot`, `ReviewSignature`, `SlotRole`, and `ReviewLimits`.
 - **Entity Framework Core** — the context base class and the model configuration API.
 
 #### Callers
