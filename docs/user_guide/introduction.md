@@ -285,6 +285,43 @@ on the page, and nothing is created.
 - Only the file name of each chosen file is kept (not its folder), so two files with the same name cannot be in the
   same review; the page reports this when you submit.
 
+### Reviews from a Repository
+
+Instead of uploading files you can review what changed in a git repository that an administrator registered (see
+[Repositories and Credentials](#repositories-and-credentials)). On the project page, under **Source**, choose
+**From a repository** and enter:
+
+- **Repository**: one of the enabled repositories, by name. If there is none, the page says so and offers only the
+  upload.
+- **Head revision**: a branch, a tag, or a commit (for example `main`, `v2.0`, or a commit id).
+- **Baseline revision** (optional): the revision to compare with. Without it every file of the head revision that
+  matches the selection counts as Added.
+- **Selection**: the files to review, patterns one per line (default `**/*`); see [Selecting Files](#selecting-files).
+  For example, the two lines `src/**/*.cs` and `!src/**/Generated/**` select the C# files below `src` except those in
+  `Generated` folders. The patterns are applied to the files that **changed** between the two revisions, not to every
+  file of the head.
+
+When you create the review, the server fetches the repository, resolves both revisions to commits, and stores in the
+database, for every changed file that matches the selection, its path, its change kind (**Added**, **Modified**, or
+**Deleted**; a rename counts as a delete and an add), and its baseline and head content. After that, nothing is read
+from the repository: later commits, a force push, or disabling the repository do not change the review.
+
+- If no changed file matches, no review is created and the page says "Nothing to review: no files matching the
+  selection changed between X and Y".
+- A revision that git does not know, a repository that cannot be reached, or a file over the size limits is reported
+  on the page and nothing is created. The limits are those of an upload (200 files, 2 MiB per file, 20 MiB per
+  review) and count the baseline and head content of the changed files.
+- Symbolic links and submodules are not reviewed. Those that match the selection are listed once, right after the
+  review is created, and are counted in the audit entry.
+- A revision such as `HEAD~1` is not accepted; use a branch, a tag, or a commit id.
+
+On the review page, each file shows its change kind. Select a file to read it. For a **Modified** file a **Head** and
+a **Baseline** button appear: Head is the numbered view with comments, Baseline shows the earlier content read-only.
+There is no highlighting of differences. A **Deleted** file shows its baseline content; you can comment on the whole
+file but not on lines. Comments on lines are made in the Head view only. The review fingerprint covers the files that
+exist at the head (Added and Modified), exactly as for an upload. The Details section shows the repository name, the
+baseline and head commits, and the selection.
+
 ### Limitations of Sign-in
 
 - There is no password reset, no email, no multi-factor sign-in, and no external identity provider. An administrator
@@ -387,7 +424,10 @@ statement.
 
 **What a signature covers.** A signature is bound to the record as it was when you signed. The record is the content
 fingerprint of the files, every checklist answer with its justification, every section marked as not applicable with its
-reason, and every comment thread with its comments. The **Record digest** in the Details section (shortened; the full
+reason, and every comment thread with its comments. For a review from a repository it also covers the repository, the
+baseline and head commits, the selection, and every changed file with its change kind and the hashes of its baseline
+and head content, so a signature cannot look current for a different selection or a different change. The
+**Record digest** in the Details section (shortened; the full
 value is its tooltip) identifies that record. Who answered a check, and when, is not part of it. If the record changes
 while you are signing, the signature is refused and you are asked to review it and try again.
 
@@ -517,14 +557,14 @@ server writes an error message and exits with a non-zero exit code. Database mig
 release: the tables are created only when the database is new. **A database file created by an earlier build, before
 user accounts, reviewer signatures, or the audit trail existed, does not have the tables and columns that are
 needed, and the pages cannot work with it: delete the file (or point `Database:ConnectionString` at a new one) and
-start again, then create the first administrator.** Do this only with development data. The repository registry is
-another new table, so a development database created before it existed must be recreated in the same way.
+start again, then create the first administrator.** Do this only with development data. The repository registry and
+the reviews from a repository add tables and columns, so a development database created before them must be recreated
+in the same way.
 
 ## Repositories and Credentials
 
-Administrators register the git repositories that reviews will be made from. This release provides the registry and the
-git access; creating a review from a repository follows in a later release, and reviews are still made from uploaded
-files.
+Administrators register the git repositories that reviews will be made from (see
+[Reviews from a Repository](#reviews-from-a-repository)).
 
 ### Prerequisite
 

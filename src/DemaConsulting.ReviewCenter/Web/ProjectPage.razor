@@ -71,28 +71,98 @@
                     <input id="review-title" type="text" maxlength="@ReviewLimits.MaxReviewTitleLength"
                            data-testid="review-title-input" @bind="ReviewTitle" @bind:event="oninput" />
                 </div>
-                <div class="field">
-                    <label for="review-files">Files</label>
-                    <InputFile id="review-files" multiple OnChange="OnFilesSelectedAsync" data-testid="review-files-input" />
-                </div>
-                @if (SelectedFiles.Count > 0)
+                <fieldset class="field source-choice" data-testid="review-source">
+                    <legend>Files come from</legend>
+                    <label>
+                        <input type="radio" name="review-source" checked="@(!FromRepository)"
+                               data-testid="source-upload-radio" @onchange="() => ChooseSource(false)" />
+                        Upload files
+                    </label>
+                    <label>
+                        <input type="radio" name="review-source" checked="@FromRepository"
+                               disabled="@(Repositories.Count == 0)"
+                               data-testid="source-repository-radio" @onchange="() => ChooseSource(true)" />
+                        From a repository
+                    </label>
+                    @if (Repositories.Count == 0)
+                    {
+                        <p class="muted" data-testid="no-repository-hint">No repository is registered; ask an administrator.</p>
+                    }
+                </fieldset>
+                @if (FromRepository)
                 {
-                    <ul class="item-list" data-testid="selected-files-list">
-                        @for (var index = 0; index < SelectedFiles.Count; index++)
-                        {
-                            <li data-testid="selected-file-@index">
-                                <span class="path" data-testid="selected-file-path-@index">@SelectedFiles[index].Path</span>
-                                <span class="muted" data-testid="selected-file-size-@index">@SelectedFiles[index].Content.Length bytes</span>
-                            </li>
-                        }
-                    </ul>
+                    <div class="field">
+                        <label for="review-repository">Repository</label>
+                        <select id="review-repository" data-testid="repository-select" @bind="RepositoryIdText">
+                            <option value="">Choose a repository</option>
+                            @foreach (var repository in Repositories)
+                            {
+                                <option value="@repository.Id">@repository.Name</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="field">
+                        <label for="review-head-revision">Head revision</label>
+                        <input id="review-head-revision" type="text" maxlength="@RevisionValidator.MaxLength"
+                               autocomplete="off" data-testid="head-revision-input"
+                               @bind="HeadRevision" @bind:event="oninput" />
+                        <span class="muted">A branch, tag or commit.</span>
+                    </div>
+                    <div class="field">
+                        <label for="review-baseline-revision">Baseline revision (optional)</label>
+                        <input id="review-baseline-revision" type="text" maxlength="@RevisionValidator.MaxLength"
+                               autocomplete="off" data-testid="baseline-revision-input"
+                               @bind="BaselineRevision" @bind:event="oninput" />
+                        <span class="muted">Leave empty to review all files at the head.</span>
+                    </div>
+                    <div class="field">
+                        <label for="review-selection">File selection</label>
+                        <textarea id="review-selection" rows="3" maxlength="@ReviewLimits.MaxSelectionLength"
+                                  data-testid="selection-input" @bind="Selection" @bind:event="oninput"></textarea>
+                        <span class="muted">One pattern per line; start a line with ! to exclude.</span>
+                    </div>
+                }
+                else
+                {
+                    <div class="field">
+                        <label for="review-files">Files</label>
+                        <InputFile id="review-files" multiple OnChange="OnFilesSelectedAsync" data-testid="review-files-input" />
+                    </div>
+                    @if (SelectedFiles.Count > 0)
+                    {
+                        <ul class="item-list" data-testid="selected-files-list">
+                            @for (var index = 0; index < SelectedFiles.Count; index++)
+                            {
+                                <li data-testid="selected-file-@index">
+                                    <span class="path" data-testid="selected-file-path-@index">@SelectedFiles[index].Path</span>
+                                    <span class="muted" data-testid="selected-file-size-@index">@SelectedFiles[index].Content.Length bytes</span>
+                                </li>
+                            }
+                        </ul>
+                    }
                 }
                 @if (ErrorMessage is not null)
                 {
                     <p class="error" role="alert" data-testid="review-error">@ErrorMessage</p>
                 }
-                <button type="submit" data-testid="create-review-button">Create review</button>
+                <button type="submit" disabled="@Busy" data-testid="create-review-button">@(Busy ? "Creating review..." : "Create review")</button>
             </form>
+            @if (CreatedReview is not null)
+            {
+                <div role="status" data-testid="review-created">
+                    <p>Review <strong>@CreatedReview.Id</strong> was created. These entries were left out because only regular files are reviewed:</p>
+                    <ul class="item-list" data-testid="skipped-entries-list">
+                        @for (var index = 0; index < SkippedEntries.Count; index++)
+                        {
+                            <li data-testid="skipped-entry-@index">
+                                <span class="path">@SkippedEntries[index].Path</span>
+                                <span class="muted">@SkippedEntries[index].Reason</span>
+                            </li>
+                        }
+                    </ul>
+                    <a href="/projects/@ProjectId/reviews/@CreatedReview.Id" data-testid="open-created-review-link">Open the review</a>
+                </div>
+            }
         </section>
     }
 </main>

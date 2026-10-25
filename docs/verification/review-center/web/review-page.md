@@ -2,7 +2,8 @@
 
 #### Verification Approach
 
-`ReviewPage` is verified with component tests defined in `ReviewPageTests.cs`, which use the bUnit test context to
+`ReviewPage` is verified with component tests defined in `ReviewPageTests.cs` and
+`ReviewPageRepositoryTests.cs`, which use the bUnit test context to
 render the real component over real Core services and an in-memory fake store holding a review of known files.
 The signed-in user is supplied by a test authentication state in `PageTestBase`: the user `ann` (display name "Ann")
 unless a test signs in as someone else. The signing tests also create real users (with a password) through
@@ -74,8 +75,40 @@ N/A - standard test environment.
   typed text, and the sign form are gone, and a stale submission of the thread form or the sign form stores nothing. A
   thread started after the session ended, before the page learned of it, shows an error that says the user is no
   longer signed in and stores nothing.
+- A review from a repository shows the change kind of every file (an uploaded review shows none) and the repository,
+  both commits, and the selection in the details; a deleted file is listed with its baseline size.
+- A modified file offers a Head and a Baseline toggle: Head is the numbered view with comments, Baseline is the
+  frozen text, read-only, without comment controls; an added file has no toggle; selecting another file starts in
+  its head view.
+- A deleted file shows its baseline, offers no line comments, and accepts a whole-file comment.
 
 #### Test Scenarios
+
+**Reviews from a repository** are verified in `ReviewPageRepositoryTests.cs` over a review stored with a source,
+changed files, and baseline bytes.
+
+**ReviewPage_Render_RepositoryReview_ShowsChangeKindPerFile**: Each file of a repository review shows Added,
+Modified, or Deleted. This scenario is tested by `ReviewPage_Render_RepositoryReview_ShowsChangeKindPerFile`.
+
+**ReviewPage_Render_RepositoryReview_DetailsShowRepositoryShasAndSelection**: The details show the repository name,
+the baseline and head commits, and the selection. This scenario is tested by
+`ReviewPage_Render_RepositoryReview_DetailsShowRepositoryShasAndSelection`.
+
+**ReviewPage_FileSelect_ModifiedFile_TogglesBetweenHeadAndReadOnlyBaseline**: A modified file shows the Head view
+with comment controls and a toggle; the Baseline view shows the baseline lines without comment controls and Head
+returns; an added file has no toggle. This scenario is tested by
+`ReviewPage_FileSelect_ModifiedFile_TogglesBetweenHeadAndReadOnlyBaseline`.
+
+**ReviewPage_FileSelect_AfterBaselineView_ShowsHeadOfTheNextFile**: After the baseline of one file was shown,
+selecting another file shows its head view. This scenario is tested by
+`ReviewPage_FileSelect_AfterBaselineView_ShowsHeadOfTheNextFile`.
+
+**ReviewPage_FileSelect_DeletedFile_ShowsBaselineAndAcceptsWholeFileCommentOnly**: A deleted file shows its baseline
+with a note and no line comment buttons, and a whole-file comment is accepted. This scenario is tested by
+`ReviewPage_FileSelect_DeletedFile_ShowsBaselineAndAcceptsWholeFileCommentOnly`.
+
+**ReviewPage_Render_DeletedFile_ListsBaselineSize**: A deleted file is listed with the size of its baseline. This
+scenario is tested by `ReviewPage_Render_DeletedFile_ListsBaselineSize`.
 
 **ReviewPage_Render_UnknownReview_ShowsNotFound**: The page is rendered for an unknown review; the not-found
 message names the identifier and no fingerprint is shown. This scenario is tested by

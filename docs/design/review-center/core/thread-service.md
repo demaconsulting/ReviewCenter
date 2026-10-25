@@ -34,7 +34,9 @@ Rules for the input: the text is not empty
 after trimming and has at most 4000 characters (the constants are in `ReviewLimits`); it is stored trimmed. A
 thread is anchored either to the whole file (no lines given) or to a range in which both lines are given, the start
 line is at least 1, the end line is not before the start line, and the end line is not beyond the last line of the
-file. A binary file and an empty file have no lines, so they can be commented only as a whole.
+file. A binary file and an empty file have no lines, so they can be commented only as a whole. A file that was deleted
+in a review from a repository has no head content, so it too can be commented only as a whole; the baseline view
+of any file is read-only and takes no comments.
 
 **Immutability**: posted comments are never changed or removed. The service and the store interface offer no way to
 edit or delete a comment or a thread. The only change to an existing thread is its state, which is not attributed
@@ -58,7 +60,8 @@ author, because the display name of a user was validated when the user was creat
 
 The rules are checked in this order, and the first violation is reported: the text (`CommentTextInvalid`); the shape
 of the anchor, that is both lines or neither, start at least 1, and end not
-before start (`ThreadAnchorInvalid`); that the review and the file exist (`ThreadAnchorInvalid`); and, only when a
+before start (`ThreadAnchorInvalid`); that the review and the file exist (`ThreadAnchorInvalid`); that a range is not
+given on a deleted file (`ThreadAnchorInvalid`, "Deleted files accept whole-file comments only."); and, only when a
 range is given, that the file is text and the end line is within its line count (`ThreadAnchorInvalid`). Checks that
 need no I/O come first so that a bad request fails cheaply, and file content is read only when a range needs it.
 

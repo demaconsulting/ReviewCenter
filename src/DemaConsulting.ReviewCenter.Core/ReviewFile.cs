@@ -46,21 +46,45 @@ public sealed class ReviewFile
     public string Path { get; init; } = string.Empty;
 
     /// <summary>
-    ///     Gets the exact bytes of the file, kept verbatim.
+    ///     Gets the exact bytes of the file at the head, kept verbatim.
     /// </summary>
     /// <remarks>
-    ///     Empty (not null) on instances read back for display, which carry metadata only; use
+    ///     Empty (not null) on instances read back for display, which carry metadata only, and for a
+    ///     <see cref="ChangeKind.Deleted"/> file, which has no head content; use
     ///     <see cref="IReviewStore.GetFileContentAsync"/> to load the bytes of one file.
     /// </remarks>
     public byte[] Content { get; init; } = [];
 
     /// <summary>
-    ///     Gets the size of the file in bytes.
+    ///     Gets the size of the head content in bytes; zero for a deleted file.
     /// </summary>
     public long Size { get; init; }
 
     /// <summary>
-    ///     Gets the SHA-256 hash of the bytes as 64 lowercase hexadecimal characters.
+    ///     Gets the SHA-256 hash of the head content as 64 lowercase hexadecimal characters; empty for a deleted file.
     /// </summary>
     public string Sha256 { get; init; } = string.Empty;
+
+    /// <summary>
+    ///     Gets the kind of change of the file; uploaded files are <see cref="ChangeKind.Added"/>.
+    /// </summary>
+    public ChangeKind ChangeKind { get; init; } = ChangeKind.Added;
+
+    /// <summary>
+    ///     Gets the exact bytes of the file at the baseline, or <c>null</c> when it had none (an added or uploaded file).
+    /// </summary>
+    /// <remarks>
+    ///     Never loaded with the file metadata; use <see cref="IReviewStore.GetBaselineContentAsync"/> to read it.
+    /// </remarks>
+    public byte[]? BaselineContent { get; init; }
+
+    /// <summary>
+    ///     Gets the size of the baseline content in bytes, or <c>null</c> when the file had none.
+    /// </summary>
+    public long? BaselineSize { get; init; }
+
+    /// <summary>
+    ///     Gets the SHA-256 hash of the baseline content as 64 lowercase hexadecimal characters, or <c>null</c> when the file had none.
+    /// </summary>
+    public string? BaselineSha256 { get; init; }
 }

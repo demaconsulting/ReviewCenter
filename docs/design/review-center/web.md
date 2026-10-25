@@ -213,6 +213,20 @@ Upload paths are the file name only. A browser file input does not expose folder
 the same name are therefore refused by Core as a duplicate path. Directory-structured uploads are
 a later feature.
 
+#### Reviews from a repository
+
+`ProjectPage` offers two sources for a new review: "Upload files" (the default) and "From a repository". The second
+shows a drop-down of the enabled repositories (by name only; `RepositoryService.ListEnabledAsync` returns a summary
+that has no location and no token), a head revision, an optional baseline revision, and the selection (one pattern
+per line, default `**/*`). The page passes the values to `ReviewService.CreateFromRepositoryAsync` and shows every
+refusal, among them "Nothing to review: no files matching the selection changed between X and Y", in the form with the
+values kept. Skipped symbolic links and submodules are listed once before the review is opened, since they are not
+stored. `ReviewPage` shows the change kind of each file, the repository, both commits and the selection in the
+details, and for a modified file a plain Head / Baseline toggle: Head is the numbered view that takes comments,
+Baseline is the frozen baseline, read-only. A deleted file shows its baseline and takes whole-file comments only.
+There is no diff highlighting. Everything the page shows comes from the frozen copies in the store, never from the
+repository.
+
 #### Slots and signatures
 
 The review page shows the reviewer slots of a review and lets a reviewer sign. The page contains no signing rules:

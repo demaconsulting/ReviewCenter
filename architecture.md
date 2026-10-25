@@ -285,10 +285,20 @@ The architecture above is the target design. Only the first two slices are imple
 - **Implemented, slice 7a-1 (git content source)**: the repository registry (`RepositoryService`, admin-only
   `/repositories` page, write-only encrypted tokens, disable and enable only), the file selection patterns
   (`SelectionMatcher`), revision validation (`RevisionValidator`), and the ContentSources subsystem (`GitRunner`,
-  `GitSource`, `CredentialProtector`), which reads repositories through the installed git into bare mirrors. Reviews do
-  not use it yet. The Data Protection key ring and the git cache are kept beside the database by default.
-- **Planned and deferred**: Api, Evidence, Messaging, the review lifecycle beyond `Draft`, creating reviews from a
-  repository, and the rest of Core and Storage. They have no code, requirements,
+  `GitSource`, `CredentialProtector`), which reads repositories through the installed git into bare mirrors. The Data
+  Protection key ring and the git cache are kept beside the database by
+  default.
+- **Implemented, slice 7a (reviews from a git repository)**: a review can be created from the files that changed between
+  an optional baseline revision and a head revision of a registered repository and match a selection. The changed
+  files (path, change kind, baseline and head content), both resolved commits, and the selection are frozen in the
+  database, so nothing is read from the repository afterwards; a selection with no changed file is refused
+  (`NothingToReview`). The fingerprint covers the files at the head; the record digest is now version 2 and binds the
+  source, the selection, and every change; line comments are refused on deleted files. The project page has an upload
+  or repository source choice, and the review page shows the change kind of each file and a Head or Baseline view of a
+  modified file (no diff highlighting). The 7a-1 note that reviews do not use the repository registry no longer
+  applies. Development databases created before this slice must be recreated (no migrations).
+- **Planned and deferred**: Api, Evidence, Messaging, the review lifecycle beyond `Draft`, and the rest of Core and
+  Storage. They have no code, requirements,
   design documents, or verification documents yet, so the SysML2 model and the design documentation describe the
   implemented items only and are deliberately partial.
 - **Pipeline**: the CI/release pipeline builds net10.0 only and publishes the self-contained win-x64 and linux-x64

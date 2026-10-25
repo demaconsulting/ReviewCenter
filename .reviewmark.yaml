@@ -377,6 +377,7 @@ reviews:
       - "src/**/Web/ProjectPage.razor"
       - "src/**/Web/ProjectPage.razor.cs"
       - "test/**/Web/ProjectPageTests.cs"
+      - "test/**/Web/ProjectPageRepositoryTests.cs"
 
   - id: ReviewCenter-Web-ReviewPage
     title: Review of ReviewCenter ReviewPage unit implementation
@@ -392,6 +393,7 @@ reviews:
       - "src/**/Web/ReviewPage.razor"
       - "src/**/Web/ReviewPage.razor.cs"
       - "test/**/Web/ReviewPageTests.cs"
+      - "test/**/Web/ReviewPageRepositoryTests.cs"
 
   - id: ReviewCenter-Web-ChecklistPage
     title: Review of ReviewCenter ChecklistPage unit implementation
@@ -565,7 +567,10 @@ reviews:
       - "src/DemaConsulting.ReviewCenter.Core/ReviewFile.cs"
       - "src/DemaConsulting.ReviewCenter.Core/ReviewState.cs"
       - "src/DemaConsulting.ReviewCenter.Core/UploadedFile.cs"
+      - "src/DemaConsulting.ReviewCenter.Core/RepositoryReviewResult.cs"
       - "test/**/Core/ReviewServiceTests.cs"
+      - "test/**/Core/ReviewServiceRepositoryTests.cs"
+      - "test/**/ContentSources/ReviewFromGitTests.cs"
       - "test/**/Core/AuditEventTests.cs"
 
   - id: ReviewCenter-Core-ThreadService
@@ -785,6 +790,7 @@ reviews:
       - "docs/verification/review-center/storage/review-store.md"
       - "src/**/Storage/ReviewStore.cs"
       - "test/**/Storage/ReviewStoreTests.cs"
+      - "test/**/Storage/ReviewStoreRepositoryTests.cs"
       - "test/**/Storage/ReviewStoreSigningTests.cs"
 
   - id: ReviewCenter-Storage-UserStore

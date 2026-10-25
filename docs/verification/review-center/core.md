@@ -26,7 +26,7 @@ N/A - standard test environment.
   the known answer for the files, every file keeps its own size and SHA-256 hash, and file bytes are returned
   exactly.
 - The same file contents give the same fingerprint when submitted in another order or under other names.
-- Every domain rule (all forty-six values of `DomainRule`) is reported as a domain rule exception that names it, and
+- Every domain rule (all forty-seven values of `DomainRule`) is reported as a domain rule exception that names it, and
   nothing is stored. The four rules that only a real git can raise (`RevisionNotFound`, `GitUnavailable`,
   `GitAccessFailed`, and `GitTimeout`) are exercised in the `ContentSources` subsystem tests instead.
 - A thread started on a file, with replies, resolved and reopened, is read back with its comments in posting order.
@@ -43,6 +43,10 @@ N/A - standard test environment.
 - A repository registry that only administrators can change: names, locations, and credentials are validated, tokens are
   stored encrypted and are never part of a listed registration, and every change is audited without a secret (see the
   unit tests of `RepositoryService`).
+- A review created from a repository freezes its source and the content of every changed file; a selection with no
+  changed file is refused with `NothingToReview` and stores nothing; the fingerprint covers the files at the head;
+  the record digest differs when the source, the selection, or any change differs; and a later change of the
+  repository does not change the stored review (see the unit tests of `ReviewService` and `RecordDigest`).
 
 ### Test Scenarios
 
@@ -70,7 +74,7 @@ administrator; a slot for a missing review, a slot with an unknown reviewer or o
 signed slot, a signing by a user who is not in the slot, a signing that is blocked, a wrong password at a signing, or
 a signing of a record that changed; a repository with an invalid name, location, or credential, a name already used,
 an unknown or disabled repository, or a token that cannot be decrypted; a revision that is not a safe name; and a
-selection with no valid pattern). Each
+selection with no valid pattern; and a selection that matches no changed file). Each
 fails with a `DomainRuleException` that names the rule, and the store holds only the project, review, and
 administrator created
 first, except that the git-only rules are skipped here. This scenario is tested by `CoreSubsystem_RuleViolation_IsReportedAsDomainRuleAndStoresNothing`.

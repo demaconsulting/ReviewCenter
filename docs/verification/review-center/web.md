@@ -42,6 +42,10 @@ N/A - standard test environment (temporary SQLite databases are created by the t
   the state.
 - A user with the Admin role who opens `/repositories` is shown the page of the registry; a reviewer is refused.
 - Every interactive element of every page has a `data-testid`.
+- The creation of a review from a repository (source choice, repository form, refusals, and skipped entries) and the
+  display of the change kinds, the source, and the Head / Baseline versions need a live connection, so they are
+  verified at unit level by the component tests of `ProjectPage` and `ReviewPage` (see the children of the requirement
+  `ReviewCenter-Web-RepositoryReviews` in `web.yaml`).
 
 ### Test Scenarios
 

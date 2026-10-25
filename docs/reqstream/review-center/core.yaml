@@ -237,3 +237,26 @@ sections:
           - ReviewCenter-SelectionMatcher-Compatibility
         tests:
           - CoreSubsystem_RuleViolation_IsReportedAsDomainRuleAndStoresNothing
+
+      - id: ReviewCenter-Core-RepositoryReviews
+        title: >-
+          The Core subsystem shall create a review from the files that changed in a registered git repository between
+          an optional baseline revision and a head revision and match a selection, freeze their baseline and head
+          content and the resolved commits, refuse a review that has no such file, bind the source, the selection, and
+          every change into the record digest, and accept a comment on the lines of a file only when it exists at the
+          head.
+        justification: |
+          A review of a change must keep exactly what was reviewed, and a signature must bind to it, so that neither a
+          later commit nor a different selection can leave a signature looking current.
+        children:
+          - ReviewCenter-ReviewService-FromRepository
+          - ReviewCenter-ReviewService-Frozen
+          - ReviewCenter-ReviewService-NothingToReview
+          - ReviewCenter-ReviewService-RepositoryLimits
+          - ReviewCenter-ReviewService-SkippedEntries
+          - ReviewCenter-ReviewService-RepositoryAudit
+          - ReviewCenter-RecordDigest-Source
+          - ReviewCenter-ThreadService-DeletedFile
+        tests:
+          - CoreSubsystem_RuleViolation_IsReportedAsDomainRuleAndStoresNothing
+          - ReviewService_CreateFromRepositoryAsync_Changes_FreezesFilesAndSource

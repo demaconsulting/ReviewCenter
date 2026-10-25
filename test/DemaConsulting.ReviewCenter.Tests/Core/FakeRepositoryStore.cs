@@ -200,6 +200,47 @@ internal sealed class FakeGitRepositoryProvider : IGitRepositoryProvider
     /// </summary>
     public Exception? OpenFailure { get; set; }
 
+    /// <summary>
+    ///     Gets the number of blob reads (not size queries) made so far.
+    /// </summary>
+    public int BlobReads { get; private set; }
+
+    /// <summary>
+    ///     Scripts one commit pair: the revision names, the changes and the blob contents they need.
+    /// </summary>
+    /// <param name="baselineSha">The baseline commit, or <c>null</c> for none.</param>
+    /// <param name="headSha">The head commit.</param>
+    /// <param name="changes">The changes between them, as (path, kind, baseline content, head content).</param>
+    /// <param name="skipped">The entries to report as skipped.</param>
+    public void Script(
+        string? baselineSha,
+        string headSha,
+        IEnumerable<(string Path, ChangeKind Kind, string? Baseline, string? Head)> changes,
+        params SkippedEntry[] skipped)
+    {
+        var list = new List<GitChange>();
+        foreach (var (path, kind, baseline, head) in changes)
+        {
+            string? baselineBlob = null;
+            string? headBlob = null;
+            if (baseline is not null)
+            {
+                baselineBlob = $"b-{baselineSha}-{path}";
+                Blobs[baselineBlob] = System.Text.Encoding.UTF8.GetBytes(baseline);
+            }
+
+            if (head is not null)
+            {
+                headBlob = $"h-{headSha}-{path}";
+                Blobs[headBlob] = System.Text.Encoding.UTF8.GetBytes(head);
+            }
+
+            list.Add(new GitChange(path, kind, baselineBlob, headBlob));
+        }
+
+        Changes[(baselineSha ?? string.Empty, headSha)] = new GitChangeSet(list, skipped);
+    }
+
     /// <inheritdoc />
     public Task<IGitRepository> OpenAsync(RepositoryAccess access, CancellationToken cancellationToken = default)
     {
@@ -246,6 +287,7 @@ internal sealed class FakeGitRepositoryProvider : IGitRepositoryProvider
         public Task<byte[]> ReadBlobAsync(string blobSha, long maxBytes, CancellationToken cancellationToken = default)
         {
             var bytes = owner.Blobs[blobSha];
+            owner.BlobReads++;
             return bytes.Length > maxBytes
                 ? throw new DomainRuleException(DomainRule.GitAccessFailed, "The file is too large.")
                 : Task.FromResult(bytes);

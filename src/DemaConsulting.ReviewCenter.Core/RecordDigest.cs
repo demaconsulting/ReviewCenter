@@ -32,8 +32,14 @@ namespace DemaConsulting.ReviewCenter.Core;
 ///     is built so that it never depends on storage row identities or on the order rows happen to be read
 ///     in, and so that two different records can never produce the same text:
 ///     <list type="number">
-///         <item>a version header line (<c>ReviewCenter record v1</c>; any change to this format must bump it);</item>
+///         <item>a version header line (<c>ReviewCenter record v2</c>; any change to this format must bump it);</item>
 ///         <item>the content fingerprint;</item>
+///         <item>the source of the files: <c>source upload</c> for an upload, otherwise
+///               <c>source git</c> with the repository identity, the baseline commit (or <c>-</c>), the head commit
+///               and the selection text, followed by a <c>changes</c> line and one <c>change</c> line per changed
+///               file, sorted by path: path, kind, baseline hash (or <c>-</c>) and head hash (or <c>-</c>). The
+///               repository name is not covered (it is a display snapshot, and renaming a repository must not
+///               invalidate a signature);</item>
 ///         <item>every stored checklist answer, sorted by check id: id, outcome, justification
 ///               (who answered and when are deliberately not covered, so answering the same value again does not
 ///               invalidate a signature);</item>
@@ -51,7 +57,7 @@ public static class RecordDigest
     /// <summary>
     ///     The first line of the canonical text; names the format version.
     /// </summary>
-    private const string Header = "ReviewCenter record v1";
+    private const string Header = "ReviewCenter record v2";
 
     /// <summary>
     ///     Builds the canonical text of a record.
@@ -68,6 +74,9 @@ public static class RecordDigest
             Header,
             "fingerprint " + Text(record.ContentFingerprint)
         };
+
+        // The source comes straight after the fingerprint so a signature binds to where the files came from
+        AddSource(lines, record.Source);
 
         // Answers, in check id order; the identity of the person and the time are left out on purpose
         lines.Add("answers");
@@ -101,6 +110,31 @@ public static class RecordDigest
     public static string Compute(ReviewRecord record)
     {
         return Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(Canonicalize(record))));
+    }
+
+    /// <summary>
+    ///     Writes the source block of the canonical text.
+    /// </summary>
+    /// <param name="lines">The lines written so far.</param>
+    /// <param name="source">The source of the review's files.</param>
+    private static void AddSource(List<string> lines, ReviewSource source)
+    {
+        if (source.IsUpload)
+        {
+            lines.Add("source upload");
+            return;
+        }
+
+        lines.Add(
+            $"source git {Number(source.RepositoryId)} {Text(source.BaselineSha)} {Text(source.HeadSha)} {Text(source.Selection)}");
+
+        // One line per changed file, sorted by path, so the order of storage does not matter
+        lines.Add("changes");
+        foreach (var change in source.Changes.OrderBy(c => c.Path, StringComparer.Ordinal))
+        {
+            lines.Add(
+                $"change {Text(change.Path)} {Text(change.Kind.ToString())} {Text(change.BaselineSha256)} {Text(change.HeadSha256)}");
+        }
     }
 
     /// <summary>

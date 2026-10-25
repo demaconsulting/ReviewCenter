@@ -23,6 +23,7 @@ N/A - standard test environment.
 - A range ending exactly at the last line is accepted, and a range beyond it, a range with one endpoint missing,
   a start below 1, an end before the start, a range on a binary or empty file, and a thread on an unknown file or
   review are rejected with `ThreadAnchorInvalid`.
+- A line range on a deleted file is rejected; a whole-file thread on a deleted file is accepted.
 - Blank or too long texts are rejected, and a padded text is stored trimmed.
 - A comment records the user name and the display name of the actor, and a missing actor is refused with an
   `ArgumentNullException`.
@@ -64,6 +65,15 @@ accepted. This scenario is tested by `ThreadService_StartThreadAsync_WholeFileOn
 **ThreadService_StartThreadAsync_UnknownFileOrReview_ThrowsThreadAnchorInvalid**: A thread on a path that is not in
 the review, and on a review that does not exist, is rejected with `ThreadAnchorInvalid`. This scenario is tested by
 `ThreadService_StartThreadAsync_UnknownFileOrReview_ThrowsThreadAnchorInvalid`.
+
+**ThreadService_StartThreadAsync_LineOnDeletedFile_ThrowsThreadAnchorInvalid**: A line range on a file that was
+deleted in a review from a repository is rejected with `ThreadAnchorInvalid` and the message "Deleted files accept
+whole-file comments only." This scenario is tested by
+`ThreadService_StartThreadAsync_LineOnDeletedFile_ThrowsThreadAnchorInvalid`.
+
+**ThreadService_StartThreadAsync_WholeFileOnDeletedAndLineOnModified_AreAllowed**: A whole-file thread on a deleted
+file and a line thread on a modified file are accepted. This scenario is tested by
+`ThreadService_StartThreadAsync_WholeFileOnDeletedAndLineOnModified_AreAllowed`.
 
 **ThreadService_StartThreadAsync_Actor_RecordsUsernameAndDisplayName**: A thread is started as an actor; its first
 comment holds the user name and the display name of the actor. A thread started without an actor is refused with an

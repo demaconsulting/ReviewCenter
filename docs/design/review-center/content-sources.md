@@ -4,8 +4,9 @@
 
 ### Overview
 
-The `ContentSources` subsystem reads content from outside the system. At present it reads git repositories, so that a
-later slice can create a review from the files of a repository revision, and it protects the access tokens that private
+The `ContentSources` subsystem reads content from outside the system. At present it reads git repositories, so that
+a review can be created from the files of a repository revision (the `ReviewService` of `Core` does that), and it
+protects the access tokens that private
 repositories need. It implements two contracts that the `Core` subsystem defines and holds no domain rule of its own: the
 registry of repositories, their names, and who may change them belong to `Core` and `Storage`. It contains three units:
 `GitRunner`, which runs the git command-line tool safely and reports its result; `GitSource`, which keeps a local

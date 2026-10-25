@@ -43,6 +43,10 @@ The native SQLite library must be loadable on the test platform (it is supplied 
 - A registered repository with its token flag and its disabled state, written through the service, is still present after
   the database is closed and opened again, and a disabled repository is not offered for selection.
 - An unsupported provider is refused with an error that names it, and no database is created.
+- A review from a repository, with its source and the change kind and baseline content of each file, is stored and
+  read back without file bytes in the review, and its baseline content is read on request; the scenario is verified
+  by the unit tests of `ReviewStore` on the real database (`ReviewStore_GetReviewAsync_RepositoryReview_ReturnsSourceAndKindsWithoutBytes`
+  and `ReviewStore_GetBaselineContentAsync_StoredFiles_ReturnsBaselineBytesOrNull`).
 - Every audited change is stored together with its audit entry; changes made at the same moment through different
   stores give one linear, intact chain, and the audit store offers no update or delete.
 

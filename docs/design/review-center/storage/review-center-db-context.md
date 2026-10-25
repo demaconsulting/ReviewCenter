@@ -16,10 +16,15 @@ repository registry is the one exception, see `Repositories`).
 - **Projects** (`Project`): key `Id`, assigned by the database. `Name` is required, at most 100 characters;
   `Description` is required (may be empty), at most 1000; `Created`.
 - **Reviews** (`Review`): key `ProjectId` plus `Id`. `Title` is required, at most 200; `State` is stored as text, at
-  most 32; `ContentFingerprint` is required, at most 64; `Created`. A review belongs to a project and is deleted
-  with it.
+  most 32; `ContentFingerprint` is required, at most 64; `Created`. A review from a repository also has
+  `RepositoryId` (a plain number, not a foreign key, so the review keeps its reference whatever happens to the
+  registration), `RepositoryName` (a display copy, at most the repository name limit), `BaselineSha` and `HeadSha` (at
+  most 64 characters), and `Selection` (at most `ReviewLimits.MaxSelectionLength`); all five are null for an uploaded
+  review. A review belongs to a project and is deleted with it.
 - **ReviewFiles** (`ReviewFile`): key `ProjectId`, `ReviewId`, and `Path`. `Content` is required and stored as a
-  binary column; `Sha256` is required, at most 64; `Size`. A file belongs to a review and is deleted with it.
+  binary column (empty for a deleted file); `Sha256` is required, at most 64; `Size`. `ChangeKind` is stored as text,
+  at most 32 (an uploaded file is `Added`); `BaselineContent` (binary), `BaselineSize`, and `BaselineSha256` (at most
+  64) are null when the file has no baseline. A file belongs to a review and is deleted with it.
 - **Threads** (`ReviewThread`): key `Id`, assigned by the database. `ProjectId`, `ReviewId`, and `FilePath` name
   the file the thread is about and form a relationship to that file, so the database refuses a thread for a file
   that does not exist, and a thread is deleted with its file. `StartLine` and `EndLine` are null for a thread on
@@ -98,7 +103,9 @@ holds for the tables of reviewer slots and signatures: a database created before
 them and must be deleted and created again. The same holds for the audit table: a database created before the audit
 trail does not have it and must be deleted and created again (there are no migrations). The same holds for the
 `Repositories` table: a database created before the repository registry does not have it and must be deleted and
-created again. The
+created again. The same holds for the review columns of a repository review (source columns on a review, change kind
+and baseline columns on a file): a database created before the review-from-git slice does not have them and must be
+deleted and created again (there are no migrations; the development database is simply recreated). The
 checklist keys are what makes "one answer per check" a rule of the database. The section and
 check identifiers are not related to a table of their own: they name entries inside the snapshot, and the service
 checks them.

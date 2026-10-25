@@ -59,3 +59,18 @@ sections:
           records could share a digest, and a signature could be reused for a record it never covered.
         tests:
           - RecordDigest_Compute_TextWithDelimiters_DoesNotCollide
+
+      - id: ReviewCenter-RecordDigest-Source
+        title: >-
+          The RecordDigest class shall cover the source of a review in the canonical text, as version 2 of the
+          format: the word upload for an uploaded review, and for a review from a repository the repository
+          identity, the baseline and head commit identifiers, the selection text, and every change with its path,
+          change kind, baseline hash, and head hash, and shall give a different digest when any of them changes,
+          and the same digest whatever the order of the changes.
+        justification: |
+          A signature approves a review of specific commits and files. If the source were not covered, the same
+          signature could stay current for another selection, another commit, or a changed file.
+        tests:
+          - RecordDigest_Canonicalize_GitSource_MatchesDocumentedFormat
+          - RecordDigest_Compute_SourceChange_ChangesDigest
+          - RecordDigest_Compute_ChangeOrder_SameDigest

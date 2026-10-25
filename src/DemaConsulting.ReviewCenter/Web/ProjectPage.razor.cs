@@ -42,6 +42,11 @@ namespace DemaConsulting.ReviewCenter.Web;
 public partial class ProjectPage : ComponentBase
 {
     /// <summary>
+    ///     The pattern the selection starts with: every changed file.
+    /// </summary>
+    private const string DefaultSelection = "**/*";
+
+    /// <summary>
     ///     Backing field for <see cref="InteractiveMarker"/>; flips to <c>true</c> after the first render
     ///     on a live circuit.
     /// </summary>
@@ -75,6 +80,12 @@ public partial class ProjectPage : ComponentBase
     /// </summary>
     [Inject]
     private SigningService SigningService { get; set; } = null!;
+
+    /// <summary>
+    ///     Gets or sets the repository registry, supplied by dependency injection; used only to list the enabled repositories.
+    /// </summary>
+    [Inject]
+    private RepositoryService RepositoryService { get; set; } = null!;
 
     /// <summary>
     ///     Gets or sets the authentication state of the current user, supplied by dependency injection.
@@ -129,6 +140,51 @@ public partial class ProjectPage : ComponentBase
     private string? ErrorMessage { get; set; }
 
     /// <summary>
+    ///     Gets the enabled repositories a review can be created from (name only; never location or credentials).
+    /// </summary>
+    private IReadOnlyList<RepositorySummary> Repositories { get; set; } = [];
+
+    /// <summary>
+    ///     Gets a value indicating whether the new review reads its files from a repository instead of an upload.
+    /// </summary>
+    private bool FromRepository { get; set; }
+
+    /// <summary>
+    ///     Gets or sets the identity of the chosen repository as the text of the select element; empty for none.
+    /// </summary>
+    private string RepositoryIdText { get; set; } = string.Empty;
+
+    /// <summary>
+    ///     Gets or sets the head revision typed into the form.
+    /// </summary>
+    private string HeadRevision { get; set; } = string.Empty;
+
+    /// <summary>
+    ///     Gets or sets the optional baseline revision typed into the form.
+    /// </summary>
+    private string BaselineRevision { get; set; } = string.Empty;
+
+    /// <summary>
+    ///     Gets or sets the file selection typed into the form, one pattern per line.
+    /// </summary>
+    private string Selection { get; set; } = DefaultSelection;
+
+    /// <summary>
+    ///     Gets a value indicating whether a submission is running.
+    /// </summary>
+    private bool Busy { get; set; }
+
+    /// <summary>
+    ///     Gets the review that was just created while the skipped entries are being shown, or <c>null</c>.
+    /// </summary>
+    private Review? CreatedReview { get; set; }
+
+    /// <summary>
+    ///     Gets the entries that were left out of the review that was just created.
+    /// </summary>
+    private IReadOnlyList<SkippedEntry> SkippedEntries { get; set; } = [];
+
+    /// <summary>
     ///     Gets a value indicating whether the last file selection was rejected for breaking an upload limit.
     /// </summary>
     private bool SelectionRejected { get; set; }
@@ -161,10 +217,18 @@ public partial class ProjectPage : ComponentBase
             SelectedFiles = [];
             ErrorMessage = null;
             SelectionRejected = false;
+            FromRepository = false;
+            RepositoryIdText = string.Empty;
+            HeadRevision = string.Empty;
+            BaselineRevision = string.Empty;
+            Selection = DefaultSelection;
+            CreatedReview = null;
+            SkippedEntries = [];
         }
 
         Project = await ProjectService.GetAsync(ProjectId);
         Reviews = Project is null ? [] : await ReviewService.ListAsync(ProjectId);
+        Repositories = await RepositoryService.ListEnabledAsync();
 
         // One approval lookup per review; the list of reviews of a project is short
         ApprovedReviews.Clear();
@@ -291,26 +355,83 @@ public partial class ProjectPage : ComponentBase
     private async Task CreateReviewAsync()
     {
         // A rejected selection already explained itself; do not replace that reason with "no files"
-        if (SelectionRejected)
+        if (SelectionRejected && !FromRepository)
         {
             return;
         }
 
-        Review review;
+        // A second submit while the first still runs (a fetch can take a while) would only repeat the work
+        if (Busy)
+        {
+            return;
+        }
+
+        Busy = true;
+        CreatedReview = null;
         try
         {
-            // The actor is audited; asking for it also refuses an ended sign-in state
-            var actor = await AuthenticationState.GetActorAsync();
-            review = await ReviewService.CreateDraftAsync(ProjectId, ReviewId, ReviewTitle, SelectedFiles, actor);
-        }
-        catch (DomainRuleException ex)
-        {
-            ErrorMessage = ex.Message;
-            return;
-        }
+            Review review;
+            IReadOnlyList<SkippedEntry> skipped = [];
+            try
+            {
+                // The actor is audited; asking for it also refuses an ended sign-in state
+                var actor = await AuthenticationState.GetActorAsync();
+                if (FromRepository)
+                {
+                    if (!int.TryParse(RepositoryIdText, out var repositoryId))
+                    {
+                        ErrorMessage = "Choose a repository.";
+                        return;
+                    }
 
-        // Success: show the review that was just created
+                    var result = await ReviewService.CreateFromRepositoryAsync(
+                        ProjectId,
+                        ReviewId,
+                        ReviewTitle,
+                        repositoryId,
+                        HeadRevision,
+                        BaselineRevision,
+                        Selection,
+                        actor);
+                    review = result.Review;
+                    skipped = result.Skipped;
+                }
+                else
+                {
+                    review = await ReviewService.CreateDraftAsync(ProjectId, ReviewId, ReviewTitle, SelectedFiles, actor);
+                }
+            }
+            catch (DomainRuleException ex)
+            {
+                ErrorMessage = ex.Message;
+                return;
+            }
+
+            // Success: show the review that was just created. Entries that were left out (symbolic links, submodules)
+            // are shown first, because they are not stored with the review and this is the only time to tell the creator
+            ErrorMessage = null;
+            if (skipped.Count > 0)
+            {
+                CreatedReview = review;
+                SkippedEntries = skipped;
+                return;
+            }
+
+            Navigation.NavigateTo($"/projects/{ProjectId}/reviews/{Uri.EscapeDataString(review.Id)}");
+        }
+        finally
+        {
+            Busy = false;
+        }
+    }
+
+    /// <summary>
+    ///     Chooses where the files of the new review come from.
+    /// </summary>
+    /// <param name="fromRepository"><c>true</c> to read them from a repository; <c>false</c> to upload them.</param>
+    private void ChooseSource(bool fromRepository)
+    {
+        FromRepository = fromRepository && Repositories.Count > 0;
         ErrorMessage = null;
-        Navigation.NavigateTo($"/projects/{ProjectId}/reviews/{Uri.EscapeDataString(review.Id)}");
     }
 }

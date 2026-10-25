@@ -31,7 +31,10 @@ application; the rest of the system sees only the Core store interfaces.
   its first comment in one
   transaction. An attempt to store a review whose identifier exists in the project raises a `DomainRuleException`
   for `ReviewIdDuplicate`. Comments, answers, and section decisions are stored with the display name and the user name
-  of the person who made them. The record of a review (fingerprint, checklist, section states, answers, and threads
+  of the person who made them. A review from a repository is stored with its source (repository, both commits,
+  selection) and, for every file, its change kind and frozen baseline content next to the head content; reads of file
+  lists carry only metadata, never bytes, and the baseline bytes are read on request. The record of a review
+  (fingerprint, source and changes, checklist, section states, answers, and threads
   with comments) is read as one snapshot. A signature is appended, never changed or deleted, in a transaction that
   recomputes the digest of the stored record: a digest that is not the current one raises a `DomainRuleException` for
   `RecordChanged` and stores nothing, a second signature of the same slot and digest raises one for
@@ -104,15 +107,16 @@ with migrations. This is adequate while there is no released schema to upgrade: 
 tables, and an existing database is left alone. The cost is that a database created by an earlier version is
 never altered, so a change of the schema needs a migration strategy before the first release that must keep
 data. This is a known limitation, recorded as an open decision in `architecture.md` and not yet resolved. It
-already matters six times: the tables for comment threads were added after the first schema, the tables for review
+already matters seven times: the tables for comment threads were added after the first schema, the tables for review
 checklists after those, the users table and the user name columns of comments, answers, and section decisions
-after those, the tables of reviewer slots and signatures after those, the audit table after those, and the
-`Repositories` table after that, so a database
+after those, the tables of reviewer slots and signatures after those, the audit table after those, the
+`Repositories` table after that, and the source and change columns of reviews from a repository after that, so a database
 created before them does not
 have them and the pages fail until the
 database file is deleted (or a new one is
 named) and created again. Databases created before the identity slice must be deleted and recreated, and so must
-databases created before the signature slice, before the audit trail, and before the repository registry; there is no
+databases created before the signature slice, before the audit trail, before the repository registry, and before
+reviews from a repository; there is no
 migration of their data, and no data of a released version is
 affected. A
 second limitation is that two processes starting at the same moment on a brand-new database file can collide

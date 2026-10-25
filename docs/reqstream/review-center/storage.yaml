@@ -161,3 +161,18 @@ sections:
           - ReviewCenter-DbContext-Repositories
         tests:
           - StorageSubsystem_Repositories_PersistAcrossReopen
+
+      - id: ReviewCenter-Storage-RepositoryReviews
+        title: >-
+          The Storage subsystem shall keep the source of a review from a repository and, for each file, its change kind
+          and its frozen baseline content in the database file, return them without file content in the review, and
+          return the baseline content of one file on request.
+        justification: |
+          The frozen copies replace the repository for everything that is read later, so they must be stored with the
+          review and read as cheaply as the head content.
+        children:
+          - ReviewCenter-ReviewStore-Source
+          - ReviewCenter-DbContext-Source
+        tests:
+          - ReviewStore_GetReviewAsync_RepositoryReview_ReturnsSourceAndKindsWithoutBytes
+          - ReviewStore_GetBaselineContentAsync_StoredFiles_ReturnsBaselineBytesOrNull

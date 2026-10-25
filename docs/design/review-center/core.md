@@ -4,7 +4,8 @@
 
 ### Overview
 
-The `Core` subsystem is the domain of ReviewCenter: projects, reviews of uploaded files, comment threads on
+The `Core` subsystem is the domain of ReviewCenter: projects, reviews of uploaded files or of the changes in a git
+repository, comment threads on
 those files, the review checklist, local user accounts, reviewer slots with re-authenticated signatures, the rules
 that protect them, the content fingerprint that identifies a review's files and the digest of a review record, and the
 hash-chained audit trail of everything that happens. It
@@ -23,7 +24,8 @@ domain types (`Project`, `Review`, `ReviewFile`, `ReviewState`, `UploadedFile`, 
 `ReviewSignature`, `SlotRole`, `ReviewRecord`, and `ReviewApproval`, the audit types `AuditEntry`, `AuditDraft`,
 and `AuditVerificationResult`, and the repository types `SourceRepository`, `RepositorySummary`, `NewRepository`,
 `RepositoryUpdate`, `TokenChange`, and `TokenAction`, and the git contract types `RepositoryAccess`, `GitChange`,
-`ChangeKind`, `SkippedEntry`, and `GitChangeSet`), the text and line definition
+`ChangeKind`, `SkippedEntry`, and `GitChangeSet`, and the review-source types `ReviewSource`, `ChangedFile`, and
+`RepositoryReviewResult`), the text and line definition
 (`FileText`), the limits
 (`ReviewLimits`), the rule failure type
 (`DomainRuleException` with the `DomainRule` enumeration), and the interfaces (`IReviewStore`, `IUserStore`,
@@ -38,8 +40,12 @@ used by the `Web` and `Identity` subsystems and by the `Hosting` subsystem.
 
 - *Type*: In-process .NET classes.
 - *Role*: Provider.
-- *Contract*: Create a project; list and read projects; create a draft review from uploaded files; list and
-  read reviews; read the exact bytes of one file of a review; start a comment thread on a file or a line range,
+- *Contract*: Create a project; list and read projects; create a draft review from uploaded files, or from the files
+  that changed between an optional baseline revision and a head revision of a registered repository, restricted by a
+  selection (the changes are fetched once and frozen in the review; nothing reads the repository again, and a selection
+  that matches no change is refused with `NothingToReview`); list and
+  read reviews; read the exact head bytes, and the frozen baseline bytes, of one file of a review; start a comment
+  thread on a file or a line range (a file deleted at the head takes whole-file comments only),
   reply to it, resolve and reopen it, and list the threads of a review with their comments; read the frozen
   checklist of a review with its progress, set whether a section applies, and answer a check; create a user, check a
   user name and password, list and read users, enable and disable a user, set the role of a user, and change a
@@ -140,7 +146,7 @@ by the `Hosting` subsystem to hand a registered repository to the git source.
   names are accepted.
 
 **SelectionMatcher and RevisionValidator**: Pure functions for the file patterns and the revision names that the
-review creation of a later slice uses.
+review creation from a repository uses.
 
 - *Type*: In-process static .NET classes.
 - *Role*: Provider.
@@ -167,6 +173,15 @@ needs no I/O, check that the project exists and the review identifier is free, c
 file and the fingerprint of the set, and then hand the complete review to the store. Nothing is
 stored when a rule fails. The bytes of each file are kept exactly as uploaded; no encoding or
 line-ending normalization is applied, since that would change the fingerprint.
+
+A review from a repository is created in the same pass, with the repository access in the middle: after the checks that
+need no I/O, the service opens the repository through `IGitRepositoryProvider`, resolves both revisions to commits,
+lists the changes, keeps those that match the selection, checks the limits from the reported sizes, reads both sides of
+each file, and closes the session; only then is the review stored. The review freezes the repository, both commits,
+the selection, and for every file its path, change kind, and baseline and head bytes. A deleted file has no head
+content, so it has empty head content, and it is left out of the fingerprint, which therefore equals the ReviewMark
+fingerprint of the files that exist at the head. The record digest covers the source and every change, so a signature
+binds to what the reviewer was shown.
 
 Draft is the only review state at present. The state is a closed enumeration and is stored as text so that
 states can be added without renumbering. A comment thread is `Open` or `Resolved`, stored the same way. Comments
@@ -223,6 +238,7 @@ message and keep the entered values, and there is a single, easily tested path f
 | `RevisionInvalid` | A revision name has a form that could be an option or an expression (see RevisionValidator) |
 | `RevisionNotFound` | The revision does not exist in the repository |
 | `SelectionInvalid` | The file selection is empty, has too many or too long lines, or has a pattern that is refused |
+| `NothingToReview` | No file matching the selection changed between the baseline and the head |
 | `GitUnavailable` | The server cannot run git, or the installed git is too old |
 | `GitAccessFailed` | Git cannot read the repository (denied, missing, over a size limit, or another failure) |
 | `GitTimeout` | A git operation did not finish within the configured time and was stopped |
@@ -237,8 +253,9 @@ together with the threads (see `RecordDigest`).
 
 Signing is a second kind of record beside the discussion. A review has reviewer slots, each with a primary and an
 optional alternate reviewer, and a slot is signed by one of the two after the password is entered again. A signature is
-bound to the digest of the record (the fingerprint, the answers, the sections that do not apply, and the threads with
-their comments) and is current only while that digest is unchanged. Slots and signatures are never edited into a
+bound to the digest of the record (the fingerprint, the source of the files with every change, the answers, the sections
+that do not apply, and the threads with their comments) and is current only while that digest is unchanged. Slots
+and signatures are never edited into a
 different meaning: a signed slot cannot be changed or removed, a signature is never changed or deleted, and the
 status of a review (Approved or In review) is computed from the record and the signatures each time and never stored.
 

@@ -145,6 +145,21 @@ public partial class ReviewPage : ComponentBase
     private IReadOnlyList<string>? SelectedLines { get; set; }
 
     /// <summary>
+    ///     Gets the change kind of the selected file; <see cref="ChangeKind.Added"/> for an upload.
+    /// </summary>
+    private ChangeKind SelectedKind { get; set; } = ChangeKind.Added;
+
+    /// <summary>
+    ///     Gets a value indicating whether the baseline (read-only) text of the selected file is shown instead of the head text.
+    /// </summary>
+    private bool BaselineView { get; set; }
+
+    /// <summary>
+    ///     Gets the lines of the baseline of the selected file, or <c>null</c> when it is not loaded or is binary.
+    /// </summary>
+    private IReadOnlyList<string>? BaselineLines { get; set; }
+
+    /// <summary>
     ///     Gets all threads of the review (every file), in creation order.
     /// </summary>
     private IReadOnlyList<ReviewThread> Threads { get; set; } = [];
@@ -282,6 +297,9 @@ public partial class ReviewPage : ComponentBase
         ProjectName = null;
         SelectedPath = null;
         SelectedLines = null;
+        SelectedKind = ChangeKind.Added;
+        BaselineView = false;
+        BaselineLines = null;
         Threads = [];
         Checklist = null;
         Approval = null;
@@ -377,14 +395,25 @@ public partial class ReviewPage : ComponentBase
             return;
         }
 
-        // Load the bytes of just this file
-        var path = Review.Files[index].Path;
-        var content = await ReviewService.GetFileContentAsync(ProjectId, ReviewId, path) ?? [];
+        // Load the bytes of just this file (a deleted file has no head content; its baseline is shown instead)
+        var file = Review.Files[index];
+        var path = file.Path;
+        var content = file.ChangeKind == ChangeKind.Deleted
+            ? []
+            : await ReviewService.GetFileContentAsync(ProjectId, ReviewId, path) ?? [];
 
         // Show text only when it is clean UTF-8; otherwise tell the operator it is binary
         var text = FileText.TryDecode(content);
         SelectedPath = path;
         SelectedLines = text is null ? null : FileText.SplitLines(text);
+        SelectedKind = file.ChangeKind;
+        BaselineView = false;
+        BaselineLines = null;
+        if (file.ChangeKind == ChangeKind.Deleted)
+        {
+            await ShowBaselineAsync();
+        }
+
         FocusedThreadId = null;
         ClearNewThreadForm();
         await RefreshAsync();
@@ -392,6 +421,45 @@ public partial class ReviewPage : ComponentBase
         // The code is the reviewer's task, so bring it to the top of the window
         _scrollTarget = "selected-file-path";
         _scrollBlock = "start";
+    }
+
+    /// <summary>
+    ///     Shows the head text of the selected file (the view that accepts comments).
+    /// </summary>
+    private void ShowHead()
+    {
+        BaselineView = false;
+    }
+
+    /// <summary>
+    ///     Shows the frozen baseline text of the selected file, read-only; it is loaded the first time it is needed.
+    /// </summary>
+    /// <returns>A task that completes when the baseline is loaded.</returns>
+    private async Task ShowBaselineAsync()
+    {
+        if (SelectedPath is null)
+        {
+            return;
+        }
+
+        if (BaselineLines is null)
+        {
+            var bytes = await ReviewService.GetBaselineContentAsync(ProjectId, ReviewId, SelectedPath) ?? [];
+            var text = FileText.TryDecode(bytes);
+            BaselineLines = text is null ? null : FileText.SplitLines(text);
+        }
+
+        BaselineView = true;
+    }
+
+    /// <summary>
+    ///     Gets the size shown for a file: the head size, or the baseline size for a deleted file.
+    /// </summary>
+    /// <param name="file">The file.</param>
+    /// <returns>The size in bytes.</returns>
+    private static long DisplaySize(ReviewFile file)
+    {
+        return file.ChangeKind == ChangeKind.Deleted ? file.BaselineSize ?? 0 : file.Size;
     }
 
     /// <summary>

@@ -278,6 +278,15 @@ disabled; it is no longer listed as enabled and its access data is refused. This
 reopened, which is tested by `StorageSubsystem_Repositories_PersistAcrossReopen`, and a token stays readable after a
 restart of the server, which is tested by `ServerHost_Restart_KeyRingPersisted_TokenStaysReadable`.
 
+**Review from a git repository**: A review is created from a real temporary git repository (a baseline commit and a
+head commit with an added, a modified, and a deleted file, and a symbolic link that is skipped); it holds both commits
+and the frozen head and baseline content; a further commit is then made in the repository, and the review, its file
+content, and its record digest are unchanged, while a review created afterwards sees the new commit. This scenario is
+tested by `ReviewService_CreateFromRepositoryAsync_RealGit_FreezesChangesAgainstLaterCommits`. A selection that
+matches no changed file is refused with the nothing-to-review message and nothing is created, which is tested by
+`ProjectPage_CreateForm_EmptySelection_ShowsNothingToReviewAndCreatesNothing`. The digest that binds to the source,
+the selection, and each change is tested by `RecordDigest_Compute_SourceChange_ChangesDigest`.
+
 **Persistence across restart**: A project is stored, the server is stopped and started again on the same
 database file, and a signed-in user sees the project on the projects page. This scenario is tested by
 `HostingSubsystem_Startup_DatabaseConfigured_ServesStoredProjectsAfterRestart`.

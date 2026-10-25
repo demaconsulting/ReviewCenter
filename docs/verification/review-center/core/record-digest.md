@@ -16,14 +16,16 @@ N/A - standard test environment.
 #### Acceptance Criteria
 
 - All unit tests pass with zero failures.
-- The canonical text of a record has the version line, the fingerprint, the answers, the sections that do not apply,
-  and the threads with their comments, written as the design states.
+- The canonical text of a record has the version line, the fingerprint, the source (upload, or repository with its
+  changes), the answers, the sections that do not apply, and the threads with their comments, written as the design
+  states.
 - The digest is the SHA-256 of the UTF-8 canonical text as 64 lowercase hexadecimal characters, and equals the known
-  value for the known record.
-- Changing a covered value (the fingerprint, an answer, the reason of a section, a thread, or a comment) changes the
-  digest.
-- Reordering the answers, sections, and threads, or giving them other identities, does not change the digest; a
-  different order of the comments of a thread does.
+  values for the two known records (an upload and a repository review).
+- Changing a covered value (the fingerprint, an answer, the reason of a section, a thread, a comment, the source
+  kind, the repository, a commit, the selection, or the path, kind, or hash of a change, or an added or removed
+  change) changes the digest.
+- Reordering the answers, sections, threads, and changes, or giving them other identities, does not change the
+  digest; a different order of the comments of a thread does.
 - Who answered a check, and a section that applies, do not change the digest.
 - Text that contains the delimiters of the format cannot produce the digest of another record.
 - A null record is rejected with an `ArgumentNullException` by both methods.
@@ -39,9 +41,23 @@ the length-prefixed strings, the version line, and only the section that does no
 64 lowercase hexadecimal characters and equals the SHA-256 of the UTF-8 bytes of the canonical text. This scenario is
 tested by `RecordDigest_Compute_SameRecord_IsStableSha256OfCanonicalText`.
 
-**RecordDigest_Compute_KnownRecord_MatchesKnownValue**: The record with the fingerprint `abc` and nothing else has the
-digest `9755f10e118733d548ae1037dd68b000d6d50ca8b62f53d4411693d85a3fe35a`. This scenario is tested by
+**RecordDigest_Compute_KnownRecord_MatchesKnownValue**: The upload record with the fingerprint `abc` and nothing else
+has the digest `fd4f16444ef233068c76aad7bed87b1bafd550c20a0019f576e5cdaaadb9384c`. This scenario is tested by
 `RecordDigest_Compute_KnownRecord_MatchesKnownValue`.
+
+**RecordDigest_Canonicalize_GitSource_MatchesDocumentedFormat**: A repository record whose changes are given out of
+path order gives exactly the canonical text of the design (source line with the length-prefixed commits and
+selection, the changes sorted by path, `-` for the head hash of a deleted file) and the known digest
+`7aed146fbc739a9314d432b2b45a843d61da01171ffb767b61671e6a66c2480d`. This scenario is tested by
+`RecordDigest_Canonicalize_GitSource_MatchesDocumentedFormat`.
+
+**RecordDigest_Compute_SourceChange_ChangesDigest**: A theory over a change of the source kind, the repository, the
+baseline (changed, or removed), the head, the selection, the path, kind, baseline hash, or head hash of a change, an
+added change, and a removed change; each gives a digest that differs from that of the unchanged record. This
+scenario is tested by `RecordDigest_Compute_SourceChange_ChangesDigest`.
+
+**RecordDigest_Compute_ChangeOrder_SameDigest**: The same changes in another order give the same digest. This
+scenario is tested by `RecordDigest_Compute_ChangeOrder_SameDigest`.
 
 **RecordDigest_Compute_CoveredChange_ChangesDigest**: A theory over a change of the fingerprint, the outcome or the
 justification of an answer, an added answer, a section that no longer applies, the reason of such a section, an added

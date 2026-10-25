@@ -37,6 +37,18 @@ sections:
           - ThreadService_StartThreadAsync_WholeFileOnBinaryFile_IsAllowed
           - ThreadService_StartThreadAsync_UnknownFileOrReview_ThrowsThreadAnchorInvalid
 
+      - id: ReviewCenter-ThreadService-DeletedFile
+        title: >-
+          The ThreadService class shall reject a thread anchored to lines of a file that a repository review
+          marks as Deleted, and shall accept a thread on the whole of a deleted file, and a thread on lines of a
+          modified or added file.
+        justification: |
+          A deleted file has no lines at the head, so a line range would point at nothing; the reviewer can still
+          comment on the deletion as a whole. Lines of a modified or added file exist at the head.
+        tests:
+          - ThreadService_StartThreadAsync_LineOnDeletedFile_ThrowsThreadAnchorInvalid
+          - ThreadService_StartThreadAsync_WholeFileOnDeletedAndLineOnModified_AreAllowed
+
       - id: ReviewCenter-ThreadService-Comment
         title: >-
           The ThreadService class shall take the author of a thread or reply as the signed-in actor (user name and

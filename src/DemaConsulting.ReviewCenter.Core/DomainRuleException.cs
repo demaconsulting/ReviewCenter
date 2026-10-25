@@ -174,7 +174,10 @@ public enum DomainRule
     GitTimeout,
 
     /// <summary>The stored token of a repository cannot be decrypted, for example because the key ring was lost.</summary>
-    CredentialsUnreadable
+    CredentialsUnreadable,
+
+    /// <summary>No file matching the selection changed between the two revisions, so no review is created.</summary>
+    NothingToReview
 }
 
 /// <summary>

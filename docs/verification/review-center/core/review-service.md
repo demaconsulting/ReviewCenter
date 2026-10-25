@@ -23,6 +23,12 @@ N/A - standard test environment.
 - Every limit is accepted at its value and rejected above it.
 - A review can be read back with its files, listed, and its file content read; the content of a missing file or
   review is null.
+- A review from a repository freezes the repository, both commits, the selection, and for every changed file the
+  path, the change kind, and the baseline and head bytes; the fingerprint covers the head files only.
+- A selection that matches no change is refused with `NothingToReview` and stores nothing; the selection, the
+  limits, and the skipped entries are honored as designed.
+- Later changes of the repository do not change the stored review.
+- The audit entry of a repository review names the repository, the commits, the counts, and the fingerprint.
 
 #### Test Scenarios
 
@@ -106,3 +112,66 @@ the audit entry `review.created` is recorded with the review title, the file cou
 detail. This scenario is tested by `ReviewService_CreateDraftAsync_Review_RecordsReviewCreatedWithFingerprint`, and
 the plural wording for several files by `ReviewService_CreateDraftAsync_SeveralFiles_RecordsPluralCount`; both are
 defined in `AuditEventTests.cs`.
+
+**Reviews from a repository** are verified in `ReviewServiceRepositoryTests.cs` with the real service, a fake store,
+and a fake git provider that serves scripted changes and blobs (`FakeGitRepositoryProvider`); one test uses a real
+temporary git repository (`ReviewFromGitTests.cs`, skipped when git is not installed).
+
+**ReviewService_CreateFromRepositoryAsync_Changes_FreezesFilesAndSource**: A review is created from an added, a
+modified, and a deleted file; the review holds both commits, the selection, the repository, and for every file the
+kind and the baseline and head bytes, with the deleted file having empty head content. This scenario is tested by
+`ReviewService_CreateFromRepositoryAsync_Changes_FreezesFilesAndSource`.
+
+**ReviewService_CreateFromRepositoryAsync_Changes_FingerprintCoversHeadFilesOnly**: The fingerprint equals that of
+the added and modified files; the deleted file does not take part. This scenario is tested by
+`ReviewService_CreateFromRepositoryAsync_Changes_FingerprintCoversHeadFilesOnly`.
+
+**ReviewService_CreateFromRepositoryAsync_Selection_ChoosesFiles**: Include and exclude patterns choose which changed
+files are reviewed. This scenario is tested by `ReviewService_CreateFromRepositoryAsync_Selection_ChoosesFiles`.
+
+**ReviewService_CreateFromRepositoryAsync_SelectionOfDeletedFile_ReviewsIt**: A deleted file is matched by its path
+and reviewed. This scenario is tested by `ReviewService_CreateFromRepositoryAsync_SelectionOfDeletedFile_ReviewsIt`.
+
+**ReviewService_CreateFromRepositoryAsync_NoMatchingChange_RefusesWithNothingToReview**: A selection that matches no
+changed file is refused with `NothingToReview` and the message names the baseline and the head; no review is stored.
+This scenario is tested by `ReviewService_CreateFromRepositoryAsync_NoMatchingChange_RefusesWithNothingToReview`, and
+the wording without a baseline by `ReviewService_CreateFromRepositoryAsync_NoBaselineNoMatch_NamesBeginningOfHistory`.
+
+**ReviewService_CreateFromRepositoryAsync_BlankBaseline_ReviewsAllHeadFilesAsAdded**: A null or blank baseline
+reviews every file at the head as added. This scenario is tested by
+`ReviewService_CreateFromRepositoryAsync_BlankBaseline_ReviewsAllHeadFilesAsAdded`.
+
+**ReviewService_CreateFromRepositoryAsync_SkippedEntries_ReturnedAndCounted**: Skipped symbolic links and submodules
+that match the selection are returned in the result and counted in the audit. This scenario is tested by
+`ReviewService_CreateFromRepositoryAsync_SkippedEntries_ReturnedAndCounted`.
+
+**ReviewService_CreateFromRepositoryAsync_Changes_AuditDetailDescribesSource**: The `review.created` entry names the
+repository, both commits, the counts, and the fingerprint. This scenario is tested by
+`ReviewService_CreateFromRepositoryAsync_Changes_AuditDetailDescribesSource`.
+
+**ReviewService_CreateFromRepositoryAsync_RepositoryChangesLater_ReviewIsUnaffected**: After the review is created
+the fake repository changes; the stored files, the fingerprint, and the record digest are the same, and nothing
+reads the repository again. This scenario is tested by
+`ReviewService_CreateFromRepositoryAsync_RepositoryChangesLater_ReviewIsUnaffected`, and with a real git repository
+(a further commit after the creation) by
+`ReviewService_CreateFromRepositoryAsync_RealGit_FreezesChangesAgainstLaterCommits`.
+
+**ReviewService_CreateFromRepositoryAsync_FileTooLarge_RefusedBeforeReading**: A baseline or head blob over the
+per-file limit is refused before any blob is read. This scenario is tested by
+`ReviewService_CreateFromRepositoryAsync_FileTooLarge_RefusedBeforeReading`, the total limit by
+`ReviewService_CreateFromRepositoryAsync_TotalTooLarge_RefusedBeforeReading`, and the file count by
+`ReviewService_CreateFromRepositoryAsync_TooManyFiles_Refused`.
+
+**ReviewService_CreateFromRepositoryAsync_BadRequests_AreRefusedWithTheirRule**: A disabled or unknown repository, an
+unknown or invalid revision, an unusable selection, and a bad identifier are each refused with their rule
+(`RepositoryDisabled`, `RepositoryNotFound`, `RevisionNotFound`, `RevisionInvalid`, `SelectionInvalid`,
+`ReviewIdInvalid`). This scenario is tested by
+`ReviewService_CreateFromRepositoryAsync_BadRequests_AreRefusedWithTheirRule`; a git failure is passed on
+(`ReviewService_CreateFromRepositoryAsync_GitFailure_IsPassedOn`), a duplicate identifier or unknown project is
+refused before the repository is opened
+(`ReviewService_CreateFromRepositoryAsync_DuplicateIdOrUnknownProject_RefusedBeforeOpening`), and a service built
+without repositories throws (`ReviewService_CreateFromRepositoryAsync_WithoutRepositories_Throws`).
+
+**ReviewService_CreateFromRepositoryAsync_SameFilesOtherSource_ChangesDigest**: Two reviews with the same head files
+but another selection text, head commit, or repository have different record digests. This scenario is tested by
+`ReviewService_CreateFromRepositoryAsync_SameFilesOtherSource_ChangesDigest`.

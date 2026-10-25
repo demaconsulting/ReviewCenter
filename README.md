@@ -14,14 +14,16 @@ comments on code blocks and files, project-specific pass/fail/N/A checklists, pr
 reviewers, and re-authenticated electronic sign-off.
 
 The `serve` verb runs ReviewCenter as an ASP.NET Core Blazor Server web application with sign-in, a home page, a
-health endpoint, projects, draft reviews made from uploaded files, threaded review comments on those files, a
+health endpoint, projects, draft reviews made from uploaded files or from the changes in a registered git repository,
+threaded review comments on those files, a
 checklist for each review, reviewer slots with re-authenticated signatures, and a hash-chained audit trail. Every
 comment, checklist answer, and signature is recorded under the signed-in user. Review states beyond Draft are still
 under development.
 
-> **Warning: databases created by an earlier build must be recreated.** The repository registry adds a table that an
-> earlier development database does not have, and the database is created by `EnsureCreated` without migrations. Delete
-> the old database file before starting this version (development databases only). The server also keeps a Data
+> **Warning: databases created by an earlier build must be recreated.** Reviews from a git repository add columns to
+> the review tables that an earlier development database does not have, and the database is created by `EnsureCreated`
+> without migrations. Delete the old database file before starting this version (development databases only). The
+> server also keeps a Data
 > Protection key ring in a `keys` folder beside the database (see
 > [Repositories and Credentials](#repositories-and-credentials)); starting this version once signs everybody out,
 > because the cookie keys now persist in that folder.
@@ -38,10 +40,20 @@ The current release provides:
   creates users, enables and disables them, changes roles, and sets passwords at `/users`; the first administrator
   is created with the `user add` command (see [Users and Sign-in](#users-and-sign-in))
 - **Projects**: create projects and list them at `/projects`; each project has its own page at `/projects/{id}`
-- **Draft Reviews**: create a review in a project by uploading a set of files; the review page shows the files and
+- **Draft Reviews**: create a review in a project by uploading a set of files, or from a registered git
+  repository; the review page shows the files and
   lets you read each file's content as numbered lines; a collapsed Details section holds the review id, state, the
   SHA-256 hash of each file, and a content fingerprint that is calculated exactly as the
   [ReviewMark][link-reviewmark] tool calculates it
+- **Reviews from a Repository**: on the project page choose **From a repository**, pick an enabled repository by
+  name, and enter a head revision, an optional baseline revision, and a selection (patterns, one per line, `!` to
+  exclude, default `**/*`). The review covers the files that changed between the baseline and the head and match the
+  selection; if none does, no review is created and you are told so. The changed files, their baseline and head
+  content, the two commits, and the selection are copied into the database when the review is created, so later
+  commits do not change the review. The review page shows each file as Added, Modified, or Deleted; a modified file
+  can be read as **Head** (where comments are made) or as a read-only **Baseline**. There is no diff highlighting.
+  A signature binds the repository, both commits, the selection, and every change (see
+  [Reviews from a Repository](#reviews-from-a-repository))
 - **Review Comments**: on the review page, start a comment thread on a whole file or on a line range, reply to it,
   and mark it resolved or reopen it; the author is the signed-in user; a next-step line says what is left to do, a
   thread index of all files (open by default, or all, or resolved) jumps to the thread's lines, resolved threads are
@@ -70,8 +82,9 @@ The current release provides:
   only through the environment of the git process; a repository can be disabled and enabled but not deleted; ordinary
   users can only see the names of enabled repositories. ReviewCenter reads repositories with the installed `git`
   (on the `PATH`), into a bare mirror cache, and can validate a revision, list the files changed between two
-  revisions, and read a file with the same size limits as an upload; review creation from a repository follows in a
-  later release (see [Repositories and Credentials](#repositories-and-credentials))
+  revisions, and read a file with the same size limits as an upload; reviews are created from a repository (see
+  [Reviews from a Repository](#reviews-from-a-repository) and
+  [Repositories and Credentials](#repositories-and-credentials))
 - **Persistent Storage**: users, projects, reviews, the uploaded file contents, the comment threads, the
   checklists, the reviewer slots and signatures, and the audit trail are kept in a SQLite database file
   (default `reviewcenter.db` in the per-user application data folder, see
@@ -252,7 +265,10 @@ A reviewer signs a slot, as primary or as alternate, by entering their own passw
 button. A signature records who signed, in which role, when, the text "I have reviewed this record and approve it.",
 and a digest of the record at that moment. The digest covers the content fingerprint of the files, every checklist
 answer and justification, every section marked not applicable with its reason, and every comment thread with its
-comments. It does not cover who answered a check or when. A wrong password at a signature counts toward the same
+comments. For a review from a repository it also covers the repository, the baseline and head commits, the selection,
+and every changed file with its change kind and the hashes of its baseline and head content (see
+[Reviews from a Repository](#reviews-from-a-repository)). It does not cover who answered a check or when. A wrong
+password at a signature counts toward the same
 lockout as a wrong password at sign-in.
 
 A review can be signed only when it has a checklist, every check of an applicable section is answered, no such check
@@ -352,6 +368,38 @@ character. Matching is case-sensitive.
 > unreadable and an administrator must enter the tokens again. The server checks at start that the folder can be
 > written and refuses to start with a clear message if it cannot.
 
+## Reviews from a Repository
+
+On the project page, choose **From a repository** instead of **Upload files**. Pick one of the enabled repositories
+by name (you never see its location), enter the **head revision** (a branch, a tag, or a commit), optionally a
+**baseline revision**, and a **selection**. Without a baseline, every file of the head that matches the selection is
+reviewed as Added.
+
+The selection is a list of patterns, one per line, with the same syntax as the ReviewMark file lists: `*` stays in one
+folder, `**` spans folders, `?` matches one character, a line that starts with `!` excludes, and matching is
+case-sensitive. The default is `**/*`. For example, `src/**/*.cs` followed by `!src/**/Generated/**` reviews the C#
+files below `src` except those in `Generated` folders. Unlike ReviewMark, the patterns are applied to the files that
+**changed** between the two revisions, not to every file of the head.
+
+On submit, the server fetches the repository, resolves both revisions to commits, and keeps in the database, for
+every changed file that matches, its path, its change kind (Added, Modified, or Deleted), and its baseline and head
+content. Nothing is read from the repository afterwards, so later commits, a force push, or a disabled repository
+change nothing in the review. If no changed file matches, the review is not created and you are told
+"Nothing to review: no files matching the selection changed between X and Y". The size limits are those of an
+upload (200 files, 2 MiB per file, 20 MiB per review), counted over both versions. Symbolic links and submodules are
+not reviewed; those that match the selection are listed once after the review is created and are counted in the audit
+entry.
+
+The review page shows the change kind of every file. A modified file can be read as **Head** (the numbered lines
+with their comments) or as **Baseline** (read-only). A deleted file shows its baseline content, and only
+whole-file comments can be made on it. Comments are made in the Head view only; there is no diff highlighting. The
+content fingerprint covers the files that exist at the head (Added and Modified), calculated as ReviewMark does. The
+Details section shows the repository name, the two commit SHAs, and the selection.
+
+The record digest of a review from a repository covers the repository, the baseline and head commits, the selection,
+and every change with the hashes of its baseline and head content, so a signature binds to exactly what was
+selected. The digest has a new format; a database from an earlier build cannot be used and must be recreated.
+
 ## Data Location and Database Settings
 
 ReviewCenter keeps its data in one SQLite database file, which is created (with its folder and tables) on first
@@ -410,8 +458,12 @@ non-zero exit code.
 - **Comments are not live**: comments posted by other people appear when you reload the page or take an action on it.
 - **Upload limits**: at most 200 files per review, 2 MiB per file, and 20 MiB per review. Only the file name of each
   uploaded file is kept, so two files with the same name cannot be in one review.
-- **Repositories are not used by reviews yet**: this release registers repositories and reads them through git, but
-  reviews are still made from uploaded files. There is no Linux or Windows secret store for the key ring, no
+- **Repository review limits**: a review from a repository has the same limits as an upload, counted over the baseline
+  and head content of the changed files. Symbolic links and submodules are not reviewed; the ones that match the
+  selection are listed once when the review is created and counted in the audit entry. `HEAD~1`-style revisions
+  are not supported; use a branch, a tag, or a commit.
+- **Repositories**: there is no Linux or Windows secret store for the key
+  ring, no
   credential helper or SSH key support, and no repository deletion.
 - **No database migrations**: the database tables are created when the database file is new; a later release that
   changes the tables will need a migration step. A database file created by an earlier version, before users,
@@ -490,7 +542,6 @@ Generated documentation includes:
 
 Planned but not yet implemented:
 
-- Creating reviews from a repository revision and its changed files
 - The remaining review features of the ReviewCenter web service: review states beyond Draft
 - External anchoring, export, and retention of the audit trail
 - Password reset, multi-factor sign-in, and external identity providers

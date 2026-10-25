@@ -271,3 +271,22 @@ sections:
         tests:
           - SignIn_RepositoriesPage_ReviewerAndAdmin_OnlyAdminIsAllowed
           - RepositoriesPage_CreateForm_WithToken_StoresItWriteOnlyAndClearsFields
+
+      - id: ReviewCenter-Web-RepositoryReviews
+        title: >-
+          The Web subsystem shall let a user create a review from a git repository on the project page, choosing among
+          the enabled repositories by name, with a head revision, an optional baseline revision, and a selection, show
+          the reason when it cannot be created, and show on the review page the change kind of each file, the source,
+          and for a modified file a choice between the Head version and a read-only Baseline version.
+        justification: |
+          Reviewing a change means seeing what it replaces. The page keeps comments on the head version, offers no
+          highlighting of differences, and never shows how the server reaches the repository.
+        children:
+          - ReviewCenter-ProjectPage-SourceChoice
+          - ReviewCenter-ProjectPage-RepositoryForm
+          - ReviewCenter-ProjectPage-RepositoryError
+          - ReviewCenter-ReviewPage-Source
+          - ReviewCenter-ReviewPage-Versions
+        tests:
+          - ProjectPage_CreateForm_FromRepository_CreatesReviewWithSourceAndNavigates
+          - ReviewPage_FileSelect_ModifiedFile_TogglesBetweenHeadAndReadOnlyBaseline

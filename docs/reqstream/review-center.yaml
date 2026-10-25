@@ -575,3 +575,23 @@ sections:
         tests:
           - CredentialProtector_ProtectUnprotect_RoundTripsAndHidesToken
           - ServerHost_Restart_KeyRingPersisted_TokenStaysReadable
+
+      - id: ReviewCenter-System-GitReviews
+        title: >-
+          The tool shall create a review from the files that changed between an optional baseline revision and a head
+          revision of a registered git repository and match a selection, refuse to create it when no file matches,
+          keep the content of the changed files and the resolved commits unchanged in the review whatever happens to
+          the repository later, show each file's change kind and, for a modified file, the Head and Baseline versions,
+          and bind the repository, the commits, the selection, and every change into the digest that a signature
+          covers.
+        tags: [system]
+        justification: |
+          The product exists to review changes to source code. A review that followed the repository, or a signature
+          that did not cover what was selected, would not be evidence of what was approved.
+        children:
+          - ReviewCenter-Core-RepositoryReviews
+          - ReviewCenter-Storage-RepositoryReviews
+          - ReviewCenter-Web-RepositoryReviews
+        tests:
+          - ReviewService_CreateFromRepositoryAsync_RealGit_FreezesChangesAgainstLaterCommits
+          - ProjectPage_CreateForm_EmptySelection_ShowsNothingToReviewAndCreatesNothing

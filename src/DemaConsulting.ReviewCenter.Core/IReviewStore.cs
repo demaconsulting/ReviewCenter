@@ -117,6 +117,20 @@ public interface IReviewStore
         CancellationToken cancellationToken = default);
 
     /// <summary>
+    ///     Reads the exact baseline bytes of one file of a repository review.
+    /// </summary>
+    /// <param name="projectId">The project identity.</param>
+    /// <param name="reviewId">The review identifier.</param>
+    /// <param name="path">The file path within the review.</param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <returns>The frozen baseline bytes, or <c>null</c> when the file does not exist or has no baseline content (an added or uploaded file).</returns>
+    Task<byte[]?> GetBaselineContentAsync(
+        int projectId,
+        string reviewId,
+        string path,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
     ///     Stores a new thread together with its first comment and assigns their identities.
     /// </summary>
     /// <param name="thread">

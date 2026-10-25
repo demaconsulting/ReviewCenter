@@ -146,7 +146,8 @@ public class CoreSubsystemTests
         DomainRule.RepositoryDisabled,
         DomainRule.CredentialsUnreadable,
         DomainRule.RevisionInvalid,
-        DomainRule.SelectionInvalid
+        DomainRule.SelectionInvalid,
+        DomainRule.NothingToReview
     ];
 
     /// <summary>
@@ -268,6 +269,18 @@ public class CoreSubsystemTests
                 return;
             case DomainRule.RevisionInvalid:
                 RevisionValidator.Validate("--upload-pack=x");
+                return;
+            case DomainRule.NothingToReview:
+                // A repository whose only change is outside the selection
+                var clock = new FixedTimeProvider(_now);
+                var reviewStore = new FakeReviewStore();
+                var project = await new ProjectService(reviewStore, clock).CreateAsync("P", null, cancellationToken);
+                var repository = await service.CreateAsync("repo", location, null, null, actor, cancellationToken);
+                var git = new FakeGitRepositoryProvider();
+                git.Revisions["main"] = "h1";
+                git.Script(null, "h1", [("docs/a.md", ChangeKind.Added, null, "x")]);
+                await new ReviewService(reviewStore, clock, service, git).CreateFromRepositoryAsync(
+                    project.Id, "rev-1", "T", repository.Id, "main", null, "src/**", actor, cancellationToken);
                 return;
             default:
                 SelectionMatcher.Parse(string.Empty);

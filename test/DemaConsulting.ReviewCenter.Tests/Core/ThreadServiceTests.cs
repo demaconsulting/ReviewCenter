@@ -58,6 +58,77 @@ public class ThreadServiceTests
     }
 
     /// <summary>
+    ///     Creates a store with a project and a repository review holding a modified and a deleted file, and a
+    ///     thread service over it.
+    /// </summary>
+    /// <returns>The thread service and the project id; the review is <c>rev-1</c>, the files <c>mod.txt</c> and <c>gone.txt</c>.</returns>
+    private static async Task<(ThreadService Service, int ProjectId)> CreateRepositoryReviewAsync()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var clock = new FixedTimeProvider(_now);
+        var users = new UserService(new FakeUserStore(), new FakePasswordHasher(), clock);
+        await users.CreateAsync("adm", "Adm", UserRole.Admin, "correct horse battery", cancellationToken);
+        var repositories = new RepositoryService(new FakeRepositoryStore(), new FakeCredentialProtector(), users, clock);
+        var repository = await repositories.CreateAsync(
+            "repo", "https://example.com/r.git", null, null, new Actor("adm", "Adm"), cancellationToken);
+        var git = new FakeGitRepositoryProvider();
+        git.Revisions["main"] = "h1";
+        git.Script(
+            null,
+            "h1",
+            [
+                ("gone.txt", ChangeKind.Deleted, "x\ny\n", null),
+                ("mod.txt", ChangeKind.Modified, "a\n", "one\ntwo\n")
+            ]);
+        var store = new FakeReviewStore();
+        var project = await new ProjectService(store, clock).CreateAsync("Apollo", null, cancellationToken);
+        await new ReviewService(store, clock, repositories, git).CreateFromRepositoryAsync(
+            project.Id, "rev-1", "First", repository.Id, "main", null, "**/*", new Actor("adm", "Adm"), cancellationToken);
+        return (new ThreadService(store, clock), project.Id);
+    }
+
+    /// <summary>
+    ///     Test that a comment on a deleted file must be whole-file: a line anchor is refused, no thread is stored.
+    /// </summary>
+    [Fact]
+    public async Task ThreadService_StartThreadAsync_LineOnDeletedFile_ThrowsThreadAnchorInvalid()
+    {
+        // Arrange: a repository review with a deleted file
+        var (service, projectId) = await CreateRepositoryReviewAsync();
+        var cancellationToken = TestContext.Current.CancellationToken;
+
+        // Act: anchor a comment to a line of the deleted file
+        var ex = await Assert.ThrowsAsync<DomainRuleException>(() => service.StartThreadAsync(
+            projectId, "rev-1", "gone.txt", 1, 1, TestActors.Ann, "Why?", cancellationToken));
+
+        // Assert: refused with the documented reason, and no thread exists
+        Assert.Equal(DomainRule.ThreadAnchorInvalid, ex.Rule);
+        Assert.Equal("Deleted files accept whole-file comments only.", ex.Message);
+        Assert.Empty(await service.ListAsync(projectId, "rev-1", cancellationToken));
+    }
+
+    /// <summary>
+    ///     Test that a whole-file comment on a deleted file is accepted, and a line comment on a modified file too.
+    /// </summary>
+    [Fact]
+    public async Task ThreadService_StartThreadAsync_WholeFileOnDeletedAndLineOnModified_AreAllowed()
+    {
+        // Arrange: a repository review with a deleted and a modified file
+        var (service, projectId) = await CreateRepositoryReviewAsync();
+        var cancellationToken = TestContext.Current.CancellationToken;
+
+        // Act: a whole-file comment on the deleted file and a line comment on the modified file
+        var whole = await service.StartThreadAsync(
+            projectId, "rev-1", "gone.txt", null, null, TestActors.Ann, "Please keep", cancellationToken);
+        var line = await service.StartThreadAsync(
+            projectId, "rev-1", "mod.txt", 2, 2, TestActors.Ann, "Head line", cancellationToken);
+
+        // Assert: both are stored with their anchors
+        Assert.Null(whole.StartLine);
+        Assert.Equal(2, line.StartLine);
+    }
+
+    /// <summary>
     ///     Test that a whole-file thread is stored open, with the clock time and its first comment.
     /// </summary>
     [Fact]

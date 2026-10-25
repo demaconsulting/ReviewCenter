@@ -3,7 +3,8 @@
 #### Verification Approach
 
 `ReviewStore` is verified with unit tests defined in `ReviewStoreTests.cs` (projects, reviews, threads, and
-checklists) and `ReviewStoreSigningTests.cs` (reviewer slots, the record, and signatures). The tests use the real
+checklists), `ReviewStoreSigningTests.cs` (reviewer slots, the record, and signatures), and
+`ReviewStoreRepositoryTests.cs` (reviews from a repository). The tests use the real
 store over a real
 SQLite database file that each test class instance creates in a private temporary folder and deletes afterward.
 Real SQLite is used because ordering, keys, constraints, transactions, and binary content are the behavior under test.
@@ -39,6 +40,10 @@ be loadable on the test platform.
   an unknown slot, or a slot reached through another review, is reported as not found.
 - The record of a review carries its fingerprint, section states, answers, and threads with their comments in posting
   order, changes when a comment is added, and is none for an unknown review.
+- A review from a repository is stored and read back with its repository, commits, selection, and for every file the
+  change kind and baseline size and hash, without loading any file bytes; the baseline bytes are read on request and
+  are none for a file without a baseline; its record carries the source and one change per file; an uploaded review
+  has the upload source.
 - A signature is stored with every value and read back; a digest that is not the digest of the stored record, whether
   made up or stale because the record changed, is refused as a changed record and nothing is stored; the same slot
   and digest a second time is refused as a signing that is not allowed; an unknown slot or review is refused; the
@@ -68,6 +73,23 @@ scenario is tested by `ReviewStore_GetRecordAsync_StoredReview_CarriesFingerprin
 
 **ReviewStore_GetRecordAsync_UnknownReview_ReturnsNull**: The record of an unknown review is requested; it is null.
 This scenario is tested by `ReviewStore_GetRecordAsync_UnknownReview_ReturnsNull`.
+
+**ReviewStore_GetReviewAsync_RepositoryReview_ReturnsSourceAndKindsWithoutBytes**: A review from a repository with an
+added, a modified, and a deleted file is stored and read back; the repository, name, commits, and selection, and for
+every file the change kind and the baseline size and hash are returned, and no file has bytes. This scenario is
+tested by `ReviewStore_GetReviewAsync_RepositoryReview_ReturnsSourceAndKindsWithoutBytes`.
+
+**ReviewStore_GetBaselineContentAsync_StoredFiles_ReturnsBaselineBytesOrNull**: The baseline bytes of a modified and a
+deleted file are returned exactly; an added file, an unknown file, and an unknown review give null. This scenario is
+tested by `ReviewStore_GetBaselineContentAsync_StoredFiles_ReturnsBaselineBytesOrNull`.
+
+**ReviewStore_GetRecordAsync_RepositoryReview_CarriesSourceAndChanges**: The record of a repository review carries the
+repository identity, both commits, the selection, and one change per file with its kind and baseline and head hashes
+(none where a side is absent). This scenario is tested by
+`ReviewStore_GetRecordAsync_RepositoryReview_CarriesSourceAndChanges`.
+
+**ReviewStore_GetRecordAsync_UploadReview_HasUploadSource**: The record of an uploaded review has the upload source
+and no changes. This scenario is tested by `ReviewStore_GetRecordAsync_UploadReview_HasUploadSource`.
 
 **ReviewStore_GetSnapshotAsync_SignedReview_CarriesRecordSlotsAndSignatures**: A review with a thread, a slot, and a
 signature is read as a snapshot; the record, the slot, and the signature come back together, and the digest of the

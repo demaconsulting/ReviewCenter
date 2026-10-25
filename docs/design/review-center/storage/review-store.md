@@ -46,12 +46,16 @@ is one transaction.
   for `ReviewIdDuplicate`. A review for a project that does not exist is not stored; the relationship constraint
   of the database refuses it.
 
-**GetReviewAsync**: Reads one review with the metadata of its files (path, size, and hash) ordered by path, and
-without file bytes, so that showing a review with large files does not load them; null when absent.
+**GetReviewAsync**: Reads one review with its source columns and the metadata of its files (path, size, hash, change
+kind, baseline size and hash) ordered by path, and without file bytes (neither head nor baseline), so that showing a
+review with large files does not load them; null when absent.
 
 **ListReviewsAsync**: Lists the reviews of a project ordered by identifier, without files.
 
 **GetFileContentAsync**: Reads the bytes of one file of a review, exactly as stored; null when absent.
+
+**GetBaselineContentAsync**: Reads the frozen baseline bytes of one file of a review; null when the review or file is
+absent or the file has no baseline.
 
 **AddThreadAsync**: Stores a thread together with its first comment in one save, which is one transaction. Fresh
 entities are copied from the argument, so identities supplied by the caller are ignored and the database assigns
@@ -86,7 +90,10 @@ was none; if two requests add the same row at the same moment, the loser of the 
 there is always exactly one row and neither request fails.
 
 **GetRecordAsync**: Reads the record that a signature covers (`ReviewRecord`): the content fingerprint, the checklist
-snapshot, the section states, the answers, and the threads with their comments; null when the review does not exist.
+snapshot, the section states, the answers, the threads with their comments, and the source (`ReviewSource`: `Upload`,
+or for a repository review the repository identity, both commits, the selection, and every change with its path,
+kind, and baseline and head hashes read from the stored columns without loading any bytes); null when the review does
+not exist.
 The work is done by a private loader that takes the context, so the same code serves this method and
 `AddSignatureAsync`. Threads and comments are ordered by identity, as for `ListThreadsAsync`. `GetRecordAsync` reads
 inside one read transaction, so the parts come from one state of the database.

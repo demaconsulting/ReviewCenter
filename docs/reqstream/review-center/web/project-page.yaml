@@ -89,6 +89,46 @@ sections:
           - ProjectPage_FileInput_TotalSizeTooLarge_ShowsErrorAndKeepsNothing
           - ProjectPage_FileInput_DeclaredSizesUnderstated_RejectsOnReceivedBytes
 
+      - id: ReviewCenter-ProjectPage-SourceChoice
+        title: >-
+          The ProjectPage unit shall let the user choose whether the files of a new review are uploaded or come
+          from a repository, with upload as the default, shall show only the controls of the chosen source, and
+          shall offer the repository source only when at least one repository is enabled, saying so otherwise.
+        justification: |
+          One form serves both sources without clutter. A repository cannot be chosen when none is registered,
+          and the user is told whom to ask.
+        tests:
+          - ProjectPage_SourceChoice_RepositoryChosen_ShowsRepositoryFieldsInsteadOfUpload
+          - ProjectPage_SourceChoice_NoEnabledRepository_DisablesRepositorySourceWithHint
+
+      - id: ReviewCenter-ProjectPage-RepositoryForm
+        title: >-
+          The ProjectPage unit shall, for the repository source, offer the enabled repositories by name only,
+          never showing a location, user name, or token, a head revision, an optional baseline revision, and a
+          selection that starts as "**/*", and shall create the review from them and show the review page, or
+          list the skipped links and submodules with a link to the review when there are any.
+        justification: |
+          Ordinary users choose from the registry the administrator maintains and must not see how it reaches
+          the repository. The creator is told once which entries were left out.
+        tests:
+          - ProjectPage_RepositorySelect_OffersOnlyEnabledRepositoriesWithoutLocationOrToken
+          - ProjectPage_CreateForm_FromRepository_CreatesReviewWithSourceAndNavigates
+          - ProjectPage_CreateForm_FromRepositoryWithoutBaseline_ReviewsAllFilesAtHead
+          - ProjectPage_CreateForm_SkippedEntries_AreShownBeforeOpeningTheReview
+
+      - id: ReviewCenter-ProjectPage-RepositoryError
+        title: >-
+          The ProjectPage unit shall show the reason when a review from a repository cannot be created, among
+          them that nothing matches the selection, that a revision does not exist, that no repository was
+          chosen, and that the repository was disabled meanwhile, and shall create nothing.
+        justification: |
+          The user can fix a wrong revision or selection only when told which one is wrong.
+        tests:
+          - ProjectPage_CreateForm_EmptySelection_ShowsNothingToReviewAndCreatesNothing
+          - ProjectPage_CreateForm_BadRevision_ShowsErrorAndCreatesNothing
+          - ProjectPage_CreateForm_NoRepositoryChosen_AsksForOne
+          - ProjectPage_CreateForm_RepositoryDisabledMeanwhile_ShowsErrorAndCreatesNothing
+
       - id: ReviewCenter-ProjectPage-Interactive
         title: >-
           The ProjectPage unit shall report that it is interactive, through a marker on its root element, once

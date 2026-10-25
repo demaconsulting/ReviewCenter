@@ -3,7 +3,7 @@
 #### Verification Approach
 
 `ReviewCenterDbContext` is verified with the unit tests of `ReviewStoreTests.cs`, `ReviewStoreSigningTests.cs`,
-`UserStoreTests.cs`, `RepositoryStoreTests.cs`, and
+`UserStoreTests.cs`, `RepositoryStoreTests.cs`, `ReviewStoreRepositoryTests.cs`, and
 `DatabaseSetupTests.cs`, which
 exercise the context through the units that use it. The context has no behavior that can be reached without a
 database, and its job is to produce the right schema, so the tests run against real SQLite database files in a
@@ -32,9 +32,17 @@ be loadable on the test platform.
   digest; the role, digest, and meaning of a signature are read back as stored.
 - The table for repositories stores every field of a registration including the encrypted token, and its unique index on
   the name ignores case.
+- The source columns of a review and the change kind and baseline columns of a file are created, stored, and read back
+  as written, with the baseline content as binary data and no value for an uploaded review.
 
 #### Test Scenarios
 
+**ReviewStore_GetReviewAsync_RepositoryReview_ReturnsSourceAndKindsWithoutBytes**: A review from a repository is
+stored and read back with its source columns and the change kind and baseline metadata of every file. This scenario
+is tested by `ReviewStore_GetReviewAsync_RepositoryReview_ReturnsSourceAndKindsWithoutBytes`, the baseline bytes by
+`ReviewStore_GetBaselineContentAsync_StoredFiles_ReturnsBaselineBytesOrNull`, and an uploaded review without these
+values by `ReviewStore_GetRecordAsync_UploadReview_HasUploadSource`; all are defined in
+`ReviewStoreRepositoryTests.cs`.
 **DatabaseSetup_EnsureCreated_MissingFolder_CreatesFolderFileAndTables**: A new database is created and the
 project, review, review file, thread, and comment tables can be queried. This scenario is tested by
 `DatabaseSetup_EnsureCreated_MissingFolder_CreatesFolderFileAndTables`.
