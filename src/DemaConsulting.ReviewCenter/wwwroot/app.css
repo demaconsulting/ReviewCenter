@@ -186,6 +186,10 @@ button:hover {
     font-size: 0.85rem;
 }
 
+.file-size .badge {
+    margin-right: 0.4rem;
+}
+
 .details {
     display: grid;
     grid-template-columns: minmax(0, 1fr);
