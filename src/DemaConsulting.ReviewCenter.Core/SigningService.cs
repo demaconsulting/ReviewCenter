@@ -104,14 +104,14 @@ public sealed class SigningService
         string reviewId,
         CancellationToken cancellationToken = default)
     {
-        var record = await _store.GetRecordAsync(projectId, reviewId, cancellationToken);
-        if (record is null)
+        // One snapshot, so the digest, the slots and the signatures compared with it describe the same state
+        var snapshot = await _store.GetSnapshotAsync(projectId, reviewId, cancellationToken);
+        if (snapshot is null)
         {
             return null;
         }
 
-        var slots = await _store.ListSlotsAsync(projectId, reviewId, cancellationToken);
-        var signatures = await _store.ListSignaturesAsync(projectId, reviewId, cancellationToken);
+        var (record, slots, signatures) = snapshot;
         var members = (await _users.ListAsync(cancellationToken)).ToDictionary(user => user.Id);
         var digest = RecordDigest.Compute(record);
 

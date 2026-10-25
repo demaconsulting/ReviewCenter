@@ -371,6 +371,10 @@ a changed answer), and "Not signed" otherwise. A review is **Approved** when it 
 signed for the current record; it goes back to In review when a change makes a signature out of date. The reviewer then
 signs the new record again; the earlier signatures stay as history.
 
+A user who is disabled while a page is open can keep acting on that page until it is reloaded. Signing still asks for
+the password, but the page does not notice that the user has been disabled; a separate follow-up will revalidate the
+sign-in state of open pages.
+
 Approved is computed each time from the record and the signatures; it is not a stored state of the review. The
 signature history is not yet protected by a hash-chained audit trail; that is planned for a later release.
 

@@ -317,6 +317,24 @@ internal sealed class FakeReviewStore : IReviewStore
     }
 
     /// <inheritdoc />
+    public async Task<ReviewSnapshot?> GetSnapshotAsync(
+        int projectId,
+        string reviewId,
+        CancellationToken cancellationToken = default)
+    {
+        var record = await GetRecordAsync(projectId, reviewId, cancellationToken);
+        if (record is null)
+        {
+            return null;
+        }
+
+        return new ReviewSnapshot(
+            record,
+            await ListSlotsAsync(projectId, reviewId, cancellationToken),
+            await ListSignaturesAsync(projectId, reviewId, cancellationToken));
+    }
+
+    /// <inheritdoc />
     public Task<IReadOnlyList<ReviewerSlot>> ListSlotsAsync(
         int projectId,
         string reviewId,

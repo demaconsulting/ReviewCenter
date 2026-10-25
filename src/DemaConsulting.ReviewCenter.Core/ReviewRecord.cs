@@ -40,3 +40,20 @@ public sealed record ReviewRecord(
     IReadOnlyList<ChecklistSectionState> SectionStates,
     IReadOnlyList<ChecklistAnswer> Answers,
     IReadOnlyList<ReviewThread> Threads);
+
+/// <summary>
+///     One consistent read of a review for the approval status: the record a signature covers, together with the
+///     reviewer slots and the signatures as they were at the same moment.
+/// </summary>
+/// <remarks>
+///     The store reads all three inside one read transaction, so the digest of <paramref name="Record"/> and the
+///     signatures compared with it belong to the same state of the review. The snapshot is an immutable value
+///     holder and is safe to share between threads.
+/// </remarks>
+/// <param name="Record">The record a signature covers.</param>
+/// <param name="Slots">The reviewer slots ordered by identity.</param>
+/// <param name="Signatures">The signatures of all slots ordered by identity.</param>
+public sealed record ReviewSnapshot(
+    ReviewRecord Record,
+    IReadOnlyList<ReviewerSlot> Slots,
+    IReadOnlyList<ReviewSignature> Signatures);

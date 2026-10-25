@@ -77,8 +77,15 @@ there is always exactly one row and neither request fails.
 **GetRecordAsync**: Reads the record that a signature covers (`ReviewRecord`): the content fingerprint, the checklist
 snapshot, the section states, the answers, and the threads with their comments; null when the review does not exist.
 The work is done by a private loader that takes the context, so the same code serves this method and
-`AddSignatureAsync`. Threads and comments are ordered by identity, as for `ListThreadsAsync`. Without a transaction the
-parts are separate reads; the consistency that a signature needs comes from the transaction of `AddSignatureAsync`.
+`AddSignatureAsync`. Threads and comments are ordered by identity, as for `ListThreadsAsync`. `GetRecordAsync` reads
+inside one read transaction, so the parts come from one state of the database.
+
+**GetSnapshotAsync**: Reads the record, the reviewer slots, and the signatures of a review (`ReviewSnapshot`) inside
+one read transaction; null when the review does not exist. The transaction is a plain read transaction (not the
+write-locking one of `AddSignatureAsync`), so a writer cannot commit between the reads and the three parts always
+describe the same state. `SigningService.GetApprovalAsync` uses it, so the digest, the blockers, and the status of the
+signatures never mix two states. Signing itself does not depend on it: `AddSignatureAsync` rechecks the digest inside
+its own transaction.
 
 **ListSlotsAsync**: Lists the reviewer slots of one review ordered by identity, which is the order they were added.
 

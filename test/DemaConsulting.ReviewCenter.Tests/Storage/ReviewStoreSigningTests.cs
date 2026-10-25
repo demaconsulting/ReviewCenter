@@ -300,6 +300,44 @@ public class ReviewStoreSigningTests
     }
 
     /// <summary>
+    ///     Test that the snapshot carries the record, the slots and the signatures of the review together.
+    /// </summary>
+    [Fact]
+    public async Task ReviewStore_GetSnapshotAsync_SignedReview_CarriesRecordSlotsAndSignatures()
+    {
+        // Arrange: a review with a thread, a slot and a signature of the current digest
+        using var db = new TestStore();
+        var projectId = await AddReviewAsync(db);
+        await AddThreadAsync(db, projectId, "First");
+        var slot = await db.Store.AddSlotAsync(NewSlot(projectId), TestContext.Current.CancellationToken);
+        var digest = await DigestAsync(db, projectId);
+        await db.Store.AddSignatureAsync(NewSignature(projectId, slot.Id, digest), TestContext.Current.CancellationToken);
+
+        // Act
+        var snapshot = await db.Store.GetSnapshotAsync(projectId, "REV-1", TestContext.Current.CancellationToken);
+
+        // Assert: the three parts belong together: the signature matches the digest of the record in the snapshot
+        Assert.NotNull(snapshot);
+        Assert.Equal(digest, RecordDigest.Compute(snapshot.Record));
+        Assert.Equal(slot.Id, snapshot.Slots.Single().Id);
+        Assert.Equal(digest, snapshot.Signatures.Single().RecordDigest);
+    }
+
+    /// <summary>
+    ///     Test that the snapshot of an unknown review is <c>null</c>.
+    /// </summary>
+    [Fact]
+    public async Task ReviewStore_GetSnapshotAsync_UnknownReview_ReturnsNull()
+    {
+        // Arrange: a project without that review
+        using var db = new TestStore();
+        var projectId = await AddReviewAsync(db);
+
+        // Act, Assert: no snapshot
+        Assert.Null(await db.Store.GetSnapshotAsync(projectId, "nope", TestContext.Current.CancellationToken));
+    }
+
+    /// <summary>
     ///     Test that a signature of the current digest is stored and read back with every value.
     /// </summary>
     [Fact]

@@ -350,7 +350,42 @@ internal sealed class ReviewStore(IDbContextFactory<ReviewCenterDbContext> facto
         CancellationToken cancellationToken = default)
     {
         await using var context = await factory.CreateDbContextAsync(cancellationToken);
+
+        // A read transaction, so the parts of the record come from one state of the database
+        await using var transaction = await context.Database.BeginTransactionAsync(
+            IsolationLevel.RepeatableRead,
+            cancellationToken);
         return await LoadRecordAsync(context, projectId, reviewId, cancellationToken);
+    }
+
+    /// <inheritdoc />
+    public async Task<ReviewSnapshot?> GetSnapshotAsync(
+        int projectId,
+        string reviewId,
+        CancellationToken cancellationToken = default)
+    {
+        await using var context = await factory.CreateDbContextAsync(cancellationToken);
+
+        // One read transaction for the record, the slots and the signatures: a writer cannot commit a change
+        // between the reads (SQLite keeps the reader's view stable until the transaction ends)
+        await using var transaction = await context.Database.BeginTransactionAsync(
+            IsolationLevel.RepeatableRead,
+            cancellationToken);
+        var record = await LoadRecordAsync(context, projectId, reviewId, cancellationToken);
+        if (record is null)
+        {
+            return null;
+        }
+
+        var slots = await context.ReviewerSlots.AsNoTracking()
+            .Where(s => s.ProjectId == projectId && s.ReviewId == reviewId)
+            .OrderBy(s => s.Id)
+            .ToListAsync(cancellationToken);
+        var signatures = await context.Signatures.AsNoTracking()
+            .Where(s => s.ProjectId == projectId && s.ReviewId == reviewId)
+            .OrderBy(s => s.Id)
+            .ToListAsync(cancellationToken);
+        return new ReviewSnapshot(record, slots, signatures);
     }
 
     /// <inheritdoc />
@@ -504,7 +539,7 @@ internal sealed class ReviewStore(IDbContextFactory<ReviewCenterDbContext> facto
     /// <summary>
     ///     Reads the record a signature covers, in one context so the parts are consistent with each other.
     /// </summary>
-    /// <param name="context">The context to read with; inside a transaction when the caller opened one.</param>
+    /// <param name="context">The context to read with; inside a transaction opened by the caller.</param>
     /// <param name="projectId">The project identity.</param>
     /// <param name="reviewId">The review identifier.</param>
     /// <param name="cancellationToken">Cancels the operation.</param>

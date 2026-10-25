@@ -224,6 +224,16 @@ public interface IReviewStore
     Task<ReviewRecord?> GetRecordAsync(int projectId, string reviewId, CancellationToken cancellationToken = default);
 
     /// <summary>
+    ///     Reads the record, the reviewer slots and the signatures of a review as one consistent snapshot, so a
+    ///     change made by another request cannot leave the three describing different states.
+    /// </summary>
+    /// <param name="projectId">The project identity.</param>
+    /// <param name="reviewId">The review identifier.</param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <returns>The snapshot, or <c>null</c> when the review does not exist.</returns>
+    Task<ReviewSnapshot?> GetSnapshotAsync(int projectId, string reviewId, CancellationToken cancellationToken = default);
+
+    /// <summary>
     ///     Lists the reviewer slots of a review.
     /// </summary>
     /// <param name="projectId">The project identity.</param>

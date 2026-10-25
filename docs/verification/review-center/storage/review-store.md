@@ -69,6 +69,14 @@ scenario is tested by `ReviewStore_GetRecordAsync_StoredReview_CarriesFingerprin
 **ReviewStore_GetRecordAsync_UnknownReview_ReturnsNull**: The record of an unknown review is requested; it is null.
 This scenario is tested by `ReviewStore_GetRecordAsync_UnknownReview_ReturnsNull`.
 
+**ReviewStore_GetSnapshotAsync_SignedReview_CarriesRecordSlotsAndSignatures**: A review with a thread, a slot, and a
+signature is read as a snapshot; the record, the slot, and the signature come back together, and the digest of the
+record equals the digest stored in the signature. This scenario is tested by
+`ReviewStore_GetSnapshotAsync_SignedReview_CarriesRecordSlotsAndSignatures`.
+
+**ReviewStore_GetSnapshotAsync_UnknownReview_ReturnsNull**: The snapshot of an unknown review is requested; it is null.
+This scenario is tested by `ReviewStore_GetSnapshotAsync_UnknownReview_ReturnsNull`.
+
 **ReviewStore_AddSignatureAsync_CurrentDigest_StoresAndRoundTrips**: A slot is signed with the current digest; the
 signature is stored with a database-assigned identity and listed with the slot, user, display name, role, time, digest,
 and meaning unchanged. This scenario is tested by `ReviewStore_AddSignatureAsync_CurrentDigest_StoresAndRoundTrips`.

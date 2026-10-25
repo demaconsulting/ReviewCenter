@@ -280,6 +280,10 @@ non-zero exit code.
   can be changed.
 - **Signed slots cannot be changed**: a reviewer slot that has any signature cannot be reassigned or removed; to
   change the reviewers after a signature, add a new slot. Anyone who is signed in can add and change unsigned slots.
+- **A disabled user can keep acting on an open page**: a user disabled while a page is open can keep acting on that
+  page (answering checks, commenting, signing) until it is reloaded. Signing also asks for the password, so it cannot
+  be done without it, but a disabled user who knows it and still has the page open is not stopped. Revalidating the
+  sign-in state of open pages is planned as a separate follow-up.
 - **No tamper-evident audit trail yet**: signatures are kept and never changed by the application, but the history is
   not yet protected by a hash chain, so a person with direct access to the database file could alter it undetected.
   A hash-chained audit trail is planned for a later release.

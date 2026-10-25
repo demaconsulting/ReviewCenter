@@ -91,9 +91,9 @@ as a singleton. The store transaction of step 8 covers changes of the record tha
 `ActorNotAllowed`, `SigningNotAllowed`, `ReauthenticationFailed`, and `RecordChanged`. `ActorNotAllowed` is the rule
 that every change made by an actor is re-authorized by the service, whatever the caller showed.
 
-**Interface additions of IReviewStore**: `GetRecordAsync`, `ListSlotsAsync`, `AddSlotAsync`, `UpdateSlotAsync`,
-`RemoveSlotAsync`, `ListSignaturesAsync`, and `AddSignatureAsync`. The store has no operation that changes or deletes
-a signature. `UpdateSlotAsync` and `RemoveSlotAsync` return `false` when the slot is not found.
+**Interface additions of IReviewStore**: `GetRecordAsync`, `GetSnapshotAsync`, `ListSlotsAsync`, `AddSlotAsync`,
+`UpdateSlotAsync`, `RemoveSlotAsync`, `ListSignaturesAsync`, and `AddSignatureAsync`. The store has no operation that
+changes or deletes a signature. `UpdateSlotAsync` and `RemoveSlotAsync` return `false` when the slot is not found.
 
 #### Key Methods
 
@@ -101,7 +101,8 @@ a signature. `UpdateSlotAsync` and `RemoveSlotAsync` return `false` when the slo
 
 - *Parameters*: project identity, review identifier, and a cancellation token.
 - *Returns*: `Task<ReviewApproval?>` — the status, or `null` when the review does not exist.
-- *Postconditions*: Nothing is stored.
+- *Postconditions*: Nothing is stored. The record, slots, and signatures come from one `GetSnapshotAsync` read, so a
+  concurrent change cannot make the digest, the blockers, and the signature status describe different states.
 
 **ListCandidatesAsync**: Lists the users that can be chosen for a slot.
 
