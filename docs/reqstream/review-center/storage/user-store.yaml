@@ -31,3 +31,15 @@ sections:
           people.
         tests:
           - UserStore_AddAsync_UsernameOtherCase_ThrowsUserNameTakenAndLookupIgnoresCase
+
+      - id: ReviewCenter-UserStore-Audit
+        title: >-
+          The UserStore class shall store a new user, and every update that carries an audit draft, together with
+          its audit entry in one transaction, through the process-wide audit gate, shall store neither when either
+          fails, and shall store no entry for an update without a draft.
+        justification: |
+          Changes of accounts and rights must appear in the history exactly when they happened, while a failure
+          counter is not an event of its own.
+        tests:
+          - UserStore_AddAsync_AuditInsertFails_RollsBackTheUserAndTheGateIsReleased
+          - UserStore_UpdateAsync_WithAndWithoutDraft_RecordsOnlyWithDraft

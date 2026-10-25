@@ -734,6 +734,44 @@ a.action {
     flex: 1 1 14rem;
 }
 
+/* The audit trail table (history and audit pages): scrolls sideways on a narrow screen instead of squeezing */
+.audit-scroll {
+    overflow-x: auto;
+}
+
+.audit-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.9rem;
+}
+
+.audit-table th,
+.audit-table td {
+    padding: 0.35rem 0.6rem;
+    border-bottom: 1px solid var(--border);
+    text-align: left;
+    vertical-align: top;
+}
+
+.audit-table td.audit-time {
+    white-space: nowrap;
+}
+
+.audit-table td.audit-detail {
+    overflow-wrap: anywhere;
+}
+
+.audit-hash {
+    font-family: monospace;
+    overflow-wrap: anywhere;
+}
+
+.audit-paging {
+    display: flex;
+    gap: 1rem;
+    margin-top: 0.75rem;
+}
+
 @media (min-width: 40rem) {
     main,
     .page {

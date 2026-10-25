@@ -135,7 +135,36 @@ public sealed class ThreadService
             ]
         };
 
-        return await _store.AddThreadAsync(thread, cancellationToken);
+        return await _store.AddThreadAsync(
+            thread,
+            stored =>
+            {
+                // A single line reads "line 3", a range "lines 3-5", a whole file "(whole file)"
+                string anchor;
+                if (stored.StartLine is not { } start)
+                {
+                    anchor = "(whole file)";
+                }
+                else if (stored.EndLine == start)
+                {
+                    anchor = $"line {start}";
+                }
+                else
+                {
+                    anchor = $"lines {start}-{stored.EndLine}";
+                }
+
+                var first = stored.Comments[0];
+
+                // The comment text itself is never audited; its short digest still identifies it
+                return AuditDraft.By(
+                    actor,
+                    "thread.started",
+                    $"thread {stored.Id} on {stored.FilePath} {anchor}; comment {first.Id}, text sha256 {AuditText.ShortHash(first.Text)}",
+                    projectId,
+                    reviewId);
+            },
+            cancellationToken);
     }
 
     /// <summary>
@@ -172,7 +201,18 @@ public sealed class ThreadService
             Created = _timeProvider.GetUtcNow()
         };
 
-        return await _store.AddCommentAsync(projectId, reviewId, threadId, comment, cancellationToken)
+        return await _store.AddCommentAsync(
+                   projectId,
+                   reviewId,
+                   threadId,
+                   comment,
+                   stored => AuditDraft.By(
+                       actor,
+                       "thread.replied",
+                       $"thread {threadId}, comment {stored.Id}, text sha256 {AuditText.ShortHash(stored.Text)}",
+                       projectId,
+                       reviewId),
+                   cancellationToken)
                ?? throw ThreadNotFound(threadId);
     }
 
@@ -182,12 +222,19 @@ public sealed class ThreadService
     /// <param name="projectId">The identity of the owning project.</param>
     /// <param name="reviewId">The review identifier.</param>
     /// <param name="threadId">The identity of the thread; it must belong to the given review.</param>
+    /// <param name="actor">The signed-in user who resolves the thread; recorded in the audit trail. Must not be null.</param>
     /// <param name="cancellationToken">Cancels the operation.</param>
     /// <returns>A task that completes when the state is stored; resolving a resolved thread does nothing.</returns>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="actor"/> is null.</exception>
     /// <exception cref="DomainRuleException">Thrown with <see cref="DomainRule.ThreadNotFound"/> when the thread does not exist in the review.</exception>
-    public Task ResolveAsync(int projectId, string reviewId, int threadId, CancellationToken cancellationToken = default)
+    public Task ResolveAsync(
+        int projectId,
+        string reviewId,
+        int threadId,
+        Actor actor,
+        CancellationToken cancellationToken = default)
     {
-        return SetStateAsync(projectId, reviewId, threadId, ReviewThreadState.Resolved, cancellationToken);
+        return SetStateAsync(projectId, reviewId, threadId, ReviewThreadState.Resolved, actor, cancellationToken);
     }
 
     /// <summary>
@@ -196,12 +243,19 @@ public sealed class ThreadService
     /// <param name="projectId">The identity of the owning project.</param>
     /// <param name="reviewId">The review identifier.</param>
     /// <param name="threadId">The identity of the thread; it must belong to the given review.</param>
+    /// <param name="actor">The signed-in user who reopens the thread; recorded in the audit trail. Must not be null.</param>
     /// <param name="cancellationToken">Cancels the operation.</param>
     /// <returns>A task that completes when the state is stored; reopening an open thread does nothing.</returns>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="actor"/> is null.</exception>
     /// <exception cref="DomainRuleException">Thrown with <see cref="DomainRule.ThreadNotFound"/> when the thread does not exist in the review.</exception>
-    public Task ReopenAsync(int projectId, string reviewId, int threadId, CancellationToken cancellationToken = default)
+    public Task ReopenAsync(
+        int projectId,
+        string reviewId,
+        int threadId,
+        Actor actor,
+        CancellationToken cancellationToken = default)
     {
-        return SetStateAsync(projectId, reviewId, threadId, ReviewThreadState.Open, cancellationToken);
+        return SetStateAsync(projectId, reviewId, threadId, ReviewThreadState.Open, actor, cancellationToken);
     }
 
     /// <summary>
@@ -316,17 +370,25 @@ public sealed class ThreadService
     /// <param name="reviewId">The review identifier.</param>
     /// <param name="threadId">The identity of the thread.</param>
     /// <param name="state">The state to store.</param>
+    /// <param name="actor">The signed-in user; recorded in the audit trail.</param>
     /// <param name="cancellationToken">Cancels the operation.</param>
     /// <returns>A task that completes when the state is stored.</returns>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="actor"/> is null.</exception>
     /// <exception cref="DomainRuleException">Thrown with <see cref="DomainRule.ThreadNotFound"/> when the thread does not exist.</exception>
     private async Task SetStateAsync(
         int projectId,
         string reviewId,
         int threadId,
         ReviewThreadState state,
+        Actor actor,
         CancellationToken cancellationToken)
     {
-        if (!await _store.SetThreadStateAsync(projectId, reviewId, threadId, state, cancellationToken))
+        ArgumentNullException.ThrowIfNull(actor);
+
+        // The store saves the entry only when the thread exists, so a refused call leaves no trace
+        var action = state == ReviewThreadState.Resolved ? "thread.resolved" : "thread.reopened";
+        var audit = AuditDraft.By(actor, action, $"thread {threadId}", projectId, reviewId);
+        if (!await _store.SetThreadStateAsync(projectId, reviewId, threadId, state, audit, cancellationToken))
         {
             throw ThreadNotFound(threadId);
         }

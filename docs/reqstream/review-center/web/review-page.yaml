@@ -241,3 +241,11 @@ sections:
           not act before the live connection exists.
         tests:
           - ReviewPage_AfterRender_Interactive_SetsMarker
+
+      - id: ReviewCenter-ReviewPage-HistoryLink
+        title: >-
+          The ReviewPage unit shall show a link to the history page of the review in its title row.
+        justification: |
+          The history of a review is reached from the review it belongs to.
+        tests:
+          - ReviewPage_Render_ExistingReview_ShowsHistoryLink

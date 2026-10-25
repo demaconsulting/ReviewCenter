@@ -7,8 +7,8 @@ interface. The service is an ASP.NET Core Blazor Server application started with
 verb. The current release lets you sign in, create projects and draft reviews made from uploaded files, shows the
 content fingerprint of each review, lets you discuss the files in threaded comments, gives each review a
 checklist, and lets reviewers sign a review with their password, with every action recorded under the signed-in
-user; the remaining review
-features (review states beyond Draft, a tamper-evident audit trail) are still under development. The command-line
+user. Every change is also recorded in a hash-chained audit trail that can be read and verified. The remaining review
+feature (review states beyond Draft) is still under development. The command-line
 interface is documented in
 this guide. A separate development tool,
 Puppet, is described near the end of this guide.
@@ -402,13 +402,91 @@ default), and the page is replaced by the Session ended message. Until then the 
 not re-checked, such as answering checks and adding comments and threads. Signing and changing reviewer slots check
 the account again on every action and are refused for a disabled user at once.
 
-Approved is computed each time from the record and the signatures; it is not a stored state of the review. The
-signature history is not yet protected by a hash-chained audit trail; that is planned for a later release.
+Approved is computed each time from the record and the signatures; it is not a stored state of the review. Every
+signature is also recorded in the audit trail, which is described in the next section.
+
+## Audit Trail
+
+ReviewCenter records every change that the application makes to projects, reviews, comments, checklists, reviewer
+slots, signatures, and users, and every sign-in, sign-out, failed sign-in, and lockout. An entry shows the time (UTC),
+the person, the action, and a short detail. A change and its entry are stored in one database transaction, so the
+application never leaves a change without its entry. A password is never recorded. The text of a comment or of a
+justification is not recorded either; the detail holds only a digest prefix (eight hexadecimal characters of its
+SHA-256 hash), which lets you match an entry with a text without copying the text. Entries cannot be edited or
+deleted through the application.
+
+### History of a Review
+
+The review page has a **History** link. It opens the history page of the review, which any signed-in user can read.
+The page lists the entries about that review, newest first, 50 at a time, with **Older** and **Newer** links. The
+text of every entry is shown as plain text.
+
+### The Audit Page (Administrators)
+
+An administrator sees an **Audit** link in the page header. It opens `/audit`, which lists the whole trail (for all
+projects and reviews, sign-ins, and user administration), newest first, 50 entries at a time. Other users are refused.
+The page has a **Verify chain** button. It reads the whole trail once and shows either that the chain is intact, with
+the number of entries and the **head hash**, or the first entry at which the chain is broken.
+
+### The Chain
+
+Each entry stores the SHA-256 hash of the entry before it and its own hash, which is calculated from the previous hash
+and from every field of the entry. A change to an old entry, the removal of an entry from the middle, an inserted
+entry, or a changed order makes a hash or a link no longer match, and verification reports the first entry where this
+happens.
+
+### Verify from the Command Line
+
+```bash
+reviewcenter audit verify
+```
+
+The command reads the configured database (the same settings as `serve`) and checks the chain. For an intact chain it
+prints `Audit chain intact: N entries` and exits with code 0. For a broken chain it prints
+`Audit chain BROKEN at entry N` to the error output and exits with code 1. If the audit trail cannot be read it prints
+an error and exits with code 1. This makes the command usable in a scheduled job. The command does not print the head
+hash; use the Audit page to see it. If the database file does not exist, the command creates an empty one.
+
+### What the Chain Proves, and What It Does Not
+
+The chain **detects** edits, deletions, insertions, and reordering of entries in the middle of the history.
+
+The chain does **not** detect the removal of the newest entries, because the remaining entries are still a valid
+chain. It also does **not** detect a complete rewrite by someone who can write to the database and who recalculates
+all hashes, because the hashes use no secret key. To detect either, record the **head hash and the entry count**
+shown on the Audit page outside the database, for example in a ticket, a signed email, or a write-once log, and
+compare them with the values shown later: the entry count must not be lower, and while no new entries have been
+added the head hash must be the same. This release has no external anchoring of its own; recording the
+head hash is a manual step, and it is most useful after important events such as the approval of a review.
+
+### Recorded Actions
+
+| Group     | Action codes                                                                         |
+| --------- | ------------------------------------------------------------------------------------ |
+| Projects  | `project.created`, `review.created`                                                  |
+| Slots     | `slot.added`, `slot.updated`, `slot.removed`, `signature.added`                      |
+| Threads   | `thread.started`, `thread.replied`, `thread.resolved`, `thread.reopened`             |
+| Checklist | `checklist.answered`, `checklist.applicability-changed`                              |
+| Users     | `user.created`, `user.enabled`, `user.disabled`, `user.role-changed`                 |
+| Passwords | `user.password-set-by-admin`, `user.password-changed`                                |
+| Sign-in   | `auth.sign-in`, `auth.sign-out`, `auth.sign-in-failed`, `auth.locked-out`            |
+
+### Limitations of the Audit Trail
+
+- Sign-in, sign-out, failed sign-in, and lockout entries are recorded on a best-effort basis, in their own
+  transaction. If an entry cannot be stored, the sign-in is still decided as usual and the failure is logged.
+- Failed attempts on an account that is already locked are not recorded. Failed attempts for unknown user names are
+  recorded without throttling, so the trail can grow quickly if someone guesses user names.
+- A wrong current password at a signature or on the account page is recorded as `auth.sign-in-failed`, because it is
+  checked in the same way as a sign-in and counts toward the same lockout.
+- There is no export and no retention or archiving of the trail, and no external anchoring.
+- The audit trail is a new table. A development database created before it existed must be recreated (see the next
+  section).
 
 ## Database
 
-ReviewCenter keeps users, projects, reviews, file contents, comment threads, checklists, and reviewer slots and
-signatures in a SQLite database
+ReviewCenter keeps users, projects, reviews, file contents, comment threads, checklists, reviewer slots and
+signatures, and the audit trail in a SQLite database
 file. On first start
 it creates the
 folder, the file, and the tables. The default file is `reviewcenter.db` in the `ReviewCenter` folder of the
@@ -435,9 +513,9 @@ Database__ConnectionString=/srv/reviewcenter/reviews.db reviewcenter serve
 If the database cannot be prepared (for example the provider is not supported or the location cannot be used), the
 server writes an error message and exits with a non-zero exit code. Database migrations are not provided in this
 release: the tables are created only when the database is new. **A database file created by an earlier build, before
-user accounts or reviewer signatures existed, does not have the tables and columns that are needed, and the pages
-cannot work with it: delete the file (or point `Database:ConnectionString` at a new one) and start again, then create
-the first administrator.** Do this only with development data.
+user accounts, reviewer signatures, or the audit trail existed, does not have the tables and columns that are
+needed, and the pages cannot work with it: delete the file (or point `Database:ConnectionString` at a new one) and
+start again, then create the first administrator.** Do this only with development data.
 
 ## Self-Validation
 
@@ -546,6 +624,7 @@ The following command-line options are supported:
 | `--username <name>`                   | User name for `user add`                                     |
 | `--display-name <text>`               | Display name for `user add`                                  |
 | `--role <Admin\|Reviewer>`            | Role for `user add` (default: `Reviewer`)                    |
+| `audit verify`                        | Verify the hash chain of the audit trail (exit code 0 or 1)  |
 | `-v`, `--version`                     | Display version information                                  |
 | `-?`, `-h`, `--help`                  | Display help message                                         |
 | `--silent`                            | Suppress console output                                      |

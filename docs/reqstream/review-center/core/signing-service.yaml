@@ -130,3 +130,15 @@ sections:
           - SigningService_SignAsync_RecordChangedAfterSigning_OutOfDateThenResignable
           - SigningService_GetApprovalAsync_NoSlots_NotApprovedAndAsksForSlot
           - SigningService_GetApprovalAsync_MissingReview_ReturnsNull
+
+      - id: ReviewCenter-SigningService-Audit
+        title: >-
+          The SigningService class shall record adding, changing, and removing a slot and adding a signature in the
+          audit trail, in the same transaction as the change, naming the actor, the slot, the reviewers, and for a
+          signature the role and the record digest.
+        justification: |
+          The approval of a review is the most important event of its history, and the history must show who
+          arranged the reviewers and who signed which record.
+        tests:
+          - SigningService_SlotAndSignatureEvents_AreRecordedWithMembersAndDigest
+          - SigningService_RemoveSlotAsync_RecordsSlotRemovedWithItsMembers

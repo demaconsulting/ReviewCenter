@@ -38,3 +38,7 @@ lockout time of a stored user are changed and updated; they are read back as cha
 
 **UserStore_ListAsync_Users_AreOrderedByUsername**: Three users are added out of order; they are listed ordered by
 user name. This scenario is tested by `UserStore_ListAsync_Users_AreOrderedByUsername`.
+
+**Audit drafts**: The store takes an audit draft with the creation of a user and with an update; an update without a
+draft is allowed and is not audited. The tests of this unit build the store with the real `AuditAppender`. The
+transaction that stores a change with its audit entry is verified in the tests of `AuditStore`.

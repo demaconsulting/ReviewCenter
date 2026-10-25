@@ -1,0 +1,41 @@
+---
+# Software Unit Requirements for the HistoryPage Component
+#
+# The HistoryPage component shows the audit entries recorded for one review.
+
+sections:
+  - title: HistoryPage Unit Requirements
+    requirements:
+      - id: ReviewCenter-HistoryPage-Display
+        title: >-
+          The HistoryPage component shall show the audit entries of one review, and of no other, newest first, with
+          the time, actor, action, and detail of each, a message when there are none, and a message when the review
+          does not exist.
+        justification: |
+          Participants need to see who did what to a review and when, and the page must not leak entries of other
+          reviews.
+        tests:
+          - HistoryPage_Render_ReviewWithEntries_ShowsOnlyItsEntriesNewestFirst
+          - HistoryPage_Render_NoEntries_ShowsEmptyMessage
+          - HistoryPage_Render_UnknownReview_ShowsNotFound
+          - HistoryPage_Render_ExistingReview_LinksBackToTheReview
+          - ReviewPage_Render_ExistingReview_ShowsHistoryLink
+
+      - id: ReviewCenter-HistoryPage-Paging
+        title: >-
+          The HistoryPage component shall show 50 entries to a page and offer links to the older and the newer page
+          only when entries exist behind them.
+        justification: |
+          A long history must stay readable and bounded.
+        tests:
+          - HistoryPage_Render_LongHistory_PagesByFiftyWithOlderAndNewerLinks
+
+      - id: ReviewCenter-HistoryPage-Access
+        title: >-
+          The HistoryPage component shall render all trail text as plain text, and shall show no entries to a visitor
+          who is not signed in.
+        justification: |
+          Names and details come from users and must not inject markup, and the history is for signed-in users.
+        tests:
+          - HistoryPage_Render_MarkupInEntries_IsEscaped
+          - Routes_Render_NobodySignedInOpensHistoryRoute_DoesNotShowEntries

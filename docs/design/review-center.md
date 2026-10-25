@@ -23,6 +23,7 @@ flowchart TD
     subgraph Hosting
         ServerHost
         UserCommand
+        AuditCommand
     end
     subgraph Identity
         PasswordHasher
@@ -39,6 +40,8 @@ flowchart TD
         LoginPage
         AccountPage
         UsersPage
+        HistoryPage
+        AuditPage
     end
     subgraph Core
         Fingerprint
@@ -49,17 +52,21 @@ flowchart TD
         UserService
         RecordDigest
         SigningService
+        AuditChain
+        AuditService
     end
     subgraph Storage
         ReviewCenterDbContext
         ReviewStore
         UserStore
+        AuditStore
         DatabaseSetup
     end
     Program --> Context
     Program --> Validation
     Program --> ServerHost
     Program --> UserCommand
+    Program --> AuditCommand
     Validation --> Program
     Validation --> PathHelpers
     Context --> UserService
@@ -68,6 +75,7 @@ flowchart TD
     ServerHost --> DatabaseSetup
     ServerHost --> ReviewStore
     ServerHost --> UserStore
+    ServerHost --> AuditStore
     ServerHost --> PasswordHasher
     ServerHost --> SignIn
     ServerHost --> ProjectService
@@ -76,11 +84,17 @@ flowchart TD
     ServerHost --> ChecklistService
     ServerHost --> UserService
     ServerHost --> SigningService
+    ServerHost --> AuditService
     UserCommand --> Context
     UserCommand --> ServerHost
     UserCommand --> DatabaseSetup
     UserCommand --> UserService
+    AuditCommand --> Context
+    AuditCommand --> ServerHost
+    AuditCommand --> DatabaseSetup
+    AuditCommand --> AuditService
     SignIn --> UserService
+    SignIn --> AuditService
     RevalidatingAuthenticationStateProvider --> SignIn
     RevalidatingAuthenticationStateProvider --> UserService
     PasswordHasher --> UserService
@@ -92,6 +106,8 @@ flowchart TD
     App --> LoginPage
     App --> AccountPage
     App --> UsersPage
+    App --> HistoryPage
+    App --> AuditPage
     App --> SignIn
     LoginPage --> SignIn
     AccountPage --> SignIn
@@ -106,27 +122,37 @@ flowchart TD
     ReviewPage --> ChecklistService
     ReviewPage --> SigningService
     ReviewPage --> SignIn
+    ReviewPage --> HistoryPage
     ChecklistPage --> ReviewService
     ChecklistPage --> ChecklistService
     ChecklistPage --> SignIn
+    HistoryPage --> AuditService
+    AuditPage --> AuditService
+    AuditPage --> UserService
     ReviewService --> Fingerprint
     ProjectService --> ReviewStore
     ReviewService --> ReviewStore
     ThreadService --> ReviewStore
     ChecklistService --> ReviewStore
     UserService --> UserStore
+    UserService --> AuditService
     SigningService --> ReviewStore
     SigningService --> UserService
     SigningService --> RecordDigest
+    AuditService --> AuditChain
+    AuditService --> AuditStore
     ReviewStore --> RecordDigest
     ReviewStore --> ReviewCenterDbContext
     UserStore --> ReviewCenterDbContext
+    AuditStore --> AuditChain
+    AuditStore --> ReviewCenterDbContext
     DatabaseSetup --> ReviewCenterDbContext
 ```
 
 `Program` is the entry point. It creates a `Context` from the `Cli` subsystem, dispatches to
 `Validation` when `--validate` is passed, dispatches to `ServerHost` from the `Hosting`
-subsystem when the `serve` verb is passed, dispatches to `UserCommand` when the `user add` verb is passed, and
+subsystem when the `serve` verb is passed, dispatches to `UserCommand` when the `user add` verb is passed, dispatches
+to `AuditCommand` when the `audit verify` verb is passed, and
 returns the exit code from `Context`.
 `Validation` calls `Program.Run` recursively to exercise the tool during self-testing, and
 uses `PathHelpers` to construct safe temporary file paths.
@@ -135,11 +161,13 @@ uses `PathHelpers` to construct safe temporary file paths.
 the silent option from `Context`, configures structured logging, registers the sign-in of the `Identity` subsystem,
 maps the `/health` endpoint, maps the user interface defined by the `Web` subsystem, and connects the pages to the
 database. `UserCommand` creates a user from the command line with the same configuration and registration, which is
-how the first administrator is created.
+how the first administrator is created. `AuditCommand` verifies the hash chain of the audit trail with the same
+configuration and registration and reports the result as the exit code.
 The `Web` subsystem is a Blazor Server user interface: `App` is the HTML shell and router,
 `HomePage` is the interactive page served at the root URL, `ProjectsPage`, `ProjectPage`,
-`ReviewPage`, and `ChecklistPage` are the pages for projects, reviews, and review checklists, and `LoginPage`,
-`AccountPage`, and `UsersPage` are the pages for signing in, changing one's own password, and managing users. A browser
+`ReviewPage`, and `ChecklistPage` are the pages for projects, reviews, and review checklists, `LoginPage`,
+`AccountPage`, and `UsersPage` are the pages for signing in, changing one's own password, and managing users, and
+`HistoryPage` and `AuditPage` show the audit trail of a review and of the whole system. A browser
 connects to the server,
 receives a server-rendered page, and then upgrades to a live connection over which user
 actions are handled on the server.
@@ -151,19 +179,22 @@ as the cookie check and ends the sign-in state of the page when the user is no l
 verifies passwords with the password hasher of the ASP.NET Core shared framework.
 
 The `Core` subsystem holds the domain: projects, reviews of uploaded files, users, the rules that
-protect them, the content fingerprint of a review, and the digest of a review record that signatures are bound to. It
+protect them, the content fingerprint of a review, the digest of a review record that signatures are bound to, and the
+hash-chained audit trail. It
 depends on no other subsystem and on
 no library beyond the .NET runtime, and it defines the store interfaces and the password hasher interface that the
-`Storage` and `Identity` subsystems implement. The `Storage` subsystem keeps projects, reviews, and users in a
+`Storage` and `Identity` subsystems implement. The `Storage` subsystem keeps projects, reviews, users, and the audit trail
+in a
 database through
 Entity Framework Core. The pages call the Core services and never see the database; the
-services reach it through the Core store interfaces, which `ReviewStore` and `UserStore` implement, and
+services reach it through the Core store interfaces, which `ReviewStore`, `UserStore`, and `AuditStore` implement, and
 `ServerHost` wires the pieces together.
 
 The system is a single process with one database; there is no separate service tier. Users are local accounts
 with a user name, a display name, a role (Reviewer or Admin), and a password that is stored only as a hash. A user
 signs in on the login page and stays signed in through a cookie; every page except the home page and the login page
-requires a signed-in user, and the users page requires the Admin role. The first administrator is created with the
+requires a signed-in user, and the users page and the audit page require the Admin role. The first administrator is
+created with the
 `user add` verb. A review can only be created (in the Draft state) from uploaded files. Review comments are implemented
 (threads anchored to a file or line range, with replies, resolve, and reopen), and every review has a checklist of
 checks (Pass, Fail, or N/A, with a justification where required) that is frozen when the review is created. The author
@@ -171,16 +202,33 @@ of a comment and the person who saved a checklist answer are the signed-in user 
 that time); the checklist has no thread links, and there is no diff view yet. Reviewers are named for a review in
 slots (a primary reviewer and an optional alternate), and a named reviewer signs the review after confirming the
 password again; a signature is bound to a digest of the review record, so it goes out of date when the record changes,
-and a review is Approved only while every slot has a current signature. A review without a slot is In review. The
-hash-chained audit trail of the architecture, author signatures, rejecting or withdrawing a signature, and a second
+and a review is Approved only while every slot has a current signature. A review without a slot is In review.
+
+Everything that changes data, and every sign-in, sign-out, failed sign-in, and lockout, is recorded in an append-only
+audit trail. Each entry carries the hash of the entry before it, so the entries form a hash chain. The change and its
+entry are stored in one transaction, so a change without an entry (or the reverse) cannot occur through the application.
+Anyone who is signed in can read the history of a review; an administrator can read the whole trail and verify the
+chain on the audit page or with the `audit verify` verb. The chain detects an edit, a deletion, an insertion, or a
+reordering of entries in the middle of the history. It does not detect the removal of the newest entries, or a complete
+rewrite of the chain by someone with write access to the database, unless the head hash, which the audit page and the
+verification show, was recorded somewhere else. There is no external anchoring in this version. The design of the unit
+`AuditChain` states this in full.
+
+Author signatures, rejecting or withdrawing a signature, and a second
 factor are deferred to later slices; a signed slot cannot be reassigned.
 The limitations of the identity slice are deliberate: lockout after failed sign-ins is per user name, so anyone can
 lock a known user name for a few minutes; a user who is disabled, removed, or changed can keep a page that is already
 open for up to the revalidation interval (`Auth:RevalidationSeconds`, 30 seconds by default), after which the page is
 replaced by a "Session ended" message, while the page header keeps the old name until the next navigation or reload; a
 password change does not end other sessions of the user; and a database that was created
-before the identity slice or before the signature slice (it has no reviewer slot and signature tables) must be
-deleted and created again.
+before the identity slice, before the signature slice (it has no reviewer slot and signature tables), or before the
+audit trail (it has no audit table) must be
+deleted and created again, because there are no migrations.
+The limitations of the audit trail are also deliberate: a failed sign-in on an account that is already locked is not
+recorded, and failed sign-ins for unknown user names are not throttled; a wrong current password when signing or on
+the account page appears as `auth.sign-in-failed`; recording of
+sign-in, sign-out, failed sign-in, and lockout is best effort and a failure is only logged; and there is no export,
+retention, or archiving of the trail.
 
 ## External Interfaces
 
@@ -189,14 +237,20 @@ deleted and created again.
 - *Type*: CLI.
 - *Role*: Consumer (the host environment invokes the system with command-line arguments).
 - *Contract*: Accepts the `serve` verb, the `user add` verb with the options `--username <name>`,
-  `--display-name <name>`, and `--role <Admin|Reviewer>`, and the arguments `-v`/`--version`, `-?`/`-h`/`--help`,
+  `--display-name <name>`, and `--role <Admin|Reviewer>`, the `audit verify` verb, and the arguments `-v`/`--version`,
+  `-?`/`-h`/`--help`,
   `--silent`, `--validate`, `--results <file>`, `--result <file>` (legacy alias for
   `--results`), `--depth <n>`, `--log <file>`, and `--urls <url>`. Returns exit code 0 for
   success and 1 for failures.
 - *Constraints*: Unknown arguments cause exit code 1 and an error message on stderr.
   `--urls` is only valid together with `serve`, and its value must be an absolute http or
   https URL. `--username`, `--display-name`, and `--role` are only valid together with `user add`, which
-  requires `--username` and `--display-name`; the role is `Reviewer` unless given. `user add` never takes the
+  requires `--username` and `--display-name`; the role is `Reviewer` unless given. `audit` must be followed by
+  `verify`. `audit verify` reads the database of the `Database` settings, verifies the hash chain of the audit trail,
+  prints `Audit chain intact: N entries` and exits with 0 when it is intact, and prints
+  `Audit chain BROKEN at entry N` on standard error and exits with 1 when it is not; an unreadable database is also
+  reported with exit code 1. It creates an empty database when none exists at the configured location. It does not
+  show the head hash, so the head hash must be taken from the audit page. `user add` never takes the
   password from the command line: it is read from the environment variable `REVIEWCENTER_PASSWORD`, otherwise from the
   first line of standard input when that is redirected, otherwise from a masked prompt that asks twice. When `serve`
   is used, the process runs until it is stopped (Ctrl+C or a
@@ -216,15 +270,18 @@ is running.
   ends the session and redirects to `/`. Both posts require the antiforgery token of the form. `GET /account`
   returns the page where the signed-in user changes their password, and `GET /users` the page where an administrator
   manages users. `GET /projects` returns the projects page, `GET /projects/{id}` the page of one project,
-  and `GET /projects/{id}/reviews/{reviewId}` the page of one review; these pages show a "does not exist"
-  message when the project or review is unknown.
+  and `GET /projects/{id}/reviews/{reviewId}` the page of one review, and
+  `GET /projects/{id}/reviews/{reviewId}/history` the history of one review; these pages show a "does not exist"
+  message when the project or review is unknown. `GET /audit` returns the whole audit trail with the button that
+  verifies its hash chain (administrators only).
   Any other path returns the not-found message of the user interface. The client
   script for the live connection is served from `/_framework/blazor.web.js`.
 - *Constraints*: The server listens on the URL given with `--urls`, by default
   `http://localhost:5000`, which is reachable only from the local machine. TLS termination is
   not performed by the server itself. Authentication is by cookie: the routes `/`, `/login`, and `/health` and the
   static assets are open to anonymous visitors, every other page requires a signed-in user (an anonymous request is
-  redirected to `/login` with the wanted address), and `/users` requires the Admin role (another user gets HTTP status
+  redirected to `/login` with the wanted address), and `/users` and `/audit` require the Admin role (another user gets
+  HTTP status
   403). The cookie is HTTP-only, belongs to the session of the browser, and expires after a sliding period of
   `Auth:SessionHours` hours (default 8). The cookie is marked secure when the request is HTTPS, so behind a proxy that
   terminates TLS the forwarded headers must be enabled (the environment variable
@@ -243,12 +300,15 @@ is running.
   `reviewcenter.db` in the `ReviewCenter` folder of the per-user application data folder (the
   `data` folder next to the executable if the operating system has no such folder); a value
   without `=` is taken as the file path; any other value is used as a complete connection
-  string. The server creates the folder, file, and tables when it starts, and so does `user add`.
+  string is used. The server creates the folder, file, and tables when it starts, and so does `user add`.
 - *Constraints*: The location must be writable. An unsupported provider or an unusable
   location prevents the server from starting: an error is reported and the exit code is 1. The
   schema is created, never migrated; the database file of an older schema is not upgraded. A database that was
-  created before the identity slice (it has no users and no user name columns) or before the signature slice (it
-  has no reviewer slot and signature tables) must be deleted and created again.
+  created before the identity slice (it has no users and no user name columns), before the signature slice (it
+  has no reviewer slot and signature tables), or before the audit trail (it has no audit table) must be deleted and
+  created again. The audit table is append-only for the application, but anyone with write access to the database file
+  can still change it; the hash chain makes such a change detectable only in the way the design of `AuditChain`
+  describes.
 
 **Standard Output**: Normal program output written to `Console.Out`.
 

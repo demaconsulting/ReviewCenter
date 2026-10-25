@@ -30,4 +30,14 @@ namespace DemaConsulting.ReviewCenter.Core;
 /// </remarks>
 /// <param name="Username">The user name of the signed-in user.</param>
 /// <param name="DisplayName">The display name of the signed-in user at the time of the action.</param>
-public sealed record Actor(string Username, string DisplayName);
+public sealed record Actor(string Username, string DisplayName)
+{
+    /// <summary>
+    ///     Gets the actor used for changes made from the command line (for example <c>user add</c>), where no
+    ///     person is signed in.
+    /// </summary>
+    /// <remarks>
+    ///     The user name contains characters a real user name cannot have, so it never matches a stored user.
+    /// </remarks>
+    public static Actor CommandLine { get; } = new("(command line)", "command line");
+}

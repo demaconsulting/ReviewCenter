@@ -131,6 +131,14 @@ public sealed class ChecklistService
                 SetByUsername = actor.Username,
                 SetAt = _timeProvider.GetUtcNow()
             },
+            AuditDraft.By(
+                actor,
+                "checklist.applicability-changed",
+                applicable
+                    ? $"section {sectionId}: applicable"
+                    : $"section {sectionId}: not applicable, reason: {trimmedReason}",
+                projectId,
+                reviewId),
             cancellationToken);
     }
 
@@ -190,6 +198,14 @@ public sealed class ChecklistService
                 AnsweredByUsername = actor.Username,
                 AnsweredAt = _timeProvider.GetUtcNow()
             },
+            AuditDraft.By(
+                actor,
+                "checklist.answered",
+                trimmed is null
+                    ? $"item {itemId}: {outcome}"
+                    : $"item {itemId}: {outcome}; justification sha256 {AuditText.ShortHash(trimmed)}",
+                projectId,
+                reviewId),
             cancellationToken);
     }
 

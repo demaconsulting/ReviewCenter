@@ -141,3 +141,34 @@ sections:
           A request that names nobody must fail visibly instead of appearing to succeed.
         tests:
           - UserService_Changes_UnknownUser_ThrowUserNotFound
+
+      - id: ReviewCenter-UserService-Audit
+        title: >-
+          The UserService class shall record creating a user, enabling, disabling, changing a role, setting a
+          password as an administrator, and changing one's own password in the audit trail, in the same transaction
+          as the change, naming the actor (the command line for a user created from it), and never recording a
+          password.
+        justification: |
+          Changes of accounts and rights are what an auditor looks for first, and a password in a history that
+          cannot be edited could never be removed.
+        tests:
+          - UserService_AdministrationEvents_AreRecordedWithoutPasswords
+          - UserService_CreateAsync_CommandLineActor_IsRecordedAsCommandLine
+
+      - id: ReviewCenter-UserService-SignInAudit
+        title: >-
+          The UserService class shall record a failed sign-in (wrong password, disabled account, unknown user) and
+          the lockout of an account in the audit trail on a best-effort basis, without echoing a user name that
+          does not exist, without recording a password, without recording attempts on an account that is already
+          locked, and without ever letting a failure of the trail change the result of the sign-in.
+        justification: |
+          Failed sign-ins show attempts to break in, but the trail must not let an unauthenticated caller fill it
+          with text of their choice, and a failing trail must not lock everybody out.
+        tests:
+          - UserService_AuthenticateAsync_WrongPassword_CounterUpdateCarriesNoDraft
+          - UserService_AuthenticateAsync_UnknownUser_RecordsUnknownUserWithoutEchoingInput
+          - UserService_AuthenticateAsync_WrongPassword_RecordsExistingUserWithoutPassword
+          - UserService_AuthenticateAsync_DisabledAccount_RecordsAccountDisabled
+          - UserService_AuthenticateAsync_FifthFailure_RecordsLockoutOnceAndLockedAttemptsAreNotRecorded
+          - UserService_AuthenticateAsync_AuditStoreFails_StillRefusesAndDoesNotThrow
+          - UserService_AuthenticateAsync_NoAuditService_Works

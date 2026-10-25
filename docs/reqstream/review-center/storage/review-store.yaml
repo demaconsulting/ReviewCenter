@@ -140,3 +140,19 @@ sections:
           - ReviewStore_AddSignatureAsync_SameSlotAndDigestTwice_ThrowsSigningNotAllowed
           - ReviewStore_AddSignatureAsync_UnknownSlotOrReview_IsRefused
           - ReviewStore_SerializableTransaction_TakesWriteLockAtBegin
+
+      - id: ReviewCenter-ReviewStore-Audit
+        title: >-
+          The ReviewStore class shall store every audited change (project, review, thread, comment, thread state,
+          checklist answer and section state, slot, and signature) together with its audit entry in one transaction,
+          through the process-wide audit gate, shall store neither when either fails, and shall store no entry
+          for a change that has no effect.
+        justification: |
+          The history must be true: a change without its entry, or an entry without its change, cannot be allowed
+          to exist.
+        tests:
+          - ReviewStore_AddProjectAsync_WithDraft_StoresProjectAndEntryTogether
+          - ReviewStore_AddReviewAsync_FailedChange_LeavesNoAuditEntry
+          - ReviewStore_AddProjectAsync_DraftFactoryThrows_StoresNothing
+          - ReviewStore_AddProjectAsync_AuditInsertFails_RollsBackTheChange
+          - ReviewStore_NoOpChanges_RecordNothing

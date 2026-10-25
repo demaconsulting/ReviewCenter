@@ -111,3 +111,25 @@ throws an `ArgumentOutOfRangeException`. This scenario is tested by
 **UserService_Constructor_NullArguments_Throws**: The constructor is called with a null store, hasher, or time
 provider; an `ArgumentNullException` is thrown for each. This scenario is tested by
 `UserService_Constructor_NullArguments_Throws`.
+
+**UserService_AdministrationEvents_AreRecordedWithoutPasswords**: A user is created, disabled, enabled, given
+another role, given a password by an administrator, and changes the own password; the entries `user.created`,
+`user.disabled`, `user.enabled`, `user.role-changed`, `user.password-set-by-admin`, and `user.password-changed` are
+recorded and none contains a password. This scenario is tested by
+`UserService_AdministrationEvents_AreRecordedWithoutPasswords`. A user created from the command line is recorded
+with the actor `(command line)`, which is tested by `UserService_CreateAsync_CommandLineActor_IsRecordedAsCommandLine`.
+
+**UserService_AuthenticateAsync audit scenarios**: The sign-in events are best effort and are verified as follows. A
+wrong password leaves the counter update without an audit draft, which is tested by
+`UserService_AuthenticateAsync_WrongPassword_CounterUpdateCarriesNoDraft`, and records `auth.sign-in-failed` for the
+existing user without the password, which is tested by
+`UserService_AuthenticateAsync_WrongPassword_RecordsExistingUserWithoutPassword`. An unknown user is recorded as
+`unknown user` without echoing the input, which is tested by
+`UserService_AuthenticateAsync_UnknownUser_RecordsUnknownUserWithoutEchoingInput`. A disabled account is recorded,
+which is tested by `UserService_AuthenticateAsync_DisabledAccount_RecordsAccountDisabled`. The fifth failure records
+`auth.locked-out` once, and attempts on the locked account are not recorded, which is tested by
+`UserService_AuthenticateAsync_FifthFailure_RecordsLockoutOnceAndLockedAttemptsAreNotRecorded`. A failing audit store
+does not change the refusal and throws nothing, which is tested by
+`UserService_AuthenticateAsync_AuditStoreFails_StillRefusesAndDoesNotThrow`, and a service without an audit service
+still works, which is tested by `UserService_AuthenticateAsync_NoAuditService_Works`. These tests are defined in
+`AuditEventTests.cs`.

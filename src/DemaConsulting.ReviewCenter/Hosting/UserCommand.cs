@@ -106,7 +106,7 @@ internal static class UserCommand
                 host.Services.GetRequiredService<IOptions<DatabaseOptions>>().Value);
 
             var user = host.Services.GetRequiredService<UserService>()
-                .CreateAsync(context.Username, context.DisplayName, context.Role, password)
+                .CreateAsync(context.Username, context.DisplayName, context.Role, password, Actor.CommandLine)
                 .GetAwaiter()
                 .GetResult();
             context.WriteLine($"Created user '{user.Username}' with the role {user.Role}.");

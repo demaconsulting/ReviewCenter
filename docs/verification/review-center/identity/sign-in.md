@@ -113,3 +113,13 @@ with a local return URL, and with a hostile return URL. It shows the user name, 
 error "Invalid user name or password." only after a failed sign-in; and a hidden return URL field that holds the
 local path, or `/` for the hostile URL. This scenario is tested by
 `SignIn_LoginPage_ErrorAndReturnUrl_AreShownSafely`.
+
+**SignIn audit scenarios**: The tests in `SignInAuditTests.cs` run the sign-in and sign-out endpoints over the real
+pipeline and read the audit trail. A valid sign-in records `auth.sign-in`, which is tested by
+`SignIn_Login_ValidCredentials_RecordsSignInEntry`; a sign-out records `auth.sign-out`, which is tested by
+`SignIn_Logout_SignedInUser_RecordsSignOutEntry`. A failed sign-in of an unknown user records the actor
+`unknown user` without echoing the input, which is tested by
+`SignIn_Login_UnknownUser_RecordsUnknownUserWithoutEchoingInput`, and a wrong password records the failure for the
+user without the password, which is tested by `SignIn_Login_WrongPassword_RecordsFailureForTheUserWithoutPassword`.
+Repeated failures record the lockout once, which is tested by `SignIn_Login_RepeatedFailures_RecordsLockoutOnce`,
+and a complete flow forms an intact chain, which is tested by `SignIn_Flow_LoginFailureAndLogout_FormAnIntactChain`.

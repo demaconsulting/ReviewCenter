@@ -6,21 +6,24 @@
 
 The `Core` subsystem is the domain of ReviewCenter: projects, reviews of uploaded files, comment threads on
 those files, the review checklist, local user accounts, reviewer slots with re-authenticated signatures, the rules
-that protect them, and the content fingerprint that identifies a review's files and the digest of a review record. It
+that protect them, the content fingerprint that identifies a review's files and the digest of a review record, and the
+hash-chained audit trail of everything that happens. It
 is
 deliberately free of web and database technology so that the rules can be reviewed and tested on their own. It
-contains eight units: `Fingerprint`, the content fingerprint algorithm; `RecordDigest`, the digest of a review
-record that a signature binds to; `ProjectService`, the rules
+contains ten units: `Fingerprint`, the content fingerprint algorithm; `RecordDigest`, the digest of a review
+record that a signature binds to; `AuditChain`, the audit entry types, their hash, and the verifier of the chain;
+`AuditService`, the recording, reading, and verification of the audit trail; `ProjectService`, the rules
 for projects; `ReviewService`, the rules for reviews; `ThreadService`, the rules for review comments;
 `ChecklistService`, the rules for the review checklist; `UserService`, the rules for users; and `SigningService`, the
 rules for reviewer slots and signatures. The
 domain types (`Project`, `Review`, `ReviewFile`, `ReviewState`, `UploadedFile`, `ReviewThread`, `ReviewComment`,
-`ReviewThreadState`, the checklist types, `User`, `UserRole`, `Actor`, and the signing types `ReviewerSlot`,
-`ReviewSignature`, `SlotRole`, `ReviewRecord`, and `ReviewApproval`), the text and line definition
+`ReviewThreadState`, the checklist types, `User`, `UserRole`, `Actor`, the signing types `ReviewerSlot`,
+`ReviewSignature`, `SlotRole`, `ReviewRecord`, and `ReviewApproval`, and the audit types `AuditEntry`, `AuditDraft`,
+and `AuditVerificationResult`), the text and line definition
 (`FileText`), the limits
 (`ReviewLimits`), the rule failure type
-(`DomainRuleException` with the `DomainRule` enumeration), and the interfaces (`IReviewStore`, `IUserStore`, and
-`IPasswordHasher`) are
+(`DomainRuleException` with the `DomainRule` enumeration), and the interfaces (`IReviewStore`, `IUserStore`,
+`IAuditStore`, and `IPasswordHasher`) are
 supporting types, documented with the unit that owns them.
 
 ### Interfaces
@@ -38,7 +41,9 @@ used by the `Web` and `Identity` subsystems and by the `Hosting` subsystem.
   password. Posting a comment or saving a checklist decision takes the signed-in user (an `Actor`), never free text.
   Add, change, and remove a reviewer slot of a review, sign a slot with the password entered again, read the
   approval status of a review (its slots, blockers, record digest, and next step), and list the users that can be
-  chosen for a slot. `RecordDigest` calculates the digest of a record.
+  chosen for a slot. `RecordDigest` calculates the digest of a record. Every operation that changes data takes
+  the `Actor` and records the change in the audit trail; `AuditService` lists the trail newest first in pages
+  and verifies its hash chain.
   Posted comments are
   immutable: there is no operation to edit or delete one. Rule violations are reported as a
   `DomainRuleException` that carries a `DomainRule` value and a message suitable for display to the user.
@@ -53,7 +58,9 @@ used by the `Web` and `Identity` subsystems and by the `Hosting` subsystem.
   its first comment; add a comment to a thread of a review; set the state of a thread; list the threads of a review
   with their comments; read the checklist snapshot, the section states, and the answers of a review; set the
   state of a section and the answer to a check; read the whole record of a review in one operation; add, list,
-  update, and remove reviewer slots; and add and list signatures.
+  update, and remove reviewer slots; and add and list signatures. Every operation that changes data takes an
+  `AuditDraft` (or a function that builds one from the stored entity) that the store appends to the audit trail in the
+  same transaction.
 - *Constraints*: A review is added with all its files, and its checklist snapshot, in one operation, and an attempt
   to add a review whose
   identifier already exists in the project fails with a `DomainRuleException` for `ReviewIdDuplicate`. A thread is
@@ -67,9 +74,19 @@ used by the `Web` and `Identity` subsystems and by the `Hosting` subsystem.
 - *Type*: In-process .NET interface.
 - *Role*: Consumer (implemented by `UserStore` in the `Storage` subsystem).
 - *Contract*: Add a user, read a user by user name without regard to case, list the users, and replace the stored
-  state of a user.
+  state of a user. Adding a user, and an update that carries a draft, append that audit entry in the same transaction.
 - *Constraints*: An attempt to add a user whose name exists fails with a `DomainRuleException` for `UserNameTaken`.
   Every read returns a new object.
+
+**IAuditStore**: The store interface the subsystem requires for the audit trail.
+
+- *Type*: In-process .NET interface.
+- *Role*: Consumer (implemented by `AuditStore` in the `Storage` subsystem).
+- *Contract*: Append one entry from a draft, list entries newest first (optionally of one review, before or after a
+  sequence), and read entries in ascending batches after a sequence.
+- *Constraints*: The interface has no operation that updates or deletes an entry. The entries of data changes are not
+  appended through it: the review and user store operations take an `AuditDraft` and append it in the transaction of the
+  change.
 
 **IPasswordHasher**: The password hashing interface the subsystem requires.
 
@@ -158,4 +175,12 @@ bound to the digest of the record (the fingerprint, the answers, the sections th
 their comments) and is current only while that digest is unchanged. Slots and signatures are never edited into a
 different meaning: a signed slot cannot be changed or removed, a signature is never changed or deleted, and the
 status of a review (Approved or In review) is computed from the record and the signatures each time and never stored.
-The tamper-evident (hash-chained) audit trail of the history is not part of the system yet.
+
+The audit trail is the third kind of record: an append-only, hash-chained list of everything that happens, kept in the
+same database. A change of data and its audit entry are stored in the same transaction by the store, so the services
+decide what is recorded (they build an `AuditDraft` with the actor, the action code, and a one-line detail) and the stores
+decide when. Events that change no data (sign-in, sign-out, failed sign-in, lockout) are recorded by `AuditService` on a
+best-effort basis. The chain detects an edit, a deletion, an insertion, or a reordering of entries in the middle of the
+history. It does not detect the removal of the newest entries, or a complete rewrite by someone with write access to
+the database, unless the head hash was recorded elsewhere, and this version has no external anchoring. See the
+`AuditChain` and `AuditService` units for the encoding, the verification, the action codes, and the known limitations.

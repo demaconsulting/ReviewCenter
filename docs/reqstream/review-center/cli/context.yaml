@@ -146,3 +146,14 @@ sections:
         tests:
           - Context_Create_UserAddMisuse_ThrowsArgumentException
           - Context_Create_PasswordOption_IsNotSupported
+
+      - id: ReviewCenter-Context-AuditVerify
+        title: >-
+          The Context class shall accept the audit verify verb to signal that the audit trail is to be verified, and
+          shall reject the audit verb without the verify action or with another action.
+        justification: |
+          Verifying the trail is an explicit action, and a mistyped action must be found when the arguments are
+          parsed, with a clear message.
+        tests:
+          - Context_Create_AuditVerifyVerb_SetsAuditVerify
+          - Context_Create_AuditMisuse_ThrowsArgumentException

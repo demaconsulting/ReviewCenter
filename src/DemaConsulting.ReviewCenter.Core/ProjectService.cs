@@ -65,16 +65,20 @@ public sealed class ProjectService
     ///     The description; may be null or empty, leading and trailing white space is removed and the
     ///     result must not exceed <see cref="ReviewLimits.MaxProjectDescriptionLength"/> characters.
     /// </param>
+    /// <param name="actor">The signed-in user creating the project; recorded in the audit trail. Must not be null.</param>
     /// <param name="cancellationToken">Cancels the operation.</param>
     /// <returns>The created project, including its assigned identity.</returns>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="actor"/> is null.</exception>
     /// <exception cref="DomainRuleException">
     ///     Thrown when the name or description violates a rule; nothing is stored then.
     /// </exception>
     public async Task<Project> CreateAsync(
         string? name,
         string? description,
+        Actor actor,
         CancellationToken cancellationToken = default)
     {
+        ArgumentNullException.ThrowIfNull(actor);
         // Normalize first so that the rules apply to what would actually be stored
         var trimmedName = name?.Trim() ?? string.Empty;
         var trimmedDescription = description?.Trim() ?? string.Empty;
@@ -99,14 +103,17 @@ public sealed class ProjectService
                 $"The project description must not be longer than {ReviewLimits.MaxProjectDescriptionLength} characters.");
         }
 
-        // Store the project; the store assigns the identity
+        // Store the project; the store assigns the identity, and saves the audit entry in the same transaction
         var project = new Project
         {
             Name = trimmedName,
             Description = trimmedDescription,
             Created = _timeProvider.GetUtcNow()
         };
-        return await _store.AddProjectAsync(project, cancellationToken);
+        return await _store.AddProjectAsync(
+            project,
+            stored => AuditDraft.By(actor, "project.created", $"project '{stored.Name}'", stored.Id),
+            cancellationToken);
     }
 
     /// <summary>

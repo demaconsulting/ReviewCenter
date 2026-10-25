@@ -545,4 +545,63 @@ public class CliSubsystemTests
             Console.SetOut(originalOut);
         }
     }
+
+    /// <summary>
+    ///     Test that the audit verify verb is parsed and is off when not given.
+    /// </summary>
+    [Fact]
+    public void Context_Create_AuditVerifyVerb_SetsAuditVerify()
+    {
+        // Act: parse the verb and a context without it
+        using var context = Context.Create(["audit", "verify"]);
+        using var other = Context.Create([]);
+
+        // Assert
+        Assert.True(context.AuditVerify);
+        Assert.False(other.AuditVerify);
+        Assert.False(context.UserAdd);
+    }
+
+    /// <summary>
+    ///     Test that incorrect use of the audit verb is rejected with a message.
+    /// </summary>
+    /// <param name="arguments">The arguments, joined by a space.</param>
+    [Theory]
+    [InlineData("audit")]
+    [InlineData("audit export")]
+    public void Context_Create_AuditMisuse_ThrowsArgumentException(string arguments)
+    {
+        // Act: parse the arguments
+        var exception = Record.Exception(() => Context.Create(arguments.Split(' ')));
+
+        // Assert: refused with a message that names the missing action
+        var argumentException = Assert.IsType<ArgumentException>(exception);
+        Assert.Contains("verify", argumentException.Message, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    ///     Test that the help text documents the audit verify verb.
+    /// </summary>
+    [Fact]
+    public void Program_Run_Help_DocumentsAuditVerify()
+    {
+        // Arrange: capture console output
+        var originalOut = Console.Out;
+        try
+        {
+            using var outWriter = new StringWriter();
+            Console.SetOut(outWriter);
+
+            // Act
+            using var help = Context.Create(["--help"]);
+            Program.Run(help);
+
+            // Assert
+            Assert.Contains("audit verify", outWriter.ToString(), StringComparison.Ordinal);
+        }
+        finally
+        {
+            Console.SetOut(originalOut);
+        }
+    }
 }

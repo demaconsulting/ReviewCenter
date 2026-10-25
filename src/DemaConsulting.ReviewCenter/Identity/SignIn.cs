@@ -159,7 +159,8 @@ internal static class SignIn
                 [FromForm] string? password,
                 [FromForm] string? returnUrl,
                 HttpContext http,
-                UserService users) =>
+                UserService users,
+                AuditService audit) =>
             {
                 var target = SafeReturnUrl(returnUrl);
                 var user = await users.AuthenticateAsync(username, password, http.RequestAborted);
@@ -175,13 +176,18 @@ internal static class SignIn
                     CookieAuthenticationDefaults.AuthenticationScheme,
                     BuildPrincipal(user),
                     new AuthenticationProperties { IsPersistent = false });
+
+                // Best effort: a failure to record is logged by the service and never stops the sign-in
+                await audit.TryRecordAsync(
+                    AuditDraft.By(new Actor(user.Username, user.DisplayName), "auth.sign-in", "signed in"),
+                    http.RequestAborted);
                 return Results.LocalRedirect(target);
             });
 
         // This endpoint binds no form field, so the framework does not check the token by itself
         endpoints.MapPost(
             LogoutEndpoint,
-            async (HttpContext http, IAntiforgery antiforgery) =>
+            async (HttpContext http, IAntiforgery antiforgery, AuditService audit) =>
             {
                 try
                 {
@@ -192,7 +198,17 @@ internal static class SignIn
                     return Results.BadRequest();
                 }
 
+                // The actor is read before the cookie is cleared; nobody signed in means nothing to record
+                var username = http.User.Identity?.IsAuthenticated == true ? http.User.Identity.Name : null;
+                var displayName = http.User.FindFirstValue(DisplayNameClaimType);
                 await http.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+                if (!string.IsNullOrEmpty(username) && !string.IsNullOrEmpty(displayName))
+                {
+                    await audit.TryRecordAsync(
+                        AuditDraft.By(new Actor(username, displayName), "auth.sign-out", "signed out"),
+                        http.RequestAborted);
+                }
+
                 return Results.LocalRedirect("/");
             });
 

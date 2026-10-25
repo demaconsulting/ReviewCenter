@@ -101,3 +101,13 @@ sections:
         tests:
           - ReviewService_GetAsync_CreatedReview_ReturnsReviewListAndContent
           - ReviewService_GetFileContentAsync_MissingFileOrReview_ReturnsNull
+
+      - id: ReviewCenter-ReviewService-Audit
+        title: >-
+          The ReviewService class shall record the creation of a draft review in the audit trail, in the same
+          transaction as the review, naming the actor, the title, the content fingerprint, and the number of files.
+        justification: |
+          The fingerprint in the history ties the creation of a review to the exact content it covers.
+        tests:
+          - ReviewService_CreateDraftAsync_Review_RecordsReviewCreatedWithFingerprint
+          - ReviewService_CreateDraftAsync_SeveralFiles_RecordsPluralCount

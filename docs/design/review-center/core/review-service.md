@@ -55,6 +55,10 @@ covers two requests that pass the check at the same time.
 **GetFileContentAsync**: Reads the exact bytes of one file of a review by its path; returns null when the
 review or file does not exist.
 
+**Audit**: `CreateDraftAsync` takes the `Actor` and passes the draft `review.created` (detail with the title, the
+fingerprint, and the number of files) to the store, which saves it in the same transaction as the review and its files.
+A refused creation records nothing. See the `AuditService` unit for the action codes.
+
 #### Error Handling
 
 Rule violations raise `DomainRuleException` with the matching `DomainRule`. A null `files` argument, and a null

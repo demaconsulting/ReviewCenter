@@ -299,9 +299,9 @@ public partial class ProjectPage : ComponentBase
         Review review;
         try
         {
-            // The service takes no actor yet; asking for one refuses an ended sign-in state
-            _ = await AuthenticationState.GetActorAsync();
-            review = await ReviewService.CreateDraftAsync(ProjectId, ReviewId, ReviewTitle, SelectedFiles);
+            // The actor is audited; asking for it also refuses an ended sign-in state
+            var actor = await AuthenticationState.GetActorAsync();
+            review = await ReviewService.CreateDraftAsync(ProjectId, ReviewId, ReviewTitle, SelectedFiles, actor);
         }
         catch (DomainRuleException ex)
         {

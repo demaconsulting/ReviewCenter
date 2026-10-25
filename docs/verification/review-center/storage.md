@@ -38,6 +38,8 @@ The native SQLite library must be loadable on the test platform (it is supplied 
 - A review for a project that does not exist is refused, by the services and by the database itself, and the stored
   data is unchanged.
 - An unsupported provider is refused with an error that names it, and no database is created.
+- Every audited change is stored together with its audit entry; changes made at the same moment through different
+  stores give one linear, intact chain, and the audit store offers no update or delete.
 
 ### Test Scenarios
 
@@ -86,3 +88,9 @@ directly to the store. The service throws a `DomainRuleException` for `ProjectNo
 `DbUpdateException` because of the foreign key, no review and no project exist for the unknown id, and the existing
 project and its review are unchanged. This scenario is tested by
 `StorageSubsystem_ServicesOverDatabase_UnknownProject_IsRefusedAndKeepsData`.
+
+**Audit trail transaction**: Changes are made at the same moment through different stores that share the
+process-wide gate; the sequence numbers are consecutive and the chain is intact. This scenario is tested by
+`AuditStore_ConcurrentChangesFromDifferentStores_ProduceLinearChain`. The public surface of the audit store has no
+method that updates or deletes an entry, which is tested by `AuditStore_PublicSurface_OffersNoUpdateOrDelete`. The
+reading and verification of stored entries is verified in the unit tests of `AuditStore`.

@@ -197,6 +197,7 @@ public sealed class SigningService
             await EnsureReviewAsync(projectId, reviewId, cancellationToken);
             var slots = await _store.ListSlotsAsync(projectId, reviewId, cancellationToken);
             await ValidateMembersAsync(slots, null, primaryUserId, alternateUserId, cancellationToken);
+            var members = await DescribeMembersAsync(primaryUserId, alternateUserId, cancellationToken);
 
             return await _store.AddSlotAsync(
                 new ReviewerSlot
@@ -206,6 +207,7 @@ public sealed class SigningService
                     PrimaryUserId = primaryUserId,
                     AlternateUserId = alternateUserId
                 },
+                stored => AuditDraft.By(actor, "slot.added", $"slot {stored.Id}: {members}", projectId, reviewId),
                 cancellationToken);
         }
         finally
@@ -247,8 +249,10 @@ public sealed class SigningService
             await EnsureActorAsync(actor, cancellationToken);
             var slots = await EnsureUnsignedSlotAsync(projectId, reviewId, slotId, cancellationToken);
             await ValidateMembersAsync(slots, slotId, primaryUserId, alternateUserId, cancellationToken);
+            var members = await DescribeMembersAsync(primaryUserId, alternateUserId, cancellationToken);
 
-            if (!await _store.UpdateSlotAsync(projectId, reviewId, slotId, primaryUserId, alternateUserId, cancellationToken))
+            var audit = AuditDraft.By(actor, "slot.updated", $"slot {slotId}: {members}", projectId, reviewId);
+            if (!await _store.UpdateSlotAsync(projectId, reviewId, slotId, primaryUserId, alternateUserId, audit, cancellationToken))
             {
                 throw SlotNotFound(slotId);
             }
@@ -285,9 +289,13 @@ public sealed class SigningService
         try
         {
             await EnsureActorAsync(actor, cancellationToken);
-            await EnsureUnsignedSlotAsync(projectId, reviewId, slotId, cancellationToken);
+            var slots = await EnsureUnsignedSlotAsync(projectId, reviewId, slotId, cancellationToken);
 
-            if (!await _store.RemoveSlotAsync(projectId, reviewId, slotId, cancellationToken))
+            // The entry describes the slot as it was before it goes
+            var slot = slots.First(s => s.Id == slotId);
+            var members = await DescribeMembersAsync(slot.PrimaryUserId, slot.AlternateUserId, cancellationToken);
+            var audit = AuditDraft.By(actor, "slot.removed", $"slot {slotId}: {members}", projectId, reviewId);
+            if (!await _store.RemoveSlotAsync(projectId, reviewId, slotId, audit, cancellationToken))
             {
                 throw SlotNotFound(slotId);
             }
@@ -401,12 +409,36 @@ public sealed class SigningService
                     RecordDigest = digest,
                     Meaning = MeaningText
                 },
+                AuditDraft.By(
+                    actor,
+                    "signature.added",
+                    $"slot {slotId}, role {role}, record digest {digest}",
+                    projectId,
+                    reviewId),
                 cancellationToken);
         }
         finally
         {
             _gate.Release();
         }
+    }
+
+    /// <summary>
+    ///     Words the members of a slot for the audit trail.
+    /// </summary>
+    /// <param name="primaryUserId">The primary reviewer.</param>
+    /// <param name="alternateUserId">The alternate reviewer, or <c>null</c>.</param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <returns>For example <c>primary ada, alternate bob</c>; <c>alternate none</c> without an alternate.</returns>
+    private async Task<string> DescribeMembersAsync(
+        int primaryUserId,
+        int? alternateUserId,
+        CancellationToken cancellationToken)
+    {
+        var names = (await _users.ListAsync(cancellationToken)).ToDictionary(user => user.Id, user => user.Username);
+        string NameOf(int id) => names.TryGetValue(id, out var name) ? name : $"user {id}";
+        var alternate = alternateUserId is { } id ? NameOf(id) : "none";
+        return $"primary {NameOf(primaryUserId)}, alternate {alternate}";
     }
 
     /// <summary>

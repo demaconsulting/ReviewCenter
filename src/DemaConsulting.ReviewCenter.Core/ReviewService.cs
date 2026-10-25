@@ -75,9 +75,10 @@ public sealed class ReviewService
     ///     <see cref="ReviewLimits.MaxFileSizeBytes"/> and all together at most
     ///     <see cref="ReviewLimits.MaxTotalSizeBytes"/> bytes.
     /// </param>
+    /// <param name="actor">The signed-in user creating the review; recorded in the audit trail. Must not be null.</param>
     /// <param name="cancellationToken">Cancels the operation.</param>
     /// <returns>The created review, including its fingerprint and file metadata.</returns>
-    /// <exception cref="ArgumentNullException">Thrown when <paramref name="files"/> is null.</exception>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="files"/> or <paramref name="actor"/> is null.</exception>
     /// <exception cref="DomainRuleException">
     ///     Thrown when any rule is violated (see <see cref="DomainRule"/>); nothing is stored then.
     /// </exception>
@@ -86,9 +87,11 @@ public sealed class ReviewService
         string? id,
         string? title,
         IReadOnlyList<UploadedFile> files,
+        Actor actor,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(files);
+        ArgumentNullException.ThrowIfNull(actor);
 
         // Validate everything that needs no I/O first so a bad request fails fast and cheaply
         ValidateId(id);
@@ -143,7 +146,15 @@ public sealed class ReviewService
             }
         };
 
-        await _store.AddReviewAsync(review, cancellationToken);
+        await _store.AddReviewAsync(
+            review,
+            AuditDraft.By(
+                actor,
+                "review.created",
+                $"review '{trimmedTitle}', fingerprint {review.ContentFingerprint}, {reviewFiles.Count} file{(reviewFiles.Count == 1 ? string.Empty : "s")}",
+                projectId,
+                id),
+            cancellationToken);
         return review;
     }
 

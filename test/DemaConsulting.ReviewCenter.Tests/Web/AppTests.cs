@@ -106,8 +106,10 @@ public class AppTests : PageTestBase
         Assert.NotNull(reviewer.Find("[data-testid='account-link']"));
         Assert.NotNull(reviewer.Find("[data-testid='logout-button']"));
         Assert.Empty(reviewer.FindAll("[data-testid='users-link']"));
+        Assert.Empty(reviewer.FindAll("[data-testid='audit-link']"));
         Assert.Empty(reviewer.FindAll("[data-testid='signin-link']"));
         Assert.NotNull(admin.Find("[data-testid='users-link']"));
+        Assert.Equal("/audit", admin.Find("[data-testid='audit-link']").GetAttribute("href"));
     }
 
     /// <summary>

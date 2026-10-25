@@ -133,3 +133,10 @@ checks named before the open threads. This scenario is tested by
 
 **ThreadService_Constructor_NullArguments_Throws**: A null store and a null clock are rejected with
 `ArgumentNullException`. This scenario is tested by `ThreadService_Constructor_NullArguments_Throws`.
+
+**ThreadService_ThreadEvents_RecordIdsAnchorsAndDigestButNotText**: A thread is started, replied to, resolved, and
+reopened; the entries `thread.started`, `thread.replied`, `thread.resolved`, and `thread.reopened` carry the thread
+and the anchor, and the comment text appears only as an eight-character digest prefix. This scenario is tested by
+`ThreadService_ThreadEvents_RecordIdsAnchorsAndDigestButNotText`. A resolve of a thread that does not exist records
+nothing, which is tested by `ThreadService_ResolveAsync_MissingThread_RecordsNothing`. Both tests are defined in
+`AuditEventTests.cs`.

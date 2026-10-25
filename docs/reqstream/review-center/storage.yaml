@@ -119,3 +119,25 @@ sections:
           - ReviewCenter-DbContext-Signatures
         tests:
           - StorageSubsystem_Signatures_PersistAcrossReopenAndStayCurrent
+
+      - id: ReviewCenter-Storage-AuditTrail
+        title: >-
+          The Storage subsystem shall store every audited change together with its audit entry in one Serializable
+          transaction, through one process-wide gate shared by all stores, so that both or neither are stored and
+          the sequence of entries has no gap and no fork, refuse a second entry with the same sequence number,
+          offer no way to update or delete an entry, and read the entries in pages and in ordered batches.
+        justification: |
+          The hash chain is only as good as the order of its entries. Appending inside the transaction of the
+          change, under one gate, keeps the chain linear and the history true even when several users act at the
+          same time or the process stops in the middle of a change.
+        children:
+          - ReviewCenter-AuditStore-Append
+          - ReviewCenter-AuditStore-Atomic
+          - ReviewCenter-AuditStore-Concurrency
+          - ReviewCenter-AuditStore-Read
+          - ReviewCenter-ReviewStore-Audit
+          - ReviewCenter-UserStore-Audit
+          - ReviewCenter-DbContext-AuditEntries
+        tests:
+          - AuditStore_ConcurrentChangesFromDifferentStores_ProduceLinearChain
+          - AuditStore_PublicSurface_OffersNoUpdateOrDelete

@@ -48,8 +48,21 @@ internal sealed class TestStore : IDisposable
             .BuildServiceProvider();
         var factory = _provider.GetRequiredService<IDbContextFactory<ReviewCenterDbContext>>();
         DatabaseSetup.EnsureCreated(factory, options);
-        Store = new ReviewStore(factory);
+        var appender = new AuditAppender(TimeProvider.System);
+        Store = new ReviewStore(factory, appender);
+        Audit = new AuditStore(factory, appender);
+        Users = new UserStore(factory, appender);
     }
+
+    /// <summary>
+    ///     Gets the audit store over the same database.
+    /// </summary>
+    public AuditStore Audit { get; }
+
+    /// <summary>
+    ///     Gets the user store over the same database.
+    /// </summary>
+    public UserStore Users { get; }
 
     /// <summary>
     ///     Gets the connection string of the database file, for tests that need a second connection.

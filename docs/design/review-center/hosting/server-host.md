@@ -58,14 +58,16 @@ server render mode; and registers the start-up log callback.
 - *Returns*: `void`.
 - *Preconditions*: Neither argument is null.
 - *Postconditions*: The `Database` options, a `ReviewCenterDbContext` factory configured by
-  `DatabaseSetup.Configure`, `TimeProvider.System`, `ReviewStore` and `UserStore` as the Core store interfaces,
-  `PasswordHasher` as the Core hasher interface, and `ProjectService`, `ReviewService`, `ThreadService`,
-  `ChecklistService`, `UserService`, and `SigningService` as singletons are registered.
+  `DatabaseSetup.Configure`, `TimeProvider.System`, one `AuditAppender`, `ReviewStore`, `UserStore`, and `AuditStore` as
+  the Core store interfaces, `PasswordHasher` as the Core hasher interface, and `ProjectService`, `ReviewService`,
+  `ThreadService`, `ChecklistService`, `UserService`, `SigningService`, and `AuditService` as singletons are registered.
+  `AuditService` gets a hook that logs a warning when an event cannot be recorded.
 
-The method is shared with `UserCommand`, so that the command line creates users with exactly the services of the
-server. `UserService` must remain a single instance, because it serializes the changes to users in the process;
+The method is shared with `UserCommand` and `AuditCommand`, so that the command line works with exactly the services of
+the server. `UserService` must remain a single instance, because it serializes the changes to users in the process;
 `SigningService` must remain a single instance for the same reason, because it serializes the changes to reviewer
-slots and signatures with one gate.
+slots and signatures with one gate. `AuditAppender` must remain a single instance, because its gate is what serializes
+every audited change of all stores in the process (the database write lock serializes other processes).
 
 **InitializeDatabase**: Creates the database for a built application.
 
@@ -130,10 +132,10 @@ always disposed.
 
 - **Context** — supplies `Urls` and `Silent`, and receives start-up error reports.
 - **App** — the root component mapped as the user interface.
-- **DatabaseSetup**, **ReviewCenterDbContext**, **ReviewStore**, **UserStore** — the database configuration, context,
-  and stores registered for the pages.
-- **ProjectService**, **ReviewService**, **ThreadService**, **ChecklistService**, **UserService**, **SigningService** —
-  the Core services registered for the pages.
+- **DatabaseSetup**, **ReviewCenterDbContext**, **ReviewStore**, **UserStore**, **AuditStore**, **AuditAppender** — the
+  database configuration, context, and stores registered for the pages.
+- **ProjectService**, **ReviewService**, **ThreadService**, **ChecklistService**, **UserService**, **SigningService**,
+  **AuditService** — the Core services registered for the pages.
 - **PasswordHasher**, **SignIn** — the password hasher registered for the Core, and the cookie sign-in, authorization,
   and login and logout endpoints.
 - **ASP.NET Core shared framework** — `WebApplication`, Kestrel, endpoint routing, authentication, authorization,
@@ -143,6 +145,6 @@ always disposed.
 #### Callers
 
 - **Program** — calls `RunAsync` when the `serve` verb is present.
-- **UserCommand** — calls `AddServices` to register the same services.
+- **UserCommand** and **AuditCommand** — call `AddServices` to register the same services.
 - **Tests** — call `CreateApplication` with `ServerHostOptions` to run the production pipeline
   against an in-memory server.

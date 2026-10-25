@@ -189,3 +189,8 @@ scenario is tested by `ReviewStore_ListThreadsAsync_TwoReviews_ReturnsOnlyOwnThr
 **ReviewStore_AddThreadAsync_UnknownFile_IsRefusedByDatabase**: A thread for a file that is not in the review
 raises a `DbUpdateException` and no thread is stored. This scenario is tested by
 `ReviewStore_AddThreadAsync_UnknownFile_IsRefusedByDatabase`.
+
+**Audit drafts**: Every mutation of the store takes an audit draft, and the tests of this unit pass one through
+the real `AuditAppender`; the helper `TestStore` builds the store and an `AuditStore` over the same database. The
+transaction that stores a change with its audit entry, and the linear chain of changes made through different
+stores, are verified in the tests of `AuditStore`.

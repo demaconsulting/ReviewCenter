@@ -71,3 +71,12 @@ sections:
           - SessionGate_Render_Anonymous_ShowsSessionEndedWithLoginLinkAndNoContent
           - SessionGate_Render_StateBecomesAnonymous_ReplacesContentWithMessage
           - SessionGate_Render_EveryProtectedPageSignedOut_ShowsSessionEndedAndNoPage
+
+      - id: ReviewCenter-App-AuditLink
+        title: >-
+          The App unit shall show a link to the audit page in the header only while an enabled administrator is
+          signed in.
+        justification: |
+          The link must not invite other users to a page they cannot open.
+        tests:
+          - MainLayout_Render_SignedInUser_ShowsNameAccountAndLogout

@@ -127,6 +127,11 @@ internal sealed class ReviewCenterDbContext : DbContext
     public DbSet<ReviewSignature> Signatures => Set<ReviewSignature>();
 
     /// <summary>
+    ///     Gets the table of audit entries.
+    /// </summary>
+    public DbSet<AuditEntry> AuditEntries => Set<AuditEntry>();
+
+    /// <summary>
     ///     Configures keys, relationships, length limits and conversions.
     /// </summary>
     /// <param name="modelBuilder">The builder used to describe the model.</param>
@@ -289,6 +294,23 @@ internal sealed class ReviewCenterDbContext : DbContext
                 .WithMany()
                 .HasForeignKey(s => s.SlotId)
                 .OnDelete(DeleteBehavior.NoAction);
+        });
+
+        // Audit trail: append-only (nothing in the application updates or deletes a row). The sequence is the key,
+        // assigned by the appender under the process-wide gate (never by the database), so a duplicate sequence
+        // is refused by the primary key. There are no foreign keys: an entry is a snapshot of text and must
+        // survive whatever happens to the rows it describes. The index serves the history of one review
+        modelBuilder.Entity<AuditEntry>(entry =>
+        {
+            entry.HasKey(a => a.Sequence);
+            entry.Property(a => a.Sequence).ValueGeneratedNever();
+            entry.Property(a => a.ActorName).IsRequired().HasMaxLength(AuditText.MaxActorNameLength);
+            entry.Property(a => a.Action).IsRequired().HasMaxLength(AuditText.MaxActionLength);
+            entry.Property(a => a.ReviewId).HasMaxLength(ReviewLimits.MaxReviewIdLength);
+            entry.Property(a => a.Detail).IsRequired().HasMaxLength(AuditText.MaxDetailLength);
+            entry.Property(a => a.PreviousHash).IsRequired().HasMaxLength(Sha256HexColumnLength);
+            entry.Property(a => a.Hash).IsRequired().HasMaxLength(Sha256HexColumnLength);
+            entry.HasIndex(a => new { a.ProjectId, a.ReviewId, a.Sequence });
         });
     }
 }

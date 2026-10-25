@@ -168,3 +168,33 @@ sections:
           - ReviewCenter-SigningService-Status
         tests:
           - CoreSubsystem_Signatures_SignChangeOutOfDateAndResign_FollowsTheRecord
+
+      - id: ReviewCenter-Core-AuditTrail
+        title: >-
+          The Core subsystem shall record every change of projects, reviews, threads, checklists, reviewer slots,
+          signatures, and users, and every sign-in event, as an entry of a hash-chained audit trail that names the
+          actor, the action, and a short detail without passwords or free text, read the trail back newest first
+          in pages, and verify the chain by streaming, so that an edit, a deletion, an insertion, or a reordering
+          in the middle of the history is detected.
+        justification: |
+          A review record is only trustworthy if its history can be checked. Hash chaining makes tampering with
+          the middle of the history evident without a special database. It does not detect the removal of the
+          newest entries or a complete rewrite by someone with write access to the database, unless the head hash
+          was recorded elsewhere.
+        children:
+          - ReviewCenter-AuditChain-Hash
+          - ReviewCenter-AuditChain-Verify
+          - ReviewCenter-AuditChain-Text
+          - ReviewCenter-AuditService-Record
+          - ReviewCenter-AuditService-List
+          - ReviewCenter-AuditService-Verify
+          - ReviewCenter-ProjectService-Audit
+          - ReviewCenter-ReviewService-Audit
+          - ReviewCenter-ThreadService-Audit
+          - ReviewCenter-ChecklistService-Audit
+          - ReviewCenter-SigningService-Audit
+          - ReviewCenter-UserService-Audit
+          - ReviewCenter-UserService-SignInAudit
+        tests:
+          - AuditService_RecordAsync_Draft_StoresEntryThatVerifies
+          - UserService_AdministrationEvents_AreRecordedWithoutPasswords

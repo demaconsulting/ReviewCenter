@@ -107,3 +107,9 @@ records the verb and the three options. `Program.Run` with `--help` prints a hel
 `REVIEWCENTER_PASSWORD` variable, `user add` without names is rejected, and `--username` without the verb is
 rejected, each with an `ArgumentException`. This scenario is tested by
 `CliSubsystem_UserAddFlow_ContextAndProgram_ParsesOptionsDocumentsThemAndRejectsMisuse`.
+
+**Audit verify verb**: The unit tests verify the flow of the `audit verify` verb. `Context.Create` with the arguments
+`audit verify` sets `AuditVerify`, which is tested by `Context_Create_AuditVerifyVerb_SetsAuditVerify`, and the help
+text printed by `Program.Run` names `audit verify`, which is tested by `Program_Run_Help_DocumentsAuditVerify`. No
+subsystem test runs the dispatch of `Program` to the command; that part is verified by the tests of
+`AuditCommand` in the `Hosting` subsystem and by inspection.

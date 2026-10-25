@@ -29,6 +29,10 @@ namespace DemaConsulting.ReviewCenter.Core;
 ///     can be tested with a fake store and Core never references a database library. Every method
 ///     is asynchronous and honors its cancellation token. Implementations must be safe for
 ///     concurrent use because the services are shared by all browser sessions.
+///     Every method that changes data takes the <see cref="AuditDraft"/> of that change (or a function that builds
+///     it from the stored entity, when the draft needs an identity the database assigns) and must save the
+///     audit entry in the same transaction as the change: both are stored or neither. A change that did not
+///     take effect (a method that returns <c>null</c> or <c>false</c>) records nothing.
 /// </remarks>
 public interface IReviewStore
 {
@@ -36,9 +40,13 @@ public interface IReviewStore
     ///     Stores a new project and assigns its identity.
     /// </summary>
     /// <param name="project">The project to store. Must not be null; its <see cref="Project.Id"/> is ignored.</param>
+    /// <param name="audit">Builds the audit draft from the stored project (so the draft can name the assigned identity). Must not be null.</param>
     /// <param name="cancellationToken">Cancels the operation.</param>
     /// <returns>The stored project, including the assigned identity.</returns>
-    Task<Project> AddProjectAsync(Project project, CancellationToken cancellationToken = default);
+    Task<Project> AddProjectAsync(
+        Project project,
+        Func<Project, AuditDraft> audit,
+        CancellationToken cancellationToken = default);
 
     /// <summary>
     ///     Reads one project.
@@ -68,13 +76,14 @@ public interface IReviewStore
     ///     Stores a new review together with its files and, when it has one, its frozen checklist.
     /// </summary>
     /// <param name="review">The review to store, with its files and their bytes. Must not be null.</param>
+    /// <param name="audit">The audit draft of the change.</param>
     /// <param name="cancellationToken">Cancels the operation.</param>
     /// <returns>A task that completes when the review is stored.</returns>
     /// <exception cref="DomainRuleException">
     ///     Thrown with <see cref="DomainRule.ReviewIdDuplicate"/> when the project already has a
     ///     review with that id, including when it was created concurrently.
     /// </exception>
-    Task AddReviewAsync(Review review, CancellationToken cancellationToken = default);
+    Task AddReviewAsync(Review review, AuditDraft audit, CancellationToken cancellationToken = default);
 
     /// <summary>
     ///     Reads one review with its file metadata (without file bytes).
@@ -114,9 +123,13 @@ public interface IReviewStore
     ///     The thread to store, with its comments. Must not be null; the identities of the thread and its
     ///     comments are ignored. The file it names must exist in the review.
     /// </param>
+    /// <param name="audit">Builds the audit draft from the stored thread (so the draft can name the assigned identities). Must not be null.</param>
     /// <param name="cancellationToken">Cancels the operation.</param>
     /// <returns>The stored thread, including the assigned identities.</returns>
-    Task<ReviewThread> AddThreadAsync(ReviewThread thread, CancellationToken cancellationToken = default);
+    Task<ReviewThread> AddThreadAsync(
+        ReviewThread thread,
+        Func<ReviewThread, AuditDraft> audit,
+        CancellationToken cancellationToken = default);
 
     /// <summary>
     ///     Appends a comment to an existing thread.
@@ -125,13 +138,15 @@ public interface IReviewStore
     /// <param name="reviewId">The review identifier.</param>
     /// <param name="threadId">The thread identity; the thread must belong to the given review.</param>
     /// <param name="comment">The comment to store. Must not be null; its identities are ignored.</param>
+    /// <param name="audit">Builds the audit draft from the stored comment (so the draft can name the assigned identity). Must not be null.</param>
     /// <param name="cancellationToken">Cancels the operation.</param>
-    /// <returns>The stored comment, or <c>null</c> when the thread does not exist in that review.</returns>
+    /// <returns>The stored comment, or <c>null</c> when the thread does not exist in that review (nothing is recorded then).</returns>
     Task<ReviewComment?> AddCommentAsync(
         int projectId,
         string reviewId,
         int threadId,
         ReviewComment comment,
+        Func<ReviewComment, AuditDraft> audit,
         CancellationToken cancellationToken = default);
 
     /// <summary>
@@ -141,6 +156,7 @@ public interface IReviewStore
     /// <param name="reviewId">The review identifier.</param>
     /// <param name="threadId">The thread identity; the thread must belong to the given review.</param>
     /// <param name="state">The state to store.</param>
+    /// <param name="audit">The audit draft of the change; stored only when the thread exists.</param>
     /// <param name="cancellationToken">Cancels the operation.</param>
     /// <returns><c>true</c> when the thread exists in that review (also when it already had the state); otherwise <c>false</c>.</returns>
     Task<bool> SetThreadStateAsync(
@@ -148,6 +164,7 @@ public interface IReviewStore
         string reviewId,
         int threadId,
         ReviewThreadState state,
+        AuditDraft audit,
         CancellationToken cancellationToken = default);
 
     /// <summary>
@@ -202,17 +219,25 @@ public interface IReviewStore
     ///     Stores the applicability of a checklist section, replacing an earlier one.
     /// </summary>
     /// <param name="state">The state to store. Must not be null; the review must exist.</param>
+    /// <param name="audit">The audit draft of the change.</param>
     /// <param name="cancellationToken">Cancels the operation.</param>
     /// <returns>A task that completes when the state is stored.</returns>
-    Task SetChecklistSectionStateAsync(ChecklistSectionState state, CancellationToken cancellationToken = default);
+    Task SetChecklistSectionStateAsync(
+        ChecklistSectionState state,
+        AuditDraft audit,
+        CancellationToken cancellationToken = default);
 
     /// <summary>
     ///     Stores the answer to a checklist check, replacing an earlier answer.
     /// </summary>
     /// <param name="answer">The answer to store. Must not be null; the review must exist.</param>
+    /// <param name="audit">The audit draft of the change.</param>
     /// <param name="cancellationToken">Cancels the operation.</param>
     /// <returns>A task that completes when the answer is stored.</returns>
-    Task SetChecklistAnswerAsync(ChecklistAnswer answer, CancellationToken cancellationToken = default);
+    Task SetChecklistAnswerAsync(
+        ChecklistAnswer answer,
+        AuditDraft audit,
+        CancellationToken cancellationToken = default);
 
     /// <summary>
     ///     Reads a consistent snapshot of everything a signature covers (see <see cref="ReviewRecord"/>).
@@ -249,9 +274,13 @@ public interface IReviewStore
     ///     Stores a new reviewer slot and assigns its identity.
     /// </summary>
     /// <param name="slot">The slot to store. Must not be null; its <see cref="ReviewerSlot.Id"/> is ignored and the review must exist.</param>
+    /// <param name="audit">Builds the audit draft from the stored slot (so the draft can name the assigned identity). Must not be null.</param>
     /// <param name="cancellationToken">Cancels the operation.</param>
     /// <returns>The stored slot, including the assigned identity.</returns>
-    Task<ReviewerSlot> AddSlotAsync(ReviewerSlot slot, CancellationToken cancellationToken = default);
+    Task<ReviewerSlot> AddSlotAsync(
+        ReviewerSlot slot,
+        Func<ReviewerSlot, AuditDraft> audit,
+        CancellationToken cancellationToken = default);
 
     /// <summary>
     ///     Changes the primary and alternate reviewer of a slot.
@@ -261,6 +290,7 @@ public interface IReviewStore
     /// <param name="slotId">The slot identity; the slot must belong to the given review.</param>
     /// <param name="primaryUserId">The new primary reviewer.</param>
     /// <param name="alternateUserId">The new alternate reviewer, or <c>null</c> for none.</param>
+    /// <param name="audit">The audit draft of the change; stored only when the slot exists.</param>
     /// <param name="cancellationToken">Cancels the operation.</param>
     /// <returns><c>true</c> when the slot exists in that review; otherwise <c>false</c>.</returns>
     Task<bool> UpdateSlotAsync(
@@ -269,6 +299,7 @@ public interface IReviewStore
         int slotId,
         int primaryUserId,
         int? alternateUserId,
+        AuditDraft audit,
         CancellationToken cancellationToken = default);
 
     /// <summary>
@@ -277,6 +308,7 @@ public interface IReviewStore
     /// <param name="projectId">The project identity.</param>
     /// <param name="reviewId">The review identifier.</param>
     /// <param name="slotId">The slot identity; the slot must belong to the given review.</param>
+    /// <param name="audit">The audit draft of the change; stored only when the slot existed.</param>
     /// <param name="cancellationToken">Cancels the operation.</param>
     /// <returns><c>true</c> when the slot existed and was removed; otherwise <c>false</c>.</returns>
     /// <remarks>
@@ -287,6 +319,7 @@ public interface IReviewStore
         int projectId,
         string reviewId,
         int slotId,
+        AuditDraft audit,
         CancellationToken cancellationToken = default);
 
     /// <summary>
@@ -305,6 +338,7 @@ public interface IReviewStore
     ///     Appends a signature, provided the review record still has the digest the signer signed.
     /// </summary>
     /// <param name="signature">The signature to store. Must not be null; its <see cref="ReviewSignature.Id"/> is ignored.</param>
+    /// <param name="audit">The audit draft of the change.</param>
     /// <param name="cancellationToken">Cancels the operation.</param>
     /// <returns>The stored signature, including the assigned identity.</returns>
     /// <remarks>
@@ -320,5 +354,8 @@ public interface IReviewStore
     ///     and with <see cref="DomainRule.SigningNotAllowed"/> when the slot already has a signature of this digest.
     ///     Nothing is stored then.
     /// </exception>
-    Task<ReviewSignature> AddSignatureAsync(ReviewSignature signature, CancellationToken cancellationToken = default);
+    Task<ReviewSignature> AddSignatureAsync(
+        ReviewSignature signature,
+        AuditDraft audit,
+        CancellationToken cancellationToken = default);
 }

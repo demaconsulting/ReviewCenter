@@ -26,6 +26,7 @@ This document covers the verification design for the following software items:
   - **Hosting** subsystem
     - **ServerHost** — web host builder and runner
     - **UserCommand** — the `user add` verb
+    - **AuditCommand** — the `audit verify` verb
   - **Identity** subsystem
     - **PasswordHasher** — password hashing and verification
     - **SignIn** — cookie sign-in, authorization, and the signed-in actor
@@ -40,9 +41,13 @@ This document covers the verification design for the following software items:
     - **LoginPage** — sign-in page
     - **AccountPage** — password change page of the signed-in user
     - **UsersPage** — user administration page
+    - **HistoryPage** — audit history of one review
+    - **AuditPage** — whole audit trail and chain verification for administrators
   - **Core** subsystem
     - **Fingerprint** — ReviewMark-compatible content fingerprint
     - **RecordDigest** — digest of a review record that a signature binds to
+    - **AuditChain** — audit entry types, canonical hash, and streaming chain verifier
+    - **AuditService** — recording, reading, and verification of the audit trail
     - **ProjectService** — project rules
     - **ReviewService** — review rules
     - **ThreadService** — review comment rules
@@ -53,6 +58,7 @@ This document covers the verification design for the following software items:
     - **ReviewCenterDbContext** — database schema mapping
     - **ReviewStore** — database implementation of the store interface
     - **UserStore** — database implementation of the user store interface
+    - **AuditStore** — database implementation of the audit store interface and the shared audit appender
     - **DatabaseSetup** — provider selection, connection resolution, and database creation
   - **SelfTest** subsystem
     - **Validation** — self-validation test runner

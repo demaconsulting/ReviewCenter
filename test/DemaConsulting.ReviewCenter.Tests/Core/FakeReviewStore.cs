@@ -92,8 +92,17 @@ internal sealed class FakeReviewStore : IReviewStore
     /// </summary>
     public IReadOnlyList<ReviewThread> Threads => _threads.ToArray();
 
+    /// <summary>
+    ///     Gets the audit drafts received so far, in the order the changes were made; a change that did not
+    ///     take effect adds none.
+    /// </summary>
+    public List<AuditDraft> Audits { get; } = [];
+
     /// <inheritdoc />
-    public Task<Project> AddProjectAsync(Project project, CancellationToken cancellationToken = default)
+    public Task<Project> AddProjectAsync(
+        Project project,
+        Func<Project, AuditDraft> audit,
+        CancellationToken cancellationToken = default)
     {
         var stored = new Project
         {
@@ -103,6 +112,7 @@ internal sealed class FakeReviewStore : IReviewStore
             Created = project.Created
         };
         _projects.Add(stored);
+        Audits.Add(audit(stored));
         return Task.FromResult(stored);
     }
 
@@ -125,9 +135,10 @@ internal sealed class FakeReviewStore : IReviewStore
     }
 
     /// <inheritdoc />
-    public Task AddReviewAsync(Review review, CancellationToken cancellationToken = default)
+    public Task AddReviewAsync(Review review, AuditDraft audit, CancellationToken cancellationToken = default)
     {
         _reviews.Add(review);
+        Audits.Add(audit);
         return Task.CompletedTask;
     }
 
@@ -163,7 +174,10 @@ internal sealed class FakeReviewStore : IReviewStore
     }
 
     /// <inheritdoc />
-    public Task<ReviewThread> AddThreadAsync(ReviewThread thread, CancellationToken cancellationToken = default)
+    public Task<ReviewThread> AddThreadAsync(
+        ReviewThread thread,
+        Func<ReviewThread, AuditDraft> audit,
+        CancellationToken cancellationToken = default)
     {
         var id = _threads.Count + 1;
         var stored = new ReviewThread
@@ -179,6 +193,7 @@ internal sealed class FakeReviewStore : IReviewStore
             Comments = thread.Comments.Select(comment => Copy(comment, id)).ToList()
         };
         _threads.Add(stored);
+        Audits.Add(audit(stored));
         return Task.FromResult(stored);
     }
 
@@ -188,6 +203,7 @@ internal sealed class FakeReviewStore : IReviewStore
         string reviewId,
         int threadId,
         ReviewComment comment,
+        Func<ReviewComment, AuditDraft> audit,
         CancellationToken cancellationToken = default)
     {
         var thread = Find(projectId, reviewId, threadId);
@@ -198,6 +214,7 @@ internal sealed class FakeReviewStore : IReviewStore
 
         var stored = Copy(comment, threadId);
         thread.Comments.Add(stored);
+        Audits.Add(audit(stored));
         return Task.FromResult<ReviewComment?>(stored);
     }
 
@@ -207,6 +224,7 @@ internal sealed class FakeReviewStore : IReviewStore
         string reviewId,
         int threadId,
         ReviewThreadState state,
+        AuditDraft audit,
         CancellationToken cancellationToken = default)
     {
         var index = _threads.FindIndex(t => t.Id == threadId && t.ProjectId == projectId && t.ReviewId == reviewId);
@@ -215,6 +233,7 @@ internal sealed class FakeReviewStore : IReviewStore
             return Task.FromResult(false);
         }
 
+        Audits.Add(audit);
         // The state is init-only, so the stored thread is replaced by a copy with the new state
         var old = _threads[index];
         _threads[index] = new ReviewThread
@@ -280,18 +299,26 @@ internal sealed class FakeReviewStore : IReviewStore
     }
 
     /// <inheritdoc />
-    public Task SetChecklistSectionStateAsync(ChecklistSectionState state, CancellationToken cancellationToken = default)
+    public Task SetChecklistSectionStateAsync(
+        ChecklistSectionState state,
+        AuditDraft audit,
+        CancellationToken cancellationToken = default)
     {
         _sectionStates.RemoveAll(s => s.ProjectId == state.ProjectId && s.ReviewId == state.ReviewId && s.SectionId == state.SectionId);
         _sectionStates.Add(state);
+        Audits.Add(audit);
         return Task.CompletedTask;
     }
 
     /// <inheritdoc />
-    public Task SetChecklistAnswerAsync(ChecklistAnswer answer, CancellationToken cancellationToken = default)
+    public Task SetChecklistAnswerAsync(
+        ChecklistAnswer answer,
+        AuditDraft audit,
+        CancellationToken cancellationToken = default)
     {
         _answers.RemoveAll(a => a.ProjectId == answer.ProjectId && a.ReviewId == answer.ReviewId && a.ItemId == answer.ItemId);
         _answers.Add(answer);
+        Audits.Add(audit);
         return Task.CompletedTask;
     }
 
@@ -348,7 +375,10 @@ internal sealed class FakeReviewStore : IReviewStore
     }
 
     /// <inheritdoc />
-    public Task<ReviewerSlot> AddSlotAsync(ReviewerSlot slot, CancellationToken cancellationToken = default)
+    public Task<ReviewerSlot> AddSlotAsync(
+        ReviewerSlot slot,
+        Func<ReviewerSlot, AuditDraft> audit,
+        CancellationToken cancellationToken = default)
     {
         var stored = new ReviewerSlot
         {
@@ -359,6 +389,7 @@ internal sealed class FakeReviewStore : IReviewStore
             AlternateUserId = slot.AlternateUserId
         };
         _slots.Add(stored);
+        Audits.Add(audit(stored));
         return Task.FromResult(stored);
     }
 
@@ -369,6 +400,7 @@ internal sealed class FakeReviewStore : IReviewStore
         int slotId,
         int primaryUserId,
         int? alternateUserId,
+        AuditDraft audit,
         CancellationToken cancellationToken = default)
     {
         var index = _slots.FindIndex(s => s.Id == slotId && s.ProjectId == projectId && s.ReviewId == reviewId);
@@ -385,6 +417,7 @@ internal sealed class FakeReviewStore : IReviewStore
             PrimaryUserId = primaryUserId,
             AlternateUserId = alternateUserId
         };
+        Audits.Add(audit);
         return Task.FromResult(true);
     }
 
@@ -393,9 +426,16 @@ internal sealed class FakeReviewStore : IReviewStore
         int projectId,
         string reviewId,
         int slotId,
+        AuditDraft audit,
         CancellationToken cancellationToken = default)
     {
-        return Task.FromResult(_slots.RemoveAll(s => s.Id == slotId && s.ProjectId == projectId && s.ReviewId == reviewId) > 0);
+        var removed = _slots.RemoveAll(s => s.Id == slotId && s.ProjectId == projectId && s.ReviewId == reviewId) > 0;
+        if (removed)
+        {
+            Audits.Add(audit);
+        }
+
+        return Task.FromResult(removed);
     }
 
     /// <inheritdoc />
@@ -414,6 +454,7 @@ internal sealed class FakeReviewStore : IReviewStore
     /// <inheritdoc />
     public async Task<ReviewSignature> AddSignatureAsync(
         ReviewSignature signature,
+        AuditDraft audit,
         CancellationToken cancellationToken = default)
     {
         // The same checks as the real store: the digest is recomputed from what is stored and the pair
@@ -444,6 +485,7 @@ internal sealed class FakeReviewStore : IReviewStore
             Meaning = signature.Meaning
         };
         _signatures.Add(stored);
+        Audits.Add(audit);
         return stored;
     }
 

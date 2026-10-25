@@ -92,3 +92,7 @@ identity. This scenario is tested by `ServerHost_AddServices_Configured_Register
 the `SigningService` is taken from the application services twice; both calls return the same instance, and it reports
 no approval for a review that does not exist. This scenario is tested by
 `ServerHost_AddServices_Configured_RegistersSigningService`.
+
+**Audit services**: The registration of the audit store, the shared audit appender, and the audit service in
+`AddServices` is exercised by the sign-in audit tests and the `AuditCommand` tests, which resolve them from the real
+pipeline; there is no separate test of the registration.

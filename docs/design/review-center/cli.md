@@ -18,22 +18,23 @@ flags and write output. The `Cli` subsystem contains one unit: `Context`.
 - *Contract*: Parses `string[] args` into flag properties and opens the log file if `--log` is
   present. Returns a fully initialized `Context`. Accepts `--result` as a legacy alias for
   `--results`, the `serve` verb, `--urls <url>`, which sets the listen URL for `serve`
-  (default `http://localhost:5000`), and the `user add` verb with `--username <name>`, `--display-name <name>`, and
-  `--role <Admin|Reviewer>`.
+  (default `http://localhost:5000`), the `user add` verb with `--username <name>`, `--display-name <name>`, and
+  `--role <Admin|Reviewer>`, and the `audit verify` verb.
 - *Constraints*: Throws `ArgumentException` for unknown or malformed arguments, including
   `--urls` without a value, `--urls` with a value that is not an absolute http or https URL,
-  `--urls` without the `serve` verb, a user option without `user add`, and `user add` without a user name and a display
-  name; throws `InvalidOperationException` when the log file
+  `--urls` without the `serve` verb, a user option without `user add`, `user add` without a user name and a display
+  name, and `audit` without the `verify` action; throws `InvalidOperationException` when the log file
   cannot be opened.
 
-**Context.Serve**, **Context.Urls**, **Context.UserAdd**, **Context.Username**, **Context.DisplayName**, and
-**Context.Role**: Read-only properties describing the serve and user requests.
+**Context.Serve**, **Context.Urls**, **Context.UserAdd**, **Context.Username**, **Context.DisplayName**,
+**Context.Role**, and **Context.AuditVerify**: Read-only properties describing the serve, user, and audit requests.
 
 - *Type*: In-process .NET properties.
 - *Role*: Provider.
 - *Contract*: `Serve` is true when the `serve` verb was supplied. `Urls` is the URL supplied
   with `--urls`, or the default when none was supplied. `UserAdd` is true when `user add` was supplied, and then
   `Username` and `DisplayName` hold the values supplied and `Role` the role supplied, `Reviewer` by default.
+  `AuditVerify` is true when `audit verify` was supplied.
 - *Constraints*: Read-only; consumed by `Program` and by the `Hosting` subsystem.
 
 **Context.WriteLine**: Writes a message to stdout and to the log file.
@@ -79,7 +80,7 @@ The subsystem has no dependencies on other tool subsystems; it uses .NET BCL typ
 `Hosting` subsystem depends on it in the other
 direction: `ServerHost` reads the listen URL and the silent option from `Context`, and reports
 a failure to start through `Context.WriteError`; `UserCommand` reads the user options and reports through the same
-methods.
+methods; `AuditCommand` reports the result of the verification the same way, so that a broken chain gives exit code 1.
 
 Error handling flows from `Context.Create` to `Program.Main`: argument parsing errors propagate
 as `ArgumentException`; log-file errors propagate as `InvalidOperationException`. Both are

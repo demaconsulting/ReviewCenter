@@ -95,3 +95,7 @@ signing that is not allowed, and one signature remains. This scenario is tested 
 **ReviewStore_AddSignatureAsync_CurrentDigest_StoresAndRoundTrips**: A signature is stored and read back with its
 role, its 64-character digest, and its meaning text unchanged, which verifies the signatures table.
 This scenario is tested by `ReviewStore_AddSignatureAsync_CurrentDigest_StoresAndRoundTrips`.
+
+**Audit entries table**: The `AuditEntries` table is mapped by `ReviewCenterDbContext` and is exercised by the tests
+of `AuditStore`, which write, read, and verify entries through the real schema; all scenarios of this unit run over a
+schema that includes it.

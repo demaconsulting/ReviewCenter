@@ -54,3 +54,7 @@ tested by `ProjectService_ListAsync_SeveralProjects_ReturnsOrderedByNameThenId`.
 **ProjectService_GetAsync_ExistingAndUnknown_ReturnsProjectOrNull**: An existing project is returned by its
 identity and an unknown identity returns null. This scenario is tested by
 `ProjectService_GetAsync_ExistingAndUnknown_ReturnsProjectOrNull`.
+
+**ProjectService_CreateAsync_Project_RecordsProjectCreated**: A project is created by a named actor; the audit entry
+`project.created` is recorded with the actor and the project name in the detail. This scenario is tested by
+`ProjectService_CreateAsync_Project_RecordsProjectCreated`, which is defined in `AuditEventTests.cs`.

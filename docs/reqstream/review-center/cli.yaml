@@ -180,3 +180,16 @@ sections:
           - ReviewCenter-Context-UserAddMisuse
         tests:
           - CliSubsystem_UserAddFlow_ContextAndProgram_ParsesOptionsDocumentsThemAndRejectsMisuse
+
+      - id: ReviewCenter-Cli-AuditVerify
+        title: >-
+          The Cli subsystem shall support the audit verify verb to signal that the audit trail is to be verified,
+          and shall reject the audit verb without the verify action or with another action.
+        justification: |
+          Verifying the trail from the command line lets scripts and scheduled jobs check it, and a mistyped
+          action must be found when the arguments are parsed.
+        children:
+          - ReviewCenter-Context-AuditVerify
+        tests:
+          - Context_Create_AuditVerifyVerb_SetsAuditVerify
+          - Program_Run_Help_DocumentsAuditVerify

@@ -379,7 +379,10 @@ public class RevalidatingAuthenticationStateProviderTests
     private sealed class ScriptedUserStore(Func<string, CancellationToken, Task<User?>> get) : IUserStore
     {
         /// <inheritdoc />
-        public Task<User> AddAsync(User user, CancellationToken cancellationToken = default)
+        public Task<User> AddAsync(
+            User user,
+            Func<User, AuditDraft> audit,
+            CancellationToken cancellationToken = default)
         {
             throw new NotSupportedException();
         }
@@ -397,7 +400,7 @@ public class RevalidatingAuthenticationStateProviderTests
         }
 
         /// <inheritdoc />
-        public Task UpdateAsync(User user, CancellationToken cancellationToken = default)
+        public Task UpdateAsync(User user, AuditDraft? audit, CancellationToken cancellationToken = default)
         {
             throw new NotSupportedException();
         }
