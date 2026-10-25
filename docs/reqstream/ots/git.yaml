@@ -16,8 +16,9 @@ sections:
             justification: |
               The ContentSources subsystem reads source code through the git program installed on the server, so
               that it behaves like the git the developers use and needs no git library. The service depends on git
-              to fetch into a bare mirror, to resolve branch, tag, and commit names, to compare commits with rename
-              detection, and to return the exact bytes of a file. Passing tests that run the real program against
+              to fetch into a bare mirror, to resolve branch, tag, and commit names, to compare commits (a rename
+              is reported as a deletion plus an addition, because renames are not detected), and to return the
+              exact bytes of a file. Passing tests that run the real program against
               real repositories confirm that it does so. The program is not distributed with the service; the
               operator installs it.
             tags: [ots]

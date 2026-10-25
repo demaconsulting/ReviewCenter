@@ -6,7 +6,7 @@ This document describes the integration and usage design for the `git` OTS softw
 
 git is the source control program through which the `ContentSources` subsystem reads the source code of registered
 repositories. Running the installed program gives the same behavior as the git that developers use, including its
-protocol support, revision names, and rename detection, and avoids a git library inside the service. It is an
+protocol support and revision names, and avoids a git library inside the service. It is an
 external runtime dependency: it is not distributed with ReviewCenter, and the operator installs it so that it is
 found on the `PATH`. A version with the features listed below is required, and the `GitRunner` unit refuses an older
 one with a clear error.
@@ -15,7 +15,8 @@ one with a clear error.
 
 - Fetching into a bare mirror of a repository, with pruning of deleted branches, over https and from a local path
 - Resolving a branch, tag, or commit name to a commit identity, and checking that a commit exists
-- Listing the entries of a commit and the changes between two commits with rename detection
+- Listing the entries of a commit and the changes between two commits as deletions plus additions (`--no-renames`;
+  renames are not detected, so a rename is one deleted file and one added file)
 - Reading the exact bytes of a stored file
 - Reading configuration from the environment of the process, to send a token as an HTTP header without a
   command-line argument or a stored setting

@@ -45,12 +45,13 @@ sections:
 
       - id: ReviewCenter-GitSource-Changes
         title: >-
-          The GitSource class shall list the files that were added, modified, or deleted between a baseline commit
-          and a head commit, reporting a rename as a deletion of the old path and an addition of the new path, and
-          shall list every file of the head commit as added when there is no baseline.
+          The GitSource class shall list the files that were added, modified, or deleted between a baseline commit and a
+          head commit, without rename detection, so that a rename is a deletion of the old path plus an addition of the
+          new path, and shall list every file of the head commit as added when there is no baseline.
         justification: |
-          A review shows what changed since the baseline. A rename reported as a rename would need a similarity guess
-          that can differ between runs, so it is reported as the two plain facts. A review without a baseline covers
+          A review shows what changed since the baseline. Renames are not detected (git runs with
+          `--no-renames`): detecting one would need a similarity guess that can differ between runs, so a rename is
+          reported as the two plain facts. A review without a baseline covers
           the whole head.
         tests:
           - GitSource_ListChanges_BetweenCommits_ListsChangesAndSkipsSpecialEntries
@@ -80,12 +81,15 @@ sections:
 
       - id: ReviewCenter-GitSource-CacheFolder
         title: >-
-          The GitSource class shall report a cache folder that cannot be written as an administrator-level
-          `GitUnavailable` error that names the setting but not the path, and shall release the repository lock.
+          The GitSource class shall report a cache folder that cannot be written, or whose path is malformed or too
+          long, as an administrator-level `GitUnavailable` error that names the setting but not the path, and shall
+          release the repository lock.
         justification: |
           A cache folder that is missing or read-only is a server problem that only an administrator can fix. The
           user must get a clear message instead of a failed page, the path must not reach ordinary users, and a
           lock that stayed held would block every later review of the repository.
         tests:
           - GitSource_Open_CacheFolderNotWritable_ThrowsGitUnavailable
+          - GitSource_Open_MalformedCachePath_ThrowsGitUnavailable
           - GitRunner_RunAsync_HomeFolderNotWritable_ThrowsGitUnavailable
+          - GitRunner_RunAsync_MalformedCachePath_ThrowsGitUnavailable

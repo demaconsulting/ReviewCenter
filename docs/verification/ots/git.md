@@ -43,8 +43,8 @@ unsafe revision are resolved too.
 **Scenario**: The changes between two commits are listed, with modified, added, deleted, and renamed files, a symbolic
 link, a submodule, and a change of the file mode only.
 
-**Expected**: git reports each change with rename detection, so that the source can list a rename as a deletion and
-an addition and skip the link and the submodule.
+**Expected**: git is run with `--no-renames`, so renames are not detected and the source lists a rename as one deleted
+file and one added file; it also skips the link and the submodule.
 
 **Requirement coverage**: `ReviewCenter-OTS-Git-Access`.
 

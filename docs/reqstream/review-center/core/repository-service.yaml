@@ -41,14 +41,14 @@ sections:
       - id: ReviewCenter-RepositoryService-Credentials
         title: >-
           The RepositoryService class shall accept a user name and a token only for an https location, refuse a token
-          without a user name, refuse a user name or token with characters or a length that is not allowed, and refuse
-          a token that is the same text (compared exactly, with case) as the repository name, the user name, or the
-          location, when it is registered, when it replaces the stored token, and when the name, the user, or the
-          location is changed while the stored token is kept.
+          without a user name, refuse a user name or token with characters or a length that is not allowed, and refuse a
+          token that is contained in (is a substring of, compared ordinally, with case) the repository name, the user
+          name, or the location, when it is registered, when it replaces the stored token, and when the name, the user,
+          or the location is changed while the stored token is kept.
         justification: |
           A credential that cannot work, or that could change the meaning of a header, must be reported when it is
           entered, not when a review is created. The repository name, the user name, and the location are written to
-          audit entries and messages, so a token with the same text would put the secret there.
+          audit entries and messages, so a token that is part of one of them would put the secret there.
         tests:
           - RepositoryService_CreateAsync_InvalidCredentials_ThrowsRepositoryCredentialInvalid
           - RepositoryService_CreateAndUpdate_LoopbackHttpWithCredentials_ThrowsRepositoryCredentialInvalid
@@ -57,6 +57,9 @@ sections:
           - RepositoryService_CreateAsync_TokenEqualsLocation_ThrowsRepositoryCredentialInvalid
           - RepositoryService_UpdateAsync_NewTokenEqualsLocation_ThrowsRepositoryCredentialInvalid
           - RepositoryService_UpdateAsync_KeepTokenEqualsNewLocation_ThrowsRepositoryCredentialInvalid
+          - RepositoryService_CreateAsync_TokenContainedInNameUserOrLocation_ThrowsRepositoryCredentialInvalid
+          - RepositoryService_UpdateAsync_NewTokenContainedInNameUserOrLocation_ThrowsRepositoryCredentialInvalid
+          - RepositoryService_UpdateAsync_KeepTokenContainedInNewNameUserOrLocation_ThrowsRepositoryCredentialInvalid
           - RepositoryService_UpdateAsync_KeepUnreadableOrClearedToken_DoesNotCompare
 
       - id: ReviewCenter-RepositoryService-Token

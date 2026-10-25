@@ -339,12 +339,11 @@ if that cannot be stored, the sign-in itself is not blocked, and the failure is 
 Administrators open **Repositories** in the page header (`/repositories`) to register the git repositories that reviews
 will be made from. A repository has a name (letters, digits, dot, underscore, and hyphen), a location (an `https://` or
 `file://` URL, an `http://` URL for `localhost`, `127.0.0.1`, or `[::1]` only, or an absolute local path), and, for a
-private repository, a user name and an access token. A user name or token is accepted only with an `https://`
-location. A repository can be disabled and enabled again; it
-cannot be deleted, so that earlier work keeps its reference. A disabled repository cannot be read. Signed-in users who
-are not administrators can only be offered the names of enabled repositories, never the location or the credentials; a
-git error that is shown to them names the repository instead of its location. A token must not be the same text as the
-repository name, the user name, or the location.
+private repository, a user name and an access token. A user name or token is accepted only with an `https://` location.
+A repository can be disabled and enabled again; it cannot be deleted, so that earlier work keeps its reference. A
+disabled repository cannot be read. Signed-in users who are not administrators can only be offered the names of enabled
+repositories, never the location or the credentials; a git error that is shown to them names the repository instead of
+its location. A token must not be contained in (a part of) the repository name, the user name, or the location.
 
 The token is **write-only**: it is typed into a password field, encrypted with ASP.NET Core Data Protection, and never
 shown again. The list shows only "token set" or "no token". When you edit a repository you choose to keep, replace, or

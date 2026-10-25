@@ -408,7 +408,7 @@ public sealed class RepositoryService
     }
 
     /// <summary>
-    ///     Checks that the stored token, which is kept, is not the same text as the new name, user name or location.
+    ///     Checks that the stored token, which is kept, is not contained in the new name, user name or location.
     /// </summary>
     /// <param name="id">The repository identity.</param>
     /// <param name="name">The new repository name.</param>
@@ -417,7 +417,7 @@ public sealed class RepositoryService
     /// <param name="cancellationToken">Cancels the operation.</param>
     /// <returns>A task that completes when the check is done.</returns>
     /// <exception cref="DomainRuleException">
-    ///     Thrown with <see cref="DomainRule.RepositoryCredentialInvalid"/> when the kept token equals the name, user
+    ///     Thrown with <see cref="DomainRule.RepositoryCredentialInvalid"/> when the kept token is contained in the name, user
     ///     name or location. A token that cannot be decrypted cannot be compared and is no obstacle: it is useless
     ///     until replaced.
     /// </exception>
@@ -443,21 +443,27 @@ public sealed class RepositoryService
     }
 
     /// <summary>
-    ///     Checks that a token is not the same text as the repository name, the user name or the location, because
+    ///     Checks that a token is not contained in (a substring of) the repository name, the user name or the location, because
     ///     those are written to audit entries and messages.
     /// </summary>
     /// <param name="token">The token.</param>
     /// <param name="name">The repository name.</param>
     /// <param name="username">The user name, or <c>null</c>.</param>
-    /// <param name="location">The location as stored (trimmed; the trimmed input is the same text).</param>
-    /// <exception cref="DomainRuleException">Thrown with <see cref="DomainRule.RepositoryCredentialInvalid"/> when it is the same text.</exception>
+    /// <param name="location">The location as stored (trimmed; the trimmed input is the same text, so one comparison covers both).</param>
+    /// <exception cref="DomainRuleException">Thrown with <see cref="DomainRule.RepositoryCredentialInvalid"/> when the token is contained in one of them (ordinal, case-sensitive).</exception>
     private static void ValidateTokenIsNotPublic(string token, string name, string? username, string location)
     {
-        if (string.Equals(token, name, StringComparison.Ordinal)
-            || string.Equals(token, username, StringComparison.Ordinal)
-            || string.Equals(token, location, StringComparison.Ordinal))
+        // An empty token is no token (every text contains the empty text), so it is never compared
+        if (token.Length == 0)
         {
-            throw CredentialInvalid("A token must not be the same as the repository name, the user name or the location, because those are shown in messages and the audit trail.");
+            return;
+        }
+
+        if (name.Contains(token, StringComparison.Ordinal)
+            || (username is not null && username.Contains(token, StringComparison.Ordinal))
+            || location.Contains(token, StringComparison.Ordinal))
+        {
+            throw CredentialInvalid("A token must not be contained in the repository name, the user name or the location, because those are shown in messages and the audit trail.");
         }
     }
 

@@ -20,6 +20,7 @@
 
 using System.ComponentModel;
 using System.Diagnostics;
+using System.Security;
 using System.Text;
 using System.Text.RegularExpressions;
 using DemaConsulting.ReviewCenter.Core;
@@ -588,7 +589,7 @@ internal sealed class GitRunner
     /// </summary>
     /// <returns>The folder path; it is created when missing.</returns>
     /// <exception cref="DomainRuleException">
-    ///     Thrown with <see cref="DomainRule.GitUnavailable"/> when the folder cannot be created.
+    ///     Thrown with <see cref="DomainRule.GitUnavailable"/> when the folder cannot be created or its path is malformed.
     /// </exception>
     private string HomeFolder()
     {
@@ -598,7 +599,7 @@ internal sealed class GitRunner
         {
             Directory.CreateDirectory(home);
         }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        catch (Exception ex) when (IsCacheFolderError(ex))
         {
             // The raw message names server paths; the exception is deliberately not chained
             throw CacheFolderUnwritable();
@@ -608,7 +609,19 @@ internal sealed class GitRunner
     }
 
     /// <summary>
-    ///     Creates the exception for a cache folder that cannot be written. The message names the setting, not the path.
+    ///     Tells whether an exception means that a cache folder path cannot be used: it cannot be created or written
+    ///     (<see cref="IOException"/>, which includes a path that is too long, and <see cref="UnauthorizedAccessException"/>),
+    ///     or the path is malformed or not supported (<see cref="ArgumentException"/>, for example a null character,
+    ///     <see cref="NotSupportedException"/>, for example a colon in the wrong place on Windows, and
+    ///     <see cref="SecurityException"/>).
+    /// </summary>
+    /// <param name="exception">The exception to classify.</param>
+    /// <returns><c>true</c> when the exception is a cache folder path or permission problem.</returns>
+    internal static bool IsCacheFolderError(Exception exception) =>
+        exception is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException or SecurityException;
+
+    /// <summary>
+    ///     Creates the exception for a cache folder that cannot be written or whose path is not valid. The message names the setting, not the path.
     /// </summary>
     /// <returns>The exception to throw.</returns>
     internal static DomainRuleException CacheFolderUnwritable() =>

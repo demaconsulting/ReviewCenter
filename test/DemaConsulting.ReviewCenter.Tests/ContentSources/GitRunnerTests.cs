@@ -448,6 +448,34 @@ public class GitRunnerTests
     }
 
     /// <summary>
+    ///     Test that a cache path that is malformed (a null character) or too long for the file system gives the
+    ///     administrator-level error without the path, not an unhandled exception.
+    /// </summary>
+    /// <param name="kind">Which malformed path to use.</param>
+    [Theory]
+    [InlineData("null-character")]
+    [InlineData("too-long-name")]
+    public async Task GitRunner_RunAsync_MalformedCachePath_ThrowsGitUnavailable(string kind)
+    {
+        // Arrange: a cache path that no platform accepts
+        using var root = new TempFolder();
+        var cache = kind == "null-character"
+            ? Path.Combine(root.Path, "bad\0cache")
+            : Path.Combine(root.Path, new string('x', 2000));
+        var runner = new GitRunner(Options(cache));
+
+        // Act: run any git call
+        var exception = await Assert.ThrowsAsync<DomainRuleException>(
+            () => runner.RunAsync(["--version"], null, 4096, TestContext.Current.CancellationToken));
+
+        // Assert: the rule and the setting are named, the path is not and no inner exception is chained
+        Assert.Equal(DomainRule.GitUnavailable, exception.Rule);
+        Assert.Contains("Git:CachePath", exception.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain(cache, exception.Message, StringComparison.Ordinal);
+        Assert.Null(exception.InnerException);
+    }
+
+    /// <summary>
     ///     Test that a call that never finishes is stopped at the time limit with the timeout error.
     /// </summary>
     [Fact]

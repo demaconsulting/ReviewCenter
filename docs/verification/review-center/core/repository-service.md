@@ -26,9 +26,9 @@ N/A - standard test environment.
 - Every change is audited with the changed field names and no secret; a change that changes nothing makes no entry.
 - A disabled repository is not offered to users and cannot be opened by the git layer.
 - A token that cannot be decrypted is reported by repository name and without the stored text.
-- A token equal to the repository name, the user name, or the location is refused when registering and when updating
-  (with a new token, or with the stored token kept while the name, user name, or location changes to it); a different
-  case is accepted.
+- A token contained in (a substring of, compared with case) the repository name, the user name, or the location is
+  refused when registering and when updating (with a new token, or with the stored token kept while the name, user
+  name, or location changes to hold it); a different case is accepted.
 - The access data is one consistent version of the registration, even when an update runs at the same time.
 - Null arguments are refused.
 
@@ -82,9 +82,10 @@ too long or holds white space are refused with `RepositoryCredentialInvalid`. Th
 `RepositoryService_CreateAsync_InvalidCredentials_ThrowsRepositoryCredentialInvalid`.
 
 **RepositoryService_CreateAsync_TokenEqualsNameOrUsername_ThrowsRepositoryCredentialInvalid**: A token that is exactly
-the repository name or exactly the user name is refused with `RepositoryCredentialInvalid`, with nothing stored or
-audited and without the token in the message; a token that differs only in letter case is accepted. This scenario is
-tested by `RepositoryService_CreateAsync_TokenEqualsNameOrUsername_ThrowsRepositoryCredentialInvalid`.
+the repository name or exactly the user name (the equal case of the contained rule) is refused with
+`RepositoryCredentialInvalid`, with nothing stored or audited and without the token in the message; a token that differs
+only in letter case is accepted. This scenario is tested by
+`RepositoryService_CreateAsync_TokenEqualsNameOrUsername_ThrowsRepositoryCredentialInvalid`.
 
 **RepositoryService_UpdateAsync_TokenEqualsNameOrUsername_ThrowsRepositoryCredentialInvalid**: On update, replacing the
 token with the new repository name or user name is refused, and so is keeping the stored token while the repository or
@@ -107,6 +108,23 @@ changes. This scenario is tested by
 stored token while the location changes to the stored token text is refused with `RepositoryCredentialInvalid` (the
 service decrypts the stored token under its lock to compare), the message has no token, and nothing changes. This
 scenario is tested by `RepositoryService_UpdateAsync_KeepTokenEqualsNewLocation_ThrowsRepositoryCredentialInvalid`.
+
+**RepositoryService_CreateAsync_TokenContainedInNameUserOrLocation_ThrowsRepositoryCredentialInvalid**: A token that is
+a substring of the repository name, of the user name, or of the location is refused with `RepositoryCredentialInvalid`,
+with nothing stored or audited and without the token in the message; a token that is contained only with a different
+letter case, or that is longer than the field, is accepted. This scenario is tested by
+`RepositoryService_CreateAsync_TokenContainedInNameUserOrLocation_ThrowsRepositoryCredentialInvalid`.
+
+**RepositoryService_UpdateAsync_NewTokenContainedInNameUserOrLocation_ThrowsRepositoryCredentialInvalid**: On update,
+replacing the token with a text that is part of the new name, the new user name, or the new location is refused with
+`RepositoryCredentialInvalid`, the message has no token, and nothing changes. This scenario is tested by
+`RepositoryService_UpdateAsync_NewTokenContainedInNameUserOrLocation_ThrowsRepositoryCredentialInvalid`.
+
+**RepositoryService_UpdateAsync_KeepTokenContainedInNewNameUserOrLocation_ThrowsRepositoryCredentialInvalid**: On
+update, keeping the stored token while the name, the user name, or the location changes to a value that holds the token
+as a part is refused with `RepositoryCredentialInvalid` (the service decrypts the stored token under its lock to
+compare), the message has no token, and nothing changes. This scenario is tested by
+`RepositoryService_UpdateAsync_KeepTokenContainedInNewNameUserOrLocation_ThrowsRepositoryCredentialInvalid`.
 
 **RepositoryService_UpdateAsync_KeepUnreadableOrClearedToken_DoesNotCompare**: A kept token that cannot be decrypted
 cannot be compared and does not block a rename, and clearing the token while renaming to its old text is allowed. This

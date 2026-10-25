@@ -30,8 +30,8 @@ N/A - standard test environment (the tests need git, and skip themselves when it
 - A second session on the same repository waits for the first to be disposed; sessions on different repositories are
   open at the same time.
 - A location that does not exist gives a clear access error and leaves no half-made mirror.
-- A cache folder that cannot be written is `GitUnavailable` with a message that names the setting and not the path, and
-  the repository lock is released.
+- A cache folder that cannot be written, or whose path is malformed or too long, is `GitUnavailable` with a message that
+  names the setting and not the path, and the repository lock is released.
 - The mirror configuration never holds the token.
 
 #### Test Scenarios
@@ -80,6 +80,11 @@ open fails with `GitUnavailable`, the message names `Git:CachePath` but not the 
 and a second open fails the same way instead of waiting, which shows the repository lock was released. The same mapping
 for the git home folder is tested by `GitRunner_RunAsync_HomeFolderNotWritable_ThrowsGitUnavailable`. This scenario is
 tested by `GitSource_Open_CacheFolderNotWritable_ThrowsGitUnavailable`.
+
+**GitSource_Open_MalformedCachePath_ThrowsGitUnavailable**: A cache path with a null character, or with a name that is
+too long for any file system, makes the open fail with `GitUnavailable` instead of an unhandled exception; the message
+names `Git:CachePath` but not the path, no inner exception is chained, and a second open fails the same way, which shows
+the repository lock was released. This scenario is tested by `GitSource_Open_MalformedCachePath_ThrowsGitUnavailable`.
 
 **GitSource_Mirror_NeverStoresTheToken**: After opening with an access that carries a token, the configuration of the
 mirror does not contain it. This scenario is tested by `GitSource_Mirror_NeverStoresTheToken`.

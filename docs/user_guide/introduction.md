@@ -578,8 +578,8 @@ An administrator sees a **Repositories** link in the page header, next to **User
 `/repositories`. Other users do not get the page.
 
 - **Add repository**: enter a name (letters, digits, dot, underscore, and hyphen, up to 40 characters, unique without
-  regard to case), a location, and for a private repository a user name and an access token. The token must not be the
-  same text as the repository name, the user name, or the location (compared exactly, with case), because those appear
+  regard to case), a location, and for a private repository a user name and an access token. The token must not be
+  contained in (a part of, compared with case) the repository name, the user name, or the location, because those appear
   in messages and in the audit trail; the same applies when you edit a repository and replace the token, or change the
   name, the user, or the location while keeping a stored token. The location is an
   `https://` or `file://` URL, an `http://` URL for the local machine only (`localhost`, `127.0.0.1`, or `[::1]`;
@@ -630,11 +630,12 @@ are skipped with a note, and the per-file and total size limits are the same as 
 read. A call that runs longer than `Git:TimeoutSeconds` is stopped together with its child processes.
 
 Redirects are not followed, so a location that redirects (for example one that needs the `.git` ending) must be entered
-in its final form. If the cache folder cannot be written, the operation fails with a message that the server "cannot
-write its git cache folder" and names the `Git:CachePath` setting; an administrator must fix the folder or its
-permissions. When git itself fails, the first line of its (redacted) error is shown to the user but is not written to the
-server log. The location of the repository is replaced in that line by the repository name, so ordinary users see which
-repository failed but not where it is kept (a form of the location that git prints in an unusual way could still show).
+in its final form. If the cache folder cannot be written, or its path is malformed or too long, the operation fails with
+a message that the server "cannot write its git cache folder" and names the `Git:CachePath` setting; an administrator
+must fix the folder or its permissions. When git itself fails, the first line of its (redacted) error is shown to the
+user but is not written to the server log. The location of the repository is replaced in that line by the repository
+name, so ordinary users see which repository failed but not where it is kept (a form of the location that git prints in
+an unusual way could still show).
 
 ### Selecting Files
 

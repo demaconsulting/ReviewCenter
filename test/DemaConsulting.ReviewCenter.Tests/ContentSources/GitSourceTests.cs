@@ -434,6 +434,39 @@ public class GitSourceTests
     }
 
     /// <summary>
+    ///     Test that a cache path that is malformed (a null character) or too long for the file system gives the same
+    ///     administrator-level error as an unwritable one, not an unhandled exception, and releases the repository lock.
+    /// </summary>
+    /// <param name="kind">Which malformed path to use.</param>
+    [Theory]
+    [InlineData("null-character")]
+    [InlineData("too-long-name")]
+    public async Task GitSource_Open_MalformedCachePath_ThrowsGitUnavailable(string kind)
+    {
+        // Arrange: a cache path that no platform accepts
+        using var root = new TempFolder();
+        var cache = kind == "null-character"
+            ? Path.Combine(root.Path, "bad\0cache")
+            : Path.Combine(root.Path, new string('x', 2000));
+        var source = NewSource(cache);
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+        timeout.CancelAfter(TimeSpan.FromSeconds(30));
+
+        // Act: open it twice (a held gate would make the second call wait until the timeout)
+        var first = await Assert.ThrowsAsync<DomainRuleException>(
+            () => source.OpenAsync(Access("unused"), timeout.Token));
+        var second = await Assert.ThrowsAsync<DomainRuleException>(
+            () => source.OpenAsync(Access("unused"), timeout.Token));
+
+        // Assert: the rule and the setting are named, the path is not and no inner exception is chained
+        Assert.Equal(DomainRule.GitUnavailable, first.Rule);
+        Assert.Equal(DomainRule.GitUnavailable, second.Rule);
+        Assert.Contains("Git:CachePath", first.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain(cache, first.Message, StringComparison.Ordinal);
+        Assert.Null(first.InnerException);
+    }
+
+    /// <summary>
     ///     Test that the mirror's configuration never holds the token, even when access carries one.
     /// </summary>
     [Fact]

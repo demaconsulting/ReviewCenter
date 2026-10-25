@@ -722,6 +722,127 @@ public class RepositoryServiceTests
     }
 
     /// <summary>
+    ///     Test that a token that is contained in (a substring of) the repository name, the user name or the location
+    ///     is refused when a repository is registered, without the token in the message; a token that is only
+    ///     contained with a different letter case, or that is longer than the field, is allowed.
+    /// </summary>
+    /// <param name="name">The repository name.</param>
+    /// <param name="username">The user name.</param>
+    /// <param name="location">The location.</param>
+    /// <param name="token">The token.</param>
+    /// <param name="refused">Whether the registration must be refused.</param>
+    [Theory]
+    [InlineData("my-tok1234-repo", "svc", "https://example.com/r.git", "tok1234", true)]
+    [InlineData("repo", "svc-tok1234-user", "https://example.com/r.git", "tok1234", true)]
+    [InlineData("repo", "svc", "https://example.com/tok1234/r.git", "tok1234", true)]
+    [InlineData("repo", "svc", "https://example.com/r.git", "example", true)]
+    [InlineData("my-Tok1234-repo", "svc", "https://example.com/r.git", "tok1234", false)]
+    [InlineData("repo", "svc-TOK1234-user", "https://example.com/r.git", "tok1234", false)]
+    [InlineData("repo", "svc", "https://example.com/TOK1234/r.git", "tok1234", false)]
+    [InlineData("repo", "svc", "https://example.com/r.git", "https://example.com/r.git-and-more", false)]
+    public async Task RepositoryService_CreateAsync_TokenContainedInNameUserOrLocation_ThrowsRepositoryCredentialInvalid(
+        string name,
+        string username,
+        string location,
+        string token,
+        bool refused)
+    {
+        // Arrange: a fixture
+        var f = await CreateAsync();
+        var cancellationToken = TestContext.Current.CancellationToken;
+
+        // Act: register the repository
+        var attempt = () => f.Service.CreateAsync(name, location, username, token, _admin, cancellationToken);
+
+        // Assert: refused with the credential rule and nothing stored, or registered (the match is case-sensitive)
+        if (refused)
+        {
+            var exception = await Assert.ThrowsAsync<DomainRuleException>(attempt);
+            Assert.Equal(DomainRule.RepositoryCredentialInvalid, exception.Rule);
+            Assert.DoesNotContain(token, exception.Message, StringComparison.Ordinal);
+            Assert.Empty(f.Store.Audits);
+        }
+        else
+        {
+            Assert.True((await attempt()).HasToken);
+        }
+    }
+
+    /// <summary>
+    ///     Test that an update that replaces the token is refused when the new token is contained in the new name,
+    ///     user name or location; nothing is changed.
+    /// </summary>
+    [Fact]
+    public async Task RepositoryService_UpdateAsync_NewTokenContainedInNameUserOrLocation_ThrowsRepositoryCredentialInvalid()
+    {
+        // Arrange: a private repository whose stored token is Secret
+        var f = await CreateAsync();
+        var cancellationToken = TestContext.Current.CancellationToken;
+        const string location = "https://example.com/r.git";
+        var created = await f.Service.CreateAsync("repo", location, "svc", Secret, _admin, cancellationToken);
+        var before = f.Store.StoredToken(created.Id);
+
+        // Act: replace the token with a part of the new name, of the new user name and of the new location
+        var inName = await Assert.ThrowsAsync<DomainRuleException>(
+            () => f.Service.UpdateAsync(created.Id, "my-n3w-T0ken-repo", location, "svc", TokenChange.Replace("n3w-T0ken"), _admin, cancellationToken));
+        var inUser = await Assert.ThrowsAsync<DomainRuleException>(
+            () => f.Service.UpdateAsync(created.Id, "repo", location, "svc-n3w-T0ken", TokenChange.Replace("n3w-T0ken"), _admin, cancellationToken));
+        var inLocation = await Assert.ThrowsAsync<DomainRuleException>(
+            () => f.Service.UpdateAsync(created.Id, "repo", "https://example.com/n3w-T0ken.git", "svc", TokenChange.Replace("n3w-T0ken"), _admin, cancellationToken));
+        var unchanged = await f.Service.GetAccessAsync(created.Id, cancellationToken);
+
+        // Assert: all three are refused with the credential rule, without the token in the message, and nothing changed
+        foreach (var exception in new[] { inName, inUser, inLocation })
+        {
+            Assert.Equal(DomainRule.RepositoryCredentialInvalid, exception.Rule);
+            Assert.DoesNotContain("n3w-T0ken", exception.Message, StringComparison.Ordinal);
+        }
+
+        Assert.Equal(before, f.Store.StoredToken(created.Id));
+        Assert.Equal("repo", unchanged.Name);
+        Assert.Equal(location, unchanged.Location);
+        Assert.Equal("svc", unchanged.Username);
+        Assert.Single(f.Store.Audits);
+    }
+
+    /// <summary>
+    ///     Test that an update that keeps the stored token while the name, user name or location changes is refused
+    ///     when the stored token is contained in the new name, user name or location; nothing is changed.
+    /// </summary>
+    [Fact]
+    public async Task RepositoryService_UpdateAsync_KeepTokenContainedInNewNameUserOrLocation_ThrowsRepositoryCredentialInvalid()
+    {
+        // Arrange: a private repository whose stored token is Secret
+        var f = await CreateAsync();
+        var cancellationToken = TestContext.Current.CancellationToken;
+        const string location = "https://example.com/r.git";
+        var created = await f.Service.CreateAsync("repo", location, "svc", Secret, _admin, cancellationToken);
+        var before = f.Store.StoredToken(created.Id);
+
+        // Act: keep the token while a new name, user name or location holds it as a part
+        var inName = await Assert.ThrowsAsync<DomainRuleException>(
+            () => f.Service.UpdateAsync(created.Id, $"my-{Secret}-repo", location, "svc", TokenChange.Keep, _admin, cancellationToken));
+        var inUser = await Assert.ThrowsAsync<DomainRuleException>(
+            () => f.Service.UpdateAsync(created.Id, "repo", location, $"svc-{Secret}", TokenChange.Keep, _admin, cancellationToken));
+        var inLocation = await Assert.ThrowsAsync<DomainRuleException>(
+            () => f.Service.UpdateAsync(created.Id, "repo", $"https://example.com/{Secret}/r.git", "svc", TokenChange.Keep, _admin, cancellationToken));
+        var unchanged = await f.Service.GetAccessAsync(created.Id, cancellationToken);
+
+        // Assert: all three are refused with the credential rule, without the token in the message, and nothing changed
+        foreach (var exception in new[] { inName, inUser, inLocation })
+        {
+            Assert.Equal(DomainRule.RepositoryCredentialInvalid, exception.Rule);
+            Assert.DoesNotContain(Secret, exception.Message, StringComparison.Ordinal);
+        }
+
+        Assert.Equal(before, f.Store.StoredToken(created.Id));
+        Assert.Equal("repo", unchanged.Name);
+        Assert.Equal(location, unchanged.Location);
+        Assert.Equal("svc", unchanged.Username);
+        Assert.Single(f.Store.Audits);
+    }
+
+    /// <summary>
     ///     Test that renaming a repository whose stored token can no longer be decrypted is not blocked by the
     ///     comparison (the token cannot be compared and is useless until replaced), and that clearing the token
     ///     while renaming to the old token text is allowed.
