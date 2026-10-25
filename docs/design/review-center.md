@@ -98,7 +98,8 @@ flowchart TD
     ServerHost --> RepositoryStore
     ServerHost --> RepositoryService
     ServerHost --> GitSource
-    ServerHost --> CredentialProtector    UserCommand --> Context
+    ServerHost --> CredentialProtector
+    UserCommand --> Context
     UserCommand --> ServerHost
     UserCommand --> DatabaseSetup
     UserCommand --> UserService
@@ -121,7 +122,8 @@ flowchart TD
     App --> UsersPage
     App --> HistoryPage
     App --> AuditPage
-    App --> RepositoriesPage    App --> SignIn
+    App --> RepositoriesPage
+    App --> SignIn
     LoginPage --> SignIn
     AccountPage --> SignIn
     AccountPage --> UserService
@@ -143,7 +145,8 @@ flowchart TD
     AuditPage --> AuditService
     AuditPage --> UserService
     RepositoriesPage --> RepositoryService
-    RepositoriesPage --> UserService    ReviewService --> Fingerprint
+    RepositoriesPage --> UserService
+    ReviewService --> Fingerprint
     ProjectService --> ReviewStore
     ReviewService --> ReviewStore
     ThreadService --> ReviewStore
@@ -165,7 +168,8 @@ flowchart TD
     RepositoryService --> UserService
     RepositoryStore --> ReviewCenterDbContext
     GitSource --> GitRunner
-    GitSource --> RevisionValidator    DatabaseSetup --> ReviewCenterDbContext
+    GitSource --> RevisionValidator
+    DatabaseSetup --> ReviewCenterDbContext
 ```
 
 `Program` is the entry point. It creates a `Context` from the `Cli` subsystem, dispatches to
