@@ -31,7 +31,7 @@ namespace DemaConsulting.ReviewCenter.ContentSources;
 /// </summary>
 /// <param name="ExitCode">The exit code of the git process.</param>
 /// <param name="Output">The raw standard output, at most the cap given to the runner.</param>
-/// <param name="Error">The last part of the standard error with every secret removed.</param>
+/// <param name="Error">The last part of the standard error with every secret removed and the repository location replaced by its name.</param>
 internal sealed record GitResult(int ExitCode, byte[] Output, string Error);
 
 /// <summary>
@@ -130,23 +130,32 @@ internal sealed class GitRunner
     }
 
     /// <summary>
-    ///     Removes every secret from text that comes from git before it is shown or logged.
+    ///     Removes every secret, and the location of the repository, from text that comes from git before it is shown
+    ///     or logged.
     /// </summary>
     /// <param name="text">The text, or <c>null</c>.</param>
     /// <param name="username">The user name of the credentials, or <c>null</c>.</param>
     /// <param name="token">The token of the credentials, or <c>null</c>.</param>
+    /// <param name="location">The registered location of the repository, or <c>null</c> to leave locations alone.</param>
+    /// <param name="name">The repository name that replaces the location; required when <paramref name="location"/> is given.</param>
     /// <returns>
-    ///     The text with the token, <c>user:token</c>, the base64 form of <c>user:token</c> and the user information
-    ///     of URLs replaced by <c>***</c>.
+    ///     The text with the location replaced by the repository name, and the token, <c>user:token</c>, the base64
+    ///     form of <c>user:token</c> and the user information of URLs replaced by <c>***</c>.
     /// </returns>
-    internal static string Redact(string? text, string? username, string? token)
+    internal static string Redact(string? text, string? username, string? token, string? location = null, string? name = null)
     {
         if (string.IsNullOrEmpty(text))
         {
             return string.Empty;
         }
 
+        // The user information goes first, so a location that carries some is found in its masked form
         var result = UserInfoPattern.Replace(text, Mask + "@");
+        if (!string.IsNullOrWhiteSpace(location))
+        {
+            result = ReplaceLocation(result, location, name ?? string.Empty);
+        }
+
         if (!string.IsNullOrEmpty(token))
         {
             var pair = $"{username}:{token}";
@@ -164,6 +173,67 @@ internal sealed class GitRunner
         }
 
         return result;
+    }
+
+    /// <summary>
+    ///     Replaces the location of a repository in text by the repository name.
+    /// </summary>
+    /// <param name="text">The text, with the user information of any URL already masked.</param>
+    /// <param name="location">The registered location.</param>
+    /// <param name="name">The repository name.</param>
+    /// <returns>
+    ///     The text with every form git prints for the location replaced: as registered, without or with masked user
+    ///     information, with or without a trailing slash or <c>.git</c>, with forward or back slashes for a local
+    ///     path, the local path of a <c>file://</c> URL, and the host name of a web address (git names it when it
+    ///     cannot connect). Case is ignored, because host names and Windows paths are.
+    /// </returns>
+    internal static string ReplaceLocation(string text, string location, string name)
+    {
+        var forms = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var withoutUserInfo = UserInfoPattern.Replace(location, string.Empty);
+        var bases = new List<string> { location, withoutUserInfo, UserInfoPattern.Replace(location, Mask + "@") };
+        var isWebAddress = location.StartsWith("http://", StringComparison.OrdinalIgnoreCase)
+            || location.StartsWith("https://", StringComparison.OrdinalIgnoreCase);
+        if (Uri.TryCreate(withoutUserInfo, UriKind.Absolute, out var uri))
+        {
+            if (uri.IsFile)
+            {
+                bases.Add(uri.LocalPath);
+            }
+            else if (isWebAddress && uri.Host.Length >= 3)
+            {
+                forms.Add(uri.Authority);
+                forms.Add(uri.Host);
+            }
+        }
+
+        foreach (var form in bases)
+        {
+            var trimmed = form.TrimEnd('/', '\\');
+            var withoutGit = trimmed.EndsWith(".git", StringComparison.OrdinalIgnoreCase) ? trimmed[..^4] : trimmed;
+            foreach (var variant in new[] { trimmed, withoutGit, withoutGit + ".git" })
+            {
+                forms.Add(variant);
+                if (!isWebAddress)
+                {
+                    forms.Add(variant.Replace('\\', '/'));
+                    forms.Add(variant.Replace('/', '\\'));
+                }
+            }
+        }
+
+        // Longest first, so a whole location wins over a part of it; an optional trailing slash goes with it
+        var alternatives = forms.Where(f => f.Length > 0).OrderByDescending(f => f.Length).Select(Regex.Escape).ToList();
+        if (alternatives.Count == 0)
+        {
+            return text;
+        }
+
+        var pattern = new Regex(
+            "(?:" + string.Join('|', alternatives) + @")[/\\]?",
+            RegexOptions.IgnoreCase | RegexOptions.CultureInvariant,
+            TimeSpan.FromSeconds(1));
+        return pattern.Replace(text, _ => name);
     }
 
     /// <summary>
@@ -301,12 +371,12 @@ internal sealed class GitRunner
     /// <summary>
     ///     Describes a failed call as a domain exception that is safe to show.
     /// </summary>
-    /// <param name="result">The failed result; its error text is already redacted.</param>
+    /// <param name="result">The failed result; its error text is normally already redacted, and is redacted again here.</param>
     /// <param name="access">The repository the call was about.</param>
-    /// <returns>The exception to throw.</returns>
+    /// <returns>The exception to throw; its message names the repository, never its location.</returns>
     internal static DomainRuleException FailureFor(GitResult result, RepositoryAccess access)
     {
-        var error = result.Error;
+        var error = Redact(result.Error, access.Username, access.Token, access.Location, access.Name);
         var denied = new[]
         {
             "authentication failed", "could not read username", "terminal prompts disabled",
@@ -401,7 +471,7 @@ internal sealed class GitRunner
             return new GitResult(
                 process.ExitCode,
                 output,
-                Redact(Encoding.UTF8.GetString(error), access?.Username, access?.Token));
+                Redact(Encoding.UTF8.GetString(error), access?.Username, access?.Token, access?.Location, access?.Name));
         }
         catch (OperationCanceledException)
         {

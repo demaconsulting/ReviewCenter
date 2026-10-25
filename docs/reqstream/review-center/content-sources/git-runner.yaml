@@ -36,13 +36,18 @@ sections:
       - id: ReviewCenter-GitRunner-Redaction
         title: >-
           The GitRunner class shall remove every form of the token, of the encoded header that carries it, and of the
-          credentials of a URL from all text that comes back from git before the text can reach a message or a log.
+          credentials of a URL from all text that comes back from git, and shall replace the location of the
+          repository (a URL or a local path, in every form git prints it) by the repository name, before the text can
+          reach a message or a log.
         justification: |
           Git echoes URLs and sometimes headers in its error output. A secret that reaches a message is shown to
-          users and written to logs.
+          users and written to logs, and the location of a repository is information for administrators only, so an
+          ordinary user must see which repository failed but never where it is kept.
         tests:
           - GitRunner_Redact_RemovesEverySecretForm
           - GitRunner_Redact_EdgeCases
+          - GitRunner_Redact_ReplacesLocationWithName
+          - GitRunner_Redact_NoLocation_LeavesTextAlone
 
       - id: ReviewCenter-GitRunner-Timeout
         title: >-
@@ -67,12 +72,16 @@ sections:
       - id: ReviewCenter-GitRunner-Errors
         title: >-
           The GitRunner class shall report a clear error when git is not installed or is older than the supported
-          version, and shall describe a failed call, including refused credentials, without any secret.
+          version, and shall describe a failed call, including refused credentials, without any secret and naming the
+          repository instead of showing its location.
         justification: |
           An operator must be able to tell a missing or old git from a wrong location or a refused token, and the
-          message must be safe to show to the user.
+          message must be safe to show to the user: no secret, and not the location of the repository.
         tests:
           - GitRunner_RunAsync_MissingGit_ThrowsGitUnavailable
           - GitRunner_RunAsync_OldGit_ThrowsGitUnavailable
           - GitRunner_FailureFor_DescribesFailuresClearly
+          - GitRunner_FailureFor_NeverContainsLocation
+          - GitRunner_RunCheckedAsync_UnknownLocalRepository_MessageHasNameNotPath
+          - GitRunner_RunCheckedAsync_UnreachableUrl_MessageHasNameNotAddress
           - GitRunner_RunCheckedAsync_RefusedCredentials_SendsHeaderAndHidesSecret

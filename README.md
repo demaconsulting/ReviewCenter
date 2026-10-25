@@ -341,7 +341,9 @@ will be made from. A repository has a name (letters, digits, dot, underscore, an
 `http://`, or `file://` URL, or an absolute local path), and, for a private repository, a user name and an access token.
 A user name or token is accepted only with an `https://` location. A repository can be disabled and enabled again; it
 cannot be deleted, so that earlier work keeps its reference. A disabled repository cannot be read. Signed-in users who
-are not administrators can only be offered the names of enabled repositories, never the location or the credentials.
+are not administrators can only be offered the names of enabled repositories, never the location or the credentials; a
+git error that is shown to them names the repository instead of its location. A token must not be the same text as the
+repository name or the user name.
 
 The token is **write-only**: it is typed into a password field, encrypted with ASP.NET Core Data Protection, and never
 shown again. The list shows only "token set" or "no token". When you edit a repository you choose to keep, replace, or

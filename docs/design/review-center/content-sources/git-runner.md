@@ -57,7 +57,8 @@ repeated at the next call.
 
 - *Parameters*: `IReadOnlyList<string> arguments`, `RepositoryAccess? access`, `long maxOutputBytes` — the largest
   standard output accepted, `CancellationToken cancellationToken`.
-- *Returns*: `GitResult` — the exit code, the output bytes, and the redacted error text.
+- *Returns*: `GitResult` — the exit code, the output bytes, and the error text, redacted with the credentials and the
+  location of `access` (the location is replaced by the repository name).
 - *Preconditions*: `arguments` is not null.
 - *Postconditions*: The process has ended and its streams are drained.
 - *Algorithm*: Check the git version once; start the process; read standard output up to the limit and keep the tail of
@@ -76,19 +77,34 @@ repeated at the next call.
 
 - *Parameters*: `GitResult result`, `RepositoryAccess access`.
 - *Returns*: `DomainRuleException` for `GitAccessFailed`.
-- *Algorithm*: When the redacted error text contains a typical authentication failure (authentication failed, could not
+- *Algorithm*: Redact the error text again (the secrets and the location, so a result that was not redacted by the
+  runner is safe too). When the text contains a typical authentication failure (authentication failed, could not
   read the user name, terminal prompts disabled, an HTTP 401 or 403 answer, access denied, invalid credentials), the
   message says that access to the repository was denied and an administrator must check the user name and token.
   Otherwise the message says that the repository could not be read and adds the first line of the redacted error, cut
-  to 300 characters.
+  to 300 characters. The message names the repository by its name and never contains its location.
 
-**Redact**: Removes secrets from text.
+**Redact**: Removes secrets, and the repository location, from text.
 
-- *Parameters*: `string? text`, `string? username`, `string? token`.
-- *Returns*: `string` — the text with each secret replaced by `***`; the empty string for null text.
-- *Algorithm*: Replace, in this order, the user information of any address (`://user:password@`), the base64 form of
-  `user:token`, the text `user:token`, the URI-escaped token, and the token itself. Nothing is replaced for a missing
-  or empty token or user name.
+- *Parameters*: `string? text`, `string? username`, `string? token`, and optionally `string? location` and
+  `string? name`.
+- *Returns*: `string` — the text with each secret replaced by `***` and the location replaced by the repository name; the
+  empty string for null text.
+- *Algorithm*: Replace, in this order, the user information of any address (`://user:password@`, also in the form git
+  prints with a redacted password), the location (see `ReplaceLocation`), the base64 form of `user:token`, the text
+  `user:token`, the URI-escaped token, and the token itself. Nothing is replaced for a missing or empty token or user
+  name, and no location is replaced when none is given.
+
+**ReplaceLocation**: Replaces the registered location of a repository in text by the repository name, so that a message
+never shows where a repository is kept.
+
+- *Parameters*: `string text`, `string location`, `string name`.
+- *Returns*: `string` — the text with every known form of the location replaced by the name.
+- *Algorithm*: Build the forms git prints for the location: as registered, without user information, with masked user
+  information, with a trailing slash or `.git` added or removed, with forward and back slashes for a local path, the
+  local path of a `file://` URL, and for a web address the host name and the host name with the port (git names the host
+  when it cannot connect). Match them in one pass, longest first, ignoring case, together with one trailing slash. A
+  location that git prints in a form that is not listed here (for example a relative or shortened path) is not found.
 
 **CheckVersionAsync** (private): Runs `git --version` once and requires a minimum version; the numbered configuration
 variables that carry the token need it.
@@ -111,7 +127,11 @@ All failures are `DomainRuleException` values, except a cancellation requested b
 A null options object or argument list raises `ArgumentNullException`.
 
 **Known limitation**: git failures are not written to the server log. The redacted first line of the error is shown to
-the user in the exception. A logger can be added later without changing the contract.
+the user in the exception. The registered location (including any user information, with or without a trailing slash or
+`.git`, with either kind of slash for a local path, and the host name of a web address) is replaced in that text by the
+repository name, so an ordinary user sees the name and never the location; a form of the location that git prints
+differently from every form listed under `ReplaceLocation` could still appear. A logger can be added later without
+changing the contract.
 
 #### Dependencies
 

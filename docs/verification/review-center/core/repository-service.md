@@ -26,6 +26,9 @@ N/A - standard test environment.
 - Every change is audited with the changed field names and no secret; a change that changes nothing makes no entry.
 - A disabled repository is not offered to users and cannot be opened by the git layer.
 - A token that cannot be decrypted is reported by repository name and without the stored text.
+- A token equal to the repository name or the user name is refused when registering and when updating (with a new token,
+  or with the stored token kept while the name or user name changes to it); a different case is accepted.
+- The access data is one consistent version of the registration, even when an update runs at the same time.
 - Null arguments are refused.
 
 #### Test Scenarios
@@ -61,6 +64,21 @@ that is
 too long or holds white space are refused with `RepositoryCredentialInvalid`. This scenario is tested by
 `RepositoryService_CreateAsync_InvalidCredentials_ThrowsRepositoryCredentialInvalid`.
 
+**RepositoryService_CreateAsync_TokenEqualsNameOrUsername_ThrowsRepositoryCredentialInvalid**: A token that is exactly
+the repository name or exactly the user name is refused with `RepositoryCredentialInvalid`, with nothing stored or
+audited and without the token in the message; a token that differs only in letter case is accepted. This scenario is
+tested by `RepositoryService_CreateAsync_TokenEqualsNameOrUsername_ThrowsRepositoryCredentialInvalid`.
+
+**RepositoryService_UpdateAsync_TokenEqualsNameOrUsername_ThrowsRepositoryCredentialInvalid**: On update, replacing the
+token with the new repository name or user name is refused, and so is keeping the stored token while the repository or
+the user is renamed to the stored token text (the service decrypts the stored token under its lock to compare); every
+refusal is `RepositoryCredentialInvalid`, the message has no token, and nothing changes. This scenario is tested by
+`RepositoryService_UpdateAsync_TokenEqualsNameOrUsername_ThrowsRepositoryCredentialInvalid`.
+
+**RepositoryService_UpdateAsync_KeepUnreadableOrClearedToken_DoesNotCompare**: A kept token that cannot be decrypted
+cannot be compared and does not block a rename, and clearing the token while renaming to its old text is allowed. This
+scenario is tested by `RepositoryService_UpdateAsync_KeepUnreadableOrClearedToken_DoesNotCompare`.
+
 **RepositoryService_AdminOnly_RefusesOtherActors**: A reviewer, an unknown user, and a disabled administrator are refused
 with `ActorNotAllowed` for every operation that needs an administrator. This scenario is tested by
 `RepositoryService_AdminOnly_RefusesOtherActors`.
@@ -84,6 +102,11 @@ scenario is tested by `RepositoryService_DisabledRepository_IsNotSelectable`.
 decrypted is
 reported as `CredentialsUnreadable` with the repository name and without the stored text, and an unknown repository is
 `RepositoryNotFound`. This scenario is tested by `RepositoryService_GetAccessAsync_UnreadableToken_ThrowsCredentialsUnreadable`.
+
+**RepositoryService_GetAccessAsync_ConcurrentUpdate_ReturnsConsistentPair**: A fake store starts an administrator's update
+at the moment between the read of the registration and the read of the token; the update waits for the service lock,
+so the access data has the location and token of one version, and a later read has the location and token of the
+updated one. This scenario is tested by `RepositoryService_GetAccessAsync_ConcurrentUpdate_ReturnsConsistentPair`.
 
 **RepositoryService_TokenTypes_ToStringHidesToken**: The text forms of the token change and of the access data never
 show a

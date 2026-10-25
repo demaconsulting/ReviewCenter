@@ -26,7 +26,8 @@ local server on the loopback address and the installed git).
   or credential helper.
 - Every form of a secret (the token, the user name and token, the base64 header value, the escaped token, and the user
   information of an address) is replaced in text, and missing text or secrets are handled.
-- A failed call is described with the repository name and without any secret, and an authentication failure gets a clear
+- A failed call is described with the repository name and without any secret or location (a URL, a local path, and the
+  host name are replaced by the name), and an authentication failure gets a clear
   message.
 - A missing or too old git is `GitUnavailable`, as is a cache folder that cannot be created; output over the limit is
   `GitAccessFailed`; a call that never finishes is
@@ -51,9 +52,30 @@ information of an address are removed from text. This scenario is tested by `Git
 **GitRunner_Redact_EdgeCases**: A URL-escaped token is removed too; null text, a missing token, and a missing user name
 are handled. This scenario is tested by `GitRunner_Redact_EdgeCases`.
 
+**GitRunner_Redact_ReplacesLocationWithName**: The registered location is replaced by the repository name in every form
+git prints it: as registered, with a trailing slash or `.git` added or removed, with forward or back slashes for a
+local path, inside quotes, with user information (also masked), a `file://` URL, and the host name in a connection
+error; nothing of the location or of its user information remains. This scenario is tested by
+`GitRunner_Redact_ReplacesLocationWithName`.
+
+**GitRunner_Redact_NoLocation_LeavesTextAlone**: Without a location nothing is replaced, and text that does not contain
+the location is unchanged. This scenario is tested by `GitRunner_Redact_NoLocation_LeavesTextAlone`.
+
 **GitRunner_FailureFor_DescribesFailuresClearly**: A failure is described with the repository name and the redacted first
 line of the error, and an authentication failure says access was denied and what an administrator must check. This
 scenario is tested by `GitRunner_FailureFor_DescribesFailuresClearly`.
+
+**GitRunner_FailureFor_NeverContainsLocation**: For a URL and for a local path, and for a denied access, an error text
+that still holds the location gives a message that names the repository and has no part of its location. This scenario
+is tested by `GitRunner_FailureFor_NeverContainsLocation`.
+
+**GitRunner_RunCheckedAsync_UnknownLocalRepository_MessageHasNameNotPath**: A real git call on a local path that does
+not exist gives a message with the repository name and no part of the path. This scenario is tested by
+`GitRunner_RunCheckedAsync_UnknownLocalRepository_MessageHasNameNotPath`.
+
+**GitRunner_RunCheckedAsync_UnreachableUrl_MessageHasNameNotAddress**: A real git call to an address where nothing
+listens gives a message with the repository name and neither the address nor the host name. This scenario is tested by
+`GitRunner_RunCheckedAsync_UnreachableUrl_MessageHasNameNotAddress`.
 
 **GitRunner_RunAsync_MissingGit_ThrowsGitUnavailable**: An executable that does not exist gives `GitUnavailable`. This
 scenario is tested by `GitRunner_RunAsync_MissingGit_ThrowsGitUnavailable`.

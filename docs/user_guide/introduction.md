@@ -578,7 +578,10 @@ An administrator sees a **Repositories** link in the page header, next to **User
 `/repositories`. Other users do not get the page.
 
 - **Add repository**: enter a name (letters, digits, dot, underscore, and hyphen, up to 40 characters, unique without
-  regard to case), a location, and for a private repository a user name and an access token. The location is an
+  regard to case), a location, and for a private repository a user name and an access token. The token must not be the
+  same text as the repository name or the user name (compared exactly, with case), because those appear in messages and
+  in the audit trail; the same applies when you edit a repository and replace the token, or rename the repository or
+  the user while keeping a stored token. The location is an
   `https://`, `http://`, or `file://` URL, or an absolute local path. A user name or token is accepted only with an
   `https://` location, because the token must not travel in clear text. The location must not contain a user name or
   password, a query string, or a fragment; enter the credentials in their own fields.
@@ -628,7 +631,8 @@ Redirects are not followed, so a location that redirects (for example one that n
 in its final form. If the cache folder cannot be written, the operation fails with a message that the server "cannot
 write its git cache folder" and names the `Git:CachePath` setting; an administrator must fix the folder or its
 permissions. When git itself fails, the first line of its (redacted) error is shown to the user but is not written to the
-server log.
+server log. The location of the repository is replaced in that line by the repository name, so ordinary users see which
+repository failed but not where it is kept (a form of the location that git prints in an unusual way could still show).
 
 ### Selecting Files
 

@@ -42,6 +42,11 @@ internal sealed class FakeRepositoryStore : IRepositoryStore
     public List<AuditDraft> Audits { get; } = [];
 
     /// <summary>
+    ///     Gets or sets an action that runs once, at the start of the next <see cref="GetEncryptedTokenAsync"/>.
+    /// </summary>
+    public Action? BeforeGetEncryptedToken { get; set; }
+
+    /// <summary>
     ///     Reads the encrypted token as stored, for asserting that the plain token never reached the store.
     /// </summary>
     /// <param name="id">The repository identity.</param>
@@ -83,6 +88,10 @@ internal sealed class FakeRepositoryStore : IRepositoryStore
     /// <inheritdoc />
     public Task<string?> GetEncryptedTokenAsync(int id, CancellationToken cancellationToken = default)
     {
+        // A test can use the hook to make a change at the moment between the two reads of a registration
+        var hook = BeforeGetEncryptedToken;
+        BeforeGetEncryptedToken = null;
+        hook?.Invoke();
         var item = _items.FirstOrDefault(i => i.Repository?.Id == id);
         return Task.FromResult(item.EncryptedToken);
     }

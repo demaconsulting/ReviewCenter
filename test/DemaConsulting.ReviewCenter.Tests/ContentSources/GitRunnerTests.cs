@@ -189,6 +189,150 @@ public class GitRunnerTests
     }
 
     /// <summary>
+    ///     Test that the location of the repository is replaced by its name in every form git prints it: as
+    ///     registered, with a trailing slash or <c>.git</c> added or removed, with either kind of slash for a local
+    ///     path, inside quotes, with user information, and as the host name in a connection error.
+    /// </summary>
+    /// <param name="location">The registered location.</param>
+    /// <param name="text">The text git printed.</param>
+    /// <param name="leaked">A part of the location that must not remain.</param>
+    [Theory]
+    [InlineData("https://example.com/org/repo.git", "fatal: repository 'https://example.com/org/repo.git/' not found", "example.com")]
+    [InlineData("https://example.com/org/repo.git", "fatal: unable to access 'https://example.com/org/repo/': error: 500", "org/repo")]
+    [InlineData("https://example.com/org/repo", "fatal: repository \"https://example.com/org/repo.git\" not found", "org/repo")]
+    [InlineData("https://example.com/org/repo.git", "fatal: unable to access 'https://example.com/org/repo.git/': Could not resolve host: example.com", "example.com")]
+    [InlineData("HTTPS://Example.COM/Org/Repo.git", "fatal: repository 'https://example.com/org/repo.git/' not found", "example.com")]
+    [InlineData("http://localhost:8080/r.git", "fatal: unable to access 'http://localhost:8080/r.git/': Failed to connect to localhost port 8080", "localhost")]
+    [InlineData("https://example.com/org/repo.git", "fatal: unable to access 'https://***@example.com/org/repo.git/': x", "example.com")]
+    [InlineData("https://bob:pw@example.com/org/repo.git", "fatal: unable to access 'https://bob:pw@example.com/org/repo.git/': x", "example.com")]
+    [InlineData("https://bob:pw@example.com/org/repo.git", "fatal: unable to access 'https://bob:<redacted>@example.com/org/repo.git/': x", "example.com")]
+    [InlineData("https://bob:pw@example.com/org/repo.git", "fatal: unable to access 'https://example.com/org/repo/': x", "example.com")]
+    [InlineData(@"C:\srv\git\repo.git", @"fatal: 'C:\srv\git\repo.git' does not appear to be a git repository", "srv")]
+    [InlineData(@"C:\srv\git\repo.git", "fatal: 'C:/srv/git/repo.git' does not appear to be a git repository", "srv")]
+    [InlineData(@"C:\srv\git\repo.git", "fatal: 'C:/srv/git/repo' does not appear to be a git repository", "srv")]
+    [InlineData("/srv/git/repo.git", "fatal: '/srv/git/repo.git/' does not appear to be a git repository", "srv")]
+    [InlineData("/srv/git/repo.git", "fatal: repository '/srv/git/repo' does not exist", "srv")]
+    [InlineData("file:///srv/git/repo.git", "fatal: repository 'file:///srv/git/repo.git/' does not exist", "srv")]
+    [InlineData("file:///C:/srv/git/repo.git", "fatal: repository 'file:///C:/srv/git/repo.git/' x C:\\srv\\git\\repo.git", "srv")]
+    public void GitRunner_Redact_ReplacesLocationWithName(string location, string text, string leaked)
+    {
+        // Arrange: nothing beyond the registered location and the text
+
+        // Act: redact the text for a repository named "my-repo"
+        var redacted = GitRunner.Redact(text, null, null, location, "my-repo");
+
+        // Assert: the name stands where the location was, and nothing of the location remains
+        Assert.Contains("my-repo", redacted, StringComparison.Ordinal);
+        Assert.DoesNotContain(leaked, redacted, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("pw@", redacted, StringComparison.Ordinal);
+        Assert.DoesNotContain("<redacted>", redacted, StringComparison.Ordinal);
+        Assert.DoesNotContain("bob", redacted, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    ///     Test that a location is left alone when none is given, and that text without the location is unchanged.
+    /// </summary>
+    [Fact]
+    public void GitRunner_Redact_NoLocation_LeavesTextAlone()
+    {
+        // Arrange: text that names a location
+
+        // Act: redact it without and with an unrelated location
+        var without = GitRunner.Redact("fatal: repository 'https://example.com/r.git/' not found", null, null);
+        var unrelated = GitRunner.Redact("fatal: something else", null, null, "https://example.com/r.git", "my-repo");
+
+        // Assert: nothing was replaced
+        Assert.Contains("https://example.com/r.git", without, StringComparison.Ordinal);
+        Assert.Equal("fatal: something else", unrelated);
+    }
+
+    /// <summary>
+    ///     Test that a failure message names the repository and never shows its location, for a URL, a local path
+    ///     and the denied-access message, even when the result was not redacted by the runner.
+    /// </summary>
+    /// <param name="location">The registered location.</param>
+    /// <param name="error">The raw error text of git.</param>
+    [Theory]
+    [InlineData("https://example.com/org/r.git", "fatal: repository 'https://example.com/org/r.git/' not found")]
+    [InlineData("https://example.com/org/r.git", "fatal: unable to access 'https://example.com/org/r.git/': Could not resolve host: example.com")]
+    [InlineData("https://example.com/org/r.git", "fatal: Authentication failed for 'https://example.com/org/r.git/'")]
+    [InlineData(@"C:\srv\git\r.git", "fatal: 'C:/srv/git/r.git' does not appear to be a git repository")]
+    [InlineData("/srv/git/r.git", "fatal: '/srv/git/r.git' does not appear to be a git repository")]
+    public void GitRunner_FailureFor_NeverContainsLocation(string location, string error)
+    {
+        // Arrange: access to a named repository and a failed result with the raw error
+        var access = new RepositoryAccess(1, "my-repo", location, User, Secret);
+        var result = new GitResult(128, [], error);
+
+        // Act: describe the failure
+        var exception = GitRunner.FailureFor(result, access);
+
+        // Assert: the repository is named and no part of the location is in the message
+        Assert.Contains("'my-repo'", exception.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("example.com", exception.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("srv", exception.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("org/r", exception.Message, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    ///     Test that a real git call on an unknown local repository gives a message with the repository name and
+    ///     no part of the local path, whichever way git prints the path.
+    /// </summary>
+    [Fact]
+    public async Task GitRunner_RunCheckedAsync_UnknownLocalRepository_MessageHasNameNotPath()
+    {
+        // Arrange: a runner and access to a local path that does not exist
+        Assert.SkipWhen(!GitTestSupport.Available, GitTestSupport.MissingMessage);
+        using var cache = new TempFolder();
+        var runner = new GitRunner(Options(cache.Path));
+        var location = Path.Combine(cache.Path, "no-such-folder", "repo.git");
+        var access = new RepositoryAccess(1, "unknown-repo", location, null, null);
+
+        // Act: list the remote refs of the missing repository
+        var exception = await Assert.ThrowsAsync<DomainRuleException>(
+            () => runner.RunCheckedAsync(["ls-remote", location], access, 1024, TestContext.Current.CancellationToken));
+
+        // Assert: the message names the repository and has no part of the path
+        Assert.Equal(DomainRule.GitAccessFailed, exception.Rule);
+        Assert.Contains("'unknown-repo'", exception.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain(Path.GetFileName(cache.Path), exception.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("no-such-folder", exception.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
+    ///     Test that a real git call that cannot connect to a web address gives a message with the repository name
+    ///     and neither the address nor the host name.
+    /// </summary>
+    [Fact]
+    public async Task GitRunner_RunCheckedAsync_UnreachableUrl_MessageHasNameNotAddress()
+    {
+        // Arrange: a runner and access to a loopback address where nothing listens
+        Assert.SkipWhen(!GitTestSupport.Available, GitTestSupport.MissingMessage);
+        using var cache = new TempFolder();
+        int port;
+        using (var listener = new TcpListener(IPAddress.Loopback, 0))
+        {
+            listener.Start();
+            port = ((IPEndPoint)listener.LocalEndpoint).Port;
+            listener.Stop();
+        }
+
+        var runner = new GitRunner(Options(cache.Path));
+        var location = $"http://127.0.0.1:{port}/secret-org/secret-repo.git";
+        var access = new RepositoryAccess(1, "unreachable-repo", location, null, null);
+
+        // Act: list the remote refs of the unreachable address
+        var exception = await Assert.ThrowsAsync<DomainRuleException>(
+            () => runner.RunCheckedAsync(["ls-remote", location], access, 1024, TestContext.Current.CancellationToken));
+
+        // Assert: the message names the repository and has no part of the address
+        Assert.Equal(DomainRule.GitAccessFailed, exception.Rule);
+        Assert.Contains("'unreachable-repo'", exception.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("127.0.0.1", exception.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("secret-", exception.Message, StringComparison.Ordinal);
+    }
+
+    /// <summary>
     ///     Test that a missing git executable gives the clear "git is not available" error.
     /// </summary>
     [Fact]

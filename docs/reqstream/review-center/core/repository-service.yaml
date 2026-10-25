@@ -36,12 +36,19 @@ sections:
       - id: ReviewCenter-RepositoryService-Credentials
         title: >-
           The RepositoryService class shall accept a user name and a token only for an https location, refuse a token
-          without a user name, and refuse a user name or token with characters or a length that is not allowed.
+          without a user name, refuse a user name or token with characters or a length that is not allowed, and refuse
+          a token that is the same text (compared exactly, with case) as the repository name or the user name, when it
+          is registered, when it replaces the stored token, and when the repository or the user is renamed while the
+          stored token is kept.
         justification: |
           A credential that cannot work, or that could change the meaning of a header, must be reported when it is
-          entered, not when a review is created.
+          entered, not when a review is created. The repository name and the user name are written to audit entries
+          and messages, so a token with the same text would put the secret there.
         tests:
           - RepositoryService_CreateAsync_InvalidCredentials_ThrowsRepositoryCredentialInvalid
+          - RepositoryService_CreateAsync_TokenEqualsNameOrUsername_ThrowsRepositoryCredentialInvalid
+          - RepositoryService_UpdateAsync_TokenEqualsNameOrUsername_ThrowsRepositoryCredentialInvalid
+          - RepositoryService_UpdateAsync_KeepUnreadableOrClearedToken_DoesNotCompare
 
       - id: ReviewCenter-RepositoryService-Token
         title: >-
@@ -94,10 +101,13 @@ sections:
       - id: ReviewCenter-RepositoryService-Access
         title: >-
           The RepositoryService class shall give the git layer the location, the user name, and the decrypted token
-          of an enabled repository, and shall report that the credentials cannot be read, without naming any secret,
+          of an enabled repository, as one consistent registration even while an administrator changes it, and shall
+          report that the credentials cannot be read, without naming any secret,
           when the stored token cannot be decrypted.
         justification: |
           The server must be able to use the token, and when the key ring was lost the administrator must be told to
-          enter the token again.
+          enter the token again. A location paired with the token of another version would send a token to the wrong
+          host.
         tests:
           - RepositoryService_GetAccessAsync_UnreadableToken_ThrowsCredentialsUnreadable
+          - RepositoryService_GetAccessAsync_ConcurrentUpdate_ReturnsConsistentPair

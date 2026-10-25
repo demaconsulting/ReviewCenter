@@ -98,7 +98,8 @@ sections:
 
       - id: ReviewCenter-ContentSources-Errors
         title: >-
-          The ContentSources subsystem shall report a clear, secret-free error that names the cause when git is not
+          The ContentSources subsystem shall report a clear, secret-free error that names the cause and the repository
+          (never its location) when git is not
           installed or too old, when a revision does not exist, when access is refused or the location cannot be
           read, and when a call runs out of time, or when the cache folder cannot be written.
         justification: |

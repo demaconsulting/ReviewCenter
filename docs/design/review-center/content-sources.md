@@ -93,7 +93,9 @@ to the registered location, and only for the commands that talk to the remote (t
 local mirror run without any credential: the session holds a copy of the access data with the user name and the token
 removed. The text that git writes to its error output, and every message built from it, is redacted before it is kept:
 the token, the user name and token pair, their encoded forms, and any user information in an address are replaced by
-`***`. The messages shown to a user say what happened (for example that access was denied and an administrator must
+`***`. The registered location of the repository is replaced in the same text by the repository name, in every form git
+prints it (see `GitRunner`), so a message shows which repository failed but never where it is kept. The messages shown
+to a user say what happened (for example that access was denied and an administrator must
 check the user name and token) and never contain the output of git verbatim beyond its first redacted line.
 
 **Limits and time**: Every git command runs under a time limit (`Git:TimeoutSeconds`). When the limit is reached, the
