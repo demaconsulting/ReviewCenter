@@ -251,6 +251,13 @@ public partial class DiffView : ComponentBase
         foreach (var thread in Threads.Where(t => t.StartLine is not null))
         {
             var side = thread.Side;
+
+            // The start row stays visible too, because the thread index and links scroll to it
+            if (RowIndex(side, thread.StartLine!.Value) is var startRow and >= 0)
+            {
+                _pins.Add(startRow);
+            }
+
             var row = RowIndex(side, thread.EndLine!.Value);
             if (row < 0)
             {

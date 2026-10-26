@@ -205,6 +205,7 @@ sections:
           missed, so its line always stays visible.
         tests:
           - ReviewPage_DiffView_ExistingThreads_AreShownUnderTheirLines
+          - ReviewPage_DiffView_MultiLineThread_KeepsItsFirstLineVisible
           - ReviewPage_DiffView_InlineThread_ReplyResolveAndReopen
           - ReviewPage_FileList_ThreadCounts_IncludeBothSides
 

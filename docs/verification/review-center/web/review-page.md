@@ -246,6 +246,10 @@ file instead" keeps the text and anchors the whole file. This scenario is tested
 a resolved one collapsed, even where the lines would be collapsed. This scenario is tested by
 `ReviewPage_DiffView_ExistingThreads_AreShownUnderTheirLines`.
 
+**ReviewPage_DiffView_MultiLineThread_KeepsItsFirstLineVisible**: A thread over several lines keeps its first line
+visible even when that line would be collapsed, so a scroll to the first line can succeed. This scenario is tested by
+`ReviewPage_DiffView_MultiLineThread_KeepsItsFirstLineVisible`.
+
 **ReviewPage_DiffView_InlineThread_ReplyResolveAndReopen**: A thread in the diff can be answered, resolved, and
 reopened. This scenario is tested by `ReviewPage_DiffView_InlineThread_ReplyResolveAndReopen`.
 

@@ -180,7 +180,8 @@ placeholders (muted, hidden from assistive technology). A cell has a comment con
 by their sign. Above the rows it shows "x added, y removed" (or a sentence that only the line endings differ), and,
 when there are rows, the hint "Click + to comment on a line." The rows are grouped by `LineDiff.Segment`, and a run
 of unchanged lines that is collapsed shows a button "Show N unchanged lines" that expands it. The rows of threads and
-of the selected line are pinned, so they are never hidden. The first change is therefore near the top of the view,
+of the selected line are pinned, so they are never hidden; a thread pins both its first and its last row, because the
+thread index and links scroll to the first row. The first change is therefore near the top of the view,
 because the unchanged lines before it (apart from three lines of context) are collapsed; when a file opens with such
 a collapsed run above its first change, `SelectFileAsync` also sets that row as the scroll target (block `center`)
 instead of the file path, using the page's existing `reviewCenter.scrollToTestId` helper of `App.razor`, which

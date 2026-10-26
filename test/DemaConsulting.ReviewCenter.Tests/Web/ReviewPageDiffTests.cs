@@ -758,6 +758,26 @@ public class ReviewPageDiffTests : PageTestBase
     }
 
     /// <summary>
+    ///     Test that a thread covering several lines keeps its first line visible, even when that line would
+    ///     otherwise be collapsed, because the thread index and links scroll to the first line.
+    /// </summary>
+    [Fact]
+    public async Task ReviewPage_DiffView_MultiLineThread_KeepsItsFirstLineVisible()
+    {
+        // Arrange: a head range whose first line (2) is far from the changes and whose last line (12) is not
+        var projectId = await CreateReviewAsync();
+        var range = await StartAsync(projectId, 2, 12, ThreadSide.Head, "Long range");
+
+        // Act: open the file
+        var cut = RenderPage(projectId);
+        await SelectFileAsync(cut, ModPath);
+
+        // Assert: the first line is rendered (so a scroll to it can succeed), and the thread is under the last line
+        Assert.Equal("l2", cut.Find("[data-testid='diff-text-1']").TextContent);
+        Assert.NotEmpty(cut.FindAll($"[data-testid='diff-threads-12'] [data-testid='thread-{range.Id}']"));
+    }
+
+    /// <summary>
     ///     Test that a resolved thread under a line is collapsed, can be expanded, and that replying, resolving
     ///     and reopening work there as they do in the list.
     /// </summary>
