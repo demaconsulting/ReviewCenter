@@ -235,7 +235,9 @@ version, Head is the numbered view that takes comments, Baseline is the frozen b
 opens on its Diff view (all lines added, an empty left side) and takes comments on its head lines and on the whole
 file. A deleted file
 opens on its Diff view (all lines removed) and takes whole-file comments and comments on its removed lines. A file
-that is too large to compare, or binary, says so in plain words and offers the other views. Everything the page shows
+that is too large to compare, or binary, says so in plain words and offers the other views. In the Head or Baseline
+view, a thread chosen in the index or opened by its address highlights its lines in the version it is on and in no
+other. Everything the page shows
 comes from the frozen copies in the store, never from the repository.
 
 #### Sharing links

@@ -120,6 +120,7 @@ public sealed class ThreadService
     /// <param name="cancellationToken">Cancels the operation.</param>
     /// <returns>The stored thread in the <see cref="ReviewThreadState.Open"/> state, with its first comment.</returns>
     /// <exception cref="ArgumentNullException">Thrown when <paramref name="actor"/> is null.</exception>
+    /// <exception cref="ArgumentOutOfRangeException">Thrown when <paramref name="side"/> is not a defined value.</exception>
     /// <exception cref="DomainRuleException">
     ///     Thrown when a rule is violated (see <see cref="DomainRule"/>); nothing is stored then.
     /// </exception>
@@ -136,6 +137,11 @@ public sealed class ThreadService
     {
         // Validate everything that needs no I/O first so a bad request fails fast and cheaply
         ArgumentNullException.ThrowIfNull(actor);
+        if (!Enum.IsDefined(side))
+        {
+            throw new ArgumentOutOfRangeException(nameof(side), side, "The side is not a known value.");
+        }
+
         var trimmedText = ValidateText(text);
         ValidateAnchorShape(startLine, endLine);
 

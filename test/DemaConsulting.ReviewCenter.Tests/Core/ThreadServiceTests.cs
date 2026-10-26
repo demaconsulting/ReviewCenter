@@ -249,6 +249,27 @@ public class ThreadServiceTests
     }
 
     /// <summary>
+    ///     Test that a side that is not a defined value is refused before the review is looked up.
+    /// </summary>
+    [Fact]
+    public async Task ThreadService_StartThreadAsync_UndefinedSide_ThrowsArgumentOutOfRange()
+    {
+        // Arrange: a service, and a review that does not exist (so only the argument check can refuse first)
+        var (_, service, projectId) = await CreateBaselineReviewAsync();
+        var cancellationToken = TestContext.Current.CancellationToken;
+
+        // Act: start threads with undefined sides, once on a review that exists and once on one that does not
+        var onReview = await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() => service.StartThreadAsync(
+            projectId, "rev-1", "mod.txt", 1, 2, TestActors.Ann, "Text", (ThreadSide)99, cancellationToken));
+        var onMissing = await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() => service.StartThreadAsync(
+            projectId, "missing", "mod.txt", null, null, TestActors.Ann, "Text", (ThreadSide)(-1), cancellationToken));
+
+        // Assert: both name the side parameter
+        Assert.Equal("side", onReview.ParamName);
+        Assert.Equal("side", onMissing.ParamName);
+    }
+
+    /// <summary>
     ///     Test that a range on the baseline side is validated against the baseline line count, not the head's.
     /// </summary>
     [Fact]

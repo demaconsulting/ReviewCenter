@@ -247,6 +247,8 @@ sections:
           - ReviewPage_ThreadIndex_RowClick_SelectsFileHighlightsAnchorAndScrolls
           - ReviewPage_ThreadIndex_ShowsSideAndLinesAndJumpsToTheDiff
           - ReviewPage_ThreadIndex_TooLargeFile_OpensTheVersionOfTheThread
+          - ReviewPage_ThreadIndex_BaselineThreadOnTooLargeFile_HighlightsItsBaselineLines
+          - ReviewPage_ThreadIndex_ThreadHighlight_StaysOnTheSideOfTheThread
           - ReviewPage_ThreadIndex_AddedFileHeadThread_JumpsToTheDiffRow
 
       - id: ReviewCenter-ReviewPage-ThreadCollapse
@@ -419,6 +421,8 @@ sections:
           - ReviewPage_ThreadAddress_HeadThread_OpensFileAndHighlightsThread
           - ReviewPage_ThreadAddress_AddedFileHeadThread_OpensDiffAndHighlightsRow
           - ReviewPage_ThreadAddress_ResolvedBaselineThread_IsExpandedAndHighlightedOnTheLeft
+          - ReviewPage_ThreadAddress_BaselineThreadOnTooLargeFile_HighlightsItsBaselineLines
+          - ReviewPage_ThreadAddress_BaselineThread_DoesNotHighlightTheSameLinesOfTheHead
           - ReviewPage_ThreadAddress_WholeFileThread_ScrollsToTheThread
           - ReviewPage_ThreadAddress_KeepsThreadCountsInTheFileList
           - ReviewPage_ThreadAddress_OverHttp_RendersFileAndHighlightedThread

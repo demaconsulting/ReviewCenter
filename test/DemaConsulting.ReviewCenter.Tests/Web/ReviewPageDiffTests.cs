@@ -872,6 +872,68 @@ public class ReviewPageDiffTests : PageTestBase
     }
 
     /// <summary>
+    ///     Test that choosing a baseline thread in the index highlights the baseline lines it covers, and only those,
+    ///     on a file whose baseline is shown alone; a head thread of the same numbers highlights nothing there.
+    /// </summary>
+    [Fact]
+    public async Task ReviewPage_ThreadIndex_BaselineThreadOnTooLargeFile_HighlightsItsBaselineLines()
+    {
+        // Arrange: a file too large to compare, a baseline thread over lines 9000-9002 and a head thread on line 2
+        var big = string.Concat(Enumerable.Repeat("x\n", ReviewLimits.MaxDiffLines + 1));
+        var projectId = await CreateReviewAsync(("src/big.txt", ChangeKind.Modified, big, "y\nz\n"));
+        var before = await StartAsync(projectId, 9000, 9002, ThreadSide.Baseline, "Before", "src/big.txt");
+        var after = await StartAsync(projectId, 2, 2, ThreadSide.Head, "After", "src/big.txt");
+        var cut = RenderPage(projectId);
+
+        // Act: choose the baseline thread
+        await cut.Find($"[data-testid='index-row-{before.Id}']").ClickAsync();
+
+        // Assert: the lines of the thread, and no others, are highlighted in the baseline text
+        Assert.Equal(
+            ["baseline-line-9000", "baseline-line-9001", "baseline-line-9002"],
+            cut.FindAll("[data-testid='baseline-content'] .code-line.focused").Select(e => e.GetAttribute("data-testid")).ToArray());
+
+        // Act: choose the head thread
+        await cut.Find($"[data-testid='index-row-{after.Id}']").ClickAsync();
+
+        // Assert: the head line is highlighted in the head text
+        Assert.Equal(
+            ["code-line-2"],
+            cut.FindAll("[data-testid='file-content'] .code-line.focused").Select(e => e.GetAttribute("data-testid")).ToArray());
+    }
+
+    /// <summary>
+    ///     Test that the highlight of a chosen thread follows its side: with a baseline thread chosen, the head
+    ///     lines of the same numbers are not highlighted, and with a head thread chosen, the baseline lines are not.
+    /// </summary>
+    [Fact]
+    public async Task ReviewPage_ThreadIndex_ThreadHighlight_StaysOnTheSideOfTheThread()
+    {
+        // Arrange: a file too large to compare, with a baseline and a head thread on line 2
+        var big = string.Concat(Enumerable.Repeat("x\n", ReviewLimits.MaxDiffLines + 1));
+        var projectId = await CreateReviewAsync(("src/big.txt", ChangeKind.Modified, big, "y\nz\n"));
+        var before = await StartAsync(projectId, 2, 2, ThreadSide.Baseline, "Before", "src/big.txt");
+        var after = await StartAsync(projectId, 2, 2, ThreadSide.Head, "After", "src/big.txt");
+        var cut = RenderPage(projectId);
+
+        // Act: choose the baseline thread, then look at the head version
+        await cut.Find($"[data-testid='index-row-{before.Id}']").ClickAsync();
+        Assert.NotEmpty(cut.FindAll("[data-testid='baseline-line-2'].focused"));
+        await cut.Find("[data-testid='view-head-button']").ClickAsync();
+
+        // Assert: the head line 2 is not highlighted for a baseline thread
+        Assert.Empty(cut.FindAll("[data-testid='code-line-2'].focused"));
+
+        // Act: choose the head thread, then look at the baseline version
+        await cut.Find($"[data-testid='index-row-{after.Id}']").ClickAsync();
+        Assert.NotEmpty(cut.FindAll("[data-testid='code-line-2'].focused"));
+        await cut.Find("[data-testid='view-baseline-button']").ClickAsync();
+
+        // Assert: the baseline line 2 is not highlighted for a head thread
+        Assert.Empty(cut.FindAll("[data-testid='baseline-content'] .code-line.focused"));
+    }
+
+    /// <summary>
     ///     Test that the file list keeps counting the open threads of each file, whichever side they are on.
     /// </summary>
     [Fact]

@@ -253,6 +253,7 @@
         {
             var fileThreads = Threads.Where(t => t.FilePath == SelectedPath).ToList();
             var focusedThread = fileThreads.FirstOrDefault(t => t.Id == FocusedThreadId && t.Side == ThreadSide.Head);
+            var focusedBaselineThread = fileThreads.FirstOrDefault(t => t.Id == FocusedThreadId && t.Side == ThreadSide.Baseline);
 
             // In the diff the threads are drawn under their lines; only whole-file threads are listed below it
             var hasLineDiff = HasLineDiff;
@@ -461,7 +462,7 @@
                         <div class="code" data-testid="baseline-content">
                             @for (var number = 1; number <= BaselineLines.Count; number++)
                             {
-                                <div class="code-line @(HighlightLine == number && HighlightSide == ThreadSide.Baseline ? "focused" : null)" data-testid="baseline-line-@number">
+                                <div class="code-line @(IsFocusedLine(focusedBaselineThread, number) || (HighlightLine == number && HighlightSide == ThreadSide.Baseline) ? "focused" : null)" data-testid="baseline-line-@number">
                                     <span class="gutter">
                                         <span class="line-no" data-testid="baseline-line-no-@number">@number</span>
                                     </span>

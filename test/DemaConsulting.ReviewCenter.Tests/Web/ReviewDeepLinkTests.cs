@@ -78,10 +78,11 @@ public class ReviewDeepLinkTests : PageTestBase
     }
 
     /// <summary>
-    ///     Creates a repository review <c>REV-1</c> with a modified, an added and a deleted file.
+    ///     Creates a repository review <c>REV-1</c> with a modified, an added and a deleted file, plus the given extra files.
     /// </summary>
+    /// <param name="extra">More changed files.</param>
     /// <returns>The project identity.</returns>
-    private async Task<int> CreateReviewAsync()
+    private async Task<int> CreateReviewAsync(params (string Path, ChangeKind Kind, string? Baseline, string? Head)[] extra)
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         var admin = new Actor("adm", "Adm");
@@ -89,14 +90,14 @@ public class ReviewDeepLinkTests : PageTestBase
         var repository = await Repositories.CreateAsync("main-repo", "https://example.com/org/repo.git", null, null, admin, cancellationToken);
         Git.Revisions["main"] = HeadSha;
         Git.Revisions["v1"] = BaseSha;
-        Git.Script(
-            BaseSha,
-            HeadSha,
-            [
-                (ModPath, ChangeKind.Modified, Lines(20), Lines(20, "n10") + "l21\n"),
-                (NewPath, ChangeKind.Added, null, "one\ntwo\nthree\n"),
-                (GonePath, ChangeKind.Deleted, "x1\nx2\n", null)
-            ]);
+        List<(string Path, ChangeKind Kind, string? Baseline, string? Head)> changes =
+        [
+            (ModPath, ChangeKind.Modified, Lines(20), Lines(20, "n10") + "l21\n"),
+            (NewPath, ChangeKind.Added, null, "one\ntwo\nthree\n"),
+            (GonePath, ChangeKind.Deleted, "x1\nx2\n", null),
+            .. extra
+        ];
+        Git.Script(BaseSha, HeadSha, changes);
         var project = await Projects.CreateAsync("Apollo", null, cancellationToken);
         await Reviews.CreateFromRepositoryAsync(
             project.Id, "REV-1", "From git", repository.Id, "main", "v1", "src/**", TestActors.Ann, cancellationToken);
@@ -169,7 +170,9 @@ public class ReviewDeepLinkTests : PageTestBase
     private static string LocalPart(HttpResponseMessage response)
     {
         var written = response.Headers.Location!.OriginalString;
-        return Uri.TryCreate(written, UriKind.Absolute, out var absolute)
+        // Only an http(s) address is absolute here: on Linux, Uri.TryCreate treats a rooted path such as "/login" as
+        // an absolute file address, which would cut the path off
+        return Uri.TryCreate(written, UriKind.Absolute, out var absolute) && absolute.Scheme is "http" or "https"
             ? written[absolute.GetLeftPart(UriPartial.Authority).Length..]
             : written;
     }
@@ -387,6 +390,51 @@ public class ReviewDeepLinkTests : PageTestBase
         // Assert: the comments are visible and the removed line is highlighted
         Assert.NotEmpty(cut.FindAll($"[data-testid='comment-{thread.Id}-1']"));
         Assert.Equal(["diff-row-9"], cut.FindAll(".diff-row.focused").Select(e => e.GetAttribute("data-testid")).ToArray());
+    }
+
+    /// <summary>
+    ///     Tests that a thread address of a baseline thread on a file too large to compare shows the baseline text with
+    ///     the lines of the thread highlighted (and only those), whatever the numbering of the head.
+    /// </summary>
+    [Fact]
+    public async Task ReviewPage_ThreadAddress_BaselineThreadOnTooLargeFile_HighlightsItsBaselineLines()
+    {
+        // Arrange: a file too large to compare, and a baseline thread over three lines of it
+        var big = string.Concat(Enumerable.Repeat("x\n", ReviewLimits.MaxDiffLines + 1));
+        var projectId = await CreateReviewAsync(("src/big.txt", ChangeKind.Modified, big, "y\nz\n"));
+        var thread = await Threads.StartThreadAsync(
+            projectId, "REV-1", "src/big.txt", 9000, 9002, TestActors.Bob, "Please check", ThreadSide.Baseline, TestContext.Current.CancellationToken);
+
+        // Act: open the thread address
+        var cut = Open(ReviewLinks.ForThread(projectId, "REV-1", thread.Id));
+
+        // Assert: the baseline text is shown and exactly the lines of the thread are highlighted
+        Assert.NotEmpty(cut.FindAll("[data-testid='baseline-content']"));
+        Assert.Equal(
+            ["baseline-line-9000", "baseline-line-9001", "baseline-line-9002"],
+            cut.FindAll("[data-testid='baseline-content'] .code-line.focused").Select(e => e.GetAttribute("data-testid")).ToArray());
+    }
+
+    /// <summary>
+    ///     Tests that the highlight of a thread address follows the side of the thread: switching to the other version
+    ///     of the file does not highlight lines of the same numbers there.
+    /// </summary>
+    [Fact]
+    public async Task ReviewPage_ThreadAddress_BaselineThread_DoesNotHighlightTheSameLinesOfTheHead()
+    {
+        // Arrange: a file too large to compare, with a baseline thread on line 2 (the head also has a line 2)
+        var big = string.Concat(Enumerable.Repeat("x\n", ReviewLimits.MaxDiffLines + 1));
+        var projectId = await CreateReviewAsync(("src/big.txt", ChangeKind.Modified, big, "y\nz\n"));
+        var thread = await StartAsync(projectId, "src/big.txt", 2, ThreadSide.Baseline);
+        var cut = Open(ReviewLinks.ForThread(projectId, "REV-1", thread.Id));
+        Assert.NotEmpty(cut.FindAll("[data-testid='baseline-line-2'].focused"));
+
+        // Act: show the head version of the file
+        await cut.Find("[data-testid='view-head-button']").ClickAsync();
+
+        // Assert: the head lines are shown and none is highlighted
+        Assert.NotEmpty(cut.FindAll("[data-testid='file-content']"));
+        Assert.Empty(cut.FindAll("[data-testid='file-content'] .code-line.focused"));
     }
 
     /// <summary>
@@ -635,7 +683,7 @@ public class ReviewDeepLinkTests : PageTestBase
     ///     link as the return address, the login page keeps it, a login goes back to it, and the page shows the file.
     /// </summary>
     /// <param name="path">The file path.</param>
-    [Theory]
+    [Theory(Timeout = 60000)]
     [InlineData("plain.txt")]
     [InlineData("deep/er/nested.txt")]
     [InlineData("my docs/a b.txt")]
@@ -682,7 +730,7 @@ public class ReviewDeepLinkTests : PageTestBase
     ///     Tests that a deep link whose characters the server normalizes (<c>+</c> and <c>&amp;</c>) still comes back
     ///     to the same file after login, and that the return address stays a local path.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 60000)]
     public async Task SignIn_DeepLink_PlusAndAmpersand_ReturnsToTheSameFileAfterLogin()
     {
         // Arrange: a review with a file whose name has + and &
@@ -711,7 +759,7 @@ public class ReviewDeepLinkTests : PageTestBase
     ///     Tests that a hostile return address does not survive the login, even when it looks like a deep link.
     /// </summary>
     /// <param name="returnUrl">The return address posted with the login.</param>
-    [Theory]
+    [Theory(Timeout = 60000)]
     [InlineData("https://evil.example/projects/1/reviews/REV-1/files/a.txt")]
     [InlineData("//evil.example/projects/1/reviews/REV-1/threads/1")]
     [InlineData("/\\evil.example/projects/1/reviews/REV-1")]
@@ -734,7 +782,7 @@ public class ReviewDeepLinkTests : PageTestBase
     ///     Tests that a signed-in visitor who opens a thread link over HTTP gets the page already showing the file
     ///     and the highlighted thread (the first response, before any live connection).
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 60000)]
     public async Task ReviewPage_ThreadAddress_OverHttp_RendersFileAndHighlightedThread()
     {
         // Arrange: an application with a review, a thread, and a signed-in browser

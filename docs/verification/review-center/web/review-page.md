@@ -257,6 +257,15 @@ and choosing one shows the diff at the thread. This scenario is tested by
 choosing a row opens the Baseline or the Head view by the side of the thread. This scenario is tested by
 `ReviewPage_ThreadIndex_TooLargeFile_OpensTheVersionOfTheThread`.
 
+**ReviewPage_ThreadIndex_BaselineThreadOnTooLargeFile_HighlightsItsBaselineLines**: Choosing a baseline thread over
+three lines of a file too large to compare highlights exactly those lines of the Baseline text, and choosing a head
+thread highlights its line of the Head text. This scenario is tested by
+`ReviewPage_ThreadIndex_BaselineThreadOnTooLargeFile_HighlightsItsBaselineLines`.
+
+**ReviewPage_ThreadIndex_ThreadHighlight_StaysOnTheSideOfTheThread**: With a baseline thread chosen, the Head line of
+the same number is not highlighted, and with a head thread chosen the Baseline line is not. This scenario is tested by
+`ReviewPage_ThreadIndex_ThreadHighlight_StaysOnTheSideOfTheThread`.
+
 **ReviewPage_FileList_ThreadCounts_IncludeBothSides**: The open thread count of a file in the list counts threads
 on both sides. This scenario is tested by `ReviewPage_FileList_ThreadCounts_IncludeBothSides`.
 
@@ -502,11 +511,15 @@ has baseline lines but no head lines. These scenarios are tested by the tests of
 **ReviewPage_ThreadAddress_HeadThread_OpensFileAndHighlightsThread**,
 **ReviewPage_ThreadAddress_AddedFileHeadThread_OpensDiffAndHighlightsRow**,
 **ReviewPage_ThreadAddress_ResolvedBaselineThread_IsExpandedAndHighlightedOnTheLeft**,
+**ReviewPage_ThreadAddress_BaselineThreadOnTooLargeFile_HighlightsItsBaselineLines**,
+**ReviewPage_ThreadAddress_BaselineThread_DoesNotHighlightTheSameLinesOfTheHead**,
 **ReviewPage_ThreadAddress_WholeFileThread_ScrollsToTheThread**,
 **ReviewPage_ThreadAddress_KeepsThreadCountsInTheFileList** and
 **ReviewPage_ThreadAddress_OverHttp_RendersFileAndHighlightedThread**: the thread address opens the file of the thread
 in the Diff view, highlights the thread and its line and scrolls to it; a resolved thread is expanded; a thread on the
-baseline side highlights the removed or baseline line; a whole-file thread is scrolled to as a card; the per-file thread
+baseline side highlights the removed or baseline line, and on a file shown only as its baseline (too large to compare)
+every baseline line of the thread's range, never the head line of the same number; a whole-file thread is scrolled to
+as a card; the per-file thread
 counts stay in the file list; and the first response over HTTP (before any live connection) already shows the file and
 the highlight, which is what a reload gets. These scenarios are tested by the tests of those names.
 

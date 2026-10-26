@@ -47,7 +47,9 @@ a whole; its baseline lines can be commented on the baseline side.
 **Side rules**: the side of a thread decides which content the range is checked against. The `Head` side uses the
 head content of the file. The `Baseline` side uses the baseline content and is allowed only when the review is from a
 repository and has a baseline commit, and the file is `Modified` or `Deleted` (an `Added` file has no baseline). A
-whole-file anchor cannot name the `Baseline` side; whole-file threads are stored as `Head`.
+whole-file anchor cannot name the `Baseline` side; whole-file threads are stored as `Head`. A `side` value that no
+member of `ThreadSide` has is a programming error and raises `ArgumentOutOfRangeException` before anything else is
+checked or read.
 
 **Immutability**: posted comments are never changed or removed. The service and the store interface offer no way to
 edit or delete a comment or a thread. The only change to an existing thread is its state, which is not attributed

@@ -199,6 +199,12 @@ jobs:
             ~/AppData/Local/ms-playwright
           key: playwright-${{ runner.os }}-${{ hashFiles('tools/puppet/*.csproj') }}
 
+      - name: Configure apt retries (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          printf 'Acquire::Retries "3";\nAcquire::http::Timeout "30";\nAcquire::https::Timeout "30";\n' \
+            | sudo tee /etc/apt/apt.conf.d/99-ci-network > /dev/null
+
       - name: Install Chromium for Playwright (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
@@ -206,8 +212,12 @@ jobs:
           ./test/DemaConsulting.ReviewCenter.Puppet.Tests/bin/Release/net10.0/playwright.ps1
           install chromium
 
+      # The system dependencies come from the Ubuntu mirror through apt. A throttled mirror once took 14 minutes
+      # (about 20 kB/s) for this one step, so apt retries and gives up on a stalled connection, and the step has
+      # a time limit: a slow mirror then fails the job early so it can be re-run, instead of holding the runner.
       - name: Install Chromium for Playwright (Linux)
         if: runner.os == 'Linux'
+        timeout-minutes: 6
         shell: pwsh
         run: >
           ./test/DemaConsulting.ReviewCenter.Puppet.Tests/bin/Release/net10.0/playwright.ps1

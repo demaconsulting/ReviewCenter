@@ -55,7 +55,8 @@ sections:
           The ThreadService class shall anchor a thread to the Head or the Baseline side of a file, taking Head
           when no side is given, shall check the lines of a range against the lines of the chosen side only, shall
           accept the Baseline side only for a modified or deleted file of a review that has a baseline commit, and
-          shall store a whole-file thread as Head and reject a whole-file anchor that names the Baseline side.
+          shall store a whole-file thread as Head and reject a whole-file anchor that names the Baseline side, and
+          shall reject a side value that is not defined with an ArgumentOutOfRangeException.
         justification: |
           A diff shows removed lines that exist only in the baseline. A reviewer must be able to comment on them,
           and the number of a line means different things on each side, so the side decides which text the range
@@ -66,6 +67,7 @@ sections:
           - ThreadService_StartThreadAsync_WholeFileSide_BaselineRefusedHeadStored
           - ThreadService_StartThreadAsync_NoSideGiven_IsHeadThread
           - ThreadService_StartThreadAsync_BaselineRange_UsesBaselineLineCount
+          - ThreadService_StartThreadAsync_UndefinedSide_ThrowsArgumentOutOfRange
 
       - id: ReviewCenter-ThreadService-Comment
         title: >-

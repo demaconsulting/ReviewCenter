@@ -103,6 +103,10 @@ thread. This scenario is tested by `ThreadService_StartThreadAsync_NoSideGiven_I
 baseline side of the modified file, which has four baseline lines, and rejected on its head side, which has two. This
 scenario is tested by `ThreadService_StartThreadAsync_BaselineRange_UsesBaselineLineCount`.
 
+**ThreadService_StartThreadAsync_UndefinedSide_ThrowsArgumentOutOfRange**: A side value that no member has is refused
+with an `ArgumentOutOfRangeException` naming the side, before the review is looked up (the same refusal on a review
+that does not exist). This scenario is tested by `ThreadService_StartThreadAsync_UndefinedSide_ThrowsArgumentOutOfRange`.
+
 **ThreadService_StartThreadAsync_Audit_NamesBaselineSideOnly**: The audit detail of a thread on one baseline line, on
 a baseline range, and on a head line reads `line 3 (baseline)`, `lines 2-4 (baseline)`, and `line 1` with the thread
 and comment identities and the text digest, within the length limit of the detail. This scenario is tested by
