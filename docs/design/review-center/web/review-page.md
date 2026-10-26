@@ -45,10 +45,14 @@ when the project cannot be found).
 file is shown as binary.
 
 **SelectedKind**, **CurrentView**, **Diff**, **BaselineLines**: the change kind of the selected file, the view shown
-(`Diff`, `Head`, or `Baseline`), the `LineDiffResult` of the file from `ReviewService.GetDiffAsync` (`null` for an
-added file or an uploaded review), and the lines of the baseline text (`null` for binary content or when not yet
-loaded). The baseline is loaded the first time it is shown. **CanCompare** is true when the file has a baseline to
-compare with (a modified file, or a deleted file that has a diff), and **ShowingDiff** when the Diff view is shown
+(`Diff`, `Head`, or `Baseline`), the `LineDiffResult` of the file from `ReviewService.GetDiffAsync` (`null` for a
+file of an uploaded review or of a review without a baseline commit), and the lines of the baseline text (`null`
+for binary content or when not yet
+loaded). The baseline is loaded the first time it is shown. **CanCompare** is true when the review is from a
+repository and froze a baseline commit (every file of it has a diff, an added file as all added lines; a file of an
+uploaded review or of a review without a baseline commit has none), **HasHeadVersion** when the file has a head
+version (every kind but deleted), **HasBaselineVersion** when it has a baseline version (`CanCompare` and not an
+added file), and **ShowingDiff** when the Diff view is shown
 for a diff that has rows. **NewSide**: the version (`Head` or `Baseline`) the new-thread form anchors to.
 
 **Threads**: all threads of the review, for every file, in creation order. The summary and the per-file counts are
@@ -156,8 +160,10 @@ lines).
 compared (`CanCompare`). The Diff view is described below; the Head view is the numbered view above, which takes
 comments; the Baseline view shows the frozen baseline as numbered lines without comment buttons, markers, or the
 new-thread form, and with a note that comments are made in the Diff or Head view. Switching keeps the typed text
-and clears the line selection. A modified file offers all three, a deleted file offers Diff and Baseline (it has no
-head), and an added file or a file of an uploaded review has no choice and shows only the head, as before. Selecting
+and clears the line selection. A modified file offers all three, an added file offers Diff and Head (no baseline
+exists, and its diff has an empty left side), a deleted file offers Diff and Baseline (it has no
+head), and a file of an uploaded review or of a review without a baseline commit has no choice and shows only the
+head. Selecting
 another file starts in its default view: Diff when the file can be compared, otherwise Head (a deleted file whose
 diff is unavailable shows its baseline and accepts whole-file comments only, with the line fields left blank, a note
 says so, and Core refuses a line range). The file
@@ -181,7 +187,8 @@ instead of the file path, using the page's existing `reviewCenter.scrollToTestId
 deep links reuse. The style sheet gives the review page a wider column (80 rem) so each side has room; below 40 rem
 it stacks the left cell above the right cell of a row and hides the empty placeholders and the left copy of an
 unchanged line, so every line shows once and the page never scrolls sideways. A result that is `TooLarge` shows "Too
-large to compare line by line." and offers the Head and the Baseline view; a binary file shows the binary notice.
+large to compare line by line." and offers the Head and the Baseline view that the file has (an added file only the
+Head view); a binary file shows the binary notice.
 
 `DiffView` has the parameters `Result`, `OnlyLineEndingsDiffer`, `Threads`, `FocusedThreadId`, `SelectedSide`,
 `SelectedStart`, `SelectedEnd`, `ThreadTemplate` (how the page draws a thread, so the reply, resolve and reopen
@@ -228,7 +235,10 @@ thread becomes the focused
 thread, a resolved thread is expanded, and the first line of its anchor (a row of the diff, a baseline line, a head
 line, or the thread card for a whole-file thread) becomes the scroll target. A file that can be compared words the
 anchor of a thread and of an index row as "Before: line N" or "After: lines N-M" (the side is the thread's
-`ThreadSide`); other files keep "Line N". The index rows come from `ThreadService.BuildIndex` and the next-step line from
+`ThreadSide`; this applies to every file of a review with a baseline commit, an added file included); other files
+keep "Line N". Each thread card has a `thread-link-{id}` anchor, a plain, small, muted text link (class
+`thread-link`, not the button-style `action`) to the thread's address, so it does not compete with Resolve and
+Reply. The index rows come from `ThreadService.BuildIndex` and the next-step line from
 `Approval.NextStep` (which `SigningService` builds with `ThreadService.NextStep`, given the checklist progress and the
 number of checks answered Fail, and words itself for missing slots and signatures), so the page holds no ordering or
 wording rules of its own.
@@ -275,7 +285,8 @@ optional query values `line` and `side`, `head` or `baseline`), and `/projects/{
 therefore a reload) already shows the file, the highlight and, on a live connection, the scroll. `ApplyAddressAsync`
 selects the file (or the file of the thread) through the ordinary `SelectFileAsync` or `SelectThreadAsync`. For a
 line it parses `line` as digits only, reads `side` (anything but `baseline` is the head), checks that a baseline line
-is asked only of a file that has a baseline, and checks that the line exists; the diff row of the line is pinned so it
+is asked only of a file that has a baseline version (never an added file), and checks that the line exists; the diff
+row of the line is pinned so it
 is not hidden in a collapsed run, and `DiffView` gets `HighlightSide` and `HighlightLine`. A file that has no diff is
 shown in the Head or the Baseline view, with the line marked there. The router decodes the file path once, so the page
 never decodes it again; the one exception is that the router also turns a literal `%2F` of a file name into a slash,
@@ -288,7 +299,8 @@ link of the file or thread; the page replaces the address of the browser by it w
 address bar always holds a shareable link and the back button is not filled with entries. `NavigateTo` with
 replacement is not used, because the router would re-initialize the page and lose what is typed. The view mode (Diff,
 Head, Baseline) is not part of the address, so a reload shows the Diff view. Each thread card has the plain anchor
-`thread-link-{id}` with the link of the thread. **ReviewLinks** builds all of these addresses: it escapes the review
+`thread-link-{id}` with the link of the thread (a plain, small, muted text link, class `thread-link`). **ReviewLinks**
+builds all of these addresses: it escapes the review
 identifier and each path segment with `Uri.EscapeDataString` and joins them with `/`, and writes `?line=N&side=...`
 only when a line is given.
 

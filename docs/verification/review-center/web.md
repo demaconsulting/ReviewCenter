@@ -95,6 +95,11 @@ is tested by
 `WebSubsystem_Stylesheet_DiffRules_KeepCodeScrollingInsideItself`. The measured width of the page at 390 by 844
 pixels is checked in a real browser by the acceptance walk-through.
 
+**WebSubsystem_Stylesheet_ThreadLink_IsQuietTextLink**: The stylesheet source is read and the `a.thread-link` rule is
+checked: it has no background and no padding, is underlined, and does not fill with the accent color, so the link of
+a thread looks like a quiet text link and not like the Resolve and Reply buttons. This scenario is tested by
+`WebSubsystem_Stylesheet_ThreadLink_IsQuietTextLink`.
+
 **Routes_DeepLink_SignedOut_LoginLinkKeepsEscapesAndQuery**: The router is rendered for a signed-out visitor at the
 address of a line link of a file whose name has a space and a hash, with a baseline side. The "Sign in required" link
 is `/login?ReturnUrl=` followed by the whole address escaped once more, and no review page is drawn. This scenario is

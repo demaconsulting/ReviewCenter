@@ -227,10 +227,13 @@ per line, default `**/*`). The page passes the values to `ReviewService.CreateFr
 refusal, among them "Nothing to review: no files matching the selection changed between X and Y", in the form with the
 values kept. Skipped symbolic links and submodules are listed once before the review is opened, since they are not
 stored. `ReviewPage` shows the change kind of each file, the repository, both commits and the selection in the
-details, and for a modified file a choice between the Diff view (the default), the Head view, and the Baseline view:
+details, and for a file of a review with a baseline commit a choice between the Diff view (the default), the Head view
+(not for a deleted file), and the Baseline view (not for an added file):
 the Diff view shows the changed lines side by side, the baseline on the left and the head on the right, with the
 unchanged lines collapsed, and takes comments on a line of either
-version, Head is the numbered view that takes comments, Baseline is the frozen baseline, read-only. A deleted file
+version, Head is the numbered view that takes comments, Baseline is the frozen baseline, read-only. An added file
+opens on its Diff view (all lines added, an empty left side) and takes comments on its head lines and on the whole
+file. A deleted file
 opens on its Diff view (all lines removed) and takes whole-file comments and comments on its removed lines. A file
 that is too large to compare, or binary, says so in plain words and offers the other views. Everything the page shows
 comes from the frozen copies in the store, never from the repository.
@@ -242,7 +245,8 @@ Every file, line and thread of a review has a stable address that opens the revi
 `/projects/{id}/reviews/{reviewId}/threads/{threadId}`. `ReviewLinks` builds them, escaping the review identifier and
 each path segment once. The page opens the file in the Diff view, scrolls to the line or the thread and highlights it,
 and replaces the address of the browser with the link of whatever the reader chooses, without adding history entries,
-so the address bar is always a link that can be shared. Each thread has a plain `Link` to its address. An address
+so the address bar is always a link that can be shared. Each thread has a plain, small `Link` (a text link, not a
+button) to its address. An address
 that names nothing gives a plain message with a link back to the file list. A signed-out visitor is sent to the login
 page and returned to the same address (the `SignIn` unit keeps the address as it was requested). No authorization
 rule is added: the link opens only for a signed-in user, as the page always did.

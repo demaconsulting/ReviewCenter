@@ -224,12 +224,21 @@ public partial class ReviewPage : ComponentBase
     private bool HasLineDiff => ShowingDiff && Diff is { Status: FileDiffStatus.Diff, Result: not null };
 
     /// <summary>
-    ///     Gets a value indicating whether the selected file has a baseline to compare against: a modified or
-    ///     deleted file of a repository review that froze its baseline commit.
+    ///     Gets a value indicating whether the selected file has a diff: a file of a repository review that froze
+    ///     its baseline commit. Files of uploads and of reviews without a baseline commit have none.
     /// </summary>
-    private bool CanCompare =>
-        Review is { IsFromRepository: true, BaselineSha: not null }
-        && SelectedKind is ChangeKind.Modified or ChangeKind.Deleted;
+    private bool CanCompare => Review is { IsFromRepository: true, BaselineSha: not null };
+
+    /// <summary>
+    ///     Gets a value indicating whether the selected file has a head version to read: every kind except deleted.
+    /// </summary>
+    private bool HasHeadVersion => SelectedKind != ChangeKind.Deleted;
+
+    /// <summary>
+    ///     Gets a value indicating whether the selected file has a baseline version to read: a file of a review
+    ///     with a baseline commit, except an added file, which did not exist at the baseline.
+    /// </summary>
+    private bool HasBaselineVersion => CanCompare && SelectedKind != ChangeKind.Added;
 
     /// <summary>
     ///     Gets the diff of the selected file, or <c>null</c> when the file has no baseline to compare against.
@@ -522,7 +531,7 @@ public partial class ReviewPage : ComponentBase
         }
 
         // A file without a baseline has no baseline numbering at all
-        if (side == ThreadSide.Baseline && !CanCompare)
+        if (side == ThreadSide.Baseline && !HasBaselineVersion)
         {
             DeepLinkMessage = $"This file has no baseline version, so there is no baseline line {line}.";
             return;
@@ -535,7 +544,7 @@ public partial class ReviewPage : ComponentBase
             {
                 await ShowBaselineAsync();
             }
-            else if (SelectedKind == ChangeKind.Modified)
+            else if (HasHeadVersion)
             {
                 ShowHead();
             }
@@ -707,7 +716,7 @@ public partial class ReviewPage : ComponentBase
         BaselineLines = null;
         Diff = null;
 
-        // A modified or deleted file of a repository review opens as a diff, which is what a reviewer needs first;
+        // A file of a repository review with a baseline commit opens as a diff, which is what a reviewer needs first;
         // the comparison is computed once here and kept while the file stays selected
         if (CanCompare)
         {
@@ -853,7 +862,7 @@ public partial class ReviewPage : ComponentBase
             {
                 await ShowBaselineAsync();
             }
-            else if (SelectedKind == ChangeKind.Modified)
+            else if (HasHeadVersion)
             {
                 ShowHead();
             }
@@ -1358,12 +1367,11 @@ public partial class ReviewPage : ComponentBase
     ///     Tells whether a file of the review has a baseline to compare against.
     /// </summary>
     /// <param name="path">The file path.</param>
-    /// <returns><c>true</c> for a modified or deleted file of a repository review that froze its baseline.</returns>
+    /// <returns><c>true</c> for a file of a repository review that froze its baseline commit.</returns>
     private bool IsComparable(string path)
     {
         var file = Review?.Files.FirstOrDefault(f => f.Path == path);
-        return Review is { IsFromRepository: true, BaselineSha: not null }
-               && file?.ChangeKind is ChangeKind.Modified or ChangeKind.Deleted;
+        return file is not null && Review is { IsFromRepository: true, BaselineSha: not null };
     }
 
     /// <summary>

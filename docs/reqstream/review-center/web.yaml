@@ -277,7 +277,8 @@ sections:
           The Web subsystem shall let a user create a review from a git repository on the project page, choosing among
           the enabled repositories by name, with a head revision, an optional baseline revision, and a selection, show
           the reason when it cannot be created, and show on the review page the change kind of each file, the source,
-          and for a modified file a choice between the Diff view, the Head version and a read-only Baseline version.
+          and for a file of a review with a baseline a choice between the Diff view, the Head version (not for a
+          deleted file) and a read-only Baseline version (not for an added file).
         justification: |
           Reviewing a change means seeing what it replaces. The page keeps the full texts one click away and never
           shows how the server reaches the repository.
@@ -324,6 +325,7 @@ sections:
           - ReviewCenter-SignIn-ReturnDeepLink
         tests:
           - Routes_DeepLink_SignedOut_LoginLinkKeepsEscapesAndQuery
+          - WebSubsystem_Stylesheet_ThreadLink_IsQuietTextLink
 
       - id: ReviewCenter-Web-PlanReviews
         title: >-

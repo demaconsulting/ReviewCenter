@@ -307,6 +307,19 @@ a.action {
     text-decoration: none;
 }
 
+/* A quiet reference link inside a thread header, so it does not compete with Resolve and Reply */
+a.thread-link {
+    font-size: 0.85rem;
+    color: var(--muted);
+    text-decoration: underline;
+    background: none;
+    padding: 0;
+}
+
+a.thread-link:hover {
+    color: var(--accent);
+}
+
 .hint {
     margin: 0.25rem 0 0.75rem;
     font-size: 0.85rem;

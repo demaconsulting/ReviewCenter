@@ -351,16 +351,22 @@ public class ReviewPageDiffTests : PageTestBase
     }
 
     /// <summary>
-    ///     Test that an uploaded review and an added file keep the head-only view without a selector or a diff.
+    ///     Test that an uploaded review, and a repository review created without a baseline revision, keep the
+    ///     head-only view without a selector or a diff.
     /// </summary>
     [Fact]
-    public async Task ReviewPage_FileSelect_UploadAndAddedFile_KeepHeadOnlyView()
+    public async Task ReviewPage_FileSelect_UploadAndNoBaselineReview_KeepHeadOnlyView()
     {
-        // Arrange: an upload review and a repository review with an added file
-        var projectId = await CreateReviewAsync(("src/new.txt", ChangeKind.Added, null, "new\n"));
-        await Reviews.CreateDraftAsync(projectId, "REV-2", "Upload", [new("a.txt", TestContent.A)], TestContext.Current.CancellationToken);
+        // Arrange: an upload review and a repository review without a baseline commit, whose files are all added
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var projectId = await CreateReviewAsync();
+        await Reviews.CreateDraftAsync(projectId, "REV-2", "Upload", [new("a.txt", TestContent.A)], cancellationToken);
+        var repository = (await Repositories.ListEnabledAsync(cancellationToken)).Single();
+        Git.Script(null, HeadSha, [("src/new.txt", ChangeKind.Added, null, "new\n")]);
+        await Reviews.CreateFromRepositoryAsync(
+            projectId, "REV-3", "No baseline", repository.Id, "main", null, "src/**", TestActors.Ann, cancellationToken);
 
-        // Act: open the uploaded file and then the added one
+        // Act: open the uploaded file
         var upload = RenderPage(projectId, "REV-2");
         await upload.Find("[data-testid='file-select-0']").ClickAsync();
 
@@ -369,14 +375,197 @@ public class ReviewPageDiffTests : PageTestBase
         Assert.Empty(upload.FindAll("[data-testid='diff-view']"));
         Assert.NotEmpty(upload.FindAll("[data-testid='file-content']"));
 
-        // Act: the added file of the repository review
-        var cut = RenderPage(projectId);
+        // Act: open the added file of the review that has no baseline commit
+        var cut = RenderPage(projectId, "REV-3");
         await SelectFileAsync(cut, "src/new.txt");
 
         // Assert: head only
         Assert.Empty(cut.FindAll("[data-testid='file-version-toggle']"));
         Assert.Empty(cut.FindAll("[data-testid='diff-view']"));
+        Assert.NotEmpty(cut.FindAll("[data-testid='file-content']"));
         Assert.Equal("new", cut.Find("[data-testid='line-text-1']").TextContent);
+    }
+
+    /// <summary>
+    ///     Test that an added file of a review that has a baseline commit opens as a diff of added lines with a
+    ///     Diff and a Head choice but no Baseline choice.
+    /// </summary>
+    [Fact]
+    public async Task ReviewPage_FileSelect_AddedFileOfReviewWithBaseline_OpensAsAllAddedDiffWithDiffAndHeadChoice()
+    {
+        // Arrange: a review with an added file of two lines
+        var projectId = await CreateReviewAsync(("src/new.txt", ChangeKind.Added, null, "new\nsecond\n"));
+        var cut = RenderPage(projectId);
+
+        // Act: open the added file
+        await SelectFileAsync(cut, "src/new.txt");
+
+        // Assert: the diff is the default view, with Diff and Head but no Baseline
+        Assert.Equal("Added", cut.Find("[data-testid='selected-file-kind']").TextContent);
+        Assert.Equal("true", cut.Find("[data-testid='view-diff-button']").GetAttribute("aria-pressed"));
+        Assert.NotEmpty(cut.FindAll("[data-testid='view-head-button']"));
+        Assert.Empty(cut.FindAll("[data-testid='view-baseline-button']"));
+
+        // Assert: every line is added, with an empty left placeholder and no old numbers
+        Assert.Equal("2 added, 0 removed", cut.Find("[data-testid='diff-summary']").TextContent);
+        Assert.Equal("Click + to comment on a line.", cut.Find("[data-testid='diff-hint']").TextContent);
+        Assert.Equal(["added", "added"], cut.FindAll("[data-testid^='diff-row-']").Select(e => e.GetAttribute("data-kind")).ToArray());
+        Assert.Equal("new", cut.Find("[data-testid='diff-text-0']").TextContent);
+        Assert.Equal("second", cut.Find("[data-testid='diff-text-1']").TextContent);
+        Assert.NotEmpty(cut.FindAll("[data-testid='diff-empty-left-0']"));
+        Assert.NotEmpty(cut.FindAll("[data-testid='diff-empty-left-1']"));
+        Assert.Empty(cut.FindAll("[data-testid^='diff-old-no-']"));
+        Assert.Empty(cut.FindAll("[data-testid^='diff-comment-old-']"));
+        Assert.Empty(cut.FindAll("[data-testid='file-content']"));
+    }
+
+    /// <summary>
+    ///     Test that an added file can be shown as its head lines with the comment controls and that the diff
+    ///     can be chosen again, without ever offering the Baseline.
+    /// </summary>
+    [Fact]
+    public async Task ReviewPage_FileSelect_AddedFile_HeadViewAndBack_ShowsNumberedLinesAndCommentControls()
+    {
+        // Arrange: the added file shown as a diff
+        var projectId = await CreateReviewAsync(("src/new.txt", ChangeKind.Added, null, "new\nsecond\n"));
+        var cut = RenderPage(projectId);
+        await SelectFileAsync(cut, "src/new.txt");
+
+        // Act: switch to the head
+        await cut.Find("[data-testid='view-head-button']").ClickAsync();
+
+        // Assert: the numbered head lines with comment controls and the form, no diff
+        Assert.Equal("true", cut.Find("[data-testid='view-head-button']").GetAttribute("aria-pressed"));
+        Assert.Equal("new", cut.Find("[data-testid='line-text-1']").TextContent);
+        Assert.NotEmpty(cut.FindAll("[data-testid='line-comment-1']"));
+        Assert.NotEmpty(cut.FindAll("[data-testid='new-thread-form']"));
+        Assert.Empty(cut.FindAll("[data-testid='diff-view']"));
+        Assert.Empty(cut.FindAll("[data-testid='view-baseline-button']"));
+
+        // Act: back to the diff
+        await cut.Find("[data-testid='view-diff-button']").ClickAsync();
+
+        // Assert: the diff is back and still no Baseline is offered
+        Assert.NotEmpty(cut.FindAll("[data-testid='diff-view']"));
+        Assert.Empty(cut.FindAll("[data-testid='file-content']"));
+        Assert.Empty(cut.FindAll("[data-testid='view-baseline-button']"));
+    }
+
+    /// <summary>
+    ///     Test that a comment on a line of an added file's diff starts a head thread shown under that row.
+    /// </summary>
+    [Fact]
+    public async Task ReviewPage_DiffView_AddedFile_CommentOnLine_StartsHeadThreadUnderTheRow()
+    {
+        // Arrange: the added file shown as a diff
+        var projectId = await CreateReviewAsync(("src/new.txt", ChangeKind.Added, null, "new\nsecond\n"));
+        var cut = RenderPage(projectId);
+        await SelectFileAsync(cut, "src/new.txt");
+
+        // Act: choose the plus of the second line and submit a comment
+        await cut.Find("[data-testid='diff-comment-1']").ClickAsync();
+        Assert.Equal("Comment on line 2 (after).", cut.Find("[data-testid='thread-target']").TextContent);
+        await cut.Find("[data-testid='thread-text-input']").InputAsync("Why this?");
+        await cut.Find("[data-testid='new-thread-form']").SubmitAsync();
+
+        // Assert: a head thread on line 2, shown under the row, worded as "After"
+        var thread = Assert.Single(await Threads.ListAsync(projectId, "REV-1", TestContext.Current.CancellationToken));
+        Assert.Equal((2, 2, ThreadSide.Head), (thread.StartLine, thread.EndLine, thread.Side));
+        Assert.NotEmpty(cut.FindAll($"[data-testid='diff-threads-1'] [data-testid='thread-{thread.Id}']"));
+        Assert.Equal("After: line 2", cut.Find($"[data-testid='thread-anchor-{thread.Id}']").TextContent);
+        Assert.Equal(
+            ReviewLinks.ForThread(projectId, "REV-1", thread.Id),
+            cut.Find($"[data-testid='thread-link-{thread.Id}']").GetAttribute("href"));
+        Assert.Empty(cut.FindAll("[data-testid^='diff-comment-old-']"));
+    }
+
+    /// <summary>
+    ///     Test that an added file too large to compare offers only the Head version.
+    /// </summary>
+    [Fact]
+    public async Task ReviewPage_FileSelect_AddedFileTooLarge_OffersHeadOnly()
+    {
+        // Arrange: an added file with more lines than a diff accepts
+        var big = string.Concat(Enumerable.Repeat("x\n", ReviewLimits.MaxDiffLines + 1));
+        var projectId = await CreateReviewAsync(("src/big.txt", ChangeKind.Added, null, big));
+        var cut = RenderPage(projectId);
+
+        // Act: open it
+        await SelectFileAsync(cut, "src/big.txt");
+
+        // Assert: the message is shown and only the head is offered
+        Assert.NotEmpty(cut.FindAll("[data-testid='diff-too-large']"));
+        Assert.Empty(cut.FindAll("[data-testid='diff-view']"));
+        Assert.NotEmpty(cut.FindAll("[data-testid='diff-too-large-head']"));
+        Assert.Empty(cut.FindAll("[data-testid='diff-too-large-baseline']"));
+
+        // Act: show the head version
+        await cut.Find("[data-testid='diff-too-large-head']").ClickAsync();
+
+        // Assert: the head lines are shown
+        Assert.NotEmpty(cut.FindAll("[data-testid='file-content']"));
+    }
+
+    /// <summary>
+    ///     Test that an added binary file shows the notice and offers no Baseline.
+    /// </summary>
+    [Fact]
+    public async Task ReviewPage_FileSelect_AddedBinaryFile_ShowsNoticeAndOffersHeadOnly()
+    {
+        // Arrange: an added file with a NUL byte
+        var projectId = await CreateReviewAsync(("src/data.bin", ChangeKind.Added, null, "a\0b"));
+        var cut = RenderPage(projectId);
+
+        // Act: open it
+        await SelectFileAsync(cut, "src/data.bin");
+
+        // Assert: the notice is shown, no diff, and no Baseline choice
+        Assert.NotEmpty(cut.FindAll("[data-testid='file-binary-notice']"));
+        Assert.Empty(cut.FindAll("[data-testid='diff-view']"));
+        Assert.Empty(cut.FindAll("[data-testid='view-baseline-button']"));
+    }
+
+    /// <summary>
+    ///     Test that an empty added file shows a diff without rows, and still accepts a whole-file comment.
+    /// </summary>
+    [Fact]
+    public async Task ReviewPage_FileSelect_EmptyAddedFile_ShowsDiffWithoutRows()
+    {
+        // Arrange: an added file without content
+        var projectId = await CreateReviewAsync(("src/empty.txt", ChangeKind.Added, null, string.Empty));
+        var cut = RenderPage(projectId);
+
+        // Act: open it
+        await SelectFileAsync(cut, "src/empty.txt");
+
+        // Assert: a diff without rows, and the form for the whole file
+        Assert.Equal("No changes.", cut.Find("[data-testid='diff-summary']").TextContent);
+        Assert.Empty(cut.FindAll("[data-testid^='diff-row-']"));
+        Assert.NotEmpty(cut.FindAll("[data-testid='new-thread-form']"));
+    }
+
+    /// <summary>
+    ///     Test that choosing a head thread of an added file in the index opens the diff at that row.
+    /// </summary>
+    [Fact]
+    public async Task ReviewPage_ThreadIndex_AddedFileHeadThread_JumpsToTheDiffRow()
+    {
+        // Arrange: a head thread on line 2 of the added file
+        var projectId = await CreateReviewAsync(("src/new.txt", ChangeKind.Added, null, "new\nsecond\n"));
+        var thread = await StartAsync(projectId, 2, 2, ThreadSide.Head, "Look", "src/new.txt");
+        var cut = RenderPage(projectId);
+
+        // Assert: the index words it like any head thread of a file with a baseline
+        Assert.Equal("After: line 2", cut.Find($"[data-testid='index-anchor-{thread.Id}']").TextContent);
+
+        // Act: choose the thread
+        await cut.Find($"[data-testid='index-row-{thread.Id}']").ClickAsync();
+
+        // Assert: the diff is shown and scrolled to the row
+        Assert.Equal("true", cut.Find("[data-testid='view-diff-button']").GetAttribute("aria-pressed"));
+        await cut.WaitForAssertionAsync(() =>
+            Assert.Equal(["diff-row-1", "center"], JSInterop.Invocations["reviewCenter.scrollToTestId"][^1].Arguments));
+        Assert.Contains("focused", cut.Find("[data-testid='diff-row-1']").ClassList);
     }
 
     /// <summary>

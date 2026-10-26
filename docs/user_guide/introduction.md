@@ -315,8 +315,10 @@ from the repository: later commits, a force push, or disabling the repository do
   review is created, and are counted in the audit entry.
 - A revision such as `HEAD~1` is not accepted; use a branch, a tag, or a commit id.
 
-On the review page, each file shows its change kind. Select a file to read it. For a **Modified** file the page opens
-on a **Diff** view, with a **Head** and a **Baseline** button next to it. The Diff view shows "x added, y removed",
+On the review page, each file shows its change kind. Select a file to read it. For a file of a review that has a
+baseline commit the page opens on a **Diff** view, with a **Head** and a **Baseline** button next to it (an **Added**
+file has no Baseline button because there was no earlier version, and a **Deleted** file has no Head button). The
+Diff view shows "x added, y removed",
 then the changed lines side by side: the earlier version (baseline) on the left and the new version (head) on the
 right, each with its own line numbers. Removed lines are red with a `-` and added lines green with a `+`; a run of
 removed lines sits next to the run of added lines that replaces it, and a cell with nothing opposite is left empty
@@ -332,8 +334,10 @@ width (a resolved thread is one line until you open it), and the thread list nam
 "Before: line N" or "After: line N" and jumps to the line when you choose one. **Head** is the numbered view with
 comments, and **Baseline** shows the earlier content read-only. A file that is too large to compare line by line
 (more than 10,000 lines on either side, or more than 2,000 added and removed lines together) says so and offers Head
-and Baseline. A **Deleted** file opens on a Diff view of its removed lines; you can comment on
-them or on the whole file. An **Added** file, and every file of an upload, shows the numbered lines as before. The
+and Baseline, as the file has them. A **Deleted** file opens on a Diff view of its removed lines; you can comment on
+them or on the whole file. An **Added** file opens on a Diff of all its lines as added (the left side is empty) and
+you can comment on any of its lines or on the whole file; every file of an upload, and of a review created without a
+baseline revision, shows the numbered lines as before. The
 review fingerprint covers the files that
 exist at the head (Added and Modified), exactly as for an upload. The Details section shows the repository name, the
 baseline and head commits, and the selection.
@@ -477,7 +481,8 @@ page you came from. Copy the address and send it to a colleague.
 | `/projects/{id}/reviews/{reviewId}/files/{path}?line=12&side=baseline` | The same for baseline line 12 |
 | `/projects/{id}/reviews/{reviewId}/threads/{threadId}` | The thread's file, scrolled to the highlighted thread |
 
-Every thread has a small **Link** next to its state; it is an ordinary link, so you can also copy it with the context
+Every thread has a small **Link** next to its state, shown as a plain text link; it is an ordinary link, so you can
+also copy it with the context
 menu of your browser (there is no separate copy button). Characters in a file path that need escaping in an address
 (spaces, `#`, `?`, `%`, and letters outside the English alphabet) are escaped for you in the links the page builds.
 

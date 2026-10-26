@@ -159,7 +159,7 @@ public class ReviewPageRepositoryTests : PageTestBase
 
     /// <summary>
     ///     Test that a modified file opens as a diff and offers a toggle to the Head version with the comment
-    ///     controls and to the read-only Baseline version, and that no toggle is offered for an added file.
+    ///     controls and to the read-only Baseline version, and that an added file offers Diff and Head but no Baseline.
     /// </summary>
     [Fact]
     public async Task ReviewPage_FileSelect_ModifiedFile_TogglesBetweenDiffHeadAndReadOnlyBaseline()
@@ -209,13 +209,17 @@ public class ReviewPageRepositoryTests : PageTestBase
         // Act: select the added file
         await cut.Find("[data-testid='file-select-2']").ClickAsync();
 
-        // Assert: it has only the head version
-        Assert.Empty(cut.FindAll("[data-testid='file-version-toggle']"));
-        Assert.Equal("new", cut.Find("[data-testid='line-text-1']").TextContent);
+        // Assert: it opens as a diff with Diff and Head but no Baseline, as nothing existed at the baseline
+        Assert.Equal("true", cut.Find("[data-testid='view-diff-button']").GetAttribute("aria-pressed"));
+        Assert.NotEmpty(cut.FindAll("[data-testid='view-head-button']"));
+        Assert.Empty(cut.FindAll("[data-testid='view-baseline-button']"));
+        Assert.Equal("1 added, 0 removed", cut.Find("[data-testid='diff-summary']").TextContent);
+        Assert.Equal("new", cut.Find("[data-testid='diff-text-0']").TextContent);
+        Assert.NotEmpty(cut.FindAll("[data-testid='diff-empty-left-0']"));
     }
 
     /// <summary>
-    ///     Test that selecting another file after viewing a baseline starts on the head version again.
+    ///     Test that selecting another file after viewing a baseline starts on the default view of that file again.
     /// </summary>
     [Fact]
     public async Task ReviewPage_FileSelect_AfterBaselineView_ShowsHeadOfTheNextFile()
@@ -229,9 +233,10 @@ public class ReviewPageRepositoryTests : PageTestBase
         // Act: select the added file
         await cut.Find("[data-testid='file-select-2']").ClickAsync();
 
-        // Assert: the head version of the added file is shown, not a baseline view
+        // Assert: the diff of the added file is shown, not a baseline view
         Assert.Empty(cut.FindAll("[data-testid='baseline-content']"));
-        Assert.NotEmpty(cut.FindAll("[data-testid='file-content']"));
+        Assert.NotEmpty(cut.FindAll("[data-testid='diff-view']"));
+        Assert.Equal("true", cut.Find("[data-testid='view-diff-button']").GetAttribute("aria-pressed"));
     }
 
     /// <summary>

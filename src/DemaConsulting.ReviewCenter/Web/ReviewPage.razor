@@ -11,8 +11,8 @@
    unsigned slot can be changed or removed and slots can be added), the
    list of files with size and open-thread count, the thread index of all files
    (filter All/Open/Resolved, default Open; choosing a row selects the file and highlights the lines), and for
-   the selected file: for a changed file of a repository review the diff (see DiffView) with a Diff / Head / Baseline
-   selector, otherwise the text as numbered lines (or a notice for binary files), a form that starts a thread (under the
+   the selected file: for a file of a repository review with a baseline the diff (see DiffView) with a Diff / Head /
+   Baseline selector (Head not for a deleted file, Baseline not for an added file), otherwise the text as numbered lines (or a notice for binary files), a form that starts a thread (under the
    selected line in the diff), and the threads of that file (a resolved thread is a one-line header until expanded;
    in the diff the threads are under their lines). The review id, state,
    content fingerprint, record digest and per-file SHA-256 hashes are last, in a Details section that is collapsed. All file
@@ -286,7 +286,7 @@
                     <span class="path" data-testid="thread-anchor-@threadId">@AnchorLabel(item)</span>
                     <span class="badge @(resolved ? "resolved" : null)" data-testid="thread-state-@threadId">@item.State</span>
                     <span class="muted" data-testid="thread-count-@threadId">@CommentCountLabel(item)</span>
-                    <a class="action thread-link" href="@ReviewLinks.ForThread(ProjectId, ReviewId, threadId)"
+                    <a class="thread-link" href="@ReviewLinks.ForThread(ProjectId, ReviewId, threadId)"
                        aria-label="Link to thread @threadId" data-testid="thread-link-@threadId">Link</a>
                     @if (resolved)
                     {
@@ -394,13 +394,16 @@
                     <div class="index-filters" role="group" aria-label="Which version of the file to show" data-testid="file-version-toggle">
                         <button type="button" class="secondary" aria-pressed="@(ShowingDiff ? "true" : "false")"
                                 data-testid="view-diff-button" @onclick="ShowDiff">Diff</button>
-                        @if (SelectedKind == ChangeKind.Modified)
+                        @if (HasHeadVersion)
                         {
                             <button type="button" class="secondary" aria-pressed="@(CurrentView == FileView.Head ? "true" : "false")"
                                     data-testid="view-head-button" @onclick="ShowHead">Head</button>
                         }
-                        <button type="button" class="secondary" aria-pressed="@(BaselineView ? "true" : "false")"
-                                data-testid="view-baseline-button" @onclick="ShowBaselineAsync">Baseline</button>
+                        @if (HasBaselineVersion)
+                        {
+                            <button type="button" class="secondary" aria-pressed="@(BaselineView ? "true" : "false")"
+                                    data-testid="view-baseline-button" @onclick="ShowBaselineAsync">Baseline</button>
+                        }
                     </div>
                 }
 
@@ -415,11 +418,14 @@
                         <div class="notice" data-testid="diff-too-large">
                             <p>Too large to compare line by line.</p>
                             <div class="index-filters">
-                                @if (SelectedKind == ChangeKind.Modified)
+                                @if (HasHeadVersion)
                                 {
                                     <button type="button" class="secondary" data-testid="diff-too-large-head" @onclick="ShowHead">Show the Head version</button>
                                 }
-                                <button type="button" class="secondary" data-testid="diff-too-large-baseline" @onclick="ShowBaselineAsync">Show the Baseline version</button>
+                                @if (HasBaselineVersion)
+                                {
+                                    <button type="button" class="secondary" data-testid="diff-too-large-baseline" @onclick="ShowBaselineAsync">Show the Baseline version</button>
+                                }
                             </div>
                         </div>
                     }

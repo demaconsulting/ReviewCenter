@@ -269,16 +269,33 @@ public class ReviewDeepLinkTests : PageTestBase
     }
 
     /// <summary>
-    ///     Tests that a line of a file without a baseline is highlighted in the numbered text.
+    ///     Tests that a line of an added file of a review with a baseline is highlighted in its diff.
     /// </summary>
     [Fact]
-    public async Task ReviewPage_LineAddress_AddedFile_HighlightsTheCodeLine()
+    public async Task ReviewPage_LineAddress_AddedFile_HighlightsTheDiffRow()
     {
         // Arrange: a review with an added file
         var projectId = await CreateReviewAsync();
 
         // Act: open line 2 of the added file
         var cut = Open(ReviewLinks.ForFile(projectId, "REV-1", NewPath, 2));
+
+        // Assert: only the row of that line is highlighted and scrolled to
+        Assert.Equal(["diff-row-1"], cut.FindAll(".diff-row.focused").Select(e => e.GetAttribute("data-testid")).ToArray());
+        Assert.Equal(["diff-row-1", "center"], LastScroll());
+    }
+
+    /// <summary>
+    ///     Tests that a line of an uploaded file is highlighted in the numbered text.
+    /// </summary>
+    [Fact]
+    public async Task ReviewPage_LineAddress_UploadFile_HighlightsTheCodeLine()
+    {
+        // Arrange: an upload review
+        var projectId = await CreateUploadReviewAsync("a.txt");
+
+        // Act: open line 2 of the file
+        var cut = Open(ReviewLinks.ForFile(projectId, "REV-1", "a.txt", 2));
 
         // Assert: the line of the numbered text is highlighted and scrolled to, the others are not
         Assert.Contains("focused", cut.Find("[data-testid='code-line-2']").ClassList);
@@ -330,6 +347,27 @@ public class ReviewDeepLinkTests : PageTestBase
         Assert.Contains("focused", cut.Find("[data-testid='diff-row-15']").ClassList);
         Assert.Equal(["diff-row-15", "center"], LastScroll());
         Assert.Empty(cut.FindAll("[data-testid='deep-link-message']"));
+    }
+
+    /// <summary>
+    ///     Tests that a head thread of an added file opens the diff and highlights the row of the thread.
+    /// </summary>
+    [Fact]
+    public async Task ReviewPage_ThreadAddress_AddedFileHeadThread_OpensDiffAndHighlightsRow()
+    {
+        // Arrange: a head thread on line 1 of the added file
+        var projectId = await CreateReviewAsync();
+        var thread = await StartAsync(projectId, NewPath, 1, ThreadSide.Head);
+
+        // Act: open the thread address
+        var cut = Open(ReviewLinks.ForThread(projectId, "REV-1", thread.Id));
+
+        // Assert: the diff is shown with the row highlighted and the thread under it
+        Assert.Equal(NewPath, cut.Find("[data-testid='selected-file-path']").TextContent);
+        Assert.Equal("true", cut.Find("[data-testid='view-diff-button']").GetAttribute("aria-pressed"));
+        Assert.Contains("focused", cut.Find("[data-testid='diff-row-0']").ClassList);
+        Assert.Equal(["diff-row-0", "center"], LastScroll());
+        Assert.NotEmpty(cut.FindAll($"[data-testid='diff-threads-0'] [data-testid='thread-{thread.Id}']"));
     }
 
     /// <summary>
@@ -487,7 +525,7 @@ public class ReviewDeepLinkTests : PageTestBase
     }
 
     /// <summary>
-    ///     Tests that each thread shows a plain link to its address.
+    ///     Tests that each thread shows a plain, unobtrusive link to its address, not styled as a button.
     /// </summary>
     [Fact]
     public async Task ReviewPage_Thread_ShowsPlainLinkToItsAddress()
@@ -503,11 +541,14 @@ public class ReviewDeepLinkTests : PageTestBase
         var diffTag = diffLink.TagName.ToLowerInvariant();
         var diffText = diffLink.TextContent;
         var diffHref = diffLink.GetAttribute("href");
+        var diffClasses = diffLink.ClassList.ToArray();
         var list = Open(ReviewLinks.ForFile(projectId, "REV-1", NewPath));
 
-        // Assert: the link is a plain anchor to the thread address
+        // Assert: the link is a plain anchor to the thread address, with the quiet style and not the button style
         Assert.Equal("a", diffTag);
         Assert.Equal("Link", diffText);
+        Assert.Contains("thread-link", diffClasses);
+        Assert.DoesNotContain("action", diffClasses);
         Assert.Equal(ReviewLinks.ForThread(projectId, "REV-1", inDiff.Id), diffHref);
         Assert.Equal(ReviewLinks.ForThread(projectId, "REV-1", whole.Id), list.Find($"[data-testid='thread-link-{whole.Id}']").GetAttribute("href"));
     }

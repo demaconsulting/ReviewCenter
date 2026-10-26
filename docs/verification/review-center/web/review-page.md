@@ -78,10 +78,12 @@ N/A - standard test environment.
 - A review from a repository shows the change kind of every file (an uploaded review shows none) and the repository,
   both commits, and the selection in the details; a deleted file is listed with its baseline size.
 - A review planned from a review-set shows the identifier of the set in the details; other reviews show no such row.
-- A modified file of a review with a baseline offers a Diff, a Head, and a Baseline view and opens on Diff; Head is
-  the numbered view with comments, Baseline is the frozen text, read-only, without comment controls; an added file
-  and a file of an uploaded review have no choice and show the head only; selecting another file starts in its
-  default view; switching views keeps the typed text and clears the line selection.
+- A file of a review with a baseline commit opens on a Diff view and offers: for a modified file Diff, Head and
+  Baseline; for an added file Diff and Head but no Baseline (the diff shows every line added with an empty left
+  side); for a deleted file Diff and Baseline but no Head. Head is the numbered view with comments, Baseline is the
+  frozen text, read-only, without comment controls; a file of an uploaded review, or of a review without a baseline
+  commit, has no choice and shows the head only; selecting another file starts in its default view; switching views
+  keeps the typed text and clears the line selection.
 - A deleted file opens on the Diff view of removed lines, offers Diff and Baseline but no Head, and accepts a
   whole-file comment; its Baseline view has a note and no line comment controls.
 - The Diff view is laid out side by side, the baseline on the left and the head on the right: it shows the summary
@@ -90,7 +92,8 @@ N/A - standard test environment.
   leftover cells, rows with their sign, and unchanged runs of more than three lines collapsed behind a "Show N
   unchanged lines" button that expands them; opening a file brings its first change into view.
 - A file that is too large to compare shows "Too large to compare line by line." with the Head and the Baseline
-  view offered; a binary file shows the binary notice; two versions that differ only in line endings are said to.
+  view offered as the file has them (an added file offers Head only); a binary file shows the binary notice; two
+  versions that differ only in line endings are said to.
 - The + control of the left cell starts a thread on the Baseline with the baseline line number (a removed row, or
   the baseline copy of an unchanged row); the control of the right cell starts it on the Head with the head line
   number; Shift-click and the "Through line" field extend the range within one side only; Cancel closes the form, and
@@ -98,14 +101,16 @@ N/A - standard test environment.
 - Threads are drawn under the row of the last line of their anchor across the full width, also where the lines would
   be collapsed, the cell of their side marked, a resolved thread as a collapsed header; reply, resolve, and reopen
   work there; the list below the diff holds only whole-file threads; the per-file thread counts include both sides.
-- The thread index words the anchor as "Before: line N" or "After: lines N-M" for a file with a baseline, and
+- The thread index words the anchor as "Before: line N" or "After: lines N-M" for every file of a review with a
+  baseline commit, an added file included, and
   choosing a row shows the diff at the thread (or the Baseline or Head view for a file that is too large).
 - The stylesheet lays each row out as two columns, wraps long lines inside their cell, stacks the cells and hides the
   empty placeholders on a narrow screen, and keeps the gap buttons and inline threads in view, with a narrower gutter
   on a phone.
 - The file, line and thread addresses open the review page at that place with the highlight and the scroll request;
   an address that names nothing gives a message with a link back to the file list; choosing a file or a thread asks
-  the browser to replace its address by the matching link without navigating; every thread has a plain link; links
+  the browser to replace its address by the matching link without navigating; every thread has a plain,
+  unobtrusive link (not styled as a button); links
   from `ReviewLinks` return the same file path through the router, whatever its characters.
 
 #### Test Scenarios
@@ -130,15 +135,48 @@ view; the Head view has comment controls, the Baseline view shows the baseline l
 the Diff view returns. This scenario is tested by
 `ReviewPage_FileSelect_ModifiedFile_TogglesBetweenDiffHeadAndReadOnlyBaseline`.
 
-**ReviewPage_FileSelect_UploadAndAddedFile_KeepHeadOnlyView**: An added file and a file of an uploaded review show
-the head with no view choice. This scenario is tested by `ReviewPage_FileSelect_UploadAndAddedFile_KeepHeadOnlyView`.
+**ReviewPage_FileSelect_UploadAndNoBaselineReview_KeepHeadOnlyView**: A file of an uploaded review and a file of a
+repository review created without a baseline revision show the head with no view choice and no diff. This scenario
+is tested by `ReviewPage_FileSelect_UploadAndNoBaselineReview_KeepHeadOnlyView`.
+
+**ReviewPage_FileSelect_AddedFileOfReviewWithBaseline_OpensAsAllAddedDiffWithDiffAndHeadChoice**: An added file of a
+review with a baseline commit opens on the Diff view with every line added, an empty left placeholder per row and
+no old line numbers, and offers Diff and Head but no Baseline. This scenario is tested by
+`ReviewPage_FileSelect_AddedFileOfReviewWithBaseline_OpensAsAllAddedDiffWithDiffAndHeadChoice`.
+
+**ReviewPage_FileSelect_AddedFile_HeadViewAndBack_ShowsNumberedLinesAndCommentControls**: The Head view of an added
+file shows the numbered lines with comment controls and the form, and the Diff view returns, with no Baseline
+choice at any point. This scenario is tested by
+`ReviewPage_FileSelect_AddedFile_HeadViewAndBack_ShowsNumberedLinesAndCommentControls`.
+
+**ReviewPage_DiffView_AddedFile_CommentOnLine_StartsHeadThreadUnderTheRow**: The + control of a line of an added
+file's diff starts a Head thread on that line, shown under the row as "After: line 2" with its link, and no control
+for the Baseline exists. This scenario is tested by
+`ReviewPage_DiffView_AddedFile_CommentOnLine_StartsHeadThreadUnderTheRow`.
+
+**ReviewPage_FileSelect_AddedFileTooLarge_OffersHeadOnly**: An added file with more lines than a diff accepts says
+so and offers the Head version only; the Head version shows its lines. This scenario is tested by
+`ReviewPage_FileSelect_AddedFileTooLarge_OffersHeadOnly`.
+
+**ReviewPage_FileSelect_AddedBinaryFile_ShowsNoticeAndOffersHeadOnly**: An added binary file shows the binary
+notice, no diff and no Baseline choice. This scenario is tested by
+`ReviewPage_FileSelect_AddedBinaryFile_ShowsNoticeAndOffersHeadOnly`.
+
+**ReviewPage_FileSelect_EmptyAddedFile_ShowsDiffWithoutRows**: An empty added file shows a diff that says "No
+changes." without rows, and the whole-file comment form is offered. This scenario is tested by
+`ReviewPage_FileSelect_EmptyAddedFile_ShowsDiffWithoutRows`.
+
+**ReviewPage_ThreadIndex_AddedFileHeadThread_JumpsToTheDiffRow**: A head thread of an added file is worded "After:
+line 2" in the index, and choosing it opens the Diff view with that row focused and scrolled to. This scenario is
+tested by `ReviewPage_ThreadIndex_AddedFileHeadThread_JumpsToTheDiffRow`.
 
 **ReviewPage_ViewSwitch_KeepsTextAndClearsTheSelection**: Switching between the views keeps the text typed in the
 comment form and clears the selected line. This scenario is tested by
 `ReviewPage_ViewSwitch_KeepsTextAndClearsTheSelection`.
 
 **ReviewPage_FileSelect_AfterBaselineView_ShowsHeadOfTheNextFile**: After the baseline of one file was shown,
-selecting another file shows its head view. This scenario is tested by
+selecting another file shows that file in its default view (the Diff view of an added file), not a baseline view.
+This scenario is tested by
 `ReviewPage_FileSelect_AfterBaselineView_ShowsHeadOfTheNextFile`.
 
 **ReviewPage_FileSelect_DeletedFile_ShowsRemovedLinesAndAcceptsWholeFileComment**: A deleted file opens on the Diff
@@ -452,14 +490,17 @@ address is a local path that `SignIn.SafeReturnUrl` keeps. These scenarios are t
 **ReviewPage_FileAddress_ModifiedFile_OpensFileInDiff**, **ReviewPage_LineAddress_HeadLine_HighlightsAndScrollsToTheRow**,
 **ReviewPage_LineAddress_BaselineLine_HighlightsTheLeftCell**,
 **ReviewPage_LineAddress_LineInCollapsedRun_IsShownAndHighlighted**,
-**ReviewPage_LineAddress_AddedFile_HighlightsTheCodeLine** and
+**ReviewPage_LineAddress_AddedFile_HighlightsTheDiffRow**,
+**ReviewPage_LineAddress_UploadFile_HighlightsTheCodeLine** and
 **ReviewPage_LineAddress_DeletedFile_BaselineLineYesHeadLineNo**: the file address opens the file in the Diff view with
 no message and no highlight, and the review address still opens no file; a line address highlights the cell of the
 right side and asks the browser to scroll to its row (the baseline copy of an unchanged line for a baseline line, a
-line inside a collapsed run is shown); a file without a diff highlights the line in the numbered text; a deleted file
+line inside a collapsed run is shown); a line of an added file of a review with a baseline highlights its diff row; a
+file without a diff (an upload) highlights the line in the numbered text; a deleted file
 has baseline lines but no head lines. These scenarios are tested by the tests of those names.
 
 **ReviewPage_ThreadAddress_HeadThread_OpensFileAndHighlightsThread**,
+**ReviewPage_ThreadAddress_AddedFileHeadThread_OpensDiffAndHighlightsRow**,
 **ReviewPage_ThreadAddress_ResolvedBaselineThread_IsExpandedAndHighlightedOnTheLeft**,
 **ReviewPage_ThreadAddress_WholeFileThread_ScrollsToTheThread**,
 **ReviewPage_ThreadAddress_KeepsThreadCountsInTheFileList** and
@@ -483,7 +524,12 @@ address and gains no history entry; opening a deep link does not rewrite the add
 tests of those names.
 
 **ReviewPage_Thread_ShowsPlainLinkToItsAddress**: every thread, in the diff and in a list, has an anchor whose text is
-"Link" and whose `href` is the thread address. This scenario is tested by the test of that name.
+"Link", whose `href` is the thread address, and whose class is `thread-link` and not the button-style `action`. This
+scenario is tested by the test of that name.
+
+**WebSubsystem_Stylesheet_ThreadLink_IsQuietTextLink**: the stylesheet gives `a.thread-link` no background, no
+padding and an underline, and no accent fill, so the link does not look like a button. This scenario is tested by
+the test of that name.
 
 **ReviewPage_RoundTrip_LinkFromBuilder_OpensTheSameFileAndLine**: a theory over file paths with nested directories,
 spaces, `#`, `?`, `%`, a literal `%2F`, a literal `%20`, `+`, `&` and non-ASCII letters, next to a decoy file; the link
