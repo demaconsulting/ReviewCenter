@@ -310,6 +310,20 @@ sections:
         tests:
           - WebSubsystem_Stylesheet_DiffRules_KeepCodeScrollingInsideItself
 
+      - id: ReviewCenter-Web-DeepLinks
+        title: >-
+          The Web subsystem shall give every file, line and thread of a review a stable address that opens the review
+          page at that place, keep the address bar equal to what is shown as the reader chooses files and threads,
+          and bring a signed-out visitor back to the same address after signing in.
+        justification: |
+          Review is a conversation between people, so a reviewer must be able to point a colleague at one file, one
+          line or one thread by sending a link, and the link must still work after a sign-in or a reload.
+        children:
+          - ReviewCenter-ReviewPage-DeepLinks
+          - ReviewCenter-ReviewPage-DeepLinksNotFound
+          - ReviewCenter-SignIn-ReturnDeepLink
+        tests:
+          - Routes_DeepLink_SignedOut_LoginLinkKeepsEscapesAndQuery
       - id: ReviewCenter-Web-PlanReviews
         title: >-
           The Web subsystem shall let a user plan the reviews a head revision of a registered repository needs on a

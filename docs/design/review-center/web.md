@@ -235,6 +235,18 @@ opens on its Diff view (all lines removed) and takes whole-file comments and com
 that is too large to compare, or binary, says so in plain words and offers the other views. Everything the page shows
 comes from the frozen copies in the store, never from the repository.
 
+#### Sharing links
+
+Every file, line and thread of a review has a stable address that opens the review page at that place:
+`/projects/{id}/reviews/{reviewId}/files/{path}` (with an optional `?line=N&side=head|baseline`) and
+`/projects/{id}/reviews/{reviewId}/threads/{threadId}`. `ReviewLinks` builds them, escaping the review identifier and
+each path segment once. The page opens the file in the Diff view, scrolls to the line or the thread and highlights it,
+and replaces the address of the browser with the link of whatever the reader chooses, without adding history entries,
+so the address bar is always a link that can be shared. Each thread has a plain `Link` to its address. An address
+that names nothing gives a plain message with a link back to the file list. A signed-out visitor is sent to the login
+page and returned to the same address (the `SignIn` unit keeps the address as it was requested). No authorization
+rule is added: the link opens only for a signed-in user, as the page always did.
+
 #### Planning reviews
 
 `PlanPage` is built for a quick read and for a clear next step. It asks for a repository, a head revision and a

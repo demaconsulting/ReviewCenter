@@ -4,7 +4,8 @@
 
 #### Purpose
 
-`ReviewPage` is the page at `/projects/{id}/reviews/{reviewId}`. Its responsibility is to show one review, with the
+`ReviewPage` is the page at `/projects/{id}/reviews/{reviewId}`, which also answers the file, line and thread addresses
+described under Deep links below. Its responsibility is to show one review, with the
 reader's work first. From the top it shows the title with an approval badge (Approved or In review), a one-sentence
 next step, a checklist card (progress summary
 such as "37 of 58 checks answered" and a link to the checklist page; absent when the review has no checklist), a
@@ -30,7 +31,9 @@ has a link to the history page of the review (`history-link`), where the audit e
 
 The page instance is created per browser connection, so its state is per user.
 
-**ProjectId**, **ReviewId**: the route parameters.
+**ProjectId**, **ReviewId**: the route parameters. **FilePath**, **ThreadId**, **LineText**, **SideText**: the optional
+route and query values of a deep link. **HighlightLine**, **HighlightSide**, **DeepLinkMessage**: the line the address
+named and the message for an address that names nothing; all three are cleared whenever the reader chooses a file.
 
 **Loaded**, **Review**, **ProjectName**: whether loading finished, the review with its file metadata (`null` when
 it does not exist), and the name of the owning project shown in the breadcrumb (the project identity is shown
@@ -258,11 +261,36 @@ browser builds a new, empty input. It is never rendered as a value, logged, or k
 **ShortDigest**: Shortens the record digest to its first 16 characters; the Details section shows the short value
 with the full 64 characters in the `title` attribute.
 
-**OnAfterRenderAsync**: Marks the page interactive after the first render on a live connection, and, when a scroll
-target is set, calls the browser function `reviewCenter.scrollToTestId` (defined in `App`) once with the test id and
+**OnAfterRenderAsync**: Marks the page interactive after the first render on a live connection, and, when a
+replacement address is pending, calls the browser function `reviewCenter.replaceUrl` (defined in `App`) with it. Then,
+when a scroll
+target is set, it calls the browser function `reviewCenter.scrollToTestId` (defined in `App`) once with the test id and
 where it should land (`start` or `center`) and clears the target. Highlighting is done by the page itself (a
 `focused` class), so only the scroll needs the browser; a
 connection that is already gone is ignored.
+
+**Deep links**: The page has three routes: the review, `/projects/{id}/reviews/{reviewId}/files/{**FilePath}` (with the
+optional query values `line` and `side`, `head` or `baseline`), and `/projects/{id}/reviews/{reviewId}/threads/{id}`.
+`OnParametersSetAsync` applies the address after the load and before `Loaded` becomes true, so the first response (and
+therefore a reload) already shows the file, the highlight and, on a live connection, the scroll. `ApplyAddressAsync`
+selects the file (or the file of the thread) through the ordinary `SelectFileAsync` or `SelectThreadAsync`. For a
+line it parses `line` as digits only, reads `side` (anything but `baseline` is the head), checks that a baseline line
+is asked only of a file that has a baseline, and checks that the line exists; the diff row of the line is pinned so it
+is not hidden in a collapsed run, and `DiffView` gets `HighlightSide` and `HighlightLine`. A file that has no diff is
+shown in the Head or the Baseline view, with the line marked there. The router decodes the file path once, so the page
+never decodes it again; the one exception is that the router also turns a literal `%2F` of a file name into a slash,
+so a file path is also matched with `%2F` in the names read as `/` when that matches exactly one file. An address that
+names nothing (an unknown file or thread, a thread of another review, a baseline line of a file without a baseline, a
+line that is not a number or does not exist) sets `DeepLinkMessage`, shown above the file list with the link
+`deep-link-back` to the plain review address; nothing is selected and the page works as usual. Choosing a file
+(`ViewFileAsync`) or a thread in the index (`ViewThreadAsync`) selects as before and sets the pending address to the
+link of the file or thread; the page replaces the address of the browser by it with `history.replaceState`, so the
+address bar always holds a shareable link and the back button is not filled with entries. `NavigateTo` with
+replacement is not used, because the router would re-initialize the page and lose what is typed. The view mode (Diff,
+Head, Baseline) is not part of the address, so a reload shows the Diff view. Each thread card has the plain anchor
+`thread-link-{id}` with the link of the thread. **ReviewLinks** builds all of these addresses: it escapes the review
+identifier and each path segment with `Uri.EscapeDataString` and joins them with `/`, and writes `?line=N&side=...`
+only when a line is given.
 
 Comments, approval, and slots are read when the page loads and after each change made on the page. A comment or
 signature made in another browser appears when this page is next loaded or changed; nothing is pushed. The page
@@ -297,12 +325,14 @@ raises no other errors of its own.
 - **FileText** — decides whether a file is text and splits it into lines.
 - **SignIn** — `GetActorAsync` supplies the signed-in user from the authentication state.
 - **ProjectService** — reads the name of the owning project for the breadcrumb.
-- **ASP.NET Core Blazor components** — the component base class, events, JavaScript interop, and the interactive
-  server render mode.
-- **App** — defines the scroll function that the page calls.
+- **ASP.NET Core Blazor components** — the component base class, events, JavaScript interop, the router, and the
+  interactive server render mode.
+- **App** — defines the scroll function and the address replacement function that the page calls.
+- **ReviewLinks** — builds the addresses of the review, its files and lines, and its threads; it is a part of this unit.
 
 #### Callers
 
 - **App** — the router renders the page for the review route.
 - **ProjectPage** — navigates to the page after a review is created.
+- **Any reader of a shared link** — the file, line and thread addresses of the page are the links people send.
 - **HistoryPage** — links back to the page.

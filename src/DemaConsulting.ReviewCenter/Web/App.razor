@@ -3,8 +3,10 @@
    This is static server-side rendered markup: it emits the document skeleton, the router that
    selects a page for the requested URL, and the Blazor client script that upgrades interactive
    pages to a live server connection. Pages opt in to interactivity individually (see HomePage),
-   so everything outside a page stays cheap, static HTML. It also carries one tiny script, the scroll
-   helper that the review page calls to bring a thread's lines into view (Blazor cannot scroll by itself). *@
+   so everything outside a page stays cheap, static HTML. It also carries one tiny script: the scroll
+   helper that the review page calls to bring a thread's lines into view (Blazor cannot scroll by itself) and the
+   helper that replaces the address in the address bar by the link of the file or thread shown (history.replaceState:
+   no navigation and no history entry, so the page keeps its state). *@
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -21,6 +23,12 @@
             scrollToTestId: function (id, block) {
                 var element = document.querySelector('[data-testid="' + id + '"]');
                 if (element) { element.scrollIntoView({ block: block }); }
+            },
+            replaceUrl: function (url) {
+                // Same-origin relative links only; keeps the history state Blazor stores on the entry
+                if (typeof url === 'string' && url.charAt(0) === '/' && url.charAt(1) !== '/') {
+                    history.replaceState(history.state, '', url);
+                }
             }
         };
     </script>

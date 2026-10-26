@@ -297,6 +297,7 @@ sections:
         children:
           - ReviewCenter-Web-Comments
           - ReviewCenter-Web-DiffReview
+          - ReviewCenter-Web-DeepLinks
           - ReviewCenter-Core-Threads
           - ReviewCenter-Core-Diff
           - ReviewCenter-Storage-Threads

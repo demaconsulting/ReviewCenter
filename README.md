@@ -67,6 +67,9 @@ The current release provides:
   and mark it resolved or reopen it; the author is the signed-in user; a next-step line says what is left to do, a
   thread index of all files (open by default, or all, or resolved) jumps to the thread's lines, resolved threads are
   collapsed to one line, and the file list shows the open threads per file
+- **Sharing Links**: every file, line and thread of a review has a stable link; the address bar always holds one, each
+  thread has a **Link**, and signing in brings you back to the link you opened (see
+  [Sharing links](#sharing-links))
 - **Review Checklist**: every new review gets a checklist of 14 sections and 58 checks, taken from the
   [Continuous Compliance review template][link-review-template]; a checklist page (linked from the review page,
   with a summary such as "37 of 58 checks answered") shows the sections with their progress, one section open at a
@@ -457,6 +460,14 @@ the creation the page lists one result per set, a link to the new review or the 
 stop the others, and **Plan again** offers it once more. When the plan cannot be made (the repository is disabled, the
 revision is unknown, or there is no valid `.reviewmark.yaml`) the page says so in plain words and what to do. The
 review page shows the set of a planned review as **Review set** in the Details.
+
+## Sharing Links
+
+Every file, line and thread of a review has a stable link, and the address bar of the browser always holds the link of
+what is shown (choosing a file or a thread changes it without adding history entries): `.../reviews/{reviewId}/files/{path}`
+opens a file, `?line=N&side=head|baseline` adds a highlighted line, and `.../reviews/{reviewId}/threads/{threadId}`
+opens the thread. Each thread has a **Link**. A link to something that does not exist shows a message and a way back to
+the file list, and a signed-out visitor is returned to the same link after signing in. The user guide has the details.
 
 ## Data Location and Database Settings
 

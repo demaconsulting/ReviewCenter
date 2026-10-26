@@ -21,6 +21,8 @@ N/A - standard test environment (temporary SQLite databases are created by the t
 - An unknown user name, a wrong password, a disabled user, and a locked user all get the same answer, a redirect to
   the login page with an error, and no cookie.
 - Only a local path is accepted as a return URL; anything else becomes the home page.
+- An anonymous request for a deep link (escaped characters and query included) is redirected to the login page with
+  the address as requested, and signing in leads back to the same page.
 - The login and logout posts need an antiforgery token.
 - Every page except the home, login, and health routes needs a signed-in user, and the users page needs an
   administrator.
@@ -123,3 +125,11 @@ pipeline and read the audit trail. A valid sign-in records `auth.sign-in`, which
 user without the password, which is tested by `SignIn_Login_WrongPassword_RecordsFailureForTheUserWithoutPassword`.
 Repeated failures record the lockout once, which is tested by `SignIn_Login_RepeatedFailures_RecordsLockoutOnce`,
 and a complete flow forms an intact chain, which is tested by `SignIn_Flow_LoginFailureAndLogout_FormAnIntactChain`.
+
+**SignIn_DeepLink_SignedOut_ReturnsToTheSameLinkAfterLogin**: A theory over file paths with nested directories, a
+space, `#`, `?`, a literal `%`, a literal `%2F` and non-ASCII letters. An anonymous request for the line link of the
+file is redirected to `/login?ReturnUrl=`; the return address of that redirect, the hidden field of the login page and
+the redirect after the login all equal the link as requested; and the page then shows that file with the line
+highlighted. **SignIn_DeepLink_PlusAndAmpersand_ReturnsToTheSameFileAfterLogin**: the same for a name with `+` and `&`.
+**SignIn_DeepLink_HostileReturnUrl_GoesToTheHomePage**: absolute, protocol-relative and backslash addresses that look
+like deep links are not followed after a login. These scenarios are tested by the tests of those names.

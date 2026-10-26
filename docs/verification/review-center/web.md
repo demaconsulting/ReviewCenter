@@ -54,6 +54,11 @@ N/A - standard test environment (temporary SQLite databases are created by the t
   unit level by the component tests of `PlanPage`, `ProjectPage`, and `ReviewPage` (see the children of the requirement
   `ReviewCenter-Web-PlanReviews` in `web.yaml`); the subsystem test requests the plan route of a project that has a
   registered repository.
+- Links to files, lines and threads (the routes, the highlight, the replacement of the address, the thread links, the
+  messages for addresses that name nothing, and the return to a link after signing in over HTTP) are verified by the
+  component tests of `ReviewPage` in `ReviewDeepLinkTests.cs`, which render the real router, and by the tests of
+  `SignIn`; the subsystem test renders the router for a signed-out visitor (see the requirement
+  `ReviewCenter-Web-DeepLinks` in `web.yaml`).
 
 ### Test Scenarios
 
@@ -89,6 +94,11 @@ baseline copy of an unchanged line are hidden, and a narrower line-number gutter
 is tested by
 `WebSubsystem_Stylesheet_DiffRules_KeepCodeScrollingInsideItself`. The measured width of the page at 390 by 844
 pixels is checked in a real browser by the acceptance walk-through.
+
+**Routes_DeepLink_SignedOut_LoginLinkKeepsEscapesAndQuery**: The router is rendered for a signed-out visitor at the
+address of a line link of a file whose name has a space and a hash, with a baseline side. The "Sign in required" link
+is `/login?ReturnUrl=` followed by the whole address escaped once more, and no review page is drawn. This scenario is
+tested by `Routes_DeepLink_SignedOut_LoginLinkKeepsEscapesAndQuery`.
 
 **WebSubsystem_ChecklistPage_AnsweredChecksSurviveReload**: A review is created through the Core services of the
 real pipeline and two checks are answered, one Pass and one Fail with a justification. The checklist page is

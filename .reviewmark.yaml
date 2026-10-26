@@ -409,9 +409,12 @@ reviews:
       - "src/**/Web/ReviewPage.razor.cs"
       - "src/**/Web/DiffView.razor"
       - "src/**/Web/DiffView.razor.cs"
+      - "src/**/Web/ReviewLinks.cs"
       - "test/**/Web/ReviewPageTests.cs"
       - "test/**/Web/ReviewPageRepositoryTests.cs"
       - "test/**/Web/ReviewPageDiffTests.cs"
+      - "test/**/Web/ReviewLinksTests.cs"
+      - "test/**/Web/ReviewDeepLinkTests.cs"
 
   - id: ReviewCenter-Web-ChecklistPage
     title: Review of ReviewCenter ChecklistPage unit implementation

@@ -103,6 +103,10 @@ N/A - standard test environment.
 - The stylesheet lays each row out as two columns, wraps long lines inside their cell, stacks the cells and hides the
   empty placeholders on a narrow screen, and keeps the gap buttons and inline threads in view, with a narrower gutter
   on a phone.
+- The file, line and thread addresses open the review page at that place with the highlight and the scroll request;
+  an address that names nothing gives a message with a link back to the file list; choosing a file or a thread asks
+  the browser to replace its address by the matching link without navigating; every thread has a plain link; links
+  from `ReviewLinks` return the same file path through the router, whatever its characters.
 
 #### Test Scenarios
 
@@ -436,3 +440,52 @@ keep their stored state, so the approval state cannot be changed. This scenario 
 **ReviewPage_Render_ExistingReview_ShowsHistoryLink**: A review is rendered; the page contains the history link
 that points to the history page of the review. This scenario is tested by
 `ReviewPage_Render_ExistingReview_ShowsHistoryLink`.
+
+**Deep links** are verified in `ReviewDeepLinkTests.cs` and `ReviewLinksTests.cs`. The tests open an address through the
+real router (`Routes`) over a repository review with a modified, an added and a deleted file, or over an upload review.
+
+**ReviewLinks_ForFile_Path_EscapesEachSegment** and the other `ReviewLinks_*` tests: the builder is called directly for
+the review address, file paths with spaces, `#`, `?`, `%`, `+`, `&`, non-ASCII letters and nested directories (each
+segment escaped once, the separators kept), a line with a side, a thread, null arguments, and the check that every
+address is a local path that `SignIn.SafeReturnUrl` keeps. These scenarios are tested by the tests of those names.
+
+**ReviewPage_FileAddress_ModifiedFile_OpensFileInDiff**, **ReviewPage_LineAddress_HeadLine_HighlightsAndScrollsToTheRow**,
+**ReviewPage_LineAddress_BaselineLine_HighlightsTheLeftCell**,
+**ReviewPage_LineAddress_LineInCollapsedRun_IsShownAndHighlighted**,
+**ReviewPage_LineAddress_AddedFile_HighlightsTheCodeLine** and
+**ReviewPage_LineAddress_DeletedFile_BaselineLineYesHeadLineNo**: the file address opens the file in the Diff view with
+no message and no highlight, and the review address still opens no file; a line address highlights the cell of the
+right side and asks the browser to scroll to its row (the baseline copy of an unchanged line for a baseline line, a
+line inside a collapsed run is shown); a file without a diff highlights the line in the numbered text; a deleted file
+has baseline lines but no head lines. These scenarios are tested by the tests of those names.
+
+**ReviewPage_ThreadAddress_HeadThread_OpensFileAndHighlightsThread**,
+**ReviewPage_ThreadAddress_ResolvedBaselineThread_IsExpandedAndHighlightedOnTheLeft**,
+**ReviewPage_ThreadAddress_WholeFileThread_ScrollsToTheThread**,
+**ReviewPage_ThreadAddress_KeepsThreadCountsInTheFileList** and
+**ReviewPage_ThreadAddress_OverHttp_RendersFileAndHighlightedThread**: the thread address opens the file of the thread
+in the Diff view, highlights the thread and its line and scrolls to it; a resolved thread is expanded; a thread on the
+baseline side highlights the removed or baseline line; a whole-file thread is scrolled to as a card; the per-file thread
+counts stay in the file list; and the first response over HTTP (before any live connection) already shows the file and
+the highlight, which is what a reload gets. These scenarios are tested by the tests of those names.
+
+**ReviewPage_Address_NamesNothing_ShowsMessageWithWayBack**: A theory over an unknown file, an unknown thread, a thread
+of another review, a baseline line of an added file, and the lines `999`, `0`, `-1` and `abc`. Each shows a message in
+the page, the link back to the review address, the whole file list, and nothing highlighted; no error page is shown.
+**ReviewPage_Address_UnknownSideAndLaterChoice_UsesHeadAndClearsMessage**: an unknown `side` value is read as the head,
+and the message of an unknown file disappears when a file is chosen. These scenarios are tested by the tests of those
+names.
+
+**ReviewPage_Choose_FileAndThread_ReplacesAddressWithoutNavigating** and
+**ReviewPage_OpenDeepLink_DoesNotReplaceAddress**: choosing a file and then a thread asks the browser, through
+`reviewCenter.replaceUrl`, for the link of the file and then of the thread, while the navigation manager keeps its
+address and gains no history entry; opening a deep link does not rewrite the address. These scenarios are tested by the
+tests of those names.
+
+**ReviewPage_Thread_ShowsPlainLinkToItsAddress**: every thread, in the diff and in a list, has an anchor whose text is
+"Link" and whose `href` is the thread address. This scenario is tested by the test of that name.
+
+**ReviewPage_RoundTrip_LinkFromBuilder_OpensTheSameFileAndLine**: a theory over file paths with nested directories,
+spaces, `#`, `?`, `%`, a literal `%2F`, a literal `%20`, `+`, `&` and non-ASCII letters, next to a decoy file; the link
+from `ReviewLinks` opens exactly that file and highlights its line through the router, so nothing is decoded twice.
+This scenario is tested by the test of that name.

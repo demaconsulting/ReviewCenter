@@ -378,3 +378,52 @@ sections:
         tests:
           - ReviewPage_Render_PlannedReview_DetailsShowReviewSet
           - ReviewPage_Render_RepositoryReview_DetailsShowRepositoryShasAndSelection
+
+      - id: ReviewCenter-ReviewPage-DeepLinks
+        title: >-
+          The ReviewPage unit shall open a file, a line or a thread of the review from its address (a path of
+          the form /files/{path} with an optional line and side, or /threads/{id}), showing the file in the diff,
+          scrolling to the line or thread and highlighting it; shall replace the address of the browser, without a
+          history entry and without reloading the page, with the link of the file or thread the reader chooses;
+          shall show on every thread a plain link to its address; and shall build every link by escaping each path
+          segment once, so the router returns the same file path.
+        justification: |
+          A link that names one file, line or thread is how reviewers point each other at a finding. An address bar
+          that always holds a shareable link needs no extra step, and escaping once and decoding once keeps names
+          with spaces, hashes, question marks, percent signs and non-ASCII letters working.
+        tests:
+          - ReviewLinks_ForReview_ProjectAndReview_BuildsAddress
+          - ReviewLinks_ForFile_Path_EscapesEachSegment
+          - ReviewLinks_ForFile_WithLine_AddsLineAndSide
+          - ReviewLinks_ForFile_SideWithoutLine_AddsNoQuery
+          - ReviewLinks_ForThread_Thread_BuildsAddress
+          - ReviewLinks_AnyAddress_IsLocalAndSurvivesTheReturnUrlCheck
+          - ReviewLinks_NullArguments_Throw
+          - ReviewPage_FileAddress_ModifiedFile_OpensFileInDiff
+          - ReviewPage_LineAddress_HeadLine_HighlightsAndScrollsToTheRow
+          - ReviewPage_LineAddress_BaselineLine_HighlightsTheLeftCell
+          - ReviewPage_LineAddress_LineInCollapsedRun_IsShownAndHighlighted
+          - ReviewPage_LineAddress_AddedFile_HighlightsTheCodeLine
+          - ReviewPage_LineAddress_DeletedFile_BaselineLineYesHeadLineNo
+          - ReviewPage_ThreadAddress_HeadThread_OpensFileAndHighlightsThread
+          - ReviewPage_ThreadAddress_ResolvedBaselineThread_IsExpandedAndHighlightedOnTheLeft
+          - ReviewPage_ThreadAddress_WholeFileThread_ScrollsToTheThread
+          - ReviewPage_ThreadAddress_KeepsThreadCountsInTheFileList
+          - ReviewPage_ThreadAddress_OverHttp_RendersFileAndHighlightedThread
+          - ReviewPage_Choose_FileAndThread_ReplacesAddressWithoutNavigating
+          - ReviewPage_OpenDeepLink_DoesNotReplaceAddress
+          - ReviewPage_Thread_ShowsPlainLinkToItsAddress
+          - ReviewPage_RoundTrip_LinkFromBuilder_OpensTheSameFileAndLine
+
+      - id: ReviewCenter-ReviewPage-DeepLinksNotFound
+        title: >-
+          The ReviewPage unit shall answer an address that names a file, line, side or thread that does not exist in
+          the review (including a thread of another review and a baseline line of a file without a baseline) with a
+          plain message in the page and a link back to the file list of the review, and shall keep the page and the
+          file list working.
+        justification: |
+          Links outlive the files and threads they point at. A friendly message with a way back is better than an
+          error page, and it must not reveal anything about other reviews.
+        tests:
+          - ReviewPage_Address_NamesNothing_ShowsMessageWithWayBack
+          - ReviewPage_Address_UnknownSideAndLaterChoice_UsesHeadAndClearsMessage

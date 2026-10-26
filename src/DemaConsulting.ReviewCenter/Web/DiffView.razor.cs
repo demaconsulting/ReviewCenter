@@ -120,6 +120,19 @@ public partial class DiffView : ComponentBase
     public int? FocusedThreadId { get; set; }
 
     /// <summary>
+    ///     Gets or sets the version of the line to highlight (a deep link to a line), or <c>null</c> for none.
+    /// </summary>
+    [Parameter]
+    public ThreadSide? HighlightSide { get; set; }
+
+    /// <summary>
+    ///     Gets or sets the line (on <see cref="HighlightSide"/>) to highlight, or <c>null</c> for none; its row is
+    ///     never hidden inside a collapsed run.
+    /// </summary>
+    [Parameter]
+    public int? HighlightLine { get; set; }
+
+    /// <summary>
     ///     Gets or sets the version the new comment is being written for, or <c>null</c> when none is selected.
     /// </summary>
     [Parameter]
@@ -226,6 +239,13 @@ public partial class DiffView : ComponentBase
                     _pins.Add(selectedRow);
                 }
             }
+        }
+
+        // The line a link points at stays visible too
+        if (HighlightSide is { } highlightSide && HighlightLine is { } highlighted
+            && RowIndex(highlightSide, highlighted) is var highlightRow and >= 0)
+        {
+            _pins.Add(highlightRow);
         }
 
         foreach (var thread in Threads.Where(t => t.StartLine is not null))
@@ -391,13 +411,18 @@ public partial class DiffView : ComponentBase
     }
 
     /// <summary>
-    ///     Tells whether a cell is inside the anchor of the focused thread.
+    ///     Tells whether a cell is the line a link points at or inside the anchor of the focused thread.
     /// </summary>
     /// <param name="line">The line shown in the cell.</param>
     /// <param name="side">The side of the cell.</param>
-    /// <returns><c>true</c> when the focused thread is on this side and covers the line.</returns>
+    /// <returns><c>true</c> when the cell is the highlighted line, or the focused thread is on this side and covers the line.</returns>
     private bool IsFocused(DiffLine line, ThreadSide side)
     {
+        if (HighlightSide == side && InRange(line, side, HighlightLine, HighlightLine))
+        {
+            return true;
+        }
+
         return FocusedThreadId is { } id
                && Threads.FirstOrDefault(t => t.Id == id) is { } thread
                && thread.Side == side

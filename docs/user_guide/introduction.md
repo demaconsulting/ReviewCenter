@@ -461,6 +461,37 @@ Posted comments cannot be edited or deleted, so the record of the discussion sta
 changes. Comments posted by other people appear when you reload the page or take an action on it. Comment text is
 always shown as plain text; any markup in it is displayed as typed.
 
+### Sharing links
+
+Every file, line and thread of a review has a stable link that opens the review page at that place. The address bar
+of your browser always holds the link of what you are looking at: choosing a file in the list, or a thread in the thread
+index, changes the address without adding entries to the browser history, so the Back button still takes you to the
+page you came from. Copy the address and send it to a colleague.
+
+| Link | What it opens |
+| ---- | ------------- |
+| `/projects/{id}/reviews/{reviewId}` | The review (no file selected) |
+| `/projects/{id}/reviews/{reviewId}/files/{path}` | That file, as a diff when it can be compared |
+| `/projects/{id}/reviews/{reviewId}/files/{path}?line=12` | The same, scrolled to and highlighting head line 12 |
+| `/projects/{id}/reviews/{reviewId}/files/{path}?line=12&side=baseline` | The same for baseline line 12 |
+| `/projects/{id}/reviews/{reviewId}/threads/{threadId}` | The thread's file, scrolled to the highlighted thread |
+
+Every thread has a small **Link** next to its state; it is an ordinary link, so you can also copy it with the context
+menu of your browser (there is no separate copy button). Characters in a file path that need escaping in an address
+(spaces, `#`, `?`, `%`, and letters outside the English alphabet) are escaped for you in the links the page builds.
+
+Reloading a link shows the same file, line or thread, always as the diff when the file has one (the choice between the
+Diff, Head and Baseline views is not part of the link). If a link names something that does not exist in this review
+(a file that is not in it, a thread of another review, a line the file does not have, or a baseline line of a file that
+has no baseline) the page says so in plain words and offers a link back to the file list of the review; nothing else
+is lost. If you are not signed in, opening a link takes you to the sign-in page, and signing in brings you back to the
+same link. Only the user's own sign-in is needed: there is no separate access for a link, so a person who is not
+signed in cannot read anything from it.
+
+Known limits: after you choose a file or thread, the address bar shows its link, but a "Session ended" message that
+appears later offers a sign-in link to the address the page was first opened at. A file whose name contains the text
+`%2F` is found from its link only while that is the one file whose name matches.
+
 ## Review Checklist
 
 Every new review gets a checklist: a copy of the default checklist, taken from the Continuous Compliance review

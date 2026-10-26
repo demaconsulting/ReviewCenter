@@ -1,4 +1,8 @@
-@* ReviewPage: the view of one review at "/projects/{id}/reviews/{reviewId}", with its comment threads.
+@* ReviewPage: the view of one review at "/projects/{id}/reviews/{reviewId}", with its comment threads. The same page
+   opens at "/projects/{id}/reviews/{reviewId}/files/{path}" (optionally with ?line=N&side=head|baseline) and at
+   "/projects/{id}/reviews/{reviewId}/threads/{threadId}": stable links that open that file, scroll to and highlight
+   that line or thread, and that the page keeps in the browser's address bar as the reader chooses files and threads.
+   A link that names something that does not exist shows a message above the file list instead of an error page.
 
    Presentation only; state and event handling live in ReviewPage.razor.cs. From the top it shows the title, a
    one-sentence next step (checklist, threads and signatures) under an Approved / In review badge, the checklist
@@ -19,6 +23,8 @@
    The page body is inside SessionGate, which replaces it with a "Session ended" message when the user is no longer
    valid while the page is open. *@
 @page "/projects/{ProjectId:int}/reviews/{ReviewId}"
+@page "/projects/{ProjectId:int}/reviews/{ReviewId}/files/{**FilePath}"
+@page "/projects/{ProjectId:int}/reviews/{ReviewId}/threads/{ThreadId:int}"
 @rendermode InteractiveServer
 @attribute [Authorize]
 
@@ -179,6 +185,11 @@
 
         <section class="card">
             <h2>Files</h2>
+            @if (DeepLinkMessage is not null)
+            {
+                <p class="notice" role="alert" data-testid="deep-link-message">@DeepLinkMessage
+                    <a href="@ReviewLinks.ForReview(ProjectId, ReviewId)" data-testid="deep-link-back">Back to the file list of this review</a></p>
+            }
             <ul class="item-list" data-testid="files-list">
                 @for (var index = 0; index < Review.Files.Count; index++)
                 {
@@ -192,7 +203,7 @@
                                 <span class="badge" data-testid="file-kind-@index">@file.ChangeKind</span>
                             }
                             <span data-testid="file-size-@index">@DisplaySize(file)</span> bytes &middot; <span data-testid="file-open-threads-@index">@OpenThreadLabel(file.Path)</span></div>
-                        <button type="button" data-testid="file-select-@index" aria-label="View @file.Path" @onclick="() => SelectFileAsync(fileIndex)">View</button>
+                        <button type="button" data-testid="file-select-@index" aria-label="View @file.Path" @onclick="() => ViewFileAsync(fileIndex)">View</button>
                     </li>
                 }
             </ul>
@@ -224,7 +235,7 @@
                         <li>
                             <button type="button" class="index-row" data-testid="index-row-@row.Id"
                                     aria-label="@IndexRowLabel(row)"
-                                    @onclick="() => SelectThreadAsync(rowThread)">
+                                    @onclick="() => ViewThreadAsync(rowThread)">
                                 <span class="path" data-testid="index-file-@row.Id">@row.FilePath</span>
                                 <span data-testid="index-anchor-@row.Id">@AnchorLabel(row)</span>
                                 <span class="badge @(row.State == ReviewThreadState.Resolved ? "resolved" : null)" data-testid="index-state-@row.Id">@row.State</span>
@@ -275,6 +286,8 @@
                     <span class="path" data-testid="thread-anchor-@threadId">@AnchorLabel(item)</span>
                     <span class="badge @(resolved ? "resolved" : null)" data-testid="thread-state-@threadId">@item.State</span>
                     <span class="muted" data-testid="thread-count-@threadId">@CommentCountLabel(item)</span>
+                    <a class="action thread-link" href="@ReviewLinks.ForThread(ProjectId, ReviewId, threadId)"
+                       aria-label="Link to thread @threadId" data-testid="thread-link-@threadId">Link</a>
                     @if (resolved)
                     {
                         <button type="button" class="secondary" data-testid="thread-expand-@threadId"
@@ -416,6 +429,8 @@
                                   OnlyLineEndingsDiffer="Diff.OnlyLineEndingsDiffer"
                                   Threads="fileThreads.Where(t => t.StartLine is not null).ToList()"
                                   FocusedThreadId="FocusedThreadId"
+                                  HighlightSide="HighlightSide"
+                                  HighlightLine="HighlightLine"
                                   SelectedSide="composerSide"
                                   SelectedStart="composerRange?.Start"
                                   SelectedEnd="composerRange?.End"
@@ -440,7 +455,7 @@
                         <div class="code" data-testid="baseline-content">
                             @for (var number = 1; number <= BaselineLines.Count; number++)
                             {
-                                <div class="code-line" data-testid="baseline-line-@number">
+                                <div class="code-line @(HighlightLine == number && HighlightSide == ThreadSide.Baseline ? "focused" : null)" data-testid="baseline-line-@number">
                                     <span class="gutter">
                                         <span class="line-no" data-testid="baseline-line-no-@number">@number</span>
                                     </span>
@@ -464,7 +479,7 @@
                         @for (var number = 1; number <= SelectedLines.Count; number++)
                         {
                             var lineNumber = number;
-                            <div class="code-line @(anchoredLines.Contains(number) ? "anchored" : null) @(IsFocusedLine(focusedThread, number) ? "focused" : null)" data-testid="code-line-@number">
+                            <div class="code-line @(anchoredLines.Contains(number) ? "anchored" : null) @(IsFocusedLine(focusedThread, number) || (HighlightLine == number && HighlightSide == ThreadSide.Head) ? "focused" : null)" data-testid="code-line-@number">
                                 <span class="gutter">
                                     <button type="button" class="line-comment" data-testid="line-comment-@number"
                                             aria-label="Comment on line @number" title="Comment on line @number"

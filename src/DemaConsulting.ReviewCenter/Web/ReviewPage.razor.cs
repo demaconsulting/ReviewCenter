@@ -45,7 +45,9 @@ namespace DemaConsulting.ReviewCenter.Web;
 ///     in other browsers appear on the next load or change. Each browser connection (circuit) gets its own
 ///     page instance, so the state here is per-user and needs no synchronization. The thread index lists
 ///     the threads of every file through <see cref="ThreadService.BuildIndex"/>; choosing a row selects its
-///     file, highlights its lines and asks the browser to scroll them into view.
+///     file, highlights its lines and asks the browser to scroll them into view. The page can also be opened at a
+///     file, a line of a file or a thread through a stable address (see <see cref="ReviewLinks"/>); choosing a file
+///     or thread replaces the address in the address bar by the matching link, without a history entry.
 /// </remarks>
 public partial class ReviewPage : ComponentBase
 {
@@ -66,6 +68,11 @@ public partial class ReviewPage : ComponentBase
     private string _scrollBlock = "center";
 
     /// <summary>
+    ///     The address to show in the browser's address bar after the next render, or <c>null</c>.
+    /// </summary>
+    private string? _pendingUrl;
+
+    /// <summary>
     ///     Gets or sets the identity of the owning project, from the page address.
     /// </summary>
     [Parameter]
@@ -76,6 +83,32 @@ public partial class ReviewPage : ComponentBase
     /// </summary>
     [Parameter]
     public string ReviewId { get; set; } = string.Empty;
+
+    /// <summary>
+    ///     Gets or sets the path of the file to open, from the <c>.../files/{path}</c> address; already decoded by the
+    ///     router, so it is used as it is. <c>null</c> or empty for the other addresses.
+    /// </summary>
+    [Parameter]
+    public string? FilePath { get; set; }
+
+    /// <summary>
+    ///     Gets or sets the identity of the thread to open, from the <c>.../threads/{id}</c> address.
+    /// </summary>
+    [Parameter]
+    public int? ThreadId { get; set; }
+
+    /// <summary>
+    ///     Gets or sets the <c>line</c> query value of a file address: the line to scroll to and highlight.
+    /// </summary>
+    /// <remarks>Kept as text so that a value that is not a number is reported on the page rather than failing it.</remarks>
+    [SupplyParameterFromQuery(Name = "line")]
+    public string? LineText { get; set; }
+
+    /// <summary>
+    ///     Gets or sets the <c>side</c> query value of a file address: <c>head</c> (the default) or <c>baseline</c>.
+    /// </summary>
+    [SupplyParameterFromQuery(Name = "side")]
+    public string? SideText { get; set; }
 
     /// <summary>
     ///     Gets or sets the service that reads reviews, supplied by dependency injection.
@@ -320,6 +353,22 @@ public partial class ReviewPage : ComponentBase
     private int? FocusedThreadId { get; set; }
 
     /// <summary>
+    ///     Gets the line of the selected file that an address points at (highlighted), or <c>null</c>.
+    /// </summary>
+    private int? HighlightLine { get; set; }
+
+    /// <summary>
+    ///     Gets which numbering <see cref="HighlightLine"/> uses.
+    /// </summary>
+    private ThreadSide HighlightSide { get; set; } = ThreadSide.Head;
+
+    /// <summary>
+    ///     Gets the friendly message shown when the address names a file, line or thread that cannot be shown, or
+    ///     <c>null</c>.
+    /// </summary>
+    private string? DeepLinkMessage { get; set; }
+
+    /// <summary>
     ///     Gets the reply text typed for each thread, by thread identity.
     /// </summary>
     private Dictionary<int, string> ReplyTexts { get; } = [];
@@ -375,12 +424,157 @@ public partial class ReviewPage : ComponentBase
         IndexFilter = ReviewThreadState.Open;
         ExpandedThreads.Clear();
         FocusedThreadId = null;
+        HighlightLine = null;
+        DeepLinkMessage = null;
         _scrollTarget = null;
+        _pendingUrl = null;
 
         Review = await ReviewService.GetAsync(ProjectId, ReviewId);
         ProjectName = (await ProjectService.GetAsync(ProjectId))?.Name;
         await RefreshAsync();
+
+        // Open what the address names (a file, a line of it, or a thread); the address stays as it is
+        await ApplyAddressAsync();
         Loaded = true;
+    }
+
+    /// <summary>
+    ///     Opens the file or thread that the page address names, or explains why it cannot be shown.
+    /// </summary>
+    /// <returns>A task that completes when the target is shown.</returns>
+    /// <remarks>
+    ///     A thread address opens the file of the thread at its anchor and highlights the thread. A file address
+    ///     opens the file and, with a <c>line</c> (and optionally a <c>side</c>), highlights that line. The values
+    ///     are never trusted: an unknown file or thread, a thread of another review, a line outside the file, a
+    ///     baseline line of a file without a baseline or a value that is not a number each give a message on the
+    ///     page (with the file list still available) rather than an error. A review address names nothing.
+    /// </remarks>
+    private async Task ApplyAddressAsync()
+    {
+        if (Review is null)
+        {
+            return;
+        }
+
+        if (ThreadId is { } threadId)
+        {
+            // The threads loaded are those of this review only, so a thread of another review is simply unknown
+            var thread = Threads.FirstOrDefault(t => t.Id == threadId);
+            if (thread is null)
+            {
+                DeepLinkMessage = $"Thread #{threadId} doesn't exist in this review.";
+            }
+            else if (!Review.Files.Any(f => f.Path == thread.FilePath))
+            {
+                DeepLinkMessage = $"Thread #{threadId} belongs to '{thread.FilePath}', which is not a file of this review.";
+            }
+            else
+            {
+                await SelectThreadAsync(thread);
+            }
+
+            return;
+        }
+
+        if (string.IsNullOrEmpty(FilePath))
+        {
+            return;
+        }
+
+        // The router turns an escaped slash (%2F) of a catch-all value into "/" a second time, so a file name that
+        // contains a literal %2F arrives with a slash in its place; the name is still found when it is unambiguous
+        var files = Review.Files.ToList();
+        var index = files.FindIndex(f => f.Path == FilePath);
+        if (index < 0)
+        {
+            var lookalikes = files
+                .Where(f => f.Path.Replace("%2F", "/", StringComparison.OrdinalIgnoreCase) == FilePath)
+                .ToList();
+            index = lookalikes.Count == 1 ? files.IndexOf(lookalikes[0]) : -1;
+        }
+
+        if (index < 0)
+        {
+            DeepLinkMessage = $"This review has no file named '{FilePath}'. Choose a file from the list.";
+            return;
+        }
+
+        await SelectFileAsync(index);
+        if (!string.IsNullOrWhiteSpace(LineText))
+        {
+            await HighlightAddressedLineAsync();
+        }
+    }
+
+    /// <summary>
+    ///     Shows the version of the selected file that a line link refers to and highlights the line.
+    /// </summary>
+    /// <returns>A task that completes when the line is shown or the problem is reported.</returns>
+    private async Task HighlightAddressedLineAsync()
+    {
+        var side = string.Equals(SideText, ReviewLinks.BaselineSide, StringComparison.OrdinalIgnoreCase)
+            ? ThreadSide.Baseline
+            : ThreadSide.Head;
+        if (!int.TryParse(LineText, NumberStyles.None, CultureInfo.InvariantCulture, out var line) || line < 1)
+        {
+            DeepLinkMessage = $"'{LineText}' is not a line number; line numbers start at 1.";
+            return;
+        }
+
+        // A file without a baseline has no baseline numbering at all
+        if (side == ThreadSide.Baseline && !CanCompare)
+        {
+            DeepLinkMessage = $"This file has no baseline version, so there is no baseline line {line}.";
+            return;
+        }
+
+        // When the diff is not available (too large) the line is looked up in the text of the version it names
+        if (!HasLineDiff && CanCompare)
+        {
+            if (side == ThreadSide.Baseline)
+            {
+                await ShowBaselineAsync();
+            }
+            else if (SelectedKind == ChangeKind.Modified)
+            {
+                ShowHead();
+            }
+        }
+
+        // Look the line up in the version it names; a file that was deleted has no head lines
+        var row = -1;
+        bool exists;
+        if (HasLineDiff)
+        {
+            row = DiffView.RowOf(Diff!.Result!, side, line);
+            exists = row >= 0;
+        }
+        else if (side == ThreadSide.Baseline)
+        {
+            exists = BaselineView && line <= (BaselineLines?.Count ?? 0);
+        }
+        else
+        {
+            exists = CurrentView == FileView.Head && line <= (SelectedLines?.Count ?? 0);
+        }
+
+        if (!exists)
+        {
+            DeepLinkMessage = $"Line {line} doesn't exist in this file.";
+            return;
+        }
+
+        HighlightLine = line;
+        HighlightSide = side;
+        _scrollBlock = "center";
+        if (HasLineDiff)
+        {
+            _scrollTarget = $"diff-row-{row}";
+        }
+        else
+        {
+            _scrollTarget = BaselineView ? $"baseline-line-{line}" : $"code-line-{line}";
+        }
     }
 
     /// <summary>
@@ -409,7 +603,8 @@ public partial class ReviewPage : ComponentBase
     /// <remarks>
     ///     <c>OnAfterRender</c> is never invoked during static prerendering, so reaching it proves that
     ///     the circuit is connected. A second render makes the new marker value reach the browser. The scroll
-    ///     is requested once per chosen thread; a connection that is already gone is ignored.
+    ///     is requested once per chosen thread; a connection that is already gone is ignored. A pending address
+    ///     (see <see cref="ViewFileAsync"/>) is also sent to the browser here.
     /// </remarks>
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -418,6 +613,21 @@ public partial class ReviewPage : ComponentBase
         {
             _interactive = true;
             StateHasChanged();
+        }
+
+        if (_pendingUrl is not null)
+        {
+            var url = _pendingUrl;
+            _pendingUrl = null;
+            try
+            {
+                // Only the address bar changes: no navigation, no history entry, and the page keeps its state
+                await JS.InvokeVoidAsync("reviewCenter.replaceUrl", url);
+            }
+            catch (JSDisconnectedException)
+            {
+                // The browser went away; there is no address bar left to update
+            }
         }
 
         if (_scrollTarget is not null)
@@ -433,6 +643,35 @@ public partial class ReviewPage : ComponentBase
                 // The browser went away; there is nothing left to scroll
             }
         }
+    }
+
+    /// <summary>
+    ///     Shows a file chosen in the file list and puts its address into the browser's address bar.
+    /// </summary>
+    /// <param name="index">The zero-based position of the file in the displayed list.</param>
+    /// <returns>A task that completes when the file is shown.</returns>
+    /// <remarks>
+    ///     The address replaces the current one (no history entry), so the address bar is always a link to what is
+    ///     shown. It is applied after the next render, when the browser can be reached.
+    /// </remarks>
+    private async Task ViewFileAsync(int index)
+    {
+        await SelectFileAsync(index);
+        if (Review is not null && SelectedPath is not null && index >= 0 && index < Review.Files.Count)
+        {
+            _pendingUrl = ReviewLinks.ForFile(ProjectId, ReviewId, SelectedPath);
+        }
+    }
+
+    /// <summary>
+    ///     Shows a thread chosen in the index and puts its address into the browser's address bar.
+    /// </summary>
+    /// <param name="thread">The thread chosen.</param>
+    /// <returns>A task that completes when the thread is shown.</returns>
+    private async Task ViewThreadAsync(ReviewThread thread)
+    {
+        await SelectThreadAsync(thread);
+        _pendingUrl = ReviewLinks.ForThread(ProjectId, ReviewId, thread.Id);
     }
 
     /// <summary>
@@ -489,6 +728,8 @@ public partial class ReviewPage : ComponentBase
         }
 
         FocusedThreadId = null;
+        HighlightLine = null;
+        DeepLinkMessage = null;
         ClearNewThreadForm();
         await RefreshAsync();
 
@@ -593,6 +834,8 @@ public partial class ReviewPage : ComponentBase
             return;
         }
 
+        HighlightLine = null;
+        DeepLinkMessage = null;
         if (thread.FilePath != SelectedPath)
         {
             await SelectFileAsync(Review.Files.ToList().FindIndex(file => file.Path == thread.FilePath));

@@ -44,6 +44,7 @@ sections:
           administrators. Closing pages by default means a new page cannot be left open by mistake.
         children:
           - ReviewCenter-SignIn-Protected
+          - ReviewCenter-SignIn-ReturnDeepLink
           - ReviewCenter-SignIn-AdminOnly
         tests:
           - IdentitySubsystem_SignInJourney_LoginUseAndLogout_WorksEndToEnd

@@ -249,7 +249,7 @@ of a comment and the person who saved a checklist answer are the signed-in user 
 that time); the checklist has no thread links, and the review page shows a modified file as a diff against its
 baseline (a Diff / Head / Baseline choice, with the baseline and the head side by side in the Diff, the unchanged
 lines collapsed, and comments on lines of either
-version). Reviewers are named
+version), and gives every file, line and thread a stable link (the address bar always holds one). Reviewers are named
 for a review in
 slots (a primary reviewer and an optional alternate), and a named reviewer signs the review after confirming the
 password again; a signature is bound to a digest of the review record, so it goes out of date when the record changes,
