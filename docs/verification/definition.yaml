@@ -37,6 +37,7 @@ input-files:
   - docs/verification/review-center/web/home-page.md
   - docs/verification/review-center/web/projects-page.md
   - docs/verification/review-center/web/project-page.md
+  - docs/verification/review-center/web/plan-page.md
   - docs/verification/review-center/web/review-page.md
   - docs/verification/review-center/web/checklist-page.md
   - docs/verification/review-center/web/login-page.md

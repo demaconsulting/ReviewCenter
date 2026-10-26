@@ -4,8 +4,8 @@
 # PURPOSE:
 # - Define requirements for the ReviewCenter Web subsystem
 # - The Web subsystem spans the App (App.razor, Routes.razor, MainLayout.razor), HomePage, ProjectsPage, ProjectPage,
-#   ReviewPage, ChecklistPage, LoginPage, AccountPage, UsersPage, AuditPage, and RepositoriesPage units; the App unit
-#   includes the SessionGate
+#   PlanPage, ReviewPage, ChecklistPage, LoginPage, AccountPage, UsersPage, AuditPage, and RepositoriesPage units; the
+#   App unit includes the SessionGate
 #   component that replaces an open protected page when the sign-in state of its user ends
 # - Subsystem requirements describe the externally visible behavior of the web user interface
 # - The subsystem tests run over plain HTTP, so they verify what the server renders: the pages, the read path from
@@ -290,3 +290,27 @@ sections:
         tests:
           - ProjectPage_CreateForm_FromRepository_CreatesReviewWithSourceAndNavigates
           - ReviewPage_FileSelect_ModifiedFile_TogglesBetweenHeadAndReadOnlyBaseline
+
+      - id: ReviewCenter-Web-PlanReviews
+        title: >-
+          The Web subsystem shall let a user plan the reviews a head revision of a registered repository needs on a
+          plan page that is reached from the project page, showing one plain summary, the sets that need a review
+          ticked first and the sets with nothing to review collapsed, creating the ticked reviews with a result per
+          review, explaining every failure in plain English, and showing on the review page the review-set a
+          planned review belongs to.
+        justification: |
+          Planning is useful only when a user can read the answer at a glance and knows what to do next. The page
+          therefore leads with the sets that need action, hides the rest, and never shows raw git output.
+        children:
+          - ReviewCenter-PlanPage-Form
+          - ReviewCenter-PlanPage-Summary
+          - ReviewCenter-PlanPage-Rows
+          - ReviewCenter-PlanPage-Create
+          - ReviewCenter-PlanPage-Error
+          - ReviewCenter-PlanPage-State
+          - ReviewCenter-PlanPage-Interactive
+          - ReviewCenter-ProjectPage-PlanLink
+          - ReviewCenter-ReviewPage-ReviewSet
+        tests:
+          - PlanPage_Create_TickedRows_ShowsResultWithLinksAndCreatesReviews
+          - PlanPage_ShowPlan_SetsNeedingReview_ShowsSummaryTickedRowsAndCollapsedEmpties

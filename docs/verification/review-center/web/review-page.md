@@ -77,6 +77,7 @@ N/A - standard test environment.
   longer signed in and stores nothing.
 - A review from a repository shows the change kind of every file (an uploaded review shows none) and the repository,
   both commits, and the selection in the details; a deleted file is listed with its baseline size.
+- A review planned from a review-set shows the identifier of the set in the details; other reviews show no such row.
 - A modified file offers a Head and a Baseline toggle: Head is the numbered view with comments, Baseline is the
   frozen text, read-only, without comment controls; an added file has no toggle; selecting another file starts in
   its head view.
@@ -92,7 +93,12 @@ Modified, or Deleted. This scenario is tested by `ReviewPage_Render_RepositoryRe
 
 **ReviewPage_Render_RepositoryReview_DetailsShowRepositoryShasAndSelection**: The details show the repository name,
 the baseline and head commits, and the selection. This scenario is tested by
-`ReviewPage_Render_RepositoryReview_DetailsShowRepositoryShasAndSelection`.
+`ReviewPage_Render_RepositoryReview_DetailsShowRepositoryShasAndSelection`, which also checks that a review that was not
+planned shows no review-set row.
+
+**ReviewPage_Render_PlannedReview_DetailsShowReviewSet**: A review created by the planner from the review-set `core`
+shows the set identifier in the details, after the repository. This scenario is tested by
+`ReviewPage_Render_PlannedReview_DetailsShowReviewSet`.
 
 **ReviewPage_FileSelect_ModifiedFile_TogglesBetweenHeadAndReadOnlyBaseline**: A modified file shows the Head view
 with comment controls and a toggle; the Baseline view shows the baseline lines without comment controls and Head

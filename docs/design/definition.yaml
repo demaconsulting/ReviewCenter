@@ -37,6 +37,7 @@ input-files:
   - docs/design/review-center/web/home-page.md
   - docs/design/review-center/web/projects-page.md
   - docs/design/review-center/web/project-page.md
+  - docs/design/review-center/web/plan-page.md
   - docs/design/review-center/web/review-page.md
   - docs/design/review-center/web/checklist-page.md
   - docs/design/review-center/web/login-page.md

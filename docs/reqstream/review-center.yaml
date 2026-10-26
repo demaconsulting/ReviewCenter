@@ -612,5 +612,6 @@ sections:
           - ReviewCenter-Core-PlanReviews
           - ReviewCenter-ContentSources-ReviewSets
           - ReviewCenter-Hosting-PlannerServices
+          - ReviewCenter-Web-PlanReviews
         tests:
           - ReviewPlanner_CreateAsync_RealGit_LastReviewedBaselineThenAlreadyFiled

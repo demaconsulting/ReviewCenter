@@ -71,8 +71,9 @@ sections:
           The ReviewPlanner shall create each picked review from the commits of the plan through the review service,
           recording the review-set identifier, in one session for the batch, with every review stored in its own
           transaction so that a failing request neither stops nor undoes the others, shall report for every request
-          whether it was created, was already filed, or failed with a plain reason, and shall refuse a batch that is
-          not valid as a whole.
+          whether it was created, was already filed, or failed with a plain reason, turning an unexpected fault of one
+          request into a failed result with a generic reason that carries no exception text, replacing the text of a
+          git access failure with a fixed sentence, and shall refuse a batch that is not valid as a whole.
         justification: |
           The pages create many reviews with one click. Creating them through the review service gives every review
           the same rules, frozen content, and audit entry as one created by hand, and reporting the result of each
@@ -81,6 +82,9 @@ sections:
           - ReviewPlanner_CreateAsync_PlanRows_CreatesReviewsWithSetIdAndOneSession
           - ReviewPlanner_CreateAsync_DeltaRow_UsesBaselineAndRangeTitle
           - ReviewPlanner_CreateAsync_OneRequestFails_OthersAreCreated
+          - ReviewPlanner_CreateAsync_UnexpectedFault_FailsOnlyThatRowWithGenericMessage
+          - ReviewPlanner_CreateAsync_GitAccessFailed_FailsOnlyThatRowWithFixedSentence
+          - ReviewPlanner_CreateAsync_Cancellation_Propagates
           - ReviewPlanner_CreateAsync_SameRangeTwice_SecondIsAlreadyFiled
           - ReviewPlanner_CreateAsync_InvalidRequests_FailPerRequest
           - ReviewPlanner_CreateAsync_BadBatch_Throws

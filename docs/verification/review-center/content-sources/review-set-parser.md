@@ -21,7 +21,8 @@ N/A - standard test environment.
 - Keys that are not `reviews`, `id`, `title`, or `paths` are ignored at every level.
 - Block, flow, quoted, and folded YAML, a byte order mark, and Windows line endings are read as YAML defines them, and
   values are trimmed.
-- Every broken file is refused with `ReviewSetConfigInvalid` and a plain message that does not show the YAML library.
+- Every broken file (including an identifier or a title with a control character) is refused with
+  `ReviewSetConfigInvalid` and a plain message that does not show the YAML library.
 - A file exactly at each limit is accepted, one past it is refused, a file with an alias is refused, and a file over the
   size limit is refused before it is read as YAML.
 
@@ -42,7 +43,8 @@ tested by `ReviewMarkConfigParser_Parse_YamlStyles_AreUnderstood`.
 
 **ReviewMarkConfigParser_Parse_BrokenFile_ThrowsConfigInvalid**: A theory over files that are empty, have no `reviews`
 list, an empty list, an entry without an identifier or a title, a repeated identifier, broken YAML, entries of the wrong
-shape, and empty or control-character paths; each gives the rule `ReviewSetConfigInvalid` and a message with the expected
+shape, and empty or control-character paths, identifiers, or titles; each gives the rule `ReviewSetConfigInvalid` and a
+message with the expected
 part that shows no library text. This scenario is tested by `ReviewMarkConfigParser_Parse_BrokenFile_ThrowsConfigInvalid`.
 
 **ReviewMarkConfigParser_Parse_Limits_AreEnforced**: Files exactly at the identifier, title, path count, path length, and

@@ -1,0 +1,116 @@
+---
+# Software Unit Requirements for the PlanPage Unit
+#
+# The PlanPage unit is the page at /projects/{project}/plan that shows which review-sets of a registered git
+# repository need a review at a head revision, and creates the reviews the user ticks.
+
+sections:
+  - title: PlanPage Unit Requirements
+    requirements:
+      - id: ReviewCenter-PlanPage-Form
+        title: >-
+          The PlanPage unit shall show the name of the project and a form with the enabled repositories by name
+          only, never a location, user name, or token, a head revision, and a choice of baseline of None, Explicit
+          revision, or Last reviewed, with Last reviewed as the default and the text box for the baseline revision
+          shown only for Explicit revision, and shall show a not-found message for an unknown project and a plain
+          message that names whom to ask when no repository is registered.
+        justification: |
+          Planning needs three answers: where, which revision, and compared with what. The form asks for exactly
+          these and nothing else, and hides the one field that does not apply.
+        tests:
+          - PlanPage_Render_OneRepository_ShowsFormWithDefaults
+          - PlanPage_Render_UnknownProject_ShowsNotFound
+          - PlanPage_Render_NoRepository_ShowsPlainMessageInsteadOfForm
+          - PlanPage_Render_SeveralRepositories_OffersEnabledOnesWithoutSecrets
+          - PlanPage_BaselineMode_ExplicitOnly_ShowsBaselineInput
+          - PlanPage_ShowPlan_IncompleteForm_SaysWhatIsMissing
+
+      - id: ReviewCenter-PlanPage-Summary
+        title: >-
+          The PlanPage unit shall show a plan as one plain summary sentence first, such as "3 sets need review, 1
+          already filed, 9 have nothing to review.", then a line stating the repository, the head, and the baseline
+          used, and then a sentence that says what to do next.
+        justification: |
+          A user opening a plan wants the answer in one glance and the next step without reading a table.
+        tests:
+          - PlanPage_ShowPlan_SetsNeedingReview_ShowsSummaryTickedRowsAndCollapsedEmpties
+          - PlanPage_ShowPlan_ExplicitBaseline_CountsChangesSinceTheBaseline
+          - PlanPage_ShowPlan_NoBaseline_SaysAllFiles
+
+      - id: ReviewCenter-PlanPage-Rows
+        title: >-
+          The PlanPage unit shall list the sets that need a review first, each ticked by default with its title,
+          where its baseline comes from, and the counts of added, modified, and deleted files, shall offer select
+          all and select none only for more than three such rows, shall keep the sets with nothing to review in a
+          collapsed list with a count, shall show the sets that are already filed with a link to their review, and
+          the sets that cannot be planned with the reason, each in its own group that is shown only when it is not
+          empty, and shall show set titles and reasons as text.
+        justification: |
+          What a user can act on must come first and stand out, and the long tail of sets with nothing to do must
+          not hide it. A set that cannot be planned must not vanish silently.
+        tests:
+          - PlanPage_ShowPlan_SetsNeedingReview_ShowsSummaryTickedRowsAndCollapsedEmpties
+          - PlanPage_Ticks_ManyRows_OffersSelectAllAndNone
+          - PlanPage_ShowPlan_EverythingFiled_OpensFiledListWithLinksAndNoCreateButton
+          - PlanPage_ShowPlan_SetCannotBePlanned_ShowsReasonInOwnGroup
+          - PlanPage_ShowPlan_MarkupInSetTitle_IsEscaped
+
+      - id: ReviewCenter-PlanPage-Create
+        title: >-
+          The PlanPage unit shall show a create button that states the number of ticked rows and is disabled when
+          none is ticked, shall create only the ticked rows from the commit the plan was made from, and then shall
+          replace the plan with one result per review: created with a link to the review, or failed with the
+          reason (never showing text printed by git), with a button to plan again and a link back to the project,
+          and a failed row shall not stop or undo the others.
+        justification: |
+          Ticking never reads the repository again, so what the user saw is what is created. The user must learn
+          the outcome of every review, because each one is stored on its own.
+        tests:
+          - PlanPage_Ticks_Clear_UpdatesCreateButtonAndDisablesAtZero
+          - PlanPage_Create_TickedRows_ShowsResultWithLinksAndCreatesReviews
+          - PlanPage_Create_OneRowNotTicked_CreatesOnlyTheTickedRow
+          - PlanPage_Create_OneRowFails_ShowsReasonAndCreatesTheOthers
+          - PlanPage_Create_OneRowGitAccessFailed_ShowsFixedSentenceWithoutGitText
+          - PlanPage_Create_WholeBatchRefused_ShowsErrorNextToButtonAndKeepsPlan
+
+      - id: ReviewCenter-PlanPage-Error
+        title: >-
+          The PlanPage unit shall show a failed plan as a plain-English message that says what to do next, for a
+          revision that does not exist, a head without a ReviewMark configuration file (with a link to the project
+          page, where a review can be made by hand), an invalid configuration, a disabled repository, an
+          unreadable repository, and any unexpected fault, shall show for an unreadable repository and an unexpected
+          fault only a fixed sentence, never the text git printed, a repository location, a credential, or a stack
+          trace, and shall create nothing.
+        justification: |
+          A user can fix a wrong revision or file, or ask the right person, only when told which. Raw git output
+          and exception text confuse users and can leak how the server reaches the repository.
+        tests:
+          - PlanPage_Error_UnknownRevision_ExplainsAndSuggestsChecking
+          - PlanPage_Error_NoConfiguration_ExplainsAndLinksToProject
+          - PlanPage_Error_InvalidConfiguration_ShowsMessageAndHint
+          - PlanPage_Error_RepositoryDisabledMeanwhile_ExplainsWithoutSecrets
+          - PlanPage_Error_GitAccessFailed_ShowsFixedSentenceWithoutGitText
+          - PlanPage_Error_UnexpectedFault_ShowsGenericMessage
+
+      - id: ReviewCenter-PlanPage-State
+        title: >-
+          The PlanPage unit shall discard the plan, the results, and any error when the repository, the head, the
+          baseline choice, or the baseline revision changes, and when the page is reused for another project, and
+          shall show while the repository is being read that it is being read, with the button disabled.
+        justification: |
+          A plan that disagrees with the form would create reviews the user did not ask for. A visible waiting
+          state prevents a second press while a slow repository is read.
+        tests:
+          - PlanPage_FormChange_DiscardsPlan
+          - PlanPage_ParametersChange_OtherProject_ClearsFormAndPlan
+          - PlanPage_ShowPlan_WhileReading_ShowsLoadingAndDisablesButton
+
+      - id: ReviewCenter-PlanPage-Interactive
+        title: >-
+          The PlanPage unit shall report that it is interactive, through a marker on its root element, once it has
+          rendered on a live connection.
+        justification: |
+          Users, automated tests, and tooling need a reliable signal that the page now responds, so that they do
+          not act before the live connection exists.
+        tests:
+          - PlanPage_AfterRender_Interactive_SetsMarker

@@ -1,0 +1,273 @@
+@* PlanPage: which review-sets of a repository's .reviewmark.yaml need a review at a head revision, and a one-click way
+   to create the ones the user ticks, at "/projects/{id}/plan".
+
+   Presentation only; state and event handling live in PlanPage.razor.cs. The page is laid out for a quick read, top to
+   bottom: the form, ONE summary sentence, the sets that need a review (ticked by default) with the create button, the
+   sets that cannot be planned, the sets already filed (each with a link to its review) and, collapsed with a count,
+   the sets with nothing to review. Groups that are empty are not shown. After creating, a result list replaces the plan.
+
+   Every interactive element and every key value carries a stable kebab-case data-testid (row-level ids carry the
+   review-set id), and the data-interactive marker on the root flips to "true" once the live circuit is connected.
+   Errors are one box (data-testid="plan-error") whose data-error-kind says which rule was broken.
+
+   The page body is inside SessionGate, which replaces it with a "Session ended" message when the user is no longer
+   valid while the page is open. *@
+@page "/projects/{ProjectId:int}/plan"
+@rendermode InteractiveServer
+@attribute [Authorize]
+
+<PageTitle>Plan reviews - @(Project?.Name ?? "Project") - ReviewCenter</PageTitle>
+
+<SessionGate>
+@{
+    // The same error box is shown under the form or, once a plan is shown, next to the create button
+    RenderFragment errorBox = @<div class="error" role="alert" data-testid="plan-error" data-error-kind="@ErrorKind">
+        <p data-testid="plan-error-message">@ErrorMessage</p>
+        @if (ErrorHint is not null)
+        {
+            <p data-testid="plan-error-hint">@ErrorHint</p>
+        }
+        @if (ErrorKind == nameof(DomainRule.ReviewSetConfigMissing))
+        {
+            <p><a href="/projects/@ProjectId" data-testid="plan-error-project-link">Go to the project page</a></p>
+        }
+    </div>;
+}
+<main class="page" data-testid="plan-page" data-interactive="@InteractiveMarker">
+    <nav class="breadcrumb">
+        <a href="/" data-testid="home-link">ReviewCenter</a>
+        <span aria-hidden="true">/</span>
+        <a href="/projects" data-testid="projects-link">Projects</a>
+        @if (Project is not null)
+        {
+            <span aria-hidden="true">/</span>
+            <a href="/projects/@ProjectId" data-testid="plan-breadcrumb-project">@Project.Name</a>
+        }
+    </nav>
+
+    @if (!Loaded)
+    {
+        <p class="muted" data-testid="plan-page-loading">Loading...</p>
+    }
+    else if (Project is null)
+    {
+        <p class="error" role="alert" data-testid="plan-project-not-found">Project @ProjectId does not exist.</p>
+    }
+    else
+    {
+        <h1 data-testid="plan-heading">Plan reviews</h1>
+        <p class="muted" data-testid="plan-help">Pick a repository and a revision to see which review-sets of its .reviewmark.yaml need a review.</p>
+
+        @if (Repositories.Count == 0)
+        {
+            <p class="notice" role="status" data-testid="plan-no-repository">No repository is registered; ask an administrator.</p>
+        }
+        else
+        {
+            @if (Results is null)
+            {
+                <section class="card">
+                    <form data-testid="plan-form" @onsubmit="LoadPlanAsync">
+                        <div class="field">
+                            <label for="plan-repository">Repository</label>
+                            <select id="plan-repository" data-testid="plan-repository-select" @bind="RepositoryIdText">
+                                <option value="">Choose a repository</option>
+                                @foreach (var repository in Repositories)
+                                {
+                                    <option value="@repository.Id">@repository.Name</option>
+                                }
+                            </select>
+                        </div>
+                        <div class="field">
+                            <label for="plan-head">Head revision</label>
+                            <input id="plan-head" type="text" maxlength="@RevisionValidator.MaxLength"
+                                   autocomplete="off" placeholder="main" data-testid="plan-head-input"
+                                   @bind="HeadRevision" @bind:event="oninput" />
+                            <span class="muted">A branch, tag or commit: the version to review.</span>
+                        </div>
+                        <fieldset class="field source-choice" data-testid="plan-baseline">
+                            <legend>What to review</legend>
+                            <label>
+                                <input type="radio" name="plan-baseline" checked="@(Mode == BaselineMode.None)"
+                                       data-testid="plan-baseline-none" @onchange="() => ChooseMode(BaselineMode.None)" />
+                                All files of each set
+                            </label>
+                            <label>
+                                <input type="radio" name="plan-baseline" checked="@(Mode == BaselineMode.Explicit)"
+                                       data-testid="plan-baseline-explicit" @onchange="() => ChooseMode(BaselineMode.Explicit)" />
+                                Changes since a branch, tag or commit
+                            </label>
+                            <label>
+                                <input type="radio" name="plan-baseline" checked="@(Mode == BaselineMode.LastReviewed)"
+                                       data-testid="plan-baseline-last" @onchange="() => ChooseMode(BaselineMode.LastReviewed)" />
+                                Changes since the last signed review of each set
+                            </label>
+                        </fieldset>
+                        @if (Mode == BaselineMode.Explicit)
+                        {
+                            <div class="field">
+                                <label for="plan-baseline-revision">Baseline revision</label>
+                                <input id="plan-baseline-revision" type="text" maxlength="@RevisionValidator.MaxLength"
+                                       autocomplete="off" data-testid="plan-baseline-input"
+                                       @bind="BaselineRevision" @bind:event="oninput" />
+                                <span class="muted">A branch, tag or commit.</span>
+                            </div>
+                        }
+                        <button type="submit" disabled="@Busy" data-testid="plan-load-button">@(Reading ? "Reading repository..." : "Show plan")</button>
+                    </form>
+                    @if (ErrorMessage is not null && Plan is null)
+                    {
+                        <div class="plan-error-wrap">@errorBox</div>
+                    }
+                </section>
+            }
+
+            @if (Reading)
+            {
+                <p class="muted" role="status" data-testid="plan-loading">Reading the repository. This can take a moment for a large one.</p>
+            }
+
+            @if (Results is not null)
+            {
+                <section class="card" data-testid="plan-results">
+                    <p class="plan-summary" role="status" data-testid="plan-result-summary">@ResultSummaryText</p>
+                    <p data-testid="plan-result-next-step">@ResultNextStepText</p>
+                    <ul class="item-list" data-testid="plan-result-list">
+                        @foreach (var result in Results)
+                        {
+                            <li class="plan-result" data-testid="plan-result-@result.SetId" data-outcome="@result.Outcome">
+                                <span class="plan-row-title">@TitleOf(result.SetId)</span>
+                                <span class="muted">@result.SetId</span>
+                                @if (result.Outcome == PlanCreateOutcome.Failed)
+                                {
+                                    <span class="badge failed" data-testid="plan-result-status-@result.SetId">Failed</span>
+                                    <span class="plan-row-note error" role="alert" data-testid="plan-result-message-@result.SetId">@result.Message</span>
+                                }
+                                else
+                                {
+                                    <span class="badge @(result.Outcome == PlanCreateOutcome.Created ? "approved" : null)" data-testid="plan-result-status-@result.SetId">@(result.Outcome == PlanCreateOutcome.Created ? "Created" : "Already filed")</span>
+                                    <a class="plan-row-note" href="/projects/@ProjectId/reviews/@result.ReviewId" data-testid="plan-result-link-@result.SetId">Open review @result.ReviewId</a>
+                                }
+                            </li>
+                        }
+                    </ul>
+                    <div class="plan-actions">
+                        <a class="action" href="/projects/@ProjectId" data-testid="plan-back-link">Back to the project</a>
+                        <button type="button" class="secondary" disabled="@Busy" data-testid="plan-again-button" @onclick="LoadPlanAsync">Plan again</button>
+                    </div>
+                </section>
+            }
+            else if (Plan is not null)
+            {
+                <section class="card" data-testid="plan-overview">
+                    <p class="plan-summary" role="status" data-testid="plan-summary">@SummaryText</p>
+                    <p class="muted" data-testid="plan-facts">@FactsText</p>
+                    <p data-testid="plan-next-step">@NextStepText</p>
+                </section>
+
+                @if (Plan.WillCreateCount > 0)
+                {
+                    <section class="card" data-testid="plan-todo">
+                        <h2>To review (@Plan.WillCreateCount)</h2>
+                        @if (OffersBulkSelection)
+                        {
+                            <p class="plan-bulk">
+                                <button type="button" class="secondary" data-testid="plan-select-all" @onclick="() => SetAllTicked(true)">Select all</button>
+                                <button type="button" class="secondary" data-testid="plan-select-none" @onclick="() => SetAllTicked(false)">Select none</button>
+                            </p>
+                        }
+                        <ul class="item-list" data-testid="plan-todo-list">
+                            @foreach (var row in TodoRows)
+                            {
+                                <li class="plan-row" data-testid="plan-row-@row.SetId">
+                                    <label>
+                                        <input type="checkbox" checked="@IsTicked(row.SetId)"
+                                               data-testid="plan-row-check-@row.SetId"
+                                               @onchange="e => SetTicked(row.SetId, (bool)e.Value!)" />
+                                        <span class="plan-row-text">
+                                            <span>
+                                                <span class="plan-row-title" data-testid="plan-row-title-@row.SetId">@row.Title</span>
+                                                <span class="muted">@row.SetId</span>
+                                            </span>
+                                            <span class="plan-row-note" data-testid="plan-row-note-@row.SetId">@row.BaselineNote</span>
+                                            <span class="muted" data-testid="plan-row-counts-@row.SetId">@CountsText(row)</span>
+                                        </span>
+                                    </label>
+                                </li>
+                            }
+                        </ul>
+                        @if (ErrorMessage is not null)
+                        {
+                            <div class="plan-error-wrap">@errorBox</div>
+                        }
+                        <button type="button" class="plan-create" disabled="@(Busy || TickedCount == 0)"
+                                data-testid="plan-create-button" @onclick="CreateReviewsAsync">@CreateButtonText</button>
+                        @if (TickedCount == 0)
+                        {
+                            <p class="muted hint" data-testid="plan-create-hint">Tick at least one set to create its review.</p>
+                        }
+                    </section>
+                }
+
+                @if (Plan.CannotPlanCount > 0)
+                {
+                    <section class="card" data-testid="plan-problems">
+                        <h2>Cannot be planned (@Plan.CannotPlanCount)</h2>
+                        <ul class="item-list" data-testid="plan-problem-list">
+                            @foreach (var row in ProblemRows)
+                            {
+                                <li data-testid="plan-problem-@row.SetId">
+                                    <span class="plan-row-title">@row.Title</span>
+                                    <span class="muted">@row.SetId</span>
+                                    <span class="plan-row-note error" data-testid="plan-problem-reason-@row.SetId">@row.Problem</span>
+                                </li>
+                            }
+                        </ul>
+                    </section>
+                }
+
+                @if (Plan.AlreadyFiledCount > 0)
+                {
+                    <section class="card">
+                        <details open="@(Plan.WillCreateCount == 0)" data-testid="plan-filed-list">
+                            <summary data-testid="plan-filed-toggle">Already filed (@Plan.AlreadyFiledCount)</summary>
+                            <ul class="item-list">
+                                @foreach (var row in FiledRows)
+                                {
+                                    <li data-testid="plan-filed-@row.SetId">
+                                        <span class="plan-row-title">@row.Title</span>
+                                        <span class="muted">@row.SetId</span>
+                                        <a class="plan-row-note" href="/projects/@ProjectId/reviews/@row.ExistingReviewId" data-testid="plan-filed-link-@row.SetId">Open review @row.ExistingReviewId</a>
+                                    </li>
+                                }
+                            </ul>
+                        </details>
+                    </section>
+                }
+
+                @if (Plan.NothingCount > 0)
+                {
+                    <section class="card">
+                        <details data-testid="plan-empty-list">
+                            <summary data-testid="plan-empty-toggle">Nothing to review (@Plan.NothingCount)</summary>
+                            <ul class="item-list">
+                                @foreach (var row in EmptyRows)
+                                {
+                                    <li data-testid="plan-empty-@row.SetId">
+                                        <span class="plan-row-title">@row.Title</span>
+                                        <span class="muted">@row.SetId</span>
+                                        @if (row.BaselineNote is not null)
+                                        {
+                                            <span class="plan-row-note muted">@row.BaselineNote</span>
+                                        }
+                                    </li>
+                                }
+                            </ul>
+                        </details>
+                    </section>
+                }
+            }
+        }
+    }
+</main>
+</SessionGate>

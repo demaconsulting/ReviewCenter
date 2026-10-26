@@ -339,11 +339,68 @@ reviews:
 
 The file is read from the head revision of the repository, so it is the version you are about to review. The limits
 are: the file is at most 256 KiB, at most 500 review-sets, an `id` of at most 100 characters, a `title` of at most 200,
-at most 100 paths in a review-set, and at most 400 characters in a path. The `id` and `title` are required and the ids
-must be different. A file that is not valid YAML, uses YAML aliases, or breaks a limit is refused with a message that
+at most 100 paths in a review-set, and at most 400 characters in a path. The `id` and `title` are required, must not
+contain control characters, and the ids must be different. A file that is not valid YAML, uses YAML aliases, or breaks a
+limit is refused with a message that
 names the problem, and a review-set without usable paths cannot be planned. A review that is made for a review-set
 keeps its `id`, and the record digest that a signature covers includes it, so the next review of the same set can
 start from the last signed one.
+
+## Planning Reviews
+
+If the repository has a `.reviewmark.yaml` with review-sets, you do not have to create each review by hand. On the
+project page choose **Plan reviews from a repository** (it is shown when an administrator has enabled a repository;
+otherwise the page says to ask one). The plan page at `/projects/{id}/plan` finds the review-sets that need a review and
+creates the reviews you tick.
+
+1. Choose the **repository** (a single enabled repository is already chosen) and enter the **head revision**, a branch,
+   a tag, or a commit, for example `main`.
+1. Under **What to review** choose one of:
+   - **Changes since the last signed review of each set** (the default): each set is compared with the head of its
+     last signed review. A set that has never been signed is reviewed in full and says so in its note. If that
+     earlier head is no longer an ancestor of the new head (for example after a force push), or the patterns of the set
+     changed since then, the set is also reviewed in full.
+   - **Changes since a branch, tag or commit**: a text box for the baseline revision appears. Every set is compared with
+     that revision.
+   - **All files of each set**: no baseline; every selected file counts as Added.
+1. Choose **Show plan**. Nothing is created yet.
+
+The plan starts with one sentence, for example "3 sets need review, 1 already filed, 9 have nothing to review.", a
+muted line with the repository, the head, and the baseline that was used, and a sentence that says what to do next. Below
+that:
+
+- **To review**: the sets that need a review, each ticked, with its title, a note about the baseline, and how many
+  files changed (added, modified, deleted). Clear the tick of the sets you do not want now. For a long list
+  **Select all** and
+  **Select none** appear. The button says how many reviews it creates, for example **Create 3 reviews**, and is
+  disabled when nothing is ticked.
+- **Cannot be planned**: shown only when a set cannot be planned, for example because its patterns are not valid,
+  with the reason. Fix the set in `.reviewmark.yaml` and plan again.
+- **Already filed**: shown only when a review of a set at this head and baseline exists, with a link to that review. A
+  set is not offered twice, so you cannot file the same review again by mistake.
+- **Nothing to review**: the sets whose files did not change. It is collapsed; open it to see which they are.
+
+Choose **Create N reviews**. The page then lists one result per set: a link to the new review, or the reason it could not
+be created. The others are still created. When a set fails because the repository could not be read, the reason is the
+fixed sentence "The repository could not be read." A failed set is not created; choose **Plan again** to offer it once
+more, or
+go back to the project. A new review has the files of the plan, the checklist, and the set identifier, which the review
+page shows as **Review set** in the Details. If you change the head revision, the baseline, or the repository, the plan
+is cleared, because it no longer matches.
+
+The creator of the reviews is you, as for any review. The reviews use the commits that the plan showed, so a commit pushed
+while you read the plan does not change them.
+
+When the plan cannot be made, the page says why in plain English and what to do:
+
+- No repository is registered, or it was disabled: ask an administrator.
+- The revision is not known: check the spelling, and push the branch or tag if it is new.
+- The head revision has no `.reviewmark.yaml`: add it, or choose another revision; you can still create a review by hand
+  on the project page.
+- The configuration is not valid or too large: the message names the problem and the position; fix the file.
+- The repository could not be read: try again later, or ask an administrator.
+
+The page never shows text printed by git, the location of the repository, or a credential.
 
 ### Limitations of Sign-in
 

@@ -699,6 +699,89 @@ public class ReviewPlannerTests
     }
 
     /// <summary>
+    ///     Test that an unexpected fault (not a domain rule violation) fails only its own row, with a generic
+    ///     message that carries none of the exception text, and does not lose the other results.
+    /// </summary>
+    [Fact]
+    public async Task ReviewPlanner_CreateAsync_UnexpectedFault_FailsOnlyThatRowWithGenericMessage()
+    {
+        // Arrange: one row created first, then a fault is armed for the next listing
+        var f = await CreateAsync();
+        var plan = await PlanAsync(f);
+        PlanCreateRequest[] requests = [RequestFor(plan.Rows[0]), RequestFor(plan.Rows[1])];
+        var created = await f.Planner.CreateAsync(
+            f.ProjectId, f.RepositoryId, plan.HeadSha, [requests[0]], _actor, TestContext.Current.CancellationToken);
+        f.Git.OnNextListChanges = () => throw new InvalidOperationException("SECRET-DATABASE-DETAIL at C:\\private\\db.sqlite");
+
+        // Act: create the second row (which hits the fault)
+        var results = await f.Planner.CreateAsync(
+            f.ProjectId, f.RepositoryId, plan.HeadSha, [requests[1]], _actor, TestContext.Current.CancellationToken);
+        var after = await f.Planner.CreateAsync(
+            f.ProjectId, f.RepositoryId, plan.HeadSha, [requests[1]], _actor, TestContext.Current.CancellationToken);
+
+        // Assert: the faulty row failed with a safe message and stored nothing; the earlier and later results are intact
+        Assert.Equal(PlanCreateOutcome.Created, created[0].Outcome);
+        Assert.Equal(PlanCreateOutcome.Failed, results[0].Outcome);
+        Assert.Null(results[0].ReviewId);
+        Assert.DoesNotContain("SECRET", results[0].Message);
+        Assert.DoesNotContain("sqlite", results[0].Message);
+        Assert.Contains("unexpected error", results[0].Message);
+        Assert.Equal(PlanCreateOutcome.Created, after[0].Outcome);
+        Assert.Equal(["core", "docs"], f.Store.Reviews.Select(review => review.Id).Order());
+    }
+
+    /// <summary>
+    ///     Test that a git access failure of one row is reported with a fixed sentence that carries none of the text
+    ///     git printed, and that the other rows are still created.
+    /// </summary>
+    [Fact]
+    public async Task ReviewPlanner_CreateAsync_GitAccessFailed_FailsOnlyThatRowWithFixedSentence()
+    {
+        // Arrange: one row created first, then a git access failure with raw git text is armed for the next listing
+        var f = await CreateAsync();
+        var plan = await PlanAsync(f);
+        PlanCreateRequest[] requests = [RequestFor(plan.Rows[0]), RequestFor(plan.Rows[1])];
+        var created = await f.Planner.CreateAsync(
+            f.ProjectId, f.RepositoryId, plan.HeadSha, [requests[0]], _actor, TestContext.Current.CancellationToken);
+        f.Git.OnNextListChanges = () => throw new DomainRuleException(
+            DomainRule.GitAccessFailed,
+            "Repository 'x' could not be read: fatal: unable to access 'https://user:SECRET-TOKEN@host.example/r.git/': denied");
+
+        // Act: create the second row (which hits the failure), then once more
+        var results = await f.Planner.CreateAsync(
+            f.ProjectId, f.RepositoryId, plan.HeadSha, [requests[1]], _actor, TestContext.Current.CancellationToken);
+        var after = await f.Planner.CreateAsync(
+            f.ProjectId, f.RepositoryId, plan.HeadSha, [requests[1]], _actor, TestContext.Current.CancellationToken);
+
+        // Assert: the row failed with the fixed sentence only; the other results are intact
+        Assert.Equal(PlanCreateOutcome.Created, created[0].Outcome);
+        Assert.Equal(PlanCreateOutcome.Failed, results[0].Outcome);
+        Assert.Null(results[0].ReviewId);
+        Assert.Equal(ReviewPlanner.GitAccessFailedMessage, results[0].Message);
+        Assert.DoesNotContain("fatal", results[0].Message);
+        Assert.DoesNotContain("host.example", results[0].Message);
+        Assert.DoesNotContain("SECRET", results[0].Message);
+        Assert.Equal(PlanCreateOutcome.Created, after[0].Outcome);
+        Assert.Equal(["core", "docs"], f.Store.Reviews.Select(review => review.Id).Order());
+    }
+
+    /// <summary>
+    ///     Test that a cancellation is not turned into a failed row.
+    /// </summary>
+    [Fact]
+    public async Task ReviewPlanner_CreateAsync_Cancellation_Propagates()
+    {
+        // Arrange: the next listing is cancelled
+        var f = await CreateAsync();
+        var plan = await PlanAsync(f);
+        f.Git.OnNextListChanges = () => throw new OperationCanceledException();
+
+        // Act / Assert: the batch is cancelled, not reported as a failed row
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => f.Planner.CreateAsync(
+            f.ProjectId, f.RepositoryId, plan.HeadSha, [RequestFor(plan.Rows[0])], _actor, TestContext.Current.CancellationToken));
+    }
+
+    /// <summary>
     ///     Test that a request whose review exists already is reported as already filed and creates nothing.
     /// </summary>
     [Fact]

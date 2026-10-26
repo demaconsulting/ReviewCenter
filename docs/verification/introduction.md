@@ -36,6 +36,7 @@ This document covers the verification design for the following software items:
     - **HomePage** — home page component
     - **ProjectsPage** — projects list and creation page
     - **ProjectPage** — project page with review creation from uploaded files
+    - **PlanPage** — planning of reviews from the review-sets of a repository
     - **ReviewPage** — review, fingerprint, files, file content, comment threads, reviewers, and signatures page
     - **ChecklistPage** — review checklist page
     - **LoginPage** — sign-in page

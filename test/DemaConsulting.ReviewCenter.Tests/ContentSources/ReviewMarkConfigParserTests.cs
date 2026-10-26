@@ -166,6 +166,8 @@ public class ReviewMarkConfigParserTests
     [InlineData("reviews:\n  - id: a\n    title: A\n    paths: [\"\"]\n", "A path of review-set 1")]
     [InlineData("reviews:\n  - id: a\n    title: A\n    paths: [\"a\\nb\"]\n", "A path of review-set 1")]
     [InlineData("reviews:\n  - id: a\n    title: A\n    paths:\n      -\n", "A path of review-set 1")]
+    [InlineData("reviews:\n  - id: \"a\\nb\"\n    title: A\n", "The id of review-set 1")]
+    [InlineData("reviews:\n  - id: a\n    title: \"A\\tB\"\n", "The title of review-set 1")]
     public void ReviewMarkConfigParser_Parse_BrokenFile_ThrowsConfigInvalid(string text, string expected)
     {
         // Arrange: the text of a file that cannot be used

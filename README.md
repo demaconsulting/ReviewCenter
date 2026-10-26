@@ -55,6 +55,12 @@ The current release provides:
   can be read as **Head** (where comments are made) or as a read-only **Baseline**. There is no diff highlighting.
   A signature binds the repository, both commits, the selection, and every change (see
   [Reviews from a Repository](#reviews-from-a-repository))
+- **Planning Reviews**: if the repository has review-sets in its `.reviewmark.yaml`, choose **Plan reviews from a
+  repository** on the project page, enter a head revision, and choose a baseline: none, a given revision, or the last
+  signed review of each set. The page shows one plain summary (for example "3 sets need review, 1 already filed, 9 have
+  nothing to review"), the sets to review first and ticked, sets that cannot be planned or are already filed (with a
+  link) only when there are some, and the sets with nothing to review collapsed; **Create** makes a review for every
+  ticked set and lists the result of each (see [Planning Reviews](#planning-reviews))
 - **Review Comments**: on the review page, start a comment thread on a whole file or on a line range, reply to it,
   and mark it resolved or reopen it; the author is the signed-in user; a next-step line says what is left to do, a
   thread index of all files (open by default, or all, or resolved) jumps to the thread's lines, resolved threads are
@@ -427,6 +433,23 @@ ReviewCenter reads the file of the head revision of the repository as it is, wit
 100 paths, and a path at most 400 characters. Two entries with the same `id`, an entry that is not valid, YAML
 aliases, and a file that is not valid YAML are refused with a message that names the problem. A review made for a
 review-set keeps the `id` of the set, so that the next review of the same set can start from the last signed one.
+
+## Planning Reviews
+
+When the repository has review-sets, choose **Plan reviews from a repository** on the project page (it is shown when a
+repository is enabled). Enter the **head revision** and choose what to review: the changes since the last signed review
+of each set (the default), the changes since a branch, tag, or commit, or all files of each set. **Show plan** reads
+the repository and creates nothing yet.
+
+The plan starts with one plain sentence, for example "3 sets need review, 1 already filed, 9 have nothing to review.",
+and says what to do next. The sets that need a review come first, each ticked, with a note about its baseline and the
+number of changed files; clear the tick of the ones you do not want now, and choose **Create N reviews**. A set that
+cannot be planned (for example because its patterns are not valid) and a set that is already filed (with a link to its
+review) are listed only when there are some, and the sets with nothing to review are collapsed behind a count. After
+the creation the page lists one result per set, a link to the new review or the reason it failed; a failed set does not
+stop the others, and **Plan again** offers it once more. When the plan cannot be made (the repository is disabled, the
+revision is unknown, or there is no valid `.reviewmark.yaml`) the page says so in plain words and what to do. The
+review page shows the set of a planned review as **Review set** in the Details.
 
 ## Data Location and Database Settings
 

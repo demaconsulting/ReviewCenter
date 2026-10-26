@@ -67,7 +67,10 @@ suffixes are tried.
   `ReviewService`, with its own audit entry; the batch is not one transaction.
 - *Algorithm*: Open one session for the batch. For each request, build the id (below) and the title, and call
   `ReviewService.CreateFromSessionAsync` with the head commit and the baseline commit of the request, never a branch
-  name. A domain rule violation of a request becomes a `Failed` result with its message, and does not stop the others. A
+  name. A domain rule violation of a request becomes a `Failed` result with its message, except that the text of a git
+  access failure (which may carry what git printed) is replaced by the fixed sentence `GitAccessFailedMessage`, which the
+  page shares; an unexpected fault (any
+  other exception except a cancellation) becomes a `Failed` result with a generic message; neither stops the others. A
   duplicate id (someone took it a moment ago) is retried with the next suffix, up to five times. The same range that
   already exists is an `AlreadyFiled` result.
 
@@ -85,8 +88,14 @@ title is cut when needed so that the range stays visible and the title fits.
 Problems that stop a plan are `DomainRuleException` values: `ProjectNotFound`, `RepositoryNotFound`,
 `RepositoryDisabled`, `RevisionInvalid`, `RevisionNotFound`, the git rules, `ReviewSetConfigMissing`, and
 `ReviewSetConfigInvalid`. A problem with one set is a `CannotPlan` row; a problem with one request of a batch is a
-`Failed` result. Only domain rule violations are turned into rows and results; other exceptions are faults and
-propagate. A null argument is `ArgumentNullException`, and a batch with too many requests is `ArgumentException`.
+`Failed` result. Domain rule violations are turned into rows and results with their message, except a git access failure
+of a request: its message may carry the first line git printed (a location, for example), so the result carries the fixed
+sentence `GitAccessFailedMessage` ("The repository could not be read.") instead; the other rules, such as a git timeout,
+keep their fixed messages. Any other exception that
+is not a cancellation, for example a database error, becomes a `Failed` result of that request with a generic message
+that carries no exception text; nothing is created for that request, and the results of the other requests stay.
+A cancellation propagates. A null argument is `ArgumentNullException`, and a batch with too many requests is
+`ArgumentException`.
 
 #### Dependencies
 

@@ -26,8 +26,9 @@ sections:
         title: >-
           The ReviewSetParser shall refuse a file larger than 256 KiB before reading it as YAML, a file that uses a
           YAML alias, a file with more than 500 review-sets, an identifier longer than 100 characters, a title longer
-          than 200 characters, a set with more paths than a selection allows, and a path that is empty, too long, or
-          contains a control character, while accepting a file exactly at each limit.
+          than 200 characters, an identifier or a title that contains a control character, a set with more paths than
+          a selection allows, and a path that is empty, too long, or contains a control character, while accepting a
+          file exactly at each limit.
         justification: |
           The file is written by other people and is read by the server. Bounding its size, its counts and its
           lengths, and refusing aliases that can expand a small file into an enormous document, keeps a hostile file

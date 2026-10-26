@@ -379,6 +379,21 @@ reviews:
       - "test/**/Web/ProjectPageTests.cs"
       - "test/**/Web/ProjectPageRepositoryTests.cs"
 
+  - id: ReviewCenter-Web-PlanPage
+    title: Review of ReviewCenter PlanPage unit implementation
+    context:
+      - docs/design/review-center.md
+      - docs/reqstream/review-center.yaml
+      - docs/design/review-center/web.md
+      - docs/reqstream/review-center/web.yaml
+    paths:
+      - "docs/reqstream/review-center/web/plan-page.yaml"
+      - "docs/design/review-center/web/plan-page.md"
+      - "docs/verification/review-center/web/plan-page.md"
+      - "src/**/Web/PlanPage.razor"
+      - "src/**/Web/PlanPage.razor.cs"
+      - "test/**/Web/PlanPageTests.cs"
+
   - id: ReviewCenter-Web-ReviewPage
     title: Review of ReviewCenter ReviewPage unit implementation
     context:

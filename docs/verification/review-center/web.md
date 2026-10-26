@@ -46,6 +46,10 @@ N/A - standard test environment (temporary SQLite databases are created by the t
   display of the change kinds, the source, and the Head / Baseline versions need a live connection, so they are
   verified at unit level by the component tests of `ProjectPage` and `ReviewPage` (see the children of the requirement
   `ReviewCenter-Web-RepositoryReviews` in `web.yaml`).
+- The plan page and the planning links need a live connection for the form and the creation, so they are verified at
+  unit level by the component tests of `PlanPage`, `ProjectPage`, and `ReviewPage` (see the children of the requirement
+  `ReviewCenter-Web-PlanReviews` in `web.yaml`); the subsystem test requests the plan route of a project that has a
+  registered repository.
 
 ### Test Scenarios
 
@@ -92,7 +96,8 @@ and the review page shows "Signature out of date". This scenario is tested by
 `WebSubsystem_SignedReview_ApprovalIsPresentedAndGoesOutOfDateWhenRecordChanges`.
 
 **WebSubsystem_AllPages_EveryInteractiveElementHasTestId**: A user with the Admin role is signed in, and every route
-(home, login, account, users, repositories, a project, a missing project, a review, a missing review, a checklist) is
+(home, login, account, users, repositories, a project, the plan page of a project that has a registered repository, the
+plan page and the project page of a missing project, a review, a missing review, a checklist) is
 requested over the in-memory server; every link, button, visible input, select, and text area in each response has a
 `data-testid` in kebab-case. This scenario is tested by
 `WebSubsystem_AllPages_EveryInteractiveElementHasTestId`.

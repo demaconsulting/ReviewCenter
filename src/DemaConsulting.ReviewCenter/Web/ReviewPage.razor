@@ -456,6 +456,11 @@
                 {
                     <dt>Repository</dt>
                     <dd data-testid="review-repository">@Review.RepositoryName</dd>
+                    @if (Review.ReviewSetId is not null)
+                    {
+                        <dt>Review set</dt>
+                        <dd data-testid="review-set-id">@Review.ReviewSetId</dd>
+                    }
                     <dt>Baseline</dt>
                     <dd class="hash" data-testid="review-baseline-sha">@(Review.BaselineSha ?? "none")</dd>
                     <dt>Head</dt>

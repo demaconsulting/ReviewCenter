@@ -278,3 +278,14 @@ sections:
           The history of a review is reached from the review it belongs to.
         tests:
           - ReviewPage_Render_ExistingReview_ShowsHistoryLink
+
+      - id: ReviewCenter-ReviewPage-ReviewSet
+        title: >-
+          The ReviewPage unit shall show in the Details section of a review that was planned from a review-set the
+          identifier of that set, and shall show no such row for any other review.
+        justification: |
+          A reviewer must see which review-set a planned review belongs to, because the set links this review to
+          the earlier and later reviews of the same files.
+        tests:
+          - ReviewPage_Render_PlannedReview_DetailsShowReviewSet
+          - ReviewPage_Render_RepositoryReview_DetailsShowRepositoryShasAndSelection

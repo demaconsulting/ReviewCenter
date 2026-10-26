@@ -29,7 +29,9 @@ N/A - standard test environment (the integration tests need git, and skip themse
 - A set with a review of the same head and baseline is `AlreadyFiled`; a set with no changed file, or at the head of its
   last signed review, is `NothingToReview`.
 - Creation uses one session, creates each review through the review service with its set identifier and the range title,
-  reports each request on its own, and lets the others succeed when one fails.
+  reports each request on its own, and lets the others succeed when one fails, also when the failure is an unexpected
+  fault, which is reported with a generic reason; a git access failure is reported with a fixed sentence that carries no
+  git text; a cancellation is not turned into a result.
 - Review identifiers are safe, within the limit, and unique, also when taken during the creation.
 
 #### Test Scenarios
@@ -106,6 +108,21 @@ with a title that shows the range. This scenario is tested by
 **ReviewPlanner_CreateAsync_OneRequestFails_OthersAreCreated**: One request fails and the others are created; the failed
 one is reported with its reason and nothing was stored for it. This scenario is tested by
 `ReviewPlanner_CreateAsync_OneRequestFails_OthersAreCreated`.
+
+**ReviewPlanner_CreateAsync_UnexpectedFault_FailsOnlyThatRowWithGenericMessage**: One request is created; then the git
+listing fails with an exception that is not a domain rule, and its text contains a marker. The next request is reported
+as `Failed` with a generic message that does not contain the marker, nothing is stored for it, the earlier result is
+intact, and creating it again afterwards succeeds. This scenario is tested by
+`ReviewPlanner_CreateAsync_UnexpectedFault_FailsOnlyThatRowWithGenericMessage`.
+
+**ReviewPlanner_CreateAsync_GitAccessFailed_FailsOnlyThatRowWithFixedSentence**: One request is created; then the git
+listing fails with a git access failure whose text carries git output, a location, and a token. The next request is
+reported as `Failed` with exactly the fixed sentence "The repository could not be read." without any of that text,
+nothing is stored for it, the earlier result is intact, and creating it again afterwards succeeds. This scenario is
+tested by `ReviewPlanner_CreateAsync_GitAccessFailed_FailsOnlyThatRowWithFixedSentence`.
+
+**ReviewPlanner_CreateAsync_Cancellation_Propagates**: A cancellation raised while a request is created is not turned
+into a failed result; it reaches the caller. This scenario is tested by `ReviewPlanner_CreateAsync_Cancellation_Propagates`.
 
 **ReviewPlanner_CreateAsync_SameRangeTwice_SecondIsAlreadyFiled**: Creating the same range again gives `AlreadyFiled`
 with the existing identifier. This scenario is tested by `ReviewPlanner_CreateAsync_SameRangeTwice_SecondIsAlreadyFiled`.

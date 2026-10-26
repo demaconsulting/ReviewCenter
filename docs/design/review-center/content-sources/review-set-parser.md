@@ -28,8 +28,9 @@ path at most `SelectionMatcher.MaxPatternLength` characters.
 - *Parameters*: `byte[] content`.
 - *Returns*: `IReadOnlyList<ReviewSetDefinition>` — at least one definition, in file order.
 - *Preconditions*: `content` is not null (otherwise `ArgumentNullException`).
-- *Postconditions*: Every definition has a trimmed, non-empty identifier that is unique in the list, a trimmed non-empty
-  title, and paths that are trimmed, not empty, free of control characters, and within the limits.
+- *Postconditions*: Every definition has a trimmed, non-empty identifier that is unique in the list and free of control
+  characters, a trimmed non-empty title free of control characters, and paths that are trimmed, not empty, free of
+  control characters, and within the limits.
 - *Algorithm*: Refuse a file over the size limit. Decode it as UTF-8, dropping a byte order mark. Read the YAML events
   with the YamlDotNet parser, without building anything, and refuse the file when an alias is found. Deserialize the
   text into the plain shapes. Refuse a file with no `reviews` list or with an empty one, or with too many entries. For

@@ -261,6 +261,7 @@ public class AppTests : PageTestBase
     [Theory]
     [InlineData("ProjectsPage", "projects-page")]
     [InlineData("ProjectPage", "project-page")]
+    [InlineData("PlanPage", "plan-page")]
     [InlineData("ReviewPage", "review-page")]
     [InlineData("ChecklistPage", "checklist-page")]
     [InlineData("AccountPage", "account-page")]
@@ -277,6 +278,7 @@ public class AppTests : PageTestBase
         {
             "ProjectsPage" => (typeof(ProjectsPage), noParameters),
             "ProjectPage" => (typeof(ProjectPage), projectParameters),
+            "PlanPage" => (typeof(PlanPage), projectParameters),
             "ReviewPage" => (typeof(ReviewPage), reviewParameters),
             "ChecklistPage" => (typeof(ChecklistPage), reviewParameters),
             "AccountPage" => (typeof(AccountPage), noParameters),

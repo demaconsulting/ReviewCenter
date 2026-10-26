@@ -38,6 +38,14 @@
 
         <section class="card">
             <h2>Reviews</h2>
+            @if (Repositories.Count > 0)
+            {
+                <p><a class="action" href="/projects/@ProjectId/plan" data-testid="plan-reviews-link">Plan reviews from a repository</a></p>
+            }
+            else
+            {
+                <p class="muted" data-testid="plan-reviews-unavailable">Planning reviews needs a registered repository; ask an administrator.</p>
+            }
             @if (Reviews.Count == 0)
             {
                 <p class="muted" data-testid="reviews-empty">This project has no reviews yet.</p>

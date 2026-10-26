@@ -39,7 +39,10 @@ namespace DemaConsulting.ReviewCenter.Core;
 ///         names, which may have moved), through <see cref="ReviewService"/> so every review has the same rules,
 ///         frozen content and audit entry as one created by hand. Every review is stored in its own transaction:
 ///         all-or-nothing per review, not per batch, so one failing row neither blocks nor undoes the others.
-///         Unexpected faults (not domain rule violations) are not turned into a row result; they propagate.
+///         An unexpected fault (not a domain rule violation, for example a database error) also becomes a failed row
+///         with a generic message, so the results of the reviews already created are never lost; cancellation
+///         still propagates. A git access failure of one row is reported with a fixed sentence, never with the text
+///         git printed.
 ///     </para>
 ///     <para>The planner holds no state and is safe for concurrent use.</para>
 /// </remarks>
@@ -64,6 +67,18 @@ public sealed class ReviewPlanner
     ///     The number of characters of a commit shown in titles and notes.
     /// </summary>
     private const int ShortShaLength = 7;
+
+    /// <summary>
+    ///     The fixed sentence that replaces the text of a git access failure, so that no raw git output (a location, for
+    ///     example) reaches a page.
+    /// </summary>
+    public const string GitAccessFailedMessage = "The repository could not be read.";
+
+    /// <summary>
+    ///     The message of a row that failed for a reason that is not a domain rule: safe to show, with no internal detail.
+    /// </summary>
+    private const string UnexpectedFailureMessage =
+        "This review could not be created because of an unexpected error; nothing was created for it. Try again, and tell an administrator if it keeps happening.";
 
     /// <summary>
     ///     The store that lists the reviews of a project.
@@ -611,7 +626,10 @@ public sealed class ReviewPlanner
     /// <param name="request">The request.</param>
     /// <param name="actor">The acting user.</param>
     /// <param name="cancellationToken">Cancels the operation.</param>
-    /// <returns>The result; a rule violation of this request is a <see cref="PlanCreateOutcome.Failed"/> result, not an exception.</returns>
+    /// <returns>
+    ///     The result; a rule violation of this request is a <see cref="PlanCreateOutcome.Failed"/> result, not an exception,
+    ///     and the text of a git access failure is replaced by <see cref="GitAccessFailedMessage"/>.
+    /// </returns>
     private async Task<PlanCreateResult> CreateOneAsync(
         IGitRepository session,
         RepositoryAccess access,
@@ -679,9 +697,28 @@ public sealed class ReviewPlanner
         }
         catch (DomainRuleException ex)
         {
-            return new PlanCreateResult(request.SetId, PlanCreateOutcome.Failed, null, ex.Message);
+            return new PlanCreateResult(request.SetId, PlanCreateOutcome.Failed, null, SafeMessage(ex));
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            // An unexpected fault (a database error, for example) must not abort the batch and lose the results of the
+            // reviews already created; the row fails with a generic message because the exception text may carry
+            // internal details. Each review is stored in one transaction, so nothing is left behind for this row
+            return new PlanCreateResult(request.SetId, PlanCreateOutcome.Failed, null, UnexpectedFailureMessage);
         }
     }
+
+    /// <summary>
+    ///     Gets the text of a rule violation that is safe to show next to a review-set.
+    /// </summary>
+    /// <param name="exception">The rule violation.</param>
+    /// <returns>The fixed <see cref="GitAccessFailedMessage"/> for a git access failure; the message of the exception otherwise.</returns>
+    /// <remarks>
+    ///     Only a git access failure can carry text printed by git (a location, for example), so only it is replaced; the
+    ///     messages of the other rules are fixed sentences written for users.
+    /// </remarks>
+    private static string SafeMessage(DomainRuleException exception) =>
+        exception.Rule == DomainRule.GitAccessFailed ? GitAccessFailedMessage : exception.Message;
 
     /// <summary>
     ///     The working data of one review-set while the plan is made.

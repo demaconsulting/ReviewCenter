@@ -142,6 +142,16 @@ internal sealed class ReviewMarkConfigParser : IReviewSetParser
             throw Invalid($"The title of review-set {position} is longer than {ReviewLimits.MaxReviewSetTitleLength} characters.");
         }
 
+        if (id.Any(char.IsControl))
+        {
+            throw Invalid($"The id of review-set {position} contains control characters.");
+        }
+
+        if (title.Any(char.IsControl))
+        {
+            throw Invalid($"The title of review-set {position} contains control characters.");
+        }
+
         // The paths join into one selection text with line breaks, so a path must not hold control characters
         var paths = entry!.Paths ?? [];
         if (paths.Count > SelectionMatcher.MaxPatterns)
