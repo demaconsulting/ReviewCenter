@@ -5,10 +5,11 @@
 ### Overview
 
 The `Web` subsystem is the Blazor Server user interface of ReviewCenter. It owns what a browser
-shows and how it responds to user actions. It contains twelve units: `App`, the HTML shell, the URL router, the
+shows and how it responds to user actions. It contains thirteen units: `App`, the HTML shell, the URL router, the
 page frame with the sign-in header, and the `SessionGate` that replaces an open page when its user is no longer
 signed in; `HomePage`, the interactive landing page served at the root URL; `ProjectsPage`,
-`ProjectPage`, `ReviewPage`, and `ChecklistPage`, the pages for projects, reviews, and review checklists;
+`ProjectPage`, `PlanPage`, `ReviewPage`, and `ChecklistPage`, the pages for projects, the planning of reviews from
+the review-sets of a repository, reviews, and review checklists;
 `LoginPage`, `AccountPage`, and `UsersPage`, the pages for signing in, changing one's own password, and managing
 users; `HistoryPage` and `AuditPage`, the pages that show the history of a review and let an administrator
 verify the audit trail; and `RepositoriesPage`, the page where an administrator registers the git repositories that
@@ -39,14 +40,17 @@ all domain behavior and never access the database.
   `Identity` subsystem, and a generic failure message when the query value `error` is present.
 - *Constraints*: Open to anonymous visitors.
 
-**Project routes** (`GET /projects`, `GET /projects/{id}`, `GET /projects/{id}/reviews/{reviewId}`,
+**Project routes** (`GET /projects`, `GET /projects/{id}`, `GET /projects/{id}/plan`,
+`GET /projects/{id}/reviews/{reviewId}`,
 `GET /projects/{id}/reviews/{reviewId}/checklist`): The
-pages for projects, reviews, and review checklists.
+pages for projects, planning, reviews, and review checklists.
 
 - *Type*: HTTP `GET`, followed by a live Blazor connection for interactivity.
 - *Role*: Provider.
 - *Contract*: `/projects` lists the projects and has a form to create one; `/projects/{id}` shows a
-  project with its reviews and a form that creates a review from selected files; the review route shows
+  project with its reviews and a form that creates a review from selected files; `/projects/{id}/plan` plans the
+  reviews that a head revision of a registered repository needs from the review-sets of its `.reviewmark.yaml`
+  and creates the ticked ones; the review route shows
   the review, its fingerprint, its files, the content of a selected file, the progress of its checklist, its
   reviewer slots with their signature status, and an Approved or In review badge, and lets a reviewer sign;
   the checklist route shows the checklist, where each check is answered. A project or review that
@@ -144,12 +148,13 @@ address), and on the ASP.NET Core Blazor components framework.
 
 #### Pages and domain access
 
-`ProjectsPage`, `ProjectPage`, `ReviewPage`, `ChecklistPage`, `AccountPage`, `UsersPage`, `HistoryPage`,
+`ProjectsPage`, `ProjectPage`, `PlanPage`, `ReviewPage`, `ChecklistPage`, `AccountPage`, `UsersPage`, `HistoryPage`,
 `AuditPage`, and `RepositoriesPage` follow the pattern of
 `HomePage`: a Razor
 presentation file and a code-behind file, interactive server rendering, and the `data-interactive`
 marker. They obtain `ProjectService`, `ReviewService`, and the other Core services they need (`ReviewPage`:
-`ThreadService`, `ChecklistService`, and `SigningService`; `ProjectPage`: also `SigningService`; `ChecklistPage`:
+`ThreadService`, `ChecklistService`, and `SigningService`; `ProjectPage`: also `SigningService`; `PlanPage`:
+`ProjectService`, `RepositoryService`, and `ReviewPlanner`; `ChecklistPage`:
 `ChecklistService`; `AccountPage` and `UsersPage`:
 `UserService`; `HistoryPage` and `AuditPage`: `AuditService`, and `AuditPage` also the user store through
 `UserService`; `RepositoriesPage`: `RepositoryService` and `UserService`) from the service container and call them
@@ -190,8 +195,8 @@ so an action that meets an authentication state that has already ended is refuse
 Each protected page opts in to interactive rendering on its own, so each page is a root component of its own live
 connection, while `App`, `Routes`, and `MainLayout` are served as static markup once. Neither the router nor the
 header can react when the authentication state of an open page ends; only a component inside the page can. The
-`SessionGate` component of the `App` unit therefore wraps the content of each of the nine protected pages
-(`ProjectsPage`, `ProjectPage`, `ReviewPage`, `ChecklistPage`, `AccountPage`, `UsersPage`, `HistoryPage`,
+`SessionGate` component of the `App` unit therefore wraps the content of each of the ten protected pages
+(`ProjectsPage`, `ProjectPage`, `PlanPage`, `ReviewPage`, `ChecklistPage`, `AccountPage`, `UsersPage`, `HistoryPage`,
 `AuditPage`, `RepositoriesPage`). While a user is signed in it
 adds no element, so the markup and the `data-interactive` marker of the page do not change. When the state becomes
 anonymous, it removes the page content, and with it every handler, and shows a "Session ended" message with a link to
@@ -227,7 +232,20 @@ Baseline is the frozen baseline, read-only. A deleted file shows its baseline an
 There is no diff highlighting. Everything the page shows comes from the frozen copies in the store, never from the
 repository.
 
-#### Slots and signatures
+#### Planning reviews
+
+`PlanPage` is built for a quick read and for a clear next step. It asks for a repository, a head revision and a
+baseline (None, Explicit revision, or Last reviewed, the default; the text box appears only for Explicit revision),
+asks `ReviewPlanner` for the plan, and shows one plain summary sentence first (for example "3 sets need review, 1
+already filed, 9 have nothing to review."), a line with the repository, head and baseline, and a sentence that says
+what to do next. The sets that need a review come first, ticked by default; the sets with nothing to review are in a
+collapsed list with a count; "Cannot be planned" and "Already filed" (with a link to the review) are groups that are
+shown only when they are not empty. Creating replaces the plan by one result per review, a link for each review that
+was created and the reason for each that failed. The page contains no planning rules: the baseline choice, the
+classification, the identifiers and the creation are in `ReviewPlanner`. A failure is shown in plain English with what
+to do next; the text git printed, a location, a credential and exception text are never shown. `ProjectPage` links to
+the plan page when an enabled repository exists, and `ReviewPage` shows the review-set of a planned review in the
+details.
 
 The review page shows the reviewer slots of a review and lets a reviewer sign. The page contains no signing rules:
 the approval status, the blockers, the record digest, and every refusal come from `SigningService` in Core. The

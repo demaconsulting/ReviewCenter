@@ -48,7 +48,7 @@ elements have `data-testid` values: `signin-link`, `current-user`, `account-link
 The layout only shows links; the access rules are enforced by the pages and the authorization of the `Identity`
 subsystem, so a hidden link is a convenience and not a protection.
 
-**SessionGate component**: A wrapper that each of the nine protected pages (`ProjectsPage`, `ProjectPage`,
+**SessionGate component**: A wrapper that each of the ten protected pages (`ProjectsPage`, `ProjectPage`, `PlanPage`,
 `ReviewPage`, `ChecklistPage`, `AccountPage`, `UsersPage`, `HistoryPage`, `AuditPage`, `RepositoriesPage`) puts around
 its whole content. It
 has one parameter, the
@@ -115,6 +115,6 @@ arguments it is called with, and the Puppet acceptance walk exercises the real s
 
 - **ServerHost** — maps `App` as the root component of the server with the interactive server
   render mode.
-- **ProjectsPage**, **ProjectPage**, **ReviewPage**, **ChecklistPage**, **AccountPage**, **UsersPage**,
+- **ProjectsPage**, **ProjectPage**, **PlanPage**, **ReviewPage**, **ChecklistPage**, **AccountPage**, **UsersPage**,
   **RepositoriesPage** — wrap their
   content in `SessionGate`.

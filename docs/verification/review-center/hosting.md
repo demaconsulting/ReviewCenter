@@ -57,7 +57,8 @@ a restart, and the clear error for a key ring folder that cannot be written are 
 `ServerHost`: `ServerHost_AddServices_Configured_RegistersRepositoryServicesWithDefaultFolders`,
 `ServerHost_Restart_KeyRingPersisted_TokenStaysReadable`,
 `ServerHost_CreateApplication_KeyRingFolderNotWritable_ThrowsClearError`, and
-`ServerHost_ResolveKeysPath_ConfiguredOrDefault_ChoosesTheFolder`.
+`ServerHost_ResolveKeysPath_ConfiguredOrDefault_ChoosesTheFolder`. The registration of the review planner and of the
+parser of the review-set file is verified by `ServerHost_AddServices_Configured_RegistersReviewPlannerAndParser`.
 
 **Audit verify verb**: The `AuditCommand` unit tests run the verb over a real database. An intact trail gives the
 entry count and exit code 0, which is tested by `AuditCommand_Run_IntactTrail_ReportsEntryCountWithExitCodeZero`, and

@@ -181,6 +181,11 @@ public class SelectionMatcherTests
         Assert.True(patterns[1].Exclude);
         Assert.Equal(["docs", "**"], patterns[1].Segments);
         Assert.Equal("README.md", patterns[2].Text);
+
+        // Assert: writing them back gives the normalized text, and parsing that text again changes nothing
+        var normalized = SelectionMatcher.Normalize(patterns);
+        Assert.Equal("src/*.cs\n!docs/\nREADME.md", normalized);
+        Assert.Equal(normalized, SelectionMatcher.Normalize(SelectionMatcher.Parse(normalized)));
     }
 
     /// <summary>
@@ -251,6 +256,7 @@ public class SelectionMatcherTests
         Assert.Throws<ArgumentNullException>(() => SelectionMatcher.Parse(null!));
         Assert.Throws<ArgumentNullException>(() => SelectionMatcher.IsMatch(null!, patterns));
         Assert.Throws<ArgumentNullException>(() => SelectionMatcher.IsMatch("a", null!));
+        Assert.Throws<ArgumentNullException>(() => SelectionMatcher.Normalize(null!));
     }
 
     /// <summary>

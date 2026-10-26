@@ -123,6 +123,38 @@ public class ReviewPageRepositoryTests : PageTestBase
         Assert.Equal(BaseSha, cut.Find("[data-testid='review-baseline-sha']").TextContent);
         Assert.Equal(HeadSha, cut.Find("[data-testid='review-head-sha']").TextContent);
         Assert.Equal("src/**\ndocs/**", cut.Find("[data-testid='review-selection']").TextContent);
+
+        // Assert: a review that was not planned from a review-set has no Review set row
+        Assert.Empty(cut.FindAll("[data-testid='review-set-id']"));
+    }
+
+    /// <summary>
+    ///     Test that the Details section of a review created by planning shows the review-set it belongs to.
+    /// </summary>
+    [Fact]
+    public async Task ReviewPage_Render_PlannedReview_DetailsShowReviewSet()
+    {
+        // Arrange: a review created from the review-set "core" by the planner
+        var projectId = await CreateRepositoryReviewAsync();
+        Git.Script(null, HeadSha, [("src/a.cs", ChangeKind.Added, null, "a\n")]);
+        var repositoryId = (await Repositories.ListEnabledAsync(TestContext.Current.CancellationToken)).Single().Id;
+        var results = await Planner.CreateAsync(
+            projectId,
+            repositoryId,
+            HeadSha,
+            [new PlanCreateRequest("core", "Core", "src/**", null)],
+            TestActors.Ann,
+            TestContext.Current.CancellationToken);
+        var reviewId = results.Single().ReviewId!;
+
+        // Act: render the planned review
+        var cut = Render<ReviewPage>(parameters => parameters
+            .Add(page => page.ProjectId, projectId)
+            .Add(page => page.ReviewId, reviewId));
+
+        // Assert: the set id is shown in the Details, after the repository
+        Assert.Equal("core", cut.Find("[data-testid='review-set-id']").TextContent);
+        Assert.Equal("main-repo", cut.Find("[data-testid='review-repository']").TextContent);
     }
 
     /// <summary>

@@ -9,7 +9,9 @@ its approval status, and to
 create a review, either from files selected in the browser (enforcing the upload limits while the files are read) or
 from the changes in a registered git repository. It requires
 a signed-in user. It is a
-Razor component split into presentation (`ProjectPage.razor`) and behavior (`ProjectPage.razor.cs`).
+Razor component split into presentation (`ProjectPage.razor`) and behavior (`ProjectPage.razor.cs`). Above the list of
+reviews it shows a link to the plan page (`/projects/{id}/plan`) when at least one repository is enabled, and a short
+note that says to ask an administrator when none is.
 
 #### Data Model
 
@@ -45,7 +47,8 @@ Test identifiers: `project-page` (root), `home-link`, `projects-link`, `project-
 `no-repository-hint`, `repository-select`, `head-revision-input`, `baseline-revision-input`, `selection-input`,
 `review-files-input`, `selected-files-list`, `selected-file-{index}`, `selected-file-path-{index}`,
 `selected-file-size-{index}`, `review-error`, `create-review-button`, `review-created`, `skipped-entries-list`,
-`skipped-entry-{index}`, and `open-created-review-link`.
+`skipped-entry-{index}`, `open-created-review-link`, `plan-reviews-link` (the link to the plan page, shown when at
+least one repository is enabled), and `plan-reviews-unavailable` (the note shown when none is).
 
 The form offers one choice, "Upload files" (the default) or "From a repository", and shows only the fields of the
 chosen source, so the page stays short. The repository choice is disabled, with a hint, when no repository is

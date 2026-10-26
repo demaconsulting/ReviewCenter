@@ -215,6 +215,46 @@ internal sealed class FakeGitRepositoryProvider : IGitRepositoryProvider
     public int BlobReads { get; private set; }
 
     /// <summary>
+    ///     Gets the (ancestor, descendant) pairs <see cref="IGitRepository.IsAncestorAsync"/> answers <c>true</c> for;
+    ///     a commit is always its own ancestor.
+    /// </summary>
+    public HashSet<(string Ancestor, string Descendant)> Ancestors { get; } = [];
+
+    /// <summary>
+    ///     Gets the ancestor questions that fail like an unknown commit would, as (ancestor, descendant) pairs.
+    /// </summary>
+    public HashSet<(string Ancestor, string Descendant)> AncestorFailures { get; } = [];
+
+    /// <summary>
+    ///     Gets the number of <see cref="IGitRepository.ListChangesAsync"/> calls made so far.
+    /// </summary>
+    public int ListCalls { get; private set; }
+
+    /// <summary>
+    ///     Gets or sets an action run (once) at the start of the next <see cref="IGitRepository.ListChangesAsync"/>
+    ///     call, to simulate something happening elsewhere while a review is made.
+    /// </summary>
+    public Func<Task>? OnNextListChanges { get; set; }
+
+    /// <summary>
+    ///     Gets or sets a value indicating whether every <see cref="IGitRepository.ListChangesAsync"/> call returns a
+    ///     fresh copy of the scripted change set that is tracked weakly, and records before each call how many of the
+    ///     earlier copies are still alive (see <see cref="AliveAtListCall"/>).
+    /// </summary>
+    public bool TrackChangeSets { get; set; }
+
+    /// <summary>
+    ///     Gets, for every <see cref="IGitRepository.ListChangesAsync"/> call made while <see cref="TrackChangeSets"/>
+    ///     is set, how many change sets returned by earlier calls had not been collected when the call started.
+    /// </summary>
+    public List<int> AliveAtListCall { get; } = [];
+
+    /// <summary>
+    ///     Gets the weak references to the change sets returned while <see cref="TrackChangeSets"/> is set.
+    /// </summary>
+    private List<WeakReference<GitChangeSet>> Returned { get; } = [];
+
+    /// <summary>
     ///     Scripts one commit pair: the revision names, the changes and the blob contents they need.
     /// </summary>
     /// <param name="baselineSha">The baseline commit, or <c>null</c> for none.</param>
@@ -250,6 +290,24 @@ internal sealed class FakeGitRepositoryProvider : IGitRepositoryProvider
         Changes[(baselineSha ?? string.Empty, headSha)] = new GitChangeSet(list, skipped);
     }
 
+    /// <summary>
+    ///     Returns a fresh copy of a scripted change set, after recording how many earlier copies are still alive.
+    /// </summary>
+    /// <param name="set">The scripted change set.</param>
+    /// <returns>The copy, which is tracked weakly from now on.</returns>
+    private GitChangeSet Track(GitChangeSet set)
+    {
+        // Collect first so that only sets that are still referenced count as alive
+#pragma warning disable S1215 // The test measures what is still reachable, which needs a deterministic collection
+        GC.Collect();
+        GC.Collect();
+#pragma warning restore S1215
+        AliveAtListCall.Add(Returned.Count(reference => reference.TryGetTarget(out _)));
+        var copy = new GitChangeSet(set.Changes, set.Skipped);
+        Returned.Add(new WeakReference<GitChangeSet>(copy));
+        return copy;
+    }
+
     /// <inheritdoc />
     public Task<IGitRepository> OpenAsync(RepositoryAccess access, CancellationToken cancellationToken = default)
     {
@@ -278,12 +336,36 @@ internal sealed class FakeGitRepositoryProvider : IGitRepositoryProvider
         }
 
         /// <inheritdoc />
-        public Task<GitChangeSet> ListChangesAsync(
+        public Task<bool> IsAncestorAsync(
+            string ancestorSha,
+            string descendantSha,
+            CancellationToken cancellationToken = default)
+        {
+            if (owner.AncestorFailures.Contains((ancestorSha, descendantSha)))
+            {
+                throw new DomainRuleException(DomainRule.GitAccessFailed, "The commit is unknown.");
+            }
+
+            return Task.FromResult(
+                ancestorSha == descendantSha || owner.Ancestors.Contains((ancestorSha, descendantSha)));
+        }
+
+        /// <inheritdoc />
+        public async Task<GitChangeSet> ListChangesAsync(
             string? baselineSha,
             string headSha,
             CancellationToken cancellationToken = default)
         {
-            return Task.FromResult(owner.Changes[(baselineSha ?? string.Empty, headSha)]);
+            owner.ListCalls++;
+            var hook = owner.OnNextListChanges;
+            owner.OnNextListChanges = null;
+            if (hook is not null)
+            {
+                await hook();
+            }
+
+            var set = owner.Changes[(baselineSha ?? string.Empty, headSha)];
+            return owner.TrackChangeSets ? owner.Track(set) : set;
         }
 
         /// <inheritdoc />

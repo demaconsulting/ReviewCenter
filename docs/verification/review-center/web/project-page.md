@@ -35,6 +35,7 @@ N/A - standard test environment.
   shows the git error, no chosen repository asks for one, and a repository disabled in the meantime is refused; each
   creates nothing and keeps the entered values.
 - Skipped links and submodules are shown to the creator before the review is opened.
+- The page links to the plan page of the project when a repository is enabled, and otherwise says whom to ask.
 
 #### Test Scenarios
 
@@ -77,6 +78,10 @@ page opened is refused on submit and nothing is created. This scenario is tested
 **ProjectPage_CreateForm_SkippedEntries_AreShownBeforeOpeningTheReview**: Skipped entries are listed with a link to
 open the created review, and the page does not navigate until the link is followed. This scenario is tested by
 `ProjectPage_CreateForm_SkippedEntries_AreShownBeforeOpeningTheReview`.
+**ProjectPage_Render_PlanLink_ShownOnlyWithEnabledRepository**: A project without any repository shows the note and no
+link; after a repository is registered, the link goes to `/projects/{id}/plan` and the note is gone. This scenario is
+tested by `ProjectPage_Render_PlanLink_ShownOnlyWithEnabledRepository`.
+
 **ProjectPage_Render_UnknownProject_ShowsNotFound**: The page is rendered for an unknown project; the not-found
 message names the identity and no form is shown. This scenario is tested by
 `ProjectPage_Render_UnknownProject_ShowsNotFound`.

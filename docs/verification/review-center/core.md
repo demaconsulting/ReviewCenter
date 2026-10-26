@@ -4,7 +4,8 @@
 
 The `Core` subsystem is verified by subsystem tests defined in `CoreSubsystemTests.cs`. The tests use the real
 `ProjectService`, `ReviewService`, `ThreadService`, `ChecklistService`, `UserService`, `SigningService`,
-`RepositoryService`, `SelectionMatcher`, `RevisionValidator`, `Fingerprint`, and `RecordDigest` together, with
+`RepositoryService`, `SelectionMatcher`, `RevisionValidator`, `Fingerprint`, `RecordDigest`, and `ReviewPlanner`
+together, with
 a fixed clock (a clock the test can move for the lockout) and fakes for the stores (`FakeReviewStore`,
 `FakeUserStore`, `FakeRepositoryStore`), a trivial password hasher (`FakePasswordHasher`), and a trivial token protector
 (`FakeCredentialProtector`) in place of the database and the real hasher and protector,
@@ -13,7 +14,7 @@ database; the real database is verified in the `Storage` subsystem, the real has
 real token protector and git in the `ContentSources` subsystem.
 The tests show that the units cooperate as the
 design describes: the services create, store, and read back what the fingerprint algorithm and the rules require.
-The rules and the algorithm themselves are verified in detail by the unit tests of the thirteen units.
+The rules and the algorithm themselves are verified in detail by the unit tests of the fourteen units.
 
 ### Test Environment
 
@@ -26,7 +27,7 @@ N/A - standard test environment.
   the known answer for the files, every file keeps its own size and SHA-256 hash, and file bytes are returned
   exactly.
 - The same file contents give the same fingerprint when submitted in another order or under other names.
-- Every domain rule (all forty-seven values of `DomainRule`) is reported as a domain rule exception that names it, and
+- Every domain rule (all forty-nine values of `DomainRule`) is reported as a domain rule exception that names it, and
   nothing is stored. The four rules that only a real git can raise (`RevisionNotFound`, `GitUnavailable`,
   `GitAccessFailed`, and `GitTimeout`) are exercised in the `ContentSources` subsystem tests instead.
 - A thread started on a file, with replies, resolved and reopened, is read back with its comments in posting order.
@@ -47,6 +48,11 @@ N/A - standard test environment.
   changed file is refused with `NothingToReview` and stores nothing; the fingerprint covers the files at the head;
   the record digest differs when the source, the selection, or any change differs; and a later change of the
   repository does not change the stored review (see the unit tests of `ReviewService` and `RecordDigest`).
+- The reviews that a head revision needs are planned from the review-sets in the configuration file of the repository,
+  one for each set, as a full review or as the changes since a given or since the last signed revision of that set;
+  a baseline that cannot be trusted gives a full review with a note, sets already filed or without a change are told
+  apart, and the picked reviews are created each in its own transaction, with the review-set recorded in the review
+  (see the unit tests of `ReviewPlanner`, and the real-git tests of the planner in the `ContentSources` subsystem tests).
 
 ### Test Scenarios
 

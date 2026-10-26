@@ -147,7 +147,9 @@ public class CoreSubsystemTests
         DomainRule.CredentialsUnreadable,
         DomainRule.RevisionInvalid,
         DomainRule.SelectionInvalid,
-        DomainRule.NothingToReview
+        DomainRule.NothingToReview,
+        DomainRule.ReviewSetConfigMissing,
+        DomainRule.ReviewSetConfigInvalid
     ];
 
     /// <summary>
@@ -281,6 +283,34 @@ public class CoreSubsystemTests
                 git.Script(null, "h1", [("docs/a.md", ChangeKind.Added, null, "x")]);
                 await new ReviewService(reviewStore, clock, service, git).CreateFromRepositoryAsync(
                     project.Id, "rev-1", "T", repository.Id, "main", null, "src/**", actor, cancellationToken);
+                return;
+            case DomainRule.ReviewSetConfigMissing:
+            case DomainRule.ReviewSetConfigInvalid:
+                // A plan for a head that has no configuration, or one the parser rejects
+                var planClock = new FixedTimeProvider(_now);
+                var planStore = new FakeReviewStore();
+                var planProject = await new ProjectService(planStore, planClock).CreateAsync("P", null, cancellationToken);
+                var planRepository = await service.CreateAsync("repo", location, null, null, actor, cancellationToken);
+                var planGit = new FakeGitRepositoryProvider();
+                var headSha = new string('1', 40);
+                planGit.Revisions["main"] = headSha;
+                var hasConfig = rule == DomainRule.ReviewSetConfigInvalid;
+                planGit.Script(
+                    null,
+                    headSha,
+                    hasConfig ? [(".reviewmark.yaml", ChangeKind.Added, null, "reviews: [")] : []);
+                var parser = new FakeReviewSetParser
+                {
+                    Failure = new DomainRuleException(DomainRule.ReviewSetConfigInvalid, "The file is not valid YAML.")
+                };
+                var planner = new ReviewPlanner(
+                    planStore,
+                    new ReviewService(planStore, planClock, service, planGit),
+                    service,
+                    planGit,
+                    new SigningService(planStore, users, planClock),
+                    parser);
+                await planner.PlanAsync(planProject.Id, planRepository.Id, "main", BaselineMode.None, null, cancellationToken);
                 return;
             default:
                 SelectionMatcher.Parse(string.Empty);

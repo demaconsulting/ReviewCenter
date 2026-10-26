@@ -1,6 +1,6 @@
 package ReviewCenter {
     part def ProjectPage {
-        doc /* Page that shows one project with its reviews, each with its approval status (Approved or In review), and offers a form to create a review from uploaded files or from a registered git repository (head revision, optional baseline revision, selection). */
+        doc /* Page that shows one project with its reviews, each with its approval status (Approved or In review), and offers a form to create a review from uploaded files or from a registered git repository (head revision, optional baseline revision, selection). It links to the plan page when a repository is enabled. */
 
         comment sourceRef /* Source: src/DemaConsulting.ReviewCenter/Web/ProjectPage.razor and ProjectPage.razor.cs */
         comment testRef /* Test: test/DemaConsulting.ReviewCenter.Tests/Web/ProjectPageTests.cs and ProjectPageRepositoryTests.cs */

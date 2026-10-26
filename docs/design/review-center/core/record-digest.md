@@ -21,7 +21,9 @@ text. Hashing is the only use of the text; it is never stored.
 2. The source of the files (new in version 2): for an uploaded review only the word `upload`; for a review from a
    git repository the identity of the repository, the baseline commit (or none), the head commit, the selection
    text, and every change as its path, its kind (`Added`, `Modified`, or `Deleted`), the SHA-256 of its baseline
-   content (none for an addition), and the SHA-256 of its head content (none for a deletion). A signature therefore
+   content (none for an addition), and the SHA-256 of its head content (none for a deletion). Since version 3 the
+   source line also carries the identifier of the review-set of `.reviewmark.yaml` the review was planned from (none
+   for a review that was not planned from a set; the empty text is a different value from none). A signature therefore
    binds to the commits, the selection, and each changed file, not only to the fingerprint, which covers the head
    content alone and would not change if a deleted file, the baseline, or the selection changed.
 3. Every stored checklist answer: the check id, the outcome (`Pass`, `Fail`, or `NotApplicable`), and the
@@ -47,16 +49,17 @@ text. Hashing is the only use of the text; it is never stored.
   from a repository, through the changes); the file paths that matter enter the digest through the anchors of
   threads and the changes.
 
-**Canonical text, version 2**: the lines below are joined with a line feed (`\n`, no trailing line feed). Version 1
-had the same text without the source lines and with the header `ReviewCenter record v1`; every digest changed with
-the move to version 2, which is intended: the database of the product is recreated in this phase, so no signature
-of version 1 exists.
+**Canonical text, version 3**: the lines below are joined with a line feed (`\n`, no trailing line feed). Version 1
+had the same text without the source lines and with the header `ReviewCenter record v1`; version 2 had the source
+lines without the review-set identifier and the header `ReviewCenter record v2`. Every digest changed with each of
+the two moves, which is intended: the database of the product is recreated in this phase, so no signature of an
+earlier version exists, and a signature that did would simply show as out of date.
 
 ```text
-ReviewCenter record v2
+ReviewCenter record v3
 fingerprint {S}
 source upload                                              for an uploaded review, or
-source git {repositoryId} {S:baseline} {S:head} {S:selection}   for a review from a repository, then
+source git {repositoryId} {S:baseline} {S:head} {S:selection} {S:reviewSetId}   for a review from a repository, then
 changes
 change {S:path} {S:kind} {S:baselineHash} {S:headHash}     one line per change, sorted by path
 answers
@@ -72,7 +75,8 @@ Notation and rules:
 
 - `{S:x}` is a string written length-prefixed as `{length}:{text}`, where the length is the number of UTF-16 code
   units, so no text can imitate a delimiter or the start of another line. An absent string (for example a missing
-  justification, the baseline of a review without one, or the head hash of a deleted file) is written as `-`.
+  justification, the baseline of a review without one, the review-set identifier of a review that was not planned
+  from a set, or the head hash of a deleted file) is written as `-`; the empty text is written as `0:`.
 - `{repositoryId}`, `{start}` and `{end}` are the numbers in the invariant culture; `{start}` and `{end}` are `-`
   when the thread is on the whole file.
 - `{createdTicks}` and `{ticks}` are the UTC ticks of the time, in the invariant culture.
@@ -91,7 +95,7 @@ Notation and rules:
 apply, and no threads, the canonical text is the six lines
 
 ```text
-ReviewCenter record v2
+ReviewCenter record v3
 fingerprint 3:abc
 source upload
 answers
@@ -99,15 +103,16 @@ sections
 threads
 ```
 
-and the digest is `fd4f16444ef233068c76aad7bed87b1bafd550c20a0019f576e5cdaaadb9384c`. For a review from the
+and the digest is `0527d1b7805490ea49b3ace3b00c531b07b44276996e0118c6c654c3f1dd8ef6` (the digest of the same
+record in version 2 was `fd4f16444ef233068c76aad7bed87b1bafd550c20a0019f576e5cdaaadb9384c`). For a review from the
 repository 7 with the fingerprint `abc`, the baseline `aaaa...` and the head `bbbb...` (forty characters each), the
-selection `**/*`, a modified file `a.txt` (baseline hash `bs1`, head hash `hs1`) and a deleted file `b.txt` (baseline
-hash `bs2`), and nothing else, the canonical text is
+selection `**/*`, no review-set, a modified file `a.txt` (baseline hash `bs1`, head hash `hs1`) and a deleted file
+`b.txt` (baseline hash `bs2`), and nothing else, the canonical text is
 
 ```text
-ReviewCenter record v2
+ReviewCenter record v3
 fingerprint 3:abc
-source git 7 40:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa 40:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb 4:**/*
+source git 7 40:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa 40:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb 4:**/* -
 changes
 change 5:a.txt 8:Modified 3:bs1 3:hs1
 change 5:b.txt 7:Deleted 3:bs2 -
@@ -116,13 +121,16 @@ sections
 threads
 ```
 
-and the digest is `7aed146fbc739a9314d432b2b45a843d61da01171ffb767b61671e6a66c2480d`. For a record with the
+and the digest is `12be9587545afc1fa2582d98cbddbfa21b4d0b0d6bdbbb3b7a86d9169f445839`. With the review-set `core` the
+source line ends with `4:core` and the digest is `f3ed40b16882604e849bce995fbb8660c83948e9c3bc0ae51a9b904b2aab2046`,
+and with the empty review-set it ends with `0:` and the digest is
+`e0e0cb426b74f3ca1b05c869cbbefecc3190c2ec4823b99eaa9a0250ed2623e9`. For a record with the
 fingerprint `abc`, one answer (check `REQ-01`, outcome `Fail`, justification `bad`), the sections `DES` (does not
 apply, reason `none`) and `DOC` (applies), and one thread on `a.txt` (lines 1 to 2, `Open`, created at time T) with the
 comment by `Ann` (`ann`) with the text `Please fix` at time T, the upload canonical text is
 
 ```text
-ReviewCenter record v2
+ReviewCenter record v3
 fingerprint 3:abc
 source upload
 answers
@@ -134,7 +142,8 @@ thread 5:a.txt 1 2 4:Open {T ticks}
 comment 3:Ann 3:ann 10:Please fix {T ticks}
 ```
 
-The tests check the digest of the first two vectors, and the exact canonical text of the second and the third.
+The tests check the digests of the first two vectors and of the two review-set variants, and the exact canonical text
+of the second and the third.
 
 #### Key Methods
 

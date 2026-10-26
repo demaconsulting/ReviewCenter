@@ -142,13 +142,15 @@ public class RecordDigestTests
     /// <param name="head">The head commit.</param>
     /// <param name="selection">The selection text.</param>
     /// <param name="changes">The changes; a modified and a deleted file when omitted.</param>
+    /// <param name="reviewSetId">The review-set identifier, or <c>null</c> for none.</param>
     /// <returns>The source.</returns>
     private static ReviewSource GitSource(
         int repositoryId = 7,
         string? baseline = "base1",
         string head = "head1",
         string selection = "**/*",
-        IReadOnlyList<ChangedFile>? changes = null)
+        IReadOnlyList<ChangedFile>? changes = null,
+        string? reviewSetId = null)
     {
         return new ReviewSource(
             repositoryId,
@@ -159,7 +161,8 @@ public class RecordDigestTests
             [
                 new ChangedFile("a.txt", ChangeKind.Modified, "bs1", "hs1"),
                 new ChangedFile("b.txt", ChangeKind.Deleted, "bs2", null)
-            ]);
+            ],
+            reviewSetId);
     }
 
     /// <summary>
@@ -204,7 +207,7 @@ public class RecordDigestTests
         // Assert: version line, fingerprint, answers, sections that do not apply, threads
         var expected = string.Join(
             '\n',
-            "ReviewCenter record v2",
+            "ReviewCenter record v3",
             "fingerprint 3:abc",
             "source upload",
             "answers",
@@ -249,8 +252,41 @@ public class RecordDigestTests
         // Act: compute the digest
         var digest = RecordDigest.Compute(record);
 
-        // Assert: the digest of "ReviewCenter record v2\nfingerprint 3:abc\nsource upload\nanswers\nsections\nthreads"
-        Assert.Equal("fd4f16444ef233068c76aad7bed87b1bafd550c20a0019f576e5cdaaadb9384c", digest);
+        // Assert: the SHA-256 of "ReviewCenter record v3\nfingerprint 3:abc\nsource upload\nanswers\nsections\nthreads",
+        // worked out with an independent tool; only the header differs from the v2 digest fd4f1644...
+        Assert.Equal("0527d1b7805490ea49b3ace3b00c531b07b44276996e0118c6c654c3f1dd8ef6", digest);
+        Assert.NotEqual("fd4f16444ef233068c76aad7bed87b1bafd550c20a0019f576e5cdaaadb9384c", digest);
+    }
+
+    /// <summary>
+    ///     Test that the review-set identifier is part of the canonical text and the digest, and that "no set" and
+    ///     an empty set identifier are different, so a signature binds to the set.
+    /// </summary>
+    [Fact]
+    public void RecordDigest_Compute_ReviewSetId_IsCoveredAndDistinguishesNullFromEmpty()
+    {
+        // Arrange: the same repository record without a set, with a set and with an empty set identifier
+        var sha1 = new string('a', 40);
+        var sha2 = new string('b', 40);
+        ChangedFile[] changes =
+        [
+            new("a.txt", ChangeKind.Modified, "bs1", "hs1"),
+            new("b.txt", ChangeKind.Deleted, "bs2", null)
+        ];
+        ReviewRecord Make(string? setId) =>
+            new("abc", null, [], [], [], new ReviewSource(7, sha1, sha2, "**/*", changes, setId));
+
+        // Act: compute the three digests
+        var none = RecordDigest.Compute(Make(null));
+        var core = RecordDigest.Compute(Make("core"));
+        var empty = RecordDigest.Compute(Make(string.Empty));
+
+        // Assert: known answers worked out with an independent tool, all different, and the line shape
+        Assert.Equal("12be9587545afc1fa2582d98cbddbfa21b4d0b0d6bdbbb3b7a86d9169f445839", none);
+        Assert.Equal("f3ed40b16882604e849bce995fbb8660c83948e9c3bc0ae51a9b904b2aab2046", core);
+        Assert.Equal("e0e0cb426b74f3ca1b05c869cbbefecc3190c2ec4823b99eaa9a0250ed2623e9", empty);
+        Assert.Contains($"source git 7 40:{sha1} 40:{sha2} 4:**/* 4:core\n", RecordDigest.Canonicalize(Make("core")));
+        Assert.Contains($"source git 7 40:{sha1} 40:{sha2} 4:**/* -\n", RecordDigest.Canonicalize(Make(null)));
     }
 
     /// <summary>
@@ -284,9 +320,9 @@ public class RecordDigestTests
         // Assert: the source block comes after the fingerprint, with the changes sorted by path
         var expected = string.Join(
             '\n',
-            "ReviewCenter record v2",
+            "ReviewCenter record v3",
             "fingerprint 3:abc",
-            $"source git 7 40:{sha1} 40:{sha2} 4:**/*",
+            $"source git 7 40:{sha1} 40:{sha2} 4:**/* -",
             "changes",
             "change 5:a.txt 8:Modified 3:bs1 3:hs1",
             "change 5:b.txt 7:Deleted 3:bs2 -",
@@ -294,7 +330,7 @@ public class RecordDigestTests
             "sections",
             "threads");
         Assert.Equal(expected, text);
-        Assert.Equal("7aed146fbc739a9314d432b2b45a843d61da01171ffb767b61671e6a66c2480d", RecordDigest.Compute(record));
+        Assert.Equal("12be9587545afc1fa2582d98cbddbfa21b4d0b0d6bdbbb3b7a86d9169f445839", RecordDigest.Compute(record));
     }
 
     /// <summary>
@@ -308,6 +344,7 @@ public class RecordDigestTests
     [InlineData("baseline-removed")]
     [InlineData("head-sha")]
     [InlineData("selection")]
+    [InlineData("review-set")]
     [InlineData("kind")]
     [InlineData("path")]
     [InlineData("baseline-hash")]
@@ -328,6 +365,7 @@ public class RecordDigestTests
             "baseline-removed" => Record(source: GitSource(baseline: null)),
             "head-sha" => Record(source: GitSource(head: "head2")),
             "selection" => Record(source: GitSource(selection: "src/**")),
+            "review-set" => Record(source: GitSource(reviewSetId: "core")),
             "kind" => Record(source: GitSource(changes:
             [
                 new ChangedFile("a.txt", ChangeKind.Added, "bs1", "hs1"),

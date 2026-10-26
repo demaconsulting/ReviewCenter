@@ -137,6 +137,12 @@ internal sealed class FakeReviewStore : IReviewStore
     /// <inheritdoc />
     public Task AddReviewAsync(Review review, AuditDraft audit, CancellationToken cancellationToken = default)
     {
+        // Like the real store's unique key: a project cannot have two reviews with the same id
+        if (_reviews.Any(r => r.ProjectId == review.ProjectId && r.Id == review.Id))
+        {
+            throw new DomainRuleException(DomainRule.ReviewIdDuplicate, $"A review with the id '{review.Id}' already exists.");
+        }
+
         _reviews.Add(review);
         Audits.Add(audit);
         return Task.CompletedTask;
@@ -366,7 +372,8 @@ internal sealed class FakeReviewStore : IReviewStore
                             f.ChangeKind,
                             f.BaselineSha256,
                             f.ChangeKind == ChangeKind.Deleted ? null : f.Sha256))
-                        .ToList())
+                        .ToList(),
+                    review.ReviewSetId)
                 : ReviewSource.Upload);
         return Task.FromResult<ReviewRecord?>(record);
     }
@@ -568,6 +575,7 @@ internal sealed class FakeReviewStore : IReviewStore
             BaselineSha = review.BaselineSha,
             HeadSha = review.HeadSha,
             Selection = review.Selection,
+            ReviewSetId = review.ReviewSetId,
             Files = review.Files
                 .Select(file => new ReviewFile
                 {

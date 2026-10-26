@@ -35,6 +35,7 @@ flowchart TD
         HomePage
         ProjectsPage
         ProjectPage
+        PlanPage
         ReviewPage
         ChecklistPage
         LoginPage
@@ -58,6 +59,7 @@ flowchart TD
         RepositoryService
         SelectionMatcher
         RevisionValidator
+        ReviewPlanner
     end
     subgraph Storage
         ReviewCenterDbContext
@@ -115,6 +117,7 @@ flowchart TD
     App --> HomePage
     App --> ProjectsPage
     App --> ProjectPage
+    App --> PlanPage
     App --> ReviewPage
     App --> ChecklistPage
     App --> LoginPage
@@ -132,6 +135,12 @@ flowchart TD
     ProjectPage --> ProjectService
     ProjectPage --> ReviewService
     ProjectPage --> SigningService
+    PlanPage --> ProjectService
+    PlanPage --> RepositoryService
+    PlanPage --> ReviewPlanner
+    ReviewPlanner --> ReviewService
+    ReviewPlanner --> RepositoryService
+    ReviewPlanner --> SigningService
     ReviewPage --> ReviewService
     ReviewPage --> ThreadService
     ReviewPage --> ChecklistService
@@ -187,8 +196,9 @@ database. `UserCommand` creates a user from the command line with the same confi
 how the first administrator is created. `AuditCommand` verifies the hash chain of the audit trail with the same
 configuration and registration and reports the result as the exit code.
 The `Web` subsystem is a Blazor Server user interface: `App` is the HTML shell and router,
-`HomePage` is the interactive page served at the root URL, `ProjectsPage`, `ProjectPage`,
-`ReviewPage`, and `ChecklistPage` are the pages for projects, reviews, and review checklists, `LoginPage`,
+`HomePage` is the interactive page served at the root URL, `ProjectsPage`, `ProjectPage`, `PlanPage`,
+`ReviewPage`, and `ChecklistPage` are the pages for projects, the planning of reviews, reviews, and review
+checklists, `LoginPage`,
 `AccountPage`, and `UsersPage` are the pages for signing in, changing one's own password, and managing users, and
 `HistoryPage` and `AuditPage` show the audit trail of a review and of the whole system, and `RepositoriesPage` lets an
 administrator register git repositories. A browser

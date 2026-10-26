@@ -89,6 +89,13 @@ public sealed class Review
     public string? Selection { get; init; }
 
     /// <summary>
+    ///     Gets the identity of the review-set of the repository's <c>.reviewmark.yaml</c> this review was planned
+    ///     from, or <c>null</c> for an upload or a review that was not planned from a review-set; at most
+    ///     <see cref="ReviewLimits.MaxReviewSetIdLength"/> characters.
+    /// </summary>
+    public string? ReviewSetId { get; init; }
+
+    /// <summary>
     ///     Gets a value indicating whether the review was created from a repository.
     /// </summary>
     public bool IsFromRepository => RepositoryId is not null;

@@ -576,6 +576,28 @@ public class ReviewServiceRepositoryTests
     }
 
     /// <summary>
+    ///     Test that a selection longer than the limit is refused before the repository is touched, and that a
+    ///     review made by hand has no review-set.
+    /// </summary>
+    [Fact]
+    public async Task ReviewService_CreateFromRepositoryAsync_SelectionTooLong_ThrowsAndManualReviewHasNoSet()
+    {
+        // Arrange: the fixture and a selection of 2001 characters made of valid patterns
+        var f = await CreateAsync();
+        var tooLong = string.Join('\n', Enumerable.Repeat("src/**", (ReviewLimits.MaxSelectionLength / 7) + 1));
+
+        // Act: create with the long selection, then a valid review
+        var exception = await Assert.ThrowsAsync<DomainRuleException>(() => CreateReviewAsync(f, selection: tooLong));
+        var opened = f.Git.Opened.Count;
+        await CreateReviewAsync(f);
+
+        // Assert: refused without opening git; the valid review has no review-set
+        Assert.Equal(DomainRule.SelectionInvalid, exception.Rule);
+        Assert.Equal(0, opened);
+        Assert.Null(f.Store.Reviews.Single().ReviewSetId);
+    }
+
+    /// <summary>
     ///     Gets the <c>review.created</c> audit entries recorded so far.
     /// </summary>
     /// <param name="f">The fixture.</param>

@@ -273,6 +273,30 @@ internal sealed class GitSource : IGitRepositoryProvider
         }
 
         /// <inheritdoc />
+        public async Task<bool> IsAncestorAsync(
+            string ancestorSha,
+            string descendantSha,
+            CancellationToken cancellationToken = default)
+        {
+            RequireObjectId(ancestorSha);
+            RequireObjectId(descendantSha);
+
+            // Exit code 0 means "is an ancestor", 1 means "is not"; any other code is a real failure (unknown
+            // commit, damaged mirror), so RunAsync is used and the code is inspected here
+            var result = await _runner.RunAsync(
+                ["--git-dir", _folder, "merge-base", "--is-ancestor", ancestorSha, descendantSha],
+                _access,
+                4096,
+                cancellationToken);
+            return result.ExitCode switch
+            {
+                0 => true,
+                1 => false,
+                _ => throw GitRunner.FailureFor(result, _access)
+            };
+        }
+
+        /// <inheritdoc />
         public async Task<GitChangeSet> ListChangesAsync(
             string? baselineSha,
             string headSha,

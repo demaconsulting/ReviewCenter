@@ -595,3 +595,23 @@ sections:
         tests:
           - ReviewService_CreateFromRepositoryAsync_RealGit_FreezesChangesAgainstLaterCommits
           - ProjectPage_CreateForm_EmptySelection_ShowsNothingToReviewAndCreatesNothing
+
+      - id: ReviewCenter-System-PlanReviews
+        title: >-
+          The tool shall plan the reviews that a head revision of a registered git repository needs from the review-sets
+          that the repository defines in its ReviewMark configuration file, as a full review or as the changes since the
+          last signed review of each set, fall back to a full review when that baseline cannot be trusted, skip sets
+          that are already filed or have nothing to review, create the picked reviews with the same rules as a review
+          made by hand, and bind the review-set into the digest that a signature covers.
+        tags: [system]
+        justification: |
+          A repository already states which files are reviewed together. Planning from that statement saves the author
+          from typing every selection by hand, and recording the set keeps each later review of the set linked to the
+          last one, so that changed files do not escape review.
+        children:
+          - ReviewCenter-Core-PlanReviews
+          - ReviewCenter-ContentSources-ReviewSets
+          - ReviewCenter-Hosting-PlannerServices
+          - ReviewCenter-Web-PlanReviews
+        tests:
+          - ReviewPlanner_CreateAsync_RealGit_LastReviewedBaselineThenAlreadyFiled

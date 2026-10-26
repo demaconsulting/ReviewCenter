@@ -16,8 +16,9 @@ threads on that file, which a reader can answer, resolve, and reopen (a resolved
 until expanded), and the form that starts a new thread. Last, in a native `<details>` element that is collapsed by
 default, it shows the review's
 identifier, state, content fingerprint, record digest, and the hash of each file; for a review from a repository it
-also shows the repository name, the baseline and head commits, and the selection. It is a Razor component split into
-presentation
+also shows the repository name, the baseline and head commits, and the selection; for a review that was planned from
+a review-set it also shows the identifier of that set (`review-set-id`, the "Review set" row). It is a Razor component
+split into presentation
 (`ReviewPage.razor`) and behavior (`ReviewPage.razor.cs`). It reads reviews through `ReviewService` and works with
 threads only through `ThreadService`, so every comment rule is applied there. It works with reviewer slots,
 signatures, and the approval status only through `SigningService`, so the page contains no signing rules. It requires
@@ -93,7 +94,8 @@ Test identifiers: `review-page` (root), `home-link`, `projects-link`, `project-l
 reviews from a repository only), `selected-file-kind`, `file-version-toggle` (shown for a modified file),
 `view-head-button`, `view-baseline-button`, `baseline-note`, `baseline-content`, `baseline-line-{n}`,
 `baseline-line-no-{n}`, `baseline-line-text-{n}`, `baseline-comment-note`, `deleted-comment-note`,
-`review-repository`, `review-baseline-sha`, `review-head-sha`, `review-selection` (in the details of a review from
+`review-repository`, `review-set-id` (only for a review planned from a review-set), `review-baseline-sha`,
+`review-head-sha`, `review-selection` (in the details of a review from
 a repository), `threads-empty`, `threads-list`, `thread-{id}`,
 `thread-anchor-{id}`, `thread-state-{id}`, `thread-count-{id}`, `thread-expand-{id}` (resolved threads only),
 `thread-toggle-{id}`, `comment-{id}-{n}`, `comment-author-{id}-{n}`,

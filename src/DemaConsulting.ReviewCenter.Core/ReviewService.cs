@@ -214,67 +214,123 @@ public sealed class ReviewService
         var trimmedTitle = ValidateTitle(title);
         var head = RevisionValidator.Validate(headRevision?.Trim());
         var baseline = string.IsNullOrWhiteSpace(baselineRevision) ? null : RevisionValidator.Validate(baselineRevision.Trim());
-        var patterns = SelectionMatcher.Parse(selection ?? string.Empty);
-        var selectionText = string.Join('\n', patterns.Select(p => (p.Exclude ? "!" : string.Empty) + p.Text));
-        if (selectionText.Length > ReviewLimits.MaxSelectionLength)
-        {
-            throw new DomainRuleException(
-                DomainRule.SelectionInvalid,
-                $"The selection must not be longer than {ReviewLimits.MaxSelectionLength} characters.");
-        }
+        var (patterns, selectionText) = ParseSelection(selection);
 
         await EnsureProjectAndFreeIdAsync(projectId, id!, cancellationToken);
         var access = await _repositories.GetAccessAsync(repositoryId, cancellationToken);
 
-        // Everything that needs the repository happens inside the session; afterwards nothing reads it again
-        string headSha;
-        string? baselineSha;
-        List<ReviewFile> files;
-        List<SkippedEntry> skipped;
-        await using (var session = await _git.OpenAsync(access, cancellationToken))
+        // The session resolves both revisions; everything after that is shared with the planner
+        await using var session = await _git.OpenAsync(access, cancellationToken);
+        var headSha = await session.ResolveRevisionAsync(head, cancellationToken);
+        var baselineSha = baseline is null ? null : await session.ResolveRevisionAsync(baseline, cancellationToken);
+        return await CreateFromSessionAsync(
+            session,
+            access,
+            projectId,
+            id!,
+            trimmedTitle,
+            headSha,
+            baselineSha,
+            patterns,
+            selectionText,
+            null,
+            head,
+            baseline,
+            actor,
+            cancellationToken);
+    }
+
+    /// <summary>
+    ///     Creates a review in the draft state from the changes between two resolved commits, using a session that
+    ///     is already open.
+    /// </summary>
+    /// <remarks>
+    ///     The planner opens one session for a whole batch of reviews and calls this method once per review, so the
+    ///     repository is fetched once. The caller has already validated the id, title and selection (see
+    ///     <see cref="ValidateId"/>, <see cref="ValidateTitle"/> and <see cref="ParseSelection"/>) and has checked
+    ///     the project and the id; this method checks the review-set id, lists and reads the changes and stores the
+    ///     review with its audit entry in one transaction, so the review exists completely or not at all.
+    /// </remarks>
+    /// <param name="session">The open repository session. Must not be null.</param>
+    /// <param name="access">The repository the session reads. Must not be null.</param>
+    /// <param name="projectId">The identity of the owning project.</param>
+    /// <param name="id">The validated review identifier.</param>
+    /// <param name="trimmedTitle">The validated, trimmed title.</param>
+    /// <param name="headSha">The full head commit identifier.</param>
+    /// <param name="baselineSha">The full baseline commit identifier, or <c>null</c> to review every file at the head.</param>
+    /// <param name="patterns">The parsed selection.</param>
+    /// <param name="selectionText">The normalized selection text stored with the review.</param>
+    /// <param name="reviewSetId">The review-set the review is planned from, or <c>null</c>.</param>
+    /// <param name="headLabel">How the head is named in the "nothing to review" message.</param>
+    /// <param name="baselineLabel">How the baseline is named in that message, or <c>null</c> for none.</param>
+    /// <param name="actor">The signed-in user creating the review. Must not be null.</param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <returns>The created review and the entries that were skipped.</returns>
+    /// <exception cref="DomainRuleException">
+    ///     Thrown when a rule is violated (see <see cref="DomainRule"/>); nothing is stored then.
+    /// </exception>
+    internal async Task<RepositoryReviewResult> CreateFromSessionAsync(
+        IGitRepository session,
+        RepositoryAccess access,
+        int projectId,
+        string id,
+        string trimmedTitle,
+        string headSha,
+        string? baselineSha,
+        IReadOnlyList<SelectionPattern> patterns,
+        string selectionText,
+        string? reviewSetId,
+        string headLabel,
+        string? baselineLabel,
+        Actor actor,
+        CancellationToken cancellationToken)
+    {
+        // The set id is stored, bound by signatures and written to the audit trail, so it is bounded here
+        if (reviewSetId is not null && (reviewSetId.Length == 0 || reviewSetId.Length > ReviewLimits.MaxReviewSetIdLength))
         {
-            headSha = await session.ResolveRevisionAsync(head, cancellationToken);
-            baselineSha = baseline is null ? null : await session.ResolveRevisionAsync(baseline, cancellationToken);
+            throw new DomainRuleException(
+                DomainRule.ReviewSetConfigInvalid,
+                $"A review-set id must be 1 to {ReviewLimits.MaxReviewSetIdLength} characters.");
+        }
 
-            // Deleted files are matched by their path like any other
-            var changeSet = await session.ListChangesAsync(baselineSha, headSha, cancellationToken);
-            var selected = changeSet.Changes
-                .Where(change => SelectionMatcher.IsMatch(change.Path, patterns))
-                .OrderBy(change => change.Path, StringComparer.Ordinal)
-                .ToList();
-            skipped = changeSet.Skipped
-                .Where(entry => SelectionMatcher.IsMatch(entry.Path, patterns))
-                .OrderBy(entry => entry.Path, StringComparer.Ordinal)
-                .ToList();
-            if (selected.Count == 0)
-            {
-                throw new DomainRuleException(
-                    DomainRule.NothingToReview,
-                    "Nothing to review: no files matching the selection changed between " +
-                    $"{baseline ?? "the beginning of the history"} and {head}");
-            }
+        // Deleted files are matched by their path like any other
+        var changeSet = await session.ListChangesAsync(baselineSha, headSha, cancellationToken);
+        var selected = changeSet.Changes
+            .Where(change => SelectionMatcher.IsMatch(change.Path, patterns))
+            .OrderBy(change => change.Path, StringComparer.Ordinal)
+            .ToList();
+        var skipped = changeSet.Skipped
+            .Where(entry => SelectionMatcher.IsMatch(entry.Path, patterns))
+            .OrderBy(entry => entry.Path, StringComparer.Ordinal)
+            .ToList();
+        if (selected.Count == 0)
+        {
+            throw new DomainRuleException(
+                DomainRule.NothingToReview,
+                "Nothing to review: no files matching the selection changed between " +
+                $"{baselineLabel ?? "the beginning of the history"} and {headLabel}");
+        }
 
-            if (selected.Count > ReviewLimits.MaxFileCount)
-            {
-                throw new DomainRuleException(
-                    DomainRule.TooManyFiles,
-                    $"A review can have at most {ReviewLimits.MaxFileCount} files; the selection matches {selected.Count}.");
-            }
+        if (selected.Count > ReviewLimits.MaxFileCount)
+        {
+            throw new DomainRuleException(
+                DomainRule.TooManyFiles,
+                $"A review can have at most {ReviewLimits.MaxFileCount} files; the selection matches {selected.Count}.");
+        }
 
-            // The limits are checked from the sizes first, so a huge file is never read
-            await CheckSizesAsync(session, selected, cancellationToken);
-            files = [];
-            foreach (var change in selected)
-            {
-                files.Add(await ReadFileAsync(session, projectId, id!, change, cancellationToken));
-            }
+        // The limits are checked from the sizes first, so a huge file is never read
+        await CheckSizesAsync(session, selected, cancellationToken);
+        var files = new List<ReviewFile>();
+        foreach (var change in selected)
+        {
+            files.Add(await ReadFileAsync(session, projectId, id, change, cancellationToken));
         }
 
         // Only files that exist at the head take part in the fingerprint, as in the ReviewMark checkout
         var review = new Review
         {
             ProjectId = projectId,
-            Id = id!,
+            Id = id,
             Title = trimmedTitle,
             State = ReviewState.Draft,
             Created = _timeProvider.GetUtcNow(),
@@ -284,14 +340,16 @@ public sealed class ReviewService
             BaselineSha = baselineSha,
             HeadSha = headSha,
             Selection = selectionText,
+            ReviewSetId = reviewSetId,
             Files = files,
-            Checklist = NewChecklist(projectId, id!)
+            Checklist = NewChecklist(projectId, id)
         };
 
         // The title is shortened so the SHAs and the fingerprint always fit in the audit detail
         var added = files.Count(f => f.ChangeKind == ChangeKind.Added);
         var modified = files.Count(f => f.ChangeKind == ChangeKind.Modified);
         var deleted = files.Count(f => f.ChangeKind == ChangeKind.Deleted);
+        var setText = reviewSetId is null ? string.Empty : $", set '{AuditText.Clean(reviewSetId, 60)}'";
         await _store.AddReviewAsync(
             review,
             AuditDraft.By(
@@ -299,7 +357,7 @@ public sealed class ReviewService
                 "review.created",
                 $"review '{AuditText.Clean(trimmedTitle, 60)}' from repository '{access.Name}', baseline {baselineSha ?? "none"}, head {headSha}, " +
                 $"{files.Count} file{(files.Count == 1 ? string.Empty : "s")}: {added} added, {modified} modified, {deleted} deleted, " +
-                $"{skipped.Count} skipped, fingerprint {review.ContentFingerprint}",
+                $"{skipped.Count} skipped, fingerprint {review.ContentFingerprint}{setText}",
                 projectId,
                 id),
             cancellationToken);
@@ -485,11 +543,31 @@ public sealed class ReviewService
     }
 
     /// <summary>
+    ///     Parses a file selection and normalizes it for storage.
+    /// </summary>
+    /// <param name="selection">The selection text; <c>null</c> is treated as empty (which is invalid).</param>
+    /// <returns>The parsed patterns and the normalized text a review stores.</returns>
+    /// <exception cref="DomainRuleException">Thrown with <see cref="DomainRule.SelectionInvalid"/> when the selection is not valid or the normalized text is too long.</exception>
+    internal static (IReadOnlyList<SelectionPattern> Patterns, string Text) ParseSelection(string? selection)
+    {
+        var patterns = SelectionMatcher.Parse(selection ?? string.Empty);
+        var text = SelectionMatcher.Normalize(patterns);
+        if (text.Length > ReviewLimits.MaxSelectionLength)
+        {
+            throw new DomainRuleException(
+                DomainRule.SelectionInvalid,
+                $"The selection must not be longer than {ReviewLimits.MaxSelectionLength} characters.");
+        }
+
+        return (patterns, text);
+    }
+
+    /// <summary>
     ///     Checks that a review id is acceptable.
     /// </summary>
     /// <param name="id">The candidate id.</param>
     /// <exception cref="DomainRuleException">Thrown with <see cref="DomainRule.ReviewIdInvalid"/> when the id is not acceptable.</exception>
-    private static void ValidateId(string? id)
+    internal static void ValidateId(string? id)
     {
         // The id appears in page addresses, so only characters that are safe there are accepted
         if (string.IsNullOrEmpty(id) || id.Length > ReviewLimits.MaxReviewIdLength || !IsAllowedId(id))
@@ -525,7 +603,7 @@ public sealed class ReviewService
     /// <param name="title">The candidate title.</param>
     /// <returns>The title without leading and trailing white space.</returns>
     /// <exception cref="DomainRuleException">Thrown with <see cref="DomainRule.ReviewTitleInvalid"/> when the title is empty or too long.</exception>
-    private static string ValidateTitle(string? title)
+    internal static string ValidateTitle(string? title)
     {
         var trimmed = title?.Trim() ?? string.Empty;
         if (trimmed.Length == 0)

@@ -138,3 +138,13 @@ sections:
           not act before the live connection exists.
         tests:
           - ProjectPage_AfterRender_Interactive_SetsMarker
+
+      - id: ReviewCenter-ProjectPage-PlanLink
+        title: >-
+          The ProjectPage unit shall show a link to the plan page of the project when at least one repository is
+          enabled, and a short note that says whom to ask when none is.
+        justification: |
+          Planning starts from the project page. A user must find the way in, and must be told why it is not
+          offered instead of finding no link and guessing.
+        tests:
+          - ProjectPage_Render_PlanLink_ShownOnlyWithEnabledRepository

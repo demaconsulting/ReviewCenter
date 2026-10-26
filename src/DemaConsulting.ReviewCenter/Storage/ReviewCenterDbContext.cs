@@ -184,6 +184,11 @@ internal sealed class ReviewCenterDbContext : DbContext
             review.Property(r => r.BaselineSha).HasMaxLength(CommitShaColumnLength);
             review.Property(r => r.HeadSha).HasMaxLength(CommitShaColumnLength);
             review.Property(r => r.Selection).HasMaxLength(ReviewLimits.MaxSelectionLength);
+
+            // The review-set a review was planned from (null otherwise). The index supports the planner's lookup
+            // of the earlier reviews of a set; it is not unique because a set is reviewed again and again
+            review.Property(r => r.ReviewSetId).HasMaxLength(ReviewLimits.MaxReviewSetIdLength);
+            review.HasIndex(r => new { r.ProjectId, r.RepositoryId, r.ReviewSetId });
             review.HasOne<Project>().WithMany().HasForeignKey(r => r.ProjectId).OnDelete(DeleteBehavior.Cascade);
             review.HasMany(r => r.Files)
                 .WithOne()

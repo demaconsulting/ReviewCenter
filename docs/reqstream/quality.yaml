@@ -173,3 +173,13 @@ sections:
           without being falsely reported as disconnected from tool functionality.
         children:
           - ReviewCenter-OTS-FileSystemGlobbing-Reference
+
+      - id: Quality-ConfigurationReading
+        title: The repository shall rely on YamlDotNet to read the review-sets of the ReviewMark configuration file.
+        tags: [quality]
+        justification: |
+          The ContentSources subsystem reads the review-sets of the configuration file of a repository with a YAML
+          library. This grouping requirement links the YamlDotNet OTS requirement to the quality root so it
+          participates in orphan detection without being falsely reported as disconnected from tool functionality.
+        children:
+          - ReviewCenter-OTS-YamlDotNet-Parse

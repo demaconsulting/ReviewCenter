@@ -297,6 +297,18 @@ The architecture above is the target design. Only the first two slices are imple
   or repository source choice, and the review page shows the change kind of each file and a Head or Baseline view of a
   modified file (no diff highlighting). The 7a-1 note that reviews do not use the repository registry no longer
   applies. Development databases created before this slice must be recreated (no migrations).
+- **Implemented, slice 7b-1 (planning core)**: the Core `ReviewPlanner` plans the reviews that a head revision needs from
+  the `reviews:` list of the repository's `.reviewmark.yaml` (read by the ContentSources `ReviewMarkConfigParser`, with
+  the single new OTS dependency YamlDotNet): a full review, the changes since a given revision, or the changes since the
+  last signed review of the same review-set, with a fallback to a full review when that baseline is not an ancestor
+  (a new `IsAncestorAsync` on the git session) or the selection changed. A review records its review-set id, and the
+  record digest is now version 3 and binds it. The plan page is slice 7b-2.
+- **Implemented, slice 7b-2 (plan page)**: the Web `PlanPage` at `/projects/{id}/plan` (linked from the project page when
+  a repository is enabled) takes a repository, a head revision, and a baseline choice (none, a given revision, or the
+  last signed review), shows one summary sentence, the sets that need a review first (ticked), the sets that cannot be
+  planned and those already filed only when present, and the empty sets collapsed, and creates the ticked reviews with a
+  result for each. The review page shows the review-set of a planned review. The planner now turns an unexpected fault
+  of one review into a failed result with a generic message, so the other reviews of the batch are kept.
 - **Planned and deferred**: Api, Evidence, Messaging, the review lifecycle beyond `Draft`, and the rest of Core and
   Storage. They have no code, requirements,
   design documents, or verification documents yet, so the SysML2 model and the design documentation describe the

@@ -324,6 +324,25 @@ public class ServerHostTests
     }
 
     /// <summary>
+    ///     Test that the host registers the review planner and the parser of the review-set file as singletons.
+    /// </summary>
+    [Fact]
+    public async Task ServerHost_AddServices_Configured_RegistersReviewPlannerAndParser()
+    {
+        // Arrange: start the real pipeline on a throwaway database
+        var logs = new CapturingLoggerProvider();
+        await using var app = await TestWebApp.StartAsync(logs, TestDatabase.NewConnectionString(), ["serve", "--silent"]);
+
+        // Act: resolve the services
+        var planner = app.Services.GetRequiredService<ReviewPlanner>();
+        var parser = app.Services.GetRequiredService<IReviewSetParser>();
+
+        // Assert: both exist and are singletons
+        Assert.Same(planner, app.Services.GetRequiredService<ReviewPlanner>());
+        Assert.Same(parser, app.Services.GetRequiredService<IReviewSetParser>());
+    }
+
+    /// <summary>
     ///     Test that a token encrypted before a restart is readable after it, because the key ring is persisted.
     /// </summary>
     [Fact]

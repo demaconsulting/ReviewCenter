@@ -34,20 +34,23 @@ public sealed record ChangedFile(string Path, ChangeKind Kind, string? BaselineS
 /// </summary>
 /// <remarks>
 ///     An upload has no source data. A repository review carries the repository identity (not its name, which may be
-///     renamed), both commits, the selection text and every changed file with the hashes of both sides, so a
-///     signature binds to exactly what was reviewed. The record is an immutable value holder.
+///     renamed), both commits, the selection text, the review-set it was planned from (if any) and every changed file
+///     with the hashes of both sides, so a signature binds to exactly what was reviewed. The record is an immutable
+///     value holder.
 /// </remarks>
 /// <param name="RepositoryId">The repository identity, or <c>null</c> for an upload.</param>
 /// <param name="BaselineSha">The baseline commit, or <c>null</c> when there was none.</param>
 /// <param name="HeadSha">The head commit, or <c>null</c> for an upload.</param>
 /// <param name="Selection">The selection text, or <c>null</c> for an upload.</param>
 /// <param name="Changes">The changed files; empty for an upload.</param>
+/// <param name="ReviewSetId">The review-set the review was planned from, or <c>null</c> when it was not planned from one.</param>
 public sealed record ReviewSource(
     int? RepositoryId,
     string? BaselineSha,
     string? HeadSha,
     string? Selection,
-    IReadOnlyList<ChangedFile> Changes)
+    IReadOnlyList<ChangedFile> Changes,
+    string? ReviewSetId = null)
 {
     /// <summary>
     ///     Gets the source of a review made from uploaded files.

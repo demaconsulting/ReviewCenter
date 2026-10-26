@@ -79,6 +79,9 @@ public abstract class PageTestBase : BunitContext
         Services.AddSingleton(Repositories);
         Signing = new SigningService(store, Users, clock);
         Services.AddSingleton(Signing);
+        SetParser = new FakeReviewSetParser();
+        Planner = new ReviewPlanner(store, Reviews, Repositories, Git, Signing, SetParser);
+        Services.AddSingleton(Planner);
         Services.AddSingleton<AuthenticationStateProvider>(_authentication);
 
         // bUnit pre-registers placeholder authorization services that throw when used; replace them with the
@@ -108,6 +111,11 @@ public abstract class PageTestBase : BunitContext
     ///     Gets the scripted git provider behind the review service, for arranging repository reviews.
     /// </summary>
     internal FakeGitRepositoryProvider Git { get; }
+
+    /// <summary>
+    ///     Gets the scripted review-set parser behind the planner, for arranging the review-sets of a head.
+    /// </summary>
+    internal FakeReviewSetParser SetParser { get; }
 
     /// <summary>
     ///     Gets the audit service the pages use.
@@ -143,6 +151,11 @@ public abstract class PageTestBase : BunitContext
     ///     Gets the repository service the pages use.
     /// </summary>
     protected RepositoryService Repositories { get; }
+
+    /// <summary>
+    ///     Gets the planner the plan page uses.
+    /// </summary>
+    protected ReviewPlanner Planner { get; }
 
     /// <summary>
     ///     Gets the signing service the pages use.

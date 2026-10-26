@@ -72,6 +72,38 @@ public class ProjectPageTests : PageTestBase
     }
 
     /// <summary>
+    ///     Test that the project page offers planning only when an enabled repository exists, and says so otherwise.
+    /// </summary>
+    [Fact]
+    public async Task ProjectPage_Render_PlanLink_ShownOnlyWithEnabledRepository()
+    {
+        // Arrange: a project, first without any repository
+        var project = await Projects.CreateAsync("Apollo", null, TestContext.Current.CancellationToken);
+
+        // Act: render the page without a repository
+        var without = RenderPage(project.Id);
+
+        // Assert: no link, but a hint that explains why
+        Assert.Empty(without.FindAll("[data-testid='plan-reviews-link']"));
+        Assert.NotEmpty(without.FindAll("[data-testid='plan-reviews-unavailable']"));
+
+        // Arrange: an administrator registers a repository
+        var admin = new Actor("adm", "Adm");
+        await Users.CreateAsync("adm", "Adm", UserRole.Admin, "correct horse battery", TestContext.Current.CancellationToken);
+        await Repositories.CreateAsync(
+            "main-repo", "https://example.com/org/repo.git", null, null, admin, TestContext.Current.CancellationToken);
+
+        // Act: render the page again
+        var with = RenderPage(project.Id);
+
+        // Assert: the link goes to the plan page of the project and the hint is gone
+        var link = with.Find("[data-testid='plan-reviews-link']");
+        Assert.Equal($"/projects/{project.Id}/plan", link.GetAttribute("href"));
+        Assert.Equal("Plan reviews from a repository", link.TextContent);
+        Assert.Empty(with.FindAll("[data-testid='plan-reviews-unavailable']"));
+    }
+
+    /// <summary>
     ///     Test that a project without reviews shows its name and an empty message.
     /// </summary>
     [Fact]

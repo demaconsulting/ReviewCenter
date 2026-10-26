@@ -32,7 +32,8 @@ application; the rest of the system sees only the Core store interfaces.
   transaction. An attempt to store a review whose identifier exists in the project raises a `DomainRuleException`
   for `ReviewIdDuplicate`. Comments, answers, and section decisions are stored with the display name and the user name
   of the person who made them. A review from a repository is stored with its source (repository, both commits,
-  selection) and, for every file, its change kind and frozen baseline content next to the head content; reads of file
+  selection, and the review-set it was planned for, if any) and, for every file, its change kind and frozen baseline
+  content next to the head content; reads of file
   lists carry only metadata, never bytes, and the baseline bytes are read on request. The record of a review
   (fingerprint, source and changes, checklist, section states, answers, and threads
   with comments) is read as one snapshot. A signature is appended, never changed or deleted, in a transaction that

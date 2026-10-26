@@ -688,6 +688,113 @@ a.action {
     font-weight: 400;
 }
 
+/* Plan page: the one summary sentence stands out, rows are blocks (never tables) so they stay one column on a phone,
+   and the whole row text is the label of its checkbox so the tap target is large */
+.plan-summary {
+    margin: 0 0 0.25rem;
+    font-size: 1.15rem;
+    font-weight: 600;
+}
+
+.plan-row label {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    min-height: 2.75rem;
+    cursor: pointer;
+}
+
+.plan-row input[type="checkbox"] {
+    flex: none;
+    width: 1.25rem;
+    height: 1.25rem;
+    margin-top: 0.2rem;
+}
+
+.plan-row-text {
+    display: block;
+    min-width: 0;
+}
+
+.plan-row-text > span {
+    display: block;
+}
+
+.plan-row-title {
+    font-weight: 600;
+}
+
+.item-list .plan-row-note {
+    display: block;
+}
+
+.plan-row-note.error {
+    margin: 0.25rem 0 0;
+}
+
+.plan-bulk {
+    margin: 0 0 0.75rem;
+}
+
+.plan-bulk button {
+    margin-right: 0.5rem;
+    padding: 0.25rem 0.75rem;
+}
+
+button.plan-create {
+    margin-top: 0.75rem;
+}
+
+button:disabled {
+    cursor: not-allowed;
+    opacity: 0.6;
+}
+
+.plan-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem 0.75rem;
+    margin-top: 0.75rem;
+}
+
+.plan-error-wrap {
+    margin-top: 0.75rem;
+}
+
+.plan-error-wrap p {
+    margin: 0 0 0.5rem;
+}
+
+.card details > summary {
+    cursor: pointer;
+    font-weight: 600;
+}
+
+.card details > .item-list {
+    margin-top: 0.75rem;
+}
+
+.badge.failed {
+    border-color: var(--error-border);
+    background: var(--error-background);
+    color: var(--error-text);
+}
+
+/* Keep the result badge off the set id that precedes it */
+.plan-result .badge {
+    margin-left: 0.5rem;
+}
+
+/* On a phone the buttons are full width, so they are easy to hit */
+@media (max-width: 29.99rem) {
+    .plan-actions > *,
+    button.plan-create,
+    form button[type="submit"] {
+        width: 100%;
+        text-align: center;
+    }
+}
+
 .app-header {
     display: flex;
     flex-wrap: wrap;

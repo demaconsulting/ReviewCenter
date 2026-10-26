@@ -82,6 +82,7 @@ public class ReviewStoreRepositoryTests
                 BaselineSha = BaseSha,
                 HeadSha = HeadSha,
                 Selection = "src/**\n!src/skip.txt",
+                ReviewSetId = "core",
                 Files =
                 [
                     File("a.txt", ChangeKind.Modified, TestContent.B, TestContent.A),
@@ -116,7 +117,8 @@ public class ReviewStoreRepositoryTests
         Assert.Equal(BaseSha, review.BaselineSha);
         Assert.Equal(HeadSha, review.HeadSha);
         Assert.Equal("src/**\n!src/skip.txt", review.Selection);
-        Assert.True(listed.IsFromRepository);
+        Assert.Equal("core", review.ReviewSetId);
+        Assert.Equal("core", listed.ReviewSetId);
 
         // Assert: kinds, head and baseline metadata, and no bytes
         Assert.Equal([ChangeKind.Modified, ChangeKind.Added, ChangeKind.Deleted], review.Files.Select(f => f.ChangeKind));
@@ -173,6 +175,7 @@ public class ReviewStoreRepositoryTests
         Assert.Equal(BaseSha, source.BaselineSha);
         Assert.Equal(HeadSha, source.HeadSha);
         Assert.Equal("src/**\n!src/skip.txt", source.Selection);
+        Assert.Equal("core", source.ReviewSetId);
         Assert.Equal(
             [
                 new ChangedFile("a.txt", ChangeKind.Modified, TestContent.HashB, TestContent.HashA),
@@ -225,5 +228,42 @@ public class ReviewStoreRepositoryTests
         Assert.Equal(ChangeKind.Added, review.Files.Single().ChangeKind);
         Assert.Null(review.Files.Single().BaselineSha256);
         Assert.True(record!.Source.IsUpload);
+        Assert.Null(review.ReviewSetId);
+        Assert.Null(record.Source.ReviewSetId);
+    }
+
+    /// <summary>
+    ///     Test that a review-set identifier of the maximum length is stored and read back whole.
+    /// </summary>
+    [Fact]
+    public async Task ReviewStore_AddReviewAsync_LongestReviewSetId_RoundTrips()
+    {
+        // Arrange: a project and a review whose set id has the maximum length
+        using var db = new TestStore();
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var project = await db.Store.AddProjectAsync(new Project { Name = "P", Created = _time }, cancellationToken);
+        var setId = new string('s', ReviewLimits.MaxReviewSetIdLength);
+
+        // Act: store it and read it back
+        await db.Store.AddReviewAsync(
+            new Review
+            {
+                ProjectId = project.Id,
+                Id = "REV-1",
+                Title = "Title",
+                State = ReviewState.Draft,
+                Created = _time,
+                ContentFingerprint = Fingerprint.Compute(Array.Empty<string>()),
+                RepositoryId = 7,
+                RepositoryName = "main-repo",
+                HeadSha = HeadSha,
+                Selection = "**",
+                ReviewSetId = setId
+            },
+            cancellationToken);
+        var review = await db.Store.GetReviewAsync(project.Id, "REV-1", cancellationToken);
+
+        // Assert: nothing was cut off
+        Assert.Equal(setId, review!.ReviewSetId);
     }
 }

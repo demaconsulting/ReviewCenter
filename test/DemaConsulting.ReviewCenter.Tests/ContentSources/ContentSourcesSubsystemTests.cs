@@ -109,6 +109,44 @@ public class ContentSourcesSubsystemTests
     }
 
     /// <summary>
+    ///     Test that the review-sets of a repository are read from the configuration file of a real repository
+    ///     through the real git source and parser, and that the ancestry of its commits is answered.
+    /// </summary>
+    [Fact]
+    public async Task ContentSourcesSubsystem_ReviewSets_AreReadFromTheRepositoryConfiguration()
+    {
+        // Arrange: an origin with a configuration file in its first commit and a change in its second
+        Assert.SkipWhen(!GitTestSupport.Available, GitTestSupport.MissingMessage);
+        using var root = new TempFolder();
+        var origin = Path.Combine(root.Path, "origin");
+        Directory.CreateDirectory(origin);
+        GitTestSupport.Init(origin);
+        GitTestSupport.Write(origin, ".reviewmark.yaml", "reviews:\n  - id: docs\n    title: Documentation\n    paths:\n      - \"docs/**\"\n");
+        GitTestSupport.Write(origin, "docs/a.md", "a\n");
+        var first = GitTestSupport.Commit(origin, "first");
+        GitTestSupport.Write(origin, "docs/a.md", "b\n");
+        var second = GitTestSupport.Commit(origin, "second");
+        var gitOptions = new GitOptions { CachePath = Path.Combine(root.Path, "cache"), TimeoutSeconds = 60 };
+        var source = new GitSource(new GitRunner(gitOptions), gitOptions);
+        var cancellationToken = TestContext.Current.CancellationToken;
+
+        // Act: read the file at the head through git, parse it, and ask about the ancestry
+        await using var session = await source.OpenAsync(new RepositoryAccess(1, "local", origin, null, null), cancellationToken);
+        var listing = await session.ListChangesAsync(null, second, cancellationToken);
+        var file = Assert.Single(listing.Changes, change => change.Path == ".reviewmark.yaml");
+        var sets = new ReviewMarkConfigParser().Parse(await session.ReadBlobAsync(file.HeadBlobSha!, ReviewLimits.MaxReviewSetFileBytes, cancellationToken));
+        var forward = await session.IsAncestorAsync(first, second, cancellationToken);
+        var backward = await session.IsAncestorAsync(second, first, cancellationToken);
+
+        // Assert: the set as written, and the history in one direction only
+        var set = Assert.Single(sets);
+        Assert.Equal("docs", set.Id);
+        Assert.Equal(["docs/**"], set.Paths);
+        Assert.True(forward);
+        Assert.False(backward);
+    }
+
+    /// <summary>
     ///     Test that a repository that is disabled in the registry cannot be opened for reading.
     /// </summary>
     [Fact]

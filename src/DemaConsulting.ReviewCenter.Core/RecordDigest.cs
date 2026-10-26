@@ -32,11 +32,12 @@ namespace DemaConsulting.ReviewCenter.Core;
 ///     is built so that it never depends on storage row identities or on the order rows happen to be read
 ///     in, and so that two different records can never produce the same text:
 ///     <list type="number">
-///         <item>a version header line (<c>ReviewCenter record v2</c>; any change to this format must bump it);</item>
+///         <item>a version header line (<c>ReviewCenter record v3</c>; any change to this format must bump it);</item>
 ///         <item>the content fingerprint;</item>
 ///         <item>the source of the files: <c>source upload</c> for an upload, otherwise
-///               <c>source git</c> with the repository identity, the baseline commit (or <c>-</c>), the head commit
-///               and the selection text, followed by a <c>changes</c> line and one <c>change</c> line per changed
+///               <c>source git</c> with the repository identity, the baseline commit (or <c>-</c>), the head commit,
+///               the selection text and the review-set identifier (or <c>-</c>), followed by a <c>changes</c> line
+///               and one <c>change</c> line per changed
 ///               file, sorted by path: path, kind, baseline hash (or <c>-</c>) and head hash (or <c>-</c>). The
 ///               repository name is not covered (it is a display snapshot, and renaming a repository must not
 ///               invalidate a signature);</item>
@@ -57,7 +58,7 @@ public static class RecordDigest
     /// <summary>
     ///     The first line of the canonical text; names the format version.
     /// </summary>
-    private const string Header = "ReviewCenter record v2";
+    private const string Header = "ReviewCenter record v3";
 
     /// <summary>
     ///     Builds the canonical text of a record.
@@ -126,7 +127,7 @@ public static class RecordDigest
         }
 
         lines.Add(
-            $"source git {Number(source.RepositoryId)} {Text(source.BaselineSha)} {Text(source.HeadSha)} {Text(source.Selection)}");
+            $"source git {Number(source.RepositoryId)} {Text(source.BaselineSha)} {Text(source.HeadSha)} {Text(source.Selection)} {Text(source.ReviewSetId)}");
 
         // One line per changed file, sorted by path, so the order of storage does not matter
         lines.Add("changes");

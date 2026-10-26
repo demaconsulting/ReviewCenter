@@ -44,6 +44,7 @@ OTS items:
 - **VersionMark**: integration and usage design.
 - **WeasyPrint**: integration and usage design.
 - **xUnit**: integration and usage design.
+- **YamlDotNet**: integration and usage design (used to read the review-sets of a ReviewMark configuration file).
 
 The following topics are out of scope:
 
@@ -74,20 +75,21 @@ The ReviewCenter system is divided as follows:
   of the user of an open page; contains the PasswordHasher, SignIn, and RevalidatingAuthenticationStateProvider units
 - **Web** (subsystem): the Blazor Server user interface; contains the App unit (HTML shell, router, page frame, and the
   SessionGate that replaces an open page when its user is no longer signed in),
-  the HomePage unit, the ProjectsPage, ProjectPage, ReviewPage, and ChecklistPage units, the LoginPage,
+  the HomePage unit, the ProjectsPage, ProjectPage, PlanPage, ReviewPage, and ChecklistPage units, the LoginPage,
   AccountPage, and UsersPage units, the HistoryPage and AuditPage units, and the RepositoriesPage unit
 - **Core** (subsystem): the domain model and rules for projects, reviews, review comments, review checklists,
   users, reviewer signatures, the hash-chained audit trail, and the registry of git repositories, free of web and
   database technology; contains the Fingerprint, RecordDigest, AuditChain, AuditService, ProjectService,
   ReviewService, ThreadService, ChecklistService, UserService, SigningService, RepositoryService, SelectionMatcher,
-  and RevisionValidator units
+  RevisionValidator, and ReviewPlanner units
 - **Storage** (subsystem): persistence of projects, reviews, comment threads, checklists, users, reviewer slots,
   signatures, the audit trail, and the registered repositories in a database
   through Entity
   Framework Core; contains the ReviewCenterDbContext, ReviewStore, UserStore, AuditStore, RepositoryStore, and
   DatabaseSetup units
 - **ContentSources** (subsystem): reads content from outside the system, currently from git repositories, and protects
-  the access tokens of private repositories; contains the GitRunner, GitSource, and CredentialProtector units
+  the access tokens of private repositories; contains the GitRunner, GitSource, ReviewSetParser, and CredentialProtector
+  units
 - **SelfTest** (subsystem): self-validation; contains the Validation unit
 - **Utilities** (subsystem): shared helpers; contains the PathHelpers unit
 

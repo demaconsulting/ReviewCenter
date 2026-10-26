@@ -15,8 +15,9 @@ back. It is also the home of the review types: `Review`, `ReviewFile`, `ReviewSt
 `Title`, `State`, `Created`, `ContentFingerprint`, `Files` (a list of `ReviewFile`), and `Checklist` (the frozen
 checklist copy of the review, see `ChecklistService`; set when the review is created and not loaded by reads of
 the review). A review from a repository also has `RepositoryId`, `RepositoryName` (a display copy), `BaselineSha`
-(null when no baseline was given), `HeadSha`, and `Selection` (the normalized selection text); all five are null for
-an uploaded review.
+(null when no baseline was given), `HeadSha`, `Selection` (the normalized selection text), and `ReviewSetId` (the
+review-set of `.reviewmark.yaml` the review was planned from, null when it was not planned from a set; at most 100
+characters); all six are null for an uploaded review.
 
 **ReviewFile**: a data class (init-only properties) of `ProjectId`, `ReviewId`, `Path`, `Content` (the bytes), `Size`,
 and `Sha256`, and for a review from a repository `ChangeKind`, `BaselineContent`, `BaselineSize` and
@@ -78,14 +79,19 @@ selection (a deleted file is matched by its path like any other), and orders the
 throws `NothingToReview` with the message `Nothing to review: no files matching the selection changed between X
 and Y`, where X is the baseline (or `the beginning of the history`) and Y the head. Then it checks the file count
 and, from the sizes the git layer reports and before any blob is read, the per-file limit (for the baseline and the
-head side) and the total limit (both sides together); then it reads the bytes of both sides of every change. The
-session is closed before the review is stored; from then on nothing reads the repository again.
+head side) and the total limit (both sides together); then it reads the bytes of both sides of every change. Nothing
+reads the repository after that. `CreateFromRepositoryAsync` opens its own
+session and then calls the internal `CreateFromSessionAsync`, which does everything from listing the changes to
+storing the review; `ReviewPlanner` calls it directly with one session that it opened for a whole batch, so the
+repository is fetched once for all the reviews of a plan. The session therefore stays open while the review is
+stored.
 
 The review stores for every file its path, kind, baseline bytes (none for an added file) and head bytes (none for a
-deleted file), and on the review the repository identity and name, both commits, and the normalized selection text.
-The fingerprint is calculated with `Fingerprint` over the hashes of the files that exist at the head (`Added` and
-`Modified`), so it equals the ReviewMark fingerprint of the head files of the selection. The record digest (see
-`RecordDigest`) additionally covers the source and every change.
+deleted file), and on the review the repository identity and name, both commits, the normalized selection text, and
+for a review planned from a review-set (only the planner passes one) the `ReviewSetId` (1 to 100 characters, else
+`ReviewSetConfigInvalid`). The fingerprint is calculated with `Fingerprint` over the hashes of the files that exist
+at the head (`Added` and `Modified`), so it equals the ReviewMark fingerprint of the head files of the selection. The
+record digest (see `RecordDigest`) additionally covers the source, the review-set, and every change.
 
 Skipped entries (symbolic links, submodules, and paths that cannot be reviewed) are not part of the review; those
 that match the selection are returned in the result and counted in the audit detail.
@@ -103,8 +109,9 @@ not exist or the file has no baseline (an added file).
 **Audit**: `CreateDraftAsync` takes the `Actor` and passes the draft `review.created` (detail with the title, the
 fingerprint, and the number of files) to the store, which saves it in the same transaction as the review and its files.
 `CreateFromRepositoryAsync` records `review.created` with the detail `review '{title}' from repository '{name}',
-baseline {sha|none}, head {sha}, {n} file(s): {a} added, {m} modified, {d} deleted, {s} skipped, fingerprint {fp}`;
-the title is shortened to 60 characters so the commits and the fingerprint always fit.
+baseline {sha|none}, head {sha}, {n} file(s): {a} added, {m} modified, {d} deleted, {s} skipped, fingerprint {fp}`
+followed, for a review planned from a review-set, by `, set '{id}'`; the title and the set identifier are shortened to
+60 characters so the commits and the fingerprint always fit.
 A refused creation records nothing. See the `AuditService` unit for the action codes.
 
 #### Error Handling
@@ -124,5 +131,6 @@ store or clock at construction, raise `ArgumentNullException`. Store failures pr
 #### Callers
 
 - **ProjectPage** — creates reviews (uploaded or from a repository) and lists the reviews of a project.
+- **ReviewPlanner** — creates the reviews of a plan through `CreateFromSessionAsync`, one session for the batch.
 - **ReviewPage** — reads a review and the head and baseline content of a file.
 - **ServerHost** — registers the service for the pages.

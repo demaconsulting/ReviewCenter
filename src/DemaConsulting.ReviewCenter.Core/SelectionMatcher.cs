@@ -154,6 +154,21 @@ public static class SelectionMatcher
     }
 
     /// <summary>
+    ///     Writes parsed patterns back as the normalized selection text a review stores.
+    /// </summary>
+    /// <remarks>
+    ///     One shared writer keeps the text a review stores and the text the planner compares it with identical.
+    /// </remarks>
+    /// <param name="patterns">The patterns from <see cref="Parse"/>. Must not be null.</param>
+    /// <returns>The patterns in their original order, one per line (<c>\n</c>), exclusions with a leading <c>!</c>.</returns>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="patterns"/> is null.</exception>
+    public static string Normalize(IReadOnlyList<SelectionPattern> patterns)
+    {
+        ArgumentNullException.ThrowIfNull(patterns);
+        return string.Join('\n', patterns.Select(p => (p.Exclude ? "!" : string.Empty) + p.Text));
+    }
+
+    /// <summary>
     ///     Parses one trimmed, non-empty line.
     /// </summary>
     /// <param name="line">The line.</param>

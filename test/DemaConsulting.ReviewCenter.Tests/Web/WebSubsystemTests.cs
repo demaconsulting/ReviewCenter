@@ -275,6 +275,8 @@ public partial class WebSubsystemTests
             .CreateAsync("Apollo", "Moon landing", TestContext.Current.CancellationToken);
         await app.Services.GetRequiredService<ReviewService>().CreateDraftAsync(
             project.Id, "rev-1", "First review", [new("a.txt", TestContent.A)], TestContext.Current.CancellationToken);
+        await app.Services.GetRequiredService<RepositoryService>().CreateAsync(
+            "main-repo", "https://example.com/org/repo.git", null, null, new Actor("root", "root"), TestContext.Current.CancellationToken);
         string[] routes =
         [
             "/",
@@ -283,6 +285,8 @@ public partial class WebSubsystemTests
             "/users",
             "/repositories",
             $"/projects/{project.Id}",
+            $"/projects/{project.Id}/plan",
+            "/projects/9999/plan",
             "/projects/9999",
             $"/projects/{project.Id}/reviews/rev-1",
             $"/projects/{project.Id}/reviews/rev-1/checklist",

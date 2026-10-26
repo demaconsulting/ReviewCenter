@@ -31,6 +31,7 @@ The following OTS items have integration design documentation:
 - VersionMark (_versionmark.md_) — tool-version documentation tool
 - WeasyPrint (_weasyprint.md_) — HTML-to-PDF conversion tool
 - xUnit (_xunit.md_) — unit-testing framework
+- YamlDotNet (_yamldotnet.md_) — YAML library that reads the review-sets of the configuration file of a repository
 
 ## References
 

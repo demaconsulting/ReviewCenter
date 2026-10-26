@@ -1,0 +1,29 @@
+---
+# YamlDotNet OTS Software Requirements
+#
+# Requirements for the YamlDotNet library, which the ContentSources subsystem uses to read the review-sets of the
+# ReviewMark configuration file of a repository.
+
+sections:
+  - title: OTS Software Requirements
+    sections:
+      - title: YamlDotNet Requirements
+        requirements:
+          - id: ReviewCenter-OTS-YamlDotNet-Parse
+            title: >-
+              YamlDotNet shall read YAML text written in block, flow, quoted, and plain styles into typed objects,
+              shall ignore the keys that the objects do not have, shall report an alias as an event that can be
+              refused before any object is built, and shall report invalid YAML as an error that names the line and
+              the column.
+            justification: |
+              The configuration file of a repository is written by other people and has many more keys than the
+              review-sets that ReviewCenter reads. Passing tests that read the configuration file of this
+              repository, other styles of YAML, and files with errors confirm that the library reads what is needed,
+              leaves the rest alone, lets the tool refuse aliases, and gives the position of a mistake so that the
+              user can correct it.
+            tags: [ots]
+            tests:
+              - ReviewMarkConfigParser_Parse_RepositoryOwnConfiguration_ReadsEverySet
+              - ReviewMarkConfigParser_Parse_YamlStyles_AreUnderstood
+              - ReviewMarkConfigParser_Parse_BrokenFile_ThrowsConfigInvalid
+              - ReviewMarkConfigParser_Parse_Alias_ThrowsConfigInvalid
