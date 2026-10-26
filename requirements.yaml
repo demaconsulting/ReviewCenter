@@ -24,6 +24,7 @@ includes:
   - docs/reqstream/review-center/content-sources/git-runner.yaml
   - docs/reqstream/review-center/content-sources/git-source.yaml
   - docs/reqstream/review-center/content-sources/credential-protector.yaml
+  - docs/reqstream/review-center/content-sources/review-set-parser.yaml
   - docs/reqstream/review-center/hosting.yaml
   - docs/reqstream/review-center/hosting/server-host.yaml
   - docs/reqstream/review-center/hosting/user-command.yaml
@@ -55,6 +56,7 @@ includes:
   - docs/reqstream/review-center/core/selection-matcher.yaml
   - docs/reqstream/review-center/core/revision-validator.yaml
   - docs/reqstream/review-center/core/repository-service.yaml
+  - docs/reqstream/review-center/core/review-planner.yaml
   - docs/reqstream/review-center/storage.yaml
   - docs/reqstream/review-center/storage/review-center-db-context.yaml
   - docs/reqstream/review-center/storage/review-store.yaml
@@ -86,3 +88,4 @@ includes:
   - docs/reqstream/ots/sysml2tools.yaml
   - docs/reqstream/ots/git.yaml
   - docs/reqstream/ots/filesystemglobbing.yaml
+  - docs/reqstream/ots/yamldotnet.yaml

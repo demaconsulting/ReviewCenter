@@ -63,6 +63,16 @@ described below.
   entries with a reason ("symbolic links are not reviewed", "submodules are not reviewed", and so on). A change whose
   two blobs are the same (only the mode changed) is dropped.
 
+**IsAncestorAsync** (session): Tells whether one commit is an ancestor of another.
+
+- *Parameters*: `string ancestorSha`, `string descendantSha`, `CancellationToken cancellationToken`.
+- *Returns*: `bool` — `true` when the first commit is the second or lies in its history.
+- *Preconditions*: Both ids are valid object ids, otherwise `ArgumentException`.
+- *Algorithm*: Run `git merge-base --is-ancestor <ancestor> <descendant>` against the mirror, without credentials, and
+  read the exit code: 0 is yes, 1 is no, and any other code (an unknown commit, a damaged mirror) is a failure
+  reported like every other git failure (`GitAccessFailed`, without paths). The planner uses it to find out whether
+  the head of the last signed review can be the baseline of a new review.
+
 **GetBlobSizeAsync** (session): Reads the size of a blob.
 
 - *Parameters*: `string blobSha`, `CancellationToken cancellationToken`.

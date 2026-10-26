@@ -113,6 +113,17 @@ sections:
           - ServerHost_AddServices_Configured_RegistersRepositoryServicesWithDefaultFolders
           - ServerHost_ResolveKeysPath_ConfiguredOrDefault_ChoosesTheFolder
 
+      - id: ReviewCenter-ServerHost-PlannerServices
+        title: >-
+          The ServerHost class shall register the review planner and the parser of the review-set file once for the
+          whole process.
+        justification: |
+          The planner is used by the pages that offer a review for every review-set of a repository, and the
+          composition root is the one place that connects it to the review service, the signing service, the git
+          source, and the parser.
+        tests:
+          - ServerHost_AddServices_Configured_RegistersReviewPlannerAndParser
+
       - id: ReviewCenter-ServerHost-KeyRing
         title: >-
           The ServerHost class shall keep the Data Protection key ring in a folder, so that a token encrypted before a

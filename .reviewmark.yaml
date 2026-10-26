@@ -719,6 +719,26 @@ reviews:
       - "src/DemaConsulting.ReviewCenter.Core/SelectionMatcher.cs"
       - "test/**/Core/SelectionMatcherTests.cs"
 
+  - id: ReviewCenter-Core-ReviewPlanner
+    title: Review of ReviewCenter ReviewPlanner unit implementation
+    context:
+      - docs/design/review-center.md
+      - docs/reqstream/review-center.yaml
+      - docs/design/review-center/core.md
+      - docs/reqstream/review-center/core.yaml
+    paths:
+      - "docs/reqstream/review-center/core/review-planner.yaml"
+      - "docs/design/review-center/core/review-planner.md"
+      - "docs/verification/review-center/core/review-planner.md"
+      - "docs/sysml2/model/review-center/core/review-planner.sysml"
+      - "src/DemaConsulting.ReviewCenter.Core/ReviewPlanner.cs"
+      - "src/DemaConsulting.ReviewCenter.Core/ReviewPlan.cs"
+      - "src/DemaConsulting.ReviewCenter.Core/ReviewSetDefinition.cs"
+      - "src/DemaConsulting.ReviewCenter.Core/IReviewSetParser.cs"
+      - "test/**/Core/ReviewPlannerTests.cs"
+      - "test/**/Core/FakeReviewSetParser.cs"
+      - "test/**/ContentSources/ReviewPlannerGitTests.cs"
+
   - id: ReviewCenter-Core-RevisionValidator
     title: Review of ReviewCenter RevisionValidator unit implementation
     context:
@@ -898,6 +918,21 @@ reviews:
       - "src/**/ContentSources/GitSource.cs"
       - "src/DemaConsulting.ReviewCenter.Core/IGitRepository.cs"
       - "test/**/ContentSources/GitSourceTests.cs"
+
+  - id: ReviewCenter-ContentSources-ReviewSetParser
+    title: Review of ReviewCenter ReviewSetParser unit implementation
+    context:
+      - docs/design/review-center.md
+      - docs/reqstream/review-center.yaml
+      - docs/design/review-center/content-sources.md
+      - docs/reqstream/review-center/content-sources.yaml
+    paths:
+      - "docs/reqstream/review-center/content-sources/review-set-parser.yaml"
+      - "docs/design/review-center/content-sources/review-set-parser.md"
+      - "docs/verification/review-center/content-sources/review-set-parser.md"
+      - "docs/sysml2/model/review-center/content-sources/review-set-parser.sysml"
+      - "src/**/ContentSources/ReviewMarkConfigParser.cs"
+      - "test/**/ContentSources/ReviewMarkConfigParserTests.cs"
 
   - id: ReviewCenter-ContentSources-CredentialProtector
     title: Review of ReviewCenter CredentialProtector unit implementation
@@ -1137,3 +1172,10 @@ reviews:
       - "docs/reqstream/ots/xunit.yaml"
       - "docs/design/ots/xunit.md"
       - "docs/verification/ots/xunit.md"
+
+  - id: OTS-YamlDotNet
+    title: Review of YamlDotNet OTS verification evidence
+    paths:
+      - "docs/reqstream/ots/yamldotnet.yaml"
+      - "docs/design/ots/yamldotnet.md"
+      - "docs/verification/ots/yamldotnet.md"

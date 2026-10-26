@@ -632,7 +632,7 @@ internal sealed class ReviewStore(IDbContextFactory<ReviewCenterDbContext> facto
     {
         var header = await context.Reviews.AsNoTracking()
             .Where(r => r.ProjectId == projectId && r.Id == reviewId)
-            .Select(r => new { r.ContentFingerprint, r.RepositoryId, r.BaselineSha, r.HeadSha, r.Selection })
+            .Select(r => new { r.ContentFingerprint, r.RepositoryId, r.BaselineSha, r.HeadSha, r.Selection, r.ReviewSetId })
             .FirstOrDefaultAsync(cancellationToken);
         if (header is null)
         {
@@ -657,7 +657,8 @@ internal sealed class ReviewStore(IDbContextFactory<ReviewCenterDbContext> facto
                     c.Path,
                     c.ChangeKind,
                     c.BaselineSha256,
-                    c.ChangeKind == ChangeKind.Deleted ? null : c.Sha256)).ToList());
+                    c.ChangeKind == ChangeKind.Deleted ? null : c.Sha256)).ToList(),
+                header.ReviewSetId);
         }
 
         var checklist = await context.ReviewChecklists.AsNoTracking()

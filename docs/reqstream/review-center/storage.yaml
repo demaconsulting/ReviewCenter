@@ -164,7 +164,8 @@ sections:
 
       - id: ReviewCenter-Storage-RepositoryReviews
         title: >-
-          The Storage subsystem shall keep the source of a review from a repository and, for each file, its change kind
+          The Storage subsystem shall keep the source of a review from a repository (including the review-set it was
+          planned for) and, for each file, its change kind
           and its frozen baseline content in the database file, return them without file content in the review, and
           return the baseline content of one file on request.
         justification: |
@@ -176,3 +177,4 @@ sections:
         tests:
           - ReviewStore_GetReviewAsync_RepositoryReview_ReturnsSourceAndKindsWithoutBytes
           - ReviewStore_GetBaselineContentAsync_StoredFiles_ReturnsBaselineBytesOrNull
+          - ReviewStore_AddReviewAsync_LongestReviewSetId_RoundTrips

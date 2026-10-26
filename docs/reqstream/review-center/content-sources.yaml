@@ -3,8 +3,9 @@
 #
 # PURPOSE:
 # - Define requirements for the ReviewCenter ContentSources subsystem
-# - The ContentSources subsystem spans the GitRunner, GitSource, and CredentialProtector units: it reads the content
-#   of registered git repositories through the installed git program and keeps the access tokens encrypted
+# - The ContentSources subsystem spans the GitRunner, GitSource, ReviewSetParser, and CredentialProtector units: it
+#   reads the content of registered git repositories through the installed git program, reads the review-sets of
+#   their configuration files, and keeps the access tokens encrypted
 # - Subsystem requirements describe the externally visible behavior of reading a repository; the subsystem tests
 #   run the real git program against a temporary repository
 
@@ -110,6 +111,24 @@ sections:
           - ReviewCenter-GitSource-CacheFolder
         tests:
           - ContentSourcesSubsystem_RegisteredRepository_IsReadThroughTheRealGitSource
+
+      - id: ReviewCenter-ContentSources-ReviewSets
+        title: >-
+          The ContentSources subsystem shall read the review-sets (identifier, title, and paths) that a repository
+          defines in its ReviewMark configuration file, within fixed limits, shall refuse a file that is not usable
+          with a plain message, and shall tell whether a commit is in the history of another commit.
+        justification: |
+          A repository already says in its configuration file which sets of files are reviewed together, so the
+          planner can offer one review for each set. The file is written by other people, so it is read within limits
+          and its errors are explained, and the history check lets the planner reuse the head of an earlier review as
+          the baseline of a new one only when that is sound.
+        children:
+          - ReviewCenter-ReviewSetParser-Read
+          - ReviewCenter-ReviewSetParser-Limits
+          - ReviewCenter-ReviewSetParser-Errors
+          - ReviewCenter-GitSource-Ancestry
+        tests:
+          - ContentSourcesSubsystem_ReviewSets_AreReadFromTheRepositoryConfiguration
 
       - id: ReviewCenter-ContentSources-DisabledRepository
         title: >-

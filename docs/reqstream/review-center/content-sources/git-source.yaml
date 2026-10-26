@@ -79,6 +79,18 @@ sections:
           - GitSource_ReadBlob_ReadsExactBytesAndEnforcesTheLimit
           - GitSource_BlobAndCommitIds_NotObjectIds_ThrowArgumentException
 
+      - id: ReviewCenter-GitSource-Ancestry
+        title: >-
+          The GitSource class shall tell whether one commit is an ancestor of another (a commit being an ancestor of
+          itself), and shall report a commit that the repository does not have as an error that shows no path.
+        justification: |
+          The planner may use the head of the last signed review as the baseline of a new review only when that commit
+          is in the history of the new head. A rewritten history makes it unrelated, and the planner then has to fall
+          back to a full review instead of listing changes against a commit that is not part of the history.
+        tests:
+          - GitSource_IsAncestor_History_AnswersYesAndNo
+          - GitSource_IsAncestor_UnknownCommit_ThrowsGitAccessFailedWithoutPaths
+
       - id: ReviewCenter-GitSource-CacheFolder
         title: >-
           The GitSource class shall report a cache folder that cannot be written, or whose path is malformed or too

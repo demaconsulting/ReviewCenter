@@ -26,6 +26,8 @@ N/A - standard test environment (the tests need git, and skip themselves when it
   a baseline every file of the commit is listed as added.
 - A blob is read as the exact bytes that were committed; a blob over the limit is an error and not a truncation; an
   identifier that is not an object id is refused before git runs.
+- The ancestor check says yes for a commit in the history of another (and for the commit itself), no for a later or a
+  diverged commit, and fails with a path-free error for a commit that does not exist.
 - Opening again fetches new commits and prunes deleted branches; a changed location makes a fresh mirror.
 - A second session on the same repository waits for the first to be disposed; sessions on different repositories are
   open at the same time.
@@ -53,7 +55,16 @@ added. This scenario is tested by `GitSource_ListChanges_NoBaseline_ListsEveryFi
 over the limit is `GitAccessFailed`, not a truncated result. This scenario is tested by
 `GitSource_ReadBlob_ReadsExactBytesAndEnforcesTheLimit`.
 
-**GitSource_BlobAndCommitIds_NotObjectIds_ThrowArgumentException**: Blob and commit identifiers that are not object ids
+**GitSource_IsAncestor_History_AnswersYesAndNo**: In a repository with a side branch, a commit is an ancestor of a
+later commit and of itself, a later commit is not an ancestor of an earlier one, and a commit on another branch is not
+an ancestor of the main branch. This scenario is tested by `GitSource_IsAncestor_History_AnswersYesAndNo`.
+
+**GitSource_IsAncestor_UnknownCommit_ThrowsGitAccessFailedWithoutPaths**: A well-formed commit id that does not exist in
+the repository gives `GitAccessFailed`, and the message shows neither the location nor the folder of the mirror. This
+scenario is tested by `GitSource_IsAncestor_UnknownCommit_ThrowsGitAccessFailedWithoutPaths`.
+
+**GitSource_BlobAndCommitIds_NotObjectIds_ThrowArgumentException**: Blob and commit identifiers, including those given
+to `IsAncestorAsync`, that are not object ids
 (an option, a revision name, a wrong length, or uppercase) are refused with an `ArgumentException` before git runs. This
 scenario is tested by `GitSource_BlobAndCommitIds_NotObjectIds_ThrowArgumentException`.
 

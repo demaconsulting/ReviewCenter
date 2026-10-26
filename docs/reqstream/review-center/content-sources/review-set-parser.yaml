@@ -1,0 +1,51 @@
+---
+# Software Unit Requirements for the ReviewMarkConfigParser Class (the review-set parser)
+#
+# The ReviewMarkConfigParser class reads the review-sets (identifier, title, and paths) from the bytes of the
+# ReviewMark configuration file of a repository, so that the planner can offer one review per set.
+
+sections:
+  - title: ReviewSetParser Unit Requirements
+    requirements:
+      - id: ReviewCenter-ReviewSetParser-Read
+        title: >-
+          The ReviewSetParser shall read the review-sets of a ReviewMark configuration file as the list of the
+          entries of its reviews key, in file order, each with its identifier, its title, and its ordered paths,
+          trimmed, shall ignore every other key at every level, and shall understand the block, flow, quoted, and
+          folded styles of YAML, a byte order mark, and Windows line endings.
+        justification: |
+          The configuration file belongs to ReviewMark and has many keys that ReviewCenter does not need. Reading only
+          what is needed, and reading it as YAML defines it, lets the same file serve both tools, and the file order
+          is the order the planner shows.
+        tests:
+          - ReviewMarkConfigParser_Parse_RepositoryOwnConfiguration_ReadsEverySet
+          - ReviewMarkConfigParser_Parse_UnknownKeys_AreIgnored
+          - ReviewMarkConfigParser_Parse_YamlStyles_AreUnderstood
+
+      - id: ReviewCenter-ReviewSetParser-Limits
+        title: >-
+          The ReviewSetParser shall refuse a file larger than 256 KiB before reading it as YAML, a file that uses a
+          YAML alias, a file with more than 500 review-sets, an identifier longer than 100 characters, a title longer
+          than 200 characters, a set with more paths than a selection allows, and a path that is empty, too long, or
+          contains a control character, while accepting a file exactly at each limit.
+        justification: |
+          The file is written by other people and is read by the server. Bounding its size, its counts and its
+          lengths, and refusing aliases that can expand a small file into an enormous document, keeps a hostile file
+          from using unbounded time or memory.
+        tests:
+          - ReviewMarkConfigParser_Parse_Limits_AreEnforced
+          - ReviewMarkConfigParser_Parse_FileTooLarge_ThrowsConfigInvalid
+          - ReviewMarkConfigParser_Parse_Alias_ThrowsConfigInvalid
+
+      - id: ReviewCenter-ReviewSetParser-Errors
+        title: >-
+          The ReviewSetParser shall report a file that is empty, has no review-sets, is not valid YAML, or has a
+          review-set without an identifier or a title, or with a repeated identifier, as a domain rule exception
+          with the rule ReviewSetConfigInvalid and a plain message that names the position of the problem and shows
+          nothing of the YAML library, and shall refuse missing content.
+        justification: |
+          The user who sees the message has to correct the file. A position and a plain sentence tell them where to
+          look, and the text and the stack of a library would only confuse them or reveal the inner workings.
+        tests:
+          - ReviewMarkConfigParser_Parse_BrokenFile_ThrowsConfigInvalid
+          - ReviewMarkConfigParser_Parse_Null_Throws

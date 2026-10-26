@@ -44,7 +44,8 @@ does not match returns within the time limit of the test. This scenario is teste
 `SelectionMatcher_IsMatch_ManyDoubleStars_FinishesQuickly`.
 
 **SelectionMatcher_Parse_Lines_AreTrimmedAndNormalized**: Lines are trimmed, blank lines skipped, a leading `./` or `/`
-dropped, and a trailing `/` turned into a folder prefix. This scenario is tested by
+dropped, and a trailing `/` turned into a folder prefix; writing the patterns back with `Normalize` gives one line per
+pattern with `!` before an exclusion, and parsing that text again gives the same text. This scenario is tested by
 `SelectionMatcher_Parse_Lines_AreTrimmedAndNormalized`.
 
 **SelectionMatcher_Parse_InvalidText_ThrowsSelectionInvalid**: Invalid selections are refused with `SelectionInvalid`. This

@@ -26,7 +26,8 @@ sections:
           The SelectionMatcher class shall read a selection as lines that are trimmed and normalized with blank lines
           skipped, and shall refuse a selection that is empty or has too many patterns, a pattern that is too long,
           or a pattern that uses a backslash, a dot or double dot segment, an empty segment, or a control character,
-          while accepting a selection at exactly the limits.
+          while accepting a selection at exactly the limits, and shall write parsed patterns back as the normalized
+          selection text, so that the text a review stores and the text compared with it are produced by one writer.
         justification: |
           A pattern must never be able to reach outside the repository or to hide text, and the size of a selection
           must be bounded. The user is told which rule a selection broke.
@@ -34,6 +35,7 @@ sections:
           - SelectionMatcher_Parse_Lines_AreTrimmedAndNormalized
           - SelectionMatcher_Parse_InvalidText_ThrowsSelectionInvalid
           - SelectionMatcher_Parse_Limits_AreInclusive
+          - SelectionMatcher_NullArguments_ThrowArgumentNull
 
       - id: ReviewCenter-SelectionMatcher-Bounded
         title: >-

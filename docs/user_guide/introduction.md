@@ -322,6 +322,29 @@ file but not on lines. Comments on lines are made in the Head view only. The rev
 exist at the head (Added and Modified), exactly as for an upload. The Details section shows the repository name, the
 baseline and head commits, and the selection.
 
+### Review-Sets in the Repository
+
+A repository can state which files are reviewed together in the `reviews:` list of the `.reviewmark.yaml` file in its
+root (the file that ReviewMark reads). ReviewCenter reads only the `id`, `title`, and `paths` of each entry and
+ignores every other key. A `paths` list uses the same pattern syntax as the selection above, with `!` to exclude.
+
+```yaml
+reviews:
+  - id: Core
+    title: Review of the Core subsystem
+    paths:
+      - "src/Core/**/*.cs"
+      - "!src/Core/Generated/**"
+```
+
+The file is read from the head revision of the repository, so it is the version you are about to review. The limits
+are: the file is at most 256 KiB, at most 500 review-sets, an `id` of at most 100 characters, a `title` of at most 200,
+at most 100 paths in a review-set, and at most 400 characters in a path. The `id` and `title` are required and the ids
+must be different. A file that is not valid YAML, uses YAML aliases, or breaks a limit is refused with a message that
+names the problem, and a review-set without usable paths cannot be planned. A review that is made for a review-set
+keeps its `id`, and the record digest that a signature covers includes it, so the next review of the same set can
+start from the last signed one.
+
 ### Limitations of Sign-in
 
 - There is no password reset, no email, no multi-factor sign-in, and no external identity provider. An administrator
@@ -558,8 +581,9 @@ release: the tables are created only when the database is new. **A database file
 user accounts, reviewer signatures, or the audit trail existed, does not have the tables and columns that are
 needed, and the pages cannot work with it: delete the file (or point `Database:ConnectionString` at a new one) and
 start again, then create the first administrator.** Do this only with development data. The repository registry and
-the reviews from a repository add tables and columns, so a development database created before them must be recreated
-in the same way.
+the reviews from a repository add tables and columns, and the record digest of a review from a repository is calculated
+in a new format (version 3) that includes the review-set, so a development database created before them must be
+recreated in the same way.
 
 ## Repositories and Credentials
 

@@ -43,7 +43,8 @@ be loadable on the test platform.
 - A review from a repository is stored and read back with its repository, commits, selection, and for every file the
   change kind and baseline size and hash, without loading any file bytes; the baseline bytes are read on request and
   are none for a file without a baseline; its record carries the source and one change per file; an uploaded review
-  has the upload source.
+  has the upload source. The review-set identifier is stored with the review, is null for a review made by hand, and
+  an identifier of the longest allowed length is stored and read back.
 - A signature is stored with every value and read back; a digest that is not the digest of the stored record, whether
   made up or stale because the record changed, is refused as a changed record and nothing is stored; the same slot
   and digest a second time is refused as a signing that is not allowed; an unknown slot or review is refused; the
@@ -90,6 +91,10 @@ repository identity, both commits, the selection, and one change per file with i
 
 **ReviewStore_GetRecordAsync_UploadReview_HasUploadSource**: The record of an uploaded review has the upload source
 and no changes. This scenario is tested by `ReviewStore_GetRecordAsync_UploadReview_HasUploadSource`.
+
+**ReviewStore_AddReviewAsync_LongestReviewSetId_RoundTrips**: A review whose review-set identifier has the longest
+allowed length is stored and read back with the identifier unchanged. This scenario is tested by
+`ReviewStore_AddReviewAsync_LongestReviewSetId_RoundTrips`.
 
 **ReviewStore_GetSnapshotAsync_SignedReview_CarriesRecordSlotsAndSignatures**: A review with a thread, a slot, and a
 signature is read as a snapshot; the record, the slot, and the signature come back together, and the digest of the

@@ -146,7 +146,8 @@ connections. `AuditService` is created with a hook that writes a warning to the 
 (the failure is never shown to the user), and `UserService` receives it so that failed sign-ins and lockouts are
 recorded. `RepositoryStore` (as the Core repository store interface), `CredentialProtector` (as the Core token
 protector), `RepositoryService`, `GitRunner`, and `GitSource` (as the Core git provider interface) are registered as
-singletons in the same way, together with the `Git` and `DataProtection` settings. The
+singletons in the same way, together with the `Git` and `DataProtection` settings. `ReviewMarkConfigParser` (as the Core
+review-set parser interface) and `ReviewPlanner` are registered as singletons too. The
 services hold no per-user state, and every
 database operation opens its own short-lived context from the factory. The registration is the public method
 `AddServices`, so that `UserCommand` and `AuditCommand` build exactly the same services.

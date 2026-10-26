@@ -11,26 +11,28 @@ that protect them, the content fingerprint that identifies a review's files and 
 hash-chained audit trail of everything that happens. It
 is
 deliberately free of web and database technology so that the rules can be reviewed and tested on their own. It
-contains thirteen units: `Fingerprint`, the content fingerprint algorithm; `RecordDigest`, the digest of a review
+contains fourteen units: `Fingerprint`, the content fingerprint algorithm; `RecordDigest`, the digest of a review
 record that a signature binds to; `AuditChain`, the audit entry types, their hash, and the verifier of the chain;
 `AuditService`, the recording, reading, and verification of the audit trail; `ProjectService`, the rules
 for projects; `ReviewService`, the rules for reviews; `ThreadService`, the rules for review comments;
 `ChecklistService`, the rules for the review checklist; `UserService`, the rules for users; `SigningService`, the
 rules for reviewer slots and signatures; `RepositoryService`, the registry of git repositories that reviews can be
 created from, with their credentials; `SelectionMatcher`, the file pattern language that selects the files of a
-repository; and `RevisionValidator`, the check that a revision name cannot be taken for an option or an expression. The
+repository; `RevisionValidator`, the check that a revision name cannot be taken for an option or an expression; and
+`ReviewPlanner`, the planning of the reviews that a head revision needs from the review-sets of the repository. The
 domain types (`Project`, `Review`, `ReviewFile`, `ReviewState`, `UploadedFile`, `ReviewThread`, `ReviewComment`,
 `ReviewThreadState`, the checklist types, `User`, `UserRole`, `Actor`, the signing types `ReviewerSlot`,
 `ReviewSignature`, `SlotRole`, `ReviewRecord`, and `ReviewApproval`, the audit types `AuditEntry`, `AuditDraft`,
 and `AuditVerificationResult`, and the repository types `SourceRepository`, `RepositorySummary`, `NewRepository`,
 `RepositoryUpdate`, `TokenChange`, and `TokenAction`, and the git contract types `RepositoryAccess`, `GitChange`,
 `ChangeKind`, `SkippedEntry`, and `GitChangeSet`, and the review-source types `ReviewSource`, `ChangedFile`, and
-`RepositoryReviewResult`), the text and line definition
+`RepositoryReviewResult`, and the planning types `BaselineMode`, `PlanRowStatus`, `PlanRow`, `ReviewPlan`,
+`PlanCreateRequest`, `PlanCreateOutcome`, `PlanCreateResult`, and `ReviewSetDefinition`), the text and line definition
 (`FileText`), the limits
 (`ReviewLimits`), the rule failure type
 (`DomainRuleException` with the `DomainRule` enumeration), and the interfaces (`IReviewStore`, `IUserStore`,
-`IAuditStore`, `IRepositoryStore`, `ICredentialProtector`, `IGitRepositoryProvider`, `IGitRepository`, and
-`IPasswordHasher`) are
+`IAuditStore`, `IRepositoryStore`, `ICredentialProtector`, `IGitRepositoryProvider`, `IGitRepository`,
+`IReviewSetParser`, and `IPasswordHasher`) are
 supporting types, documented with the unit that owns them.
 
 ### Interfaces
@@ -141,7 +143,8 @@ by the `Hosting` subsystem to hand a registered repository to the git source.
 - *Role*: Consumer (implemented by `GitSource` in the `ContentSources` subsystem).
 - *Contract*: Open a registered repository from a `RepositoryAccess` to get a session; the session resolves a revision
   name to a commit id, lists the files that changed between two commits (or all files when there is no baseline),
-  reads the size of a blob, and reads a blob with a byte limit. Disposing the session releases the repository.
+  reads the size of a blob, reads a blob with a byte limit, and tells whether one commit is an ancestor of another.
+  Disposing the session releases the repository.
 - *Constraints*: A session never exposes the token, and only commit and blob ids that are valid hexadecimal object
   names are accepted.
 
@@ -153,6 +156,28 @@ review creation from a repository uses.
 - *Contract*: Parse the text of a file selection into patterns and decide whether a path is selected; check a revision
   name.
 - *Constraints*: Invalid input fails with a `DomainRuleException` for `SelectionInvalid` or `RevisionInvalid`.
+
+**ReviewPlanner**: The operations used by the `Web` subsystem to plan and create the reviews that a head revision of
+a registered repository needs.
+
+- *Type*: In-process .NET class.
+- *Role*: Provider.
+- *Contract*: Plan the reviews for a repository, a head revision, and a baseline choice (none, a given revision, or the
+  last signed review of each set): one row for each review-set of the configuration file of the repository, as a full
+  review or a change since a baseline, already filed, with nothing to review, or one that cannot be planned, with a
+  plain note when
+  a fallback was used. Create the picked rows through `ReviewService`, each in its own transaction, and report the
+  outcome of each. Creating takes the `Actor` and records every review in the audit trail like any other review.
+- *Constraints*: A missing or invalid configuration file fails with a `DomainRuleException` for
+  `ReviewSetConfigMissing` or `ReviewSetConfigInvalid`; a problem with one set affects only its row.
+
+**IReviewSetParser**: The configuration reading interface the subsystem requires.
+
+- *Type*: In-process .NET interface.
+- *Role*: Consumer (implemented by `ReviewMarkConfigParser` in the `ContentSources` subsystem).
+- *Contract*: Read the text of a `.reviewmark.yaml` file into review-set definitions (identifier, title, and file
+  patterns).
+- *Constraints*: Text that cannot be read fails with a `DomainRuleException` for `ReviewSetConfigInvalid`.
 
 **ReviewLimits**: The limits of the system as constants (see the `ProjectService` and `UserService` units).
 

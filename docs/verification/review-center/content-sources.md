@@ -27,6 +27,8 @@ git. No network access is needed: repositories are local, and one test starts a 
   the real git source: its revision resolves, the change between two commits is listed, and the exact bytes of a file are
   read.
 - A disabled repository is not available for reading.
+- The review-sets of a repository are read from the configuration file that git returns for a commit, and the history of
+  its commits is answered.
 - The token reaches git only through the environment of the child process, never through an argument, the mirror
   configuration, a message, or a stored value.
 - A failed git call, a missing git, a call that never ends, and output over the limit are reported as clear domain rule
@@ -46,8 +48,16 @@ bytes of the changed file. This scenario is tested by
 offered for selection, and building the access data for it is refused with `RepositoryDisabled`, so it cannot be
 opened. This scenario is tested by `ContentSourcesSubsystem_DisabledRepository_IsNotAvailableForReading`.
 
+**ContentSourcesSubsystem_ReviewSets_AreReadFromTheRepositoryConfiguration**: A local repository holds a
+`.reviewmark.yaml` with one review-set in its first commit and a change in its second. The real git source lists the
+head commit, reads the bytes of the configuration file, and the real parser returns the set with its identifier, title,
+and paths; the ancestor check says yes from the first commit to the second and no the other way. This scenario is tested
+by `ContentSourcesSubsystem_ReviewSets_AreReadFromTheRepositoryConfiguration`.
+
 **Units**: The start of git without a shell and with a curated environment, the redaction of secrets, the limits and the
-failures are verified in the unit tests of `GitRunner`; the mirror, the revisions, the change lists, the blobs, and the
-serialization per repository in the unit tests of `GitSource`; and the encryption and the key ring in the unit tests of
-`CredentialProtector`. The starting of the server with a persisted key ring, so that a token stays readable after a
+failures are verified in the unit tests of `GitRunner`; the mirror, the revisions, the change lists, the blobs, the
+ancestor check, and the serialization per repository in the unit tests of `GitSource`; the reading and the limits of
+the configuration file in the unit tests of `ReviewMarkConfigParser`; and the encryption and the key ring in the unit
+tests of `CredentialProtector`. The starting of the server with a persisted key ring, so that a token stays readable
+after a
 restart, is verified in the `Hosting` subsystem.

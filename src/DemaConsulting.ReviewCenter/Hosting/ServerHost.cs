@@ -225,6 +225,8 @@ internal static class ServerHost
         services.AddSingleton(provider => provider.GetRequiredService<IOptions<GitOptions>>().Value);
         services.AddSingleton<GitRunner>();
         services.AddSingleton<IGitRepositoryProvider, GitSource>();
+        services.AddSingleton<IReviewSetParser, ReviewMarkConfigParser>();
+        services.AddSingleton<ReviewPlanner>();
     }
 
     /// <summary>

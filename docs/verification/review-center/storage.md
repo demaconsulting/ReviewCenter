@@ -46,7 +46,8 @@ The native SQLite library must be loadable on the test platform (it is supplied 
 - A review from a repository, with its source and the change kind and baseline content of each file, is stored and
   read back without file bytes in the review, and its baseline content is read on request; the scenario is verified
   by the unit tests of `ReviewStore` on the real database (`ReviewStore_GetReviewAsync_RepositoryReview_ReturnsSourceAndKindsWithoutBytes`
-  and `ReviewStore_GetBaselineContentAsync_StoredFiles_ReturnsBaselineBytesOrNull`).
+  and `ReviewStore_GetBaselineContentAsync_StoredFiles_ReturnsBaselineBytesOrNull`); the review-set a review was planned
+  for is stored with it (`ReviewStore_AddReviewAsync_LongestReviewSetId_RoundTrips`).
 - Every audited change is stored together with its audit entry; changes made at the same moment through different
   stores give one linear, intact chain, and the audit store offers no update or delete.
 

@@ -34,6 +34,14 @@ A `SelectionPattern` is created only by `Parse`, so every instance is valid.
   segment. A trailing `/` means a directory prefix and appends a `**` segment. Reject a text that yields no pattern
   ("Enter at least one file pattern.") or more than 100.
 
+**Normalize**: Writes patterns back as the selection text that a review stores.
+
+- *Parameters*: `IReadOnlyList<SelectionPattern> patterns`.
+- *Returns*: `string` — the patterns in order, one per line, with `!` before an exclusion.
+- *Preconditions*: `patterns` is not null.
+- *Algorithm*: Join the text of each pattern, with its mark, by `\n`. One shared writer keeps the text that a review
+  stores and the text that the planner compares it with identical, so parsing the result again gives the same text.
+
 **IsMatch**: Decides whether a path is selected.
 
 - *Parameters*: `string path` — a repository path with `/` separators; `IReadOnlyList<SelectionPattern> patterns`.

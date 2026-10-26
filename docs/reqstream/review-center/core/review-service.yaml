@@ -190,3 +190,19 @@ sections:
         tests:
           - ReviewService_CreateFromRepositoryAsync_Changes_AuditDetailDescribesSource
           - ReviewService_CreateFromRepositoryAsync_SameFilesOtherSource_ChangesDigest
+
+      - id: ReviewCenter-ReviewService-ReviewSet
+        title: >-
+          The ReviewService class shall let a review created from a plan record the identifier of the review-set it
+          comes from (1 to 100 characters, refused otherwise), create that review through an already open
+          repository session so that a batch of reviews fetches the repository once, name the set last in the audit
+          entry, and keep the identifier empty for every other review.
+        justification: |
+          A review that was planned from a set must say which set it covers, so that the next plan can find the
+          last signed review of the same set. A shared session keeps a plan of many sets from fetching the
+          repository once per review, and a bounded identifier keeps the stored value and the audit text bounded.
+        tests:
+          - ReviewPlanner_CreateAsync_PlanRows_CreatesReviewsWithSetIdAndOneSession
+          - ReviewPlanner_CreateAsync_InvalidRequests_FailPerRequest
+          - ReviewPlanner_CreateAsync_LongestInputs_AuditDetailFits
+          - ReviewService_CreateFromRepositoryAsync_SelectionTooLong_ThrowsAndManualReviewHasNoSet

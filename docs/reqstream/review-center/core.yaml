@@ -4,9 +4,9 @@
 # PURPOSE:
 # - Define requirements for the ReviewCenter Core subsystem
 # - The Core subsystem spans the Fingerprint, ProjectService, ReviewService, ThreadService, ChecklistService,
-#   UserService, RecordDigest, SigningService, RepositoryService, SelectionMatcher, and RevisionValidator units, with
-#   the domain types they share (project, review, review file, thread, comment, checklist, user, role, actor, reviewer
-#   slot, signature, upload, limits, repository, rule exception, and store interfaces)
+#   UserService, RecordDigest, SigningService, RepositoryService, SelectionMatcher, RevisionValidator, and
+#   ReviewPlanner units, with the domain types they share (project, review, review file, thread, comment, checklist,
+#   user, role, actor, reviewer slot, signature, upload, limits, repository, rule exception, and store interfaces)
 # - Subsystem requirements describe the externally visible behavior of the domain model and its rules
 
 sections:
@@ -256,7 +256,32 @@ sections:
           - ReviewCenter-ReviewService-SkippedEntries
           - ReviewCenter-ReviewService-RepositoryAudit
           - ReviewCenter-RecordDigest-Source
+          - ReviewCenter-ReviewService-ReviewSet
           - ReviewCenter-ThreadService-DeletedFile
         tests:
           - CoreSubsystem_RuleViolation_IsReportedAsDomainRuleAndStoresNothing
           - ReviewService_CreateFromRepositoryAsync_Changes_FreezesFilesAndSource
+
+      - id: ReviewCenter-Core-PlanReviews
+        title: >-
+          The Core subsystem shall plan the reviews that a head revision of a registered repository needs, one for each
+          review-set that the repository defines in its configuration file, choosing for each set a full review, the
+          changes since a given revision, or the changes since the last signed review of that set (falling back to a
+          full
+          review, with a plain note, when that review is not in the history or covered other files), telling which sets
+          are already filed or have nothing to review, and create the picked reviews through the review service, each in
+          its own transaction, reporting the result of each.
+        justification: |
+          A repository already states which sets of files are reviewed together. Planning from that statement, and
+          creating the reviews with the same rules as a review made by hand, saves effort and mistakes, and falling
+          back to a full review whenever a baseline cannot be trusted keeps changed files from escaping review.
+        children:
+          - ReviewCenter-ReviewPlanner-Plan
+          - ReviewCenter-ReviewPlanner-Baseline
+          - ReviewCenter-ReviewPlanner-Classification
+          - ReviewCenter-ReviewPlanner-Create
+          - ReviewCenter-ReviewPlanner-Identity
+        tests:
+          - ReviewPlanner_PlanAsync_NoBaseline_ClassifiesSetsWithOneSession
+          - ReviewPlanner_CreateAsync_PlanRows_CreatesReviewsWithSetIdAndOneSession
+          - ReviewPlanner_CreateAsync_RealGit_LastReviewedBaselineThenAlreadyFiled

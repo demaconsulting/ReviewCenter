@@ -29,6 +29,8 @@ N/A - standard test environment.
   limits, and the skipped entries are honored as designed.
 - Later changes of the repository do not change the stored review.
 - The audit entry of a repository review names the repository, the commits, the counts, and the fingerprint.
+- A review created from a plan carries its review-set identifier and names it last in the audit entry; a manual
+  review has none.
 
 #### Test Scenarios
 
@@ -175,3 +177,15 @@ without repositories throws (`ReviewService_CreateFromRepositoryAsync_WithoutRep
 **ReviewService_CreateFromRepositoryAsync_SameFilesOtherSource_ChangesDigest**: Two reviews with the same head files
 but another selection text, head commit, or repository have different record digests. This scenario is tested by
 `ReviewService_CreateFromRepositoryAsync_SameFilesOtherSource_ChangesDigest`.
+
+**ReviewService_CreateFromRepositoryAsync_SelectionTooLong_ThrowsAndManualReviewHasNoSet**: A selection longer than
+the limit is refused with `SelectionInvalid` before git is opened, and a manual review from a repository has no
+review-set. This scenario is tested by
+`ReviewService_CreateFromRepositoryAsync_SelectionTooLong_ThrowsAndManualReviewHasNoSet`.
+
+**Reviews created from a plan** use `CreateFromSessionAsync` through the planner and are verified in
+`ReviewPlannerTests.cs` (see the `ReviewPlanner` verification): the review carries the set identifier and the audit
+entry ends with `, set '{id}'` (`ReviewPlanner_CreateAsync_PlanRows_CreatesReviewsWithSetIdAndOneSession`), an
+overlong set identifier is refused (`ReviewPlanner_CreateAsync_InvalidRequests_FailPerRequest`), and the longest title,
+repository name, and set identifier still fit in the audit detail
+(`ReviewPlanner_CreateAsync_LongestInputs_AuditDetailFits`).

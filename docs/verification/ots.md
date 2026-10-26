@@ -10,7 +10,7 @@ Each OTS item is verified by a combination of:
 - The OTS tool's own self-validation suite (where the tool supports `--validate`)
 - Pipeline output assertions performed by FileAssert on documents produced by the tool
 - Integration evidence from the project's own tests for libraries and frameworks that have no self-validation mode
-  (ASP.NET Core, bUnit, Entity Framework Core, FileSystemGlobbing, git, Playwright, and xUnit)
+  (ASP.NET Core, bUnit, Entity Framework Core, FileSystemGlobbing, git, Playwright, xUnit, and YamlDotNet)
 
 Internal OTS tool design is out of scope; only integration and usage evidence is documented.
 
@@ -36,3 +36,4 @@ The following OTS items have verification evidence in this section:
 - VersionMark (_versionmark.md_) — tool-version documentation tool
 - WeasyPrint (_weasyprint.md_) — HTML-to-PDF conversion tool
 - xUnit (_xunit.md_) — unit-testing framework
+- YamlDotNet (_yamldotnet.md_) — YAML library that reads the review-sets of the configuration file of a repository

@@ -131,6 +131,18 @@ sections:
           - ServerHost_AddServices_Configured_RegistersRepositoryServicesWithDefaultFolders
           - ServerHost_Restart_KeyRingPersisted_TokenStaysReadable
 
+      - id: ReviewCenter-Hosting-PlannerServices
+        title: >-
+          The Hosting subsystem shall make the review planner and the parser of the review-set file available to the
+          pages.
+        justification: |
+          The pages that plan reviews for the review-sets of a repository can only use the planner when the server
+          connects it to the services and the git source it works with.
+        children:
+          - ReviewCenter-ServerHost-PlannerServices
+        tests:
+          - ServerHost_AddServices_Configured_RegistersReviewPlannerAndParser
+
       - id: ReviewCenter-Hosting-KeyRingFailure
         title: >-
           The Hosting subsystem shall report a key ring folder that cannot be written as an error that names the folder

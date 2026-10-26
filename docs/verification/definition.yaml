@@ -55,6 +55,7 @@ input-files:
   - docs/verification/review-center/core/selection-matcher.md
   - docs/verification/review-center/core/revision-validator.md
   - docs/verification/review-center/core/repository-service.md
+  - docs/verification/review-center/core/review-planner.md
   - docs/verification/review-center/storage.md
   - docs/verification/review-center/storage/review-center-db-context.md
   - docs/verification/review-center/storage/review-store.md
@@ -65,6 +66,7 @@ input-files:
   - docs/verification/review-center/content-sources/git-runner.md
   - docs/verification/review-center/content-sources/git-source.md
   - docs/verification/review-center/content-sources/credential-protector.md
+  - docs/verification/review-center/content-sources/review-set-parser.md
   - docs/verification/review-center-puppet.md
   - docs/verification/review-center-puppet/puppet-program.md
   - docs/verification/review-center-puppet/control-channel.md
@@ -88,6 +90,7 @@ input-files:
   - docs/verification/ots/sysml2tools.md
   - docs/verification/ots/versionmark.md
   - docs/verification/ots/weasyprint.md
+  - docs/verification/ots/yamldotnet.md
   - docs/verification/ots/xunit.md
 template: template.html
 table-of-contents: true

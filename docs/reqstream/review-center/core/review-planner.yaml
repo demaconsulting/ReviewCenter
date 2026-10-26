@@ -1,0 +1,104 @@
+---
+# Software Unit Requirements for the ReviewPlanner Class
+#
+# The ReviewPlanner class works out which reviews a head revision of a repository needs, one for every review-set of
+# the .reviewmark.yaml of that revision, and creates the reviews that the user picks.
+
+sections:
+  - title: ReviewPlanner Unit Requirements
+    requirements:
+      - id: ReviewCenter-ReviewPlanner-Plan
+        title: >-
+          The ReviewPlanner shall read the review-sets from the configuration file at the head commit of a repository,
+          using one session for the whole plan, and shall return one row per review-set in file order with the files
+          added, modified, and deleted within its selection, and shall refuse a plan whose project, repository,
+          revision, or configuration file is not valid, with the rule of the problem, while a problem with one
+          review-set can only be planned as it stands, so a broken one affects only its own row.
+        justification: |
+          A repository says in one file which sets of files are reviewed together. Reading that file at the head, once
+          and from one fetch, shows the user in one place everything that needs a review, and a broken set must not
+          hide the others.
+        tests:
+          - ReviewPlanner_PlanAsync_NoBaseline_ClassifiesSetsWithOneSession
+          - ReviewPlanner_PlanAsync_UnusableSets_CannotPlanRows
+          - ReviewPlanner_PlanAsync_NoConfiguration_ThrowsConfigMissing
+          - ReviewPlanner_PlanAsync_ConfigurationTooLarge_ThrowsConfigInvalidWithoutReading
+          - ReviewPlanner_PlanAsync_ParserRejectsFile_ThrowsConfigInvalid
+          - ReviewPlanner_PlanAsync_BadRequests_ThrowTheirRules
+          - ReviewPlanner_PlanAsync_RealGit_NoBaselineAndExplicitBaseline
+          - ReviewPlanner_PlanAsync_RealGit_NoConfigurationOrUnknownHead_ThrowTheirRules
+          - ReviewPlanner_Constructor_NullArgument_Throws
+
+      - id: ReviewCenter-ReviewPlanner-Baseline
+        title: >-
+          The ReviewPlanner shall choose the baseline of every review-set as no baseline, as one revision given by the
+          user for all sets, or as the head of the last signed review of the same set, the one signed last, and shall
+          fall back to a full review with a plain note when the set has no signed review, when that head is not an
+          ancestor of the new head or cannot be checked, or when the selection of the set changed since that review.
+        justification: |
+          Reviewing only what changed since the last signed review saves effort, but only when that review really is
+          part of the history and covered the same files. In every other case the safe choice is a full review, and
+          the note tells the user why, so that nothing escapes review without anyone seeing it.
+        tests:
+          - ReviewPlanner_PlanAsync_ExplicitBaseline_UsesItForEverySet
+          - ReviewPlanner_PlanAsync_UnknownExplicitBaseline_ThrowsRevisionNotFound
+          - ReviewPlanner_PlanAsync_LastReviewedWithOnlyDraft_FullReview
+          - ReviewPlanner_PlanAsync_LastReviewedSignedAncestor_UsesItsHeadAsBaseline
+          - ReviewPlanner_PlanAsync_LastReviewedTwoSigned_PicksTheOneSignedLast
+          - ReviewPlanner_PlanAsync_LastReviewedNotAncestor_FullReviewWithNote
+          - ReviewPlanner_PlanAsync_AncestorCheckFails_FullReviewWithNote
+          - ReviewPlanner_PlanAsync_SelectionChanged_FullReviewWithNote
+          - ReviewPlanner_PlanAsync_RealGit_NotAncestor_FallsBackToFullReview
+          - ReviewPlanner_PlanAsync_RealGit_SelectionChanged_FallsBackToFullReview
+          - ReviewPlanner_CreateAsync_RealGit_LastReviewedBaselineThenAlreadyFiled
+
+      - id: ReviewCenter-ReviewPlanner-Classification
+        title: >-
+          The ReviewPlanner shall mark a review-set as already filed when a review of the same repository, set,
+          head commit, and baseline exists, as nothing to review when no selected file changed or none matches, and
+          as ready to create otherwise.
+        justification: |
+          Planning the same revision twice must not create the same review twice, and a set without changes needs no
+          review. Telling the user which is which makes the plan something that can be run again safely.
+        tests:
+          - ReviewPlanner_PlanAsync_ReviewExists_AlreadyFiled
+          - ReviewPlanner_PlanAsync_LastReviewedSameHead_NothingToReview
+          - ReviewPlanner_CreateAsync_RealGit_LastReviewedBaselineThenAlreadyFiled
+          - ReviewPlanner_PlanAsync_RealGit_NoBaselineAndExplicitBaseline
+
+      - id: ReviewCenter-ReviewPlanner-Create
+        title: >-
+          The ReviewPlanner shall create each picked review from the commits of the plan through the review service,
+          recording the review-set identifier, in one session for the batch, with every review stored in its own
+          transaction so that a failing request neither stops nor undoes the others, shall report for every request
+          whether it was created, was already filed, or failed with a plain reason, and shall refuse a batch that is
+          not valid as a whole.
+        justification: |
+          The pages create many reviews with one click. Creating them through the review service gives every review
+          the same rules, frozen content, and audit entry as one created by hand, and reporting the result of each
+          request lets the user see what happened without losing the reviews that succeeded.
+        tests:
+          - ReviewPlanner_CreateAsync_PlanRows_CreatesReviewsWithSetIdAndOneSession
+          - ReviewPlanner_CreateAsync_DeltaRow_UsesBaselineAndRangeTitle
+          - ReviewPlanner_CreateAsync_OneRequestFails_OthersAreCreated
+          - ReviewPlanner_CreateAsync_SameRangeTwice_SecondIsAlreadyFiled
+          - ReviewPlanner_CreateAsync_InvalidRequests_FailPerRequest
+          - ReviewPlanner_CreateAsync_BadBatch_Throws
+          - ReviewPlanner_CreateAsync_LongestInputs_AuditDetailFits
+
+      - id: ReviewCenter-ReviewPlanner-Identity
+        title: >-
+          The ReviewPlanner shall give each created review an identifier made from the review-set identifier that is
+          safe for page addresses, within the length limit, and unique in the project (adding a number when it is
+          taken, also when another user takes it at the same moment), and a title that shows the set title and the
+          range of commits, cut so that the range stays visible.
+        justification: |
+          The identifier of a review is part of its address and is chosen by the file of a repository, so it must be
+          made safe. Two reviews of the same set, for example before and after a change, need different identifiers,
+          and the title must still tell the user which range a review covers.
+        tests:
+          - ReviewPlanner_GenerateId_SetId_MakesSafeUniqueId
+          - ReviewPlanner_GenerateId_LongSetId_CutsAndStaysWithinLimit
+          - ReviewPlanner_GenerateTitle_LongSetTitle_CutsTitleKeepsRange
+          - ReviewPlanner_CreateAsync_IdTaken_UsesSuffix
+          - ReviewPlanner_CreateAsync_IdTakenDuringCreate_RetriesWithNextSuffix

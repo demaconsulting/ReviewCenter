@@ -77,6 +77,26 @@ public static class ReviewLimits
     public const int MaxReviewTitleLength = 200;
 
     /// <summary>
+    ///     The longest accepted review-set identifier of a repository's <c>.reviewmark.yaml</c>, in characters.
+    /// </summary>
+    public const int MaxReviewSetIdLength = 100;
+
+    /// <summary>
+    ///     The longest accepted review-set title, in characters.
+    /// </summary>
+    public const int MaxReviewSetTitleLength = 200;
+
+    /// <summary>
+    ///     The largest accepted <c>.reviewmark.yaml</c> file, in bytes (256 KiB).
+    /// </summary>
+    public const long MaxReviewSetFileBytes = 256L * 1024;
+
+    /// <summary>
+    ///     The largest accepted number of review-sets in one <c>.reviewmark.yaml</c>.
+    /// </summary>
+    public const int MaxReviewSets = 500;
+
+    /// <summary>
     ///     The longest stored comment author name (the display name at the time), in characters.
     /// </summary>
     public const int MaxAuthorLength = 100;

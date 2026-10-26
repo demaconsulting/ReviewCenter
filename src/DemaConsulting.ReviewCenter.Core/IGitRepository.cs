@@ -129,6 +129,24 @@ public interface IGitRepository : IAsyncDisposable
     Task<string> ResolveRevisionAsync(string revision, CancellationToken cancellationToken = default);
 
     /// <summary>
+    ///     Decides whether one commit is an ancestor of another (or the same commit).
+    /// </summary>
+    /// <remarks>
+    ///     The planner uses this to decide whether the head of the last signed review can serve as the baseline of a
+    ///     new review: after a force-push or on another branch it cannot.
+    /// </remarks>
+    /// <param name="ancestorSha">The commit that may be the ancestor, as a full lowercase hexadecimal identifier.</param>
+    /// <param name="descendantSha">The commit that may descend from it, as a full lowercase hexadecimal identifier.</param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <returns><c>true</c> when <paramref name="ancestorSha"/> is reachable from <paramref name="descendantSha"/> (or equal to it).</returns>
+    /// <exception cref="ArgumentException">Thrown when an identifier is not a full lowercase hexadecimal object identifier.</exception>
+    /// <exception cref="DomainRuleException">
+    ///     Thrown with <see cref="DomainRule.GitAccessFailed"/> or <see cref="DomainRule.GitTimeout"/> when git cannot
+    ///     answer, for example because a commit is unknown to the mirror.
+    /// </exception>
+    Task<bool> IsAncestorAsync(string ancestorSha, string descendantSha, CancellationToken cancellationToken = default);
+
+    /// <summary>
     ///     Lists the files that differ between two commits, or all files of a commit.
     /// </summary>
     /// <param name="baselineSha">The baseline commit, or <c>null</c> to list every file of the head commit as added.</param>

@@ -269,6 +269,62 @@ public class GitSourceTests
         await Assert.ThrowsAsync<ArgumentException>(() => session.ReadBlobAsync(value, 10, cancellationToken));
         await Assert.ThrowsAsync<ArgumentException>(() => session.ListChangesAsync(null, value, cancellationToken));
         await Assert.ThrowsAsync<ArgumentException>(() => session.ListChangesAsync(value, origin.Second, cancellationToken));
+        await Assert.ThrowsAsync<ArgumentException>(() => session.IsAncestorAsync(value, origin.Second, cancellationToken));
+        await Assert.ThrowsAsync<ArgumentException>(() => session.IsAncestorAsync(origin.First, value, cancellationToken));
+    }
+
+    /// <summary>
+    ///     Test that the ancestor check says yes for an earlier commit and for the commit itself, no for a later
+    ///     commit and for a commit on a diverged branch.
+    /// </summary>
+    [Fact]
+    public async Task GitSource_IsAncestor_History_AnswersYesAndNo()
+    {
+        // Arrange: an origin whose second commit follows the first, plus a side branch from the first commit
+        Assert.SkipWhen(!GitTestSupport.Available, GitTestSupport.MissingMessage);
+        using var root = new TempFolder();
+        var origin = CreateOrigin(root.Path);
+        GitTestSupport.Git(origin.Folder, "checkout", "-b", "side", origin.First);
+        GitTestSupport.Write(origin.Folder, "side.txt", "side\n");
+        var side = GitTestSupport.Commit(origin.Folder, "side");
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var session = await NewSource(Path.Combine(root.Path, "cache")).OpenAsync(Access(origin.Folder), cancellationToken);
+
+        // Act: ask in both directions, about the same commit and about the diverged branches
+        var forward = await session.IsAncestorAsync(origin.First, origin.Second, cancellationToken);
+        var backward = await session.IsAncestorAsync(origin.Second, origin.First, cancellationToken);
+        var same = await session.IsAncestorAsync(origin.Second, origin.Second, cancellationToken);
+        var diverged = await session.IsAncestorAsync(side, origin.Second, cancellationToken);
+        var fromBase = await session.IsAncestorAsync(origin.First, side, cancellationToken);
+
+        // Assert: only a real ancestor, or the commit itself, is an ancestor
+        Assert.True(forward);
+        Assert.False(backward);
+        Assert.True(same);
+        Assert.False(diverged);
+        Assert.True(fromBase);
+    }
+
+    /// <summary>
+    ///     Test that a commit the repository does not have is an error with the named rule and no file path in the message.
+    /// </summary>
+    [Fact]
+    public async Task GitSource_IsAncestor_UnknownCommit_ThrowsGitAccessFailedWithoutPaths()
+    {
+        // Arrange: an origin and a well-formed commit id that it does not contain
+        Assert.SkipWhen(!GitTestSupport.Available, GitTestSupport.MissingMessage);
+        using var root = new TempFolder();
+        var origin = CreateOrigin(root.Path);
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var session = await NewSource(Path.Combine(root.Path, "cache")).OpenAsync(Access(origin.Folder), cancellationToken);
+
+        // Act: ask about the unknown commit
+        var exception = await Assert.ThrowsAsync<DomainRuleException>(
+            () => session.IsAncestorAsync(new string('1', 40), origin.Second, cancellationToken));
+
+        // Assert: the rule, and the message does not reveal where the mirror is
+        Assert.Equal(DomainRule.GitAccessFailed, exception.Rule);
+        Assert.DoesNotContain(root.Path, exception.Message);
     }
 
     /// <summary>

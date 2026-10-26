@@ -19,8 +19,11 @@ repository registry is the one exception, see `Repositories`).
   most 32; `ContentFingerprint` is required, at most 64; `Created`. A review from a repository also has
   `RepositoryId` (a plain number, not a foreign key, so the review keeps its reference whatever happens to the
   registration), `RepositoryName` (a display copy, at most the repository name limit), `BaselineSha` and `HeadSha` (at
-  most 64 characters), and `Selection` (at most `ReviewLimits.MaxSelectionLength`); all five are null for an uploaded
-  review. A review belongs to a project and is deleted with it.
+  most 64 characters), `Selection` (at most `ReviewLimits.MaxSelectionLength`), and `ReviewSetId` (the review-set
+  that a planned review was made for, at most `ReviewLimits.MaxReviewSetIdLength`, 100 characters); all six are null
+  for an uploaded review, and `ReviewSetId` is also null for a review made by hand. An index on `ProjectId`,
+  `RepositoryId`, and `ReviewSetId` serves the planner's search for the last review of a set. A review belongs to a
+  project and is deleted with it.
 - **ReviewFiles** (`ReviewFile`): key `ProjectId`, `ReviewId`, and `Path`. `Content` is required and stored as a
   binary column (empty for a deleted file); `Sha256` is required, at most 64; `Size`. `ChangeKind` is stored as text,
   at most 32 (an uploaded file is `Added`); `BaselineContent` (binary), `BaselineSize`, and `BaselineSha256` (at most

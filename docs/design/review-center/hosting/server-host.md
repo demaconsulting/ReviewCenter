@@ -68,6 +68,7 @@ server render mode; and registers the start-up log callback.
   `DemaConsulting.ReviewCenter` and a file system key ring in the folder from `ResolveKeysPath`, and `RepositoryStore`,
   `CredentialProtector`, `RepositoryService`, `GitRunner`, and `GitSource` are registered as singletons, the first
   two and the last as the Core interfaces `IRepositoryStore`, `ICredentialProtector`, and `IGitRepositoryProvider`.
+  `ReviewMarkConfigParser` is registered as the Core interface `IReviewSetParser`, and `ReviewPlanner` as a singleton.
 
 The method is shared with `UserCommand` and `AuditCommand`, so that the command line works with exactly the services of
 the server. `UserService` must remain a single instance, because it serializes the changes to users in the process;

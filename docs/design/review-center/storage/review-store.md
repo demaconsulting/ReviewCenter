@@ -91,7 +91,8 @@ there is always exactly one row and neither request fails.
 
 **GetRecordAsync**: Reads the record that a signature covers (`ReviewRecord`): the content fingerprint, the checklist
 snapshot, the section states, the answers, the threads with their comments, and the source (`ReviewSource`: `Upload`,
-or for a repository review the repository identity, both commits, the selection, and every change with its path,
+or for a repository review the repository identity, both commits, the selection, the review-set identifier (null when
+the review was not planned), and every change with its path,
 kind, and baseline and head hashes read from the stored columns without loading any bytes); null when the review does
 not exist.
 The work is done by a private loader that takes the context, so the same code serves this method and

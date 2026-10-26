@@ -47,6 +47,7 @@ This document covers the verification design for the following software items:
   - **ContentSources** subsystem
     - **GitRunner** — safe git child-process runner
     - **GitSource** — git implementation of the repository provider
+    - **ReviewSetParser** — reading of the review-sets of a ReviewMark configuration file
     - **CredentialProtector** — token encryption through Data Protection
   - **Core** subsystem
     - **Fingerprint** — ReviewMark-compatible content fingerprint
@@ -62,6 +63,7 @@ This document covers the verification design for the following software items:
     - **SelectionMatcher** — include and exclude pattern matching for file selection
     - **RevisionValidator** — git revision name validation
     - **RepositoryService** — repository registry rules
+    - **ReviewPlanner** — review planning from review-sets, baselines, and fallbacks
   - **Storage** subsystem
     - **ReviewCenterDbContext** — database schema mapping
     - **ReviewStore** — database implementation of the store interface
@@ -97,6 +99,7 @@ This document covers the verification design for the following software items:
 - **VersionMark** — tool-version documentation tool
 - **WeasyPrint** — HTML-to-PDF conversion tool
 - **xUnit** — unit-testing framework
+- **YamlDotNet** — YAML reading library used for the review-set configuration file
 
 The following topics are out of scope:
 

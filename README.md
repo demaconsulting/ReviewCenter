@@ -21,9 +21,10 @@ comment, checklist answer, and signature is recorded under the signed-in user. R
 under development.
 
 > **Warning: databases created by an earlier build must be recreated.** Reviews from a git repository add columns to
-> the review tables that an earlier development database does not have, and the database is created by `EnsureCreated`
-> without migrations. Delete the old database file before starting this version (development databases only). The
-> server also keeps a Data
+> the review tables, and the review record has a new digest format (version 3) that also covers the review-set a
+> review was planned for; an earlier development database does not have these columns, and the database is created
+> by `EnsureCreated` without migrations. Delete the old database file before starting this version (development
+> databases only). The server also keeps a Data
 > Protection key ring in a `keys` folder beside the database (see
 > [Repositories and Credentials](#repositories-and-credentials)); starting this version once signs everybody out,
 > because the cookie keys now persist in that folder.
@@ -400,8 +401,32 @@ content fingerprint covers the files that exist at the head (Added and Modified)
 Details section shows the repository name, the two commit SHAs, and the selection.
 
 The record digest of a review from a repository covers the repository, the baseline and head commits, the selection,
-and every change with the hashes of its baseline and head content, so a signature binds to exactly what was
-selected. The digest has a new format; a database from an earlier build cannot be used and must be recreated.
+the review-set the review was planned for (if any), and every change with the hashes of its baseline and head content,
+so a signature binds to exactly what was selected. The digest has a new format (version 3); a database from an earlier
+build cannot be used and must be recreated.
+
+### Review-Sets in the Repository
+
+A repository can state which files are reviewed together in the `reviews:` list of its `.reviewmark.yaml` file in the
+root of the repository (the file that ReviewMark reads). ReviewCenter reads only these fields of each entry and ignores
+every other key:
+
+```yaml
+reviews:
+  - id: Core
+    title: Review of the Core subsystem
+    paths:
+      - "src/Core/**/*.cs"
+      - "!src/Core/Generated/**"
+```
+
+The `id` and `title` are required. A review-set without paths, or whose paths select nothing valid, cannot be planned.
+The paths use the selection syntax described above.
+ReviewCenter reads the file of the head revision of the repository as it is, with these limits: the file is at most
+256 KiB, it has at most 500 review-sets, an `id` has at most 100 characters, a `title` at most 200, a review-set at most
+100 paths, and a path at most 400 characters. Two entries with the same `id`, an entry that is not valid, YAML
+aliases, and a file that is not valid YAML are refused with a message that names the problem. A review made for a
+review-set keeps the `id` of the set, so that the next review of the same set can start from the last signed one.
 
 ## Data Location and Database Settings
 

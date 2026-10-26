@@ -40,8 +40,9 @@ be loadable on the test platform.
 **ReviewStore_GetReviewAsync_RepositoryReview_ReturnsSourceAndKindsWithoutBytes**: A review from a repository is
 stored and read back with its source columns and the change kind and baseline metadata of every file. This scenario
 is tested by `ReviewStore_GetReviewAsync_RepositoryReview_ReturnsSourceAndKindsWithoutBytes`, the baseline bytes by
-`ReviewStore_GetBaselineContentAsync_StoredFiles_ReturnsBaselineBytesOrNull`, and an uploaded review without these
-values by `ReviewStore_GetRecordAsync_UploadReview_HasUploadSource`; all are defined in
+`ReviewStore_GetBaselineContentAsync_StoredFiles_ReturnsBaselineBytesOrNull`, an uploaded review without these
+values by `ReviewStore_GetRecordAsync_UploadReview_HasUploadSource`, and the longest review-set identifier by
+`ReviewStore_AddReviewAsync_LongestReviewSetId_RoundTrips`; all are defined in
 `ReviewStoreRepositoryTests.cs`.
 **DatabaseSetup_EnsureCreated_MissingFolder_CreatesFolderFileAndTables**: A new database is created and the
 project, review, review file, thread, and comment tables can be queried. This scenario is tested by

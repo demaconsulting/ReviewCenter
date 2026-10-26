@@ -177,7 +177,13 @@ public enum DomainRule
     CredentialsUnreadable,
 
     /// <summary>No file matching the selection changed between the two revisions, so no review is created.</summary>
-    NothingToReview
+    NothingToReview,
+
+    /// <summary>The revision has no <c>.reviewmark.yaml</c> in its root, so there are no review-sets to plan from.</summary>
+    ReviewSetConfigMissing,
+
+    /// <summary>The <c>.reviewmark.yaml</c> is not valid YAML, is too large, or does not define usable review-sets.</summary>
+    ReviewSetConfigInvalid
 }
 
 /// <summary>

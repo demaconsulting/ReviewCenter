@@ -215,6 +215,28 @@ internal sealed class FakeGitRepositoryProvider : IGitRepositoryProvider
     public int BlobReads { get; private set; }
 
     /// <summary>
+    ///     Gets the (ancestor, descendant) pairs <see cref="IGitRepository.IsAncestorAsync"/> answers <c>true</c> for;
+    ///     a commit is always its own ancestor.
+    /// </summary>
+    public HashSet<(string Ancestor, string Descendant)> Ancestors { get; } = [];
+
+    /// <summary>
+    ///     Gets the ancestor questions that fail like an unknown commit would, as (ancestor, descendant) pairs.
+    /// </summary>
+    public HashSet<(string Ancestor, string Descendant)> AncestorFailures { get; } = [];
+
+    /// <summary>
+    ///     Gets the number of <see cref="IGitRepository.ListChangesAsync"/> calls made so far.
+    /// </summary>
+    public int ListCalls { get; private set; }
+
+    /// <summary>
+    ///     Gets or sets an action run (once) at the start of the next <see cref="IGitRepository.ListChangesAsync"/>
+    ///     call, to simulate something happening elsewhere while a review is made.
+    /// </summary>
+    public Func<Task>? OnNextListChanges { get; set; }
+
+    /// <summary>
     ///     Scripts one commit pair: the revision names, the changes and the blob contents they need.
     /// </summary>
     /// <param name="baselineSha">The baseline commit, or <c>null</c> for none.</param>
@@ -278,12 +300,35 @@ internal sealed class FakeGitRepositoryProvider : IGitRepositoryProvider
         }
 
         /// <inheritdoc />
-        public Task<GitChangeSet> ListChangesAsync(
+        public Task<bool> IsAncestorAsync(
+            string ancestorSha,
+            string descendantSha,
+            CancellationToken cancellationToken = default)
+        {
+            if (owner.AncestorFailures.Contains((ancestorSha, descendantSha)))
+            {
+                throw new DomainRuleException(DomainRule.GitAccessFailed, "The commit is unknown.");
+            }
+
+            return Task.FromResult(
+                ancestorSha == descendantSha || owner.Ancestors.Contains((ancestorSha, descendantSha)));
+        }
+
+        /// <inheritdoc />
+        public async Task<GitChangeSet> ListChangesAsync(
             string? baselineSha,
             string headSha,
             CancellationToken cancellationToken = default)
         {
-            return Task.FromResult(owner.Changes[(baselineSha ?? string.Empty, headSha)]);
+            owner.ListCalls++;
+            var hook = owner.OnNextListChanges;
+            owner.OnNextListChanges = null;
+            if (hook is not null)
+            {
+                await hook();
+            }
+
+            return owner.Changes[(baselineSha ?? string.Empty, headSha)];
         }
 
         /// <inheritdoc />
