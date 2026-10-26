@@ -113,19 +113,114 @@ sections:
 
       - id: ReviewCenter-ReviewPage-Versions
         title: >-
-          The ReviewPage unit shall offer for a modified file a choice between the Head version, which is the
-          numbered view with the comment controls, and the Baseline version, which is a read-only numbered view
-          without comment controls, shall show the Head version again when another file is selected, and shall
-          show for a deleted file its baseline content, with no choice and no line comment controls, accepting
-          only a comment on the whole file.
+          The ReviewPage unit shall offer for a file of a review that has a baseline commit a choice between the Diff
+          view, which is the default, and: for a modified file the Head version, which is the numbered view with the
+          comment controls, and the Baseline version, which is a read-only numbered view without comment controls;
+          for an added file the Head version only, because nothing existed at the baseline and the Diff view shows
+          every line added; for a deleted file the Baseline version only, opening on the Diff view; shall show the
+          Diff view again when another file is selected; and shall show a file of an uploaded review, or of a review
+          without a baseline commit, as the Head version only, with no choice.
         justification: |
-          A change is reviewed against what it replaces. Comments belong to the head, which the signature
-          covers; a deleted file has no head lines to comment on. No highlighting of differences keeps the page
-          simple.
+          A change is reviewed against what it replaces, so the differences are what the reader sees first, also for
+          a file that is new. The full head and baseline texts stay one click away where they exist, and a file with
+          nothing to compare against keeps the plain numbered view.
         tests:
-          - ReviewPage_FileSelect_ModifiedFile_TogglesBetweenHeadAndReadOnlyBaseline
+          - ReviewPage_FileSelect_ModifiedFile_TogglesBetweenDiffHeadAndReadOnlyBaseline
           - ReviewPage_FileSelect_AfterBaselineView_ShowsHeadOfTheNextFile
-          - ReviewPage_FileSelect_DeletedFile_ShowsBaselineAndAcceptsWholeFileCommentOnly
+          - ReviewPage_FileSelect_DeletedFileBaselineView_ShowsNoteWithoutLineControls
+          - ReviewPage_FileSelect_UploadAndNoBaselineReview_KeepHeadOnlyView
+          - ReviewPage_FileSelect_AddedFileOfReviewWithBaseline_OpensAsAllAddedDiffWithDiffAndHeadChoice
+          - ReviewPage_FileSelect_AddedFile_HeadViewAndBack_ShowsNumberedLinesAndCommentControls
+          - ReviewPage_ViewSwitch_KeepsTextAndClearsTheSelection
+
+      - id: ReviewCenter-ReviewPage-Diff
+        title: >-
+          The ReviewPage unit shall show the Diff view of a file side by side, the baseline on the left and the head
+          on the right with their own line numbers and the text as plain text, an unchanged line on both sides, a
+          run of removed lines paired row by row with the run of added lines that follows it (the leftover cells of
+          the shorter run being muted empty placeholders), an added file as all added lines and a deleted file as
+          all removed lines, removed and added lines marked by color and by a - or +
+          sign, with a one-line summary "x added, y removed" above the rows, a hint that says to click + to comment
+          on a line, and every run of unchanged lines that is more than three lines from a change collapsed into a
+          button "Show N unchanged lines" that expands it, and shall bring the first change into view when a file
+          opens on its diff.
+        justification: |
+          A reviewer wants to see what changed and nothing else. Old and new next to each other, aligned row by row,
+          show what replaced what. Collapsing the unchanged lines and scrolling to the first change put it in
+          front of the reader, the summary tells how much there is to read, and the sign keeps added and removed
+          lines apart for a reader who cannot tell the colors apart.
+        tests:
+          - ReviewPage_FileSelect_ModifiedFile_ShowsDiffWithSummaryHintAndNumbers
+          - ReviewPage_DiffView_Rows_AreSideBySideWithPlaceholders
+          - ReviewPage_DiffView_UnchangedRuns_AreCollapsedAndExpandOnRequest
+          - ReviewPage_FileSelect_ModifiedFile_ScrollsToFirstChange
+          - ReviewPage_FileSelect_DeletedFile_ShowsRemovedLinesAndAcceptsWholeFileComment
+          - ReviewPage_FileSelect_AddedFileOfReviewWithBaseline_OpensAsAllAddedDiffWithDiffAndHeadChoice
+          - ReviewPage_FileSelect_EmptyAddedFile_ShowsDiffWithoutRows
+
+      - id: ReviewCenter-ReviewPage-DiffStates
+        title: >-
+          The ReviewPage unit shall say in plain words, instead of rows, that a file is too large to compare line
+          by line and offer the Head and the Baseline version that the file has, that a file is binary, and that two
+          versions differ only in their line endings.
+        justification: |
+          A comparison that cannot be shown must not look like a failure or like an empty change. The reader is
+          told why and what to do instead, and is not offered a version that does not exist.
+        tests:
+          - ReviewPage_FileSelect_TooLargeFile_OffersHeadAndBaseline
+          - ReviewPage_FileSelect_BinaryFile_ShowsNotice
+          - ReviewPage_DiffView_OnlyLineEndingsDiffer_SaysSo
+          - ReviewPage_FileSelect_AddedFileTooLarge_OffersHeadOnly
+          - ReviewPage_FileSelect_AddedBinaryFile_ShowsNoticeAndOffersHeadOnly
+
+      - id: ReviewCenter-ReviewPage-DiffComment
+        title: >-
+          The ReviewPage unit shall offer a + control in every cell of the Diff view that opens the comment form
+          under that row, anchored to the Baseline version with the baseline line number for a control in the left
+          cell and to the Head version with the head line number for a control in the right cell, state the version
+          and lines in plain words ("Comment on line 10 (before)"), extend the selection with Shift-click or a
+          "Through line" field only within one version, and offer Cancel and a whole-file comment that keeps the
+          typed text.
+        justification: |
+          The left cell shows the baseline and the right cell the head, so the cell chosen says which version the
+          comment is about, with the number the reader sees. Keeping a range within one version prevents mixing two
+          numberings, and the plain wording tells the reader what the comment will be attached to.
+        tests:
+          - ReviewPage_DiffView_CommentOnRemovedLine_StartsBaselineThread
+          - ReviewPage_DiffView_CommentOnAddedAndContextLines_StartsHeadThreads
+          - ReviewPage_DiffView_LeftControlIsBaseline_RightControlIsHead
+          - ReviewPage_DiffView_ShiftClick_ExtendsOnlyWithinTheSameSide
+          - ReviewPage_DiffView_ThroughLineField_ExtendsTheRange
+          - ReviewPage_DiffView_CancelAndWholeFileOption_BehaveAsLabelled
+          - ReviewPage_DiffView_AddedFile_CommentOnLine_StartsHeadThreadUnderTheRow
+
+      - id: ReviewCenter-ReviewPage-DiffThreads
+        title: >-
+          The ReviewPage unit shall draw the threads of a file under the row of the last line of their anchor in the
+          Diff view, across the full width, even where the line would be collapsed, highlight the cell of the lines
+          they cover on the side the thread belongs to, show a resolved thread as a collapsed header, reuse the
+          reply, resolve and reopen controls of the thread list, and list only whole-file threads below the diff.
+        justification: |
+          Discussion is read next to the code it is about. A thread that is hidden inside a collapsed run would be
+          missed, so its line always stays visible.
+        tests:
+          - ReviewPage_DiffView_ExistingThreads_AreShownUnderTheirLines
+          - ReviewPage_DiffView_MultiLineThread_KeepsItsFirstLineVisible
+          - ReviewPage_DiffView_InlineThread_ReplyResolveAndReopen
+          - ReviewPage_FileList_ThreadCounts_IncludeBothSides
+
+      - id: ReviewCenter-ReviewPage-DiffLayout
+        title: >-
+          The ReviewPage unit shall keep the Diff view inside the width of the page on a phone, stacking the left
+          cell of a row above its right cell and hiding the empty placeholders and the repeated baseline copy of an
+          unchanged line, wrapping long lines inside their cell, keeping the collapsed-run buttons and inline
+          threads in view, and using a narrower line-number gutter, and shall give the two sides room on a wide
+          screen.
+        justification: |
+          Reviewers read on phones as well. A long line must never make the whole page scroll sideways, a narrow
+          screen has no room for two columns, and the comment form under a line must stay reachable.
+        tests:
+          - WebSubsystem_Stylesheet_DiffRules_KeepCodeScrollingInsideItself
 
       - id: ReviewCenter-ReviewPage-ThreadSummary
         title: >-
@@ -139,16 +234,23 @@ sections:
 
       - id: ReviewCenter-ReviewPage-ThreadIndex
         title: >-
-          The ReviewPage unit shall list the threads of all files in one index showing file, anchor, state,
-          number of comments, author of the first comment and time of last activity, filterable to All, Open
-          (default) and Resolved, where choosing a thread selects its file and highlights and scrolls to its
-          anchored lines.
+          The ReviewPage unit shall list the threads of all files in one index showing file, anchor (for a file
+          that has a baseline in plain words as "Before: line N" or "After: lines N-M"), state, number of
+          comments, author of the first comment and time of last activity, filterable to All, Open (default) and
+          Resolved, where choosing a thread selects its file and highlights and scrolls to its anchored lines, in
+          the Diff view when the file has one.
         justification: |
           Reviewers need to find the discussion that needs them without opening every file, and to go from a
-          thread to the code it is about in one step.
+          thread to the code it is about in one step. A line number alone is ambiguous when a file has two
+          versions, so the index says which one it means.
         tests:
           - ReviewPage_ThreadIndex_Filters_ShowRowsWithFileAnchorStateCountAuthorAndActivity
           - ReviewPage_ThreadIndex_RowClick_SelectsFileHighlightsAnchorAndScrolls
+          - ReviewPage_ThreadIndex_ShowsSideAndLinesAndJumpsToTheDiff
+          - ReviewPage_ThreadIndex_TooLargeFile_OpensTheVersionOfTheThread
+          - ReviewPage_ThreadIndex_BaselineThreadOnTooLargeFile_HighlightsItsBaselineLines
+          - ReviewPage_ThreadIndex_ThreadHighlight_StaysOnTheSideOfTheThread
+          - ReviewPage_ThreadIndex_AddedFileHeadThread_JumpsToTheDiffRow
 
       - id: ReviewCenter-ReviewPage-ThreadCollapse
         title: >-
@@ -289,3 +391,57 @@ sections:
         tests:
           - ReviewPage_Render_PlannedReview_DetailsShowReviewSet
           - ReviewPage_Render_RepositoryReview_DetailsShowRepositoryShasAndSelection
+
+      - id: ReviewCenter-ReviewPage-DeepLinks
+        title: >-
+          The ReviewPage unit shall open a file, a line or a thread of the review from its address (a path of
+          the form /files/{path} with an optional line and side, or /threads/{id}), showing the file in the diff,
+          scrolling to the line or thread and highlighting it; shall replace the address of the browser, without a
+          history entry and without reloading the page, with the link of the file or thread the reader chooses;
+          shall show on every thread a plain, unobtrusive link (not styled as a button) to its address; and shall
+          build every link by escaping each path segment once, so the router returns the same file path.
+        justification: |
+          A link that names one file, line or thread is how reviewers point each other at a finding. An address bar
+          that always holds a shareable link needs no extra step, and escaping once and decoding once keeps names
+          with spaces, hashes, question marks, percent signs and non-ASCII letters working.
+        tests:
+          - ReviewLinks_ForReview_ProjectAndReview_BuildsAddress
+          - ReviewLinks_ForFile_Path_EscapesEachSegment
+          - ReviewLinks_ForFile_WithLine_AddsLineAndSide
+          - ReviewLinks_ForFile_SideWithoutLine_AddsNoQuery
+          - ReviewLinks_ForThread_Thread_BuildsAddress
+          - ReviewLinks_AnyAddress_IsLocalAndSurvivesTheReturnUrlCheck
+          - ReviewLinks_NullArguments_Throw
+          - ReviewPage_FileAddress_ModifiedFile_OpensFileInDiff
+          - ReviewPage_LineAddress_HeadLine_HighlightsAndScrollsToTheRow
+          - ReviewPage_LineAddress_BaselineLine_HighlightsTheLeftCell
+          - ReviewPage_LineAddress_LineInCollapsedRun_IsShownAndHighlighted
+          - ReviewPage_LineAddress_AddedFile_HighlightsTheDiffRow
+          - ReviewPage_LineAddress_UploadFile_HighlightsTheCodeLine
+          - ReviewPage_LineAddress_DeletedFile_BaselineLineYesHeadLineNo
+          - ReviewPage_ThreadAddress_HeadThread_OpensFileAndHighlightsThread
+          - ReviewPage_ThreadAddress_AddedFileHeadThread_OpensDiffAndHighlightsRow
+          - ReviewPage_ThreadAddress_ResolvedBaselineThread_IsExpandedAndHighlightedOnTheLeft
+          - ReviewPage_ThreadAddress_BaselineThreadOnTooLargeFile_HighlightsItsBaselineLines
+          - ReviewPage_ThreadAddress_BaselineThread_DoesNotHighlightTheSameLinesOfTheHead
+          - ReviewPage_ThreadAddress_WholeFileThread_ScrollsToTheThread
+          - ReviewPage_ThreadAddress_KeepsThreadCountsInTheFileList
+          - ReviewPage_ThreadAddress_OverHttp_RendersFileAndHighlightedThread
+          - ReviewPage_Choose_FileAndThread_ReplacesAddressWithoutNavigating
+          - ReviewPage_OpenDeepLink_DoesNotReplaceAddress
+          - ReviewPage_Thread_ShowsPlainLinkToItsAddress
+          - WebSubsystem_Stylesheet_ThreadLink_IsQuietTextLink
+          - ReviewPage_RoundTrip_LinkFromBuilder_OpensTheSameFileAndLine
+
+      - id: ReviewCenter-ReviewPage-DeepLinksNotFound
+        title: >-
+          The ReviewPage unit shall answer an address that names a file, line, side or thread that does not exist in
+          the review (including a thread of another review and a baseline line of a file without a baseline) with a
+          plain message in the page and a link back to the file list of the review, and shall keep the page and the
+          file list working.
+        justification: |
+          Links outlive the files and threads they point at. A friendly message with a way back is better than an
+          error page, and it must not reveal anything about other reviews.
+        tests:
+          - ReviewPage_Address_NamesNothing_ShowsMessageWithWayBack
+          - ReviewPage_Address_UnknownSideAndLaterChoice_UsesHeadAndClearsMessage

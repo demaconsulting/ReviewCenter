@@ -24,6 +24,7 @@ using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Components.Authorization;
+using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
 
@@ -130,6 +131,19 @@ internal static class SignIn
                         "<p><a href=\"/projects\" data-testid=\"access-denied-projects-link\">Back to projects</a></p>" +
                         "</main></body></html>");
                 };
+                cookie.Events.OnRedirectToLogin = context =>
+                {
+                    // The visitor comes back to the exact address that was requested: the raw request target keeps the
+                    // escapes of a deep link as sent (the decoded path would turn a literal %2F or %20 in a file name
+                    // into a separator or a space), and only a local path is accepted as the return address
+                    var raw = context.HttpContext.Features.Get<IHttpRequestFeature>()?.RawTarget;
+                    var target = SafeReturnUrl(string.IsNullOrEmpty(raw)
+                        ? EscapedPathAndQuery(context.Request)
+                        : raw);
+                    var retry = target == "/" ? string.Empty : $"?ReturnUrl={Uri.EscapeDataString(target)}";
+                    context.Response.Redirect($"{LoginPath}{retry}");
+                    return Task.CompletedTask;
+                };
                 cookie.Events.OnValidatePrincipal = ValidatePrincipalAsync;
             });
 
@@ -214,6 +228,17 @@ internal static class SignIn
             });
 
         return endpoints;
+    }
+
+    /// <summary>
+    ///     Writes the path and query of a request as an escaped address, for a server that has no raw request target.
+    /// </summary>
+    /// <param name="request">The request.</param>
+    /// <returns>The address; each path segment is escaped, so a literal <c>%2F</c> in a name stays literal.</returns>
+    private static string EscapedPathAndQuery(HttpRequest request)
+    {
+        var path = string.Join('/', (request.Path.Value ?? string.Empty).Split('/').Select(Uri.EscapeDataString));
+        return path + request.QueryString;
     }
 
     /// <summary>

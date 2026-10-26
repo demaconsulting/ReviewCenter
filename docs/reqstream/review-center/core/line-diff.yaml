@@ -1,0 +1,114 @@
+---
+# Software Unit Requirements for the LineDiff Class
+#
+# The LineDiff class compares two lists of lines with a shortest-edit-script algorithm, numbers the rows on both
+# sides, refuses inputs that are too large, and divides the rows into changed regions with a few lines of context
+# and collapsible gaps, and arranges the rows side by side. FileText.TryReadLines gives it the same lines that the
+# thread rules count.
+
+sections:
+  - title: LineDiff Unit Requirements
+    requirements:
+      - id: ReviewCenter-LineDiff-Compute
+        title: >-
+          The LineDiff class shall compare a baseline and a head list of lines and give the rows of a shortest
+          edit script, each row being a context, removed, or added line, so that the context and removed rows
+          are exactly the baseline lines and the context and added rows are exactly the head lines, in order,
+          with no lines added or removed when the lists are equal, all lines added when the baseline is empty,
+          and all lines removed when the head is empty.
+        justification: |
+          A reviewer reads the differences to know what to look at. A script that is not minimal shows changes
+          that are not there, and a script that loses or invents a line shows something the files do not contain.
+        tests:
+          - LineDiff_Compute_BothEmpty_NoRows
+          - LineDiff_Compute_Identical_AllContext
+          - LineDiff_Compute_OldEmpty_AllAdded
+          - LineDiff_Compute_NewEmpty_AllRemoved
+          - LineDiff_Compute_MyersPaperExample_MinimalEdits
+          - LineDiff_Compute_InsertAtStartAndDeleteAtEnd_AreFound
+          - LineDiff_Compute_RandomInputs_ReconstructBothSidesWithMinimalEdits
+          - LineDiff_Compute_NullArgument_ThrowsArgumentNullException
+
+      - id: ReviewCenter-LineDiff-Order
+        title: >-
+          The LineDiff class shall give the removed rows of a block of changes before its added rows, so that a
+          replaced line shows the old line above the new line.
+        justification: |
+          Reviewers expect the old text above the new text. A fixed order also makes the result the same on every
+          run and independent of how the algorithm happened to find the edits.
+        tests:
+          - LineDiff_Compute_ReplacedLine_RemovedBeforeAdded
+          - LineDiff_Compute_RandomInputs_RemovedRowsPrecedeAddedRowsInEachBlock
+
+      - id: ReviewCenter-LineDiff-Numbering
+        title: >-
+          The LineDiff class shall number the rows of each side from 1 without gaps, giving a context row both
+          numbers, a removed row its baseline number only and an added row its head number only, with the numbers
+          equal to the line numbers that FileText.SplitLines gives for the same text, so that Windows and Unix line
+          endings, a missing final line ending, and a lone carriage return give the same lines as the thread rules
+          count.
+        justification: |
+          A comment is anchored to a line number. If the diff numbered lines differently than the rules that
+          validate the anchor, a comment placed on a row of the diff could point at another line or be refused.
+        tests:
+          - LineDiff_Compute_Numbering_AgreesWithFileTextSplitLines
+          - LineDiff_Compute_CrlfVersusLf_NoLineChanges
+          - LineDiff_Compute_NoTrailingNewline_NoLineChanges
+          - LineDiff_Compute_LoneCarriageReturn_IsPartOfTheLine
+          - FileText_TryReadLines_Text_SplitsLikeSplitLines
+          - FileText_TryReadLines_Binary_ReturnsNull
+          - FileText_TryReadLines_Null_ThrowsArgumentNullException
+
+      - id: ReviewCenter-LineDiff-Bounds
+        title: >-
+          The LineDiff class shall report that the comparison is too large, giving no rows, when either list has
+          more than 10,000 lines or the script needs more than 2,000 added and removed lines together, shall
+          accept a list of exactly that size, and shall not apply the edit bound when one of the lists is empty,
+          so that the time and memory of a comparison stay bounded for any input.
+        justification: |
+          The comparison runs on the server for any file of a review. A bound on the size of the input and on the
+          number of edits keeps one request from using unbounded time or memory, and a clear answer lets the page
+          say that the file is too large instead of failing.
+        tests:
+          - LineDiff_Compute_LineLimit_IsInclusive
+          - LineDiff_Compute_OneSideEmptyAtLineLimit_AllAddedNotTooLarge
+          - LineDiff_Compute_EditLimit_IsInclusive
+          - LineDiff_Compute_LargeFileFewEdits_FindsTheEdits
+
+      - id: ReviewCenter-LineDiff-Segments
+        title: >-
+          The LineDiff class shall divide the rows into shown regions and gaps by keeping three context rows
+          around every change, merging regions that touch, keeping a gap of a single row shown instead of
+          collapsing it, and covering every row exactly once, with no gap at the start or the end next to a change
+          and with the number of context rows configurable, and keeping rows the caller pins (and their context)
+          shown.
+        justification: |
+          A long file with a few changes is only readable if the unchanged parts are collapsed. Hiding a single
+          row behind a control would cost more attention than showing it, and the regions must neither lose nor
+          repeat a row. A row with a comment thread must never be hidden.
+        tests:
+          - LineDiff_Segment_NoChanges_OneGapOrNothing
+          - LineDiff_Segment_SingleChange_KeepsThreeContextRowsEachSide
+          - LineDiff_Segment_ChangeAtEdges_HasNoGapOnThatSide
+          - LineDiff_Segment_GapOfOneRow_StaysVisibleAndGapOfTwoCollapses
+          - LineDiff_Segment_NearbyChangesMergeAndContextIsConfigurable
+          - LineDiff_Segment_RandomChanges_CoverEveryRowOnce
+          - LineDiff_Segment_PinnedRows_StayVisibleWithContext
+
+      - id: ReviewCenter-LineDiff-Pairing
+        title: >-
+          The LineDiff class shall arrange a run of rows as side-by-side rows, giving an unchanged line one row with
+          both sides, pairing a run of removed lines row by row with the run of added lines that follows it and
+          leaving the other side of the leftover rows empty, giving a run of only added or only removed lines
+          empty cells on the other side, and covering every given row exactly once, in order, so that the baseline
+          is shown on the left and the head on the right.
+        justification: |
+          A side-by-side view aligns what replaced what. The pairing is a pure function of the rows, so the page
+          only draws it, and no line may be lost or shown twice.
+        tests:
+          - LineDiff_Pair_ThreeRemovedOneAdded_PairsFirstAndLeavesRightEmpty
+          - LineDiff_Pair_OneRemovedThreeAdded_PairsFirstAndLeavesLeftEmpty
+          - LineDiff_Pair_EqualRunsPureAddAndPureRemove_AreHandled
+          - LineDiff_Pair_ContextRows_AppearOnBothSidesAndRangesAreRespected
+          - LineDiff_Pair_InvalidArguments_Throw
+          - LineDiff_Pair_VisibleSegmentsOfRealDiff_KeepContextGapsAndPins

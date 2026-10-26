@@ -63,6 +63,23 @@ public static class FileText
     }
 
     /// <summary>
+    ///     Decodes file bytes and splits them into lines, in one step.
+    /// </summary>
+    /// <remarks>
+    ///     This is the single entry point that the thread validation, the line diff and the review page use to
+    ///     obtain the lines of a file, so they can never disagree about line numbers (CRLF handling and the
+    ///     final line terminator are decided once, in <see cref="SplitLines"/>).
+    /// </remarks>
+    /// <param name="content">The exact file bytes. Must not be null.</param>
+    /// <returns>The lines (see <see cref="SplitLines"/>), or <c>null</c> when the bytes are binary (see <see cref="TryDecode"/>).</returns>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="content"/> is null.</exception>
+    public static IReadOnlyList<string>? TryReadLines(byte[] content)
+    {
+        var text = TryDecode(content);
+        return text is null ? null : SplitLines(text);
+    }
+
+    /// <summary>
     ///     Splits text into lines.
     /// </summary>
     /// <param name="text">The text to split. Must not be null.</param>

@@ -407,8 +407,14 @@ reviews:
       - "docs/verification/review-center/web/review-page.md"
       - "src/**/Web/ReviewPage.razor"
       - "src/**/Web/ReviewPage.razor.cs"
+      - "src/**/Web/DiffView.razor"
+      - "src/**/Web/DiffView.razor.cs"
+      - "src/**/Web/ReviewLinks.cs"
       - "test/**/Web/ReviewPageTests.cs"
       - "test/**/Web/ReviewPageRepositoryTests.cs"
+      - "test/**/Web/ReviewPageDiffTests.cs"
+      - "test/**/Web/ReviewLinksTests.cs"
+      - "test/**/Web/ReviewDeepLinkTests.cs"
 
   - id: ReviewCenter-Web-ChecklistPage
     title: Review of ReviewCenter ChecklistPage unit implementation
@@ -581,6 +587,7 @@ reviews:
       - "src/DemaConsulting.ReviewCenter.Core/Review.cs"
       - "src/DemaConsulting.ReviewCenter.Core/ReviewFile.cs"
       - "src/DemaConsulting.ReviewCenter.Core/ReviewState.cs"
+      - "src/DemaConsulting.ReviewCenter.Core/FileDiff.cs"
       - "src/DemaConsulting.ReviewCenter.Core/UploadedFile.cs"
       - "src/DemaConsulting.ReviewCenter.Core/RepositoryReviewResult.cs"
       - "test/**/Core/ReviewServiceTests.cs"
@@ -603,6 +610,7 @@ reviews:
       - "src/DemaConsulting.ReviewCenter.Core/ReviewThread.cs"
       - "src/DemaConsulting.ReviewCenter.Core/ReviewComment.cs"
       - "src/DemaConsulting.ReviewCenter.Core/ReviewThreadState.cs"
+      - "src/DemaConsulting.ReviewCenter.Core/ThreadSide.cs"
       - "src/DemaConsulting.ReviewCenter.Core/FileText.cs"
       - "test/**/Core/ThreadServiceTests.cs"
       - "test/**/Core/AuditEventTests.cs"
@@ -768,6 +776,22 @@ reviews:
       - "docs/sysml2/model/review-center/core/revision-validator.sysml"
       - "src/DemaConsulting.ReviewCenter.Core/RevisionValidator.cs"
       - "test/**/Core/RevisionValidatorTests.cs"
+
+  - id: ReviewCenter-Core-LineDiff
+    title: Review of ReviewCenter LineDiff unit implementation
+    context:
+      - docs/design/review-center.md
+      - docs/reqstream/review-center.yaml
+      - docs/design/review-center/core.md
+      - docs/reqstream/review-center/core.yaml
+    paths:
+      - "docs/reqstream/review-center/core/line-diff.yaml"
+      - "docs/design/review-center/core/line-diff.md"
+      - "docs/verification/review-center/core/line-diff.md"
+      - "docs/sysml2/model/review-center/core/line-diff.sysml"
+      - "src/DemaConsulting.ReviewCenter.Core/LineDiff.cs"
+      - "test/**/Core/LineDiffTests.cs"
+      - "test/**/Core/FileTextTests.cs"
 
   - id: ReviewCenter-Core-RepositoryService
     title: Review of ReviewCenter RepositoryService unit implementation

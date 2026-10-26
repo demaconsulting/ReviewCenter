@@ -277,10 +277,11 @@ sections:
           The Web subsystem shall let a user create a review from a git repository on the project page, choosing among
           the enabled repositories by name, with a head revision, an optional baseline revision, and a selection, show
           the reason when it cannot be created, and show on the review page the change kind of each file, the source,
-          and for a modified file a choice between the Head version and a read-only Baseline version.
+          and for a file of a review with a baseline a choice between the Diff view, the Head version (not for a
+          deleted file) and a read-only Baseline version (not for an added file).
         justification: |
-          Reviewing a change means seeing what it replaces. The page keeps comments on the head version, offers no
-          highlighting of differences, and never shows how the server reaches the repository.
+          Reviewing a change means seeing what it replaces. The page keeps the full texts one click away and never
+          shows how the server reaches the repository.
         children:
           - ReviewCenter-ProjectPage-SourceChoice
           - ReviewCenter-ProjectPage-RepositoryForm
@@ -289,7 +290,42 @@ sections:
           - ReviewCenter-ReviewPage-Versions
         tests:
           - ProjectPage_CreateForm_FromRepository_CreatesReviewWithSourceAndNavigates
-          - ReviewPage_FileSelect_ModifiedFile_TogglesBetweenHeadAndReadOnlyBaseline
+          - ReviewPage_FileSelect_ModifiedFile_TogglesBetweenDiffHeadAndReadOnlyBaseline
+
+      - id: ReviewCenter-Web-DiffReview
+        title: >-
+          The Web subsystem shall show a changed file of a review from a repository as a side-by-side diff on the
+          review page, with the unchanged lines collapsed, let a signed-in user comment on a line of either version
+          and read the threads under their rows, say in plain words when a comparison cannot be shown, and keep the
+          diff inside the width of a phone by stacking its two sides.
+        justification: |
+          Reviewers judge a change by reading what changed. The subsystem test guards the stylesheet rules that keep
+          the page from scrolling sideways; the interactions need a live connection and are verified by the
+          component tests of the page unit.
+        children:
+          - ReviewCenter-ReviewPage-Diff
+          - ReviewCenter-ReviewPage-DiffStates
+          - ReviewCenter-ReviewPage-DiffComment
+          - ReviewCenter-ReviewPage-DiffThreads
+          - ReviewCenter-ReviewPage-DiffLayout
+        tests:
+          - WebSubsystem_Stylesheet_DiffRules_KeepCodeScrollingInsideItself
+
+      - id: ReviewCenter-Web-DeepLinks
+        title: >-
+          The Web subsystem shall give every file, line and thread of a review a stable address that opens the review
+          page at that place, keep the address bar equal to what is shown as the reader chooses files and threads,
+          and bring a signed-out visitor back to the same address after signing in.
+        justification: |
+          Review is a conversation between people, so a reviewer must be able to point a colleague at one file, one
+          line or one thread by sending a link, and the link must still work after a sign-in or a reload.
+        children:
+          - ReviewCenter-ReviewPage-DeepLinks
+          - ReviewCenter-ReviewPage-DeepLinksNotFound
+          - ReviewCenter-SignIn-ReturnDeepLink
+        tests:
+          - Routes_DeepLink_SignedOut_LoginLinkKeepsEscapesAndQuery
+          - WebSubsystem_Stylesheet_ThreadLink_IsQuietTextLink
 
       - id: ReviewCenter-Web-PlanReviews
         title: >-

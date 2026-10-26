@@ -29,9 +29,11 @@ text. Hashing is the only use of the text; it is never stored.
 3. Every stored checklist answer: the check id, the outcome (`Pass`, `Fail`, or `NotApplicable`), and the
    justification.
 4. Every checklist section that is marked as not applicable: the section id and the reason.
-5. Every comment thread: the file path, the start and end line (or none for a whole file), the state (`Open` or
-   `Resolved`), and the creation time of the thread; and every comment of the thread in posting order: the display
-   name of the author, the user name of the author, the text, and the time.
+5. Every comment thread: the file path, the side (`Head` or `Baseline`, new in version 4), the start and end line (or
+   none for a whole file), the state (`Open` or `Resolved`), and the creation time of the thread; and every comment
+   of the thread in posting order: the display name of the author, the user name of the author, the text, and the
+   time. A line of a thread means a line of the text of its side, so a head thread and a baseline thread on the same
+   numbers are different discussions and give different digests.
 
 **What the digest does not cover**:
 
@@ -49,14 +51,15 @@ text. Hashing is the only use of the text; it is never stored.
   from a repository, through the changes); the file paths that matter enter the digest through the anchors of
   threads and the changes.
 
-**Canonical text, version 3**: the lines below are joined with a line feed (`\n`, no trailing line feed). Version 1
+**Canonical text, version 4**: the lines below are joined with a line feed (`\n`, no trailing line feed). Version 1
 had the same text without the source lines and with the header `ReviewCenter record v1`; version 2 had the source
-lines without the review-set identifier and the header `ReviewCenter record v2`. Every digest changed with each of
-the two moves, which is intended: the database of the product is recreated in this phase, so no signature of an
+lines without the review-set identifier and the header `ReviewCenter record v2`; version 3 had the review-set
+identifier but no side in the thread line and the header `ReviewCenter record v3`. Every digest changed with each of
+the three moves, which is intended: the database of the product is recreated at these moves, so no signature of an
 earlier version exists, and a signature that did would simply show as out of date.
 
 ```text
-ReviewCenter record v3
+ReviewCenter record v4
 fingerprint {S}
 source upload                                              for an uploaded review, or
 source git {repositoryId} {S:baseline} {S:head} {S:selection} {S:reviewSetId}   for a review from a repository, then
@@ -67,7 +70,7 @@ answer {S:itemId} {S:outcome} {S:justification}            one line per answer, 
 sections
 not-applicable {S:sectionId} {S:reason}                    one line per section that does not apply, sorted by id
 threads
-thread {S:path} {start} {end} {S:state} {createdTicks}     one block per thread: this line,
+thread {S:path} {S:side} {start} {end} {S:state} {createdTicks}   one block per thread: this line,
 comment {S:author} {S:username} {S:text} {ticks}           then one line per comment in posting order
 ```
 
@@ -80,7 +83,8 @@ Notation and rules:
 - `{repositoryId}`, `{start}` and `{end}` are the numbers in the invariant culture; `{start}` and `{end}` are `-`
   when the thread is on the whole file.
 - `{createdTicks}` and `{ticks}` are the UTC ticks of the time, in the invariant culture.
-- The outcome, the thread state, and the change kind are written by their enumeration names.
+- The outcome, the thread state, the thread side, and the change kind are written by their enumeration names (the
+  side as a length-prefixed string, for example `4:Head` or `8:Baseline`).
 - The selection text is the text kept with the review: the patterns in the order given, one per line, with `!` in
   front of an exclusion.
 - Changes are sorted by path, answers by item id, and sections by section id, all with the ordinal comparison. Each
@@ -95,7 +99,7 @@ Notation and rules:
 apply, and no threads, the canonical text is the six lines
 
 ```text
-ReviewCenter record v3
+ReviewCenter record v4
 fingerprint 3:abc
 source upload
 answers
@@ -103,14 +107,15 @@ sections
 threads
 ```
 
-and the digest is `0527d1b7805490ea49b3ace3b00c531b07b44276996e0118c6c654c3f1dd8ef6` (the digest of the same
-record in version 2 was `fd4f16444ef233068c76aad7bed87b1bafd550c20a0019f576e5cdaaadb9384c`). For a review from the
+and the digest is `244341c991c7ad467cb6f84ea3236bf06cddaada609cabc5ef7a5f3326f7aeb0` (the digest of the same
+record in version 3 was `0527d1b7805490ea49b3ace3b00c531b07b44276996e0118c6c654c3f1dd8ef6`, and in version 2
+`fd4f16444ef233068c76aad7bed87b1bafd550c20a0019f576e5cdaaadb9384c`). For a review from the
 repository 7 with the fingerprint `abc`, the baseline `aaaa...` and the head `bbbb...` (forty characters each), the
 selection `**/*`, no review-set, a modified file `a.txt` (baseline hash `bs1`, head hash `hs1`) and a deleted file
 `b.txt` (baseline hash `bs2`), and nothing else, the canonical text is
 
 ```text
-ReviewCenter record v3
+ReviewCenter record v4
 fingerprint 3:abc
 source git 7 40:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa 40:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb 4:**/* -
 changes
@@ -121,16 +126,16 @@ sections
 threads
 ```
 
-and the digest is `12be9587545afc1fa2582d98cbddbfa21b4d0b0d6bdbbb3b7a86d9169f445839`. With the review-set `core` the
-source line ends with `4:core` and the digest is `f3ed40b16882604e849bce995fbb8660c83948e9c3bc0ae51a9b904b2aab2046`,
+and the digest is `1c2c05b15941c7bc7f8c6b63aff356e4efd5123c0ed8d97ffa3ead7635046387`. With the review-set `core` the
+source line ends with `4:core` and the digest is `54b660301c966a5e5fb0e76bbf91860da1e6ea5544b74232fe851762f0721cbc`,
 and with the empty review-set it ends with `0:` and the digest is
-`e0e0cb426b74f3ca1b05c869cbbefecc3190c2ec4823b99eaa9a0250ed2623e9`. For a record with the
+`6b9383b83e087a9f862b95079e9eb2caccda8b51e04bb4e2484fd0c94a430364`. For a record with the
 fingerprint `abc`, one answer (check `REQ-01`, outcome `Fail`, justification `bad`), the sections `DES` (does not
-apply, reason `none`) and `DOC` (applies), and one thread on `a.txt` (lines 1 to 2, `Open`, created at time T) with the
-comment by `Ann` (`ann`) with the text `Please fix` at time T, the upload canonical text is
+apply, reason `none`) and `DOC` (applies), and one thread on `a.txt` (head side, lines 1 to 2, `Open`, created at time
+T) with the comment by `Ann` (`ann`) with the text `Please fix` at time T, the upload canonical text is
 
 ```text
-ReviewCenter record v3
+ReviewCenter record v4
 fingerprint 3:abc
 source upload
 answers
@@ -138,12 +143,20 @@ answer 6:REQ-01 4:Fail 3:bad
 sections
 not-applicable 3:DES 4:none
 threads
-thread 5:a.txt 1 2 4:Open {T ticks}
+thread 5:a.txt 4:Head 1 2 4:Open {T ticks}
 comment 3:Ann 3:ann 10:Please fix {T ticks}
 ```
 
-The tests check the digests of the first two vectors and of the two review-set variants, and the exact canonical text
-of the second and the third.
+The side vectors use the upload record with the fingerprint `abc`, no answers, and one thread on `a.txt` for lines 1
+to 2, `Open`, created at the UTC time 2025-03-04 05:06:07 (ticks `638766615670000000`) with the comment by `Ann` (`ann`)
+with the text `Please fix` at the same time. With the side `Head` the digest is
+`9fbaa65dceeba949bcfb6ebbf94570035516a11aed51df672503fee68c08a528`, and with the side `Baseline` (written
+`8:Baseline`) it is `b3254cedc7e54cac4d5452de47858bb0b64de2f2bc7daa703a58012e632042df`. All version 4 answers were
+calculated independently of the implementation with a short script (SHA-256 of the canonical text as written
+above), not copied from the code under test.
+
+The tests check the digests of the first two vectors, of the two review-set variants, and of the two side vectors,
+and the exact canonical text of the second and the third.
 
 #### Key Methods
 

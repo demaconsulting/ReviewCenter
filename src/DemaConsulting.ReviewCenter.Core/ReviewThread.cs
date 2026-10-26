@@ -52,6 +52,11 @@ public sealed class ReviewThread
     public string FilePath { get; init; } = string.Empty;
 
     /// <summary>
+    ///     Gets the version of the file the line numbers refer to; <see cref="ThreadSide.Head"/> for a whole-file thread.
+    /// </summary>
+    public ThreadSide Side { get; init; } = ThreadSide.Head;
+
+    /// <summary>
     ///     Gets the first line of the anchor (1-based), or <c>null</c> when the thread is anchored to the whole file.
     /// </summary>
     public int? StartLine { get; init; }

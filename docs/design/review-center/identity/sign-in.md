@@ -55,7 +55,11 @@ framework registers its own default provider with `TryAdd`, and the host calls `
 registration is the one that wins. That ordering is a dependency of the host and is commented in the code.
 
 An anonymous request for a protected page is redirected to `LoginPath` (the original address travels in the standard
-`ReturnUrl` query value). A signed-in user without the needed role does not get a redirect: the access-denied
+`ReturnUrl` query value). The address is the raw request target as the client wrote it, so escaped characters of a
+deep link (`%20`, `%23`, `%3F`, a literal `%2F` or `%25`) and its query come back unchanged; the decoded path would
+turn a literal `%2F` of a file name into a separator. Where the server gives no raw target, each path segment of the
+decoded path is escaped again. The value is reduced with `SafeReturnUrl`, so only a local path is kept, and a request
+for `/` carries no return address. A signed-in user without the needed role does not get a redirect: the access-denied
 redirect is replaced by HTTP status 403 with a short "Access denied" page that links back to `/projects`. No
 fallback authorization policy is set, so static assets, `/health`,
 `/`, and `/login` stay anonymous and each protected page declares its own requirement. The session length and the

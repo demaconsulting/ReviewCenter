@@ -19,7 +19,9 @@ their own.
 attribute, the character set and viewport declarations, the base address (`/`), the page head
 outlet, the `Routes` component, a small inline script that defines `window.reviewCenter.scrollToTestId` (the review
 page calls it to bring the selected file's code, a thread's first line, or the new-thread form into view; Blazor
-cannot scroll by itself), and a script reference to
+cannot scroll by itself) and `window.reviewCenter.replaceUrl` (the review page calls it to put the link of the chosen
+file or thread in the address bar with `history.replaceState`, which adds no history entry and does not run the
+router; it accepts only a path that starts with a single `/`), and a script reference to
 `_framework/blazor.web.js`.
 
 **Routes component**: A router that searches the application assembly for page components.

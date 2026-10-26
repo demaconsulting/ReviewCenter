@@ -20,8 +20,10 @@ N/A - standard test environment.
   changes), the answers, the sections that do not apply, and the threads with their comments, written as the design
   states.
 - The digest is the SHA-256 of the UTF-8 canonical text as 64 lowercase hexadecimal characters, and equals the known
-  values for the two known records (an upload and a repository review) and for the review-set variants.
-- Changing a covered value (the fingerprint, an answer, the reason of a section, a thread, a comment, the source
+  values for the two known records (an upload and a repository review), for the review-set variants, and for the two
+  thread sides.
+- Changing a covered value (the fingerprint, an answer, the reason of a section, a thread, the side of a thread, a
+  comment, the source
   kind, the repository, a commit, the selection, the review-set, or the path, kind, or hash of a change, or an added
   or removed change) changes the digest.
 - Reordering the answers, sections, threads, and changes, or giving them other identities, does not change the
@@ -42,13 +44,22 @@ the length-prefixed strings, the version line, and only the section that does no
 tested by `RecordDigest_Compute_SameRecord_IsStableSha256OfCanonicalText`.
 
 **RecordDigest_Compute_KnownRecord_MatchesKnownValue**: The upload record with the fingerprint `abc` and nothing else
-has the digest `0527d1b7805490ea49b3ace3b00c531b07b44276996e0118c6c654c3f1dd8ef6`. This scenario is tested by
-`RecordDigest_Compute_KnownRecord_MatchesKnownValue`.
+has the digest `244341c991c7ad467cb6f84ea3236bf06cddaada609cabc5ef7a5f3326f7aeb0` (version 4), and not the digest
+of the same record in version 3. This scenario is tested by `RecordDigest_Compute_KnownRecord_MatchesKnownValue`.
+
+**RecordDigest_Compute_ThreadSide_IsWrittenAndMatchesKnownValue**: A theory over the side `Head` and the side
+`Baseline`: the thread line of the canonical text carries `4:Head` or `8:Baseline` between the path and the range,
+and the digest equals the known value of the design for that side, calculated with an independent script. This
+scenario is tested by `RecordDigest_Compute_ThreadSide_IsWrittenAndMatchesKnownValue`.
+
+**RecordDigest_Compute_ThreadSideChange_ChangesDigest**: The same record with the thread on the head side and on
+the baseline side gives two different digests. This scenario is tested by
+`RecordDigest_Compute_ThreadSideChange_ChangesDigest`.
 
 **RecordDigest_Canonicalize_GitSource_MatchesDocumentedFormat**: A repository record whose changes are given out of
 path order gives exactly the canonical text of the design (source line with the length-prefixed commits and
 selection and `-` for no review-set, the changes sorted by path, `-` for the head hash of a deleted file) and the
-known digest `12be9587545afc1fa2582d98cbddbfa21b4d0b0d6bdbbb3b7a86d9169f445839`. This scenario is tested by
+known digest `1c2c05b15941c7bc7f8c6b63aff356e4efd5123c0ed8d97ffa3ead7635046387`. This scenario is tested by
 `RecordDigest_Canonicalize_GitSource_MatchesDocumentedFormat`.
 
 **RecordDigest_Compute_ReviewSetId_IsCoveredAndDistinguishesNullFromEmpty**: The repository record with no review-set,

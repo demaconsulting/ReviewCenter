@@ -312,6 +312,72 @@ public partial class WebSubsystemTests
     }
 
     /// <summary>
+    ///     Test that the stylesheet of the app keeps a long line of a diff inside the code area
+    ///     and keeps the phone layout narrow, so the page itself never scrolls sideways.
+    /// </summary>
+    /// <remarks>
+    ///     The in-memory browser has no layout engine, so the rendered width at 390 pixels is measured by the
+    ///     Puppet walk-through; this test guards the rules that width depends on.
+    /// </remarks>
+    [Fact]
+    public async Task WebSubsystem_Stylesheet_DiffRules_KeepCodeScrollingInsideItself()
+    {
+        // Arrange and Act: read the stylesheet the shell links to
+        var css = await ReadStylesheetAsync();
+
+        // Assert: the stylesheet lays the diff out as two columns per row, wraps long lines inside their cell, keeps the
+        // code area from widening the page, keeps inline threads and the collapsed-run button in view, stacks the
+        // cells and hides the placeholders on a narrow screen, and gives a phone a narrower gutter
+        Assert.Matches(@"\.diff-code\s*\{[^}]*max-width:\s*100%;[^}]*overflow-x:\s*auto;", css);
+        Assert.Matches(@"\.diff-pair\s*\{[^}]*display:\s*grid;[^}]*grid-template-columns:\s*\w+\(0,\s*1fr\)\s+\w+\(0,\s*1fr\);", css);
+        Assert.Matches(@"\.diff-row\s*\{[^}]*min-width:\s*0;", css);
+        Assert.Matches(@"\.diff-row \.line-text\s*\{[^}]*white-space:\s*pre-wrap;[^}]*overflow-wrap:\s*anywhere;", css);
+        Assert.Matches(@"\.diff-row\.empty,\s*\.diff-row\.empty \.gutter\s*\{[^}]*background:", css);
+        Assert.Matches(@"\.diff-inline\s*\{[^}]*position:\s*sticky;[^}]*left:\s*0;", css);
+        Assert.Matches(@"\.diff-gap\s*\{[^}]*position:\s*sticky;[^}]*left:\s*0;", css);
+        Assert.Matches(
+            @"@media \(max-width: 39\.99rem\)\s*\{\s*\.diff-pair\s*\{[^}]*grid-template-columns:\s*\w+\(0,\s*1fr\);\s*\}\s*\.diff-row\.empty,\s*\.diff-row\.context\.left\s*\{[^}]*display:\s*none;",
+            css);
+        Assert.Matches(@"@media \(max-width: 29\.99rem\)\s*\{\s*\.diff-row \.line-no\s*\{[^}]*min-width:", css);
+    }
+
+    /// <summary>
+    ///     Test that the stylesheet shows the per-thread link as a quiet text link, not as the filled button the
+    ///     other action links use.
+    /// </summary>
+    [Fact]
+    public async Task WebSubsystem_Stylesheet_ThreadLink_IsQuietTextLink()
+    {
+        // Arrange and Act: read the stylesheet the shell links to
+        var css = await ReadStylesheetAsync();
+
+        // Assert: the thread link has no background and no padding, is underlined, and is not filled with the accent
+        Assert.Matches(@"a\.thread-link\s*\{[^}]*background:\s*none;", css);
+        Assert.Matches(@"a\.thread-link\s*\{[^}]*padding:\s*0;", css);
+        Assert.Matches(@"a\.thread-link\s*\{[^}]*text-decoration:\s*underline;", css);
+        Assert.DoesNotMatch(@"a\.thread-link\s*\{[^}]*background:\s*var\(--accent\)", css);
+    }
+
+    /// <summary>
+    ///     Reads the stylesheet the shell links to. The in-memory host does not serve static files, so it is read
+    ///     from the project that ships it.
+    /// </summary>
+    /// <returns>The text of <c>app.css</c>.</returns>
+    private static async Task<string> ReadStylesheetAsync()
+    {
+        var directory = new DirectoryInfo(AppContext.BaseDirectory);
+        while (directory is not null && !File.Exists(Path.Combine(directory.FullName, "DemaConsulting.ReviewCenter.slnx")))
+        {
+            directory = directory.Parent;
+        }
+
+        Assert.NotNull(directory);
+        return await File.ReadAllTextAsync(
+            Path.Combine(directory.FullName, "src", "DemaConsulting.ReviewCenter", "wwwroot", "app.css"),
+            TestContext.Current.CancellationToken);
+    }
+
+    /// <summary>
     ///     Requests a page and parses the returned document.
     /// </summary>
     /// <param name="client">The in-memory client.</param>

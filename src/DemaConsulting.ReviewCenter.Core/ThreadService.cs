@@ -25,7 +25,8 @@ namespace DemaConsulting.ReviewCenter.Core;
 /// </summary>
 /// <remarks>
 ///     The service is the single place where comment rules live. A thread is anchored to the whole file
-///     or to a range of lines and always starts with one comment; anyone can reply. Comments are
+///     or to a range of lines of the head or (for a repository review) of the baseline, and always starts
+///     with one comment; anyone can reply. Comments are
 ///     immutable, so the service offers no way to edit or delete one; the only change to an existing
 ///     thread is its <see cref="ReviewThreadState"/>. The author of a comment is the signed-in
 ///     <see cref="Actor"/>, never free text, so it cannot be spoofed by a form field.
@@ -60,6 +61,38 @@ public sealed class ThreadService
     }
 
     /// <summary>
+    ///     Starts a thread on the head of a file of a review, with its first comment.
+    /// </summary>
+    /// <remarks>
+    ///     The overload exists so that callers that do not know about sides (the head is the default) keep their
+    ///     call shape; it is the same as calling the overload with <see cref="ThreadSide.Head"/>.
+    /// </remarks>
+    /// <param name="projectId">The identity of the owning project.</param>
+    /// <param name="reviewId">The review identifier.</param>
+    /// <param name="filePath">The path of the file within the review (ordinal comparison).</param>
+    /// <param name="startLine">The first line of the anchor (1-based), or <c>null</c> for the whole file.</param>
+    /// <param name="endLine">The last line of the anchor (inclusive); <c>null</c> exactly when <paramref name="startLine"/> is <c>null</c>.</param>
+    /// <param name="actor">The signed-in user who writes the comment. Must not be null.</param>
+    /// <param name="text">The comment text; same rules as for the overload with a side.</param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <returns>The stored thread in the <see cref="ReviewThreadState.Open"/> state, with its first comment.</returns>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="actor"/> is null.</exception>
+    /// <exception cref="DomainRuleException">Thrown when a rule is violated (see <see cref="DomainRule"/>); nothing is stored then.</exception>
+    public Task<ReviewThread> StartThreadAsync(
+        int projectId,
+        string reviewId,
+        string filePath,
+        int? startLine,
+        int? endLine,
+        Actor actor,
+        string? text,
+        CancellationToken cancellationToken = default)
+    {
+        return StartThreadAsync(
+            projectId, reviewId, filePath, startLine, endLine, actor, text, ThreadSide.Head, cancellationToken);
+    }
+
+    /// <summary>
     ///     Starts a thread on a file of a review, with its first comment.
     /// </summary>
     /// <param name="projectId">The identity of the owning project.</param>
@@ -77,9 +110,17 @@ public sealed class ThreadService
     ///     The comment text; leading and trailing white space is removed. Must not be empty and must not
     ///     exceed <see cref="ReviewLimits.MaxCommentLength"/> characters.
     /// </param>
+    /// <param name="side">
+    ///     The version of the file the line numbers refer to; ignored for a whole-file anchor (which is always
+    ///     stored as <see cref="ThreadSide.Head"/>, and rejects <see cref="ThreadSide.Baseline"/>).
+    ///     <see cref="ThreadSide.Baseline"/> needs a repository review with a baseline commit and a file that is
+    ///     <see cref="ChangeKind.Modified"/> or <see cref="ChangeKind.Deleted"/>; the range is then checked
+    ///     against the baseline lines. On the head side a <see cref="ChangeKind.Deleted"/> file accepts no lines.
+    /// </param>
     /// <param name="cancellationToken">Cancels the operation.</param>
     /// <returns>The stored thread in the <see cref="ReviewThreadState.Open"/> state, with its first comment.</returns>
     /// <exception cref="ArgumentNullException">Thrown when <paramref name="actor"/> is null.</exception>
+    /// <exception cref="ArgumentOutOfRangeException">Thrown when <paramref name="side"/> is not a defined value.</exception>
     /// <exception cref="DomainRuleException">
     ///     Thrown when a rule is violated (see <see cref="DomainRule"/>); nothing is stored then.
     /// </exception>
@@ -91,35 +132,44 @@ public sealed class ThreadService
         int? endLine,
         Actor actor,
         string? text,
+        ThreadSide side,
         CancellationToken cancellationToken = default)
     {
         // Validate everything that needs no I/O first so a bad request fails fast and cheaply
         ArgumentNullException.ThrowIfNull(actor);
+        if (!Enum.IsDefined(side))
+        {
+            throw new ArgumentOutOfRangeException(nameof(side), side, "The side is not a known value.");
+        }
+
         var trimmedText = ValidateText(text);
         ValidateAnchorShape(startLine, endLine);
+
+        // A whole-file anchor has no line numbers, so it has no side to choose: it is always stored as Head
+        if (startLine is null && side == ThreadSide.Baseline)
+        {
+            throw new DomainRuleException(
+                DomainRule.ThreadAnchorInvalid,
+                "A whole-file comment has no baseline side; comment on a baseline line instead.");
+        }
 
         // The file must exist in the review; the metadata read does not load any file bytes
         var review = await _store.GetReviewAsync(projectId, reviewId, cancellationToken);
         var file = review?.Files.FirstOrDefault(f => string.Equals(f.Path, filePath, StringComparison.Ordinal));
-        if (file is null)
+        if (review is null || file is null)
         {
             throw new DomainRuleException(
                 DomainRule.ThreadAnchorInvalid,
                 $"The file '{filePath}' does not exist in this review.");
         }
 
-        // A deleted file has no head content, so there are no head lines to anchor to
-        if (startLine is not null && file.ChangeKind == ChangeKind.Deleted)
-        {
-            throw new DomainRuleException(
-                DomainRule.ThreadAnchorInvalid,
-                "Deleted files accept whole-file comments only.");
-        }
-
-        // Only a line range needs the bytes, to count lines the way the page shows them
+        // Which side may carry line anchors depends on the kind of change
         if (startLine is not null)
         {
-            await ValidateRangeWithinFileAsync(projectId, reviewId, filePath, endLine!.Value, cancellationToken);
+            ValidateSideForFile(review, file, side);
+
+            // Only a line range needs the bytes, to count lines the way the page shows them
+            await ValidateRangeWithinFileAsync(projectId, reviewId, filePath, side, endLine!.Value, cancellationToken);
         }
 
         var now = _timeProvider.GetUtcNow();
@@ -128,6 +178,7 @@ public sealed class ThreadService
             ProjectId = projectId,
             ReviewId = reviewId,
             FilePath = filePath,
+            Side = startLine is null ? ThreadSide.Head : side,
             StartLine = startLine,
             EndLine = endLine,
             State = ReviewThreadState.Open,
@@ -148,7 +199,8 @@ public sealed class ThreadService
             thread,
             stored =>
             {
-                // A single line reads "line 3", a range "lines 3-5", a whole file "(whole file)"
+                // A single line reads "line 3", a range "lines 3-5", a whole file "(whole file)"; only the
+                // baseline side is named, because the head is the default and keeps the text unchanged
                 string anchor;
                 if (stored.StartLine is not { } start)
                 {
@@ -161,6 +213,11 @@ public sealed class ThreadService
                 else
                 {
                     anchor = $"lines {start}-{stored.EndLine}";
+                }
+
+                if (stored.StartLine is not null && stored.Side == ThreadSide.Baseline)
+                {
+                    anchor += " (baseline)";
                 }
 
                 var first = stored.Comments[0];
@@ -471,11 +528,43 @@ public sealed class ThreadService
     }
 
     /// <summary>
-    ///     Checks that a file is text and has at least the given number of lines.
+    ///     Checks that the chosen side can carry line anchors for this file of this review.
+    /// </summary>
+    /// <param name="review">The review the file belongs to.</param>
+    /// <param name="file">The file the thread is anchored to.</param>
+    /// <param name="side">The requested side.</param>
+    /// <exception cref="DomainRuleException">Thrown with <see cref="DomainRule.ThreadAnchorInvalid"/> when the file has no lines on that side.</exception>
+    private static void ValidateSideForFile(Review review, ReviewFile file, ThreadSide side)
+    {
+        if (side == ThreadSide.Head)
+        {
+            // A deleted file has no head content, so there are no head lines to anchor to
+            if (file.ChangeKind == ChangeKind.Deleted)
+            {
+                throw new DomainRuleException(
+                    DomainRule.ThreadAnchorInvalid,
+                    "A deleted file has no head lines; comment on its baseline lines or on the whole file instead.");
+            }
+
+            return;
+        }
+
+        // Baseline lines exist only when the review froze a baseline and the file was there before the change
+        if (review.BaselineSha is null || file.ChangeKind == ChangeKind.Added)
+        {
+            throw new DomainRuleException(
+                DomainRule.ThreadAnchorInvalid,
+                "This file has no baseline lines to comment on.");
+        }
+    }
+
+    /// <summary>
+    ///     Checks that a file is text and has at least the given number of lines on the chosen side.
     /// </summary>
     /// <param name="projectId">The identity of the owning project.</param>
     /// <param name="reviewId">The review identifier.</param>
     /// <param name="filePath">The path of the file; it exists in the review.</param>
+    /// <param name="side">The side whose content is counted.</param>
     /// <param name="endLine">The last line the anchor needs.</param>
     /// <param name="cancellationToken">Cancels the operation.</param>
     /// <returns>A task that completes when the range is accepted.</returns>
@@ -484,19 +573,22 @@ public sealed class ThreadService
         int projectId,
         string reviewId,
         string filePath,
+        ThreadSide side,
         int endLine,
         CancellationToken cancellationToken)
     {
-        var content = await _store.GetFileContentAsync(projectId, reviewId, filePath, cancellationToken) ?? [];
-        var text = FileText.TryDecode(content);
-        if (text is null)
+        var content = (side == ThreadSide.Baseline
+            ? await _store.GetBaselineContentAsync(projectId, reviewId, filePath, cancellationToken)
+            : await _store.GetFileContentAsync(projectId, reviewId, filePath, cancellationToken)) ?? [];
+        var lines = FileText.TryReadLines(content);
+        if (lines is null)
         {
             throw new DomainRuleException(
                 DomainRule.ThreadAnchorInvalid,
                 "Line comments are not possible on a binary file; comment on the whole file instead.");
         }
 
-        var lineCount = FileText.SplitLines(text).Count;
+        var lineCount = lines.Count;
         if (endLine > lineCount)
         {
             throw new DomainRuleException(

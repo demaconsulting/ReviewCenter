@@ -32,7 +32,7 @@ namespace DemaConsulting.ReviewCenter.Core;
 ///     is built so that it never depends on storage row identities or on the order rows happen to be read
 ///     in, and so that two different records can never produce the same text:
 ///     <list type="number">
-///         <item>a version header line (<c>ReviewCenter record v3</c>; any change to this format must bump it);</item>
+///         <item>a version header line (<c>ReviewCenter record v4</c>; any change to this format must bump it);</item>
 ///         <item>the content fingerprint;</item>
 ///         <item>the source of the files: <c>source upload</c> for an upload, otherwise
 ///               <c>source git</c> with the repository identity, the baseline commit (or <c>-</c>), the head commit,
@@ -45,7 +45,7 @@ namespace DemaConsulting.ReviewCenter.Core;
 ///               (who answered and when are deliberately not covered, so answering the same value again does not
 ///               invalidate a signature);</item>
 ///         <item>the sections that do not apply, sorted by section id: id and reason;</item>
-///         <item>every thread rendered to one block (anchor, state, creation time, and its comments in posting
+///         <item>every thread rendered to one block (anchor with its side, state, creation time, and its comments in posting
 ///               order with author display name, author user name, text and time); the blocks are sorted, so
 ///               the order of threads does not matter, while the order of comments does.</item>
 ///     </list>
@@ -58,7 +58,7 @@ public static class RecordDigest
     /// <summary>
     ///     The first line of the canonical text; names the format version.
     /// </summary>
-    private const string Header = "ReviewCenter record v3";
+    private const string Header = "ReviewCenter record v4";
 
     /// <summary>
     ///     Builds the canonical text of a record.
@@ -147,7 +147,7 @@ public static class RecordDigest
     {
         var lines = new List<string>
         {
-            $"thread {Text(thread.FilePath)} {Number(thread.StartLine)} {Number(thread.EndLine)} " +
+            $"thread {Text(thread.FilePath)} {Text(thread.Side.ToString())} {Number(thread.StartLine)} {Number(thread.EndLine)} " +
             $"{Text(thread.State.ToString())} {thread.Created.UtcTicks.ToString(CultureInfo.InvariantCulture)}"
         };
 

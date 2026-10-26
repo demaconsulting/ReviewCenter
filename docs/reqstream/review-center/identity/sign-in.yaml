@@ -40,6 +40,18 @@ sections:
           - SignIn_SafeReturnUrl_AnyInput_KeepsOnlyLocalPaths
           - SignIn_Login_HostileReturnUrl_RedirectsToHomePage
 
+      - id: ReviewCenter-SignIn-ReturnDeepLink
+        title: >-
+          The SignIn unit shall send an anonymous request for a protected page to the login page with the address
+          that was requested as the return address, exactly as it was written, including escaped characters and the
+          query, so that signing in leads back to the same page.
+        justification: |
+          A link to one file, line or thread is only useful if it survives the sign-in. The decoded request path
+          cannot be used, because it turns an escaped slash or percent sign in a file name into something else.
+        tests:
+          - SignIn_DeepLink_SignedOut_ReturnsToTheSameLinkAfterLogin
+          - SignIn_DeepLink_PlusAndAmpersand_ReturnsToTheSameFileAfterLogin
+          - SignIn_DeepLink_HostileReturnUrl_GoesToTheHomePage
       - id: ReviewCenter-SignIn-Cookie
         title: >-
           The SignIn unit shall keep the session in a cookie that scripts cannot read, that is not sent with

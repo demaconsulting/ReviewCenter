@@ -58,6 +58,7 @@ includes:
   - docs/reqstream/review-center/core/revision-validator.yaml
   - docs/reqstream/review-center/core/repository-service.yaml
   - docs/reqstream/review-center/core/review-planner.yaml
+  - docs/reqstream/review-center/core/line-diff.yaml
   - docs/reqstream/review-center/storage.yaml
   - docs/reqstream/review-center/storage/review-center-db-context.yaml
   - docs/reqstream/review-center/storage/review-store.yaml

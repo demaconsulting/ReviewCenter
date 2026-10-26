@@ -207,7 +207,7 @@ public class RecordDigestTests
         // Assert: version line, fingerprint, answers, sections that do not apply, threads
         var expected = string.Join(
             '\n',
-            "ReviewCenter record v3",
+            "ReviewCenter record v4",
             "fingerprint 3:abc",
             "source upload",
             "answers",
@@ -215,7 +215,7 @@ public class RecordDigestTests
             "sections",
             "not-applicable 3:DES 4:none",
             "threads",
-            $"thread 5:a.txt 1 2 4:Open {ticks}",
+            $"thread 5:a.txt 4:Head 1 2 4:Open {ticks}",
             $"comment 3:Ann 3:ann 10:Please fix {ticks}");
         Assert.Equal(expected, text);
     }
@@ -252,10 +252,79 @@ public class RecordDigestTests
         // Act: compute the digest
         var digest = RecordDigest.Compute(record);
 
-        // Assert: the SHA-256 of "ReviewCenter record v3\nfingerprint 3:abc\nsource upload\nanswers\nsections\nthreads",
-        // worked out with an independent tool; only the header differs from the v2 digest fd4f1644...
-        Assert.Equal("0527d1b7805490ea49b3ace3b00c531b07b44276996e0118c6c654c3f1dd8ef6", digest);
-        Assert.NotEqual("fd4f16444ef233068c76aad7bed87b1bafd550c20a0019f576e5cdaaadb9384c", digest);
+        // Assert: the SHA-256 of "ReviewCenter record v4\nfingerprint 3:abc\nsource upload\nanswers\nsections\nthreads",
+        // worked out with an independent tool; the v3 digest of the same record was 0527d1b7...
+        Assert.Equal("244341c991c7ad467cb6f84ea3236bf06cddaada609cabc5ef7a5f3326f7aeb0", digest);
+        Assert.NotEqual("0527d1b7805490ea49b3ace3b00c531b07b44276996e0118c6c654c3f1dd8ef6", digest);
+    }
+
+    /// <summary>
+    ///     Builds a record of an upload with a single thread anchored to lines 1-2 of <c>a.txt</c> on the given side.
+    /// </summary>
+    /// <param name="side">The side of the thread.</param>
+    /// <returns>The record.</returns>
+    private static ReviewRecord SidedRecord(ThreadSide side)
+    {
+        var thread = new ReviewThread
+        {
+            Id = 7,
+            ProjectId = 1,
+            ReviewId = "rev-1",
+            FilePath = "a.txt",
+            Side = side,
+            StartLine = 1,
+            EndLine = 2,
+            State = ReviewThreadState.Open,
+            Created = _time,
+            Comments = [Comment(70)]
+        };
+        return new ReviewRecord("abc", null, [], [], [thread], ReviewSource.Upload);
+    }
+
+    /// <summary>
+    ///     Test that the side of a thread is written after the path as a length-prefixed name, with known
+    ///     digests for both sides worked out with an independent tool.
+    /// </summary>
+    [Theory]
+    [InlineData(ThreadSide.Head, "4:Head", "9fbaa65dceeba949bcfb6ebbf94570035516a11aed51df672503fee68c08a528")]
+    [InlineData(ThreadSide.Baseline, "8:Baseline", "b3254cedc7e54cac4d5452de47858bb0b64de2f2bc7daa703a58012e632042df")]
+    public void RecordDigest_Compute_ThreadSide_IsWrittenAndMatchesKnownValue(ThreadSide side, string written, string expectedDigest)
+    {
+        // Arrange: an upload record with one thread on the given side
+        var record = SidedRecord(side);
+        var ticks = _time.UtcTicks;
+
+        // Act: build the canonical text and the digest
+        var text = RecordDigest.Canonicalize(record);
+        var digest = RecordDigest.Compute(record);
+
+        // Assert: the thread line carries the side after the path, and the digest is the known answer
+        var expected = string.Join(
+            '\n',
+            "ReviewCenter record v4",
+            "fingerprint 3:abc",
+            "source upload",
+            "answers",
+            "sections",
+            "threads",
+            $"thread 5:a.txt {written} 1 2 4:Open {ticks}",
+            $"comment 3:Ann 3:ann 10:Please fix {ticks}");
+        Assert.Equal(expected, text);
+        Assert.Equal(expectedDigest, digest);
+    }
+
+    /// <summary>
+    ///     Test that moving a thread from the head to the baseline changes the digest, so a signature binds to the side.
+    /// </summary>
+    [Fact]
+    public void RecordDigest_Compute_ThreadSideChange_ChangesDigest()
+    {
+        // Arrange, Act: the digests of the same thread on each side
+        var head = RecordDigest.Compute(SidedRecord(ThreadSide.Head));
+        var baseline = RecordDigest.Compute(SidedRecord(ThreadSide.Baseline));
+
+        // Assert: they differ
+        Assert.NotEqual(head, baseline);
     }
 
     /// <summary>
@@ -282,9 +351,9 @@ public class RecordDigestTests
         var empty = RecordDigest.Compute(Make(string.Empty));
 
         // Assert: known answers worked out with an independent tool, all different, and the line shape
-        Assert.Equal("12be9587545afc1fa2582d98cbddbfa21b4d0b0d6bdbbb3b7a86d9169f445839", none);
-        Assert.Equal("f3ed40b16882604e849bce995fbb8660c83948e9c3bc0ae51a9b904b2aab2046", core);
-        Assert.Equal("e0e0cb426b74f3ca1b05c869cbbefecc3190c2ec4823b99eaa9a0250ed2623e9", empty);
+        Assert.Equal("1c2c05b15941c7bc7f8c6b63aff356e4efd5123c0ed8d97ffa3ead7635046387", none);
+        Assert.Equal("54b660301c966a5e5fb0e76bbf91860da1e6ea5544b74232fe851762f0721cbc", core);
+        Assert.Equal("6b9383b83e087a9f862b95079e9eb2caccda8b51e04bb4e2484fd0c94a430364", empty);
         Assert.Contains($"source git 7 40:{sha1} 40:{sha2} 4:**/* 4:core\n", RecordDigest.Canonicalize(Make("core")));
         Assert.Contains($"source git 7 40:{sha1} 40:{sha2} 4:**/* -\n", RecordDigest.Canonicalize(Make(null)));
     }
@@ -320,7 +389,7 @@ public class RecordDigestTests
         // Assert: the source block comes after the fingerprint, with the changes sorted by path
         var expected = string.Join(
             '\n',
-            "ReviewCenter record v3",
+            "ReviewCenter record v4",
             "fingerprint 3:abc",
             $"source git 7 40:{sha1} 40:{sha2} 4:**/* -",
             "changes",
@@ -330,7 +399,7 @@ public class RecordDigestTests
             "sections",
             "threads");
         Assert.Equal(expected, text);
-        Assert.Equal("12be9587545afc1fa2582d98cbddbfa21b4d0b0d6bdbbb3b7a86d9169f445839", RecordDigest.Compute(record));
+        Assert.Equal("1c2c05b15941c7bc7f8c6b63aff356e4efd5123c0ed8d97ffa3ead7635046387", RecordDigest.Compute(record));
     }
 
     /// <summary>

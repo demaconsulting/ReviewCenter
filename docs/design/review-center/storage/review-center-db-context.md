@@ -30,8 +30,9 @@ repository registry is the one exception, see `Repositories`).
   64) are null when the file has no baseline. A file belongs to a review and is deleted with it.
 - **Threads** (`ReviewThread`): key `Id`, assigned by the database. `ProjectId`, `ReviewId`, and `FilePath` name
   the file the thread is about and form a relationship to that file, so the database refuses a thread for a file
-  that does not exist, and a thread is deleted with its file. `StartLine` and `EndLine` are null for a thread on
-  the whole file. `State` is stored as text, at most 32; `Created`.
+  that does not exist, and a thread is deleted with its file. `Side` is stored as text (`Head` or `Baseline`), at most
+  32, with `Head` as the default, so a row written without a side reads as a head thread. `StartLine` and `EndLine`
+  are null for a thread on the whole file. `State` is stored as text, at most 32; `Created`.
 - **Comments** (`ReviewComment`): key `Id`, assigned by the database, so it grows with the posting order.
   `ThreadId` relates the comment to its thread, and a comment is deleted with its thread. `Author` (the display name
   at the time) is required, at most 100 characters; `AuthorUsername` (the user name) is required, at most 50;

@@ -206,3 +206,24 @@ sections:
           - ReviewPlanner_CreateAsync_InvalidRequests_FailPerRequest
           - ReviewPlanner_CreateAsync_LongestInputs_AuditDetailFits
           - ReviewService_CreateFromRepositoryAsync_SelectionTooLong_ThrowsAndManualReviewHasNoSet
+
+      - id: ReviewCenter-ReviewService-Diff
+        title: >-
+          The ReviewService class shall give the line differences between the baseline and the head content of a
+          file of a review, computed from the content already stored with the review and without opening the
+          repository, treating an added file as all lines added and a deleted file as all lines removed, and shall
+          report instead of lines that the review has no baseline (an uploaded review or one without a baseline
+          commit), that a side of the file is binary, or that the file is too large to compare, and that the lines
+          are the same when only line endings or the final line ending differ, and shall give nothing for a review
+          or file that does not exist.
+        justification: |
+          A reviewer needs to see what changed in a file. The review froze both contents, so the answer must not
+          depend on the repository still being available or unchanged, and must be the same every time. A file that
+          cannot be compared sensibly is better explained than shown wrongly.
+        tests:
+          - ReviewService_GetDiffAsync_ModifiedAddedDeleted_ComparesFrozenContentWithoutGit
+          - ReviewService_GetDiffAsync_UnknownFileOrReview_ReturnsNull
+          - ReviewService_GetDiffAsync_NoBaselineOrUpload_ReportsNoBaseline
+          - ReviewService_GetDiffAsync_BinarySide_ReportsBinary
+          - ReviewService_GetDiffAsync_BeyondLineLimit_ReportsTooLarge
+          - ReviewService_GetDiffAsync_OnlyLineEndingsDiffer_IsFlagged

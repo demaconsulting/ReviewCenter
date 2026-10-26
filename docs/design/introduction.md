@@ -81,7 +81,7 @@ The ReviewCenter system is divided as follows:
   users, reviewer signatures, the hash-chained audit trail, and the registry of git repositories, free of web and
   database technology; contains the Fingerprint, RecordDigest, AuditChain, AuditService, ProjectService,
   ReviewService, ThreadService, ChecklistService, UserService, SigningService, RepositoryService, SelectionMatcher,
-  RevisionValidator, and ReviewPlanner units
+  RevisionValidator, ReviewPlanner, and LineDiff units
 - **Storage** (subsystem): persistence of projects, reviews, comment threads, checklists, users, reviewer slots,
   signatures, the audit trail, and the registered repositories in a database
   through Entity

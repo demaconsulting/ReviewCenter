@@ -21,13 +21,12 @@ comment, checklist answer, and signature is recorded under the signed-in user. R
 under development.
 
 > **Warning: databases created by an earlier build must be recreated.** Reviews from a git repository add columns to
-> the review tables, and the review record has a new digest format (version 3) that also covers the review-set a
-> review was planned for; an earlier development database does not have these columns, and the database is created
-> by `EnsureCreated` without migrations. Delete the old database file before starting this version (development
-> databases only). The server also keeps a Data
-> Protection key ring in a `keys` folder beside the database (see
-> [Repositories and Credentials](#repositories-and-credentials)); starting this version once signs everybody out,
-> because the cookie keys now persist in that folder.
+> the review tables, and the review record has a new digest format (version 4) that also covers the review-set a
+> review was planned for and the side of every line comment; an earlier development database does not have these
+> columns, and the database is created by `EnsureCreated` without migrations. Delete the old database file before
+> starting this version (development databases only). The server also keeps a Data Protection key ring in a `keys`
+> folder beside the database (see [Repositories and Credentials](#repositories-and-credentials)); starting this
+> version once signs everybody out, because the cookie keys now persist in that folder.
 
 ## Features
 
@@ -51,8 +50,11 @@ The current release provides:
   exclude, default `**/*`). The review covers the files that changed between the baseline and the head and match the
   selection; if none does, no review is created and you are told so. The changed files, their baseline and head
   content, the two commits, and the selection are copied into the database when the review is created, so later
-  commits do not change the review. The review page shows each file as Added, Modified, or Deleted; a modified file
-  can be read as **Head** (where comments are made) or as a read-only **Baseline**. There is no diff highlighting.
+  commits do not change the review. The review page shows each file as Added, Modified, or Deleted; every file of a
+  review that has a baseline commit opens as a **Diff** (the baseline and the head side by side, unchanged lines
+  collapsed, a **+** on every line to comment on it; an added file shows all its lines as added, a deleted file all
+  as removed) and can also be read as **Head** (not for a deleted file) or as a read-only **Baseline** (not for an
+  added file). Uploads and reviews without a baseline commit show the numbered head only.
   A signature binds the repository, both commits, the selection, and every change (see
   [Reviews from a Repository](#reviews-from-a-repository))
 - **Planning Reviews**: if the repository has review-sets in its `.reviewmark.yaml`, choose **Plan reviews from a
@@ -65,6 +67,9 @@ The current release provides:
   and mark it resolved or reopen it; the author is the signed-in user; a next-step line says what is left to do, a
   thread index of all files (open by default, or all, or resolved) jumps to the thread's lines, resolved threads are
   collapsed to one line, and the file list shows the open threads per file
+- **Sharing Links**: every file, line and thread of a review has a stable link; the address bar always holds one, each
+  thread has a **Link**, and signing in brings you back to the link you opened (see
+  [Sharing links](#sharing-links))
 - **Review Checklist**: every new review gets a checklist of 14 sections and 58 checks, taken from the
   [Continuous Compliance review template][link-review-template]; a checklist page (linked from the review page,
   with a summary such as "37 of 58 checks answered") shows the sections with their progress, one section open at a
@@ -400,16 +405,25 @@ upload (200 files, 2 MiB per file, 20 MiB per review), counted over both version
 not reviewed; those that match the selection are listed once after the review is created and are counted in the audit
 entry.
 
-The review page shows the change kind of every file. A modified file can be read as **Head** (the numbered lines
-with their comments) or as **Baseline** (read-only). A deleted file shows its baseline content, and only
-whole-file comments can be made on it. Comments are made in the Head view only; there is no diff highlighting. The
+The review page shows the change kind of every file. Every file of a review that has a baseline commit opens as a
+**Diff**: "x added, y removed", the
+baseline on the left and the head on the right (stacked on a narrow screen), each with its own line numbers, a run of
+removed lines next to the run of added lines that replaces it, and the unchanged lines collapsed behind **Show N
+unchanged lines**. Click the **+** on a line to comment on it; the left side is commented on in the baseline and the
+right side in the head, and the thread list says "Before: line N" or "After: line N". A modified file can also be read as
+**Head** (the numbered lines with their comments) or as **Baseline** (read-only), and a file too large to compare
+line by line (more than 10,000 lines on either side, or more than 2,000 added and removed lines together) offers
+those two. A deleted file opens on its removed lines and accepts comments on them or on the whole file; it offers
+**Baseline** but no **Head**. An added file opens on its lines shown as added and accepts comments on them or on the
+whole file; it offers **Head** but no **Baseline**, because nothing existed there. An upload, and a review created
+without a baseline revision, show the numbered head only. The
 content fingerprint covers the files that exist at the head (Added and Modified), calculated as ReviewMark does. The
 Details section shows the repository name, the two commit SHAs, and the selection.
 
 The record digest of a review from a repository covers the repository, the baseline and head commits, the selection,
 the review-set the review was planned for (if any), and every change with the hashes of its baseline and head content,
-so a signature binds to exactly what was selected. The digest has a new format (version 3); a database from an earlier
-build cannot be used and must be recreated.
+so a signature binds to exactly what was selected. The digest has a new format (version 4, which also covers the side
+of every line comment); a database from an earlier build cannot be used and must be recreated.
 
 ### Review-Sets in the Repository
 
@@ -450,6 +464,14 @@ the creation the page lists one result per set, a link to the new review or the 
 stop the others, and **Plan again** offers it once more. When the plan cannot be made (the repository is disabled, the
 revision is unknown, or there is no valid `.reviewmark.yaml`) the page says so in plain words and what to do. The
 review page shows the set of a planned review as **Review set** in the Details.
+
+## Sharing Links
+
+Every file, line and thread of a review has a stable link, and the address bar of the browser always holds the link of
+what is shown (choosing a file or a thread changes it without adding history entries): `.../reviews/{reviewId}/files/{path}`
+opens a file, `?line=N&side=head|baseline` adds a highlighted line, and `.../reviews/{reviewId}/threads/{threadId}`
+opens the thread. Each thread has a **Link**. A link to something that does not exist shows a message and a way back to
+the file list, and a signed-out visitor is returned to the same link after signing in. The user guide has the details.
 
 ## Data Location and Database Settings
 

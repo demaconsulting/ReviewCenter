@@ -315,10 +315,30 @@ from the repository: later commits, a force push, or disabling the repository do
   review is created, and are counted in the audit entry.
 - A revision such as `HEAD~1` is not accepted; use a branch, a tag, or a commit id.
 
-On the review page, each file shows its change kind. Select a file to read it. For a **Modified** file a **Head** and
-a **Baseline** button appear: Head is the numbered view with comments, Baseline shows the earlier content read-only.
-There is no highlighting of differences. A **Deleted** file shows its baseline content; you can comment on the whole
-file but not on lines. Comments on lines are made in the Head view only. The review fingerprint covers the files that
+On the review page, each file shows its change kind. Select a file to read it. For a file of a review that has a
+baseline commit the page opens on a **Diff** view, with a **Head** and a **Baseline** button next to it (an **Added**
+file has no Baseline button because there was no earlier version, and a **Deleted** file has no Head button). The
+Diff view shows "x added, y removed",
+then the changed lines side by side: the earlier version (baseline) on the left and the new version (head) on the
+right, each with its own line numbers. Removed lines are red with a `-` and added lines green with a `+`; a run of
+removed lines sits next to the run of added lines that replaces it, and a cell with nothing opposite is left empty
+and grey. Unchanged lines show on both sides. Unchanged lines far from a change are collapsed behind a **Show N
+unchanged lines** button, and the page scrolls to the first change when you open the file. On a narrow screen, such as
+a phone, each row stacks: the baseline cell above the head cell, with the empty cells hidden. To comment on a line,
+click the **+** at the start of its cell: a form opens under the row saying what you are commenting on, for example
+"Comment on line 10 (before)". The **+** in the left cell comments on the baseline with the baseline line number, and
+the **+** in the right cell on the head with the head line number; hold Shift while you click another line on the
+same side, or fill in "Through line", to comment on a range. **Cancel** closes the form and **Comment on the whole
+file instead** keeps your text. Threads appear right under the row of the lines they are about, across the full
+width (a resolved thread is one line until you open it), and the thread list names them
+"Before: line N" or "After: line N" and jumps to the line when you choose one. **Head** is the numbered view with
+comments, and **Baseline** shows the earlier content read-only. A file that is too large to compare line by line
+(more than 10,000 lines on either side, or more than 2,000 added and removed lines together) says so and offers Head
+and Baseline, as the file has them. A **Deleted** file opens on a Diff view of its removed lines; you can comment on
+them or on the whole file. An **Added** file opens on a Diff of all its lines as added (the left side is empty) and
+you can comment on any of its lines or on the whole file; every file of an upload, and of a review created without a
+baseline revision, shows the numbered lines as before. The
+review fingerprint covers the files that
 exist at the head (Added and Modified), exactly as for an upload. The Details section shows the repository name, the
 baseline and head commits, and the selection.
 
@@ -445,6 +465,38 @@ problem is shown as a message next to the form (or inside the thread for a reply
 Posted comments cannot be edited or deleted, so the record of the discussion stays complete; only a thread's state
 changes. Comments posted by other people appear when you reload the page or take an action on it. Comment text is
 always shown as plain text; any markup in it is displayed as typed.
+
+### Sharing links
+
+Every file, line and thread of a review has a stable link that opens the review page at that place. The address bar
+of your browser always holds the link of what you are looking at: choosing a file in the list, or a thread in the thread
+index, changes the address without adding entries to the browser history, so the Back button still takes you to the
+page you came from. Copy the address and send it to a colleague.
+
+| Link | What it opens |
+| ---- | ------------- |
+| `/projects/{id}/reviews/{reviewId}` | The review (no file selected) |
+| `/projects/{id}/reviews/{reviewId}/files/{path}` | That file, as a diff when it can be compared |
+| `/projects/{id}/reviews/{reviewId}/files/{path}?line=12` | The same, scrolled to and highlighting head line 12 |
+| `/projects/{id}/reviews/{reviewId}/files/{path}?line=12&side=baseline` | The same for baseline line 12 |
+| `/projects/{id}/reviews/{reviewId}/threads/{threadId}` | The thread's file, scrolled to the highlighted thread |
+
+Every thread has a small **Link** next to its state, shown as a plain text link; it is an ordinary link, so you can
+also copy it with the context
+menu of your browser (there is no separate copy button). Characters in a file path that need escaping in an address
+(spaces, `#`, `?`, `%`, and letters outside the English alphabet) are escaped for you in the links the page builds.
+
+Reloading a link shows the same file, line or thread, always as the diff when the file has one (the choice between the
+Diff, Head and Baseline views is not part of the link). If a link names something that does not exist in this review
+(a file that is not in it, a thread of another review, a line the file does not have, or a baseline line of a file that
+has no baseline) the page says so in plain words and offers a link back to the file list of the review; nothing else
+is lost. If you are not signed in, opening a link takes you to the sign-in page, and signing in brings you back to the
+same link. Only the user's own sign-in is needed: there is no separate access for a link, so a person who is not
+signed in cannot read anything from it.
+
+Known limits: after you choose a file or thread, the address bar shows its link, but a "Session ended" message that
+appears later offers a sign-in link to the address the page was first opened at. A file whose name contains the text
+`%2F` is found from its link only while that is the one file whose name matches.
 
 ## Review Checklist
 
@@ -639,8 +691,8 @@ user accounts, reviewer signatures, or the audit trail existed, does not have th
 needed, and the pages cannot work with it: delete the file (or point `Database:ConnectionString` at a new one) and
 start again, then create the first administrator.** Do this only with development data. The repository registry and
 the reviews from a repository add tables and columns, and the record digest of a review from a repository is calculated
-in a new format (version 3) that includes the review-set, so a development database created before them must be
-recreated in the same way.
+in a new format (version 4) that includes the review-set and the side of every line comment, so a development
+database created before them must be recreated in the same way.
 
 ## Repositories and Credentials
 

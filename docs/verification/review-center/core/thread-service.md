@@ -23,7 +23,11 @@ N/A - standard test environment.
 - A range ending exactly at the last line is accepted, and a range beyond it, a range with one endpoint missing,
   a start below 1, an end before the start, a range on a binary or empty file, and a thread on an unknown file or
   review are rejected with `ThreadAnchorInvalid`.
-- A line range on a deleted file is rejected; a whole-file thread on a deleted file is accepted.
+- A head line range on a deleted file is rejected; a whole-file thread on a deleted file is accepted.
+- A line is accepted on a side exactly when it exists on that side, counted in the lines of that side; the baseline
+  side needs a repository review with a baseline commit and a modified or deleted file; a whole-file anchor on the
+  baseline side is rejected; a thread started without a side is a head thread.
+- The audit text of a thread on the baseline side says so, and the text of a head thread is unchanged.
 - Blank or too long texts are rejected, and a padded text is stored trimmed.
 - A comment records the user name and the display name of the actor, and a missing actor is refused with an
   `ArgumentNullException`.
@@ -66,14 +70,47 @@ accepted. This scenario is tested by `ThreadService_StartThreadAsync_WholeFileOn
 the review, and on a review that does not exist, is rejected with `ThreadAnchorInvalid`. This scenario is tested by
 `ThreadService_StartThreadAsync_UnknownFileOrReview_ThrowsThreadAnchorInvalid`.
 
-**ThreadService_StartThreadAsync_LineOnDeletedFile_ThrowsThreadAnchorInvalid**: A line range on a file that was
-deleted in a review from a repository is rejected with `ThreadAnchorInvalid` and the message "Deleted files accept
-whole-file comments only." This scenario is tested by
+**ThreadService_StartThreadAsync_LineOnDeletedFile_ThrowsThreadAnchorInvalid**: A head line range on a file that was
+deleted in a review from a repository is rejected with `ThreadAnchorInvalid` and the message "A deleted file has no
+head lines; comment on its baseline lines or on the whole file instead." This scenario is tested by
 `ThreadService_StartThreadAsync_LineOnDeletedFile_ThrowsThreadAnchorInvalid`.
 
 **ThreadService_StartThreadAsync_WholeFileOnDeletedAndLineOnModified_AreAllowed**: A whole-file thread on a deleted
 file and a line thread on a modified file are accepted. This scenario is tested by
 `ThreadService_StartThreadAsync_WholeFileOnDeletedAndLineOnModified_AreAllowed`.
+
+**ThreadService_StartThreadAsync_SideMatrix_AcceptsOnlyLinesThatExistOnThatSide**: In a repository review with a
+baseline, a theory over a modified file (four baseline lines, two head lines), a deleted file (two baseline lines),
+and an added file (three head lines): a line is accepted on a side exactly when it exists on that side, so a head
+line 3 of the modified file, a baseline line 5, any head line of the deleted file, a baseline line 3 of the deleted
+file, a head line 4 of the added file, and any baseline line of the added file are rejected with
+`ThreadAnchorInvalid` and nothing is stored, while the side of an accepted thread is the side that was requested.
+This scenario is tested by `ThreadService_StartThreadAsync_SideMatrix_AcceptsOnlyLinesThatExistOnThatSide`.
+
+**ThreadService_StartThreadAsync_BaselineWithoutBaselineCommit_ThrowsThreadAnchorInvalid**: A baseline line on a
+file of a repository review that has no baseline commit, and on a file of an uploaded review, is rejected with
+`ThreadAnchorInvalid` and nothing is stored. This scenario is tested by
+`ThreadService_StartThreadAsync_BaselineWithoutBaselineCommit_ThrowsThreadAnchorInvalid`.
+
+**ThreadService_StartThreadAsync_WholeFileSide_BaselineRefusedHeadStored**: A whole-file anchor that names the
+baseline side is rejected with `ThreadAnchorInvalid`; the same anchor on the head side is stored as a head thread.
+This scenario is tested by `ThreadService_StartThreadAsync_WholeFileSide_BaselineRefusedHeadStored`.
+
+**ThreadService_StartThreadAsync_NoSideGiven_IsHeadThread**: A thread started without naming a side is a head
+thread. This scenario is tested by `ThreadService_StartThreadAsync_NoSideGiven_IsHeadThread`.
+
+**ThreadService_StartThreadAsync_BaselineRange_UsesBaselineLineCount**: A range over four lines is accepted on the
+baseline side of the modified file, which has four baseline lines, and rejected on its head side, which has two. This
+scenario is tested by `ThreadService_StartThreadAsync_BaselineRange_UsesBaselineLineCount`.
+
+**ThreadService_StartThreadAsync_UndefinedSide_ThrowsArgumentOutOfRange**: A side value that no member has is refused
+with an `ArgumentOutOfRangeException` naming the side, before the review is looked up (the same refusal on a review
+that does not exist). This scenario is tested by `ThreadService_StartThreadAsync_UndefinedSide_ThrowsArgumentOutOfRange`.
+
+**ThreadService_StartThreadAsync_Audit_NamesBaselineSideOnly**: The audit detail of a thread on one baseline line, on
+a baseline range, and on a head line reads `line 3 (baseline)`, `lines 2-4 (baseline)`, and `line 1` with the thread
+and comment identities and the text digest, within the length limit of the detail. This scenario is tested by
+`ThreadService_StartThreadAsync_Audit_NamesBaselineSideOnly`.
 
 **ThreadService_StartThreadAsync_Actor_RecordsUsernameAndDisplayName**: A thread is started as an actor; its first
 comment holds the user name and the display name of the actor. A thread started without an actor is refused with an

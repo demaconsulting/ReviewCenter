@@ -1,6 +1,6 @@
 package ReviewCenter {
     part def ReviewService {
-        doc /* Creates draft reviews from uploaded files or from the changes between two revisions of a registered git repository, freezing the changed content, enforcing the review and upload rules, and reads reviews back. */
+        doc /* Creates draft reviews from uploaded files or from the changes between two revisions of a registered git repository, freezing the changed content, enforcing the review and upload rules, and reads reviews back. Also reads one file back as a line diff between its baseline and head content (`GetDiffAsync`), computed by `LineDiff`. */
 
         comment sourceRef /* Source: src/DemaConsulting.ReviewCenter.Core/ReviewService.cs, Review.cs, ReviewFile.cs, ReviewState.cs, RepositoryReviewResult.cs, and UploadedFile.cs */
         comment testRef /* Test: test/DemaConsulting.ReviewCenter.Tests/Core/ReviewServiceTests.cs and ReviewServiceRepositoryTests.cs */

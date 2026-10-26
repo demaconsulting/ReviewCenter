@@ -246,8 +246,10 @@ selection, and every change. Review comments are implemented
 (threads anchored to a file or line range, with replies, resolve, and reopen), and every review has a checklist of
 checks (Pass, Fail, or N/A, with a justification where required) that is frozen when the review is created. The author
 of a comment and the person who saved a checklist answer are the signed-in user (user name and display name at
-that time); the checklist has no thread links, and the review page has no diff highlighting (a modified file has a
-plain Head / Baseline toggle). Reviewers are named
+that time); the checklist has no thread links, and the review page shows a file of a review with a baseline as a diff
+against its baseline (a Diff / Head / Baseline choice where the file has those versions, with the baseline and the
+head side by side in the Diff, the unchanged lines collapsed, and comments on lines of either
+version), and gives every file, line and thread a stable link (the address bar always holds one). Reviewers are named
 for a review in
 slots (a primary reviewer and an optional alternate), and a named reviewer signs the review after confirming the
 password again; a signature is bound to a digest of the review record, so it goes out of date when the record changes,

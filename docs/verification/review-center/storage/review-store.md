@@ -217,6 +217,14 @@ scenario is tested by `ReviewStore_ListThreadsAsync_TwoReviews_ReturnsOnlyOwnThr
 raises a `DbUpdateException` and no thread is stored. This scenario is tested by
 `ReviewStore_AddThreadAsync_UnknownFile_IsRefusedByDatabase`.
 
+**ReviewStore_AddThreadAsync_Side_IsPersisted**: A thread on the baseline side and a thread on the head side are
+stored and read back with the side they were given. This scenario is tested by
+`ReviewStore_AddThreadAsync_Side_IsPersisted`.
+
+**ReviewStore_AddThreadAsync_Side_IsStoredAsText**: A thread on the baseline side is stored, and a raw query of the
+`Side` column of the `Threads` table returns the text "Baseline". This scenario is tested by
+`ReviewStore_AddThreadAsync_Side_IsStoredAsText`.
+
 **Audit drafts**: Every mutation of the store takes an audit draft, and the tests of this unit pass one through
 the real `AuditAppender`; the helper `TestStore` builds the store and an `AuditStore` over the same database. The
 transaction that stores a change with its audit entry, and the linear chain of changes made through different

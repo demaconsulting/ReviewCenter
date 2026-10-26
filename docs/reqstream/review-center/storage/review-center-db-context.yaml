@@ -59,13 +59,16 @@ sections:
         title: >-
           The ReviewCenterDbContext class shall map threads and comments to tables in which a thread belongs to
           an existing file of its review and a comment belongs to a thread, so that the database refuses a
-          thread for a file that does not exist and deletes the comments of a deleted thread.
+          thread for a file that does not exist and deletes the comments of a deleted thread, and shall map the side
+          of a thread as text with Head as the default.
         justification: |
           A thread is about one file of one review. Having the database enforce that relationship keeps the
-          record consistent even when two requests overlap or a programming error occurs.
+          record consistent even when two requests overlap or a programming error occurs. Storing the side by
+          name keeps the stored value readable and independent of the order of the enumeration.
         tests:
           - DatabaseSetup_EnsureCreated_MissingFolder_CreatesFolderFileAndTables
           - ReviewStore_AddThreadAsync_UnknownFile_IsRefusedByDatabase
+          - ReviewStore_AddThreadAsync_Side_IsStoredAsText
 
       - id: ReviewCenter-DbContext-Checklist
         title: >-

@@ -4,14 +4,16 @@
 
 #### Purpose
 
-`ReviewPage` is the page at `/projects/{id}/reviews/{reviewId}`. Its responsibility is to show one review, with the
+`ReviewPage` is the page at `/projects/{id}/reviews/{reviewId}`, which also answers the file, line and thread addresses
+described under Deep links below. Its responsibility is to show one review, with the
 reader's work first. From the top it shows the title with an approval badge (Approved or In review), a one-sentence
 next step, a checklist card (progress summary
 such as "37 of 58 checks answered" and a link to the checklist page; absent when the review has no checklist), a
 Reviewers card (the reviewer slots with their signature status, the form that adds a slot, and, for a reviewer, the
 form that signs), the
 files with the size and number
-of open threads of each, the thread index of all files, the numbered lines of a selected file, the comment
+of open threads of each, the thread index of all files, the selected file as a diff against its baseline (or as numbered
+lines), the comment
 threads on that file, which a reader can answer, resolve, and reopen (a resolved thread is a one-line header
 until expanded), and the form that starts a new thread. Last, in a native `<details>` element that is collapsed by
 default, it shows the review's
@@ -29,7 +31,9 @@ has a link to the history page of the review (`history-link`), where the audit e
 
 The page instance is created per browser connection, so its state is per user.
 
-**ProjectId**, **ReviewId**: the route parameters.
+**ProjectId**, **ReviewId**: the route parameters. **FilePath**, **ThreadId**, **LineText**, **SideText**: the optional
+route and query values of a deep link. **HighlightLine**, **HighlightSide**, **DeepLinkMessage**: the line the address
+named and the message for an address that names nothing; all three are cleared whenever the reader chooses a file.
 
 **Loaded**, **Review**, **ProjectName**: whether loading finished, the review with its file metadata (`null` when
 it does not exist), and the name of the owning project shown in the breadcrumb (the project identity is shown
@@ -40,9 +44,16 @@ when the project cannot be found).
 **SelectedLines**: the lines of the selected file as defined by `FileText`; `null` when no file is selected or the
 file is shown as binary.
 
-**SelectedKind**, **BaselineView**, **BaselineLines**: the change kind of the selected file, whether the read-only
-baseline is shown instead of the head, and the lines of the baseline text (`null` for binary content or when not yet
-loaded). The baseline is loaded the first time it is shown.
+**SelectedKind**, **CurrentView**, **Diff**, **BaselineLines**: the change kind of the selected file, the view shown
+(`Diff`, `Head`, or `Baseline`), the `LineDiffResult` of the file from `ReviewService.GetDiffAsync` (`null` for a
+file of an uploaded review or of a review without a baseline commit), and the lines of the baseline text (`null`
+for binary content or when not yet
+loaded). The baseline is loaded the first time it is shown. **CanCompare** is true when the review is from a
+repository and froze a baseline commit (every file of it has a diff, an added file as all added lines; a file of an
+uploaded review or of a review without a baseline commit has none), **HasHeadVersion** when the file has a head
+version (every kind but deleted), **HasBaselineVersion** when it has a baseline version (`CanCompare` and not an
+added file), and **ShowingDiff** when the Diff view is shown
+for a diff that has rows. **NewSide**: the version (`Head` or `Baseline`) the new-thread form anchors to.
 
 **Threads**: all threads of the review, for every file, in creation order. The summary and the per-file counts are
 calculated from this list, and the selected file's threads are the ones with its path.
@@ -89,11 +100,19 @@ Test identifiers: `review-page` (root), `home-link`, `projects-link`, `project-l
 `file-size-{index}`, `file-open-threads-{index}`, `file-select-{index}`,
 `selected-file-path`, `file-binary-notice`, `file-empty-notice`, `new-thread-form`,
 `thread-start-line-input`, `thread-end-line-input`, `thread-target`, `thread-text-input`, `thread-error`,
-`start-thread-button`, `file-content`, `code-line-{n}`, `line-comment-{n}`, `line-no-{n}`, `line-marker-{n}`,
+`start-thread-button`, `thread-cancel-button` and `thread-whole-file-button` (only in the form under a diff row),
+`file-content`, `code-line-{n}`, `line-comment-{n}`, `line-no-{n}`, `line-marker-{n}`,
 `line-text-{n}` (all by 1-based line number), `file-kind-{index}` (the change kind of a file in the list, shown for
-reviews from a repository only), `selected-file-kind`, `file-version-toggle` (shown for a modified file),
-`view-head-button`, `view-baseline-button`, `baseline-note`, `baseline-content`, `baseline-line-{n}`,
-`baseline-line-no-{n}`, `baseline-line-text-{n}`, `baseline-comment-note`, `deleted-comment-note`,
+reviews from a repository only), `selected-file-kind`, `file-version-toggle` (shown when the file can be compared),
+`view-diff-button`, `view-head-button`, `view-baseline-button`, `baseline-note`, `baseline-content`,
+`baseline-line-{n}`, `baseline-line-no-{n}`, `baseline-line-text-{n}`, `baseline-comment-note`,
+`deleted-comment-note`, `diff-too-large`, `diff-too-large-head`, `diff-too-large-baseline`, and, from
+`DiffView`, `diff-view`, `diff-summary`, `diff-hint`, `diff-content`, `diff-gap-{start}` (by the index of the first
+collapsed row), `diff-pair-{i}` (a side-by-side row, by the index of its first line), `diff-row-{i}` (a cell, with
+`data-kind` of `context`, `added`, or `removed`; the cell of a removed line, of an added line and the right cell of an
+unchanged line), `diff-row-old-{i}` (the left cell of an unchanged line), `diff-comment-{i}`, `diff-comment-old-{i}`,
+`diff-old-no-{i}`, `diff-new-no-{i}`, `diff-text-{i}`, `diff-text-old-{i}`, `diff-threads-{i}`,
+`diff-empty-left-{i}`, `diff-empty-right-{i}` (the empty placeholders), and `diff-composer` (all by row index),
 `review-repository`, `review-set-id` (only for a review planned from a review-set), `review-baseline-sha`,
 `review-head-sha`, `review-selection` (in the details of a review from
 a repository), `threads-empty`, `threads-list`, `thread-{id}`,
@@ -137,21 +156,63 @@ begin there. Every line is a row of the page, so a file with very many lines mak
 limits bound this (measured: about 3 seconds for 5,000 lines, about 10 seconds for a 2 MiB file of 32,000 short
 lines).
 
-**ShowHead** and **ShowBaselineAsync**: For a modified file, a simple two-button toggle (`Head` and `Baseline`)
-switches between the head view described above, which takes comments, and the frozen baseline, shown as numbered
-lines without comment buttons, markers, or the new-thread form, and with a note that comments are made in the Head
-view. There is no diff highlighting. An added file shows only the head; a deleted file shows its baseline (the
-file has no head) and accepts whole-file comments only, through the same new-thread form with the line fields left
-blank (a note says so, and Core refuses a line range). Selecting another file always starts in its head view. The
-file list shows the change kind (Added, Modified, or Deleted) of each file of a review from a repository, and the
+**ShowDiff**, **ShowHead**, and **ShowBaselineAsync**: Switch between the three views of a file that can be
+compared (`CanCompare`). The Diff view is described below; the Head view is the numbered view above, which takes
+comments; the Baseline view shows the frozen baseline as numbered lines without comment buttons, markers, or the
+new-thread form, and with a note that comments are made in the Diff or Head view. Switching keeps the typed text
+and clears the line selection. A modified file offers all three, an added file offers Diff and Head (no baseline
+exists, and its diff has an empty left side), a deleted file offers Diff and Baseline (it has no
+head), and a file of an uploaded review or of a review without a baseline commit has no choice and shows only the
+head. Selecting
+another file starts in its default view: Diff when the file can be compared, otherwise Head (a deleted file whose
+diff is unavailable shows its baseline and accepts whole-file comments only, with the line fields left blank, a note
+says so, and Core refuses a line range). The file
+list shows the change kind (Added, Modified, or Deleted) of each file of a review from a repository, and the
 size of a deleted file is its baseline size. Both the head and the baseline bytes are read from the frozen copies in
 the store, never from the repository.
+
+**Diff view**: `SelectFileAsync` asks `ReviewService.GetDiffAsync` for the comparison. The `DiffView` component
+draws a `LineDiffResult` side by side: the baseline on the left and the head on the right. Each shown segment of
+rows is arranged by `LineDiff.Pair`, so an unchanged line shows on both sides, a run of removed lines is paired row
+by row with the run of added lines that follows it, and the leftover cells of the shorter run are empty
+placeholders (muted, hidden from assistive technology). A cell has a comment control, the line number of its side, a
+`-` or `+` sign, and the text as plain text, wrapped inside the cell. Removed and added cells are marked by color and
+by their sign. Above the rows it shows "x added, y removed" (or a sentence that only the line endings differ), and,
+when there are rows, the hint "Click + to comment on a line." The rows are grouped by `LineDiff.Segment`, and a run
+of unchanged lines that is collapsed shows a button "Show N unchanged lines" that expands it. The rows of threads and
+of the selected line are pinned, so they are never hidden; a thread pins both its first and its last row, because the
+thread index and links scroll to the first row. The first change is therefore near the top of the view,
+because the unchanged lines before it (apart from three lines of context) are collapsed; when a file opens with such
+a collapsed run above its first change, `SelectFileAsync` also sets that row as the scroll target (block `center`)
+instead of the file path, using the page's existing `reviewCenter.scrollToTestId` helper of `App.razor`, which
+deep links reuse. The style sheet gives the review page a wider column (80 rem) so each side has room; below 40 rem
+it stacks the left cell above the right cell of a row and hides the empty placeholders and the left copy of an
+unchanged line, so every line shows once and the page never scrolls sideways. A result that is `TooLarge` shows "Too
+large to compare line by line." and offers the Head and the Baseline view that the file has (an added file only the
+Head view); a binary file shows the binary notice.
+
+`DiffView` has the parameters `Result`, `OnlyLineEndingsDiffer`, `Threads`, `FocusedThreadId`, `SelectedSide`,
+`SelectedStart`, `SelectedEnd`, `ThreadTemplate` (how the page draws a thread, so the reply, resolve and reopen
+controls are the ones of the thread list), `Composer` (the new-thread form, drawn under the selected row), and the
+event `OnComment`, which carries a `DiffCommentRequest(Side, Line, Extend)`. The control of a left cell asks for the
+Baseline side and its baseline line number (a removed line, or the baseline copy of an unchanged line); the control
+of a right cell asks for the Head side and its head line number. A thread is drawn under the row of the last line of
+its anchor, across the full width, and the cell of its side is marked. The component holds only which collapsed runs
+the reader has expanded; every other state is the page's.
+
+**CommentOnDiffLine**: Handles an `OnComment` request. A plain click selects the line on its side and opens the
+new-thread form under its row; Shift-click, or the "Through line (optional)" field, extends the selection to a
+range, but only on the same side, because the two sides have different numbering. The form says what it will do in
+plain words ("Comment on line 10 (before)", "Comment on line 12 (after)"), and offers Cancel
+(`CancelComment`) and "Comment on the whole file instead" (`CommentOnWholeFile`), which clears the selection and
+keeps the typed text.
 
 **CommentOnLine**: Fills the start and end line of the new-thread form with one line number, and makes the form the
 scroll target, because the form sits below the code and the threads.
 
 **StartThreadAsync**: Starts a thread on the selected file from the form, on behalf of the signed-in user, who comes
-from the authentication state (`SignIn.GetActorAsync`). Both line fields blank anchor the whole
+from the authentication state (`SignIn.GetActorAsync`), on the side `NewSide` (Head unless the form was opened from a
+left cell of the diff). Both line fields blank anchor the whole
 file, only a start line anchors that line, and both anchor the range. A line field that is not a whole number is
 reported as "Line numbers must be whole numbers." A violated comment rule is shown in `thread-error` next to the
 form and everything typed stays. Success clears the text and line fields and reloads the
@@ -169,9 +230,16 @@ user sees. **ToggleThreadExpanded**: Expands or collapses a resolved
 thread.
 
 **SelectThreadAsync**: Shows a thread chosen in the index. The thread's file is selected through `SelectFileAsync`
-only when it is not already shown, so text typed in the new-thread form is kept; the thread becomes the focused
-thread, a resolved thread is expanded, and the first line of its anchor (or the thread card for a whole-file
-thread) becomes the scroll target. The index rows come from `ThreadService.BuildIndex` and the next-step line from
+only when it is not already shown, so text typed in the new-thread form is kept. A file that has a diff is shown in
+the Diff view; a too-large file is shown in the Baseline or the Head view, whichever the thread's side names. The
+thread becomes the focused
+thread, a resolved thread is expanded, and the first line of its anchor (a row of the diff, a baseline line, a head
+line, or the thread card for a whole-file thread) becomes the scroll target. A file that can be compared words the
+anchor of a thread and of an index row as "Before: line N" or "After: lines N-M" (the side is the thread's
+`ThreadSide`; this applies to every file of a review with a baseline commit, an added file included); other files
+keep "Line N". Each thread card has a `thread-link-{id}` anchor, a plain, small, muted text link (class
+`thread-link`, not the button-style `action`) to the thread's address, so it does not compete with Resolve and
+Reply. The index rows come from `ThreadService.BuildIndex` and the next-step line from
 `Approval.NextStep` (which `SigningService` builds with `ThreadService.NextStep`, given the checklist progress and the
 number of checks answered Fail, and words itself for missing slots and signatures), so the page holds no ordering or
 wording rules of its own.
@@ -204,11 +272,38 @@ browser builds a new, empty input. It is never rendered as a value, logged, or k
 **ShortDigest**: Shortens the record digest to its first 16 characters; the Details section shows the short value
 with the full 64 characters in the `title` attribute.
 
-**OnAfterRenderAsync**: Marks the page interactive after the first render on a live connection, and, when a scroll
-target is set, calls the browser function `reviewCenter.scrollToTestId` (defined in `App`) once with the test id and
+**OnAfterRenderAsync**: Marks the page interactive after the first render on a live connection, and, when a
+replacement address is pending, calls the browser function `reviewCenter.replaceUrl` (defined in `App`) with it. Then,
+when a scroll
+target is set, it calls the browser function `reviewCenter.scrollToTestId` (defined in `App`) once with the test id and
 where it should land (`start` or `center`) and clears the target. Highlighting is done by the page itself (a
 `focused` class), so only the scroll needs the browser; a
 connection that is already gone is ignored.
+
+**Deep links**: The page has three routes: the review, `/projects/{id}/reviews/{reviewId}/files/{**FilePath}` (with the
+optional query values `line` and `side`, `head` or `baseline`), and `/projects/{id}/reviews/{reviewId}/threads/{id}`.
+`OnParametersSetAsync` applies the address after the load and before `Loaded` becomes true, so the first response (and
+therefore a reload) already shows the file, the highlight and, on a live connection, the scroll. `ApplyAddressAsync`
+selects the file (or the file of the thread) through the ordinary `SelectFileAsync` or `SelectThreadAsync`. For a
+line it parses `line` as digits only, reads `side` (anything but `baseline` is the head), checks that a baseline line
+is asked only of a file that has a baseline version (never an added file), and checks that the line exists; the diff
+row of the line is pinned so it
+is not hidden in a collapsed run, and `DiffView` gets `HighlightSide` and `HighlightLine`. A file that has no diff is
+shown in the Head or the Baseline view, with the line marked there. The router decodes the file path once, so the page
+never decodes it again; the one exception is that the router also turns a literal `%2F` of a file name into a slash,
+so a file path is also matched with `%2F` in the names read as `/` when that matches exactly one file. An address that
+names nothing (an unknown file or thread, a thread of another review, a baseline line of a file without a baseline, a
+line that is not a number or does not exist) sets `DeepLinkMessage`, shown above the file list with the link
+`deep-link-back` to the plain review address; nothing is selected and the page works as usual. Choosing a file
+(`ViewFileAsync`) or a thread in the index (`ViewThreadAsync`) selects as before and sets the pending address to the
+link of the file or thread; the page replaces the address of the browser by it with `history.replaceState`, so the
+address bar always holds a shareable link and the back button is not filled with entries. `NavigateTo` with
+replacement is not used, because the router would re-initialize the page and lose what is typed. The view mode (Diff,
+Head, Baseline) is not part of the address, so a reload shows the Diff view. Each thread card has the plain anchor
+`thread-link-{id}` with the link of the thread (a plain, small, muted text link, class `thread-link`). **ReviewLinks**
+builds all of these addresses: it escapes the review
+identifier and each path segment with `Uri.EscapeDataString` and joins them with `/`, and writes `?line=N&side=...`
+only when a line is given.
 
 Comments, approval, and slots are read when the page loads and after each change made on the page. A comment or
 signature made in another browser appears when this page is next loaded or changed; nothing is pushed. The page
@@ -231,20 +326,26 @@ raises no other errors of its own.
 
 - **SessionGate** (App) — wraps the whole page content, so the page is replaced by a "Session ended" message when the
   sign-in state of the open page ends.
-- **ReviewService** — reads the review and the head and baseline bytes of a file.
-- **ThreadService** — starts, answers, resolves, reopens, and lists threads, and shapes them for the index.
+- **ReviewService** — reads the review, the head and baseline bytes of a file, and the comparison of a file
+  (`GetDiffAsync`).
+- **DiffView** — draws the Diff view; it is a part of this unit.
+- **LineDiff** — groups the rows of a comparison into shown regions and collapsed runs, and arranges them side by side.
+- **ThreadService** — starts (on the Head or the Baseline side), answers, resolves, reopens, and lists threads, and
+  shapes them for the index.
 - **ChecklistService** — reads the checklist progress for the summary.
 - **SigningService** — computes the approval status (blockers, record digest, next step), lists the users that can
   fill a slot, adds, changes, and removes slots, and signs; it holds every signing rule.
 - **FileText** — decides whether a file is text and splits it into lines.
 - **SignIn** — `GetActorAsync` supplies the signed-in user from the authentication state.
 - **ProjectService** — reads the name of the owning project for the breadcrumb.
-- **ASP.NET Core Blazor components** — the component base class, events, JavaScript interop, and the interactive
-  server render mode.
-- **App** — defines the scroll function that the page calls.
+- **ASP.NET Core Blazor components** — the component base class, events, JavaScript interop, the router, and the
+  interactive server render mode.
+- **App** — defines the scroll function and the address replacement function that the page calls.
+- **ReviewLinks** — builds the addresses of the review, its files and lines, and its threads; it is a part of this unit.
 
 #### Callers
 
 - **App** — the router renders the page for the review route.
 - **ProjectPage** — navigates to the page after a review is created.
+- **Any reader of a shared link** — the file, line and thread addresses of the page are the links people send.
 - **HistoryPage** — links back to the page.

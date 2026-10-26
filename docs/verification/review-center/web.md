@@ -43,13 +43,22 @@ N/A - standard test environment (temporary SQLite databases are created by the t
 - A user with the Admin role who opens `/repositories` is shown the page of the registry; a reviewer is refused.
 - Every interactive element of every page has a `data-testid`.
 - The creation of a review from a repository (source choice, repository form, refusals, and skipped entries) and the
-  display of the change kinds, the source, and the Head / Baseline versions need a live connection, so they are
+  display of the change kinds, the source, and the Diff / Head / Baseline views need a live connection, so they are
   verified at unit level by the component tests of `ProjectPage` and `ReviewPage` (see the children of the requirement
   `ReviewCenter-Web-RepositoryReviews` in `web.yaml`).
+- The diff view of a review page (collapsed unchanged lines, line comments on both sides, threads under their lines,
+  and the too-large state) needs a live connection, so it is verified at unit level by the component tests of
+  `ReviewPage`; the subsystem test reads the stylesheet that keeps the code area scrolling inside itself on a phone
+  (see the requirement `ReviewCenter-Web-DiffReview` in `web.yaml`).
 - The plan page and the planning links need a live connection for the form and the creation, so they are verified at
   unit level by the component tests of `PlanPage`, `ProjectPage`, and `ReviewPage` (see the children of the requirement
   `ReviewCenter-Web-PlanReviews` in `web.yaml`); the subsystem test requests the plan route of a project that has a
   registered repository.
+- Links to files, lines and threads (the routes, the highlight, the replacement of the address, the thread links, the
+  messages for addresses that name nothing, and the return to a link after signing in over HTTP) are verified by the
+  component tests of `ReviewPage` in `ReviewDeepLinkTests.cs`, which render the real router, and by the tests of
+  `SignIn`; the subsystem test renders the router for a signed-out visitor (see the requirement
+  `ReviewCenter-Web-DeepLinks` in `web.yaml`).
 
 ### Test Scenarios
 
@@ -76,6 +85,25 @@ summary shows one open and one resolved thread, the file shows "1 open thread", 
 thread, the index lists the open thread with an activity time read back from the database, and the Details section
 is collapsed. This scenario is tested by
 `WebSubsystem_ReviewWithThreads_ArePresentedByThePage`.
+
+**WebSubsystem_Stylesheet_DiffRules_KeepCodeScrollingInsideItself**: The stylesheet source is read and checked for the
+rules that keep the diff inside the page width: each row is a grid of two equal columns, long lines wrap inside their
+cell, the code area still scrolls inside itself as a safety net, empty placeholders are muted, inline threads and
+collapsed-run buttons stick to the left edge, below 40 rem the cells stack and the placeholders and the repeated
+baseline copy of an unchanged line are hidden, and a narrower line-number gutter applies on a phone. This scenario
+is tested by
+`WebSubsystem_Stylesheet_DiffRules_KeepCodeScrollingInsideItself`. The measured width of the page at 390 by 844
+pixels is checked in a real browser by the acceptance walk-through.
+
+**WebSubsystem_Stylesheet_ThreadLink_IsQuietTextLink**: The stylesheet source is read and the `a.thread-link` rule is
+checked: it has no background and no padding, is underlined, and does not fill with the accent color, so the link of
+a thread looks like a quiet text link and not like the Resolve and Reply buttons. This scenario is tested by
+`WebSubsystem_Stylesheet_ThreadLink_IsQuietTextLink`.
+
+**Routes_DeepLink_SignedOut_LoginLinkKeepsEscapesAndQuery**: The router is rendered for a signed-out visitor at the
+address of a line link of a file whose name has a space and a hash, with a baseline side. The "Sign in required" link
+is `/login?ReturnUrl=` followed by the whole address escaped once more, and no review page is drawn. This scenario is
+tested by `Routes_DeepLink_SignedOut_LoginLinkKeepsEscapesAndQuery`.
 
 **WebSubsystem_ChecklistPage_AnsweredChecksSurviveReload**: A review is created through the Core services of the
 real pipeline and two checks are answered, one Pass and one Fail with a justification. The checklist page is
