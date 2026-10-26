@@ -227,10 +227,12 @@ per line, default `**/*`). The page passes the values to `ReviewService.CreateFr
 refusal, among them "Nothing to review: no files matching the selection changed between X and Y", in the form with the
 values kept. Skipped symbolic links and submodules are listed once before the review is opened, since they are not
 stored. `ReviewPage` shows the change kind of each file, the repository, both commits and the selection in the
-details, and for a modified file a plain Head / Baseline toggle: Head is the numbered view that takes comments,
-Baseline is the frozen baseline, read-only. A deleted file shows its baseline and takes whole-file comments only.
-There is no diff highlighting. Everything the page shows comes from the frozen copies in the store, never from the
-repository.
+details, and for a modified file a choice between the Diff view (the default), the Head view, and the Baseline view:
+the Diff view shows the changed lines with the unchanged lines collapsed and takes comments on a line of either
+version, Head is the numbered view that takes comments, Baseline is the frozen baseline, read-only. A deleted file
+opens on its Diff view (all lines removed) and takes whole-file comments and comments on its removed lines. A file
+that is too large to compare, or binary, says so in plain words and offers the other views. Everything the page shows
+comes from the frozen copies in the store, never from the repository.
 
 #### Planning reviews
 

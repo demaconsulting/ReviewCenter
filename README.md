@@ -52,7 +52,8 @@ The current release provides:
   selection; if none does, no review is created and you are told so. The changed files, their baseline and head
   content, the two commits, and the selection are copied into the database when the review is created, so later
   commits do not change the review. The review page shows each file as Added, Modified, or Deleted; a modified file
-  can be read as **Head** (where comments are made) or as a read-only **Baseline**. There is no diff highlighting.
+  opens as a **Diff** (added and removed lines, unchanged lines collapsed, a **+** on every line to comment on it) and
+  can also be read as **Head** or as a read-only **Baseline**.
   A signature binds the repository, both commits, the selection, and every change (see
   [Reviews from a Repository](#reviews-from-a-repository))
 - **Planning Reviews**: if the repository has review-sets in its `.reviewmark.yaml`, choose **Plan reviews from a
@@ -400,9 +401,12 @@ upload (200 files, 2 MiB per file, 20 MiB per review), counted over both version
 not reviewed; those that match the selection are listed once after the review is created and are counted in the audit
 entry.
 
-The review page shows the change kind of every file. A modified file can be read as **Head** (the numbered lines
-with their comments) or as **Baseline** (read-only). A deleted file shows its baseline content, and only
-whole-file comments can be made on it. Comments are made in the Head view only; there is no diff highlighting. The
+The review page shows the change kind of every file. A modified file opens as a **Diff**: "x added, y removed", the
+changed lines with old and new line numbers, and the unchanged lines collapsed behind **Show N unchanged lines**.
+Click the **+** on a line to comment on it; a removed line is commented on in the baseline and every other line in
+the head, and the thread list says "Before: line N" or "After: line N". The file can also be read as **Head** (the
+numbered lines with their comments) or as **Baseline** (read-only), and a file too large to compare line by line
+offers those two. A deleted file opens on its removed lines and accepts comments on them or on the whole file. The
 content fingerprint covers the files that exist at the head (Added and Modified), calculated as ReviewMark does. The
 Details section shows the repository name, the two commit SHAs, and the selection.
 

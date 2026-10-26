@@ -296,6 +296,7 @@ sections:
           who said what.
         children:
           - ReviewCenter-Web-Comments
+          - ReviewCenter-Web-DiffReview
           - ReviewCenter-Core-Threads
           - ReviewCenter-Core-Diff
           - ReviewCenter-Storage-Threads

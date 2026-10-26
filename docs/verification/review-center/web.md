@@ -43,9 +43,13 @@ N/A - standard test environment (temporary SQLite databases are created by the t
 - A user with the Admin role who opens `/repositories` is shown the page of the registry; a reviewer is refused.
 - Every interactive element of every page has a `data-testid`.
 - The creation of a review from a repository (source choice, repository form, refusals, and skipped entries) and the
-  display of the change kinds, the source, and the Head / Baseline versions need a live connection, so they are
+  display of the change kinds, the source, and the Diff / Head / Baseline views need a live connection, so they are
   verified at unit level by the component tests of `ProjectPage` and `ReviewPage` (see the children of the requirement
   `ReviewCenter-Web-RepositoryReviews` in `web.yaml`).
+- The diff view of a review page (collapsed unchanged lines, line comments on both sides, threads under their lines,
+  and the too-large state) needs a live connection, so it is verified at unit level by the component tests of
+  `ReviewPage`; the subsystem test reads the stylesheet that keeps the code area scrolling inside itself on a phone
+  (see the requirement `ReviewCenter-Web-DiffReview` in `web.yaml`).
 - The plan page and the planning links need a live connection for the form and the creation, so they are verified at
   unit level by the component tests of `PlanPage`, `ProjectPage`, and `ReviewPage` (see the children of the requirement
   `ReviewCenter-Web-PlanReviews` in `web.yaml`); the subsystem test requests the plan route of a project that has a
@@ -76,6 +80,13 @@ summary shows one open and one resolved thread, the file shows "1 open thread", 
 thread, the index lists the open thread with an activity time read back from the database, and the Details section
 is collapsed. This scenario is tested by
 `WebSubsystem_ReviewWithThreads_ArePresentedByThePage`.
+
+**WebSubsystem_Stylesheet_DiffRules_KeepCodeScrollingInsideItself**: The stylesheet source is read and checked for the
+rules that keep the diff inside the page width: the code area scrolls horizontally inside itself, a row is as wide as
+its longest line, inline threads and collapsed-run buttons stick to the left edge of the scrolled area, and a
+narrower line-number gutter applies on a phone. This scenario is tested by
+`WebSubsystem_Stylesheet_DiffRules_KeepCodeScrollingInsideItself`. The measured width of the page at 390 by 844
+pixels is checked in a real browser by the acceptance walk-through.
 
 **WebSubsystem_ChecklistPage_AnsweredChecksSurviveReload**: A review is created through the Core services of the
 real pipeline and two checks are answered, one Pass and one Fail with a justification. The checklist page is

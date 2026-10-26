@@ -79,11 +79,12 @@ sections:
           The LineDiff class shall divide the rows into shown regions and gaps by keeping three context rows
           around every change, merging regions that touch, keeping a gap of a single row shown instead of
           collapsing it, and covering every row exactly once, with no gap at the start or the end next to a change
-          and with the number of context rows configurable.
+          and with the number of context rows configurable, and keeping rows the caller pins (and their context)
+          shown.
         justification: |
           A long file with a few changes is only readable if the unchanged parts are collapsed. Hiding a single
           row behind a control would cost more attention than showing it, and the regions must neither lose nor
-          repeat a row.
+          repeat a row. A row with a comment thread must never be hidden.
         tests:
           - LineDiff_Segment_NoChanges_OneGapOrNothing
           - LineDiff_Segment_SingleChange_KeepsThreeContextRowsEachSide
@@ -91,3 +92,4 @@ sections:
           - LineDiff_Segment_GapOfOneRow_StaysVisibleAndGapOfTwoCollapses
           - LineDiff_Segment_NearbyChangesMergeAndContextIsConfigurable
           - LineDiff_Segment_RandomChanges_CoverEveryRowOnce
+          - LineDiff_Segment_PinnedRows_StayVisibleWithContext

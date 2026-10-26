@@ -158,23 +158,32 @@ public class ReviewPageRepositoryTests : PageTestBase
     }
 
     /// <summary>
-    ///     Test that a modified file shows the Head version with the comment controls and a toggle to the
-    ///     read-only Baseline version, and that no toggle is offered for an added file.
+    ///     Test that a modified file opens as a diff and offers a toggle to the Head version with the comment
+    ///     controls and to the read-only Baseline version, and that no toggle is offered for an added file.
     /// </summary>
     [Fact]
-    public async Task ReviewPage_FileSelect_ModifiedFile_TogglesBetweenHeadAndReadOnlyBaseline()
+    public async Task ReviewPage_FileSelect_ModifiedFile_TogglesBetweenDiffHeadAndReadOnlyBaseline()
     {
         // Arrange: the repository review, with the modified file selected
         var projectId = await CreateRepositoryReviewAsync();
         var cut = RenderPage(projectId);
         await cut.Find("[data-testid='file-select-1']").ClickAsync();
 
-        // Assert: the head version is shown with comment buttons and the toggle
+        // Assert: the diff is the default view
         Assert.Equal("Modified", cut.Find("[data-testid='selected-file-kind']").TextContent);
+        Assert.Equal("true", cut.Find("[data-testid='view-diff-button']").GetAttribute("aria-pressed"));
+        Assert.NotEmpty(cut.FindAll("[data-testid='diff-view']"));
+        Assert.Empty(cut.FindAll("[data-testid='file-content']"));
+
+        // Act: switch to the head
+        await cut.Find("[data-testid='view-head-button']").ClickAsync();
+
+        // Assert: the head version is shown with comment buttons
         Assert.Equal("true", cut.Find("[data-testid='view-head-button']").GetAttribute("aria-pressed"));
         Assert.Equal("head 3", cut.Find("[data-testid='line-text-3']").TextContent);
         Assert.NotEmpty(cut.FindAll("[data-testid='line-comment-1']"));
         Assert.Empty(cut.FindAll("[data-testid='baseline-content']"));
+        Assert.Empty(cut.FindAll("[data-testid='diff-view']"));
 
         // Act: switch to the baseline
         await cut.Find("[data-testid='view-baseline-button']").ClickAsync();
@@ -226,11 +235,11 @@ public class ReviewPageRepositoryTests : PageTestBase
     }
 
     /// <summary>
-    ///     Test that a deleted file shows its baseline content with a note, no line comment controls, and accepts
-    ///     a whole-file comment only.
+    ///     Test that a deleted file opens as a diff of removed lines that can be commented on in the baseline
+    ///     numbering, offers the baseline text, and still accepts a whole-file comment.
     /// </summary>
     [Fact]
-    public async Task ReviewPage_FileSelect_DeletedFile_ShowsBaselineAndAcceptsWholeFileCommentOnly()
+    public async Task ReviewPage_FileSelect_DeletedFile_ShowsRemovedLinesAndAcceptsWholeFileComment()
     {
         // Arrange: the repository review
         var projectId = await CreateRepositoryReviewAsync();
@@ -239,16 +248,15 @@ public class ReviewPageRepositoryTests : PageTestBase
         // Act: select the deleted file
         await cut.Find("[data-testid='file-select-0']").ClickAsync();
 
-        // Assert: its baseline is shown, without toggle or line comment controls
+        // Assert: the diff shows every line removed, with a Diff and a Baseline view but no Head view
         Assert.Equal("Deleted", cut.Find("[data-testid='selected-file-kind']").TextContent);
-        Assert.Equal("old doc", cut.Find("[data-testid='baseline-line-text-1']").TextContent);
-        Assert.Contains("Deleted file", cut.Find("[data-testid='baseline-note']").TextContent, StringComparison.Ordinal);
-        Assert.Empty(cut.FindAll("[data-testid='file-version-toggle']"));
-        Assert.Empty(cut.FindAll("[data-testid^='line-comment-']"));
-        Assert.Empty(cut.FindAll("[data-testid='thread-start-line-input']"));
-        Assert.NotEmpty(cut.FindAll("[data-testid='deleted-comment-note']"));
+        Assert.Equal("0 added, 2 removed", cut.Find("[data-testid='diff-summary']").TextContent);
+        Assert.Equal("old doc", cut.Find("[data-testid='diff-text-0']").TextContent);
+        Assert.Equal("removed", cut.Find("[data-testid='diff-row-0']").GetAttribute("data-kind"));
+        Assert.Empty(cut.FindAll("[data-testid='view-head-button']"));
+        Assert.NotEmpty(cut.FindAll("[data-testid='view-baseline-button']"));
 
-        // Act: start a whole-file thread
+        // Act: comment on the whole file, as the form below the diff offers
         await cut.Find("[data-testid='thread-text-input']").InputAsync("Why was this removed?");
         await cut.Find("[data-testid='new-thread-form']").SubmitAsync();
 
@@ -257,6 +265,29 @@ public class ReviewPageRepositoryTests : PageTestBase
         Assert.Equal("docs/gone.md", thread.FilePath);
         Assert.Null(thread.StartLine);
         Assert.Empty(cut.FindAll("[data-testid='thread-error']"));
+    }
+
+    /// <summary>
+    ///     Test that the baseline view of a deleted file shows the deleted content with a note and offers a
+    ///     whole-file comment only.
+    /// </summary>
+    [Fact]
+    public async Task ReviewPage_FileSelect_DeletedFileBaselineView_ShowsNoteWithoutLineControls()
+    {
+        // Arrange: the deleted file selected
+        var projectId = await CreateRepositoryReviewAsync();
+        var cut = RenderPage(projectId);
+        await cut.Find("[data-testid='file-select-0']").ClickAsync();
+
+        // Act: switch to the baseline
+        await cut.Find("[data-testid='view-baseline-button']").ClickAsync();
+
+        // Assert: the content is read-only with a note, and only a whole-file comment is offered
+        Assert.Equal("old doc", cut.Find("[data-testid='baseline-line-text-1']").TextContent);
+        Assert.Contains("Deleted file", cut.Find("[data-testid='baseline-note']").TextContent, StringComparison.Ordinal);
+        Assert.Empty(cut.FindAll("[data-testid^='line-comment-']"));
+        Assert.Empty(cut.FindAll("[data-testid='thread-start-line-input']"));
+        Assert.NotEmpty(cut.FindAll("[data-testid='deleted-comment-note']"));
     }
 
     /// <summary>

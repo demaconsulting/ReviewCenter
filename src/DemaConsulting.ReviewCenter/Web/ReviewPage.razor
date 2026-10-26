@@ -7,8 +7,10 @@
    unsigned slot can be changed or removed and slots can be added), the
    list of files with size and open-thread count, the thread index of all files
    (filter All/Open/Resolved, default Open; choosing a row selects the file and highlights the lines), and for
-   the selected file: the text as numbered lines (or a notice for binary files), a form that starts a thread,
-   and the threads of that file (a resolved thread is a one-line header until expanded). The review id, state,
+   the selected file: for a changed file of a repository review the diff (see DiffView) with a Diff / Head / Baseline
+   selector, otherwise the text as numbered lines (or a notice for binary files), a form that starts a thread (under the
+   selected line in the diff), and the threads of that file (a resolved thread is a one-line header until expanded;
+   in the diff the threads are under their lines). The review id, state,
    content fingerprint, record digest and per-file SHA-256 hashes are last, in a Details section that is collapsed. All file
    and comment text is rendered as plain text. Every interactive element and every key value carries a stable
    kebab-case data-testid (file rows carry the list index, line and thread elements the line number or thread
@@ -239,12 +241,20 @@
         @if (SelectedPath is not null)
         {
             var fileThreads = Threads.Where(t => t.FilePath == SelectedPath).ToList();
-            var focusedThread = fileThreads.FirstOrDefault(t => t.Id == FocusedThreadId);
+            var focusedThread = fileThreads.FirstOrDefault(t => t.Id == FocusedThreadId && t.Side == ThreadSide.Head);
 
-            // Lines inside any thread's range are highlighted; the first line of a range carries a count marker
+            // In the diff the threads are drawn under their lines; only whole-file threads are listed below it
+            var hasLineDiff = HasLineDiff;
+            var listedThreads = hasLineDiff ? fileThreads.Where(t => t.StartLine is null).ToList() : fileThreads;
+            var composerRange = hasLineDiff ? ComposerRange() : null;
+            var inlineComposer = composerRange is not null;
+            ThreadSide? composerSide = inlineComposer ? NewSide : null;
+
+            // Lines inside the range of a head thread are highlighted in the head view; the first line of a range
+            // carries a count marker. Threads on the baseline side belong to the diff and the baseline view.
             var anchoredLines = new HashSet<int>();
             var startCounts = new Dictionary<int, int>();
-            foreach (var thread in fileThreads.Where(t => t.StartLine is not null))
+            foreach (var thread in fileThreads.Where(t => t.StartLine is not null && t.Side == ThreadSide.Head))
             {
                 for (var line = thread.StartLine!.Value; line <= thread.EndLine!.Value; line++)
                 {
@@ -253,6 +263,109 @@
 
                 startCounts[thread.StartLine!.Value] = startCounts.GetValueOrDefault(thread.StartLine!.Value) + 1;
             }
+
+            // One thread: its header, comments, reply box and resolve control; used in the diff and in the list
+            RenderFragment<ReviewThread> threadCard = item => @<li class="thread @(item.Id == FocusedThreadId ? "focused" : null)" data-testid="thread-@item.Id">
+                @{
+                    var threadId = item.Id;
+                    var resolved = item.State == ReviewThreadState.Resolved;
+                    var expanded = !resolved || ExpandedThreads.Contains(threadId);
+                }
+                <div class="thread-head">
+                    <span class="path" data-testid="thread-anchor-@threadId">@AnchorLabel(item)</span>
+                    <span class="badge @(resolved ? "resolved" : null)" data-testid="thread-state-@threadId">@item.State</span>
+                    <span class="muted" data-testid="thread-count-@threadId">@CommentCountLabel(item)</span>
+                    @if (resolved)
+                    {
+                        <button type="button" class="secondary" data-testid="thread-expand-@threadId"
+                                aria-expanded="@(expanded ? "true" : "false")"
+                                aria-label="@(expanded ? "Collapse" : "Expand") thread @threadId"
+                                @onclick="() => ToggleThreadExpanded(threadId)">@(expanded ? "Collapse" : "Expand")</button>
+                    }
+                    @if (expanded)
+                    {
+                        <button type="button" class="secondary" data-testid="thread-toggle-@threadId"
+                                aria-label="@(resolved ? "Reopen" : "Resolve") thread @threadId"
+                                @onclick="() => ToggleThreadAsync(item)">@(resolved ? "Reopen" : "Resolve")</button>
+                    }
+                </div>
+                @if (expanded)
+                {
+                    @for (var n = 1; n <= item.Comments.Count; n++)
+                    {
+                        var comment = item.Comments[n - 1];
+                        <div class="comment" data-testid="comment-@threadId-@n">
+                            <div class="comment-meta">
+                                <strong data-testid="comment-author-@threadId-@n">@comment.Author</strong>
+                                <time class="muted" datetime="@comment.Created.UtcDateTime.ToString("O")" data-testid="comment-time-@threadId-@n">@FormatTime(comment.Created)</time>
+                            </div>
+                            <p class="comment-text" data-testid="comment-text-@threadId-@n">@comment.Text</p>
+                        </div>
+                    }
+                    <div class="reply">
+                        <textarea id="reply-text-@threadId" rows="2" maxlength="@ReviewLimits.MaxCommentLength"
+                                  aria-label="Reply to thread @threadId" placeholder="Reply"
+                                  data-testid="reply-text-@threadId" value="@ReplyTexts.GetValueOrDefault(threadId)"
+                                  @oninput="e => ReplyTexts[threadId] = e.Value?.ToString() ?? string.Empty"></textarea>
+                        @if (ReplyErrors.TryGetValue(threadId, out var replyError))
+                        {
+                            <p class="error" role="alert" data-testid="reply-error-@threadId">@replyError</p>
+                        }
+                        <button type="button" class="secondary" data-testid="reply-button-@threadId"
+                                aria-label="Post reply to thread @threadId"
+                                @onclick="() => ReplyAsync(threadId)">Reply</button>
+                    </div>
+                }
+            </li>;
+
+            // The new-thread form; in the diff it is drawn under the selected line, otherwise in its own card
+            RenderFragment newThreadForm = @<form data-testid="new-thread-form" novalidate @onsubmit="StartThreadAsync">
+                @if (CurrentView == FileView.Baseline && SelectedKind == ChangeKind.Deleted)
+                {
+                    <p class="muted hint" data-testid="deleted-comment-note">This file was deleted. A comment here applies to the whole file; use the Diff view to comment on a line.</p>
+                }
+                else if (CurrentView == FileView.Head)
+                {
+                    <div class="line-fields">
+                        <div class="field">
+                            <label for="thread-start-line">Start line (optional)</label>
+                            <input id="thread-start-line" type="number" min="1"
+                                   data-testid="thread-start-line-input" @bind="NewStartLine" @bind:event="oninput" />
+                        </div>
+                        <div class="field">
+                            <label for="thread-end-line">End line (optional)</label>
+                            <input id="thread-end-line" type="number" min="1"
+                                   data-testid="thread-end-line-input" @bind="NewEndLine" @bind:event="oninput" />
+                        </div>
+                    </div>
+                }
+                else if (inlineComposer)
+                {
+                    <div class="field through-field">
+                        <label for="thread-end-line">Through line (optional)</label>
+                        <input id="thread-end-line" type="number" min="1"
+                               data-testid="thread-end-line-input" @bind="NewEndLine" @bind:event="oninput" />
+                    </div>
+                }
+                <p class="muted hint" data-testid="thread-target">@NewThreadTarget().</p>
+                <div class="field">
+                    <label for="thread-text">Comment</label>
+                    <textarea id="thread-text" rows="3" maxlength="@ReviewLimits.MaxCommentLength"
+                              data-testid="thread-text-input" @bind="NewText" @bind:event="oninput"></textarea>
+                </div>
+                @if (NewThreadError is not null)
+                {
+                    <p class="error" role="alert" data-testid="thread-error">@NewThreadError</p>
+                }
+                <div class="form-actions">
+                    <button type="submit" data-testid="start-thread-button">Start thread</button>
+                    @if (inlineComposer)
+                    {
+                        <button type="button" class="secondary" data-testid="thread-cancel-button" @onclick="CancelComment">Cancel</button>
+                        <button type="button" class="secondary" data-testid="thread-whole-file-button" @onclick="CommentOnWholeFile">Comment on the whole file instead</button>
+                    }
+                </div>
+            </form>;
 
             <section class="card">
                 <h2>File content</h2>
@@ -263,19 +376,57 @@
                     <p class="muted" data-testid="selected-file-kind">@SelectedKind</p>
                 }
 
-                @if (SelectedKind == ChangeKind.Modified)
+                @if (CanCompare)
                 {
                     <div class="index-filters" role="group" aria-label="Which version of the file to show" data-testid="file-version-toggle">
-                        <button type="button" class="secondary" aria-pressed="@(BaselineView ? "false" : "true")"
-                                data-testid="view-head-button" @onclick="ShowHead">Head</button>
+                        <button type="button" class="secondary" aria-pressed="@(ShowingDiff ? "true" : "false")"
+                                data-testid="view-diff-button" @onclick="ShowDiff">Diff</button>
+                        @if (SelectedKind == ChangeKind.Modified)
+                        {
+                            <button type="button" class="secondary" aria-pressed="@(CurrentView == FileView.Head ? "true" : "false")"
+                                    data-testid="view-head-button" @onclick="ShowHead">Head</button>
+                        }
                         <button type="button" class="secondary" aria-pressed="@(BaselineView ? "true" : "false")"
                                 data-testid="view-baseline-button" @onclick="ShowBaselineAsync">Baseline</button>
                     </div>
                 }
 
-                @if (BaselineView)
+                @if (ShowingDiff)
                 {
-                    <p class="notice" data-testid="baseline-note">@(SelectedKind == ChangeKind.Deleted ? "Deleted file; this is its content at the baseline." : "Baseline (read-only). Switch to Head to comment.")</p>
+                    @if (Diff!.Status == FileDiffStatus.Binary)
+                    {
+                        <p class="notice" data-testid="file-binary-notice">This is a binary file; its content is not shown.</p>
+                    }
+                    else if (Diff.Status == FileDiffStatus.TooLarge)
+                    {
+                        <div class="notice" data-testid="diff-too-large">
+                            <p>Too large to compare line by line.</p>
+                            <div class="index-filters">
+                                @if (SelectedKind == ChangeKind.Modified)
+                                {
+                                    <button type="button" class="secondary" data-testid="diff-too-large-head" @onclick="ShowHead">Show the Head version</button>
+                                }
+                                <button type="button" class="secondary" data-testid="diff-too-large-baseline" @onclick="ShowBaselineAsync">Show the Baseline version</button>
+                            </div>
+                        </div>
+                    }
+                    else
+                    {
+                        <DiffView Result="Diff.Result!"
+                                  OnlyLineEndingsDiffer="Diff.OnlyLineEndingsDiffer"
+                                  Threads="fileThreads.Where(t => t.StartLine is not null).ToList()"
+                                  FocusedThreadId="FocusedThreadId"
+                                  SelectedSide="composerSide"
+                                  SelectedStart="composerRange?.Start"
+                                  SelectedEnd="composerRange?.End"
+                                  ThreadTemplate="threadCard"
+                                  Composer="newThreadForm"
+                                  OnComment="CommentOnDiffLine" />
+                    }
+                }
+                else if (BaselineView)
+                {
+                    <p class="notice" data-testid="baseline-note">@(SelectedKind == ChangeKind.Deleted ? "Deleted file; this is its content at the baseline." : "Baseline (read-only). Use the Diff view to comment on these lines.")</p>
                     @if (BaselineLines is null)
                     {
                         <p class="notice" data-testid="file-binary-notice">This is a binary file; its content is not shown.</p>
@@ -333,114 +484,40 @@
                 }
             </section>
 
-            <section class="card">
-                <h2>Threads on this file</h2>
-                @if (fileThreads.Count == 0)
-                {
-                    <p class="muted" data-testid="threads-empty">There are no threads on this file yet.</p>
-                }
-                else
-                {
-                    <ul class="item-list threads" data-testid="threads-list">
-                        @foreach (var thread in fileThreads)
-                        {
-                            var threadId = thread.Id;
-                            var resolved = thread.State == ReviewThreadState.Resolved;
-                            var expanded = !resolved || ExpandedThreads.Contains(threadId);
-                            <li class="thread @(thread.Id == FocusedThreadId ? "focused" : null)" data-testid="thread-@threadId">
-                                <div class="thread-head">
-                                    <span class="path" data-testid="thread-anchor-@threadId">@AnchorLabel(thread)</span>
-                                    <span class="badge @(resolved ? "resolved" : null)" data-testid="thread-state-@threadId">@thread.State</span>
-                                    <span class="muted" data-testid="thread-count-@threadId">@CommentCountLabel(thread)</span>
-                                    @if (resolved)
-                                    {
-                                        <button type="button" class="secondary" data-testid="thread-expand-@threadId"
-                                                aria-expanded="@(expanded ? "true" : "false")"
-                                                aria-label="@(expanded ? "Collapse" : "Expand") thread @threadId"
-                                                @onclick="() => ToggleThreadExpanded(threadId)">@(expanded ? "Collapse" : "Expand")</button>
-                                    }
-                                    @if (expanded)
-                                    {
-                                        <button type="button" class="secondary" data-testid="thread-toggle-@threadId"
-                                                aria-label="@(resolved ? "Reopen" : "Resolve") thread @threadId"
-                                                @onclick="() => ToggleThreadAsync(thread)">@(resolved ? "Reopen" : "Resolve")</button>
-                                    }
-                                </div>
-                                @if (expanded)
-                                {
-                                    @for (var n = 1; n <= thread.Comments.Count; n++)
-                                    {
-                                        var comment = thread.Comments[n - 1];
-                                        <div class="comment" data-testid="comment-@threadId-@n">
-                                            <div class="comment-meta">
-                                                <strong data-testid="comment-author-@threadId-@n">@comment.Author</strong>
-                                                <time class="muted" datetime="@comment.Created.UtcDateTime.ToString("O")" data-testid="comment-time-@threadId-@n">@FormatTime(comment.Created)</time>
-                                            </div>
-                                            <p class="comment-text" data-testid="comment-text-@threadId-@n">@comment.Text</p>
-                                        </div>
-                                    }
-                                    <div class="reply">
-                                        <textarea id="reply-text-@threadId" rows="2" maxlength="@ReviewLimits.MaxCommentLength"
-                                                  aria-label="Reply to thread @threadId" placeholder="Reply"
-                                                  data-testid="reply-text-@threadId" value="@ReplyTexts.GetValueOrDefault(threadId)"
-                                                  @oninput="e => ReplyTexts[threadId] = e.Value?.ToString() ?? string.Empty"></textarea>
-                                        @if (ReplyErrors.TryGetValue(threadId, out var replyError))
-                                        {
-                                            <p class="error" role="alert" data-testid="reply-error-@threadId">@replyError</p>
-                                        }
-                                        <button type="button" class="secondary" data-testid="reply-button-@threadId"
-                                                aria-label="Post reply to thread @threadId"
-                                                @onclick="() => ReplyAsync(threadId)">Reply</button>
-                                    </div>
-                                }
-                            </li>
-                        }
-                    </ul>
-                }
-            </section>
-
-            <section class="card">
-                <h2>New thread</h2>
-                @if (BaselineView && SelectedKind != ChangeKind.Deleted)
-                {
-                    <p class="muted" data-testid="baseline-comment-note">Comments are written on the Head version. Switch to Head to comment.</p>
-                }
-                else
-                {
-                <form data-testid="new-thread-form" novalidate @onsubmit="StartThreadAsync">
-                    @if (SelectedKind == ChangeKind.Deleted)
+            @if (!hasLineDiff || listedThreads.Count > 0)
+            {
+                <section class="card">
+                    <h2>@(hasLineDiff ? "Comments on the whole file" : "Threads on this file")</h2>
+                    @if (listedThreads.Count == 0)
                     {
-                        <p class="muted hint" data-testid="deleted-comment-note">This file was deleted, so a comment applies to the whole file.</p>
+                        <p class="muted" data-testid="threads-empty">There are no threads on this file yet.</p>
                     }
                     else
                     {
-                    <div class="line-fields">
-                        <div class="field">
-                            <label for="thread-start-line">Start line (optional)</label>
-                            <input id="thread-start-line" type="number" min="1"
-                                   data-testid="thread-start-line-input" @bind="NewStartLine" @bind:event="oninput" />
-                        </div>
-                        <div class="field">
-                            <label for="thread-end-line">End line (optional)</label>
-                            <input id="thread-end-line" type="number" min="1"
-                                   data-testid="thread-end-line-input" @bind="NewEndLine" @bind:event="oninput" />
-                        </div>
-                    </div>
+                        <ul class="item-list threads" data-testid="threads-list">
+                            @foreach (var listed in listedThreads)
+                            {
+                                @threadCard(listed)
+                            }
+                        </ul>
                     }
-                    <p class="muted hint" data-testid="thread-target">@NewThreadTarget().</p>
-                    <div class="field">
-                        <label for="thread-text">Comment</label>
-                        <textarea id="thread-text" rows="3" maxlength="@ReviewLimits.MaxCommentLength"
-                                  data-testid="thread-text-input" @bind="NewText" @bind:event="oninput"></textarea>
-                    </div>
-                    @if (NewThreadError is not null)
+                </section>
+            }
+
+            @if (!inlineComposer)
+            {
+                <section class="card">
+                    <h2>@(CurrentView == FileView.Head ? "New thread" : "Comment on the whole file")</h2>
+                    @if (BaselineView && SelectedKind != ChangeKind.Deleted)
                     {
-                        <p class="error" role="alert" data-testid="thread-error">@NewThreadError</p>
+                        <p class="muted" data-testid="baseline-comment-note">To comment on a line, switch to the Diff or Head view.</p>
                     }
-                    <button type="submit" data-testid="start-thread-button">Start thread</button>
-                </form>
-                }
-            </section>
+                    else
+                    {
+                        @newThreadForm
+                    }
+                </section>
+            }
         }
 
         <details class="review-details" data-testid="review-details">

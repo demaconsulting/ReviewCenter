@@ -3,7 +3,7 @@
 #### Verification Approach
 
 `ReviewPage` is verified with component tests defined in `ReviewPageTests.cs` and
-`ReviewPageRepositoryTests.cs`, which use the bUnit test context to
+`ReviewPageRepositoryTests.cs` and `ReviewPageDiffTests.cs`, which use the bUnit test context to
 render the real component over real Core services and an in-memory fake store holding a review of known files.
 The signed-in user is supplied by a test authentication state in `PageTestBase`: the user `ann` (display name "Ann")
 unless a test signs in as someone else. The signing tests also create real users (with a password) through
@@ -78,10 +78,28 @@ N/A - standard test environment.
 - A review from a repository shows the change kind of every file (an uploaded review shows none) and the repository,
   both commits, and the selection in the details; a deleted file is listed with its baseline size.
 - A review planned from a review-set shows the identifier of the set in the details; other reviews show no such row.
-- A modified file offers a Head and a Baseline toggle: Head is the numbered view with comments, Baseline is the
-  frozen text, read-only, without comment controls; an added file has no toggle; selecting another file starts in
-  its head view.
-- A deleted file shows its baseline, offers no line comments, and accepts a whole-file comment.
+- A modified file of a review with a baseline offers a Diff, a Head, and a Baseline view and opens on Diff; Head is
+  the numbered view with comments, Baseline is the frozen text, read-only, without comment controls; an added file
+  and a file of an uploaded review have no choice and show the head only; selecting another file starts in its
+  default view; switching views keeps the typed text and clears the line selection.
+- A deleted file opens on the Diff view of removed lines, offers Diff and Baseline but no Head, and accepts a
+  whole-file comment; its Baseline view has a note and no line comment controls.
+- The Diff view shows the summary "x added, y removed", the hint "Click + to comment on a line.", old and new line
+  numbers, added and removed rows with their sign, and unchanged runs of more than three lines collapsed behind a
+  "Show N unchanged lines" button that expands them.
+- A file that is too large to compare shows "Too large to compare line by line." with the Head and the Baseline
+  view offered; a binary file shows the binary notice; two versions that differ only in line endings are said to.
+- The + control of a removed row starts a thread on the Baseline with the old line number; the control of an added
+  or unchanged row starts it on the Head with the new line number; Shift-click and the "Through line" field extend
+  the range within one side only; Cancel closes the form, and "Comment on the whole file instead" keeps the typed
+  text.
+- Threads are drawn under the last line of their anchor on their side, also where the lines would be collapsed, a
+  resolved thread as a collapsed header; reply, resolve, and reopen work there; the list below the diff holds only
+  whole-file threads; the per-file thread counts include both sides.
+- The thread index words the anchor as "Before: line N" or "After: lines N-M" for a file with a baseline, and
+  choosing a row shows the diff at the thread (or the Baseline or Head view for a file that is too large).
+- The stylesheet keeps the code area of the diff scrolling inside itself and the gap buttons and inline threads in
+  view, with a narrower gutter on a phone.
 
 #### Test Scenarios
 
@@ -100,18 +118,87 @@ planned shows no review-set row.
 shows the set identifier in the details, after the repository. This scenario is tested by
 `ReviewPage_Render_PlannedReview_DetailsShowReviewSet`.
 
-**ReviewPage_FileSelect_ModifiedFile_TogglesBetweenHeadAndReadOnlyBaseline**: A modified file shows the Head view
-with comment controls and a toggle; the Baseline view shows the baseline lines without comment controls and Head
-returns; an added file has no toggle. This scenario is tested by
-`ReviewPage_FileSelect_ModifiedFile_TogglesBetweenHeadAndReadOnlyBaseline`.
+**ReviewPage_FileSelect_ModifiedFile_TogglesBetweenDiffHeadAndReadOnlyBaseline**: A modified file opens on the Diff
+view; the Head view has comment controls, the Baseline view shows the baseline lines without comment controls, and
+the Diff view returns. This scenario is tested by
+`ReviewPage_FileSelect_ModifiedFile_TogglesBetweenDiffHeadAndReadOnlyBaseline`.
+
+**ReviewPage_FileSelect_UploadAndAddedFile_KeepHeadOnlyView**: An added file and a file of an uploaded review show
+the head with no view choice. This scenario is tested by `ReviewPage_FileSelect_UploadAndAddedFile_KeepHeadOnlyView`.
+
+**ReviewPage_ViewSwitch_KeepsTextAndClearsTheSelection**: Switching between the views keeps the text typed in the
+comment form and clears the selected line. This scenario is tested by
+`ReviewPage_ViewSwitch_KeepsTextAndClearsTheSelection`.
 
 **ReviewPage_FileSelect_AfterBaselineView_ShowsHeadOfTheNextFile**: After the baseline of one file was shown,
 selecting another file shows its head view. This scenario is tested by
 `ReviewPage_FileSelect_AfterBaselineView_ShowsHeadOfTheNextFile`.
 
-**ReviewPage_FileSelect_DeletedFile_ShowsBaselineAndAcceptsWholeFileCommentOnly**: A deleted file shows its baseline
-with a note and no line comment buttons, and a whole-file comment is accepted. This scenario is tested by
-`ReviewPage_FileSelect_DeletedFile_ShowsBaselineAndAcceptsWholeFileCommentOnly`.
+**ReviewPage_FileSelect_DeletedFile_ShowsRemovedLinesAndAcceptsWholeFileComment**: A deleted file opens on the Diff
+view with only removed lines, and a whole-file comment is accepted. This scenario is tested by
+`ReviewPage_FileSelect_DeletedFile_ShowsRemovedLinesAndAcceptsWholeFileComment`.
+
+**ReviewPage_FileSelect_DeletedFileBaselineView_ShowsNoteWithoutLineControls**: The Baseline view of a deleted file
+shows a note and no line comment buttons. This scenario is tested by
+`ReviewPage_FileSelect_DeletedFileBaselineView_ShowsNoteWithoutLineControls`.
+
+**Diff view** scenarios are verified in `ReviewPageDiffTests.cs` over a modified file of twenty lines with one line
+replaced and one line added.
+
+**ReviewPage_FileSelect_ModifiedFile_ShowsDiffWithSummaryHintAndNumbers**: The Diff view shows "2 added, 1 removed",
+the hint, old and new line numbers, and the added and removed rows. This scenario is tested by
+`ReviewPage_FileSelect_ModifiedFile_ShowsDiffWithSummaryHintAndNumbers`.
+
+**ReviewPage_DiffView_UnchangedRuns_AreCollapsedAndExpandOnRequest**: Unchanged runs far from a change show
+"Show N unchanged lines", and the button expands the run. This scenario is tested by
+`ReviewPage_DiffView_UnchangedRuns_AreCollapsedAndExpandOnRequest`.
+
+**ReviewPage_DiffView_OnlyLineEndingsDiffer_SaysSo**: Two versions that differ only in line endings show a sentence
+saying so. This scenario is tested by `ReviewPage_DiffView_OnlyLineEndingsDiffer_SaysSo`.
+
+**ReviewPage_FileSelect_TooLargeFile_OffersHeadAndBaseline**: A file over the comparison limit shows "Too large to
+compare line by line." and the Head and Baseline buttons. This scenario is tested by
+`ReviewPage_FileSelect_TooLargeFile_OffersHeadAndBaseline`.
+
+**ReviewPage_FileSelect_BinaryFile_ShowsNotice**: A binary file shows the binary notice instead of rows. This
+scenario is tested by `ReviewPage_FileSelect_BinaryFile_ShowsNotice`.
+
+**ReviewPage_DiffView_CommentOnRemovedLine_StartsBaselineThread**: The + control of a removed row opens the form
+worded for a removed line and starts a thread on the Baseline with the old line number. This scenario is tested by
+`ReviewPage_DiffView_CommentOnRemovedLine_StartsBaselineThread`.
+
+**ReviewPage_DiffView_CommentOnAddedAndContextLines_StartsHeadThreads**: The + control of an added or unchanged row
+starts a thread on the Head with the new line number. This scenario is tested by
+`ReviewPage_DiffView_CommentOnAddedAndContextLines_StartsHeadThreads`.
+
+**ReviewPage_DiffView_ShiftClick_ExtendsOnlyWithinTheSameSide**: Shift-click extends the selection on the same side
+and starts a new selection on the other side. This scenario is tested by
+`ReviewPage_DiffView_ShiftClick_ExtendsOnlyWithinTheSameSide`.
+
+**ReviewPage_DiffView_ThroughLineField_ExtendsTheRange**: The "Through line" field turns the comment into a range.
+This scenario is tested by `ReviewPage_DiffView_ThroughLineField_ExtendsTheRange`.
+
+**ReviewPage_DiffView_CancelAndWholeFileOption_BehaveAsLabelled**: Cancel closes the form, and "Comment on the whole
+file instead" keeps the text and anchors the whole file. This scenario is tested by
+`ReviewPage_DiffView_CancelAndWholeFileOption_BehaveAsLabelled`.
+
+**ReviewPage_DiffView_ExistingThreads_AreShownUnderTheirLines**: Threads of both sides are drawn under their lines,
+a resolved one collapsed, even where the lines would be collapsed. This scenario is tested by
+`ReviewPage_DiffView_ExistingThreads_AreShownUnderTheirLines`.
+
+**ReviewPage_DiffView_InlineThread_ReplyResolveAndReopen**: A thread in the diff can be answered, resolved, and
+reopened. This scenario is tested by `ReviewPage_DiffView_InlineThread_ReplyResolveAndReopen`.
+
+**ReviewPage_ThreadIndex_ShowsSideAndLinesAndJumpsToTheDiff**: Index rows say "Before" or "After" with the lines,
+and choosing one shows the diff at the thread. This scenario is tested by
+`ReviewPage_ThreadIndex_ShowsSideAndLinesAndJumpsToTheDiff`.
+
+**ReviewPage_ThreadIndex_TooLargeFile_OpensTheVersionOfTheThread**: For a file that is too large to compare,
+choosing a row opens the Baseline or the Head view by the side of the thread. This scenario is tested by
+`ReviewPage_ThreadIndex_TooLargeFile_OpensTheVersionOfTheThread`.
+
+**ReviewPage_FileList_ThreadCounts_IncludeBothSides**: The open thread count of a file in the list counts threads
+on both sides. This scenario is tested by `ReviewPage_FileList_ThreadCounts_IncludeBothSides`.
 
 **ReviewPage_Render_DeletedFile_ListsBaselineSize**: A deleted file is listed with the size of its baseline. This
 scenario is tested by `ReviewPage_Render_DeletedFile_ListsBaselineSize`.

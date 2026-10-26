@@ -560,6 +560,23 @@ public class LineDiffTests
     }
 
     /// <summary>
+    ///     Test that a pinned unchanged row stays visible with its context, and that pinned indexes outside the rows
+    ///     are ignored.
+    /// </summary>
+    [Fact]
+    public void LineDiff_Segment_PinnedRows_StayVisibleWithContext()
+    {
+        // Arrange: 30 unchanged rows with row 15 pinned, and one pin far outside the rows
+        var rows = Rows(30);
+
+        // Act: segment with the pins
+        var segments = LineDiff.Segment(rows, 3, new HashSet<int> { 15, 500, -1 });
+
+        // Assert: a gap, rows 12-18 visible (three context rows each side), a gap
+        Assert.Equal([new DiffSegment(true, 0, 12), new DiffSegment(false, 12, 7), new DiffSegment(true, 19, 11)], segments);
+    }
+
+    /// <summary>
     ///     Test that the segments always cover every row exactly once, in order.
     /// </summary>
     [Fact]

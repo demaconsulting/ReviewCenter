@@ -117,6 +117,10 @@ tested by `LineDiff_Segment_NearbyChangesMergeAndContextIsConfigurable`.
 another from the first row to the last, and no gap holds fewer than two rows. This scenario is tested by
 `LineDiff_Segment_RandomChanges_CoverEveryRowOnce`.
 
+**LineDiff_Segment_PinnedRows_StayVisibleWithContext**: A pinned row in the middle of an unchanged run stays shown
+with its context rows and splits the run into two gaps, and pins outside the rows are ignored. This scenario is tested by
+`LineDiff_Segment_PinnedRows_StayVisibleWithContext`.
+
 **FileText_TryReadLines_Text_SplitsLikeSplitLines**: Texts with Unix and Windows line endings, no final line ending,
 blank lines, a lone carriage return, and an empty text give the same lines as `FileText.SplitLines`. This scenario is
 tested by `FileText_TryReadLines_Text_SplitsLikeSplitLines`.

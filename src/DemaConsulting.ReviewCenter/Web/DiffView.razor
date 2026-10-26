@@ -1,0 +1,69 @@
+@* DiffView: the changes of one file, as one column of rows with the old and the new line number in front.
+
+   Presentation only; state and event handling live in DiffView.razor.cs. From the top: a one-line summary
+   ("3 added, 1 removed"), a hint that says how to comment, then the rows. Added rows are green, removed rows red
+   and carry a + or - mark; unchanged rows far from a change are collapsed into a "Show N unchanged lines" button.
+   Every row has a + control that starts a comment on that line (a removed line is commented on in the baseline
+   numbering, every other line in the head numbering). The threads of the file are drawn under their last line and
+   the new-thread form under the selected line; both are supplied by the page. The code area scrolls inside itself,
+   so a long line never widens the page. All file text is rendered as plain text. Every interactive element and every
+   key value carries a stable kebab-case data-testid; rows carry the zero-based row index. *@
+<div class="diff" data-testid="diff-view">
+    <p class="diff-summary" data-testid="diff-summary">@SummaryText()</p>
+    @if (Result.Lines.Count > 0)
+    {
+        <p class="muted hint" data-testid="diff-hint">Click + to comment on a line.</p>
+    }
+    <div class="diff-code" data-testid="diff-content">
+        @{
+            var composerRow = ComposerRow();
+        }
+        @foreach (var segment in _segments)
+        {
+            @if (segment.IsGap)
+            {
+                var gap = segment;
+                <button type="button" class="secondary diff-gap" data-testid="diff-gap-@gap.Start"
+                        @onclick="() => Reveal(gap)">Show @gap.Count unchanged lines</button>
+            }
+            else
+            {
+                @for (var index = segment.Start; index < segment.Start + segment.Count; index++)
+                {
+                    var row = index;
+                    var line = Result.Lines[row];
+                    <div class="diff-row @KindClass(line) @(IsAnchored(line) ? "anchored" : null) @(IsSelected(line) ? "selected" : null) @(IsFocused(line) ? "focused" : null)"
+                         data-testid="diff-row-@row" data-kind="@KindClass(line)">
+                        <span class="gutter">
+                            <button type="button" class="line-comment" data-testid="diff-comment-@row"
+                                    aria-label="@CommentLabel(line)" title="@CommentLabel(line)"
+                                    @onclick="e => CommentAsync(row, e)">+</button>
+                            <span class="line-no" data-testid="diff-old-no-@row">@line.OldNumber</span>
+                            <span class="line-no" data-testid="diff-new-no-@row">@line.NewNumber</span>
+                        </span>
+                        <span class="diff-sign" aria-hidden="true">@Sign(line)</span>
+                        <span class="line-text" data-testid="diff-text-@row">@line.Text</span>
+                    </div>
+                    @if (_threadsByRow.TryGetValue(row, out var threadsHere) && ThreadTemplate is not null)
+                    {
+                        <div class="diff-inline" data-testid="diff-threads-@row">
+                            <ul class="item-list threads">
+                                @foreach (var thread in threadsHere)
+                                {
+                                    @ThreadTemplate(thread)
+                                }
+                            </ul>
+                        </div>
+                    }
+
+                    @if (row == composerRow && Composer is not null)
+                    {
+                        <div class="diff-inline diff-composer" data-testid="diff-composer">
+                            @Composer
+                        </div>
+                    }
+                }
+            }
+        }
+    </div>
+</div>

@@ -277,10 +277,10 @@ sections:
           The Web subsystem shall let a user create a review from a git repository on the project page, choosing among
           the enabled repositories by name, with a head revision, an optional baseline revision, and a selection, show
           the reason when it cannot be created, and show on the review page the change kind of each file, the source,
-          and for a modified file a choice between the Head version and a read-only Baseline version.
+          and for a modified file a choice between the Diff view, the Head version and a read-only Baseline version.
         justification: |
-          Reviewing a change means seeing what it replaces. The page keeps comments on the head version, offers no
-          highlighting of differences, and never shows how the server reaches the repository.
+          Reviewing a change means seeing what it replaces. The page keeps the full texts one click away and never
+          shows how the server reaches the repository.
         children:
           - ReviewCenter-ProjectPage-SourceChoice
           - ReviewCenter-ProjectPage-RepositoryForm
@@ -289,7 +289,26 @@ sections:
           - ReviewCenter-ReviewPage-Versions
         tests:
           - ProjectPage_CreateForm_FromRepository_CreatesReviewWithSourceAndNavigates
-          - ReviewPage_FileSelect_ModifiedFile_TogglesBetweenHeadAndReadOnlyBaseline
+          - ReviewPage_FileSelect_ModifiedFile_TogglesBetweenDiffHeadAndReadOnlyBaseline
+
+      - id: ReviewCenter-Web-DiffReview
+        title: >-
+          The Web subsystem shall show a changed file of a review from a repository as a diff on the review page,
+          with the unchanged lines collapsed, let a signed-in user comment on a line of either version and read the
+          threads under their lines, say in plain words when a comparison cannot be shown, and keep the code area
+          inside the width of a phone.
+        justification: |
+          Reviewers judge a change by reading what changed. The subsystem test guards the stylesheet rules that keep
+          the page from scrolling sideways; the interactions need a live connection and are verified by the
+          component tests of the page unit.
+        children:
+          - ReviewCenter-ReviewPage-Diff
+          - ReviewCenter-ReviewPage-DiffStates
+          - ReviewCenter-ReviewPage-DiffComment
+          - ReviewCenter-ReviewPage-DiffThreads
+          - ReviewCenter-ReviewPage-DiffLayout
+        tests:
+          - WebSubsystem_Stylesheet_DiffRules_KeepCodeScrollingInsideItself
 
       - id: ReviewCenter-Web-PlanReviews
         title: >-

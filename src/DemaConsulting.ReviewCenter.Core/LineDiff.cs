@@ -167,22 +167,32 @@ public static class LineDiff
     ///     Rows within <paramref name="contextLines"/> of a change are shown. A run of hidden rows of length 1 is
     ///     shown too, because a "show 1 unchanged line" button would take more room than the line itself; longer
     ///     runs become a gap. A diff without any change is one gap (or the lone row when it has a single line).
+    ///     The caller can name rows that must stay visible although they are unchanged (a row that carries a
+    ///     comment thread, or a row the reader has revealed); such a row is treated like a change, so it keeps
+    ///     its context rows too.
     /// </remarks>
     /// <param name="lines">The rows of <see cref="LineDiffResult.Lines"/>. Must not be null.</param>
     /// <param name="contextLines">The number of unchanged rows to keep around each change; not negative.</param>
+    /// <param name="pinnedRows">
+    ///     Zero-based row indexes to keep visible like changes; <c>null</c> for none. Indexes outside the rows
+    ///     are ignored.
+    /// </param>
     /// <returns>Consecutive segments that together cover every row exactly once, in order; empty for no rows.</returns>
     /// <exception cref="ArgumentNullException">Thrown when <paramref name="lines"/> is null.</exception>
     /// <exception cref="ArgumentOutOfRangeException">Thrown when <paramref name="contextLines"/> is negative.</exception>
-    public static IReadOnlyList<DiffSegment> Segment(IReadOnlyList<DiffLine> lines, int contextLines = DefaultContextLines)
+    public static IReadOnlyList<DiffSegment> Segment(
+        IReadOnlyList<DiffLine> lines,
+        int contextLines = DefaultContextLines,
+        IReadOnlySet<int>? pinnedRows = null)
     {
         ArgumentNullException.ThrowIfNull(lines);
         ArgumentOutOfRangeException.ThrowIfNegative(contextLines);
 
-        // Mark every row within the context distance of a change as visible
+        // Mark every row within the context distance of a change (or of a pinned row) as visible
         var visible = new bool[lines.Count];
         for (var i = 0; i < lines.Count; i++)
         {
-            if (lines[i].Kind == DiffLineKind.Context)
+            if (lines[i].Kind == DiffLineKind.Context && pinnedRows?.Contains(i) != true)
             {
                 continue;
             }

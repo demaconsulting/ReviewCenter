@@ -315,10 +315,20 @@ from the repository: later commits, a force push, or disabling the repository do
   review is created, and are counted in the audit entry.
 - A revision such as `HEAD~1` is not accepted; use a branch, a tag, or a commit id.
 
-On the review page, each file shows its change kind. Select a file to read it. For a **Modified** file a **Head** and
-a **Baseline** button appear: Head is the numbered view with comments, Baseline shows the earlier content read-only.
-There is no highlighting of differences. A **Deleted** file shows its baseline content; you can comment on the whole
-file but not on lines. Comments on lines are made in the Head view only. The review fingerprint covers the files that
+On the review page, each file shows its change kind. Select a file to read it. For a **Modified** file the page opens
+on a **Diff** view, with a **Head** and a **Baseline** button next to it. The Diff view shows "x added, y removed",
+then the changed lines with the old and the new line number: added lines are green with a `+`, removed lines red with
+a `-`. Unchanged lines far from a change are collapsed behind a **Show N unchanged lines** button, so the first change
+is at the top. To comment on a line, click the **+** at its start: a form opens under the line saying what you are
+commenting on, for example "Comment on removed line 10 (before)". A removed line belongs to the baseline, every other
+line to the head; hold Shift while you click another line on the same side, or fill in "Through line", to comment on a
+range. **Cancel** closes the form and **Comment on the whole file instead** keeps your text. Threads appear right
+under the lines they are about (a resolved thread is one line until you open it), and the thread list names them
+"Before: line N" or "After: line N" and jumps to the line when you choose one. **Head** is the numbered view with
+comments, and **Baseline** shows the earlier content read-only. A file that is too large to compare line by line says
+so and offers Head and Baseline. A **Deleted** file opens on a Diff view of its removed lines; you can comment on
+them or on the whole file. An **Added** file, and every file of an upload, shows the numbered lines as before. The
+review fingerprint covers the files that
 exist at the head (Added and Modified), exactly as for an upload. The Details section shows the repository name, the
 baseline and head commits, and the selection.
 

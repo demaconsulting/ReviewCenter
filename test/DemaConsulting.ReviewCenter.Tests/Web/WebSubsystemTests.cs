@@ -312,6 +312,40 @@ public partial class WebSubsystemTests
     }
 
     /// <summary>
+    ///     Test that the stylesheet of the app keeps a long line of a diff inside the code area
+    ///     and keeps the phone layout narrow, so the page itself never scrolls sideways.
+    /// </summary>
+    /// <remarks>
+    ///     The in-memory browser has no layout engine, so the rendered width at 390 pixels is measured by the
+    ///     Puppet walk-through; this test guards the rules that width depends on.
+    /// </remarks>
+    [Fact]
+    public async Task WebSubsystem_Stylesheet_DiffRules_KeepCodeScrollingInsideItself()
+    {
+        // Arrange: read the stylesheet the shell links to (the in-memory host does not serve static files, so it
+        // is read from the project that ships it)
+        var directory = new DirectoryInfo(AppContext.BaseDirectory);
+        while (directory is not null && !File.Exists(Path.Combine(directory.FullName, "DemaConsulting.ReviewCenter.slnx")))
+        {
+            directory = directory.Parent;
+        }
+
+        Assert.NotNull(directory);
+
+        // Act: read it
+        var css = await File.ReadAllTextAsync(
+            Path.Combine(directory.FullName, "src", "DemaConsulting.ReviewCenter", "wwwroot", "app.css"),
+            TestContext.Current.CancellationToken);
+        // Assert: the code area scrolls inside itself, rows are as wide as their text, inline threads and the
+        // collapsed-run button stay in view while it scrolls, and a phone gets a narrower gutter
+        Assert.Matches(@"\.diff-code\s*\{[^}]*max-width:\s*100%;[^}]*overflow-x:\s*auto;", css);
+        Assert.Matches(@"\.diff-row\s*\{[^}]*min-width:\s*max-content;", css);
+        Assert.Matches(@"\.diff-inline\s*\{[^}]*position:\s*sticky;[^}]*left:\s*0;", css);
+        Assert.Matches(@"\.diff-gap\s*\{[^}]*position:\s*sticky;[^}]*left:\s*0;", css);
+        Assert.Matches(@"@media \(max-width: 29\.99rem\)\s*\{\s*\.diff-row \.line-no\s*\{[^}]*min-width:", css);
+    }
+
+    /// <summary>
     ///     Requests a page and parses the returned document.
     /// </summary>
     /// <param name="client">The in-memory client.</param>

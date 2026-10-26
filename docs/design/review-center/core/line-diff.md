@@ -58,9 +58,10 @@ The memory used is bounded by the line bound and the edit bound (at most about `
 **Segment**: Divides rows into shown regions and gaps.
 
 - *Parameters*: `IReadOnlyList<DiffLine> lines` — the rows; `int contextLines` — the unchanged rows to keep around
-  a change (default 3).
+  a change (default 3); `IReadOnlySet<int>? pinnedRows` — row indexes that must stay visible (default none).
 - *Returns*: `IReadOnlyList<DiffSegment>` — consecutive segments that cover every row exactly once.
-- *Postconditions*: Every changed row and the `contextLines` rows before and after it are in shown segments.
+- *Postconditions*: Every changed row, every pinned row, and the `contextLines` rows before and after each of
+  them are in shown segments.
   Shown segments that touch are merged. A run of unchanged rows between two shown segments becomes a gap only
   when it has at least two rows; a run of one row stays shown, because collapsing it would take more room than
   showing it. The same holds at the start and the end of the file. A file without changes is one gap, or its single
@@ -81,5 +82,6 @@ can explain it. The unit throws no other exception for any text.
 
 - **ReviewService** — `GetDiffAsync` splits the frozen contents into lines with `FileText.TryReadLines` and
   compares them with `Compute`.
-- **ReviewPage** — groups the rows with `Segment` for display (planned for the diff view of a later phase).
+- **ReviewPage** — the `DiffView` component groups the rows with `Segment` for display, pinning the rows of threads
+  and of the selected line.
 - **Tests** — `LineDiffTests` check edge cases, the bounds, and a randomized reconstruction property.

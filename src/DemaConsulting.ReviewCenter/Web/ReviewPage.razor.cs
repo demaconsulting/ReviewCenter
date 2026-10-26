@@ -150,9 +150,64 @@ public partial class ReviewPage : ComponentBase
     private ChangeKind SelectedKind { get; set; } = ChangeKind.Added;
 
     /// <summary>
+    ///     The ways the text of a changed file can be shown.
+    /// </summary>
+    private enum FileView
+    {
+        /// <summary>
+        ///     The changes between baseline and head, with the threads under their lines.
+        /// </summary>
+        Diff,
+
+        /// <summary>
+        ///     The head text as numbered lines.
+        /// </summary>
+        Head,
+
+        /// <summary>
+        ///     The frozen baseline text as numbered lines, read-only.
+        /// </summary>
+        Baseline
+    }
+
+    /// <summary>
+    ///     Gets which version of the selected file is shown.
+    /// </summary>
+    private FileView CurrentView { get; set; } = FileView.Head;
+
+    /// <summary>
     ///     Gets a value indicating whether the baseline (read-only) text of the selected file is shown instead of the head text.
     /// </summary>
-    private bool BaselineView { get; set; }
+    private bool BaselineView => CurrentView == FileView.Baseline;
+
+    /// <summary>
+    ///     Gets a value indicating whether the diff of the selected file is the chosen view.
+    /// </summary>
+    private bool ShowingDiff => CurrentView == FileView.Diff;
+
+    /// <summary>
+    ///     Gets a value indicating whether the diff of the selected file is shown as rows with comment controls.
+    /// </summary>
+    private bool HasLineDiff => ShowingDiff && Diff is { Status: FileDiffStatus.Diff, Result: not null };
+
+    /// <summary>
+    ///     Gets a value indicating whether the selected file has a baseline to compare against: a modified or
+    ///     deleted file of a repository review that froze its baseline commit.
+    /// </summary>
+    private bool CanCompare =>
+        Review is { IsFromRepository: true, BaselineSha: not null }
+        && SelectedKind is ChangeKind.Modified or ChangeKind.Deleted;
+
+    /// <summary>
+    ///     Gets the diff of the selected file, or <c>null</c> when the file has no baseline to compare against.
+    /// </summary>
+    /// <remarks>It is computed once when the file is selected and kept until another file is selected.</remarks>
+    private FileDiff? Diff { get; set; }
+
+    /// <summary>
+    ///     Gets the version of the file the line numbers of the new-thread form refer to.
+    /// </summary>
+    private ThreadSide NewSide { get; set; } = ThreadSide.Head;
 
     /// <summary>
     ///     Gets the lines of the baseline of the selected file, or <c>null</c> when it is not loaded or is binary.
@@ -298,8 +353,10 @@ public partial class ReviewPage : ComponentBase
         SelectedPath = null;
         SelectedLines = null;
         SelectedKind = ChangeKind.Added;
-        BaselineView = false;
+        CurrentView = FileView.Head;
         BaselineLines = null;
+        Diff = null;
+        NewSide = ThreadSide.Head;
         Threads = [];
         Checklist = null;
         Approval = null;
@@ -407,9 +464,26 @@ public partial class ReviewPage : ComponentBase
         SelectedPath = path;
         SelectedLines = text is null ? null : FileText.SplitLines(text);
         SelectedKind = file.ChangeKind;
-        BaselineView = false;
+        CurrentView = FileView.Head;
         BaselineLines = null;
-        if (file.ChangeKind == ChangeKind.Deleted)
+        Diff = null;
+
+        // A modified or deleted file of a repository review opens as a diff, which is what a reviewer needs first;
+        // the comparison is computed once here and kept while the file stays selected
+        if (CanCompare)
+        {
+            Diff = await ReviewService.GetDiffAsync(ProjectId, ReviewId, path);
+            if (Diff is { Status: not FileDiffStatus.NoBaseline })
+            {
+                CurrentView = FileView.Diff;
+            }
+            else
+            {
+                Diff = null;
+            }
+        }
+
+        if (CurrentView != FileView.Diff && file.ChangeKind == ChangeKind.Deleted)
         {
             await ShowBaselineAsync();
         }
@@ -424,11 +498,24 @@ public partial class ReviewPage : ComponentBase
     }
 
     /// <summary>
-    ///     Shows the head text of the selected file (the view that accepts comments).
+    ///     Shows the diff of the selected file (the view that offers comments on both versions).
+    /// </summary>
+    private void ShowDiff()
+    {
+        if (Diff is not null)
+        {
+            CurrentView = FileView.Diff;
+            ClearAnchor();
+        }
+    }
+
+    /// <summary>
+    ///     Shows the head text of the selected file (the view that accepts comments by line number).
     /// </summary>
     private void ShowHead()
     {
-        BaselineView = false;
+        CurrentView = FileView.Head;
+        ClearAnchor();
     }
 
     /// <summary>
@@ -449,7 +536,8 @@ public partial class ReviewPage : ComponentBase
             BaselineLines = text is null ? null : FileText.SplitLines(text);
         }
 
-        BaselineView = true;
+        CurrentView = FileView.Baseline;
+        ClearAnchor();
     }
 
     /// <summary>
@@ -504,26 +592,131 @@ public partial class ReviewPage : ComponentBase
             await SelectFileAsync(Review.Files.ToList().FindIndex(file => file.Path == thread.FilePath));
         }
 
+        // The diff shows both sides, so a file that has one shows its threads there; a file whose diff is not
+        // available (too large) falls back to the version the thread refers to
+        if (Diff is { Status: FileDiffStatus.Diff })
+        {
+            ShowDiff();
+        }
+        else if (CanCompare && thread.StartLine is not null)
+        {
+            if (thread.Side == ThreadSide.Baseline)
+            {
+                await ShowBaselineAsync();
+            }
+            else if (SelectedKind == ChangeKind.Modified)
+            {
+                ShowHead();
+            }
+        }
+
         FocusedThreadId = thread.Id;
         if (thread.State == ReviewThreadState.Resolved)
         {
             ExpandedThreads.Add(thread.Id);
         }
 
-        _scrollTarget = thread.StartLine is null ? $"thread-{thread.Id}" : $"code-line-{thread.StartLine}";
+        _scrollTarget = ThreadScrollTarget(thread);
         _scrollBlock = "center";
     }
 
     /// <summary>
-    ///     Aims the new-thread form at one line and scrolls the form into view.
+    ///     Gets the test id of the element a thread chosen in the index is scrolled to in the current view.
+    /// </summary>
+    /// <param name="thread">The thread chosen.</param>
+    /// <returns>The row or line where the thread's anchor starts, or the thread itself for a whole-file thread.</returns>
+    private string ThreadScrollTarget(ReviewThread thread)
+    {
+        var whole = $"thread-{thread.Id}";
+        if (thread.StartLine is not { } start)
+        {
+            return whole;
+        }
+
+        if (HasLineDiff)
+        {
+            var row = DiffView.RowOf(Diff!.Result!, thread.Side, start);
+            return row < 0 ? whole : $"diff-row-{row}";
+        }
+
+        return BaselineView ? $"baseline-line-{start}" : $"code-line-{start}";
+    }
+
+    /// <summary>
+    ///     Aims the new-thread form at one line of the head text and scrolls the form into view.
     /// </summary>
     /// <param name="line">The 1-based line number.</param>
     private void CommentOnLine(int line)
     {
+        NewSide = ThreadSide.Head;
         NewStartLine = line.ToString(CultureInfo.InvariantCulture);
         NewEndLine = NewStartLine;
         _scrollTarget = "new-thread-form";
         _scrollBlock = "center";
+    }
+
+    /// <summary>
+    ///     Aims the new-thread form at a line of the diff.
+    /// </summary>
+    /// <param name="request">The line chosen and whether Shift was held.</param>
+    /// <remarks>
+    ///     A plain click selects that one line. Shift-click extends the selection to the line, but only on the
+    ///     same side; a range never mixes the baseline and the head numbering.
+    /// </remarks>
+    private void CommentOnDiffLine(DiffCommentRequest request)
+    {
+        var current = ComposerRange();
+        if (request.Extend && current is { } range && NewSide == request.Side)
+        {
+            NewStartLine = Math.Min(range.Start, request.Line).ToString(CultureInfo.InvariantCulture);
+            NewEndLine = Math.Max(range.End, request.Line).ToString(CultureInfo.InvariantCulture);
+        }
+        else
+        {
+            NewSide = request.Side;
+            NewStartLine = request.Line.ToString(CultureInfo.InvariantCulture);
+            NewEndLine = NewStartLine;
+        }
+
+        NewThreadError = null;
+        _scrollTarget = "new-thread-form";
+        _scrollBlock = "center";
+    }
+
+    /// <summary>
+    ///     Closes the form under the selected line and forgets what was typed.
+    /// </summary>
+    private void CancelComment()
+    {
+        ClearNewThreadForm();
+    }
+
+    /// <summary>
+    ///     Turns the comment under the selected line into a comment on the whole file; the typed text stays.
+    /// </summary>
+    private void CommentOnWholeFile()
+    {
+        ClearAnchor();
+        _scrollTarget = "new-thread-form";
+        _scrollBlock = "center";
+    }
+
+    /// <summary>
+    ///     Reads the lines of the new-thread form as the range the form is aimed at.
+    /// </summary>
+    /// <returns>
+    ///     The first and last line; the last equals the first when the second field is blank or does not
+    ///     reach the first; <c>null</c> when no line is selected or the first field is not a whole number.
+    /// </returns>
+    private (int Start, int End)? ComposerRange()
+    {
+        if (!TryParseLine(NewStartLine, out var start) || start is null)
+        {
+            return null;
+        }
+
+        var end = TryParseLine(NewEndLine, out var parsed) && parsed is { } last && last >= start ? last : start.Value;
+        return (start.Value, end);
     }
 
     /// <summary>
@@ -551,7 +744,8 @@ public partial class ReviewPage : ComponentBase
         try
         {
             await ThreadService.StartThreadAsync(
-                ProjectId, ReviewId, SelectedPath, start, end ?? start, await AuthenticationState.GetActorAsync(), NewText);
+                ProjectId, ReviewId, SelectedPath, start, end ?? start, await AuthenticationState.GetActorAsync(),
+                NewText, start is null ? ThreadSide.Head : NewSide);
         }
         catch (DomainRuleException ex)
         {
@@ -561,8 +755,7 @@ public partial class ReviewPage : ComponentBase
 
         NewThreadError = null;
         NewText = string.Empty;
-        NewStartLine = string.Empty;
-        NewEndLine = string.Empty;
+        ClearAnchor();
         await RefreshAsync();
     }
 
@@ -879,22 +1072,49 @@ public partial class ReviewPage : ComponentBase
             return "Comment on the whole file";
         }
 
-        return end is null || end == start ? $"Comment on line {start}" : $"Comment on lines {start}-{end}";
+        var lines = end is null || end == start ? $"line {start}" : $"lines {start}-{end}";
+        if (!HasLineDiff)
+        {
+            return $"Comment on {lines}";
+        }
+
+        return NewSide == ThreadSide.Baseline ? $"Comment on removed {lines} (before)" : $"Comment on {lines} (after)";
     }
 
     /// <summary>
     ///     Describes the anchor of a thread for display.
     /// </summary>
     /// <param name="thread">The thread.</param>
-    /// <returns>"Whole file", "Line 4" or "Lines 4-9".</returns>
-    private static string AnchorLabel(ReviewThread thread)
+    /// <returns>
+    ///     "Whole file"; "Line 4" or "Lines 4-9" for a file shown as one text; "Before: line 4" or "After: lines 4-9"
+    ///     for a file that can be compared, where the same number could mean either version.
+    /// </returns>
+    private string AnchorLabel(ReviewThread thread)
     {
         if (thread.StartLine is null)
         {
             return "Whole file";
         }
 
-        return thread.EndLine == thread.StartLine ? $"Line {thread.StartLine}" : $"Lines {thread.StartLine}-{thread.EndLine}";
+        var text = thread.EndLine == thread.StartLine ? $"line {thread.StartLine}" : $"lines {thread.StartLine}-{thread.EndLine}";
+        if (thread.Side == ThreadSide.Baseline)
+        {
+            return $"Before: {text}";
+        }
+
+        return IsComparable(thread.FilePath) ? $"After: {text}" : char.ToUpperInvariant(text[0]) + text[1..];
+    }
+
+    /// <summary>
+    ///     Tells whether a file of the review has a baseline to compare against.
+    /// </summary>
+    /// <param name="path">The file path.</param>
+    /// <returns><c>true</c> for a modified or deleted file of a repository review that froze its baseline.</returns>
+    private bool IsComparable(string path)
+    {
+        var file = Review?.Files.FirstOrDefault(f => f.Path == path);
+        return Review is { IsFromRepository: true, BaselineSha: not null }
+               && file?.ChangeKind is ChangeKind.Modified or ChangeKind.Deleted;
     }
 
     /// <summary>
@@ -902,7 +1122,7 @@ public partial class ReviewPage : ComponentBase
     /// </summary>
     /// <param name="thread">The thread of the row.</param>
     /// <returns>For example "Show Line 4 of src/a.cs, Open, 2 comments, first by Ann, last activity 2026-01-02 03:04 UTC".</returns>
-    private static string IndexRowLabel(ReviewThread thread)
+    private string IndexRowLabel(ReviewThread thread)
     {
         return $"Show {AnchorLabel(thread)} of {thread.FilePath}, {thread.State}, {CommentCountLabel(thread)}, " +
                $"first by {thread.Comments.FirstOrDefault()?.Author}, last activity {FormatTime(thread.LastActivity)}";
@@ -956,9 +1176,18 @@ public partial class ReviewPage : ComponentBase
     /// </summary>
     private void ClearNewThreadForm()
     {
-        NewStartLine = string.Empty;
-        NewEndLine = string.Empty;
+        ClearAnchor();
         NewText = string.Empty;
         NewThreadError = null;
+    }
+
+    /// <summary>
+    ///     Empties the line fields of the new-thread form and aims it at the head version again; the typed text stays.
+    /// </summary>
+    private void ClearAnchor()
+    {
+        NewStartLine = string.Empty;
+        NewEndLine = string.Empty;
+        NewSide = ThreadSide.Head;
     }
 }
