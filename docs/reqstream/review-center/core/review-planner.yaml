@@ -66,6 +66,7 @@ sections:
           review. Telling the user which is which makes the plan something that can be run again safely.
         tests:
           - ReviewPlanner_PlanAsync_ReviewExists_AlreadyFiled
+          - ReviewPlanner_PlanAsync_SameCommitsOtherPaths_WillCreate
           - ReviewPlanner_PlanAsync_LastReviewedSameHead_NothingToReview
           - ReviewPlanner_CreateAsync_RealGit_LastReviewedBaselineThenAlreadyFiled
           - ReviewPlanner_PlanAsync_RealGit_NoBaselineAndExplicitBaseline

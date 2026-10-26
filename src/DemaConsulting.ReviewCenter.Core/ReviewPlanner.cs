@@ -722,8 +722,13 @@ public sealed class ReviewPlanner
         var added = selected.Count(change => change.Kind == ChangeKind.Added);
         var modified = selected.Count(change => change.Kind == ChangeKind.Modified);
         var deleted = selected.Count(change => change.Kind == ChangeKind.Deleted);
+        // The selection counts too: when the paths of the set changed, an older review of the same commits does not
+        // cover what the set is now, so a new one is still needed
         var filed = existing
-            .Where(r => r.ReviewSetId == definition.Id && r.HeadSha == headSha && r.BaselineSha == candidate.BaselineSha)
+            .Where(r => r.ReviewSetId == definition.Id
+                && r.HeadSha == headSha
+                && r.BaselineSha == candidate.BaselineSha
+                && string.Equals(r.Selection, candidate.SelectionText, StringComparison.Ordinal))
             .OrderBy(r => r.Created)
             .FirstOrDefault();
         return filed is null
@@ -771,7 +776,8 @@ public sealed class ReviewPlanner
                 r.RepositoryId == access.RepositoryId
                 && r.ReviewSetId == request.SetId
                 && r.HeadSha == headSha
-                && r.BaselineSha == request.BaselineSha);
+                && r.BaselineSha == request.BaselineSha
+                && string.Equals(r.Selection, selectionText, StringComparison.Ordinal));
             if (filed is not null)
             {
                 return new PlanCreateResult(request.SetId, PlanCreateOutcome.AlreadyFiled, filed.Id, $"Review '{filed.Id}' already exists.");

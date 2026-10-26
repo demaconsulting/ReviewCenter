@@ -665,12 +665,19 @@ public partial class PlanPage : ComponentBase
     private string TitleOf(string setId) => Plan?.Rows.FirstOrDefault(row => row.SetId == setId)?.Title ?? setId;
 
     /// <summary>
-    ///     Describes how many files changed in a row, for example <c>3 changed files (2 added, 1 modified)</c>.
+    ///     Describes how many files a row would review, for example <c>3 changed files (2 added, 1 modified)</c> since a
+    ///     baseline, or <c>3 files</c> when all files are reviewed.
     /// </summary>
     /// <param name="row">The row.</param>
     /// <returns>The description.</returns>
     private static string CountsText(PlanRow row)
     {
+        // A review of all files has no changes to describe: every file is "added", so the counts would only repeat it
+        if (row.BaselineSha is null)
+        {
+            return row.ChangedFiles == 1 ? "1 file" : $"{row.ChangedFiles} files";
+        }
+
         var kinds = new List<string>();
         if (row.Added > 0)
         {

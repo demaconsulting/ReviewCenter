@@ -85,6 +85,11 @@ signed review gets a full review and a note. This scenario is tested by
 `AlreadyFiled` with the identifier of that review. This scenario is tested by
 `ReviewPlanner_PlanAsync_ReviewExists_AlreadyFiled`.
 
+**ReviewPlanner_PlanAsync_SameCommitsOtherPaths_WillCreate**: A review of the same set, head, and baseline whose paths
+were different does not make the set `AlreadyFiled`; the set is `WillCreate`, the created review gets the next free
+identifier, and a second plan then finds the new review. This scenario is tested by
+`ReviewPlanner_PlanAsync_SameCommitsOtherPaths_WillCreate`.
+
 **ReviewPlanner_PlanAsync_UnusableSets_CannotPlanRows**: A set with an invalid path, one with an identifier over the
 limit, and one that selects too many files are `CannotPlan` rows with a problem, and the good set is still planned. This
 scenario is tested by `ReviewPlanner_PlanAsync_UnusableSets_CannotPlanRows`.

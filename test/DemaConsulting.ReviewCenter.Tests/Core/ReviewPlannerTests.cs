@@ -540,6 +540,38 @@ public class ReviewPlannerTests
     }
 
     /// <summary>
+    ///     Test that a review of the same set and commits whose paths were different does not hide the set: the
+    ///     selection is part of what makes a review the same.
+    /// </summary>
+    [Fact]
+    public async Task ReviewPlanner_PlanAsync_SameCommitsOtherPaths_WillCreate()
+    {
+        // Arrange: core was reviewed at the head with src/**, then its paths changed in the configuration
+        var f = await CreateAsync();
+        await FileAsync(f, H2, "core");
+        f.Parser.Sets[0] = new("core", "Core", ["src/a.cs"]);
+
+        // Act: plan the same head again
+        var plan = await PlanAsync(f);
+
+        // Assert: core needs a new review for its new selection, with no link to the old review
+        Assert.Equal(PlanRowStatus.WillCreate, plan.Rows[0].Status);
+        Assert.Null(plan.Rows[0].ExistingReviewId);
+        Assert.Equal(0, plan.AlreadyFiledCount);
+
+        // Act: create it, and plan again
+        var results = await f.Planner.CreateAsync(
+            f.ProjectId, f.RepositoryId, plan.HeadSha, [RequestFor(plan.Rows[0])], _actor, TestContext.Current.CancellationToken);
+        var again = await PlanAsync(f);
+
+        // Assert: the new review has its own id, and the plan now finds it
+        Assert.Equal(PlanCreateOutcome.Created, results[0].Outcome);
+        Assert.Equal("core-2", results[0].ReviewId);
+        Assert.Equal(PlanRowStatus.AlreadyFiled, again.Rows[0].Status);
+        Assert.Equal("core-2", again.Rows[0].ExistingReviewId);
+    }
+
+    /// <summary>
     ///     Test that a set that cannot be planned is a row of its own and does not fail the plan.
     /// </summary>
     [Fact]

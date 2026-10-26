@@ -315,8 +315,8 @@ public class PlanPageTests : PageTestBase
         // Assert: the actionable rows come first, are ticked and say what they will review
         Assert.Equal("Core", TextOf(cut, "plan-row-title-core"));
         Assert.Equal("Full review: no signed review of this set yet", TextOf(cut, "plan-row-note-core"));
-        Assert.Equal("2 changed files (2 added)", TextOf(cut, "plan-row-counts-core"));
-        Assert.Equal("1 changed file (1 added)", TextOf(cut, "plan-row-counts-docs"));
+        Assert.Equal("2 files", TextOf(cut, "plan-row-counts-core"));
+        Assert.Equal("1 file", TextOf(cut, "plan-row-counts-docs"));
         Assert.True(cut.Find("[data-testid='plan-row-check-core']").HasAttribute("checked"));
         Assert.True(cut.Find("[data-testid='plan-row-check-docs']").HasAttribute("checked"));
         Assert.Equal("Create 2 reviews", TextOf(cut, "plan-create-button"));

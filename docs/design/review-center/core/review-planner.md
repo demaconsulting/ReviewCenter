@@ -46,7 +46,8 @@ most five suffixes are tried when a create is refused as a duplicate.
      becomes a `CannotPlan` row with the problem and does not stop the plan) and choose its baseline (below).
   5. Group the sets by baseline. For each distinct baseline, list the changes once, count the added, modified, and
      deleted files of each selection of the group, and classify each set: `AlreadyFiled` when a review of this
-     repository with the same set, head commit, and baseline exists (the id of that review is given);
+     repository with the same set, head commit, baseline, and selection text exists (the id of that review is given;
+     a review made when the paths of the set were different does not count);
      `NothingToReview` when no selected file changed, or none matches; otherwise `WillCreate`. The head listing serves
      the full reviews and is released first; then the group of each baseline is classified before the next list is
      loaded, so only one change list (up to the size limit of a listing) is held at a time. The rows keep the order
@@ -74,8 +75,8 @@ most five suffixes are tried when a create is refused as a duplicate.
   access failure (which may carry what git printed) is replaced by the fixed sentence `GitAccessFailedMessage`, which the
   page shares; an unexpected fault (any
   other exception except a cancellation) becomes a `Failed` result with a generic message; neither stops the others. A
-  duplicate id (someone took it a moment ago) is retried with the next suffix, up to five times. The same range that
-  already exists is an `AlreadyFiled` result.
+  duplicate id (someone took it a moment ago) is retried with the next suffix, up to five times. The same range and
+  selection that already exists is an `AlreadyFiled` result.
 
 **GenerateId** (internal): Makes the review id of a set: characters other than letters, digits, `.`, and `_` become `-`,
 runs of `-` collapse, a leading character that is not a letter or a digit and trailing `-`, `.`, and `_` are removed, an
@@ -106,6 +107,10 @@ a batch with too many requests is `ArgumentException`.
 The last-signed baseline asks the signing service for the approval of every review of a set to find the latest signed
 one. The lookups are bounded by the reviews of each set, not by the sets times all reviews of the project, so a plan
 stays cheap for the project sizes this release targets; there is no cache.
+
+Matching the changed files against the selections costs the number of sets times the number of changed files, and a
+listing is held in memory while its sets are classified (bounded by the 64 MiB limit of a git listing), so a very large
+repository with hundreds of sets is slow to plan.
 
 #### Dependencies
 
