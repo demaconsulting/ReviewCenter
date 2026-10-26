@@ -82,7 +82,8 @@ the short hash (8 hexadecimal characters) of the trimmed text (see `AuditChain`)
 | `auth.sign-in-failed` | `wrong password`, `account disabled`, or `unknown user` |
 | `auth.locked-out` | `locked for 5 minutes after 5 failed attempts` |
 
-The anchor of `thread.started` is `line N`, `lines S-E`, or `(whole file)`.
+The anchor of `thread.started` is `line N`, `lines S-E`, or `(whole file)`; a line anchor on the baseline side has the
+suffix `(baseline)`, for example `line 3 (baseline)` and `lines 2-4 (baseline)`.
 
 The actor of an entry is the signed-in user, taken on the server from the authentication state and never from form
 input, stored as `Display Name (username)`. An action from the command line (`user add`) has the actor

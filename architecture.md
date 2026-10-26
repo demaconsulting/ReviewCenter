@@ -309,6 +309,13 @@ The architecture above is the target design. Only the first two slices are imple
   planned and those already filed only when present, and the empty sets collapsed, and creates the ticked reviews with a
   result for each. The review page shows the review-set of a planned review. The planner now turns an unexpected fault
   of one review into a failed result with a generic message, so the other reviews of the batch are kept.
+- **Implemented, slice 7c (diff viewer and deep links)**: the Core `LineDiff` (Myers line diff, bounded by 10,000 lines
+  per side and 2,000 changed lines) and `ReviewService.GetDiffAsync` give the review page a side-by-side Diff view for a
+  changed file, with unchanged lines collapsed and a plain "too large" fallback. A thread is anchored to the Head or the
+  Baseline side (`ThreadSide`, stored with the thread, shown as "Before" or "After"), and the record digest is now
+  version 4 and binds the side. Links address one file, line (`?line=`, `&side=baseline`), or thread
+  (`/reviews/{id}/threads/{n}`), survive a sign-in (`ReturnUrl`, open-redirect safe), and the address follows the
+  selection (`replaceUrl`). Development databases created before this slice must be recreated.
 - **Planned and deferred**: Api, Evidence, Messaging, the review lifecycle beyond `Draft`, and the rest of Core and
   Storage. They have no code, requirements,
   design documents, or verification documents yet, so the SysML2 model and the design documentation describe the

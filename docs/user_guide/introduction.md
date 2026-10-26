@@ -330,8 +330,9 @@ same side, or fill in "Through line", to comment on a range. **Cancel** closes t
 file instead** keeps your text. Threads appear right under the row of the lines they are about, across the full
 width (a resolved thread is one line until you open it), and the thread list names them
 "Before: line N" or "After: line N" and jumps to the line when you choose one. **Head** is the numbered view with
-comments, and **Baseline** shows the earlier content read-only. A file that is too large to compare line by line says
-so and offers Head and Baseline. A **Deleted** file opens on a Diff view of its removed lines; you can comment on
+comments, and **Baseline** shows the earlier content read-only. A file that is too large to compare line by line
+(more than 10,000 lines on either side, or more than 2,000 added and removed lines together) says so and offers Head
+and Baseline. A **Deleted** file opens on a Diff view of its removed lines; you can comment on
 them or on the whole file. An **Added** file, and every file of an upload, shows the numbered lines as before. The
 review fingerprint covers the files that
 exist at the head (Added and Modified), exactly as for an upload. The Details section shows the repository name, the
@@ -685,8 +686,8 @@ user accounts, reviewer signatures, or the audit trail existed, does not have th
 needed, and the pages cannot work with it: delete the file (or point `Database:ConnectionString` at a new one) and
 start again, then create the first administrator.** Do this only with development data. The repository registry and
 the reviews from a repository add tables and columns, and the record digest of a review from a repository is calculated
-in a new format (version 3) that includes the review-set, so a development database created before them must be
-recreated in the same way.
+in a new format (version 4) that includes the review-set and the side of every line comment, so a development
+database created before them must be recreated in the same way.
 
 ## Repositories and Credentials
 

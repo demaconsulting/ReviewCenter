@@ -21,13 +21,12 @@ comment, checklist answer, and signature is recorded under the signed-in user. R
 under development.
 
 > **Warning: databases created by an earlier build must be recreated.** Reviews from a git repository add columns to
-> the review tables, and the review record has a new digest format (version 3) that also covers the review-set a
-> review was planned for; an earlier development database does not have these columns, and the database is created
-> by `EnsureCreated` without migrations. Delete the old database file before starting this version (development
-> databases only). The server also keeps a Data
-> Protection key ring in a `keys` folder beside the database (see
-> [Repositories and Credentials](#repositories-and-credentials)); starting this version once signs everybody out,
-> because the cookie keys now persist in that folder.
+> the review tables, and the review record has a new digest format (version 4) that also covers the review-set a
+> review was planned for and the side of every line comment; an earlier development database does not have these
+> columns, and the database is created by `EnsureCreated` without migrations. Delete the old database file before
+> starting this version (development databases only). The server also keeps a Data Protection key ring in a `keys`
+> folder beside the database (see [Repositories and Credentials](#repositories-and-credentials)); starting this
+> version once signs everybody out, because the cookie keys now persist in that folder.
 
 ## Features
 
@@ -53,8 +52,7 @@ The current release provides:
   content, the two commits, and the selection are copied into the database when the review is created, so later
   commits do not change the review. The review page shows each file as Added, Modified, or Deleted; a modified file
   opens as a **Diff** (the baseline and the head side by side, unchanged lines collapsed, a **+** on every line to
-  comment on it) and
-  can also be read as **Head** or as a read-only **Baseline**.
+  comment on it) and can also be read as **Head** or as a read-only **Baseline**.
   A signature binds the repository, both commits, the selection, and every change (see
   [Reviews from a Repository](#reviews-from-a-repository))
 - **Planning Reviews**: if the repository has review-sets in its `.reviewmark.yaml`, choose **Plan reviews from a
@@ -410,16 +408,16 @@ baseline on the left and the head on the right (stacked on a narrow screen), eac
 removed lines next to the run of added lines that replaces it, and the unchanged lines collapsed behind **Show N
 unchanged lines**. Click the **+** on a line to comment on it; the left side is commented on in the baseline and the
 right side in the head, and the thread list says "Before: line N" or "After: line N". The file can also be read as
-**Head** (the
-numbered lines with their comments) or as **Baseline** (read-only), and a file too large to compare line by line
-offers those two. A deleted file opens on its removed lines and accepts comments on them or on the whole file. The
+**Head** (the numbered lines with their comments) or as **Baseline** (read-only), and a file too large to compare
+line by line (more than 10,000 lines on either side, or more than 2,000 added and removed lines together) offers
+those two. A deleted file opens on its removed lines and accepts comments on them or on the whole file. The
 content fingerprint covers the files that exist at the head (Added and Modified), calculated as ReviewMark does. The
 Details section shows the repository name, the two commit SHAs, and the selection.
 
 The record digest of a review from a repository covers the repository, the baseline and head commits, the selection,
 the review-set the review was planned for (if any), and every change with the hashes of its baseline and head content,
-so a signature binds to exactly what was selected. The digest has a new format (version 3); a database from an earlier
-build cannot be used and must be recreated.
+so a signature binds to exactly what was selected. The digest has a new format (version 4, which also covers the side
+of every line comment); a database from an earlier build cannot be used and must be recreated.
 
 ### Review-Sets in the Repository
 
