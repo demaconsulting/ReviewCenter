@@ -47,6 +47,17 @@ public static class ReviewLimits
     public const long MaxTotalSizeBytes = 20L * 1024 * 1024;
 
     /// <summary>
+    ///     The largest number of lines per side that the line diff compares; larger files are reported as too large.
+    /// </summary>
+    public const int MaxDiffLines = 10_000;
+
+    /// <summary>
+    ///     The largest number of changed lines (added plus removed) that the line diff computes; more are
+    ///     reported as too large. It bounds the work of the diff to a few tens of millions of steps.
+    /// </summary>
+    public const int MaxDiffEdits = 2_000;
+
+    /// <summary>
     ///     The longest accepted file path, in characters.
     /// </summary>
     public const int MaxPathLength = 400;

@@ -229,6 +229,7 @@ internal sealed class ReviewStore(IDbContextFactory<ReviewCenterDbContext> facto
                     ProjectId = thread.ProjectId,
                     ReviewId = thread.ReviewId,
                     FilePath = thread.FilePath,
+                    Side = thread.Side,
                     StartLine = thread.StartLine,
                     EndLine = thread.EndLine,
                     State = thread.State,

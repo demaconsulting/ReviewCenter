@@ -21,6 +21,7 @@
 using DemaConsulting.ReviewCenter.Core;
 using DemaConsulting.ReviewCenter.Storage;
 using DemaConsulting.ReviewCenter.Tests.Core;
+using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -375,11 +376,14 @@ public class ReviewStoreTests
     /// <param name="start">The first line, or <c>null</c> for the whole file.</param>
     /// <param name="end">The last line, or <c>null</c> for the whole file.</param>
     /// <param name="text">The text of the first comment.</param>
+    /// <param name="side">The side of the anchor.</param>
     /// <returns>The thread, ready to add.</returns>
-    private static ReviewThread NewThread(int projectId, string reviewId, string filePath, int? start, int? end, string text)
+    private static ReviewThread NewThread(
+        int projectId, string reviewId, string filePath, int? start, int? end, string text, ThreadSide side = ThreadSide.Head)
     {
         return new ReviewThread
         {
+            Side = side,
             Id = 9001, // supplied identities must be ignored; the store assigns its own
             ProjectId = projectId,
             ReviewId = reviewId,
@@ -440,6 +444,53 @@ public class ReviewStoreTests
         Assert.NotEqual(9002, comment.Id);
         Assert.Equal(range.Id, comment.ThreadId);
         Assert.Equal(("Ann", "ann", "Range", _created), (comment.Author, comment.AuthorUsername, comment.Text, comment.Created));
+    }
+
+    /// <summary>
+    ///     Test that the side of a thread survives storage, whether it is read back as a list or in a record, and
+    ///     that a state change keeps it.
+    /// </summary>
+    [Fact]
+    public async Task ReviewStore_AddThreadAsync_Side_IsPersisted()
+    {
+        // Arrange: a review with two files
+        using var db = new TestStore();
+        var projectId = await AddReviewAsync(db);
+
+        // Act: add a baseline thread and a head thread, then read them back from a new context
+        var baseline = await db.Store.AddThreadAsync(
+            NewThread(projectId, "REV-1", "a.txt", 1, 1, "Old", ThreadSide.Baseline), TestContext.Current.CancellationToken);
+        var head = await db.Store.AddThreadAsync(
+            NewThread(projectId, "REV-1", "a.txt", 1, 1, "New"), TestContext.Current.CancellationToken);
+        var listed = await db.Store.ListThreadsAsync(projectId, "REV-1", TestContext.Current.CancellationToken);
+
+        // Assert: the sides are what was stored
+        Assert.Equal(ThreadSide.Baseline, baseline.Side);
+        Assert.Equal([ThreadSide.Baseline, ThreadSide.Head], listed.OrderBy(t => t.Id).Select(t => t.Side));
+        Assert.Equal(head.Id, listed.Single(t => t.Side == ThreadSide.Head).Id);
+    }
+
+    /// <summary>
+    ///     Test that the side is stored as its name in a string column.
+    /// </summary>
+    [Fact]
+    public async Task ReviewStore_AddThreadAsync_Side_IsStoredAsText()
+    {
+        // Arrange: a review with a baseline thread
+        using var db = new TestStore();
+        var projectId = await AddReviewAsync(db);
+        await db.Store.AddThreadAsync(
+            NewThread(projectId, "REV-1", "a.txt", 1, 1, "Old", ThreadSide.Baseline), TestContext.Current.CancellationToken);
+
+        // Act: read the raw column
+        await using var connection = new SqliteConnection(db.ConnectionString);
+        await connection.OpenAsync(TestContext.Current.CancellationToken);
+        await using var command = connection.CreateCommand();
+        command.CommandText = "SELECT Side FROM Threads";
+        var raw = (string?)await command.ExecuteScalarAsync(TestContext.Current.CancellationToken);
+
+        // Assert: the name, not a number
+        Assert.Equal("Baseline", raw);
     }
 
     /// <summary>

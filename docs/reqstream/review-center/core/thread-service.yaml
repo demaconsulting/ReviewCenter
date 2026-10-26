@@ -39,15 +39,33 @@ sections:
 
       - id: ReviewCenter-ThreadService-DeletedFile
         title: >-
-          The ThreadService class shall reject a thread anchored to lines of a file that a repository review
-          marks as Deleted, and shall accept a thread on the whole of a deleted file, and a thread on lines of a
-          modified or added file.
+          The ThreadService class shall reject a thread anchored to head lines of a file that a repository review
+          marks as Deleted, and shall accept a thread on the whole of a deleted file, a thread on baseline lines of a
+          deleted file, and a thread on lines of a modified or added file.
         justification: |
-          A deleted file has no lines at the head, so a line range would point at nothing; the reviewer can still
-          comment on the deletion as a whole. Lines of a modified or added file exist at the head.
+          A deleted file has no lines at the head, so a head line range would point at nothing; the reviewer can
+          comment on the deletion as a whole or on the removed baseline lines. Lines of a modified or added file
+          exist at the head.
         tests:
           - ThreadService_StartThreadAsync_LineOnDeletedFile_ThrowsThreadAnchorInvalid
           - ThreadService_StartThreadAsync_WholeFileOnDeletedAndLineOnModified_AreAllowed
+
+      - id: ReviewCenter-ThreadService-Side
+        title: >-
+          The ThreadService class shall anchor a thread to the Head or the Baseline side of a file, taking Head
+          when no side is given, shall check the lines of a range against the lines of the chosen side only, shall
+          accept the Baseline side only for a modified or deleted file of a review that has a baseline commit, and
+          shall store a whole-file thread as Head and reject a whole-file anchor that names the Baseline side.
+        justification: |
+          A diff shows removed lines that exist only in the baseline. A reviewer must be able to comment on them,
+          and the number of a line means different things on each side, so the side decides which text the range
+          is checked against and what the thread is about.
+        tests:
+          - ThreadService_StartThreadAsync_SideMatrix_AcceptsOnlyLinesThatExistOnThatSide
+          - ThreadService_StartThreadAsync_BaselineWithoutBaselineCommit_ThrowsThreadAnchorInvalid
+          - ThreadService_StartThreadAsync_WholeFileSide_BaselineRefusedHeadStored
+          - ThreadService_StartThreadAsync_NoSideGiven_IsHeadThread
+          - ThreadService_StartThreadAsync_BaselineRange_UsesBaselineLineCount
 
       - id: ReviewCenter-ThreadService-Comment
         title: >-
@@ -129,7 +147,8 @@ sections:
       - id: ReviewCenter-ThreadService-Audit
         title: >-
           The ThreadService class shall record starting a thread, replying, resolving, and reopening in the audit
-          trail, in the same transaction as the change, naming the actor, the identifiers, the anchor, and a short
+          trail, in the same transaction as the change, naming the actor, the identifiers, the anchor (marking a
+          line anchor on the Baseline side), and a short
           hash of the comment text but never the text itself, and shall record nothing for a thread that does not
           exist.
         justification: |
@@ -137,4 +156,5 @@ sections:
           be edited, and a request that changed nothing must leave no entry.
         tests:
           - ThreadService_ThreadEvents_RecordIdsAnchorsAndDigestButNotText
+          - ThreadService_StartThreadAsync_Audit_NamesBaselineSideOnly
           - ThreadService_ResolveAsync_MissingThread_RecordsNothing

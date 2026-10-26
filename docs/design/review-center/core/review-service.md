@@ -35,6 +35,9 @@ baseline columns set.
 and unusable paths that matched the selection). The skipped entries are not stored; they are returned so the page
 can tell the creator once, and their number is recorded in the audit detail.
 
+**FileDiff**: the answer of `GetDiffAsync`: a `FileDiffStatus` (`Diff`, `Binary`, `TooLarge`, or `NoBaseline`), the
+`LineDiffResult` (only for `Diff`), and `OnlyLineEndingsDiffer`.
+
 Rules for the input: the review identifier consists of 1 to 100 ASCII letters, digits, dots, underscores, and
 hyphens and starts with a letter or digit; the title is not empty after trimming and has at most 200
 characters; a review has 1 to 200 files; each path is not empty and has at most 400 characters; paths are
@@ -106,6 +109,22 @@ when the review or file does not exist.
 **GetBaselineContentAsync**: Reads the frozen baseline bytes of one file; returns null when the review or file does
 not exist or the file has no baseline (an added file).
 
+**GetDiffAsync**: Gives the line differences between the baseline and the head of one file of a review.
+
+- *Parameters*: `int projectId`, `string reviewId`, `string path`, and a cancellation token.
+- *Returns*: `Task<FileDiff?>` — null when the review or the file does not exist; otherwise a `FileDiff` whose
+  `Status` is `Diff` (with the `LineDiffResult` and `OnlyLineEndingsDiffer`), `NoBaseline`, `Binary`, or `TooLarge`.
+- *Postconditions*: Nothing is stored, and git is not opened: both contents come from the store, where they were
+  frozen when the review was created, so the answer does not depend on the repository and is the same every time.
+
+The status is decided in this order: `NoBaseline` when the review is not from a repository or has no baseline commit
+(there is nothing to compare against); otherwise the head content (empty for a deleted file) and the baseline content
+(empty for an added file) are split into lines with `FileText.TryReadLines`, and the status is `Binary` when either
+side is binary; otherwise the lines are compared with `LineDiff.Compute`, and the status is `TooLarge` when the
+comparison exceeds its bounds, else `Diff`. `OnlyLineEndingsDiffer` is true when the two sides have the same lines
+but not the same bytes (line endings or the final line ending changed), so the page can say so instead of showing a
+diff without changes. An added file is therefore all added rows and a deleted file all removed rows.
+
 **Audit**: `CreateDraftAsync` takes the `Actor` and passes the draft `review.created` (detail with the title, the
 fingerprint, and the number of files) to the store, which saves it in the same transaction as the review and its files.
 `CreateFromRepositoryAsync` records `review.created` with the detail `review '{title}' from repository '{name}',
@@ -126,11 +145,12 @@ store or clock at construction, raise `ArgumentNullException`. Store failures pr
 - **Fingerprint** — calculates the file hashes and the review fingerprint.
 - **RepositoryService** and **IGitRepositoryProvider** — resolve the access to a repository and open the git session
   (injected, optional; needed only for `CreateFromRepositoryAsync`).
+- **FileText** and **LineDiff** — split the frozen contents into lines and compare them (for `GetDiffAsync`).
 - **RevisionValidator** and **SelectionMatcher** — validate the revision names and match the selection.
 
 #### Callers
 
 - **ProjectPage** — creates reviews (uploaded or from a repository) and lists the reviews of a project.
 - **ReviewPlanner** — creates the reviews of a plan through `CreateFromSessionAsync`, one session for the batch.
-- **ReviewPage** — reads a review and the head and baseline content of a file.
+- **ReviewPage** — reads a review, the head and baseline content of a file, and (in the diff view) its differences.
 - **ServerHost** — registers the service for the pages.

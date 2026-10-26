@@ -79,13 +79,16 @@ sections:
           a comment to a thread of a review, change the state of a thread, list the threads of one review with
           their comments in creation order while keeping the threads of different reviews apart, and report a
           thread that does not exist as nothing or false. Each comment keeps the user name and the display name of
-          its author.
+          its author, and each thread keeps the side (head or baseline) it was anchored to.
         justification: |
           Pages show the threads of exactly one review in a stable order, and a thread must be saved together
           with its first comment or not at all. Identifiers belong to the database alone, and the user name
-          keeps an author identifiable when the display name later changes.
+          keeps an author identifiable when the display name later changes. The side says which text the lines
+          of a thread belong to, and must come back as it was saved.
         tests:
           - ReviewStore_AddThreadAsync_WholeFileAndRange_RoundTripsWithComments
+          - ReviewStore_AddThreadAsync_Side_IsPersisted
+          - ReviewStore_AddThreadAsync_Side_IsStoredAsText
           - ReviewStore_AddCommentAsync_ExistingThread_AppendsInOrder
           - ReviewStore_AddCommentAsync_UnknownOrOtherReviewThread_ReturnsNull
           - ReviewStore_SetThreadStateAsync_ExistingAndUnknown_ChangesStateOrReturnsFalse

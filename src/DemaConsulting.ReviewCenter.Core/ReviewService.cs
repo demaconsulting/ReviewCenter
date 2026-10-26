@@ -422,6 +422,70 @@ public sealed class ReviewService
     }
 
     /// <summary>
+    ///     Compares the frozen baseline and head of one file of a repository review line by line.
+    /// </summary>
+    /// <remarks>
+    ///     Only the content stored with the review is read, never the git repository, so the diff is the same
+    ///     whenever it is viewed. An added file is compared with no lines (all added) and a deleted file
+    ///     produces no head lines (all removed). Line numbers come from <see cref="FileText.TryReadLines"/>,
+    ///     the same definition thread validation uses.
+    /// </remarks>
+    /// <param name="projectId">The project identity.</param>
+    /// <param name="reviewId">The review identifier.</param>
+    /// <param name="path">The file path within the review (ordinal comparison).</param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <returns>
+    ///     <c>null</c> when the review or the file does not exist; otherwise the diff with status
+    ///     <see cref="FileDiffStatus.NoBaseline"/> (upload review or no baseline commit),
+    ///     <see cref="FileDiffStatus.Binary"/>, <see cref="FileDiffStatus.TooLarge"/> or
+    ///     <see cref="FileDiffStatus.Diff"/>.
+    /// </returns>
+    public async Task<FileDiff?> GetDiffAsync(
+        int projectId,
+        string reviewId,
+        string path,
+        CancellationToken cancellationToken = default)
+    {
+        // The file must exist in the review; the metadata read does not load any file bytes
+        var review = await _store.GetReviewAsync(projectId, reviewId, cancellationToken);
+        var file = review?.Files.FirstOrDefault(f => string.Equals(f.Path, path, StringComparison.Ordinal));
+        if (review is null || file is null)
+        {
+            return null;
+        }
+
+        // Without a frozen baseline there is nothing to compare against
+        if (!review.IsFromRepository || review.BaselineSha is null)
+        {
+            return new FileDiff(FileDiffStatus.NoBaseline);
+        }
+
+        // A file that is not there on one side (added or deleted) has no bytes, hence no lines, on that side
+        var headBytes = file.ChangeKind == ChangeKind.Deleted
+            ? []
+            : await _store.GetFileContentAsync(projectId, reviewId, path, cancellationToken) ?? [];
+        var baselineBytes = file.ChangeKind == ChangeKind.Added
+            ? []
+            : await _store.GetBaselineContentAsync(projectId, reviewId, path, cancellationToken) ?? [];
+        var headLines = FileText.TryReadLines(headBytes);
+        var baselineLines = FileText.TryReadLines(baselineBytes);
+        if (headLines is null || baselineLines is null)
+        {
+            return new FileDiff(FileDiffStatus.Binary);
+        }
+
+        var result = LineDiff.Compute(baselineLines, headLines);
+        if (result.TooLarge)
+        {
+            return new FileDiff(FileDiffStatus.TooLarge);
+        }
+
+        // Identical lines with different bytes means only line endings (or the final newline) changed
+        var onlyLineEndings = result.Added == 0 && result.Removed == 0 && !baselineBytes.AsSpan().SequenceEqual(headBytes);
+        return new FileDiff(FileDiffStatus.Diff, result, onlyLineEndings);
+    }
+
+    /// <summary>
     ///     Checks that the project exists and the review id is still free in it.
     /// </summary>
     /// <param name="projectId">The project identity.</param>

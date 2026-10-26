@@ -297,6 +297,7 @@ sections:
         children:
           - ReviewCenter-Web-Comments
           - ReviewCenter-Core-Threads
+          - ReviewCenter-Core-Diff
           - ReviewCenter-Storage-Threads
         tests:
           - WebSubsystem_ReviewWithThreads_ArePresentedByThePage

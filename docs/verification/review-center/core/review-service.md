@@ -31,6 +31,8 @@ N/A - standard test environment.
 - The audit entry of a repository review names the repository, the commits, the counts, and the fingerprint.
 - A review created from a plan carries its review-set identifier and names it last in the audit entry; a manual
   review has none.
+- The diff of a file is computed from the stored content only, never from git; it reports no baseline, a binary
+  side, or a file that is too large instead of rows, and flags content that differs only in line endings.
 
 #### Test Scenarios
 
@@ -182,6 +184,28 @@ but another selection text, head commit, or repository have different record dig
 the limit is refused with `SelectionInvalid` before git is opened, and a manual review from a repository has no
 review-set. This scenario is tested by
 `ReviewService_CreateFromRepositoryAsync_SelectionTooLong_ThrowsAndManualReviewHasNoSet`.
+
+**ReviewService_GetDiffAsync_ModifiedAddedDeleted_ComparesFrozenContentWithoutGit**: A modified, an added, and a
+deleted file of a repository review are compared from the stored content; the rows, the counts, and the line numbers
+of both sides are as expected, the missing side of an added or deleted file is empty, and git is never opened. This
+scenario is tested by `ReviewService_GetDiffAsync_ModifiedAddedDeleted_ComparesFrozenContentWithoutGit`.
+
+**ReviewService_GetDiffAsync_UnknownFileOrReview_ReturnsNull**: A file that is not in the review and a review that
+does not exist both give null. This scenario is tested by `ReviewService_GetDiffAsync_UnknownFileOrReview_ReturnsNull`.
+
+**ReviewService_GetDiffAsync_NoBaselineOrUpload_ReportsNoBaseline**: A file of an uploaded review and a file of a
+repository review without a baseline commit give the status `NoBaseline` and no rows. This scenario is tested by
+`ReviewService_GetDiffAsync_NoBaselineOrUpload_ReportsNoBaseline`.
+
+**ReviewService_GetDiffAsync_BinarySide_ReportsBinary**: A theory over a binary baseline and a binary head gives
+the status `Binary` and no rows. This scenario is tested by `ReviewService_GetDiffAsync_BinarySide_ReportsBinary`.
+
+**ReviewService_GetDiffAsync_BeyondLineLimit_ReportsTooLarge**: A file with more lines than the diff limit gives the
+status `TooLarge` and no rows. This scenario is tested by `ReviewService_GetDiffAsync_BeyondLineLimit_ReportsTooLarge`.
+
+**ReviewService_GetDiffAsync_OnlyLineEndingsDiffer_IsFlagged**: A theory over two contents that differ only in their
+line endings gives no changed rows and sets the flag that says the line endings differ. This scenario is tested by
+`ReviewService_GetDiffAsync_OnlyLineEndingsDiffer_IsFlagged`.
 
 **Reviews created from a plan** use `CreateFromSessionAsync` through the planner and are verified in
 `ReviewPlannerTests.cs` (see the `ReviewPlanner` verification): the review carries the set identifier and the audit

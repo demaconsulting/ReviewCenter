@@ -59,7 +59,8 @@ absent or the file has no baseline.
 
 **AddThreadAsync**: Stores a thread together with its first comment in one save, which is one transaction. Fresh
 entities are copied from the argument, so identities supplied by the caller are ignored and the database assigns
-them; the comment keeps the display name and the user name of its author. A thread for a file that does not exist in
+them; the thread keeps its side, and the comment keeps the display name and the user name of its author. A thread for
+a file that does not exist in
 the review is refused by the relationship constraint of the
 database.
 

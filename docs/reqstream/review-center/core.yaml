@@ -4,9 +4,10 @@
 # PURPOSE:
 # - Define requirements for the ReviewCenter Core subsystem
 # - The Core subsystem spans the Fingerprint, ProjectService, ReviewService, ThreadService, ChecklistService,
-#   UserService, RecordDigest, SigningService, RepositoryService, SelectionMatcher, RevisionValidator, and
-#   ReviewPlanner units, with the domain types they share (project, review, review file, thread, comment, checklist,
-#   user, role, actor, reviewer slot, signature, upload, limits, repository, rule exception, and store interfaces)
+#   UserService, RecordDigest, SigningService, RepositoryService, SelectionMatcher, RevisionValidator,
+#   ReviewPlanner, and LineDiff units, with the domain types they share (project, review, review file, thread,
+#   comment, checklist, user, role, actor, reviewer slot, signature, upload, limits, repository, rule exception,
+#   and store interfaces)
 # - Subsystem requirements describe the externally visible behavior of the domain model and its rules
 
 sections:
@@ -96,6 +97,29 @@ sections:
           - ReviewCenter-ThreadService-NextStep
         tests:
           - CoreSubsystem_ThreadWorkflow_StartReplyResolveReopen_ReadsBackInOrder
+
+      - id: ReviewCenter-Core-Diff
+        title: >-
+          The Core subsystem shall give the line differences between the baseline and the head content of a file of
+          a review from the content frozen with the review, within fixed bounds on the size of the comparison, and
+          let a thread be anchored to lines of either side, so that a reviewer can comment on removed lines as well
+          as on lines at the head, with the side bound into the record digest.
+        justification: |
+          A change is reviewed by looking at what was removed and what was added. The comparison must not depend on
+          the repository still being reachable, must stay bounded, and a comment must keep saying which text it is
+          about.
+        children:
+          - ReviewCenter-LineDiff-Compute
+          - ReviewCenter-LineDiff-Order
+          - ReviewCenter-LineDiff-Numbering
+          - ReviewCenter-LineDiff-Bounds
+          - ReviewCenter-LineDiff-Segments
+          - ReviewCenter-ReviewService-Diff
+          - ReviewCenter-ThreadService-Side
+          - ReviewCenter-RecordDigest-ThreadSide
+        tests:
+          - ReviewService_GetDiffAsync_ModifiedAddedDeleted_ComparesFrozenContentWithoutGit
+          - ThreadService_StartThreadAsync_SideMatrix_AcceptsOnlyLinesThatExistOnThatSide
 
       - id: ReviewCenter-Core-Checklist
         title: >-

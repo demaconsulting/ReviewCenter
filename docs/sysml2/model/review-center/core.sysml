@@ -1,6 +1,6 @@
 package ReviewCenter {
     part def CoreSubsystem {
-        doc /* Domain model and rules for users, projects, reviews, review comment threads, the review checklist, and reviewer slots with re-authenticated signatures, including the review content fingerprint, the record digest, the hash-chained audit trail, the registry of git repositories, file selection patterns, revision name validation, and the planning of reviews from review-sets, independent of web and database technology. */
+        doc /* Domain model and rules for users, projects, reviews, review comment threads, the review checklist, and reviewer slots with re-authenticated signatures, including the review content fingerprint, the record digest, the hash-chained audit trail, the registry of git repositories, file selection patterns, revision name validation, the planning of reviews from review-sets, and the line comparison of a file against its baseline, independent of web and database technology. */
 
         comment testRef /* Test: test/DemaConsulting.ReviewCenter.Tests/Core/CoreSubsystemTests.cs */
         comment designRef /* Design: docs/design/review-center/core.md */
@@ -21,5 +21,6 @@ package ReviewCenter {
         part revisionValidator : RevisionValidator;
         part repositoryService : RepositoryService;
         part reviewPlanner : ReviewPlanner;
+        part lineDiff : LineDiff;
     }
 }

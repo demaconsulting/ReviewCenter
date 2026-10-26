@@ -21,19 +21,21 @@ sections:
           - RecordDigest_Canonicalize_SmallRecord_MatchesDocumentedFormat
           - RecordDigest_Compute_SameRecord_IsStableSha256OfCanonicalText
           - RecordDigest_Compute_KnownRecord_MatchesKnownValue
+          - RecordDigest_Compute_ThreadSide_IsWrittenAndMatchesKnownValue
           - RecordDigest_Compute_NullRecord_Throws
 
       - id: ReviewCenter-RecordDigest-Coverage
         title: >-
           The RecordDigest class shall give a different digest when the content fingerprint, the outcome or
           justification of a check, an answered check, a section marked as not applicable or its reason, a thread
-          or its file, range, or state, or the author, text, or order of a comment, or a new comment, changes.
+          or its file, side, range, or state, or the author, text, or order of a comment, or a new comment, changes.
         justification: |
           A signature approves what the reviewer saw. Anything the reviewer relied on must change the digest, or a
           signature could stay current after the content, the answers, or the discussion it approved had changed.
         tests:
           - RecordDigest_Compute_CoveredChange_ChangesDigest
           - RecordDigest_Compute_CommentOrder_ChangesDigest
+          - RecordDigest_Compute_ThreadSideChange_ChangesDigest
 
       - id: ReviewCenter-RecordDigest-Independence
         title: >-
@@ -60,9 +62,21 @@ sections:
         tests:
           - RecordDigest_Compute_TextWithDelimiters_DoesNotCollide
 
+      - id: ReviewCenter-RecordDigest-ThreadSide
+        title: >-
+          The RecordDigest class shall write the side of every thread (Head or Baseline) into the canonical text
+          between the file path and the line range, as version 4 of the format, and shall give a different digest
+          for two records that differ only in the side of a thread.
+        justification: |
+          A comment on a baseline line is about different text than a comment on a head line of the same number.
+          A signature approves the discussion as it was, so the side must be part of what the signature binds to.
+        tests:
+          - RecordDigest_Compute_ThreadSide_IsWrittenAndMatchesKnownValue
+          - RecordDigest_Compute_ThreadSideChange_ChangesDigest
+
       - id: ReviewCenter-RecordDigest-Source
         title: >-
-          The RecordDigest class shall cover the source of a review in the canonical text, as version 3 of the
+          The RecordDigest class shall cover the source of a review in the canonical text, as version 4 of the
           format: the word upload for an uploaded review, and for a review from a repository the repository
           identity, the baseline and head commit identifiers, the selection text, the identifier of the review-set
           the review was planned from (distinguishing none from the empty text), and every change with its path,

@@ -103,8 +103,202 @@ public class ThreadServiceTests
 
         // Assert: refused with the documented reason, and no thread exists
         Assert.Equal(DomainRule.ThreadAnchorInvalid, ex.Rule);
-        Assert.Equal("Deleted files accept whole-file comments only.", ex.Message);
+        Assert.Equal("A deleted file has no head lines; comment on its baseline lines or on the whole file instead.", ex.Message);
         Assert.Empty(await service.ListAsync(projectId, "rev-1", cancellationToken));
+    }
+
+    /// <summary>
+    ///     Creates a store with a project and a repository review that has a baseline commit, holding a modified
+    ///     file <c>mod.txt</c> (four baseline lines, two head lines), a deleted file <c>gone.txt</c> (two baseline
+    ///     lines) and an added file <c>new.txt</c> (three head lines), and a thread service over it.
+    /// </summary>
+    /// <returns>The store, the service and the project id; the review is <c>rev-1</c>.</returns>
+    private static async Task<(FakeReviewStore Store, ThreadService Service, int ProjectId)> CreateBaselineReviewAsync()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var clock = new FixedTimeProvider(_now);
+        var users = new UserService(new FakeUserStore(), new FakePasswordHasher(), clock);
+        await users.CreateAsync("adm", "Adm", UserRole.Admin, "correct horse battery", cancellationToken);
+        var repositories = new RepositoryService(new FakeRepositoryStore(), new FakeCredentialProtector(), users, clock);
+        var repository = await repositories.CreateAsync(
+            "repo", "https://example.com/r.git", null, null, new Actor("adm", "Adm"), cancellationToken);
+        var git = new FakeGitRepositoryProvider();
+        git.Revisions["main"] = "h1";
+        git.Revisions["v1"] = "b1";
+        git.Script(
+            "b1",
+            "h1",
+            [
+                ("gone.txt", ChangeKind.Deleted, "x\ny\n", null),
+                ("mod.txt", ChangeKind.Modified, "a\nb\nc\nd\n", "one\ntwo\n"),
+                ("new.txt", ChangeKind.Added, null, "n1\nn2\nn3\n")
+            ]);
+        var store = new FakeReviewStore();
+        var project = await new ProjectService(store, clock).CreateAsync("Apollo", null, cancellationToken);
+        await new ReviewService(store, clock, repositories, git).CreateFromRepositoryAsync(
+            project.Id, "rev-1", "First", repository.Id, "main", "v1", "**/*", new Actor("adm", "Adm"), cancellationToken);
+        return (store, new ThreadService(store, clock), project.Id);
+    }
+
+    /// <summary>
+    ///     Test the side validation matrix of a repository review with a baseline: which side accepts which line
+    ///     on a modified, a deleted and an added file, counting lines of the chosen side only.
+    /// </summary>
+    /// <param name="path">The file.</param>
+    /// <param name="side">The side of the anchor.</param>
+    /// <param name="line">The (single) line.</param>
+    /// <param name="accepted">Whether the anchor is accepted.</param>
+    [Theory]
+    [InlineData("mod.txt", ThreadSide.Head, 2, true)]
+    [InlineData("mod.txt", ThreadSide.Head, 3, false)]
+    [InlineData("mod.txt", ThreadSide.Baseline, 4, true)]
+    [InlineData("mod.txt", ThreadSide.Baseline, 5, false)]
+    [InlineData("gone.txt", ThreadSide.Head, 1, false)]
+    [InlineData("gone.txt", ThreadSide.Baseline, 2, true)]
+    [InlineData("gone.txt", ThreadSide.Baseline, 3, false)]
+    [InlineData("new.txt", ThreadSide.Head, 3, true)]
+    [InlineData("new.txt", ThreadSide.Head, 4, false)]
+    [InlineData("new.txt", ThreadSide.Baseline, 1, false)]
+    public async Task ThreadService_StartThreadAsync_SideMatrix_AcceptsOnlyLinesThatExistOnThatSide(
+        string path, ThreadSide side, int line, bool accepted)
+    {
+        // Arrange: a repository review with a baseline
+        var (store, service, projectId) = await CreateBaselineReviewAsync();
+        var cancellationToken = TestContext.Current.CancellationToken;
+
+        // Act: start a thread on the line of the side
+        var attempt = service.StartThreadAsync(projectId, "rev-1", path, line, line, TestActors.Ann, "Text", side, cancellationToken);
+
+        // Assert: stored with the side, or refused for the anchor with nothing stored
+        if (accepted)
+        {
+            var thread = await attempt;
+            Assert.Equal(side, thread.Side);
+            Assert.Equal(line, thread.StartLine);
+            Assert.Single(store.Threads);
+        }
+        else
+        {
+            var ex = await Assert.ThrowsAsync<DomainRuleException>(() => attempt);
+            Assert.Equal(DomainRule.ThreadAnchorInvalid, ex.Rule);
+            Assert.Empty(store.Threads);
+        }
+    }
+
+    /// <summary>
+    ///     Test that a baseline side is refused when the review has no baseline commit, and for an upload review.
+    /// </summary>
+    [Fact]
+    public async Task ThreadService_StartThreadAsync_BaselineWithoutBaselineCommit_ThrowsThreadAnchorInvalid()
+    {
+        // Arrange: a repository review without a baseline commit (its modified file has baseline bytes, but the
+        // review froze no baseline), and an upload review
+        var (repositoryService, repositoryProjectId) = await CreateRepositoryReviewAsync();
+        var (uploadStore, uploadService, uploadProjectId) = await CreateAsync();
+        var cancellationToken = TestContext.Current.CancellationToken;
+
+        // Act: anchor to a baseline line in each
+        var repository = await Assert.ThrowsAsync<DomainRuleException>(() => repositoryService.StartThreadAsync(
+            repositoryProjectId, "rev-1", "mod.txt", 1, 1, TestActors.Ann, "Text", ThreadSide.Baseline, cancellationToken));
+        var upload = await Assert.ThrowsAsync<DomainRuleException>(() => uploadService.StartThreadAsync(
+            uploadProjectId, "rev-1", "a.txt", 1, 1, TestActors.Ann, "Text", ThreadSide.Baseline, cancellationToken));
+
+        // Assert: both refused for the anchor and nothing stored
+        Assert.Equal(DomainRule.ThreadAnchorInvalid, repository.Rule);
+        Assert.Equal(DomainRule.ThreadAnchorInvalid, upload.Rule);
+        Assert.Empty(uploadStore.Threads);
+    }
+
+    /// <summary>
+    ///     Test that a whole-file anchor cannot name the baseline, and is stored as head otherwise.
+    /// </summary>
+    [Fact]
+    public async Task ThreadService_StartThreadAsync_WholeFileSide_BaselineRefusedHeadStored()
+    {
+        // Arrange: a repository review with a baseline
+        var (store, service, projectId) = await CreateBaselineReviewAsync();
+        var cancellationToken = TestContext.Current.CancellationToken;
+
+        // Act: a whole-file comment on the baseline, and one on the head
+        var ex = await Assert.ThrowsAsync<DomainRuleException>(() => service.StartThreadAsync(
+            projectId, "rev-1", "mod.txt", null, null, TestActors.Ann, "Text", ThreadSide.Baseline, cancellationToken));
+        var thread = await service.StartThreadAsync(
+            projectId, "rev-1", "mod.txt", null, null, TestActors.Ann, "Text", ThreadSide.Head, cancellationToken);
+
+        // Assert: the first is refused, the second is stored on the head
+        Assert.Equal(DomainRule.ThreadAnchorInvalid, ex.Rule);
+        Assert.Equal(ThreadSide.Head, thread.Side);
+        Assert.Single(store.Threads);
+    }
+
+    /// <summary>
+    ///     Test that a thread started without naming a side is a head thread.
+    /// </summary>
+    [Fact]
+    public async Task ThreadService_StartThreadAsync_NoSideGiven_IsHeadThread()
+    {
+        // Arrange: a repository review with a baseline
+        var (_, service, projectId) = await CreateBaselineReviewAsync();
+
+        // Act: start a thread with the overload that has no side
+        var thread = await service.StartThreadAsync(
+            projectId, "rev-1", "mod.txt", 1, 2, TestActors.Ann, "Text", TestContext.Current.CancellationToken);
+
+        // Assert: the head side
+        Assert.Equal(ThreadSide.Head, thread.Side);
+    }
+
+    /// <summary>
+    ///     Test that a range on the baseline side is validated against the baseline line count, not the head's.
+    /// </summary>
+    [Fact]
+    public async Task ThreadService_StartThreadAsync_BaselineRange_UsesBaselineLineCount()
+    {
+        // Arrange: mod.txt has four baseline lines and two head lines
+        var (_, service, projectId) = await CreateBaselineReviewAsync();
+        var cancellationToken = TestContext.Current.CancellationToken;
+
+        // Act: a baseline range over all four lines, and the same range on the head
+        var baseline = await service.StartThreadAsync(
+            projectId, "rev-1", "mod.txt", 1, 4, TestActors.Ann, "Text", ThreadSide.Baseline, cancellationToken);
+        var head = await Assert.ThrowsAsync<DomainRuleException>(() => service.StartThreadAsync(
+            projectId, "rev-1", "mod.txt", 1, 4, TestActors.Ann, "Text", ThreadSide.Head, cancellationToken));
+
+        // Assert: accepted on the baseline, refused on the head
+        Assert.Equal((1, 4, ThreadSide.Baseline), (baseline.StartLine, baseline.EndLine, baseline.Side));
+        Assert.Equal(DomainRule.ThreadAnchorInvalid, head.Rule);
+    }
+
+    /// <summary>
+    ///     Test that the audit text names the baseline side only, and that the head text stays as before.
+    /// </summary>
+    [Fact]
+    public async Task ThreadService_StartThreadAsync_Audit_NamesBaselineSideOnly()
+    {
+        // Arrange: a repository review with a baseline
+        var (store, service, projectId) = await CreateBaselineReviewAsync();
+        var cancellationToken = TestContext.Current.CancellationToken;
+
+        // Act: a baseline line, a baseline range, a head line
+        var single = await service.StartThreadAsync(
+            projectId, "rev-1", "mod.txt", 3, 3, TestActors.Ann, "one", ThreadSide.Baseline, cancellationToken);
+        var range = await service.StartThreadAsync(
+            projectId, "rev-1", "mod.txt", 2, 4, TestActors.Ann, "two", ThreadSide.Baseline, cancellationToken);
+        var head = await service.StartThreadAsync(
+            projectId, "rev-1", "mod.txt", 1, 1, TestActors.Ann, "three", ThreadSide.Head, cancellationToken);
+
+        // Assert: the baseline anchors carry the suffix; the head anchor is unchanged; all within the length limit
+        var details = store.Audits.Where(a => a.Action == "thread.started").Select(a => a.Detail).ToList();
+        Assert.Equal(
+            $"thread {single.Id} on mod.txt line 3 (baseline); comment {single.Comments[0].Id}, text sha256 {AuditText.ShortHash("one")}",
+            details[0]);
+        Assert.Equal(
+            $"thread {range.Id} on mod.txt lines 2-4 (baseline); comment {range.Comments[0].Id}, text sha256 {AuditText.ShortHash("two")}",
+            details[1]);
+        Assert.Equal(
+            $"thread {head.Id} on mod.txt line 1; comment {head.Comments[0].Id}, text sha256 {AuditText.ShortHash("three")}",
+            details[2]);
+        Assert.All(details, d => Assert.True(d.Length <= AuditText.MaxDetailLength));
     }
 
     /// <summary>

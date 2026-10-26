@@ -598,6 +598,153 @@ public class ReviewServiceRepositoryTests
     }
 
     /// <summary>
+    ///     Reads the diff of a file of review <c>rev-1</c> created with the baseline <c>v1</c>.
+    /// </summary>
+    /// <param name="f">The fixture, with the review created.</param>
+    /// <param name="path">The file path.</param>
+    /// <returns>The diff, or <c>null</c> for an unknown file.</returns>
+    private static Task<FileDiff?> DiffAsync(Fixture f, string path)
+    {
+        return f.Service.GetDiffAsync(f.ProjectId, "rev-1", path, TestContext.Current.CancellationToken);
+    }
+
+    /// <summary>
+    ///     Test that the diff of a modified, an added and a deleted file compares the frozen contents, and that
+    ///     reading it does not open the repository again.
+    /// </summary>
+    [Fact]
+    public async Task ReviewService_GetDiffAsync_ModifiedAddedDeleted_ComparesFrozenContentWithoutGit()
+    {
+        // Arrange: a review with a baseline; note how often git was opened
+        var f = await CreateAsync();
+        await CreateReviewAsync(f);
+        var opened = f.Git.Opened.Count;
+        var listed = f.Git.ListCalls;
+
+        // Act: diff each kind of file
+        var modified = await DiffAsync(f, "src/mod.txt");
+        var added = await DiffAsync(f, "src/new.txt");
+        var deleted = await DiffAsync(f, "docs/gone.md");
+
+        // Assert: replaced line; all added; all removed; git was not touched
+        Assert.Equal(FileDiffStatus.Diff, modified!.Status);
+        Assert.Equal(["-world", "+hello"], modified.Result!.Lines.Select(l => (l.Kind == DiffLineKind.Added ? "+" : "-") + l.Text));
+        Assert.False(modified.OnlyLineEndingsDiffer);
+        Assert.Equal(FileDiffStatus.Diff, added!.Status);
+        Assert.Equal((1, 0), (added.Result!.Added, added.Result.Removed));
+        Assert.Equal(FileDiffStatus.Diff, deleted!.Status);
+        Assert.Equal((0, 1), (deleted.Result!.Added, deleted.Result.Removed));
+        Assert.Equal(opened, f.Git.Opened.Count);
+        Assert.Equal(listed, f.Git.ListCalls);
+    }
+
+    /// <summary>
+    ///     Test that an unknown file or review has no diff.
+    /// </summary>
+    [Fact]
+    public async Task ReviewService_GetDiffAsync_UnknownFileOrReview_ReturnsNull()
+    {
+        // Arrange: a review with a baseline
+        var f = await CreateAsync();
+        await CreateReviewAsync(f);
+
+        // Act, Assert: an unknown file, a wrong-case path and an unknown review
+        Assert.Null(await DiffAsync(f, "nope.txt"));
+        Assert.Null(await DiffAsync(f, "SRC/MOD.TXT"));
+        Assert.Null(await f.Service.GetDiffAsync(f.ProjectId, "rev-9", "src/mod.txt", TestContext.Current.CancellationToken));
+    }
+
+    /// <summary>
+    ///     Test that a review without a baseline commit and an upload review report that there is nothing to compare.
+    /// </summary>
+    [Fact]
+    public async Task ReviewService_GetDiffAsync_NoBaselineOrUpload_ReportsNoBaseline()
+    {
+        // Arrange: a repository review without a baseline commit, and an upload review
+        var f = await CreateAsync();
+        f.Git.Script(null, HeadSha, [("src/mod.txt", ChangeKind.Added, null, "hello\n")]);
+        await CreateReviewAsync(f, baseline: null);
+        await f.Service.CreateDraftAsync(
+            f.ProjectId, "up-1", "Upload", [new("a.txt", Encoding.UTF8.GetBytes("a\n"))], _actor, TestContext.Current.CancellationToken);
+
+        // Act: diff a file of each
+        var repository = await DiffAsync(f, "src/mod.txt");
+        var upload = await f.Service.GetDiffAsync(f.ProjectId, "up-1", "a.txt", TestContext.Current.CancellationToken);
+
+        // Assert: nothing to compare against, no rows
+        Assert.Equal(FileDiffStatus.NoBaseline, repository!.Status);
+        Assert.Null(repository.Result);
+        Assert.Equal(FileDiffStatus.NoBaseline, upload!.Status);
+    }
+
+    /// <summary>
+    ///     Test that a binary head or baseline gives no line diff.
+    /// </summary>
+    /// <param name="baseline">The baseline content.</param>
+    /// <param name="head">The head content.</param>
+    [Theory]
+    [InlineData("a\0b", "text\n")]
+    [InlineData("text\n", "a\0b")]
+    public async Task ReviewService_GetDiffAsync_BinarySide_ReportsBinary(string baseline, string head)
+    {
+        // Arrange: a modified file with a NUL byte on one side
+        var f = await CreateAsync();
+        f.Git.Script(BaseSha, HeadSha, [("bin.dat", ChangeKind.Modified, baseline, head)]);
+        await CreateReviewAsync(f);
+
+        // Act: diff it
+        var diff = await DiffAsync(f, "bin.dat");
+
+        // Assert: binary, no rows
+        Assert.Equal(FileDiffStatus.Binary, diff!.Status);
+        Assert.Null(diff.Result);
+    }
+
+    /// <summary>
+    ///     Test that a file beyond the line limit reports too large, and no rows.
+    /// </summary>
+    [Fact]
+    public async Task ReviewService_GetDiffAsync_BeyondLineLimit_ReportsTooLarge()
+    {
+        // Arrange: a modified file whose baseline has one line more than the limit
+        var f = await CreateAsync();
+        var big = string.Concat(Enumerable.Range(0, ReviewLimits.MaxDiffLines + 1).Select(i => $"l{i}\n"));
+        f.Git.Script(BaseSha, HeadSha, [("big.txt", ChangeKind.Modified, big, "small\n")]);
+        await CreateReviewAsync(f);
+
+        // Act: diff it
+        var diff = await DiffAsync(f, "big.txt");
+
+        // Assert: too large, no rows
+        Assert.Equal(FileDiffStatus.TooLarge, diff!.Status);
+        Assert.Null(diff.Result);
+    }
+
+    /// <summary>
+    ///     Test that identical lines with different line endings or a different final newline are reported as such.
+    /// </summary>
+    /// <param name="baseline">The baseline content.</param>
+    /// <param name="head">The head content.</param>
+    [Theory]
+    [InlineData("a\r\nb\r\n", "a\nb\n")]
+    [InlineData("a\nb", "a\nb\n")]
+    public async Task ReviewService_GetDiffAsync_OnlyLineEndingsDiffer_IsFlagged(string baseline, string head)
+    {
+        // Arrange: a modified file whose lines are identical but whose bytes are not
+        var f = await CreateAsync();
+        f.Git.Script(BaseSha, HeadSha, [("eol.txt", ChangeKind.Modified, baseline, head)]);
+        await CreateReviewAsync(f);
+
+        // Act: diff it
+        var diff = await DiffAsync(f, "eol.txt");
+
+        // Assert: a diff without line changes, flagged as line endings only
+        Assert.Equal(FileDiffStatus.Diff, diff!.Status);
+        Assert.Equal(0, diff.Result!.Added + diff.Result.Removed);
+        Assert.True(diff.OnlyLineEndingsDiffer);
+    }
+
+    /// <summary>
     ///     Gets the <c>review.created</c> audit entries recorded so far.
     /// </summary>
     /// <param name="f">The fixture.</param>

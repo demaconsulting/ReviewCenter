@@ -217,6 +217,7 @@ internal sealed class ReviewCenterDbContext : DbContext
             thread.Property(t => t.ReviewId).HasMaxLength(ReviewLimits.MaxReviewIdLength);
             thread.Property(t => t.FilePath).IsRequired().HasMaxLength(ReviewLimits.MaxPathLength);
             thread.Property(t => t.State).HasConversion<string>().HasMaxLength(StateColumnLength);
+            thread.Property(t => t.Side).HasConversion<string>().HasMaxLength(StateColumnLength).HasDefaultValue(ThreadSide.Head);
             thread.HasOne<ReviewFile>()
                 .WithMany()
                 .HasForeignKey(t => new { t.ProjectId, t.ReviewId, t.FilePath })

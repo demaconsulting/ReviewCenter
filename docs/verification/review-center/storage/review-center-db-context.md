@@ -73,6 +73,10 @@ stored with their comments and read back unchanged, including the display name a
 which verifies the thread and comment tables. This scenario is
 tested by `ReviewStore_AddThreadAsync_WholeFileAndRange_RoundTripsWithComments`.
 
+**ReviewStore_AddThreadAsync_Side_IsStoredAsText**: A thread on the baseline side is stored, and a raw query of the
+`Side` column of the `Threads` table returns the text "Baseline", which verifies the mapping of the side to text.
+This scenario is tested by `ReviewStore_AddThreadAsync_Side_IsStoredAsText`.
+
 **ReviewStore_SetChecklistAnswer_UpsertsSingleRowPerItem**: A check is answered twice and another check once; the
 database holds one row per check, the first with the latest answer. This scenario is tested by
 `ReviewStore_SetChecklistAnswer_UpsertsSingleRowPerItem`.

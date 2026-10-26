@@ -11,22 +11,25 @@ that protect them, the content fingerprint that identifies a review's files and 
 hash-chained audit trail of everything that happens. It
 is
 deliberately free of web and database technology so that the rules can be reviewed and tested on their own. It
-contains fourteen units: `Fingerprint`, the content fingerprint algorithm; `RecordDigest`, the digest of a review
+contains fifteen units: `Fingerprint`, the content fingerprint algorithm; `RecordDigest`, the digest of a review
 record that a signature binds to; `AuditChain`, the audit entry types, their hash, and the verifier of the chain;
 `AuditService`, the recording, reading, and verification of the audit trail; `ProjectService`, the rules
 for projects; `ReviewService`, the rules for reviews; `ThreadService`, the rules for review comments;
 `ChecklistService`, the rules for the review checklist; `UserService`, the rules for users; `SigningService`, the
 rules for reviewer slots and signatures; `RepositoryService`, the registry of git repositories that reviews can be
 created from, with their credentials; `SelectionMatcher`, the file pattern language that selects the files of a
-repository; `RevisionValidator`, the check that a revision name cannot be taken for an option or an expression; and
-`ReviewPlanner`, the planning of the reviews that a head revision needs from the review-sets of the repository. The
-domain types (`Project`, `Review`, `ReviewFile`, `ReviewState`, `UploadedFile`, `ReviewThread`, `ReviewComment`,
+repository; `RevisionValidator`, the check that a revision name cannot be taken for an option or an expression;
+`LineDiff`, the comparison of the lines of two versions of a file and its division into shown and collapsed regions;
+and `ReviewPlanner`, the planning of the reviews that a head revision needs from the review-sets of the repository. The
+domain types (`Project`, `Review`, `ReviewFile`, `ReviewState`, `UploadedFile`, `ReviewThread`, `ThreadSide`,
+`ReviewComment`,
 `ReviewThreadState`, the checklist types, `User`, `UserRole`, `Actor`, the signing types `ReviewerSlot`,
 `ReviewSignature`, `SlotRole`, `ReviewRecord`, and `ReviewApproval`, the audit types `AuditEntry`, `AuditDraft`,
 and `AuditVerificationResult`, and the repository types `SourceRepository`, `RepositorySummary`, `NewRepository`,
 `RepositoryUpdate`, `TokenChange`, and `TokenAction`, and the git contract types `RepositoryAccess`, `GitChange`,
 `ChangeKind`, `SkippedEntry`, and `GitChangeSet`, and the review-source types `ReviewSource`, `ChangedFile`, and
-`RepositoryReviewResult`, and the planning types `BaselineMode`, `PlanRowStatus`, `PlanRow`, `ReviewPlan`,
+`RepositoryReviewResult`, and the diff types `FileDiff`, `FileDiffStatus`, `DiffLine`, `DiffLineKind`,
+`LineDiffResult`, and `DiffSegment`, and the planning types `BaselineMode`, `PlanRowStatus`, `PlanRow`, `ReviewPlan`,
 `PlanCreateRequest`, `PlanCreateOutcome`, `PlanCreateResult`, and `ReviewSetDefinition`), the text and line definition
 (`FileText`), the limits
 (`ReviewLimits`), the rule failure type
@@ -47,7 +50,9 @@ used by the `Web` and `Identity` subsystems and by the `Hosting` subsystem.
   selection (the changes are fetched once and frozen in the review; nothing reads the repository again, and a selection
   that matches no change is refused with `NothingToReview`); list and
   read reviews; read the exact head bytes, and the frozen baseline bytes, of one file of a review; start a comment
-  thread on a file or a line range (a file deleted at the head takes whole-file comments only),
+  thread on a file or a line range of the head or, for a file with a baseline, of the baseline (a file deleted at
+  the head takes whole-file comments and baseline line comments only), read the line differences between the
+  baseline and the head of one file from the frozen contents (within fixed bounds on the size of the comparison),
   reply to it, resolve and reopen it, and list the threads of a review with their comments; read the frozen
   checklist of a review with its progress, set whether a section applies, and answer a check; create a user, check a
   user name and password, list and read users, enable and disable a user, set the role of a user, and change a
@@ -211,7 +216,10 @@ binds to what the reviewer was shown.
 Draft is the only review state at present. The state is a closed enumeration and is stored as text so that
 states can be added without renumbering. A comment thread is `Open` or `Resolved`, stored the same way. Comments
 are immutable by design: a posted comment can neither be edited nor deleted, so a discussion stays a reliable
-record. The only change to an existing thread is its state. The author of a comment is the signed-in user: the web
+record. The only change to an existing thread is its state. A thread has a side: `Head` for the version under review,
+or `Baseline` for the version before the change, so that a reviewer can comment on a removed line; the line numbers of
+a thread belong to its side, and a whole-file thread is always `Head`. The author of a comment is the signed-in user:
+the web
 layer passes an `Actor` (user name and display name) obtained from the authentication state, so the author cannot be
 typed or forged on a page. The comment keeps both, the display name as it was at that time and the user name, so the
 record stays readable when a display name changes later.
