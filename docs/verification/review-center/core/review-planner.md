@@ -161,8 +161,9 @@ identifier, and title is created, and its audit detail and title fit their limit
 results, and taken identifiers give the expected safe and unique identifiers. This scenario is tested by
 `ReviewPlanner_GenerateId_SetId_MakesSafeUniqueId`.
 
-**ReviewPlanner_GenerateId_LongSetId_CutsAndStaysWithinLimit**: A set identifier of the maximum length gives an
-identifier within the limit, also with a suffix. This scenario is tested by
+**ReviewPlanner_GenerateId_LongSetId_CutsAndStaysWithinLimit**: A set identifier longer than the limit gives an
+identifier of exactly the limit, and with the first suffix and with a five character suffix after a thousand collisions
+the base is cut so that the identifier stays valid, unique, and within the limit. This scenario is tested by
 `ReviewPlanner_GenerateId_LongSetId_CutsAndStaysWithinLimit`.
 
 **ReviewPlanner_GenerateTitle_LongSetTitle_CutsTitleKeepsRange**: A long set title is cut so that the range and the whole

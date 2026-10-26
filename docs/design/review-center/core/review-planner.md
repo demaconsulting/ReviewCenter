@@ -21,9 +21,9 @@ commit, a note, the numbers of added, modified, and deleted files, the id of an 
 id, title, selection, baseline commit); `PlanCreateOutcome` (`Created`, `AlreadyFiled`, `Failed`); and `PlanCreateResult`.
 All are immutable records. `ReviewSetDefinition` and `IReviewSetParser` are defined with the planner.
 
-**Limits**: a batch has at most `ReviewLimits.MaxReviewSets` requests. A generated review id has a base of at most 96
-characters, so that a suffix fits in the limit of review ids (`ReviewLimits.MaxReviewIdLength`), and at most five
-suffixes are tried.
+**Limits**: a batch has at most `ReviewLimits.MaxReviewSets` requests. A generated review id is at most
+`ReviewLimits.MaxReviewIdLength` characters: the base is cut for each suffix so that base and suffix always fit, and at
+most five suffixes are tried when a create is refused as a duplicate.
 
 #### Key Methods
 
@@ -79,8 +79,8 @@ suffixes are tried.
 
 **GenerateId** (internal): Makes the review id of a set: characters other than letters, digits, `.`, and `_` become `-`,
 runs of `-` collapse, a leading character that is not a letter or a digit and trailing `-`, `.`, and `_` are removed, an
-empty result becomes `review`, the base is cut to 96 characters, and when the id is taken `-2`, `-3`, and so on are
-appended until one is free.
+empty result becomes `review`, the id is cut to the limit of review ids, and when the id is taken `-2`, `-3`, and so on
+are appended until one is free; the base is cut for each suffix, so the id never exceeds the limit and stays unique.
 
 **GenerateTitle** (internal): Makes the title `Set title (all files at ccccccc)` for a full review and
 `Set title (bbbbbbb..ccccccc)` for a review since a baseline, with the commits shortened to seven characters; the set

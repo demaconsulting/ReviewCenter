@@ -81,6 +81,12 @@ public partial class PlanPage : ComponentBase
     private int? _loadedProjectId;
 
     /// <summary>
+    ///     Counts the plans, creates and discards; a call that finds it changed after an await was overtaken (the
+    ///     project or the form changed) and must not touch the page.
+    /// </summary>
+    private int _version;
+
+    /// <summary>
     ///     Backing field of <see cref="RepositoryIdText"/>.
     /// </summary>
     private string _repositoryIdText = string.Empty;
@@ -415,10 +421,24 @@ public partial class PlanPage : ComponentBase
         _headRevision = string.Empty;
         _baselineRevision = string.Empty;
         _mode = BaselineMode.LastReviewed;
-        Discard();
 
-        Project = await ProjectService.GetAsync(ProjectId);
-        Repositories = await RepositoryService.ListEnabledAsync();
+        // A plan or create call of the previous project may still be awaited: forget it (its result is ignored
+        // because the version moves on) and make the form usable for the new project
+        Busy = false;
+        Reading = false;
+        Discard();
+        var projectId = ProjectId;
+
+        var project = await ProjectService.GetAsync(projectId);
+        var repositories = await RepositoryService.ListEnabledAsync();
+        if (_loadedProjectId != projectId)
+        {
+            // The project changed again while loading; the newer call loads its own data
+            return;
+        }
+
+        Project = project;
+        Repositories = repositories;
 
         // With a single repository there is nothing to choose, so one step less for the user
         if (Repositories.Count == 1)
@@ -497,9 +517,15 @@ public partial class PlanPage : ComponentBase
 
         Busy = true;
         Reading = true;
+        var version = _version;
+        var projectId = ProjectId;
         try
         {
-            var plan = await Planner.PlanAsync(ProjectId, repositoryId, HeadRevision, Mode, BaselineRevision);
+            var plan = await Planner.PlanAsync(projectId, repositoryId, HeadRevision, Mode, BaselineRevision);
+            if (version != _version)
+            {
+                return;
+            }
 
             // Every set that needs a review starts ticked: the usual case is to create them all
             _ticked.Clear();
@@ -510,18 +536,26 @@ public partial class PlanPage : ComponentBase
 
             Plan = plan;
         }
-        catch (DomainRuleException ex)
+        catch (DomainRuleException ex) when (version == _version)
         {
             ShowRuleError(ex);
         }
-        catch (Exception ex) when (ex is not OperationCanceledException)
+        catch (Exception ex) when (ex is not OperationCanceledException && version == _version)
         {
             ShowUnexpectedError();
         }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            // Overtaken: the page already shows something else, so the outcome of this call is dropped
+        }
         finally
         {
-            Busy = false;
-            Reading = false;
+            // An overtaken call must not release the busy state of the call that overtook it
+            if (version == _version)
+            {
+                Busy = false;
+                Reading = false;
+            }
         }
     }
 
@@ -542,6 +576,8 @@ public partial class PlanPage : ComponentBase
         }
 
         var plan = Plan;
+        var projectId = ProjectId;
+        var version = _version;
         ErrorMessage = null;
         ErrorHint = null;
         Busy = true;
@@ -553,19 +589,31 @@ public partial class PlanPage : ComponentBase
                 .Where(row => _ticked.Contains(row.SetId))
                 .Select(row => new PlanCreateRequest(row.SetId, row.Title, row.Selection, row.BaselineSha))
                 .ToList();
-            Results = await Planner.CreateAsync(ProjectId, plan.RepositoryId, plan.HeadSha, requests, actor);
+            var results = await Planner.CreateAsync(projectId, plan.RepositoryId, plan.HeadSha, requests, actor);
+            if (version == _version)
+            {
+                Results = results;
+            }
         }
-        catch (DomainRuleException ex)
+        catch (DomainRuleException ex) when (version == _version)
         {
             ShowRuleError(ex);
         }
-        catch (Exception ex) when (ex is not OperationCanceledException)
+        catch (Exception ex) when (ex is not OperationCanceledException && version == _version)
         {
             ShowUnexpectedError();
         }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            // Overtaken: the page already shows something else, so the outcome of this call is dropped
+        }
         finally
         {
-            Busy = false;
+            // An overtaken call must not release the busy state of the call that overtook it
+            if (version == _version)
+            {
+                Busy = false;
+            }
         }
     }
 
@@ -674,6 +722,8 @@ public partial class PlanPage : ComponentBase
     /// </summary>
     private void Discard()
     {
+        // Any plan or create call still awaited was started for what is discarded: its result must be ignored
+        _version++;
         Plan = null;
         Results = null;
         _ticked.Clear();

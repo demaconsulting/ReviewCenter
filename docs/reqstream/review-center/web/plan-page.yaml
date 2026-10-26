@@ -105,6 +105,8 @@ sections:
         tests:
           - PlanPage_FormChange_DiscardsPlan
           - PlanPage_ParametersChange_OtherProject_ClearsFormAndPlan
+          - PlanPage_ParametersChange_WhilePlanning_IgnoresStalePlanAndFreesForm
+          - PlanPage_ParametersChange_WhileCreating_IgnoresStaleResults
           - PlanPage_ShowPlan_WhileReading_ShowsLoadingAndDisablesButton
           - PlanPage_ShowPlan_WhileReading_DisablesEveryFormControl
           - PlanPage_Create_WhileCreating_DisablesFormAndRowControls

@@ -29,6 +29,11 @@ error, so the screen never disagrees with the form.
 **Busy**, **Reading**: set while the plan is read or the reviews are created, so a second submit is ignored; `Reading`
 tells the plan from the creation.
 
+**Version**: a counter that every discard increments (a form change, a new plan request, and a change of the project).
+A plan or create call remembers it before it awaits and ignores its outcome (plan, results, error and the release of the
+busy state) when the counter moved, so an answer for the previous project or inputs can never be shown. Changing the
+project also clears `Busy` and `Reading`, so the form of the new project is usable at once.
+
 **Plan**: the `ReviewPlan` shown, or `null`. **Ticked**: the identifiers of the ticked rows. **Results**: the
 `PlanCreateResult` values of the last creation, or `null`.
 

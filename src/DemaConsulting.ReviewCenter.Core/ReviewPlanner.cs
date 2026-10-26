@@ -55,11 +55,6 @@ public sealed class ReviewPlanner
     private const string ConfigPath = ".reviewmark.yaml";
 
     /// <summary>
-    ///     The longest base of a generated review id, leaving room for a suffix such as <c>-123</c>.
-    /// </summary>
-    private const int MaxIdBaseLength = ReviewLimits.MaxReviewIdLength - 4;
-
-    /// <summary>
     ///     How many id suffixes are tried when a generated id turns out to be taken.
     /// </summary>
     private const int MaxIdAttempts = 5;
@@ -310,8 +305,9 @@ public sealed class ReviewPlanner
     /// <remarks>
     ///     Characters outside letters, digits, <c>.</c>, <c>_</c> and <c>-</c> become <c>-</c>; runs of <c>-</c> collapse;
     ///     leading characters that are not letters or digits and trailing <c>-</c>, <c>.</c> and <c>_</c> are removed;
-    ///     an empty result becomes <c>review</c>; the base is cut to 96 characters so a suffix always fits. When the
-    ///     id is taken, <c>-2</c>, <c>-3</c> and so on are appended until one is free.
+    ///     an empty result becomes <c>review</c>; the id is cut to the id limit. When the id is taken, <c>-2</c>,
+    ///     <c>-3</c> and so on are appended until one is free, and the base is cut for each suffix so that the id never
+    ///     exceeds <see cref="ReviewLimits.MaxReviewIdLength"/>.
     /// </remarks>
     /// <param name="setId">The review-set identifier. Must not be null.</param>
     /// <param name="taken">The review ids already in use in the project (compared ordinally). Must not be null.</param>
@@ -343,22 +339,37 @@ public sealed class ReviewPlanner
         }
 
         var cleaned = builder.ToString()[start..];
-        var baseId = TrimEnd(cleaned.Length > MaxIdBaseLength ? cleaned[..MaxIdBaseLength] : cleaned);
-        if (baseId.Length == 0)
+        if (cleaned.Length == 0)
         {
-            baseId = "review";
+            cleaned = "review";
         }
 
-        // Append a number until the id is free
-        var candidate = baseId;
+        // The id without a suffix may use the whole limit
+        var candidate = CutBase(cleaned, ReviewLimits.MaxReviewIdLength);
+
+        // Append a number until the id is free; the base is cut for each suffix, so the id never exceeds the limit
+        // however many numbers are in use (the loop ends because the set of taken ids is finite)
         var suffix = 2;
         while (taken.Contains(candidate))
         {
-            candidate = $"{baseId}-{suffix}";
+            var suffixText = $"-{suffix}";
+            candidate = CutBase(cleaned, ReviewLimits.MaxReviewIdLength - suffixText.Length) + suffixText;
             suffix++;
         }
 
         return candidate;
+    }
+
+    /// <summary>
+    ///     Cuts an id base to a length and removes trailing characters an id may not end a base with.
+    /// </summary>
+    /// <param name="cleaned">The cleaned set id; it starts with a letter or digit.</param>
+    /// <param name="maxLength">The longest result.</param>
+    /// <returns>The cut base, never empty because the first character is a letter or digit.</returns>
+    private static string CutBase(string cleaned, int maxLength)
+    {
+        var cut = TrimEnd(cleaned.Length > maxLength ? cleaned[..maxLength] : cleaned);
+        return cut.Length == 0 ? "review" : cut;
     }
 
     /// <summary>

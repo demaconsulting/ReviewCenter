@@ -663,6 +663,69 @@ public class PlanPageTests : PageTestBase
     }
 
     /// <summary>
+    ///     Test that a plan still being read for a project is ignored when the page moves to another project: it
+    ///     neither shows its plan nor leaves the new project's form busy.
+    /// </summary>
+    [Fact]
+    public async Task PlanPage_ParametersChange_WhilePlanning_IgnoresStalePlanAndFreesForm()
+    {
+        // Arrange: a listing that waits, a plan request in flight, and a second project
+        var (projectId, _) = await ArrangeAsync();
+        var second = await Projects.CreateAsync("Gemini", null, TestContext.Current.CancellationToken);
+        var gate = new TaskCompletionSource();
+        Git.OnNextListChanges = () => gate.Task;
+        var cut = RenderPage(projectId);
+        await cut.Find("[data-testid='plan-head-input']").InputAsync("main");
+        var submit = cut.Find("[data-testid='plan-form']").SubmitAsync();
+        await cut.WaitForAssertionAsync(() => Assert.True(Has(cut, "plan-loading")));
+
+        // Act: the router reuses the component for the other project, then the old plan arrives
+        await cut.InvokeAsync(() => cut.Instance.SetParametersAsync(
+            ParameterView.FromDictionary(new Dictionary<string, object?> { [nameof(PlanPage.ProjectId)] = second.Id })));
+        await cut.WaitForAssertionAsync(() => Assert.Equal("Gemini", TextOf(cut, "plan-breadcrumb-project")));
+        gate.SetResult();
+        await submit;
+
+        // Assert: the new project shows no plan, no loading note, and a form that can be used
+        Assert.False(Has(cut, "plan-summary"));
+        Assert.False(Has(cut, "plan-loading"));
+        Assert.False(Has(cut, "plan-error"));
+        Assert.Equal("Show plan", TextOf(cut, "plan-load-button"));
+        Assert.False(cut.Find("[data-testid='plan-load-button']").HasAttribute("disabled"));
+        Assert.False(cut.Find("[data-testid='plan-head-input']").HasAttribute("disabled"));
+    }
+
+    /// <summary>
+    ///     Test that results of a creation still running for a project are ignored when the page moves to another
+    ///     project.
+    /// </summary>
+    [Fact]
+    public async Task PlanPage_ParametersChange_WhileCreating_IgnoresStaleResults()
+    {
+        // Arrange: a shown plan, a creation that waits, and a second project
+        var (projectId, _) = await ArrangeAsync();
+        var second = await Projects.CreateAsync("Gemini", null, TestContext.Current.CancellationToken);
+        var cut = RenderPage(projectId);
+        await ShowPlanAsync(cut);
+        var gate = new TaskCompletionSource();
+        Git.OnNextListChanges = () => gate.Task;
+        var create = cut.Find("[data-testid='plan-create-button']").ClickAsync();
+        await cut.WaitForAssertionAsync(() => Assert.Equal("Creating...", TextOf(cut, "plan-create-button")));
+
+        // Act: the router reuses the component for the other project, then the old creation finishes
+        await cut.InvokeAsync(() => cut.Instance.SetParametersAsync(
+            ParameterView.FromDictionary(new Dictionary<string, object?> { [nameof(PlanPage.ProjectId)] = second.Id })));
+        await cut.WaitForAssertionAsync(() => Assert.Equal("Gemini", TextOf(cut, "plan-breadcrumb-project")));
+        gate.SetResult();
+        await create;
+
+        // Assert: the new project shows no results and no plan, and its form can be used
+        Assert.False(Has(cut, "plan-result-summary"));
+        Assert.False(Has(cut, "plan-summary"));
+        Assert.False(cut.Find("[data-testid='plan-load-button']").HasAttribute("disabled"));
+    }
+
+    /// <summary>
     ///     Test that the button shows that the repository is being read, and is disabled, while the plan is made.
     /// </summary>
     [Fact]

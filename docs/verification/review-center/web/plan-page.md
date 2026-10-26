@@ -116,6 +116,14 @@ shown in its own group with a reason and no checkbox. This scenario is tested by
 **PlanPage_ParametersChange_OtherProject_ClearsFormAndPlan**: Reusing the page for another project shows that project with
 an empty head and no plan. This scenario is tested by `PlanPage_ParametersChange_OtherProject_ClearsFormAndPlan`.
 
+**PlanPage_ParametersChange_WhilePlanning_IgnoresStalePlanAndFreesForm**: While a plan of the first project is read, the
+page is reused for another project and the old plan arrives: no plan, loading note, or error is shown, and the form of
+the new project is enabled. This scenario is tested by `PlanPage_ParametersChange_WhilePlanning_IgnoresStalePlanAndFreesForm`.
+
+**PlanPage_ParametersChange_WhileCreating_IgnoresStaleResults**: While reviews of the first project are created, the
+page is reused for another project and the old creation finishes: no results or plan are shown, and the form of the new
+project is enabled. This scenario is tested by `PlanPage_ParametersChange_WhileCreating_IgnoresStaleResults`.
+
 **PlanPage_ShowPlan_WhileReading_ShowsLoadingAndDisablesButton**: While the listing waits, the button reads "Reading
 repository..." and is disabled; afterwards the plan is shown. This scenario is tested by
 `PlanPage_ShowPlan_WhileReading_ShowsLoadingAndDisablesButton`.

@@ -1023,20 +1023,34 @@ public class ReviewPlannerTests
     [Fact]
     public void ReviewPlanner_GenerateId_LongSetId_CutsAndStaysWithinLimit()
     {
-        // Arrange: a set id of 120 characters whose cut form is already taken
+        // Arrange: a set id of 120 characters; the full-length form is taken, then also the first suffixed forms
         var setId = new string('a', 120);
-        var cut = new string('a', ReviewLimits.MaxReviewIdLength - 4);
-        var taken = new HashSet<string>(StringComparer.Ordinal) { cut };
+        var full = new string('a', ReviewLimits.MaxReviewIdLength);
+        var taken = new HashSet<string>(StringComparer.Ordinal) { full };
 
-        // Act: generate the id without and with the cut form taken
+        // Act: generate the id without and with the full form taken
         var first = ReviewPlanner.GenerateId(setId, new HashSet<string>(StringComparer.Ordinal));
         var second = ReviewPlanner.GenerateId(setId, taken);
 
-        // Assert: cut to 96 characters, then suffixed; both valid ids within the limit
-        Assert.Equal(cut, first);
-        Assert.Equal(cut + "-2", second);
-        Assert.True(second.Length <= ReviewLimits.MaxReviewIdLength);
+        // Assert: cut to the limit, then cut again to make room for the suffix; both valid ids within the limit
+        Assert.Equal(full, first);
+        Assert.Equal(new string('a', ReviewLimits.MaxReviewIdLength - 2) + "-2", second);
+        Assert.Equal(ReviewLimits.MaxReviewIdLength, second.Length);
         ReviewService.ValidateId(second);
+
+        // Act: take many suffixes, so that the suffix gets longer
+        for (var number = 2; number <= 1000; number++)
+        {
+            taken.Add(ReviewPlanner.GenerateId(setId, taken));
+        }
+
+        var crowded = ReviewPlanner.GenerateId(setId, taken);
+
+        // Assert: still unique, valid, and within the limit with a five character suffix
+        Assert.DoesNotContain(crowded, taken);
+        Assert.EndsWith("-1001", crowded);
+        Assert.True(crowded.Length <= ReviewLimits.MaxReviewIdLength);
+        ReviewService.ValidateId(crowded);
     }
 
     /// <summary>
