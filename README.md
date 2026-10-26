@@ -52,7 +52,8 @@ The current release provides:
   selection; if none does, no review is created and you are told so. The changed files, their baseline and head
   content, the two commits, and the selection are copied into the database when the review is created, so later
   commits do not change the review. The review page shows each file as Added, Modified, or Deleted; a modified file
-  opens as a **Diff** (added and removed lines, unchanged lines collapsed, a **+** on every line to comment on it) and
+  opens as a **Diff** (the baseline and the head side by side, unchanged lines collapsed, a **+** on every line to
+  comment on it) and
   can also be read as **Head** or as a read-only **Baseline**.
   A signature binds the repository, both commits, the selection, and every change (see
   [Reviews from a Repository](#reviews-from-a-repository))
@@ -402,9 +403,11 @@ not reviewed; those that match the selection are listed once after the review is
 entry.
 
 The review page shows the change kind of every file. A modified file opens as a **Diff**: "x added, y removed", the
-changed lines with old and new line numbers, and the unchanged lines collapsed behind **Show N unchanged lines**.
-Click the **+** on a line to comment on it; a removed line is commented on in the baseline and every other line in
-the head, and the thread list says "Before: line N" or "After: line N". The file can also be read as **Head** (the
+baseline on the left and the head on the right (stacked on a narrow screen), each with its own line numbers, a run of
+removed lines next to the run of added lines that replaces it, and the unchanged lines collapsed behind **Show N
+unchanged lines**. Click the **+** on a line to comment on it; the left side is commented on in the baseline and the
+right side in the head, and the thread list says "Before: line N" or "After: line N". The file can also be read as
+**Head** (the
 numbered lines with their comments) or as **Baseline** (read-only), and a file too large to compare line by line
 offers those two. A deleted file opens on its removed lines and accepts comments on them or on the whole file. The
 content fingerprint covers the files that exist at the head (Added and Modified), calculated as ReviewMark does. The

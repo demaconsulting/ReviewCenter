@@ -492,9 +492,15 @@ public partial class ReviewPage : ComponentBase
         ClearNewThreadForm();
         await RefreshAsync();
 
-        // The code is the reviewer's task, so bring it to the top of the window
+        // The code is the reviewer's task, so bring it to the top of the window; a diff that opens with unchanged
+        // lines collapsed above its first change brings that change into view instead
         _scrollTarget = "selected-file-path";
         _scrollBlock = "start";
+        if (HasLineDiff && DiffView.FirstChangeRow(Diff!.Result!) is > LineDiff.DefaultContextLines and var firstChange)
+        {
+            _scrollTarget = $"diff-row-{firstChange}";
+            _scrollBlock = "center";
+        }
     }
 
     /// <summary>
@@ -1078,7 +1084,7 @@ public partial class ReviewPage : ComponentBase
             return $"Comment on {lines}";
         }
 
-        return NewSide == ThreadSide.Baseline ? $"Comment on removed {lines} (before)" : $"Comment on {lines} (after)";
+        return NewSide == ThreadSide.Baseline ? $"Comment on {lines} (before)" : $"Comment on {lines} (after)";
     }
 
     /// <summary>

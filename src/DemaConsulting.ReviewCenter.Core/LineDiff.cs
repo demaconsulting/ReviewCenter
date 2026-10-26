@@ -78,6 +78,18 @@ public sealed record LineDiffResult(bool TooLarge, IReadOnlyList<DiffLine> Lines
 public sealed record DiffSegment(bool IsGap, int Start, int Count);
 
 /// <summary>
+///     One row of a side-by-side diff: what the baseline shows on the left and what the head shows on the right.
+/// </summary>
+/// <remarks>
+///     The indexes refer to <see cref="LineDiffResult.Lines"/>. An unchanged line appears on both sides (both
+///     indexes are equal); a removed line has only a left cell and an added line only a right cell, the other
+///     side being an empty placeholder. The record is immutable and thread-safe.
+/// </remarks>
+/// <param name="LeftIndex">The index of the baseline line shown on the left; <c>null</c> for an empty left cell.</param>
+/// <param name="RightIndex">The index of the head line shown on the right; <c>null</c> for an empty right cell.</param>
+public sealed record DiffRow(int? LeftIndex, int? RightIndex);
+
+/// <summary>
 ///     Compares two versions of a file line by line, so a reviewer sees what changed.
 /// </summary>
 /// <remarks>
@@ -233,6 +245,65 @@ public static class LineDiff
         }
 
         return segments;
+    }
+
+    /// <summary>
+    ///     Arranges a run of diff rows as side-by-side rows, baseline on the left and head on the right.
+    /// </summary>
+    /// <remarks>
+    ///     An unchanged line becomes one row with both sides. A run of removed lines is paired row by row with the
+    ///     run of added lines that follows it; when one run is shorter, the leftover rows have an empty cell on
+    ///     the shorter side. A run of added lines with no removed lines before it (or the reverse) is paired with
+    ///     nothing. Call it with a visible segment (see <see cref="Segment"/>), which never cuts through a block
+    ///     of changes, because every changed row is visible.
+    /// </remarks>
+    /// <param name="lines">The rows of <see cref="LineDiffResult.Lines"/>. Must not be null.</param>
+    /// <param name="start">The index of the first row to arrange; not negative.</param>
+    /// <param name="count">The number of rows to arrange; not negative.</param>
+    /// <returns>The side-by-side rows in display order; every given row appears in exactly one of them.</returns>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="lines"/> is null.</exception>
+    /// <exception cref="ArgumentOutOfRangeException">Thrown when the range lies outside <paramref name="lines"/>.</exception>
+    public static IReadOnlyList<DiffRow> Pair(IReadOnlyList<DiffLine> lines, int start, int count)
+    {
+        ArgumentNullException.ThrowIfNull(lines);
+        ArgumentOutOfRangeException.ThrowIfNegative(start);
+        ArgumentOutOfRangeException.ThrowIfNegative(count);
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(start + count, lines.Count);
+
+        var rows = new List<DiffRow>();
+        var end = start + count;
+        var i = start;
+        while (i < end)
+        {
+            if (lines[i].Kind == DiffLineKind.Context)
+            {
+                rows.Add(new DiffRow(i, i));
+                i++;
+                continue;
+            }
+
+            // A block of changes: the removed run first, then the added run, paired row by row
+            var removedStart = i;
+            while (i < end && lines[i].Kind == DiffLineKind.Removed)
+            {
+                i++;
+            }
+
+            var removed = i - removedStart;
+            var addedStart = i;
+            while (i < end && lines[i].Kind == DiffLineKind.Added)
+            {
+                i++;
+            }
+
+            var added = i - addedStart;
+            for (var k = 0; k < Math.Max(removed, added); k++)
+            {
+                rows.Add(new DiffRow(k < removed ? removedStart + k : null, k < added ? addedStart + k : null));
+            }
+        }
+
+        return rows;
     }
 
     /// <summary>

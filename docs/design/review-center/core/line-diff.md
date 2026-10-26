@@ -24,6 +24,8 @@ compared as exact strings, case and white space included.
 - `LineDiffResult(TooLarge, Lines, Added, Removed)` — the rows in display order and the numbers of added and
   removed rows. When `TooLarge` is `true`, `Lines` is empty.
 - `DiffSegment(IsGap, Start, Count)` — a range of rows by index; a gap is a run of context rows to collapse.
+- `DiffRow(LeftIndex, RightIndex)` — one side-by-side row, by row index: the baseline line shown on the left and the
+  head line shown on the right; `null` for an empty cell.
 
 The bounds are `ReviewLimits.MaxDiffLines` (10,000 lines on either side) and `ReviewLimits.MaxDiffEdits` (2,000
 added plus removed lines).
@@ -67,10 +69,22 @@ The memory used is bounded by the line bound and the edit bound (at most about `
   showing it. The same holds at the start and the end of the file. A file without changes is one gap, or its single
   row when it has only one, or no segment when it has no rows.
 
+**Pair**: Arranges a range of rows as side-by-side rows.
+
+- *Parameters*: `IReadOnlyList<DiffLine> lines` — the rows; `int start`, `int count` — the range to arrange
+  (normally one shown segment).
+- *Returns*: `IReadOnlyList<DiffRow>` — the rows to draw, in order.
+- *Postconditions*: A context row gives one `DiffRow` with the same index on both sides. A run of removed rows
+  and the run of added rows that follows it give `max(removed, added)` rows: the n-th removed row is paired with the
+  n-th added row, and when one run is shorter the missing cells are `null`. A run of added rows without removed
+  rows, or the reverse, gives rows with `null` on the other side. Every row of the range appears in exactly one
+  `DiffRow`. A shown segment never cuts a block of changes, because every changed row is shown, so pairing a
+  segment pairs complete blocks.
+
 #### Error Handling
 
-A null argument raises `ArgumentNullException`; a negative number of context rows raises
-`ArgumentOutOfRangeException`. Input that is too large is not an error: the result says `TooLarge` so the caller
+A null argument raises `ArgumentNullException`; a negative number of context rows, or a range outside the rows,
+raises `ArgumentOutOfRangeException`. Input that is too large is not an error: the result says `TooLarge` so the caller
 can explain it. The unit throws no other exception for any text.
 
 #### Dependencies
@@ -83,5 +97,5 @@ can explain it. The unit throws no other exception for any text.
 - **ReviewService** — `GetDiffAsync` splits the frozen contents into lines with `FileText.TryReadLines` and
   compares them with `Compute`.
 - **ReviewPage** — the `DiffView` component groups the rows with `Segment` for display, pinning the rows of threads
-  and of the selected line.
+  and of the selected line, and arranges each shown segment side by side with `Pair`.
 - **Tests** — `LineDiffTests` check edge cases, the bounds, and a randomized reconstruction property.

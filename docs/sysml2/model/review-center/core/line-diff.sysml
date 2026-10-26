@@ -1,6 +1,6 @@
 package ReviewCenter {
     part def LineDiff {
-        doc /* Compares the lines of a baseline and a head file with a shortest-edit-script algorithm, numbers the rows on both sides like the lines that comment anchors count, refuses inputs above a line and an edit bound, and divides the rows into changed regions with context and collapsible gaps. */
+        doc /* Compares the lines of a baseline and a head file with a shortest-edit-script algorithm, numbers the rows on both sides like the lines that comment anchors count, refuses inputs above a line and an edit bound, and divides the rows into changed regions with context and collapsible gaps, and arranges the rows of a region side by side, pairing a removed run with the added run that follows it. */
 
         comment sourceRef /* Source: src/DemaConsulting.ReviewCenter.Core/LineDiff.cs */
         comment testRef /* Test: test/DemaConsulting.ReviewCenter.Tests/Core/LineDiffTests.cs */

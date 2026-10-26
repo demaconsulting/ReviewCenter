@@ -3,7 +3,8 @@
 #
 # The LineDiff class compares two lists of lines with a shortest-edit-script algorithm, numbers the rows on both
 # sides, refuses inputs that are too large, and divides the rows into changed regions with a few lines of context
-# and collapsible gaps. FileText.TryReadLines gives it the same lines that the thread rules count.
+# and collapsible gaps, and arranges the rows side by side. FileText.TryReadLines gives it the same lines that the
+# thread rules count.
 
 sections:
   - title: LineDiff Unit Requirements
@@ -93,3 +94,21 @@ sections:
           - LineDiff_Segment_NearbyChangesMergeAndContextIsConfigurable
           - LineDiff_Segment_RandomChanges_CoverEveryRowOnce
           - LineDiff_Segment_PinnedRows_StayVisibleWithContext
+
+      - id: ReviewCenter-LineDiff-Pairing
+        title: >-
+          The LineDiff class shall arrange a run of rows as side-by-side rows, giving an unchanged line one row with
+          both sides, pairing a run of removed lines row by row with the run of added lines that follows it and
+          leaving the other side of the leftover rows empty, giving a run of only added or only removed lines
+          empty cells on the other side, and covering every given row exactly once, in order, so that the baseline
+          is shown on the left and the head on the right.
+        justification: |
+          A side-by-side view aligns what replaced what. The pairing is a pure function of the rows, so the page
+          only draws it, and no line may be lost or shown twice.
+        tests:
+          - LineDiff_Pair_ThreeRemovedOneAdded_PairsFirstAndLeavesRightEmpty
+          - LineDiff_Pair_OneRemovedThreeAdded_PairsFirstAndLeavesLeftEmpty
+          - LineDiff_Pair_EqualRunsPureAddAndPureRemove_AreHandled
+          - LineDiff_Pair_ContextRows_AppearOnBothSidesAndRangesAreRespected
+          - LineDiff_Pair_InvalidArguments_Throw
+          - LineDiff_Pair_VisibleSegmentsOfRealDiff_KeepContextGapsAndPins

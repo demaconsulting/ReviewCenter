@@ -28,6 +28,9 @@ N/A - standard test environment.
   large with no rows; an empty side is not subject to the edit bound.
 - The regions keep three context rows around every change, merge when they touch, keep a gap of one row shown,
   collapse a gap of two or more, and cover every row exactly once.
+- Pairing puts an unchanged row on both sides, pairs a run of removed rows row by row with the following run of
+  added rows with empty cells for the leftover rows, gives pure additions and pure removals empty cells on the other
+  side, and covers every row exactly once.
 - A binary text gives no lines, and a null argument is rejected with an `ArgumentNullException`.
 
 #### Test Scenarios
@@ -120,6 +123,30 @@ another from the first row to the last, and no gap holds fewer than two rows. Th
 **LineDiff_Segment_PinnedRows_StayVisibleWithContext**: A pinned row in the middle of an unchanged run stays shown
 with its context rows and splits the run into two gaps, and pins outside the rows are ignored. This scenario is tested by
 `LineDiff_Segment_PinnedRows_StayVisibleWithContext`.
+
+**LineDiff_Pair_ThreeRemovedOneAdded_PairsFirstAndLeavesRightEmpty**: Three removed rows followed by one added row give
+three side-by-side rows: the first removed row with the added row, the other two with an empty right cell. This
+scenario is tested by `LineDiff_Pair_ThreeRemovedOneAdded_PairsFirstAndLeavesRightEmpty`.
+
+**LineDiff_Pair_OneRemovedThreeAdded_PairsFirstAndLeavesLeftEmpty**: One removed row followed by three added rows give
+three rows: the removed row with the first added row, the other two added rows with an empty left cell. This scenario
+is tested by `LineDiff_Pair_OneRemovedThreeAdded_PairsFirstAndLeavesLeftEmpty`.
+
+**LineDiff_Pair_EqualRunsPureAddAndPureRemove_AreHandled**: Two removed against two added rows pair completely, only
+added rows have empty left cells, and only removed rows have empty right cells. This scenario is tested by
+`LineDiff_Pair_EqualRunsPureAddAndPureRemove_AreHandled`.
+
+**LineDiff_Pair_ContextRows_AppearOnBothSidesAndRangesAreRespected**: An unchanged row gives one row with the same index
+on both sides, between paired blocks, and a sub-range is paired on its own. This scenario is tested by
+`LineDiff_Pair_ContextRows_AppearOnBothSidesAndRangesAreRespected`.
+
+**LineDiff_Pair_InvalidArguments_Throw**: A null list and a range outside the rows are rejected. This scenario is
+tested by `LineDiff_Pair_InvalidArguments_Throw`.
+
+**LineDiff_Pair_VisibleSegmentsOfRealDiff_KeepContextGapsAndPins**: The shown segments of a computed diff (with a
+pinned unchanged row) are paired; the collapsed gaps stay out, the pinned row is shown, a replacement of one line by
+two pairs the first and leaves an empty left cell for the second, and every shown row appears exactly once. This
+scenario is tested by `LineDiff_Pair_VisibleSegmentsOfRealDiff_KeepContextGapsAndPins`.
 
 **FileText_TryReadLines_Text_SplitsLikeSplitLines**: Texts with Unix and Windows line endings, no final line ending,
 blank lines, a lone carriage return, and an empty text give the same lines as `FileText.SplitLines`. This scenario is

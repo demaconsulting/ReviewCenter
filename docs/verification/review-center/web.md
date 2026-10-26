@@ -82,9 +82,11 @@ is collapsed. This scenario is tested by
 `WebSubsystem_ReviewWithThreads_ArePresentedByThePage`.
 
 **WebSubsystem_Stylesheet_DiffRules_KeepCodeScrollingInsideItself**: The stylesheet source is read and checked for the
-rules that keep the diff inside the page width: the code area scrolls horizontally inside itself, a row is as wide as
-its longest line, inline threads and collapsed-run buttons stick to the left edge of the scrolled area, and a
-narrower line-number gutter applies on a phone. This scenario is tested by
+rules that keep the diff inside the page width: each row is a grid of two equal columns, long lines wrap inside their
+cell, the code area still scrolls inside itself as a safety net, empty placeholders are muted, inline threads and
+collapsed-run buttons stick to the left edge, below 40 rem the cells stack and the placeholders and the repeated
+baseline copy of an unchanged line are hidden, and a narrower line-number gutter applies on a phone. This scenario
+is tested by
 `WebSubsystem_Stylesheet_DiffRules_KeepCodeScrollingInsideItself`. The measured width of the page at 390 by 844
 pixels is checked in a real browser by the acceptance walk-through.
 

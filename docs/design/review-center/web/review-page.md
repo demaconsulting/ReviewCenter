@@ -101,8 +101,11 @@ reviews from a repository only), `selected-file-kind`, `file-version-toggle` (sh
 `baseline-line-{n}`, `baseline-line-no-{n}`, `baseline-line-text-{n}`, `baseline-comment-note`,
 `deleted-comment-note`, `diff-too-large`, `diff-too-large-head`, `diff-too-large-baseline`, and, from
 `DiffView`, `diff-view`, `diff-summary`, `diff-hint`, `diff-content`, `diff-gap-{start}` (by the index of the first
-collapsed row), `diff-row-{i}` (with `data-kind` of `context`, `added`, or `removed`), `diff-comment-{i}`,
-`diff-old-no-{i}`, `diff-new-no-{i}`, `diff-text-{i}`, `diff-threads-{i}`, and `diff-composer` (all by row index),
+collapsed row), `diff-pair-{i}` (a side-by-side row, by the index of its first line), `diff-row-{i}` (a cell, with
+`data-kind` of `context`, `added`, or `removed`; the cell of a removed line, of an added line and the right cell of an
+unchanged line), `diff-row-old-{i}` (the left cell of an unchanged line), `diff-comment-{i}`, `diff-comment-old-{i}`,
+`diff-old-no-{i}`, `diff-new-no-{i}`, `diff-text-{i}`, `diff-text-old-{i}`, `diff-threads-{i}`,
+`diff-empty-left-{i}`, `diff-empty-right-{i}` (the empty placeholders), and `diff-composer` (all by row index),
 `review-repository`, `review-set-id` (only for a review planned from a review-set), `review-baseline-sha`,
 `review-head-sha`, `review-selection` (in the details of a review from
 a repository), `threads-empty`, `threads-list`, `thread-{id}`,
@@ -160,28 +163,36 @@ size of a deleted file is its baseline size. Both the head and the baseline byte
 the store, never from the repository.
 
 **Diff view**: `SelectFileAsync` asks `ReviewService.GetDiffAsync` for the comparison. The `DiffView` component
-draws a `LineDiffResult` as one column of rows, each with a comment control, the old and the new line number
-(blank on the side where the line does not exist), a `+` or `-` sign, and the text as plain text. Added and removed
-rows are marked by color and by their sign. Above the rows it shows "x added, y removed" (or a sentence that only
-the line endings differ), and, when there are rows, the hint "Click + to comment on a line." The rows are
-grouped by `LineDiff.Segment`, and a run of unchanged lines that is collapsed shows a button "Show N unchanged
-lines" that expands it. The rows of threads and of the selected line are pinned, so they are never hidden. The
-first change is therefore at the top of the view, because the unchanged lines before it (apart from three lines of
-context) are collapsed. A result that is `TooLarge` shows "Too large to compare line by line." and offers the Head
-and the Baseline view; a binary file shows the binary notice.
+draws a `LineDiffResult` side by side: the baseline on the left and the head on the right. Each shown segment of
+rows is arranged by `LineDiff.Pair`, so an unchanged line shows on both sides, a run of removed lines is paired row
+by row with the run of added lines that follows it, and the leftover cells of the shorter run are empty
+placeholders (muted, hidden from assistive technology). A cell has a comment control, the line number of its side, a
+`-` or `+` sign, and the text as plain text, wrapped inside the cell. Removed and added cells are marked by color and
+by their sign. Above the rows it shows "x added, y removed" (or a sentence that only the line endings differ), and,
+when there are rows, the hint "Click + to comment on a line." The rows are grouped by `LineDiff.Segment`, and a run
+of unchanged lines that is collapsed shows a button "Show N unchanged lines" that expands it. The rows of threads and
+of the selected line are pinned, so they are never hidden. The first change is therefore near the top of the view,
+because the unchanged lines before it (apart from three lines of context) are collapsed; when a file opens with such
+a collapsed run above its first change, `SelectFileAsync` also sets that row as the scroll target (block `center`)
+instead of the file path, using the page's existing `reviewCenter.scrollToTestId` helper of `App.razor`, which
+deep links reuse. The style sheet gives the review page a wider column (80 rem) so each side has room; below 40 rem
+it stacks the left cell above the right cell of a row and hides the empty placeholders and the left copy of an
+unchanged line, so every line shows once and the page never scrolls sideways. A result that is `TooLarge` shows "Too
+large to compare line by line." and offers the Head and the Baseline view; a binary file shows the binary notice.
 
 `DiffView` has the parameters `Result`, `OnlyLineEndingsDiffer`, `Threads`, `FocusedThreadId`, `SelectedSide`,
 `SelectedStart`, `SelectedEnd`, `ThreadTemplate` (how the page draws a thread, so the reply, resolve and reopen
 controls are the ones of the thread list), `Composer` (the new-thread form, drawn under the selected row), and the
-event `OnComment`, which carries a `DiffCommentRequest(Side, Line, Extend)`. A removed row asks for the
-Baseline side and its old line number; every other row asks for the Head side and its new line number. A thread is
-drawn under the last row of its anchor on its side. The component holds only which collapsed runs the reader has
-expanded; every other state is the page's.
+event `OnComment`, which carries a `DiffCommentRequest(Side, Line, Extend)`. The control of a left cell asks for the
+Baseline side and its baseline line number (a removed line, or the baseline copy of an unchanged line); the control
+of a right cell asks for the Head side and its head line number. A thread is drawn under the row of the last line of
+its anchor, across the full width, and the cell of its side is marked. The component holds only which collapsed runs
+the reader has expanded; every other state is the page's.
 
 **CommentOnDiffLine**: Handles an `OnComment` request. A plain click selects the line on its side and opens the
 new-thread form under its row; Shift-click, or the "Through line (optional)" field, extends the selection to a
 range, but only on the same side, because the two sides have different numbering. The form says what it will do in
-plain words ("Comment on removed line 10 (before)", "Comment on line 12 (after)"), and offers Cancel
+plain words ("Comment on line 10 (before)", "Comment on line 12 (after)"), and offers Cancel
 (`CancelComment`) and "Comment on the whole file instead" (`CommentOnWholeFile`), which clears the selection and
 keeps the typed text.
 
@@ -189,8 +200,8 @@ keeps the typed text.
 scroll target, because the form sits below the code and the threads.
 
 **StartThreadAsync**: Starts a thread on the selected file from the form, on behalf of the signed-in user, who comes
-from the authentication state (`SignIn.GetActorAsync`), on the side `NewSide` (Head unless the form was opened under a
-removed row). Both line fields blank anchor the whole
+from the authentication state (`SignIn.GetActorAsync`), on the side `NewSide` (Head unless the form was opened from a
+left cell of the diff). Both line fields blank anchor the whole
 file, only a start line anchors that line, and both anchor the range. A line field that is not a whole number is
 reported as "Line numbers must be whole numbers." A violated comment rule is shown in `thread-error` next to the
 form and everything typed stays. Success clears the text and line fields and reloads the
@@ -277,7 +288,7 @@ raises no other errors of its own.
 - **ReviewService** — reads the review, the head and baseline bytes of a file, and the comparison of a file
   (`GetDiffAsync`).
 - **DiffView** — draws the Diff view; it is a part of this unit.
-- **LineDiff** — groups the rows of a comparison into shown regions and collapsed runs.
+- **LineDiff** — groups the rows of a comparison into shown regions and collapsed runs, and arranges them side by side.
 - **ThreadService** — starts (on the Head or the Baseline side), answers, resolves, reopens, and lists threads, and
   shapes them for the index.
 - **ChecklistService** — reads the checklist progress for the summary.

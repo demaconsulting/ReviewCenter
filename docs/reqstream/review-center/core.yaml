@@ -114,6 +114,7 @@ sections:
           - ReviewCenter-LineDiff-Numbering
           - ReviewCenter-LineDiff-Bounds
           - ReviewCenter-LineDiff-Segments
+          - ReviewCenter-LineDiff-Pairing
           - ReviewCenter-ReviewService-Diff
           - ReviewCenter-ThreadService-Side
           - ReviewCenter-RecordDigest-ThreadSide

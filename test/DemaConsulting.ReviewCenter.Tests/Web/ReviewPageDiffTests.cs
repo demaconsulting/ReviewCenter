@@ -156,17 +156,102 @@ public class ReviewPageDiffTests : PageTestBase
         Assert.Equal("2 added, 1 removed", cut.Find("[data-testid='diff-summary']").TextContent);
         Assert.Equal("Click + to comment on a line.", cut.Find("[data-testid='diff-hint']").TextContent);
 
-        // Assert: the removed row has only an old number, the added row only a new one, a context row both
+        // Assert: the removed row has only an old number (left), the added row only a new one (right), a context row both
         Assert.Equal("removed", cut.Find("[data-testid='diff-row-9']").GetAttribute("data-kind"));
         Assert.Equal("l10", cut.Find("[data-testid='diff-text-9']").TextContent);
         Assert.Equal("10", cut.Find("[data-testid='diff-old-no-9']").TextContent);
-        Assert.Equal(string.Empty, cut.Find("[data-testid='diff-new-no-9']").TextContent);
+        Assert.Empty(cut.FindAll("[data-testid='diff-new-no-9']"));
         Assert.Equal("added", cut.Find("[data-testid='diff-row-10']").GetAttribute("data-kind"));
         Assert.Equal("n10", cut.Find("[data-testid='diff-text-10']").TextContent);
         Assert.Equal("10", cut.Find("[data-testid='diff-new-no-10']").TextContent);
+        Assert.Empty(cut.FindAll("[data-testid='diff-old-no-10']"));
         Assert.Equal("context", cut.Find("[data-testid='diff-row-11']").GetAttribute("data-kind"));
         Assert.Equal("11", cut.Find("[data-testid='diff-old-no-11']").TextContent);
         Assert.Equal("11", cut.Find("[data-testid='diff-new-no-11']").TextContent);
+    }
+
+    /// <summary>
+    ///     Test that the diff is laid out side by side: the removed line and the added line that replaces it share a
+    ///     row (baseline on the left, head on the right), an unchanged line shows on both sides, and the line that
+    ///     is only added has a muted empty placeholder on the left.
+    /// </summary>
+    [Fact]
+    public async Task ReviewPage_DiffView_Rows_AreSideBySideWithPlaceholders()
+    {
+        // Arrange and Act: open the modified file
+        var (_, cut) = await OpenModAsync();
+
+        // Assert: the replaced line is one row, left removed and right added
+        var replaced = cut.Find("[data-testid='diff-pair-9']");
+        Assert.Equal(
+            ["diff-row-9", "diff-row-10"],
+            replaced.QuerySelectorAll(".diff-row").Select(e => e.GetAttribute("data-testid")).ToArray());
+        Assert.Contains("left", cut.Find("[data-testid='diff-row-9']").ClassList);
+        Assert.Contains("right", cut.Find("[data-testid='diff-row-10']").ClassList);
+
+        // Assert: an unchanged line is on both sides, the baseline copy having its own ids
+        Assert.Equal("l11", cut.Find("[data-testid='diff-text-old-11']").TextContent);
+        Assert.Equal("l11", cut.Find("[data-testid='diff-text-11']").TextContent);
+        Assert.Contains("left", cut.Find("[data-testid='diff-row-old-11']").ClassList);
+        Assert.Contains("right", cut.Find("[data-testid='diff-row-11']").ClassList);
+
+        // Assert: the pure addition (head line 21) has an empty left placeholder
+        var placeholder = cut.Find("[data-testid='diff-empty-left-21']");
+        Assert.Contains("empty", placeholder.ClassList);
+        Assert.Equal("true", placeholder.GetAttribute("aria-hidden"));
+        Assert.Equal("added", cut.Find("[data-testid='diff-row-21']").GetAttribute("data-kind"));
+    }
+
+    /// <summary>
+    ///     Test that the left control comments on the baseline numbering, also for an unchanged line, and the right
+    ///     control on the head numbering.
+    /// </summary>
+    [Fact]
+    public async Task ReviewPage_DiffView_LeftControlIsBaseline_RightControlIsHead()
+    {
+        // Arrange: open the modified file
+        var (projectId, cut) = await OpenModAsync();
+
+        // Act: comment through the left cell of an unchanged line
+        await cut.Find("[data-testid='diff-comment-old-11']").ClickAsync();
+
+        // Assert: the form is aimed at baseline line 11
+        Assert.Equal("Comment on line 11 (before).", cut.Find("[data-testid='thread-target']").TextContent);
+        Assert.Contains("selected", cut.Find("[data-testid='diff-row-old-11']").ClassList);
+        Assert.DoesNotContain("selected", cut.Find("[data-testid='diff-row-11']").ClassList);
+
+        // Act: submit it
+        await cut.Find("[data-testid='thread-text-input']").InputAsync("Was fine before");
+        await cut.Find("[data-testid='new-thread-form']").SubmitAsync();
+
+        // Assert: a baseline thread, shown under the row and marking the left cell only
+        var thread = Assert.Single(await Threads.ListAsync(projectId, "REV-1", TestContext.Current.CancellationToken));
+        Assert.Equal((11, 11, ThreadSide.Baseline), (thread.StartLine, thread.EndLine, thread.Side));
+        Assert.Contains("anchored", cut.Find("[data-testid='diff-row-old-11']").ClassList);
+        Assert.DoesNotContain("anchored", cut.Find("[data-testid='diff-row-11']").ClassList);
+        Assert.NotEmpty(cut.FindAll($"[data-testid='diff-pair-11'] ~ [data-testid='diff-threads-11'] [data-testid='thread-{thread.Id}']"));
+
+        // Act: comment through the right cell of the same line
+        await cut.Find("[data-testid='diff-comment-11']").ClickAsync();
+
+        // Assert: the form is aimed at head line 11
+        Assert.Equal("Comment on line 11 (after).", cut.Find("[data-testid='thread-target']").TextContent);
+        Assert.Contains("selected", cut.Find("[data-testid='diff-row-11']").ClassList);
+        Assert.DoesNotContain("selected", cut.Find("[data-testid='diff-row-old-11']").ClassList);
+    }
+
+    /// <summary>
+    ///     Test that opening a diff whose first change is preceded by collapsed lines scrolls that change into view.
+    /// </summary>
+    [Fact]
+    public async Task ReviewPage_FileSelect_ModifiedFile_ScrollsToFirstChange()
+    {
+        // Arrange and Act: open the modified file (its first change is row 9)
+        var (_, cut) = await OpenModAsync();
+
+        // Assert: the page asked the browser to bring that row to the middle of the window
+        await cut.WaitForAssertionAsync(() =>
+            Assert.Equal(["diff-row-9", "center"], JSInterop.Invocations["reviewCenter.scrollToTestId"][^1].Arguments));
     }
 
     /// <summary>
@@ -308,7 +393,7 @@ public class ReviewPageDiffTests : PageTestBase
 
         // Assert: the form opens under that line and names the version in plain words
         Assert.NotEmpty(cut.FindAll("[data-testid='diff-composer'] [data-testid='new-thread-form']"));
-        Assert.Equal("Comment on removed line 10 (before).", cut.Find("[data-testid='thread-target']").TextContent);
+        Assert.Equal("Comment on line 10 (before).", cut.Find("[data-testid='thread-target']").TextContent);
         Assert.Contains("selected", cut.Find("[data-testid='diff-row-9']").ClassList);
 
         // Act: write and submit
@@ -373,13 +458,13 @@ public class ReviewPageDiffTests : PageTestBase
         // Assert: a range of head lines, with the form under the last line
         Assert.Equal("Comment on lines 11-13 (after).", cut.Find("[data-testid='thread-target']").TextContent);
         Assert.NotEmpty(cut.FindAll("[data-testid='diff-row-12'].selected"));
-        Assert.NotEmpty(cut.FindAll("[data-testid='diff-row-13'] ~ .diff-composer"));
+        Assert.NotEmpty(cut.FindAll("[data-testid='diff-pair-13'] ~ .diff-composer"));
 
         // Act: shift-click the removed line, which belongs to the other version
         await cut.Find("[data-testid='diff-comment-9']").ClickAsync(new MouseEventArgs { ShiftKey = true });
 
         // Assert: the selection restarted on the baseline instead of mixing the two numberings
-        Assert.Equal("Comment on removed line 10 (before).", cut.Find("[data-testid='thread-target']").TextContent);
+        Assert.Equal("Comment on line 10 (before).", cut.Find("[data-testid='thread-target']").TextContent);
 
         // Act: select a range on the head and submit it
         await cut.Find("[data-testid='diff-comment-11']").ClickAsync();

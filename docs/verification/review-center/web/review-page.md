@@ -84,22 +84,25 @@ N/A - standard test environment.
   default view; switching views keeps the typed text and clears the line selection.
 - A deleted file opens on the Diff view of removed lines, offers Diff and Baseline but no Head, and accepts a
   whole-file comment; its Baseline view has a note and no line comment controls.
-- The Diff view shows the summary "x added, y removed", the hint "Click + to comment on a line.", old and new line
-  numbers, added and removed rows with their sign, and unchanged runs of more than three lines collapsed behind a
-  "Show N unchanged lines" button that expands them.
+- The Diff view is laid out side by side, the baseline on the left and the head on the right: it shows the summary
+  "x added, y removed", the hint "Click + to comment on a line.", each side's line numbers, an unchanged line on both
+  sides, a removed run paired row by row with the added run that follows it with muted empty placeholders for the
+  leftover cells, rows with their sign, and unchanged runs of more than three lines collapsed behind a "Show N
+  unchanged lines" button that expands them; opening a file brings its first change into view.
 - A file that is too large to compare shows "Too large to compare line by line." with the Head and the Baseline
   view offered; a binary file shows the binary notice; two versions that differ only in line endings are said to.
-- The + control of a removed row starts a thread on the Baseline with the old line number; the control of an added
-  or unchanged row starts it on the Head with the new line number; Shift-click and the "Through line" field extend
-  the range within one side only; Cancel closes the form, and "Comment on the whole file instead" keeps the typed
-  text.
-- Threads are drawn under the last line of their anchor on their side, also where the lines would be collapsed, a
-  resolved thread as a collapsed header; reply, resolve, and reopen work there; the list below the diff holds only
-  whole-file threads; the per-file thread counts include both sides.
+- The + control of the left cell starts a thread on the Baseline with the baseline line number (a removed row, or
+  the baseline copy of an unchanged row); the control of the right cell starts it on the Head with the head line
+  number; Shift-click and the "Through line" field extend the range within one side only; Cancel closes the form, and
+  "Comment on the whole file instead" keeps the typed text.
+- Threads are drawn under the row of the last line of their anchor across the full width, also where the lines would
+  be collapsed, the cell of their side marked, a resolved thread as a collapsed header; reply, resolve, and reopen
+  work there; the list below the diff holds only whole-file threads; the per-file thread counts include both sides.
 - The thread index words the anchor as "Before: line N" or "After: lines N-M" for a file with a baseline, and
   choosing a row shows the diff at the thread (or the Baseline or Head view for a file that is too large).
-- The stylesheet keeps the code area of the diff scrolling inside itself and the gap buttons and inline threads in
-  view, with a narrower gutter on a phone.
+- The stylesheet lays each row out as two columns, wraps long lines inside their cell, stacks the cells and hides the
+  empty placeholders on a narrow screen, and keeps the gap buttons and inline threads in view, with a narrower gutter
+  on a phone.
 
 #### Test Scenarios
 
@@ -146,8 +149,18 @@ shows a note and no line comment buttons. This scenario is tested by
 replaced and one line added.
 
 **ReviewPage_FileSelect_ModifiedFile_ShowsDiffWithSummaryHintAndNumbers**: The Diff view shows "2 added, 1 removed",
-the hint, old and new line numbers, and the added and removed rows. This scenario is tested by
+the hint, the line numbers of each side (a removed row only a baseline number, an added row only a head number), and
+the added and removed rows. This scenario is tested by
 `ReviewPage_FileSelect_ModifiedFile_ShowsDiffWithSummaryHintAndNumbers`.
+
+**ReviewPage_DiffView_Rows_AreSideBySideWithPlaceholders**: The removed line and the added line that replaces it
+share one row, left and right; an unchanged line shows on both sides with its own ids; a line that is only added has
+a muted, hidden-from-assistive-technology empty placeholder on the left. This scenario is tested by
+`ReviewPage_DiffView_Rows_AreSideBySideWithPlaceholders`.
+
+**ReviewPage_FileSelect_ModifiedFile_ScrollsToFirstChange**: Opening a modified file whose first change follows
+collapsed lines asks the browser to scroll that row to the middle of the window (the bUnit stand-in records the
+call). This scenario is tested by `ReviewPage_FileSelect_ModifiedFile_ScrollsToFirstChange`.
 
 **ReviewPage_DiffView_UnchangedRuns_AreCollapsedAndExpandOnRequest**: Unchanged runs far from a change show
 "Show N unchanged lines", and the button expands the run. This scenario is tested by
@@ -163,13 +176,18 @@ compare line by line." and the Head and Baseline buttons. This scenario is teste
 **ReviewPage_FileSelect_BinaryFile_ShowsNotice**: A binary file shows the binary notice instead of rows. This
 scenario is tested by `ReviewPage_FileSelect_BinaryFile_ShowsNotice`.
 
-**ReviewPage_DiffView_CommentOnRemovedLine_StartsBaselineThread**: The + control of a removed row opens the form
-worded for a removed line and starts a thread on the Baseline with the old line number. This scenario is tested by
-`ReviewPage_DiffView_CommentOnRemovedLine_StartsBaselineThread`.
+**ReviewPage_DiffView_CommentOnRemovedLine_StartsBaselineThread**: The + control of a removed row (left cell) opens
+the form worded "Comment on line 10 (before)" and starts a thread on the Baseline with the baseline line number. This
+scenario is tested by `ReviewPage_DiffView_CommentOnRemovedLine_StartsBaselineThread`.
 
-**ReviewPage_DiffView_CommentOnAddedAndContextLines_StartsHeadThreads**: The + control of an added or unchanged row
-starts a thread on the Head with the new line number. This scenario is tested by
+**ReviewPage_DiffView_CommentOnAddedAndContextLines_StartsHeadThreads**: The + control of an added row or of the right
+cell of an unchanged row starts a thread on the Head with the head line number. This scenario is tested by
 `ReviewPage_DiffView_CommentOnAddedAndContextLines_StartsHeadThreads`.
+
+**ReviewPage_DiffView_LeftControlIsBaseline_RightControlIsHead**: The + control in the left cell of an unchanged row
+starts a Baseline thread with the baseline number, shown under the row and marking only the left cell; the control in
+the right cell of the same row starts a Head thread. This scenario is tested by
+`ReviewPage_DiffView_LeftControlIsBaseline_RightControlIsHead`.
 
 **ReviewPage_DiffView_ShiftClick_ExtendsOnlyWithinTheSameSide**: Shift-click extends the selection on the same side
 and starts a new selection on the other side. This scenario is tested by

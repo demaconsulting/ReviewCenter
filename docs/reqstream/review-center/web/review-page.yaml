@@ -132,18 +132,24 @@ sections:
 
       - id: ReviewCenter-ReviewPage-Diff
         title: >-
-          The ReviewPage unit shall show the Diff view of a file as one column of rows, each with the old and the new
-          line number, the text as plain text, and added and removed lines marked by color and by a + or - sign,
-          with a one-line summary "x added, y removed" above the rows, a hint that says to click + to comment on a
-          line, and every run of unchanged lines that is more than three lines from a change collapsed into a
-          button "Show N unchanged lines" that expands it, so that the view opens on the first change.
+          The ReviewPage unit shall show the Diff view of a file side by side, the baseline on the left and the head
+          on the right with their own line numbers and the text as plain text, an unchanged line on both sides, a
+          run of removed lines paired row by row with the run of added lines that follows it (the leftover cells of
+          the shorter run being muted empty placeholders), removed and added lines marked by color and by a - or +
+          sign, with a one-line summary "x added, y removed" above the rows, a hint that says to click + to comment
+          on a line, and every run of unchanged lines that is more than three lines from a change collapsed into a
+          button "Show N unchanged lines" that expands it, and shall bring the first change into view when a file
+          opens on its diff.
         justification: |
-          A reviewer wants to see what changed and nothing else. Collapsing the unchanged lines puts the first
-          change at the top, the summary tells how much there is to read, and the sign keeps added and removed
+          A reviewer wants to see what changed and nothing else. Old and new next to each other, aligned row by row,
+          show what replaced what. Collapsing the unchanged lines and scrolling to the first change put it in
+          front of the reader, the summary tells how much there is to read, and the sign keeps added and removed
           lines apart for a reader who cannot tell the colors apart.
         tests:
           - ReviewPage_FileSelect_ModifiedFile_ShowsDiffWithSummaryHintAndNumbers
+          - ReviewPage_DiffView_Rows_AreSideBySideWithPlaceholders
           - ReviewPage_DiffView_UnchangedRuns_AreCollapsedAndExpandOnRequest
+          - ReviewPage_FileSelect_ModifiedFile_ScrollsToFirstChange
           - ReviewPage_FileSelect_DeletedFile_ShowsRemovedLinesAndAcceptsWholeFileComment
 
       - id: ReviewCenter-ReviewPage-DiffStates
@@ -161,28 +167,30 @@ sections:
 
       - id: ReviewCenter-ReviewPage-DiffComment
         title: >-
-          The ReviewPage unit shall offer a + control on every row of the Diff view that opens the comment form under
-          that row, anchored to the Baseline version with the old line number for a removed line and to the Head
-          version with the new line number for any other line, state the version and lines in plain words
-          ("Comment on removed line 10 (before)"), extend the selection with Shift-click or a "Through line" field
-          only within one version, and offer Cancel and a whole-file comment that keeps the typed text.
+          The ReviewPage unit shall offer a + control in every cell of the Diff view that opens the comment form
+          under that row, anchored to the Baseline version with the baseline line number for a control in the left
+          cell and to the Head version with the head line number for a control in the right cell, state the version
+          and lines in plain words ("Comment on line 10 (before)"), extend the selection with Shift-click or a
+          "Through line" field only within one version, and offer Cancel and a whole-file comment that keeps the
+          typed text.
         justification: |
-          A removed line exists only in the baseline, so a comment on it must be anchored there, with the number the
-          reader sees. Keeping a range within one version prevents mixing two numberings, and the plain wording
-          tells the reader what the comment will be attached to.
+          The left cell shows the baseline and the right cell the head, so the cell chosen says which version the
+          comment is about, with the number the reader sees. Keeping a range within one version prevents mixing two
+          numberings, and the plain wording tells the reader what the comment will be attached to.
         tests:
           - ReviewPage_DiffView_CommentOnRemovedLine_StartsBaselineThread
           - ReviewPage_DiffView_CommentOnAddedAndContextLines_StartsHeadThreads
+          - ReviewPage_DiffView_LeftControlIsBaseline_RightControlIsHead
           - ReviewPage_DiffView_ShiftClick_ExtendsOnlyWithinTheSameSide
           - ReviewPage_DiffView_ThroughLineField_ExtendsTheRange
           - ReviewPage_DiffView_CancelAndWholeFileOption_BehaveAsLabelled
 
       - id: ReviewCenter-ReviewPage-DiffThreads
         title: >-
-          The ReviewPage unit shall draw the threads of a file under the last line of their anchor in the Diff view,
-          on the side the thread belongs to and even where the line would be collapsed, highlight the lines they
-          cover, show a resolved thread as a collapsed header, reuse the reply, resolve and reopen controls of the
-          thread list, and list only whole-file threads below the diff.
+          The ReviewPage unit shall draw the threads of a file under the row of the last line of their anchor in the
+          Diff view, across the full width, even where the line would be collapsed, highlight the cell of the lines
+          they cover on the side the thread belongs to, show a resolved thread as a collapsed header, reuse the
+          reply, resolve and reopen controls of the thread list, and list only whole-file threads below the diff.
         justification: |
           Discussion is read next to the code it is about. A thread that is hidden inside a collapsed run would be
           missed, so its line always stays visible.
@@ -193,12 +201,14 @@ sections:
 
       - id: ReviewCenter-ReviewPage-DiffLayout
         title: >-
-          The ReviewPage unit shall keep the Diff view inside the width of the page on a phone, with the code area
-          scrolling inside itself, the collapsed-run buttons and inline threads staying in view while it scrolls,
-          and a narrower line-number gutter.
+          The ReviewPage unit shall keep the Diff view inside the width of the page on a phone, stacking the left
+          cell of a row above its right cell and hiding the empty placeholders and the repeated baseline copy of an
+          unchanged line, wrapping long lines inside their cell, keeping the collapsed-run buttons and inline
+          threads in view, and using a narrower line-number gutter, and shall give the two sides room on a wide
+          screen.
         justification: |
-          Reviewers read on phones as well. A long line must never make the whole page scroll sideways, and the
-          comment form under a line must stay reachable.
+          Reviewers read on phones as well. A long line must never make the whole page scroll sideways, a narrow
+          screen has no room for two columns, and the comment form under a line must stay reachable.
         tests:
           - WebSubsystem_Stylesheet_DiffRules_KeepCodeScrollingInsideItself
 

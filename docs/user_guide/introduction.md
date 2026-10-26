@@ -317,13 +317,18 @@ from the repository: later commits, a force push, or disabling the repository do
 
 On the review page, each file shows its change kind. Select a file to read it. For a **Modified** file the page opens
 on a **Diff** view, with a **Head** and a **Baseline** button next to it. The Diff view shows "x added, y removed",
-then the changed lines with the old and the new line number: added lines are green with a `+`, removed lines red with
-a `-`. Unchanged lines far from a change are collapsed behind a **Show N unchanged lines** button, so the first change
-is at the top. To comment on a line, click the **+** at its start: a form opens under the line saying what you are
-commenting on, for example "Comment on removed line 10 (before)". A removed line belongs to the baseline, every other
-line to the head; hold Shift while you click another line on the same side, or fill in "Through line", to comment on a
-range. **Cancel** closes the form and **Comment on the whole file instead** keeps your text. Threads appear right
-under the lines they are about (a resolved thread is one line until you open it), and the thread list names them
+then the changed lines side by side: the earlier version (baseline) on the left and the new version (head) on the
+right, each with its own line numbers. Removed lines are red with a `-` and added lines green with a `+`; a run of
+removed lines sits next to the run of added lines that replaces it, and a cell with nothing opposite is left empty
+and grey. Unchanged lines show on both sides. Unchanged lines far from a change are collapsed behind a **Show N
+unchanged lines** button, and the page scrolls to the first change when you open the file. On a narrow screen, such as
+a phone, each row stacks: the baseline cell above the head cell, with the empty cells hidden. To comment on a line,
+click the **+** at the start of its cell: a form opens under the row saying what you are commenting on, for example
+"Comment on line 10 (before)". The **+** in the left cell comments on the baseline with the baseline line number, and
+the **+** in the right cell on the head with the head line number; hold Shift while you click another line on the
+same side, or fill in "Through line", to comment on a range. **Cancel** closes the form and **Comment on the whole
+file instead** keeps your text. Threads appear right under the row of the lines they are about, across the full
+width (a resolved thread is one line until you open it), and the thread list names them
 "Before: line N" or "After: line N" and jumps to the line when you choose one. **Head** is the numbered view with
 comments, and **Baseline** shows the earlier content read-only. A file that is too large to compare line by line says
 so and offers Head and Baseline. A **Deleted** file opens on a Diff view of its removed lines; you can comment on

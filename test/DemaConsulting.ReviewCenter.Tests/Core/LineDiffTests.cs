@@ -605,4 +605,138 @@ public class LineDiffTests
             Assert.Equal(count, next);
         }
     }
+
+    /// <summary>
+    ///     Builds rows from a pattern: <c>c</c> is an unchanged row, <c>-</c> a removed row and <c>+</c> an added row.
+    /// </summary>
+    /// <param name="pattern">The pattern.</param>
+    /// <returns>The rows, numbered as a real diff would number them.</returns>
+    private static List<DiffLine> Pattern(string pattern)
+    {
+        var rows = new List<DiffLine>();
+        int oldNumber = 0, newNumber = 0;
+        for (var i = 0; i < pattern.Length; i++)
+        {
+            rows.Add(pattern[i] switch
+            {
+                '-' => new DiffLine(DiffLineKind.Removed, ++oldNumber, null, $"r{i}"),
+                '+' => new DiffLine(DiffLineKind.Added, null, ++newNumber, $"r{i}"),
+                _ => new DiffLine(DiffLineKind.Context, ++oldNumber, ++newNumber, $"r{i}")
+            });
+        }
+
+        return rows;
+    }
+
+    /// <summary>
+    ///     Test that three removed lines and one added line pair row by row, leaving two empty right cells.
+    /// </summary>
+    [Fact]
+    public void LineDiff_Pair_ThreeRemovedOneAdded_PairsFirstAndLeavesRightEmpty()
+    {
+        // Arrange: three removed rows (0-2) followed by one added row (3)
+        var rows = Pattern("---+");
+
+        // Act: pair
+        var paired = LineDiff.Pair(rows, 0, rows.Count);
+
+        // Assert: removed 0 with added 3, then removed 1 and 2 alone
+        Assert.Equal([new DiffRow(0, 3), new DiffRow(1, null), new DiffRow(2, null)], paired);
+    }
+
+    /// <summary>
+    ///     Test that one removed line and three added lines pair row by row, leaving two empty left cells.
+    /// </summary>
+    [Fact]
+    public void LineDiff_Pair_OneRemovedThreeAdded_PairsFirstAndLeavesLeftEmpty()
+    {
+        // Arrange, Act
+        var rows = Pattern("-+++");
+        var paired = LineDiff.Pair(rows, 0, rows.Count);
+
+        // Assert
+        Assert.Equal([new DiffRow(0, 1), new DiffRow(null, 2), new DiffRow(null, 3)], paired);
+    }
+
+    /// <summary>
+    ///     Test that equal runs pair completely, a pure addition has empty left cells and a pure removal empty
+    ///     right cells.
+    /// </summary>
+    [Fact]
+    public void LineDiff_Pair_EqualRunsPureAddAndPureRemove_AreHandled()
+    {
+        // Arrange, Act: two against two, only added, only removed
+        var equal = Pattern("--++");
+        var pureAdd = Pattern("++");
+        var pureRemove = Pattern("--");
+
+        // Assert
+        Assert.Equal([new DiffRow(0, 2), new DiffRow(1, 3)], LineDiff.Pair(equal, 0, equal.Count));
+        Assert.Equal([new DiffRow(null, 0), new DiffRow(null, 1)], LineDiff.Pair(pureAdd, 0, pureAdd.Count));
+        Assert.Equal([new DiffRow(0, null), new DiffRow(1, null)], LineDiff.Pair(pureRemove, 0, pureRemove.Count));
+    }
+
+    /// <summary>
+    ///     Test that an unchanged row appears once with the same index on both sides, between paired blocks, and
+    ///     that a sub-range is paired on its own.
+    /// </summary>
+    [Fact]
+    public void LineDiff_Pair_ContextRows_AppearOnBothSidesAndRangesAreRespected()
+    {
+        // Arrange: context, a replacement, context, an addition
+        var rows = Pattern("c-+c+");
+
+        // Act: pair everything, then only rows 1-3
+        var all = LineDiff.Pair(rows, 0, rows.Count);
+        var part = LineDiff.Pair(rows, 1, 3);
+
+        // Assert
+        Assert.Equal([new DiffRow(0, 0), new DiffRow(1, 2), new DiffRow(3, 3), new DiffRow(null, 4)], all);
+        Assert.Equal([new DiffRow(1, 2), new DiffRow(3, 3)], part);
+        Assert.Empty(LineDiff.Pair(rows, 2, 0));
+    }
+
+    /// <summary>
+    ///     Test that rejects a null list and a range outside the rows.
+    /// </summary>
+    [Fact]
+    public void LineDiff_Pair_InvalidArguments_Throw()
+    {
+        // Arrange, Act, Assert
+        Assert.Throws<ArgumentNullException>(() => LineDiff.Pair(null!, 0, 0));
+        Assert.Throws<ArgumentOutOfRangeException>(() => LineDiff.Pair(Pattern("c"), -1, 1));
+        Assert.Throws<ArgumentOutOfRangeException>(() => LineDiff.Pair(Pattern("c"), 0, -1));
+        Assert.Throws<ArgumentOutOfRangeException>(() => LineDiff.Pair(Pattern("c"), 0, 2));
+    }
+
+    /// <summary>
+    ///     Test that pairing the visible segments of a real diff keeps three lines of context, collapsed gaps stay
+    ///     out of the rows, a pinned unchanged row keeps its place, and every visible row appears exactly once.
+    /// </summary>
+    [Fact]
+    public void LineDiff_Pair_VisibleSegmentsOfRealDiff_KeepContextGapsAndPins()
+    {
+        // Arrange: 30 lines where line 15 is replaced by two and line 28 is deleted
+        var oldLines = Enumerable.Range(1, 30).Select(n => $"l{n}").ToList();
+        var newLines = oldLines.ToList();
+        newLines.RemoveAt(27);
+        newLines[14] = "n15a";
+        newLines.Insert(15, "n15b");
+        var result = LineDiff.Compute(oldLines, newLines);
+
+        // Act: segment (with an unchanged row pinned far from the changes) and pair the visible segments
+        var segments = LineDiff.Segment(result.Lines, LineDiff.DefaultContextLines, new HashSet<int> { 3 });
+        var visible = segments.Where(s => !s.IsGap).ToList();
+        var paired = visible.SelectMany(s => LineDiff.Pair(result.Lines, s.Start, s.Count)).ToList();
+
+        // Assert: the gaps are what Segment collapsed, the replacement pairs 1 removed with 2 added, and the
+        // pinned row (index 3) is shown with its context
+        Assert.Equal(2, segments.Count(s => s.IsGap));
+        var indexes = paired.SelectMany(p => new[] { p.LeftIndex, p.RightIndex }).Where(i => i is not null).Select(i => i!.Value).Distinct().Order().ToList();
+        Assert.Equal(visible.SelectMany(s => Enumerable.Range(s.Start, s.Count)).ToList(), indexes);
+        Assert.Contains(new DiffRow(3, 3), paired);
+        var replaced = paired.Single(p => p.LeftIndex is { } l && result.Lines[l].Kind == DiffLineKind.Removed && p.RightIndex is not null && result.Lines[p.LeftIndex.Value].Text == "l15");
+        Assert.Equal("n15a", result.Lines[replaced.RightIndex!.Value].Text);
+        Assert.Contains(paired, p => p.LeftIndex is null && result.Lines[p.RightIndex!.Value].Text == "n15b");
+    }
 }

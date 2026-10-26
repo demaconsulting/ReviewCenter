@@ -35,16 +35,18 @@ namespace DemaConsulting.ReviewCenter.Web;
 public sealed record DiffCommentRequest(ThreadSide Side, int Line, bool Extend);
 
 /// <summary>
-///     Code-behind for the diff component (<c>DiffView.razor</c>): the changes of one file as rows with old and new
-///     line numbers, where the reader can comment on a line and read the threads under their lines.
+///     Code-behind for the diff component (<c>DiffView.razor</c>): the changes of one file side by side (baseline
+///     on the left, head on the right), where the reader can comment on a line and read the threads under their
+///     rows.
 /// </summary>
 /// <remarks>
 ///     The component shows a <see cref="LineDiffResult"/> that the page computed once per file selection; it
 ///     holds no domain state of its own. The only state it keeps is which collapsed runs of unchanged lines the
 ///     reader has expanded. Unchanged runs are collapsed (see <see cref="LineDiff.Segment"/>) except where a
-///     thread is anchored or the reader expanded them, so every thread is always visible. A comment control on a
-///     removed line addresses the baseline numbering, on any other line the head numbering; this is the same
-///     choice the thread service validates. The threads and the new-thread form are rendered by the page
+///     thread is anchored or the reader expanded them, so every thread is always visible. A comment control in a
+///     left cell (a removed line, or the baseline copy of an unchanged line) addresses the baseline numbering, a
+///     right cell the head numbering; this is the numbering the thread service validates. The pairing of removed
+///     and added lines into rows is <see cref="LineDiff.Pair"/>. The threads and the new-thread form are rendered by the page
 ///     (passed as fragments) so the existing reply, resolve and reopen behavior is reused unchanged. All text of
 ///     the file is rendered as plain text.
 /// </remarks>
@@ -324,52 +326,82 @@ public partial class DiffView : ComponentBase
     }
 
     /// <summary>
-    ///     Raises the comment callback for a row.
+    ///     Gets the row indexes a side-by-side row stands for.
     /// </summary>
-    /// <param name="row">The row index.</param>
+    /// <param name="pair">The side-by-side row.</param>
+    /// <returns>The index of its left line and of its right line, once when both are the same line; never empty.</returns>
+    private static int[] RowsOf(DiffRow pair)
+    {
+        return pair.LeftIndex is { } left && pair.RightIndex is { } right && left != right
+            ? [left, right]
+            : [pair.LeftIndex ?? pair.RightIndex!.Value];
+    }
+
+    /// <summary>
+    ///     Gets the key that names a cell in its test ids.
+    /// </summary>
+    /// <param name="line">The line shown in the cell.</param>
+    /// <param name="row">The row index of the line.</param>
+    /// <param name="isLeft"><c>true</c> for the left (baseline) cell.</param>
+    /// <returns>
+    ///     The row index; the left cell of an unchanged line, which repeats the right cell, gets an "old-" prefix
+    ///     so both ids stay unique.
+    /// </returns>
+    private static string CellKey(DiffLine line, int row, bool isLeft)
+    {
+        var index = row.ToString(CultureInfo.InvariantCulture);
+        return isLeft && line.Kind == DiffLineKind.Context ? $"old-{index}" : index;
+    }
+
+    /// <summary>
+    ///     Raises the comment callback for a cell.
+    /// </summary>
+    /// <param name="row">The row index of the line.</param>
+    /// <param name="side">The side of the cell: the baseline for the left cell, the head for the right cell.</param>
     /// <param name="args">The click, to read whether Shift was held.</param>
     /// <returns>A task that completes when the callback has run.</returns>
-    private Task CommentAsync(int row, MouseEventArgs args)
+    private Task CommentAsync(int row, ThreadSide side, MouseEventArgs args)
     {
+        // The cell decides the numbering: the left cell is the baseline, the right cell the head
         var line = Result.Lines[row];
-
-        // A removed line only exists in the baseline; every other line is addressed by its head number
-        var request = line.Kind == DiffLineKind.Removed
-            ? new DiffCommentRequest(ThreadSide.Baseline, line.OldNumber!.Value, args.ShiftKey)
-            : new DiffCommentRequest(ThreadSide.Head, line.NewNumber!.Value, args.ShiftKey);
-        return OnComment.InvokeAsync(request);
+        var number = side == ThreadSide.Baseline ? line.OldNumber : line.NewNumber;
+        return OnComment.InvokeAsync(new DiffCommentRequest(side, number!.Value, args.ShiftKey));
     }
 
     /// <summary>
-    ///     Tells whether a row is inside the selection of the new comment.
+    ///     Tells whether a cell is inside the selection of the new comment.
     /// </summary>
-    /// <param name="line">The row.</param>
-    /// <returns><c>true</c> when the row's number on the selected side lies in the selected range.</returns>
-    private bool IsSelected(DiffLine line)
+    /// <param name="line">The line shown in the cell.</param>
+    /// <param name="side">The side of the cell.</param>
+    /// <returns><c>true</c> when the selection is on this side and the line's number lies in the selected range.</returns>
+    private bool IsSelected(DiffLine line, ThreadSide side)
     {
-        return InRange(line, SelectedSide, SelectedStart, SelectedEnd);
+        return SelectedSide == side && InRange(line, side, SelectedStart, SelectedEnd);
     }
 
     /// <summary>
-    ///     Tells whether a row is inside the anchor of any thread.
+    ///     Tells whether a cell is inside the anchor of any thread.
     /// </summary>
-    /// <param name="line">The row.</param>
-    /// <returns><c>true</c> when a thread covers the row on its side.</returns>
-    private bool IsAnchored(DiffLine line)
+    /// <param name="line">The line shown in the cell.</param>
+    /// <param name="side">The side of the cell.</param>
+    /// <returns><c>true</c> when a thread on this side covers the line.</returns>
+    private bool IsAnchored(DiffLine line, ThreadSide side)
     {
-        return Threads.Any(t => InRange(line, t.Side, t.StartLine, t.EndLine));
+        return Threads.Any(t => t.Side == side && InRange(line, side, t.StartLine, t.EndLine));
     }
 
     /// <summary>
-    ///     Tells whether a row is inside the anchor of the focused thread.
+    ///     Tells whether a cell is inside the anchor of the focused thread.
     /// </summary>
-    /// <param name="line">The row.</param>
-    /// <returns><c>true</c> when the focused thread covers the row on its side.</returns>
-    private bool IsFocused(DiffLine line)
+    /// <param name="line">The line shown in the cell.</param>
+    /// <param name="side">The side of the cell.</param>
+    /// <returns><c>true</c> when the focused thread is on this side and covers the line.</returns>
+    private bool IsFocused(DiffLine line, ThreadSide side)
     {
         return FocusedThreadId is { } id
                && Threads.FirstOrDefault(t => t.Id == id) is { } thread
-               && InRange(line, thread.Side, thread.StartLine, thread.EndLine);
+               && thread.Side == side
+               && InRange(line, side, thread.StartLine, thread.EndLine);
     }
 
     /// <summary>
@@ -453,16 +485,21 @@ public partial class DiffView : ComponentBase
     }
 
     /// <summary>
-    ///     Words the accessible name of the comment control of a row.
+    ///     Words the accessible name of the comment control of a cell.
     /// </summary>
-    /// <param name="line">The row.</param>
-    /// <returns>For example "Comment on removed line 12" or "Comment on added line 14".</returns>
-    private static string CommentLabel(DiffLine line)
+    /// <param name="line">The line shown in the cell.</param>
+    /// <param name="side">The side of the cell.</param>
+    /// <returns>
+    ///     For example "Comment on removed line 12", "Comment on added line 14", "Comment on line 7" (head) or
+    ///     "Comment on baseline line 7" for the left copy of an unchanged line.
+    /// </returns>
+    private static string CommentLabel(DiffLine line, ThreadSide side)
     {
         return line.Kind switch
         {
             DiffLineKind.Removed => string.Create(CultureInfo.InvariantCulture, $"Comment on removed line {line.OldNumber}"),
             DiffLineKind.Added => string.Create(CultureInfo.InvariantCulture, $"Comment on added line {line.NewNumber}"),
+            _ when side == ThreadSide.Baseline => string.Create(CultureInfo.InvariantCulture, $"Comment on baseline line {line.OldNumber}"),
             _ => string.Create(CultureInfo.InvariantCulture, $"Comment on line {line.NewNumber}")
         };
     }

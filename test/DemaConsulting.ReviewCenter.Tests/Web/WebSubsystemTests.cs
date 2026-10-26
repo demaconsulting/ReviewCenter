@@ -336,12 +336,19 @@ public partial class WebSubsystemTests
         var css = await File.ReadAllTextAsync(
             Path.Combine(directory.FullName, "src", "DemaConsulting.ReviewCenter", "wwwroot", "app.css"),
             TestContext.Current.CancellationToken);
-        // Assert: the code area scrolls inside itself, rows are as wide as their text, inline threads and the
-        // collapsed-run button stay in view while it scrolls, and a phone gets a narrower gutter
+        // Assert: the stylesheet lays the diff out as two columns per row, wraps long lines inside their cell, keeps the
+        // code area from widening the page, keeps inline threads and the collapsed-run button in view, stacks the
+        // cells and hides the placeholders on a narrow screen, and gives a phone a narrower gutter
         Assert.Matches(@"\.diff-code\s*\{[^}]*max-width:\s*100%;[^}]*overflow-x:\s*auto;", css);
-        Assert.Matches(@"\.diff-row\s*\{[^}]*min-width:\s*max-content;", css);
+        Assert.Matches(@"\.diff-pair\s*\{[^}]*display:\s*grid;[^}]*grid-template-columns:\s*\w+\(0,\s*1fr\)\s+\w+\(0,\s*1fr\);", css);
+        Assert.Matches(@"\.diff-row\s*\{[^}]*min-width:\s*0;", css);
+        Assert.Matches(@"\.diff-row \.line-text\s*\{[^}]*white-space:\s*pre-wrap;[^}]*overflow-wrap:\s*anywhere;", css);
+        Assert.Matches(@"\.diff-row\.empty,\s*\.diff-row\.empty \.gutter\s*\{[^}]*background:", css);
         Assert.Matches(@"\.diff-inline\s*\{[^}]*position:\s*sticky;[^}]*left:\s*0;", css);
         Assert.Matches(@"\.diff-gap\s*\{[^}]*position:\s*sticky;[^}]*left:\s*0;", css);
+        Assert.Matches(
+            @"@media \(max-width: 39\.99rem\)\s*\{\s*\.diff-pair\s*\{[^}]*grid-template-columns:\s*\w+\(0,\s*1fr\);\s*\}\s*\.diff-row\.empty,\s*\.diff-row\.context\.left\s*\{[^}]*display:\s*none;",
+            css);
         Assert.Matches(@"@media \(max-width: 29\.99rem\)\s*\{\s*\.diff-row \.line-no\s*\{[^}]*min-width:", css);
     }
 

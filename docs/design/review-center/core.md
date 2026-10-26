@@ -29,7 +29,7 @@ and `AuditVerificationResult`, and the repository types `SourceRepository`, `Rep
 `RepositoryUpdate`, `TokenChange`, and `TokenAction`, and the git contract types `RepositoryAccess`, `GitChange`,
 `ChangeKind`, `SkippedEntry`, and `GitChangeSet`, and the review-source types `ReviewSource`, `ChangedFile`, and
 `RepositoryReviewResult`, and the diff types `FileDiff`, `FileDiffStatus`, `DiffLine`, `DiffLineKind`,
-`LineDiffResult`, and `DiffSegment`, and the planning types `BaselineMode`, `PlanRowStatus`, `PlanRow`, `ReviewPlan`,
+`LineDiffResult`, `DiffSegment`, and `DiffRow`, and the planning types `BaselineMode`, `PlanRowStatus`, `PlanRow`, `ReviewPlan`,
 `PlanCreateRequest`, `PlanCreateOutcome`, `PlanCreateResult`, and `ReviewSetDefinition`), the text and line definition
 (`FileText`), the limits
 (`ReviewLimits`), the rule failure type

@@ -293,10 +293,10 @@ sections:
 
       - id: ReviewCenter-Web-DiffReview
         title: >-
-          The Web subsystem shall show a changed file of a review from a repository as a diff on the review page,
-          with the unchanged lines collapsed, let a signed-in user comment on a line of either version and read the
-          threads under their lines, say in plain words when a comparison cannot be shown, and keep the code area
-          inside the width of a phone.
+          The Web subsystem shall show a changed file of a review from a repository as a side-by-side diff on the
+          review page, with the unchanged lines collapsed, let a signed-in user comment on a line of either version
+          and read the threads under their rows, say in plain words when a comparison cannot be shown, and keep the
+          diff inside the width of a phone by stacking its two sides.
         justification: |
           Reviewers judge a change by reading what changed. The subsystem test guards the stylesheet rules that keep
           the page from scrolling sideways; the interactions need a live connection and are verified by the

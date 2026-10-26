@@ -549,7 +549,8 @@ a.action {
     background: #ffd76a;
 }
 
-/* The diff: one column of rows with an old and a new line number; the code area scrolls inside itself */
+/* The diff, side by side: each row is a grid of two cells, baseline on the left and head on the right; lines wrap
+   inside their cell, so the page never scrolls sideways */
 .diff-summary {
     margin: 0 0 0.25rem;
     font-weight: 600;
@@ -563,17 +564,35 @@ a.action {
     background: var(--code-background);
 }
 
+.diff-pair {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+}
+
 .diff-row {
     display: flex;
-    min-width: max-content;
+    min-width: 0;
     background: var(--code-background);
     font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
     font-size: 0.85rem;
     line-height: 1.4;
 }
 
+.diff-row.right {
+    border-left: 1px solid var(--border);
+}
+
 .diff-row .gutter {
+    position: static;
     background: inherit;
+}
+
+.diff-row .line-text {
+    flex: 1 1 auto;
+    min-width: 0;
+    padding: 0 0.5rem;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
 }
 
 .diff-row.added,
@@ -586,6 +605,12 @@ a.action {
     background: #ffebe9;
 }
 
+/* The empty cell opposite a line that exists on one side only: quiet, so the eye stays on the code */
+.diff-row.empty,
+.diff-row.empty .gutter {
+    background: #f4f6f8;
+}
+
 /* A line that carries a thread gets a stripe at its left edge */
 .diff-row.anchored {
     box-shadow: inset 0.25rem 0 0 #d9a400;
@@ -594,6 +619,11 @@ a.action {
 .diff-row.selected,
 .diff-row.selected .gutter {
     background: #d6e8ff;
+}
+
+.diff-row.focused,
+.diff-row.focused .gutter {
+    background: #ffd76a;
 }
 
 .diff-sign {
@@ -645,6 +675,28 @@ a.action {
 
 .form-actions button {
     margin: 0;
+}
+
+/* The review page is wider than other pages so the two sides of a diff have room */
+.page.review-page {
+    max-width: 80rem;
+}
+
+/* On a narrow screen a row stacks its left cell above its right cell; the empty placeholders and the repeated left
+   copy of an unchanged line are hidden, so every line shows once */
+@media (max-width: 39.99rem) {
+    .diff-pair {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .diff-row.empty,
+    .diff-row.context.left {
+        display: none;
+    }
+
+    .diff-row.right {
+        border-left: 0;
+    }
 }
 
 /* On a phone the gutter gets narrower so the code has room; the page itself never scrolls sideways */
