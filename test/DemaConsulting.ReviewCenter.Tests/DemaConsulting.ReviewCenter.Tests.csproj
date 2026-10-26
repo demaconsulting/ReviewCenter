@@ -49,16 +49,16 @@
   <!-- Web Component Test Dependencies -->
   <ItemGroup>
     <!-- bUnit renders Razor components in memory so component behavior can be unit tested without a browser -->
-    <PackageReference Include="bunit" Version="2.12.5" />
+    <PackageReference Include="bunit" Version="2.13.3" />
     <!-- TestHost provides the in-memory web server used to exercise the HTTP pipeline without a network port -->
-    <PackageReference Include="Microsoft.AspNetCore.TestHost" Version="10.0.13" />
+    <PackageReference Include="Microsoft.AspNetCore.TestHost" Version="10.0.14" />
   </ItemGroup>
 
   <!-- Differential Test Dependency -->
   <ItemGroup>
     <!-- The globbing library that ReviewMark uses; only the tests reference it, to check that the file selection
          matcher agrees with it for the syntax both support -->
-    <PackageReference Include="Microsoft.Extensions.FileSystemGlobbing" Version="10.0.13" />
+    <PackageReference Include="Microsoft.Extensions.FileSystemGlobbing" Version="10.0.14" />
   </ItemGroup>
 
   <!-- Code Analysis Dependencies -->
@@ -68,7 +68,7 @@
            in any project that references this test project.
          - IncludeAssets lists all asset types (including 'analyzers' and 'buildtransitive') to ensure
            Roslyn analyzers and MSBuild targets are fully activated during the build. -->
-    <PackageReference Include="Microsoft.CodeAnalysis.NetAnalyzers" Version="10.0.402">
+    <PackageReference Include="Microsoft.CodeAnalysis.NetAnalyzers" Version="10.0.403">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>

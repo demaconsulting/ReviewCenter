@@ -39,7 +39,7 @@
     <PackageReference Include="DemaConsulting.TestResults" Version="1.10.0" />
     <!-- Entity Framework Core with the SQLite provider stores projects and reviews. The native SQLite library
          (e_sqlite3 / libe_sqlite3.so) is published as a side file next to the single-file executable. -->
-    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="10.0.13" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="10.0.14" />
     <!-- YamlDotNet reads the review-sets of a repository's .reviewmark.yaml (the same library ReviewMark uses). -->
     <PackageReference Include="YamlDotNet" Version="18.1.0" />
   </ItemGroup>
@@ -52,7 +52,7 @@
 
   <!-- Build Tool Dependencies -->
   <ItemGroup>
-    <PackageReference Include="Microsoft.SourceLink.GitHub" Version="10.0.402" PrivateAssets="All" />
+    <PackageReference Include="Microsoft.SourceLink.GitHub" Version="10.0.403" PrivateAssets="All" />
     <PackageReference Include="Polyfill" Version="11.4.5" PrivateAssets="All" />
   </ItemGroup>
 
@@ -63,7 +63,7 @@
            in projects that consume this one.
          - IncludeAssets lists all asset types (including 'analyzers' and 'buildtransitive') to ensure
            Roslyn analyzers and MSBuild targets are fully activated during the build. -->
-    <PackageReference Include="Microsoft.CodeAnalysis.NetAnalyzers" Version="10.0.402">
+    <PackageReference Include="Microsoft.CodeAnalysis.NetAnalyzers" Version="10.0.403">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
