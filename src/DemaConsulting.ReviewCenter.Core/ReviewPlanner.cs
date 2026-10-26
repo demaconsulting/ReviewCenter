@@ -18,6 +18,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
+using System.Runtime.CompilerServices;
 using System.Text;
 
 namespace DemaConsulting.ReviewCenter.Core;
@@ -177,9 +178,10 @@ public sealed class ReviewPlanner
         var headSha = await session.ResolveRevisionAsync(head, cancellationToken);
         var explicitSha = explicitRevision is null ? null : await session.ResolveRevisionAsync(explicitRevision, cancellationToken);
 
-        // The head listing finds the configuration and is also the change list of every full review
-        var headList = await session.ListChangesAsync(null, headSha, cancellationToken);
-        var definitions = _parser.Parse(await ReadConfigurationAsync(session, headList, cancellationToken));
+        // The head listing finds the configuration and is also the change list of every full review; it is held in a
+        // box so it can be released as soon as the full reviews are classified
+        var headBox = await ListHeadAsync(session, headSha, cancellationToken);
+        var definitions = _parser.Parse(await ReadConfigurationAsync(session, headBox.Value!, cancellationToken));
         var existing = (await _store.ListReviewsAsync(projectId, cancellationToken))
             .Where(review => review.RepositoryId == repositoryId)
             .ToList();
@@ -198,20 +200,44 @@ public sealed class ReviewPlanner
             candidates.Add(candidate);
         }
 
-        // Pass 2: the changes, listed once per distinct baseline, then the classification of every set
-        var lists = new Dictionary<string, GitChangeSet> { [string.Empty] = headList };
-        var baselines = candidates
-            .Where(c => c.Problem is null && !c.Unchanged && c.BaselineSha is not null)
-            .Select(c => c.BaselineSha!)
-            .Distinct();
-        foreach (var baseline in baselines)
+        // Pass 2: the changes, listed once per distinct baseline, then the classification of every set. The rows
+        // of one baseline are classified before the next list is loaded, so only one change list (which can be
+        // large) is held at a time
+        var rows = new PlanRow?[candidates.Count];
+        var groups = new Dictionary<string, List<int>>();
+        var order = new List<string>();
+        for (var index = 0; index < candidates.Count; index++)
         {
-            lists[baseline] = await session.ListChangesAsync(baseline, headSha, cancellationToken);
+            var candidate = candidates[index];
+            if (candidate.Problem is not null || candidate.Unchanged)
+            {
+                rows[index] = ToRow(candidate, null, existing, headSha, mode);
+                continue;
+            }
+
+            var key = candidate.BaselineSha ?? string.Empty;
+            if (!groups.TryGetValue(key, out var members))
+            {
+                members = [];
+                groups[key] = members;
+                order.Add(key);
+            }
+
+            members.Add(index);
         }
 
-        var rows = candidates
-            .Select(candidate => ToRow(candidate, lists, existing, headSha, mode))
-            .ToList();
+        // The head listing is already loaded; it serves the full reviews and is released before any other list is read
+        if (groups.TryGetValue(string.Empty, out var fullMembers))
+        {
+            ClassifyGroup(fullMembers, headBox.Value!, candidates, rows, existing, headSha, mode);
+        }
+
+        headBox.Value = null;
+        foreach (var key in order.Where(key => key.Length > 0))
+        {
+            await ClassifyBaselineAsync(session, key, headSha, groups[key], candidates, rows, existing, mode, cancellationToken);
+        }
+
         return new ReviewPlan(
             access.RepositoryId,
             access.Name,
@@ -220,7 +246,7 @@ public sealed class ReviewPlanner
             mode,
             explicitRevision,
             explicitSha,
-            rows);
+            rows.Select(row => row!).ToList());
     }
 
     /// <summary>
@@ -546,17 +572,89 @@ public sealed class ReviewPlanner
     }
 
     /// <summary>
+    ///     Lists all files at the head, in a box the caller can empty to release the listing.
+    /// </summary>
+    /// <param name="session">The open session.</param>
+    /// <param name="headSha">The head commit.</param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <returns>The box holding the listing.</returns>
+    private static async Task<StrongBox<GitChangeSet?>> ListHeadAsync(
+        IGitRepository session,
+        string headSha,
+        CancellationToken cancellationToken)
+    {
+        return new StrongBox<GitChangeSet?>(await session.ListChangesAsync(null, headSha, cancellationToken));
+    }
+
+    /// <summary>
+    ///     Lists the changes since one baseline and classifies the sets that use it.
+    /// </summary>
+    /// <remarks>
+    ///     The change list is local to this method, so it can be collected as soon as the group is classified and
+    ///     before the next baseline is listed.
+    /// </remarks>
+    /// <param name="session">The open session.</param>
+    /// <param name="baselineSha">The baseline commit of the group.</param>
+    /// <param name="headSha">The head commit.</param>
+    /// <param name="members">The positions in <paramref name="candidates"/> of the sets of the group.</param>
+    /// <param name="candidates">All sets, in configuration order.</param>
+    /// <param name="rows">The rows by position of their set; filled for the members.</param>
+    /// <param name="existing">The reviews of the project made from this repository.</param>
+    /// <param name="mode">The baseline mode.</param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <returns>A task that completes when the group is classified.</returns>
+    private static async Task ClassifyBaselineAsync(
+        IGitRepository session,
+        string baselineSha,
+        string headSha,
+        List<int> members,
+        List<Candidate> candidates,
+        PlanRow?[] rows,
+        IReadOnlyList<Review> existing,
+        BaselineMode mode,
+        CancellationToken cancellationToken)
+    {
+        var changes = await session.ListChangesAsync(baselineSha, headSha, cancellationToken);
+        ClassifyGroup(members, changes, candidates, rows, existing, headSha, mode);
+    }
+
+    /// <summary>
+    ///     Classifies the sets that share one baseline, storing each row at the position of its set.
+    /// </summary>
+    /// <param name="members">The positions in <paramref name="candidates"/> of the sets of the group.</param>
+    /// <param name="changes">The changes between the baseline of the group and the head.</param>
+    /// <param name="candidates">All sets, in configuration order.</param>
+    /// <param name="rows">The rows by position of their set; filled for the members.</param>
+    /// <param name="existing">The reviews of the project made from this repository.</param>
+    /// <param name="headSha">The head commit.</param>
+    /// <param name="mode">The baseline mode.</param>
+    private static void ClassifyGroup(
+        List<int> members,
+        GitChangeSet changes,
+        List<Candidate> candidates,
+        PlanRow?[] rows,
+        IReadOnlyList<Review> existing,
+        string headSha,
+        BaselineMode mode)
+    {
+        foreach (var index in members)
+        {
+            rows[index] = ToRow(candidates[index], changes, existing, headSha, mode);
+        }
+    }
+
+    /// <summary>
     ///     Classifies one set once the changes for its baseline are known.
     /// </summary>
     /// <param name="candidate">The set.</param>
-    /// <param name="lists">The change lists by baseline commit (the empty text for none).</param>
+    /// <param name="changeSet">The changes for the baseline of the set; <c>null</c> when the set has a problem or is unchanged.</param>
     /// <param name="existing">The reviews of the project made from this repository.</param>
     /// <param name="headSha">The head commit.</param>
     /// <param name="mode">The baseline mode.</param>
     /// <returns>The row.</returns>
     private static PlanRow ToRow(
         Candidate candidate,
-        Dictionary<string, GitChangeSet> lists,
+        GitChangeSet? changeSet,
         IReadOnlyList<Review> existing,
         string headSha,
         BaselineMode mode)
@@ -587,7 +685,7 @@ public sealed class ReviewPlanner
         }
 
         // Deleted files are matched by their path like any other, as when a review is created
-        var selected = lists[candidate.BaselineSha ?? string.Empty].Changes
+        var selected = changeSet!.Changes
             .Where(change => SelectionMatcher.IsMatch(change.Path, candidate.Patterns!))
             .ToList();
         if (selected.Count == 0)

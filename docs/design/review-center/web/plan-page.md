@@ -67,14 +67,17 @@ shows a plain message ("No repository is registered; ask an administrator.") ins
 
 **LoadPlanAsync**: Checks the form (a repository, a head revision, and for the explicit mode a baseline revision), each
 with a message that says what is missing, and then calls `ReviewPlanner.PlanAsync`. On success every row that needs a
-review is ticked. The button shows "Reading repository..." and is disabled while git is read.
+review is ticked. The button shows "Reading repository..." while git is read, and every form control is disabled while
+the page is busy (reading or creating), so the inputs cannot change under a request that is still running and a late
+answer cannot replace the plan of other inputs.
 
 **CreateReviewsAsync**: Asks for the signed-in user (`GetActorAsync`, which also refuses an ended sign-in state), builds
 one `PlanCreateRequest` for every ticked row, and calls `ReviewPlanner.CreateAsync` with the commit of the plan, never a
 branch name. The plan is then replaced by the results: one row per request, with a link to the review for a created or an
 already filed one, and the reason for a failed one, with a button to plan again and a link back to the project. When the
 whole batch is refused (for example the repository was disabled after the plan was shown), the message is shown next to
-the create button and the plan and ticks stay, so the user can try again.
+the create button and the plan and ticks stay, so the user can try again. While the batch is created the form, the ticks,
+and select all and none are disabled.
 
 **SetTicked**, **SetAllTicked**: Set or clear the tick of one row, or of all rows. Ticking never reads git again. Select
 all and select none are offered only for more than three rows.

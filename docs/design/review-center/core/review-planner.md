@@ -44,10 +44,13 @@ suffixes are tried.
   3. List the reviews of the project that belong to the repository.
   4. For every set, normalize its paths into a selection text (a set whose paths are invalid, or select too many files,
      becomes a `CannotPlan` row with the problem and does not stop the plan) and choose its baseline (below).
-  5. List the changes once for every distinct baseline, count the added, modified, and deleted files of each selection,
-     and classify each set: `AlreadyFiled` when a review of this repository with the same set, head commit, and
-     baseline exists (the id of that review is given); `NothingToReview` when no selected file changed, or none matches;
-     otherwise `WillCreate`.
+  5. Group the sets by baseline. For each distinct baseline, list the changes once, count the added, modified, and
+     deleted files of each selection of the group, and classify each set: `AlreadyFiled` when a review of this
+     repository with the same set, head commit, and baseline exists (the id of that review is given);
+     `NothingToReview` when no selected file changed, or none matches; otherwise `WillCreate`. The head listing serves
+     the full reviews and is released first; then the group of each baseline is classified before the next list is
+     loaded, so only one change list (up to the size limit of a listing) is held at a time. The rows keep the order
+     of the file.
 - *Baseline choice*: With `None` there is no baseline, and with `Explicit` it is the given commit, for every set. With
   `LastReviewed` the planner looks, among the reviews of the same repository and set, for the signed ones (as
   `SigningService` decides) and takes the one that was signed last (ties go to the later creation). Without a signed

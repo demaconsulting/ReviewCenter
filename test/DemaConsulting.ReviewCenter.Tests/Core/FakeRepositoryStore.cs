@@ -237,6 +237,24 @@ internal sealed class FakeGitRepositoryProvider : IGitRepositoryProvider
     public Func<Task>? OnNextListChanges { get; set; }
 
     /// <summary>
+    ///     Gets or sets a value indicating whether every <see cref="IGitRepository.ListChangesAsync"/> call returns a
+    ///     fresh copy of the scripted change set that is tracked weakly, and records before each call how many of the
+    ///     earlier copies are still alive (see <see cref="AliveAtListCall"/>).
+    /// </summary>
+    public bool TrackChangeSets { get; set; }
+
+    /// <summary>
+    ///     Gets, for every <see cref="IGitRepository.ListChangesAsync"/> call made while <see cref="TrackChangeSets"/>
+    ///     is set, how many change sets returned by earlier calls had not been collected when the call started.
+    /// </summary>
+    public List<int> AliveAtListCall { get; } = [];
+
+    /// <summary>
+    ///     Gets the weak references to the change sets returned while <see cref="TrackChangeSets"/> is set.
+    /// </summary>
+    private List<WeakReference<GitChangeSet>> Returned { get; } = [];
+
+    /// <summary>
     ///     Scripts one commit pair: the revision names, the changes and the blob contents they need.
     /// </summary>
     /// <param name="baselineSha">The baseline commit, or <c>null</c> for none.</param>
@@ -270,6 +288,24 @@ internal sealed class FakeGitRepositoryProvider : IGitRepositoryProvider
         }
 
         Changes[(baselineSha ?? string.Empty, headSha)] = new GitChangeSet(list, skipped);
+    }
+
+    /// <summary>
+    ///     Returns a fresh copy of a scripted change set, after recording how many earlier copies are still alive.
+    /// </summary>
+    /// <param name="set">The scripted change set.</param>
+    /// <returns>The copy, which is tracked weakly from now on.</returns>
+    private GitChangeSet Track(GitChangeSet set)
+    {
+        // Collect first so that only sets that are still referenced count as alive
+#pragma warning disable S1215 // The test measures what is still reachable, which needs a deterministic collection
+        GC.Collect();
+        GC.Collect();
+#pragma warning restore S1215
+        AliveAtListCall.Add(Returned.Count(reference => reference.TryGetTarget(out _)));
+        var copy = new GitChangeSet(set.Changes, set.Skipped);
+        Returned.Add(new WeakReference<GitChangeSet>(copy));
+        return copy;
     }
 
     /// <inheritdoc />
@@ -328,7 +364,8 @@ internal sealed class FakeGitRepositoryProvider : IGitRepositoryProvider
                 await hook();
             }
 
-            return owner.Changes[(baselineSha ?? string.Empty, headSha)];
+            var set = owner.Changes[(baselineSha ?? string.Empty, headSha)];
+            return owner.TrackChangeSets ? owner.Track(set) : set;
         }
 
         /// <inheritdoc />

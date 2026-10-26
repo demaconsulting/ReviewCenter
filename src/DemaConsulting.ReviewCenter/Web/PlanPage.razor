@@ -70,7 +70,7 @@
                     <form data-testid="plan-form" @onsubmit="LoadPlanAsync">
                         <div class="field">
                             <label for="plan-repository">Repository</label>
-                            <select id="plan-repository" data-testid="plan-repository-select" @bind="RepositoryIdText">
+                            <select id="plan-repository" data-testid="plan-repository-select" disabled="@Busy" @bind="RepositoryIdText">
                                 <option value="">Choose a repository</option>
                                 @foreach (var repository in Repositories)
                                 {
@@ -81,7 +81,7 @@
                         <div class="field">
                             <label for="plan-head">Head revision</label>
                             <input id="plan-head" type="text" maxlength="@RevisionValidator.MaxLength"
-                                   autocomplete="off" placeholder="main" data-testid="plan-head-input"
+                                   autocomplete="off" placeholder="main" data-testid="plan-head-input" disabled="@Busy"
                                    @bind="HeadRevision" @bind:event="oninput" />
                             <span class="muted">A branch, tag or commit: the version to review.</span>
                         </div>
@@ -89,17 +89,17 @@
                             <legend>What to review</legend>
                             <label>
                                 <input type="radio" name="plan-baseline" checked="@(Mode == BaselineMode.None)"
-                                       data-testid="plan-baseline-none" @onchange="() => ChooseMode(BaselineMode.None)" />
+                                       data-testid="plan-baseline-none" disabled="@Busy" @onchange="() => ChooseMode(BaselineMode.None)" />
                                 All files of each set
                             </label>
                             <label>
                                 <input type="radio" name="plan-baseline" checked="@(Mode == BaselineMode.Explicit)"
-                                       data-testid="plan-baseline-explicit" @onchange="() => ChooseMode(BaselineMode.Explicit)" />
+                                       data-testid="plan-baseline-explicit" disabled="@Busy" @onchange="() => ChooseMode(BaselineMode.Explicit)" />
                                 Changes since a branch, tag or commit
                             </label>
                             <label>
                                 <input type="radio" name="plan-baseline" checked="@(Mode == BaselineMode.LastReviewed)"
-                                       data-testid="plan-baseline-last" @onchange="() => ChooseMode(BaselineMode.LastReviewed)" />
+                                       data-testid="plan-baseline-last" disabled="@Busy" @onchange="() => ChooseMode(BaselineMode.LastReviewed)" />
                                 Changes since the last signed review of each set
                             </label>
                         </fieldset>
@@ -108,7 +108,7 @@
                             <div class="field">
                                 <label for="plan-baseline-revision">Baseline revision</label>
                                 <input id="plan-baseline-revision" type="text" maxlength="@RevisionValidator.MaxLength"
-                                       autocomplete="off" data-testid="plan-baseline-input"
+                                       autocomplete="off" data-testid="plan-baseline-input" disabled="@Busy"
                                        @bind="BaselineRevision" @bind:event="oninput" />
                                 <span class="muted">A branch, tag or commit.</span>
                             </div>
@@ -172,8 +172,8 @@
                         @if (OffersBulkSelection)
                         {
                             <p class="plan-bulk">
-                                <button type="button" class="secondary" data-testid="plan-select-all" @onclick="() => SetAllTicked(true)">Select all</button>
-                                <button type="button" class="secondary" data-testid="plan-select-none" @onclick="() => SetAllTicked(false)">Select none</button>
+                                <button type="button" class="secondary" data-testid="plan-select-all" disabled="@Busy" @onclick="() => SetAllTicked(true)">Select all</button>
+                                <button type="button" class="secondary" data-testid="plan-select-none" disabled="@Busy" @onclick="() => SetAllTicked(false)">Select none</button>
                             </p>
                         }
                         <ul class="item-list" data-testid="plan-todo-list">
@@ -182,7 +182,7 @@
                                 <li class="plan-row" data-testid="plan-row-@row.SetId">
                                     <label>
                                         <input type="checkbox" checked="@IsTicked(row.SetId)"
-                                               data-testid="plan-row-check-@row.SetId"
+                                               data-testid="plan-row-check-@row.SetId" disabled="@Busy"
                                                @onchange="e => SetTicked(row.SetId, (bool)e.Value!)" />
                                         <span class="plan-row-text">
                                             <span>

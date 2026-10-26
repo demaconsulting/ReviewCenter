@@ -35,7 +35,8 @@ N/A - standard test environment.
   access failure, unexpected fault) is explained in plain English with what to do next, shows no raw git text, location,
   credential, or exception text, and creates nothing; a refused creation keeps the plan.
 - Changing the form, or reusing the page for another project, discards the plan; the button shows and disables itself
-  while the repository is read.
+  while the repository is read, and every form control (and, while reviews are created, every tick and select all and
+  none) is disabled while the page is busy and enabled again afterwards.
 - Set titles are shown as text, never as markup.
 - The interactive marker is `true` after the page has rendered on a live connection.
 
@@ -118,6 +119,14 @@ an empty head and no plan. This scenario is tested by `PlanPage_ParametersChange
 **PlanPage_ShowPlan_WhileReading_ShowsLoadingAndDisablesButton**: While the listing waits, the button reads "Reading
 repository..." and is disabled; afterwards the plan is shown. This scenario is tested by
 `PlanPage_ShowPlan_WhileReading_ShowsLoadingAndDisablesButton`.
+
+**PlanPage_ShowPlan_WhileReading_DisablesEveryFormControl**: While the listing waits, the repository, head, the three
+baseline choices, and the baseline text box are disabled; after the plan is shown they are enabled again. This scenario
+is tested by `PlanPage_ShowPlan_WhileReading_DisablesEveryFormControl`.
+
+**PlanPage_Create_WhileCreating_DisablesFormAndRowControls**: While the first review of a batch waits, the form
+controls, select all, select none, and the row ticks are disabled; afterwards the results are shown. This scenario is
+tested by `PlanPage_Create_WhileCreating_DisablesFormAndRowControls`.
 
 **PlanPage_Error_UnknownRevision_ExplainsAndSuggestsChecking**: An unknown head names the revision and says to check the
 spelling. This scenario is tested by `PlanPage_Error_UnknownRevision_ExplainsAndSuggestsChecking`.

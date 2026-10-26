@@ -26,6 +26,8 @@ N/A - standard test environment (the integration tests need git, and skip themse
 - With no baseline every selected file is reviewed; with an explicit baseline every set uses it; with the last reviewed
   mode a set uses the head of the review that was signed last when it is an ancestor of the new head and the selection is
   the same, and otherwise gets a full review with a note that says why.
+- Change lists are loaded once per distinct baseline and one at a time: the earlier list is no longer held when the
+  next one is requested, and the rows keep the order of the file.
 - A set with a review of the same head and baseline is `AlreadyFiled`; a set with no changed file, or at the head of its
   last signed review, is `NothingToReview`.
 - Creation uses one session, creates each review through the review service with its set identifier and the range title,
@@ -58,6 +60,11 @@ gives the changes since that head. This scenario is tested by
 
 **ReviewPlanner_PlanAsync_LastReviewedTwoSigned_PicksTheOneSignedLast**: Of two signed reviews of a set the one signed
 last is the baseline. This scenario is tested by `ReviewPlanner_PlanAsync_LastReviewedTwoSigned_PicksTheOneSignedLast`.
+
+**ReviewPlanner_PlanAsync_SeveralBaselines_HoldsOneChangeListAtATimeAndKeepsRowOrder**: Four sets alternate between two
+last-signed baselines and the full head; the head and each baseline are listed once, no earlier change list is still
+alive when the next is requested, and the rows are in the order of the file with the changes of their own baseline. This
+scenario is tested by `ReviewPlanner_PlanAsync_SeveralBaselines_HoldsOneChangeListAtATimeAndKeepsRowOrder`.
 
 **ReviewPlanner_PlanAsync_LastReviewedNotAncestor_FullReviewWithNote**: A signed review whose head is not an ancestor
 gives a full review and a note about the rewritten history. This scenario is tested by

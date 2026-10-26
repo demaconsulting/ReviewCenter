@@ -284,7 +284,9 @@ public class GitSourceTests
         Assert.SkipWhen(!GitTestSupport.Available, GitTestSupport.MissingMessage);
         using var root = new TempFolder();
         var origin = CreateOrigin(root.Path);
-        GitTestSupport.Git(origin.Folder, "checkout", "-b", "side", origin.First);
+        // The fixture marks script.sh executable in the index only, so on Linux the working file looks modified and a
+        // plain checkout would refuse; force the switch (the working tree holds nothing worth keeping).
+        GitTestSupport.Git(origin.Folder, "checkout", "--force", "-b", "side", origin.First);
         GitTestSupport.Write(origin.Folder, "side.txt", "side\n");
         var side = GitTestSupport.Commit(origin.Folder, "side");
         var cancellationToken = TestContext.Current.CancellationToken;

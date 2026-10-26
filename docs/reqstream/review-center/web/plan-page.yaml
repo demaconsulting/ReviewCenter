@@ -95,15 +95,19 @@ sections:
       - id: ReviewCenter-PlanPage-State
         title: >-
           The PlanPage unit shall discard the plan, the results, and any error when the repository, the head, the
-          baseline choice, or the baseline revision changes, and when the page is reused for another project, and
-          shall show while the repository is being read that it is being read, with the button disabled.
+          baseline choice, or the baseline revision changes, and when the page is reused for another project, shall
+          show while the repository is being read that it is being read, and shall disable every form control, tick,
+          and bulk selection button while it reads or creates.
         justification: |
           A plan that disagrees with the form would create reviews the user did not ask for. A visible waiting
-          state prevents a second press while a slow repository is read.
+          state prevents a second press while a slow repository is read, and inputs that cannot change while a
+          request runs prevent a late answer from replacing the plan or results of other inputs.
         tests:
           - PlanPage_FormChange_DiscardsPlan
           - PlanPage_ParametersChange_OtherProject_ClearsFormAndPlan
           - PlanPage_ShowPlan_WhileReading_ShowsLoadingAndDisablesButton
+          - PlanPage_ShowPlan_WhileReading_DisablesEveryFormControl
+          - PlanPage_Create_WhileCreating_DisablesFormAndRowControls
 
       - id: ReviewCenter-PlanPage-Interactive
         title: >-

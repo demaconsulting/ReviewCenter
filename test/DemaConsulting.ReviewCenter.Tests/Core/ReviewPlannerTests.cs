@@ -456,6 +456,51 @@ public class ReviewPlannerTests
     }
 
     /// <summary>
+    ///     Test that the change lists are loaded one baseline at a time, once per distinct baseline, and that the rows
+    ///     of sets that share a baseline are still classified and kept in the order of the configuration.
+    /// </summary>
+    [Fact]
+    public async Task ReviewPlanner_PlanAsync_SeveralBaselines_HoldsOneChangeListAtATimeAndKeepsRowOrder()
+    {
+        // Arrange: core and core2 signed at H0, lib signed at H1, docs never signed; the sets alternate baselines
+        var f = await CreateAsync();
+        f.Parser.Sets =
+        [
+            new("core", "Core", ["src/**"]),
+            new("lib", "Lib", ["src/**"]),
+            new("docs", "Documentation", ["docs/**"]),
+            new("core2", "Core Two", ["src/**"])
+        ];
+        f.Git.Script(H1, H2, [("src/b.cs", ChangeKind.Added, null, "new\n")]);
+        await FileAsync(f, H0, "core", "core2");
+        await FileAsync(f, H1, "lib");
+        await SignAsync(f, "core");
+        await SignAsync(f, "core2");
+        await SignAsync(f, "lib");
+        f.Git.Ancestors.Add((H0, H2));
+        f.Git.Ancestors.Add((H1, H2));
+        var listsBefore = f.Git.ListCalls;
+        f.Git.TrackChangeSets = true;
+
+        // Act: plan with the last reviewed head as baseline
+        var plan = await PlanAsync(f, BaselineMode.LastReviewed);
+
+        // Assert: one listing for the head and one per distinct baseline
+        Assert.Equal(3, f.Git.ListCalls - listsBefore);
+
+        // Assert: when each list was requested, none of the earlier ones was still held
+        Assert.Equal([0, 0, 0], f.Git.AliveAtListCall);
+
+        // Assert: the rows are in the order of the configuration and each used the changes of its own baseline
+        Assert.Equal(["core", "lib", "docs", "core2"], plan.Rows.Select(row => row.SetId));
+        Assert.Equal([H0, H1, null, H0], plan.Rows.Select(row => row.BaselineSha));
+        Assert.Equal(
+            [(1, 1, 0), (1, 0, 0), (1, 0, 0), (1, 1, 0)],
+            plan.Rows.Select(row => (row.Added, row.Modified, row.Deleted)));
+        Assert.All(plan.Rows, row => Assert.Equal(PlanRowStatus.WillCreate, row.Status));
+    }
+
+    /// <summary>
     ///     Test that a set whose last signed review has the same head has nothing to review.
     /// </summary>
     [Fact]

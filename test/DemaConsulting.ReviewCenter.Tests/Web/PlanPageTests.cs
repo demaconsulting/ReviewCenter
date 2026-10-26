@@ -693,6 +693,93 @@ public class PlanPageTests : PageTestBase
     }
 
     /// <summary>
+    ///     Test that every form control is disabled while the plan is read, so the inputs cannot change under it, and
+    ///     enabled again when the plan is shown.
+    /// </summary>
+    [Fact]
+    public async Task PlanPage_ShowPlan_WhileReading_DisablesEveryFormControl()
+    {
+        // Arrange: the explicit mode with a baseline, and a listing that waits until the test lets it go
+        var (projectId, _) = await ArrangeAsync();
+        var gate = new TaskCompletionSource();
+        Git.OnNextListChanges = () => gate.Task;
+        var cut = RenderPage(projectId);
+        await cut.Find("[data-testid='plan-baseline-explicit']").ChangeAsync(true);
+        await cut.Find("[data-testid='plan-baseline-input']").InputAsync("v1");
+        await cut.Find("[data-testid='plan-head-input']").InputAsync("main");
+        string[] controls =
+        [
+            "plan-repository-select",
+            "plan-head-input",
+            "plan-baseline-none",
+            "plan-baseline-explicit",
+            "plan-baseline-last",
+            "plan-baseline-input"
+        ];
+        Assert.All(controls, id => Assert.False(cut.Find($"[data-testid='{id}']").HasAttribute("disabled"), id));
+
+        // Act: submit and look at the page while the listing waits
+        var submit = cut.Find("[data-testid='plan-form']").SubmitAsync();
+        await cut.WaitForAssertionAsync(() => Assert.True(Has(cut, "plan-loading")));
+
+        // Assert: nothing in the form can be changed
+        Assert.All(controls, id => Assert.True(cut.Find($"[data-testid='{id}']").HasAttribute("disabled"), id));
+
+        // Act: let the listing finish
+        gate.SetResult();
+        await submit;
+
+        // Assert: the plan is shown and the form can be used again
+        Assert.True(Has(cut, "plan-summary"));
+        Assert.All(controls, id => Assert.False(cut.Find($"[data-testid='{id}']").HasAttribute("disabled"), id));
+    }
+
+    /// <summary>
+    ///     Test that the form and the row controls are disabled while the reviews are created, so neither the form nor
+    ///     the ticks can change under the creation.
+    /// </summary>
+    [Fact]
+    public async Task PlanPage_Create_WhileCreating_DisablesFormAndRowControls()
+    {
+        // Arrange: a plan of four rows, and a creation that waits until the test lets it go
+        var (projectId, _) = await ArrangeAsync();
+        SetParser.Sets = [.. Enumerable.Range(1, 4).Select(n => new ReviewSetDefinition($"s{n}", $"Set {n}", ["src/**"]))];
+        var cut = RenderPage(projectId);
+        await ShowPlanAsync(cut);
+        string[] controls =
+        [
+            "plan-repository-select",
+            "plan-head-input",
+            "plan-baseline-none",
+            "plan-baseline-explicit",
+            "plan-baseline-last",
+            "plan-select-all",
+            "plan-select-none",
+            "plan-row-check-s1",
+            "plan-row-check-s4",
+            "plan-load-button"
+        ];
+        Assert.All(controls, id => Assert.False(cut.Find($"[data-testid='{id}']").HasAttribute("disabled"), id));
+        var gate = new TaskCompletionSource();
+        Git.OnNextListChanges = () => gate.Task;
+
+        // Act: create and look at the page while the first review waits
+        var create = cut.Find("[data-testid='plan-create-button']").ClickAsync();
+        await cut.WaitForAssertionAsync(() => Assert.Equal("Creating...", TextOf(cut, "plan-create-button")));
+
+        // Assert: neither the form nor the ticks can be changed
+        Assert.All(controls, id => Assert.True(cut.Find($"[data-testid='{id}']").HasAttribute("disabled"), id));
+
+        // Act: let the creation finish
+        gate.SetResult();
+        await create;
+
+        // Assert: the results are shown and can be left for a new plan
+        Assert.Equal("4 reviews created.", TextOf(cut, "plan-result-summary"));
+        Assert.False(cut.Find("[data-testid='plan-again-button']").HasAttribute("disabled"));
+    }
+
+    /// <summary>
     ///     Test that a revision that does not exist is explained with what to do, and nothing is shown as a plan.
     /// </summary>
     [Fact]
