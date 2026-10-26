@@ -97,8 +97,15 @@ sentence `GitAccessFailedMessage` ("The repository could not be read.") instead;
 keep their fixed messages. Any other exception that
 is not a cancellation, for example a database error, becomes a `Failed` result of that request with a generic message
 that carries no exception text; nothing is created for that request, and the results of the other requests stay.
-A cancellation propagates. A null argument is `ArgumentNullException`, and a batch with too many requests is
-`ArgumentException`.
+A cancellation propagates. A null argument is `ArgumentNullException`, a baseline mode that is not defined is
+`ArgumentOutOfRangeException` (checked before anything is read, so it can never be taken for the last-signed mode), and
+a batch with too many requests is `ArgumentException`.
+
+#### Limitations
+
+The last-signed baseline asks the signing service for the approval of every review of a set to find the latest signed
+one. The lookups are bounded by the reviews of each set, not by the sets times all reviews of the project, so a plan
+stays cheap for the project sizes this release targets; there is no cache.
 
 #### Dependencies
 

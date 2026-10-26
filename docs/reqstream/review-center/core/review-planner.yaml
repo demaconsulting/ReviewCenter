@@ -27,6 +27,7 @@ sections:
           - ReviewPlanner_PlanAsync_ConfigurationTooLarge_ThrowsConfigInvalidWithoutReading
           - ReviewPlanner_PlanAsync_ParserRejectsFile_ThrowsConfigInvalid
           - ReviewPlanner_PlanAsync_BadRequests_ThrowTheirRules
+          - ReviewPlanner_PlanAsync_UndefinedBaselineMode_ThrowsArgumentOutOfRangeWithoutReading
           - ReviewPlanner_PlanAsync_RealGit_NoBaselineAndExplicitBaseline
           - ReviewPlanner_PlanAsync_RealGit_NoConfigurationOrUnknownHead_ThrowTheirRules
           - ReviewPlanner_PlanAsync_SeveralBaselines_HoldsOneChangeListAtATimeAndKeepsRowOrder

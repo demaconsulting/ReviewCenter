@@ -611,6 +611,24 @@ public class ReviewPlannerTests
     }
 
     /// <summary>
+    ///     Test that a baseline mode that is not defined is refused before anything is read, instead of being
+    ///     treated as the last-signed mode.
+    /// </summary>
+    [Fact]
+    public async Task ReviewPlanner_PlanAsync_UndefinedBaselineMode_ThrowsArgumentOutOfRangeWithoutReading()
+    {
+        // Arrange: the fixture
+        var f = await CreateAsync();
+
+        // Act: plan with a mode value that no enum member has
+        var exception = await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() => PlanAsync(f, (BaselineMode)99));
+
+        // Assert: the parameter is named and no listing was requested
+        Assert.Equal("mode", exception.ParamName);
+        Assert.Equal(0, f.Git.BlobReads);
+    }
+
+    /// <summary>
     ///     Test that a parser failure is passed on unchanged.
     /// </summary>
     [Fact]

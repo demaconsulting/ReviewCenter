@@ -159,6 +159,7 @@ public sealed class ReviewPlanner
     ///     (<see cref="DomainRule.ReviewSetConfigMissing"/>, <see cref="DomainRule.ReviewSetConfigInvalid"/>). A
     ///     problem with one set never fails the plan; it becomes a <see cref="PlanRowStatus.CannotPlan"/> row.
     /// </exception>
+    /// <exception cref="ArgumentOutOfRangeException">Thrown when <paramref name="mode"/> is not a defined value.</exception>
     public async Task<ReviewPlan> PlanAsync(
         int projectId,
         int repositoryId,
@@ -168,6 +169,11 @@ public sealed class ReviewPlanner
         CancellationToken cancellationToken = default)
     {
         // Validate everything that needs no I/O first so a bad request fails fast and cheaply
+        if (!Enum.IsDefined(mode))
+        {
+            throw new ArgumentOutOfRangeException(nameof(mode), mode, "The baseline mode is not a known value.");
+        }
+
         var head = RevisionValidator.Validate(headRevision?.Trim());
         var explicitRevision = mode == BaselineMode.Explicit ? RevisionValidator.Validate(baselineRevision?.Trim()) : null;
         await EnsureProjectAsync(projectId, cancellationToken);

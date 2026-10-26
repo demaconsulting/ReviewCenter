@@ -104,6 +104,10 @@ scenario is tested by `ReviewPlanner_PlanAsync_ParserRejectsFile_ThrowsConfigInv
 repository, and a disabled repository stop the plan with their own rules. This scenario is tested by
 `ReviewPlanner_PlanAsync_BadRequests_ThrowTheirRules`.
 
+**ReviewPlanner_PlanAsync_UndefinedBaselineMode_ThrowsArgumentOutOfRangeWithoutReading**: A baseline mode value that no
+member has is refused with `ArgumentOutOfRangeException` before anything is read, and is not taken for the last-signed
+mode. This scenario is tested by `ReviewPlanner_PlanAsync_UndefinedBaselineMode_ThrowsArgumentOutOfRangeWithoutReading`.
+
 **ReviewPlanner_CreateAsync_PlanRows_CreatesReviewsWithSetIdAndOneSession**: The rows of a plan are created; each review
 has its set identifier, the head commit, and a frozen file list, and git was opened once for the batch. This scenario is
 tested by `ReviewPlanner_CreateAsync_PlanRows_CreatesReviewsWithSetIdAndOneSession`.
