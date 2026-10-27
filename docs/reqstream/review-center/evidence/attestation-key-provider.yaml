@@ -77,6 +77,20 @@ sections:
           - CertificateStoreKeyProvider_GetSigningKey_CertificateWithoutPrivateKey_Throws
           - CertificateStoreKeyProvider_GetSigningKey_ConfiguredForTheServer_StartsWithTheCertificate
 
+      - id: ReviewCenter-AttestationKeyProvider-Describe
+        title: >-
+          The AttestationKeyProvider unit shall describe the state of the key without ever throwing: available with
+          the public description of the key, or unavailable with the message of the key error, and for any other
+          non-fatal failure unavailable with a message that holds no detail (the detail goes to the log).
+        justification: |
+          The review page asks for the status on every render. A platform failure while the key is loaded (a malformed
+          folder or store name, a broken certificate chain) must not turn into an error page for the whole review.
+        tests:
+          - SelfSignedKeyProvider_GetSigningKey_FolderIsAFile_ThrowsNamingTheSetting
+          - CertificateStoreKeyProvider_GetSigningKey_CertificateNotInStore_ThrowsNamingThumbprintAndStore
+          - CertificateStoreKeyProvider_GetSigningKey_CertificateInStore_FindsItAndSigns
+          - SelfSignedKeyProvider_Describe_UnexpectedFailure_ReportsUnavailableWithoutDetail
+
       - id: ReviewCenter-AttestationKeyProvider-RequireTrustedKey
         title: >-
           The AttestationKeyProvider unit shall, when RequireTrustedKey is set, refuse a self-signed certificate, a

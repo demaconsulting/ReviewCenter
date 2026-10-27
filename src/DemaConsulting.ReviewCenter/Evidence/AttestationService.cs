@@ -31,13 +31,16 @@ namespace DemaConsulting.ReviewCenter.Evidence;
 ///     An attestation is available only when the review is complete: every reviewer slot has a signature of the
 ///     record as it is now (the existing completion rule of <see cref="SigningService"/>). Nothing is stored; the
 ///     PDF is built, signed and returned each time, and each creation is recorded in the audit trail. A key problem
-///     never produces an unsigned or partly signed document and is not recorded as an attestation. The service is
+///     never produces an unsigned or partly signed document and is not recorded as an attestation. Because reading,
+///     verifying the audit chain, and rendering take time, the review is read again after rendering and before
+///     signing; when it is no longer complete or no longer the same, nothing is signed or recorded. The service is
 ///     thread-safe.
 /// </remarks>
 internal sealed class AttestationService
 {
     /// <summary>
-    ///     The longest first comment, in characters, that the summary of a resolved thread keeps.
+    ///     The longest first comment, in characters, that the summary of a resolved thread keeps; the summary ends with
+    ///     an ellipsis when it was cut. It applies only to resolved-thread summaries, never to checklist comments.
     /// </summary>
     private const int SummaryLength = 300;
 
@@ -118,6 +121,12 @@ internal sealed class AttestationService
     }
 
     /// <summary>
+    ///     Gets a step that runs after the document is rendered and before the review is checked again; it exists
+    ///     only so that a test can change the review in that moment. It is <c>null</c> in production.
+    /// </summary>
+    internal Func<CancellationToken, Task>? AfterRender { get; init; }
+
+    /// <summary>
     ///     Creates the signed attestation of a review.
     /// </summary>
     /// <param name="projectId">The project number.</param>
@@ -125,8 +134,9 @@ internal sealed class AttestationService
     /// <param name="actor">The user who asks for it. Must not be null.</param>
     /// <param name="cancellationToken">A token to cancel the work.</param>
     /// <returns>
-    ///     The result: the signed PDF when the review is complete and the key is usable; otherwise why not. Only the
-    ///     success is recorded in the audit trail.
+    ///     The result: the signed PDF when the review is complete and the key is usable; otherwise why not
+    ///     (including <see cref="AttestationStatus.Changed"/> when the review changed while the document was being
+    ///     prepared). Only the success is recorded in the audit trail.
     /// </returns>
     /// <exception cref="ArgumentNullException">Thrown when <paramref name="reviewId"/> or <paramref name="actor"/> is null.</exception>
     public async Task<AttestationResult> GenerateAsync(
@@ -170,17 +180,31 @@ internal sealed class AttestationService
             return new AttestationResult(AttestationStatus.NotFound, null, null, "The review was not found.");
         }
 
-        if (RecordDigest.Compute(snapshot.Record) != approval.Digest)
+        // The approval and the snapshot are two reads: they must describe the same record and the same slots
+        if (RecordDigest.Compute(snapshot.Record) != approval.Digest || !SameSlots(approval, snapshot))
         {
-            return new AttestationResult(AttestationStatus.NotApproved, null, null, "The review changed while the attestation was prepared; try again.");
+            return ChangedResult();
         }
 
+        // The whole chain is verified on every request: the document states whether it is intact, and the check is
+        // linear in the number of audit entries
         var chain = await _audit.VerifyAsync(cancellationToken);
         var now = _time.GetUtcNow();
         var document = BuildDocument(project, review, snapshot, approval, chain, key.Info, actor, now);
-
-        // Render, then sign; a failure to sign throws a key exception and returns nothing
         var unsigned = _renderer.Render(document);
+
+        // The reads above and the render take time, so check again that the review is still what was rendered
+        if (AfterRender is not null)
+        {
+            await AfterRender(cancellationToken);
+        }
+
+        if (!await IsUnchangedAsync(projectId, reviewId, approval.Digest, snapshot, cancellationToken))
+        {
+            return ChangedResult();
+        }
+
+        // Sign; a failure to sign throws a key exception and returns nothing
         byte[] signed;
         try
         {
@@ -191,7 +215,8 @@ internal sealed class AttestationService
             return new AttestationResult(AttestationStatus.KeyUnavailable, null, null, ex.Message);
         }
 
-        // The event is recorded strictly: an attestation that cannot be traced is not handed out
+        // The event is recorded strictly: an attestation that cannot be traced is not handed out. It records the
+        // digest that was attested.
         var hash = Convert.ToHexString(SHA256.HashData(signed)).ToLowerInvariant();
         await _audit.RecordAsync(
             AuditDraft.By(
@@ -202,6 +227,84 @@ internal sealed class AttestationService
                 reviewId),
             cancellationToken);
         return new AttestationResult(AttestationStatus.Ok, signed, FileNameFor(projectId, reviewId), null);
+    }
+
+    /// <summary>
+    ///     Builds the answer for a review that changed while the attestation was being prepared.
+    /// </summary>
+    /// <returns>The result with the status <see cref="AttestationStatus.Changed"/>.</returns>
+    private static AttestationResult ChangedResult()
+    {
+        return new AttestationResult(
+            AttestationStatus.Changed,
+            null,
+            null,
+            "The review changed while the attestation was being prepared; try again.");
+    }
+
+    /// <summary>
+    ///     Checks, from fresh reads, that the review is still complete and is still exactly what was rendered.
+    /// </summary>
+    /// <param name="projectId">The project number.</param>
+    /// <param name="reviewId">The review identifier.</param>
+    /// <param name="digest">The record digest that was approved and rendered.</param>
+    /// <param name="rendered">The snapshot the document was built from.</param>
+    /// <param name="cancellationToken">A token to cancel the work.</param>
+    /// <returns>
+    ///     <c>true</c> when the review is still approved with the same record digest, and has the same slots and the
+    ///     same signatures that count as the rendered one.
+    /// </returns>
+    private async Task<bool> IsUnchangedAsync(
+        int projectId,
+        string reviewId,
+        string digest,
+        ReviewSnapshot rendered,
+        CancellationToken cancellationToken)
+    {
+        var approval = await _signing.GetApprovalAsync(projectId, reviewId, cancellationToken);
+        if (approval is null || !approval.IsApproved || approval.Digest != digest)
+        {
+            return false;
+        }
+
+        var current = await _store.GetSnapshotAsync(projectId, reviewId, cancellationToken);
+        return current is not null
+               && RecordDigest.Compute(current.Record) == digest
+               && SlotSignature(current, digest) == SlotSignature(rendered, digest);
+    }
+
+    /// <summary>
+    ///     Checks that the approval and the snapshot describe the same slots with the same members.
+    /// </summary>
+    /// <param name="approval">The approval status.</param>
+    /// <param name="snapshot">The snapshot.</param>
+    /// <returns><c>true</c> when both have the same slots, in the same order, with the same primary and alternate.</returns>
+    private static bool SameSlots(ReviewApproval approval, ReviewSnapshot snapshot)
+    {
+        return approval.Slots
+            .Select(s => string.Create(CultureInfo.InvariantCulture, $"{s.SlotId}:{s.Primary.UserId}:{s.Alternate?.UserId}"))
+            .SequenceEqual(snapshot.Slots
+                .OrderBy(s => s.Id)
+                .Select(s => string.Create(CultureInfo.InvariantCulture, $"{s.Id}:{s.PrimaryUserId}:{s.AlternateUserId}")));
+    }
+
+    /// <summary>
+    ///     Describes the slots of a snapshot and the signature that counts for each, so that two snapshots can be compared.
+    /// </summary>
+    /// <param name="snapshot">The snapshot.</param>
+    /// <param name="digest">The record digest the signatures must bind to.</param>
+    /// <returns>One text that is equal for two snapshots exactly when their slots and counting signatures are equal.</returns>
+    private static string SlotSignature(ReviewSnapshot snapshot, string digest)
+    {
+        return string.Join(
+            ";",
+            snapshot.Slots.OrderBy(s => s.Id).Select(slot =>
+            {
+                var signature = snapshot.Signatures.Where(s => s.SlotId == slot.Id && s.RecordDigest == digest).MaxBy(s => s.Id);
+                return string.Create(
+                    CultureInfo.InvariantCulture,
+                    $"{slot.Id}:{slot.PrimaryUserId}:{slot.AlternateUserId}:{signature?.Id}:{signature?.UserId}");
+            }));
     }
 
     /// <summary>

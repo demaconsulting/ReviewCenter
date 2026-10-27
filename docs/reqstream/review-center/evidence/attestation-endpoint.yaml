@@ -31,13 +31,15 @@ sections:
       - id: ReviewCenter-AttestationEndpoint-Statuses
         title: >-
           The AttestationEndpoint class shall answer 404 for a review that does not exist, 409 with a problem
-          description that says the review is not complete for a review that is not approved, and 500 with a problem
-          description that says the signing key is unavailable when the key cannot be used, and in the last case
-          record nothing in the audit trail.
+          description that says the review is not complete for a review that is not approved, 409 with a problem
+          description that says the review changed during generation when it changed while the document was being
+          prepared, and 500 with a problem description that says the signing key is unavailable when the key cannot
+          be used, and in the last two cases record nothing in the audit trail.
         justification: |
           A client must be able to tell a wrong address from a review that has to be signed first and from a problem
           that only the operator can solve.
         tests:
           - AttestationEndpoint_Get_UnknownReview_Answers404
           - AttestationEndpoint_Get_ReviewNotSigned_Answers409
+          - AttestationEndpoint_Get_ReviewChangesDuringGeneration_Answers409AndRecordsNothing
           - AttestationEndpoint_Get_KeyBecomesUnavailable_Answers500AndRecordsNothing

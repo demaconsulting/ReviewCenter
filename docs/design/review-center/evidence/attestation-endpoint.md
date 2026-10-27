@@ -27,6 +27,8 @@ from the user name and the display name claim of the signed-in user.
     for a completed review.
   - 404 for a review that does not exist.
   - 409 with a problem description titled "The review is not complete" for a review that is not approved.
+  - 409 with a problem description titled "The review changed during generation" when the review changed while the
+    attestation was being prepared (nothing was signed or recorded; the user can ask again).
   - 500 with a problem description titled "Attestation signing key unavailable" and the reason, when the key cannot be
     used. The reason names the setting to correct and never contains a secret.
 

@@ -73,7 +73,7 @@ internal static class AttestationKeyPolicy
         if (!info.HasDigitalSignatureUsage)
         {
             throw new AttestationKeyException(
-                "Attestation:RequireTrustedKey is true but the certificate's key usage does not allow digital signatures. "
+                "Attestation:RequireTrustedKey is true but the certificate's key usage does not allow digital signatures or non-repudiation. "
                 + "Use a document-signing certificate (key usage digitalSignature or nonRepudiation).");
         }
 

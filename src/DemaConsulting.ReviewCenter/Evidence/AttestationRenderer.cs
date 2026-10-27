@@ -49,9 +49,10 @@ internal sealed class AttestationRenderer : IAttestationRenderer
         + "the server clock and is not a trusted timestamp.";
 
     /// <summary>
-    ///     The longest comment text, in characters, that is printed for a resolved thread or a check.
+    ///     The largest number of resolved threads that are listed; the counts stay exact and the rest are summed up in
+    ///     one line. Checklist comments are signed evidence of what a reviewer answered and are never cut.
     /// </summary>
-    private const int MaxText = 400;
+    public const int MaxListedResolvedThreads = 100;
 
     /// <inheritdoc />
     public byte[] Render(AttestationDocument document)
@@ -94,16 +95,6 @@ internal sealed class AttestationRenderer : IAttestationRenderer
     private static string Time(DateTimeOffset value)
     {
         return value.UtcDateTime.ToString("yyyy-MM-dd HH:mm:ss 'UTC'", CultureInfo.InvariantCulture);
-    }
-
-    /// <summary>
-    ///     Shortens a text that is too long to print in full.
-    /// </summary>
-    /// <param name="text">The text.</param>
-    /// <returns>The text, or its start followed by an ellipsis.</returns>
-    private static string Shorten(string text)
-    {
-        return text.Length <= MaxText ? text : text[..MaxText] + "...";
     }
 
     /// <summary>
@@ -187,7 +178,8 @@ internal sealed class AttestationRenderer : IAttestationRenderer
                 writer.Row($"{item.Id}  {item.Outcome}", item.Text, PdfFont.Helvetica, 12, 110);
                 if (!string.IsNullOrWhiteSpace(item.Comment))
                 {
-                    writer.Paragraph($"Comment: {Shorten(item.Comment)}", PdfFont.HelveticaOblique, 9, 122, 1);
+                    // The full comment: it is the reviewer's own words, and the paragraph wraps and breaks pages
+                    writer.Paragraph($"Comment: {item.Comment}", PdfFont.HelveticaOblique, 9, 122, 1);
                 }
 
                 if (item.AnsweredBy is not null)
@@ -199,8 +191,13 @@ internal sealed class AttestationRenderer : IAttestationRenderer
     }
 
     /// <summary>
-    ///     Writes how many threads are open and resolved, and the resolved ones.
+    ///     Writes how many threads are open and resolved, and the first resolved ones.
     /// </summary>
+    /// <remarks>
+    ///     The counts are exact. At most <see cref="MaxListedResolvedThreads"/> resolved threads are listed, in the
+    ///     order of the document (the order in which the threads were created); a line states how many are left out.
+    ///     The summary of a thread is already cut by the service; the renderer cuts nothing.
+    /// </remarks>
     /// <param name="writer">The writer.</param>
     /// <param name="document">The document.</param>
     private static void WriteThreads(PdfDocumentWriter writer, AttestationDocument document)
@@ -208,7 +205,7 @@ internal sealed class AttestationRenderer : IAttestationRenderer
         writer.Heading("Comment threads");
         writer.Row("Open", document.OpenThreads.ToString(CultureInfo.InvariantCulture));
         writer.Row("Resolved", document.ResolvedThreads.Count.ToString(CultureInfo.InvariantCulture));
-        foreach (var thread in document.ResolvedThreads)
+        foreach (var thread in document.ResolvedThreads.Take(MaxListedResolvedThreads))
         {
             writer.Paragraph(
                 $"{thread.Location} ({thread.CommentCount.ToString(CultureInfo.InvariantCulture)} comments)",
@@ -216,7 +213,18 @@ internal sealed class AttestationRenderer : IAttestationRenderer
                 9,
                 12,
                 4);
-            writer.Paragraph(Shorten(thread.Summary), PdfFont.Helvetica, 9, 24, 1);
+            writer.Paragraph(thread.Summary, PdfFont.Helvetica, 9, 24, 1);
+        }
+
+        var omitted = document.ResolvedThreads.Count - MaxListedResolvedThreads;
+        if (omitted > 0)
+        {
+            writer.Paragraph(
+                $"and {omitted.ToString(CultureInfo.InvariantCulture)} more resolved threads (see the review record)",
+                PdfFont.HelveticaOblique,
+                9,
+                12,
+                4);
         }
     }
 

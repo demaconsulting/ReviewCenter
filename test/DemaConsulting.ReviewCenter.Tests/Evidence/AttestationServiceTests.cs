@@ -96,6 +96,107 @@ public class AttestationServiceTests
     }
 
     /// <summary>
+    ///     Test that a record that changes after the document was rendered and before it is signed gives no
+    ///     attestation, no PDF and no audit event.
+    /// </summary>
+    [Fact]
+    public async Task AttestationService_GenerateAsync_RecordChangesWhileRendering_ReturnsChangedAndRecordsNothing()
+    {
+        // Arrange: a complete review, and a step between rendering and signing that changes the checklist answers
+        var fixture = await AttestationFixture.CreateAsync(signed: true);
+        using var keys = new FakeAttestationKeyProvider(TestKeys.SelfSignedRsa());
+        var service = fixture.CreateService(keys, afterRender: _ => fixture.AnswerAllAsync(ChecklistOutcome.Fail));
+
+        // Act: ask for the attestation
+        var result = await service.GenerateAsync(fixture.ProjectId, AttestationFixture.ReviewId, TestActors.Ann, TestContext.Current.CancellationToken);
+
+        // Assert: the changed outcome with its message, nothing signed, nothing recorded
+        Assert.Equal(AttestationStatus.Changed, result.Status);
+        Assert.Null(result.Content);
+        Assert.Null(result.FileName);
+        Assert.Equal("The review changed while the attestation was being prepared; try again.", result.Message);
+        Assert.Empty(await AttestationAuditAsync(fixture));
+    }
+
+    /// <summary>
+    ///     Test that a slot added while the document is being prepared gives no attestation: the review is no longer
+    ///     complete.
+    /// </summary>
+    [Fact]
+    public async Task AttestationService_GenerateAsync_SlotAddedWhileRendering_ReturnsChangedAndRecordsNothing()
+    {
+        // Arrange: a complete review, and a step that adds a second slot nobody has signed
+        var fixture = await AttestationFixture.CreateAsync(signed: true);
+        using var keys = new FakeAttestationKeyProvider(TestKeys.SelfSignedRsa());
+        var service = fixture.CreateService(
+            keys,
+            afterRender: async cancellationToken =>
+                await fixture.Signing.AddSlotAsync(new Actor("cyd", "Cyd"), fixture.ProjectId, AttestationFixture.ReviewId, fixture.CydUserId, null, cancellationToken));
+
+        // Act: ask for the attestation
+        var result = await service.GenerateAsync(fixture.ProjectId, AttestationFixture.ReviewId, TestActors.Ann, TestContext.Current.CancellationToken);
+
+        // Assert: changed, no PDF, no audit event
+        Assert.Equal(AttestationStatus.Changed, result.Status);
+        Assert.Null(result.Content);
+        Assert.Empty(await AttestationAuditAsync(fixture));
+    }
+
+    /// <summary>
+    ///     Test that a different set of slots gives no attestation even when the record digest is the same and the
+    ///     review is still complete: the document would list the wrong signers.
+    /// </summary>
+    [Fact]
+    public async Task AttestationService_GenerateAsync_SlotsChangeWhileRenderingButStillComplete_ReturnsChangedAndRecordsNothing()
+    {
+        // Arrange: a complete review, and a step that adds a second slot and signs it, so the review stays complete
+        var fixture = await AttestationFixture.CreateAsync(signed: true);
+        using var keys = new FakeAttestationKeyProvider(TestKeys.SelfSignedRsa());
+        var service = fixture.CreateService(keys, afterRender: _ => fixture.AddAndSignSecondSlotAsync());
+
+        // Act: ask for the attestation
+        var result = await service.GenerateAsync(fixture.ProjectId, AttestationFixture.ReviewId, TestActors.Ann, TestContext.Current.CancellationToken);
+
+        // Assert: the review is still approved, but what was rendered is out of date: changed, no PDF, no audit event
+        var approval = await fixture.Signing.GetApprovalAsync(fixture.ProjectId, AttestationFixture.ReviewId, TestContext.Current.CancellationToken);
+        Assert.True(approval!.IsApproved);
+        Assert.Equal(AttestationStatus.Changed, result.Status);
+        Assert.Null(result.Content);
+        Assert.Empty(await AttestationAuditAsync(fixture));
+    }
+
+    /// <summary>
+    ///     Test that a review that does not change between the render and the signing is attested after the check,
+    ///     and that the check runs exactly once, before the audit event.
+    /// </summary>
+    [Fact]
+    public async Task AttestationService_GenerateAsync_ReviewUnchangedWhileRendering_PassesRevalidationAndIsAttested()
+    {
+        // Arrange: a complete review, and a step that changes nothing but records that it ran and what was recorded then
+        var fixture = await AttestationFixture.CreateAsync(signed: true);
+        using var keys = new FakeAttestationKeyProvider(TestKeys.SelfSignedRsa());
+        var calls = 0;
+        var eventsWhenCalled = -1;
+        var service = fixture.CreateService(
+            keys,
+            afterRender: async _ =>
+            {
+                calls++;
+                eventsWhenCalled = (await AttestationAuditAsync(fixture)).Count;
+            });
+
+        // Act: ask for the attestation
+        var result = await service.GenerateAsync(fixture.ProjectId, AttestationFixture.ReviewId, TestActors.Ann, TestContext.Current.CancellationToken);
+
+        // Assert: signed and recorded once; the step ran once, before anything was recorded
+        Assert.Equal(AttestationStatus.Ok, result.Status);
+        Assert.NotNull(result.Content);
+        Assert.Equal(1, calls);
+        Assert.Equal(0, eventsWhenCalled);
+        Assert.Single(await AttestationAuditAsync(fixture));
+    }
+
+    /// <summary>
     ///     Test that a key problem gives no document, says what is wrong, and records nothing.
     /// </summary>
     [Fact]

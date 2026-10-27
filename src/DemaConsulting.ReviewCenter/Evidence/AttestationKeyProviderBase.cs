@@ -120,6 +120,20 @@ internal abstract class AttestationKeyProviderBase(AttestationOptions options, T
         {
             return new AttestationKeyStatus(Name, false, null, ex.Message);
         }
+        catch (Exception ex) when (ex is not (OutOfMemoryException or StackOverflowException or AccessViolationException))
+        {
+            // An unexpected failure of the platform (a malformed folder or store name, a broken certificate chain, ...)
+            // must not break the page that asks: report the key as unavailable with a message that holds no detail,
+            // and keep the detail in the log
+#pragma warning disable CA1848 // Logged only for an unexpected failure
+            Log.LogWarning(ex, "The attestation signing key of provider {Provider} could not be loaded.", Name);
+#pragma warning restore CA1848
+            return new AttestationKeyStatus(
+                Name,
+                false,
+                null,
+                "The attestation signing key could not be loaded because of an unexpected error; see the server log.");
+        }
     }
 
     /// <summary>

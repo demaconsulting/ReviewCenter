@@ -30,7 +30,8 @@ namespace DemaConsulting.ReviewCenter.Evidence;
 /// <remarks>
 ///     <c>GET /projects/{projectId}/reviews/{reviewId}/attestation.pdf</c> is authorized like viewing the review: any
 ///     signed-in user may download it, and anybody else is sent to the sign-in page by the authentication scheme.
-///     It answers 200 with the PDF, 404 when the review does not exist, 409 when the review is not complete and 500
+///     It answers 200 with the PDF, 404 when the review does not exist, 409 when the review is not complete or changed
+///     while the attestation was being prepared, and 500
 ///     (a problem document that names the setting to correct) when the signing key is not usable.
 /// </remarks>
 internal static class AttestationEndpoint
@@ -66,6 +67,10 @@ internal static class AttestationEndpoint
                     AttestationStatus.NotFound => Results.NotFound(),
                     AttestationStatus.NotApproved => Results.Problem(
                         title: "The review is not complete",
+                        detail: result.Message,
+                        statusCode: StatusCodes.Status409Conflict),
+                    AttestationStatus.Changed => Results.Problem(
+                        title: "The review changed during generation",
                         detail: result.Message,
                         statusCode: StatusCodes.Status409Conflict),
                     _ => Results.Problem(

@@ -110,6 +110,51 @@ public class AttestationEndpointTests
     }
 
     /// <summary>
+    ///     Test that a review that changes while the document is being prepared answers 409 Conflict with the
+    ///     "changed" problem, no document, and no audit event.
+    /// </summary>
+    [Fact(Timeout = 60000)]
+    public async Task AttestationEndpoint_Get_ReviewChangesDuringGeneration_Answers409AndRecordsNothing()
+    {
+        // Arrange: an application whose attestation service changes the checklist answers after rendering
+        using var keys = new FakeAttestationKeyProvider(TestKeys.SelfSignedRsa());
+        var projectId = 0;
+        await using var app = await StartAsync(
+            keys,
+            services => services.AddSingleton(provider => new AttestationService(
+                provider.GetRequiredService<IReviewStore>(),
+                provider.GetRequiredService<SigningService>(),
+                provider.GetRequiredService<AuditService>(),
+                provider.GetRequiredService<IAttestationKeyProvider>(),
+                provider.GetRequiredService<IAttestationRenderer>(),
+                provider.GetRequiredService<IAttestationSigner>(),
+                provider.GetRequiredService<TimeProvider>())
+            {
+                AfterRender = async cancellationToken =>
+                {
+                    var checklists = provider.GetRequiredService<ChecklistService>();
+                    foreach (var item in DefaultChecklist.Current.Sections.SelectMany(section => section.Items))
+                    {
+                        await checklists.SetAnswerAsync(
+                            projectId, "REV-1", item.Id, ChecklistOutcome.Fail, "Changed while rendering.", new Actor("ann", "Ann"), cancellationToken);
+                    }
+                }
+            }));
+        projectId = await CreateReviewAsync(app, signed: true);
+        using var browser = await TestBrowser.SignedInAsync(app, "cyd");
+
+        // Act: request the attestation
+        var response = await browser.Client.GetAsync(ReviewLinks.ForAttestation(projectId, "REV-1"), TestContext.Current.CancellationToken);
+        var body = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
+
+        // Assert: conflict that says the review changed, not a PDF, nothing recorded
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+        Assert.NotEqual("application/pdf", response.Content.Headers.ContentType?.MediaType);
+        Assert.Contains("changed", body, StringComparison.Ordinal);
+        Assert.Empty(await AttestationEventsAsync(app));
+    }
+
+    /// <summary>
     ///     Test that a complete review gives a PDF download whose signature verifies against the organization key,
     ///     and that the download is recorded in the audit trail.
     /// </summary>
@@ -200,8 +245,9 @@ public class AttestationEndpointTests
     ///     Starts the application with a key provider of the test's choosing.
     /// </summary>
     /// <param name="keys">The key provider that replaces the configured one.</param>
+    /// <param name="configureServices">Further changes to the services; none when <c>null</c>.</param>
     /// <returns>The started application; the caller disposes it.</returns>
-    private static async Task<WebApplication> StartAsync(IAttestationKeyProvider keys)
+    private static async Task<WebApplication> StartAsync(IAttestationKeyProvider keys, Action<IServiceCollection>? configureServices = null)
     {
         using var context = Context.Create(["serve", "--silent"]);
         var app = ServerHost.CreateApplication(context, new ServerHostOptions
@@ -216,6 +262,7 @@ public class AttestationEndpointTests
                     ["Database:ConnectionString"] = TestDatabase.NewConnectionString()
                 });
                 builder.Services.AddSingleton(keys);
+                configureServices?.Invoke(builder.Services);
             }
         });
         await app.StartAsync();

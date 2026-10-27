@@ -27,6 +27,8 @@ certificate store tests need the store of the current user.
 - `RequireTrustedKey` is checked on every call; the rule accepts an organization certificate and refuses a self-signed
   one, one without a signing key usage, and one outside its validity.
 - A certificate for code signing only is warned about and not refused.
+- `Describe` never throws: a known key problem is reported with its message, and an unexpected failure is reported as
+  unavailable with a generic message.
 
 #### Test Scenarios
 
@@ -111,6 +113,12 @@ setting. This scenario is tested by `SelfSignedKeyProvider_GetSigningKey_FolderI
 
 **SelfSignedKeyProvider_GetSigningKey_CorruptFile_ThrowsNamingTheFile**: The key file holds garbage. The error names the
 file. This scenario is tested by `SelfSignedKeyProvider_GetSigningKey_CorruptFile_ThrowsNamingTheFile`.
+
+**SelfSignedKeyProvider_Describe_UnexpectedFailure_ReportsUnavailableWithoutDetail**: The folder is a name that the
+runtime rejects with an exception that is not an `AttestationKeyException`, so loading the key fails unexpectedly.
+`Describe` does not throw; it reports the key as unavailable with the generic message about an unexpected error, which
+does not contain the detail of the exception. This scenario is tested by
+`SelfSignedKeyProvider_Describe_UnexpectedFailure_ReportsUnavailableWithoutDetail`.
 
 **CertificateStoreKeyProvider_NormalizeThumbprint_CopiedText_GivesUpperCaseHex**: A thumbprint with spaces and invisible
 marks, in lower case, is normalized. The result is 40 upper-case hexadecimal digits. This scenario is tested by

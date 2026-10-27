@@ -362,7 +362,10 @@ stored. It states the project, the review, the repository and commits, the conte
 file, the checklist with every answer and comment, the comment threads, the sign-off of every reviewer slot with the
 record digest it bound to, and the head of the audit trail (entry count and head hash) at that moment. It carries a
 digital signature that PDF readers such as Adobe Acrobat show and verify. A review that is not Approved has no
-download; a direct request is answered with HTTP status 409. Each download is recorded in the audit trail
+download; a direct request is answered with HTTP status 409, which is also the answer when the review changes while
+the PDF is being prepared (nothing is signed or recorded then; ask again). Checklist comments are printed in full; of
+the resolved threads the first 100 are listed (counts stay exact) and a line says how many more there are. Each
+download is recorded in the audit trail
 (`attestation.generated`).
 
 ### What the Signature Proves, and What It Does Not
@@ -422,7 +425,8 @@ stops the start.
   internal certificate authority is fine, as long as the readers of the PDF trust that authority: distribute its root
   certificate to them.
 - **`RequireTrustedKey`**: when `true`, the server refuses a self-signed key, a certificate whose key usage does not
-  allow signing, and a certificate that is not valid now. This is all it checks. It does **not** check that the
+  allow digital signatures or non-repudiation, and a certificate that is not valid now. This is all it checks. It does
+  **not** check that the
   certificate chains to a root that the readers trust and does **not** check revocation, because the server cannot know
   whom its readers trust.
 

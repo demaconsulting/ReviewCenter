@@ -26,6 +26,7 @@ sections:
           - ReviewCenter-PdfDocumentWriter-Text
           - ReviewCenter-AttestationRenderer-Review
           - ReviewCenter-AttestationRenderer-Findings
+          - ReviewCenter-AttestationRenderer-ThreadLimit
           - ReviewCenter-AttestationRenderer-SignOffs
           - ReviewCenter-AttestationRenderer-Output
         tests:
@@ -68,6 +69,7 @@ sections:
           - ReviewCenter-AttestationKeyProvider-CertificateStore
           - ReviewCenter-AttestationKeyProvider-RequireTrustedKey
           - ReviewCenter-AttestationKeyProvider-CodeSigningWarning
+          - ReviewCenter-AttestationKeyProvider-Describe
           - ReviewCenter-AttestationRenderer-KeyStatement
         tests:
           - EvidenceSubsystem_CompletedReview_IsOfferedAndDownloadedAsSignedPdf
@@ -93,6 +95,7 @@ sections:
           audit head, and recording each release keeps the trail complete about who took a copy.
         children:
           - ReviewCenter-AttestationService-Approved
+          - ReviewCenter-AttestationService-Revalidation
           - ReviewCenter-AttestationService-Document
           - ReviewCenter-AttestationService-KeyUnavailable
           - ReviewCenter-AttestationService-Audit

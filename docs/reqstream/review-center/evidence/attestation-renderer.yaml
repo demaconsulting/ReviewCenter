@@ -22,15 +22,32 @@ sections:
 
       - id: ReviewCenter-AttestationRenderer-Findings
         title: >-
-          The AttestationRenderer class shall show every checklist answer with its comment, say so when the review has
-          no checklist, and summarize the comment threads.
+          The AttestationRenderer class shall show every checklist answer with its comment in full, never truncated, say
+          so when the review has no checklist, and summarize the comment threads with exact counts of open and
+          resolved threads.
         justification: |
           The approval is based on what the reviewers found and answered. An attestation that left it out would prove
-          that someone signed, but not what they were signing.
+          that someone signed, but not what they were signing, and a comment that is cut is a reviewer answer that the
+          signed evidence no longer shows.
         tests:
           - AttestationRenderer_Render_Document_ShowsChecklistAnswersAndComments
+          - AttestationRenderer_Render_LongChecklistComment_IsPrintedInFull
+          - AttestationRenderer_Render_VeryLongChecklistComment_RunsOverPagesWithoutLoss
           - AttestationRenderer_Render_NoChecklist_SaysSo
           - AttestationRenderer_Render_Document_SummarizesThreads
+
+      - id: ReviewCenter-AttestationRenderer-ThreadLimit
+        title: >-
+          The AttestationRenderer class shall list at most 100 resolved threads, in the order of the document, and
+          when there are more shall add one line saying how many more resolved threads there are, while the printed
+          counts of open and resolved threads stay exact.
+        justification: |
+          A review can hold any number of resolved threads, and the document is made in memory for every request, so
+          its size must be bounded. Only this list is capped; checklist comments are never cut. The line and the exact
+          count tell the reader what the list leaves out.
+        tests:
+          - AttestationRenderer_Render_MoreResolvedThreadsThanTheCap_ListsTheCapAndCountsTheRest
+          - AttestationRenderer_Render_ExactlyTheCapOfResolvedThreads_ListsAllWithoutAMoreLine
 
       - id: ReviewCenter-AttestationRenderer-SignOffs
         title: >-

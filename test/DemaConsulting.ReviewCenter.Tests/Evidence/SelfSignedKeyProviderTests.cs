@@ -282,6 +282,29 @@ public sealed class SelfSignedKeyProviderTests : IDisposable
     }
 
     /// <summary>
+    ///     Test that an unexpected failure while the key is loaded does not escape <c>Describe</c>: the page that
+    ///     shows the key status must not break, and the message holds no path.
+    /// </summary>
+    [Fact]
+    public void SelfSignedKeyProvider_Describe_UnexpectedFailure_ReportsUnavailableWithoutDetail()
+    {
+        // Arrange: a folder name that the platform refuses with an exception that is not an attestation key error
+        var folder = Path.Combine(Path.GetTempPath(), "bad\0folder");
+        using var provider = new SelfSignedKeyProvider(Options(folder), TimeProvider.System, Microsoft.Extensions.Logging.Abstractions.NullLogger.Instance);
+        Assert.IsNotType<AttestationKeyException>(Record.Exception(provider.GetSigningKey));
+
+        // Act: describe the key
+        var status = provider.Describe();
+
+        // Assert: unavailable, with a safe message that does not repeat the folder
+        Assert.False(status.IsAvailable);
+        Assert.Null(status.Info);
+        Assert.Equal("SelfSigned", status.Provider);
+        Assert.Contains("unexpected error", status.Problem, StringComparison.Ordinal);
+        Assert.DoesNotContain("folder", status.Problem, StringComparison.Ordinal);
+    }
+
+    /// <summary>
     ///     Gets a path for a new temporary folder that is removed when the class is disposed.
     /// </summary>
     /// <returns>The path; the folder does not exist yet.</returns>

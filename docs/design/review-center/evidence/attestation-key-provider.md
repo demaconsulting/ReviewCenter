@@ -64,7 +64,11 @@ the signature carries what a reader needs to follow the chain, and the root is l
 - *Parameters*: None.
 - *Returns*: `AttestationKeyStatus` — the provider name, whether a key can be used, its description (subject,
   thumbprint, and whether it is self-signed), and the problem.
-- *Postconditions*: Never throws; a failure is returned as the problem text.
+- *Postconditions*: Never throws. An `AttestationKeyException` is returned as its message (which names what to correct).
+  Any other non-fatal exception (for example an invalid folder name, or a store or chain error of the runtime) is logged
+  at warning level and returned as the generic problem "The attestation signing key could not be loaded because of an
+  unexpected error; see the server log.", without the detail of the exception, so the review page never fails because
+  of the key. Only fatal runtime errors (out of memory, stack overflow, access violation) are not caught.
 
 **AttestationKeyProviderFactory.Create**: Chooses the provider.
 
@@ -79,7 +83,8 @@ Every problem is an `AttestationKeyException` whose message names the setting or
 provider, a missing or malformed thumbprint, an unknown store location, a certificate that is not in the store (with the
 thumbprint and the store), a certificate without a private key or with a key of an unsupported kind, a self-signed
 folder that is not set or is a file, a key file that cannot be read, and a certificate that fails the policy. The
-messages and the logs never contain a secret. `Describe` turns the exception into a status. `ServerHost` calls
+messages and the logs never contain a secret. `Describe` turns the exception into a status (and any other non-fatal
+exception into a generic status, with the detail in the log only). `ServerHost` calls
 `GetSigningKey` at start-up and turns the exception into a start-up error, so a configuration that cannot work stops the
 server with a message; the consequence is that a server whose key is in a hardware module that is not present does not
 start.

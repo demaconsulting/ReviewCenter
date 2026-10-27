@@ -100,6 +100,11 @@ internal sealed class AttestationFixture
     public int SlotId { get; private set; }
 
     /// <summary>
+    ///     Gets the identity of the user cyd, who is in no slot at first.
+    /// </summary>
+    public int CydUserId { get; private set; }
+
+    /// <summary>
     ///     Creates the fixture.
     /// </summary>
     /// <param name="signed">Whether the slot is signed, which completes the review.</param>
@@ -114,6 +119,7 @@ internal sealed class AttestationFixture
             ids[username] = (await fixture.Users.CreateAsync(username, name, UserRole.Reviewer, Password, cancellationToken)).Id;
         }
 
+        fixture.CydUserId = ids["cyd"];
         var project = await new ProjectService(fixture.Store, fixture.Clock).CreateAsync("Apollo", null, cancellationToken);
         fixture.ProjectId = project.Id;
         await new ReviewService(fixture.Store, fixture.Clock).CreateDraftAsync(
@@ -159,9 +165,30 @@ internal sealed class AttestationFixture
     /// </summary>
     /// <param name="keys">The key provider.</param>
     /// <param name="signer">The signer; the real one when <c>null</c>.</param>
+    /// <param name="afterRender">A step that runs after rendering and before the second check; none when <c>null</c>.</param>
     /// <returns>The service.</returns>
-    public AttestationService CreateService(IAttestationKeyProvider keys, IAttestationSigner? signer = null)
+    public AttestationService CreateService(
+        IAttestationKeyProvider keys,
+        IAttestationSigner? signer = null,
+        Func<CancellationToken, Task>? afterRender = null)
     {
-        return new AttestationService(Store, Signing, Audit, keys, new AttestationRenderer(), signer ?? new AttestationSigner(), Clock);
+        return new AttestationService(Store, Signing, Audit, keys, new AttestationRenderer(), signer ?? new AttestationSigner(), Clock)
+        {
+            AfterRender = afterRender
+        };
+    }
+
+    /// <summary>
+    ///     Adds a second slot for cyd and signs it as cyd with the current record, which keeps the review complete
+    ///     but changes its set of slots.
+    /// </summary>
+    /// <returns>A task that completes when the slot is signed.</returns>
+    public async Task AddAndSignSecondSlotAsync()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var cyd = new Actor("cyd", "Cyd");
+        var slot = await Signing.AddSlotAsync(cyd, ProjectId, ReviewId, CydUserId, null, cancellationToken);
+        var approval = await Signing.GetApprovalAsync(ProjectId, ReviewId, cancellationToken);
+        await Signing.SignAsync(cyd, ProjectId, ReviewId, slot.Id, approval!.Digest, Password, cancellationToken);
     }
 }

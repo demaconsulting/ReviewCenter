@@ -18,7 +18,8 @@ N/A - standard test environment (a temporary database and key folder are created
 - A visitor who is not signed in is redirected to the sign-in page.
 - A completed review is downloaded as a signed PDF with the right content type, a file name, and no caching, and the
   download is recorded in the audit trail; with the default configuration it is signed by the key that the server created.
-- An unknown review is 404, a review that is not complete is 409, and an unusable key is 500 without an audit event.
+- An unknown review is 404, a review that is not complete is 409, a review that changed during generation is 409, and
+  an unusable key is 500 without an audit event.
 
 #### Test Scenarios
 
@@ -31,6 +32,11 @@ answer is 404. This scenario is tested by `AttestationEndpoint_Get_UnknownReview
 **AttestationEndpoint_Get_ReviewNotSigned_Answers409**: The address of a review that is not complete is requested. The
 answer is 409 with a problem description that says the review is not complete. This scenario is tested by
 `AttestationEndpoint_Get_ReviewNotSigned_Answers409`.
+
+**AttestationEndpoint_Get_ReviewChangesDuringGeneration_Answers409AndRecordsNothing**: The application is started with an
+attestation service whose test step changes the checklist answers after the document is rendered. The answer is 409
+with a problem description that says the review changed, no PDF is sent, and no event is recorded. This scenario is
+tested by `AttestationEndpoint_Get_ReviewChangesDuringGeneration_Answers409AndRecordsNothing`.
 
 **AttestationEndpoint_Get_CompleteReview_ReturnsSignedPdfDownloadAndRecordsEvent**: The address of a complete review is
 requested. The answer is 200 with `application/pdf`, a download file name, and no caching; the PDF is signed; and the

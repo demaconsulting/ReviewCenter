@@ -31,8 +31,11 @@ internal enum AttestationStatus
     /// <summary>The project or the review does not exist.</summary>
     NotFound,
 
-    /// <summary>The review is not complete: some slot has no valid signature, or the record changed meanwhile.</summary>
+    /// <summary>The review is not complete: some slot has no valid signature for the current record.</summary>
     NotApproved,
+
+    /// <summary>The review changed while the attestation was being prepared; asking again may succeed.</summary>
+    Changed,
 
     /// <summary>The signing key is not usable; the message says what to correct.</summary>
     KeyUnavailable

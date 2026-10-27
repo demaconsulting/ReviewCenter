@@ -16,6 +16,8 @@ N/A - standard test environment (everything runs in memory).
 
 - All tests pass with zero failures.
 - The document shows the review, its fingerprint, files, checklist, threads, sign-offs, audit head, and tool version.
+- A checklist comment is printed in full, however long, and runs over pages without loss; only the list of resolved
+  threads is capped (100), with exact counts and a line that says how many are left out.
 - A self-signed key gets the notice; an organization key gets its subject and issuer and no notice.
 - The statement of what the signature proves and does not prove is in the document.
 - The result is deterministic, grows over pages, and handles characters beyond WinAnsi and a missing document.
@@ -38,9 +40,26 @@ listed with its status, size, and hash. This scenario is tested by
 rendered. Every check shows its outcome, its comment, and who answered it. This scenario is tested by
 `AttestationRenderer_Render_Document_ShowsChecklistAnswersAndComments`.
 
+**AttestationRenderer_Render_LongChecklistComment_IsPrintedInFull**: A comment of 400 numbered words (about 3,600
+characters) is rendered. Every word is in the text lines of the PDF, in order, and no line holds an ellipsis. This
+scenario is tested by `AttestationRenderer_Render_LongChecklistComment_IsPrintedInFull`.
+
+**AttestationRenderer_Render_VeryLongChecklistComment_RunsOverPagesWithoutLoss**: A comment of 6,000 numbered words
+(about 54,000 characters) is rendered. The document has many more pages than the sample, and every word is in the text,
+in order. This scenario is tested by `AttestationRenderer_Render_VeryLongChecklistComment_RunsOverPagesWithoutLoss`.
+
 **AttestationRenderer_Render_Document_SummarizesThreads**: A review with open and resolved threads is rendered. The text
 gives the count of open threads and a summary of each resolved one. This scenario is tested by
 `AttestationRenderer_Render_Document_SummarizesThreads`.
+
+**AttestationRenderer_Render_MoreResolvedThreadsThanTheCap_ListsTheCapAndCountsTheRest**: A review with 130 resolved
+threads is rendered. The counts say 2 open and 130 resolved, the first 100 threads are listed in order (the first and the
+hundredth are present, the 101st is not), and one line says "and 30 more resolved threads (see the review record)". This
+scenario is tested by `AttestationRenderer_Render_MoreResolvedThreadsThanTheCap_ListsTheCapAndCountsTheRest`.
+
+**AttestationRenderer_Render_ExactlyTheCapOfResolvedThreads_ListsAllWithoutAMoreLine**: A review with exactly 100 resolved
+threads is rendered. All 100 are listed and there is no line about further threads. This scenario is tested by
+`AttestationRenderer_Render_ExactlyTheCapOfResolvedThreads_ListsAllWithoutAMoreLine`.
 
 **AttestationRenderer_Render_Document_ShowsSlotsSignersTimestampsAndDigests**: Slots with signatures are rendered. Each
 slot shows its signer, the time, and the digest it covers. This scenario is tested by

@@ -20,6 +20,22 @@ sections:
           - AttestationService_GenerateAsync_SlotNotSigned_ReturnsNotApprovedWithoutAskingForTheKey
           - AttestationService_GenerateAsync_RecordChangedAfterSigning_ReturnsNotApproved
 
+      - id: ReviewCenter-AttestationService-Revalidation
+        title: >-
+          The AttestationService class shall read the review again after the document is rendered and before it is
+          signed, and when the review is no longer complete, or its record digest, its slots, its signers, or the
+          digests they signed differ from what was rendered, shall report that the review changed, and shall sign
+          nothing, return no document, and record nothing in the audit trail.
+        justification: |
+          The approval and the content are read in separate steps and rendering takes time. Without the second check a
+          slot added or a record changed in between would yield a signed document that attests a review that was no
+          longer complete when it was signed.
+        tests:
+          - AttestationService_GenerateAsync_RecordChangesWhileRendering_ReturnsChangedAndRecordsNothing
+          - AttestationService_GenerateAsync_SlotAddedWhileRendering_ReturnsChangedAndRecordsNothing
+          - AttestationService_GenerateAsync_SlotsChangeWhileRenderingButStillComplete_ReturnsChangedAndRecordsNothing
+          - AttestationService_GenerateAsync_ReviewUnchangedWhileRendering_PassesRevalidationAndIsAttested
+
       - id: ReviewCenter-AttestationService-Document
         title: >-
           The AttestationService class shall return a signed PDF of the review, with its content, checklist, threads,

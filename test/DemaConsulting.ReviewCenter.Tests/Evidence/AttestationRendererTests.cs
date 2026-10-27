@@ -18,6 +18,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
+using System.Text.RegularExpressions;
 using DemaConsulting.ReviewCenter.Evidence;
 
 namespace DemaConsulting.ReviewCenter.Tests.Evidence;
@@ -228,6 +229,146 @@ public class AttestationRendererTests
         Assert.Contains("Resolved\n1\n", text, StringComparison.Ordinal);
         Assert.Contains("src/a.txt, lines 3-5 (3 comments)", lines);
         Assert.Contains("Bob: please rename this", lines);
+    }
+
+    /// <summary>
+    ///     Test that a checklist comment of more than 1,500 characters is printed in full, in order, and is not cut.
+    /// </summary>
+    [Fact]
+    public void AttestationRenderer_Render_LongChecklistComment_IsPrintedInFull()
+    {
+        // Arrange: a sample document whose first check has a comment of 400 numbered words (about 3,600 characters)
+        var comment = LongComment(400);
+        Assert.True(comment.Length > 1500);
+        var document = WithComment(Sample(), comment);
+
+        // Act: render
+        var lines = Render(document).TextLines;
+
+        // Assert: every word is in the text, in order, and nothing was replaced by an ellipsis
+        Assert.Equal(ExpectedWords(400), PrintedWords(lines));
+        Assert.DoesNotContain(lines, line => line.Contains("...", StringComparison.Ordinal));
+        Assert.Contains(lines, line => line.StartsWith("Comment: word0000 word0001", StringComparison.Ordinal));
+    }
+
+    /// <summary>
+    ///     Test that a very long checklist comment that runs over several pages is printed in full.
+    /// </summary>
+    [Fact]
+    public void AttestationRenderer_Render_VeryLongChecklistComment_RunsOverPagesWithoutLoss()
+    {
+        // Arrange: the sample, and the same sample with a comment of 6,000 numbered words (about 54,000 characters)
+        var shortPages = Render(Sample()).PageCount;
+        var document = WithComment(Sample(), LongComment(6000));
+
+        // Act: render
+        var pdf = Render(document);
+
+        // Assert: the comment made the document longer, and every word is still there, in order
+        Assert.True(pdf.PageCount > shortPages + 5);
+        Assert.Equal(ExpectedWords(6000), PrintedWords(pdf.TextLines));
+    }
+
+    /// <summary>
+    ///     Test that more than the cap of resolved threads gives exact counts, lists only the cap, and says how many
+    ///     were left out.
+    /// </summary>
+    [Fact]
+    public void AttestationRenderer_Render_MoreResolvedThreadsThanTheCap_ListsTheCapAndCountsTheRest()
+    {
+        // Arrange: the sample with 130 resolved threads
+        var document = Sample() with { ResolvedThreads = Threads(130) };
+
+        // Act: render
+        var lines = Render(document).TextLines;
+        var text = string.Join("\n", lines);
+
+        // Assert: exact counts, the first 100 listed in order, the rest summarized in one line
+        Assert.Equal(100, AttestationRenderer.MaxListedResolvedThreads);
+        Assert.Contains("Open\n2\n", text, StringComparison.Ordinal);
+        Assert.Contains("Resolved\n130\n", text, StringComparison.Ordinal);
+        Assert.Equal(100, lines.Count(line => line.StartsWith("src/f", StringComparison.Ordinal)));
+        Assert.Contains("src/f000.txt, lines 1-2 (1 comments)", lines);
+        Assert.Contains("src/f099.txt, lines 1-2 (1 comments)", lines);
+        Assert.DoesNotContain("src/f100.txt, lines 1-2 (1 comments)", lines);
+        Assert.Contains("and 30 more resolved threads (see the review record)", lines);
+    }
+
+    /// <summary>
+    ///     Test that exactly the cap of resolved threads are all listed and no line about further threads appears.
+    /// </summary>
+    [Fact]
+    public void AttestationRenderer_Render_ExactlyTheCapOfResolvedThreads_ListsAllWithoutAMoreLine()
+    {
+        // Arrange: the sample with 100 resolved threads
+        var document = Sample() with { ResolvedThreads = Threads(100) };
+
+        // Act: render
+        var lines = Render(document).TextLines;
+
+        // Assert: all 100 listed and no "more" line
+        Assert.Equal(100, lines.Count(line => line.StartsWith("src/f", StringComparison.Ordinal)));
+        Assert.DoesNotContain(lines, line => line.Contains("more resolved threads", StringComparison.Ordinal));
+    }
+
+    /// <summary>
+    ///     Builds a comment of numbered words, which makes any cut or loss visible.
+    /// </summary>
+    /// <param name="count">The number of words.</param>
+    /// <returns>The comment, words separated by one space.</returns>
+    private static string LongComment(int count)
+    {
+        return string.Join(' ', Enumerable.Range(0, count).Select(i => $"word{i:D4}"));
+    }
+
+    /// <summary>
+    ///     Builds the words that <see cref="LongComment"/> contains.
+    /// </summary>
+    /// <param name="count">The number of words.</param>
+    /// <returns>The words in order.</returns>
+    private static List<string> ExpectedWords(int count)
+    {
+        return Enumerable.Range(0, count).Select(i => $"word{i:D4}").ToList();
+    }
+
+    /// <summary>
+    ///     Extracts the numbered words from the text lines of a rendered document, in order.
+    /// </summary>
+    /// <param name="lines">The text lines.</param>
+    /// <returns>The words.</returns>
+    private static List<string> PrintedWords(IReadOnlyList<string> lines)
+    {
+        return Regex.Matches(string.Join(' ', lines), @"word\d{4}", RegexOptions.None, TimeSpan.FromSeconds(10))
+            .Select(m => m.Value)
+            .ToList();
+    }
+
+    /// <summary>
+    ///     Gives the first check of the first section of a document another comment.
+    /// </summary>
+    /// <param name="document">The document.</param>
+    /// <param name="comment">The comment.</param>
+    /// <returns>The changed document.</returns>
+    private static AttestationDocument WithComment(AttestationDocument document, string comment)
+    {
+        var first = document.Sections[0];
+        var items = first.Items.ToList();
+        items[0] = items[0] with { Comment = comment };
+        var sections = document.Sections.ToList();
+        sections[0] = first with { Items = items };
+        return document with { Sections = sections };
+    }
+
+    /// <summary>
+    ///     Builds resolved threads with numbered locations.
+    /// </summary>
+    /// <param name="count">The number of threads.</param>
+    /// <returns>The threads in order.</returns>
+    private static List<AttestationThread> Threads(int count)
+    {
+        return Enumerable.Range(0, count)
+            .Select(i => new AttestationThread($"src/f{i:D3}.txt, lines 1-2", $"Bob: remark {i:D3}", 1))
+            .ToList();
     }
 
     /// <summary>

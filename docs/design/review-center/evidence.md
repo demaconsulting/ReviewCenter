@@ -23,7 +23,8 @@ subsystem uses one OTS item, `System.Security.Cryptography.Pkcs`, for the CMS si
 - *Contract*: A signed-in user gets the signed PDF (`application/pdf`, file name
   `attestation-{projectId}-{reviewId}.pdf`, `Cache-Control: no-store`). The statuses are 200 for the document, 404 for a
   review that does not exist, 409 (a problem description, "The review is not complete") for a review that is not
-  approved, and 500 (a problem description, "Attestation signing key unavailable", with the reason) when the key cannot
+  approved and 409 ("The review changed during generation") for a review that changed while the document was being
+  prepared, and 500 (a problem description, "Attestation signing key unavailable", with the reason) when the key cannot
   be used. A visitor who is not signed in is redirected to the sign-in page by the authentication scheme.
 - *Constraints*: The attestation is made for every request and is stored nowhere; every successful request adds an
   `attestation.generated` event to the audit trail. The route includes the project number because reviews are
@@ -113,12 +114,17 @@ is in a hardware module that is not present does not start.
 **Release of an attestation**: `AttestationService` first asks `SigningService` for the approval, so a missing review is
 reported as not found and a review that is not complete is refused without the key being touched. Then it gets the key
 (a key problem is reported, and nothing is recorded), reads the review, checks again that the record digest is the one
-that was approved, verifies the audit chain to get its head, renders the document, and signs it. Last, it records the
+that was approved, verifies the audit chain to get its head, renders the document, reads the review again and
+checks that it is still complete and unchanged (otherwise the attestation is refused and nothing is recorded), and
+signs it. Last, it records the
 release in the audit trail with the record digest, the chain head that is printed in the document, the SHA-256 hash of
 the PDF, and the key. The event is written strictly: if the trail cannot be written, nothing is released. The event
 follows the signing, so the chain head in the document precedes its own event. The head is found by verifying the chain,
-which reads every entry; this is acceptable because an attestation is rare. The user interface offers the download only
-for an approved review, but the endpoint decides again, so the rule does not depend on the page.
+which reads every entry on every request; this is intentional integrity evidence and is acceptable because an
+attestation is rare. A change that happens between the second check and the audit event is not seen; that window is
+tiny and the event states the digest that was attested. The user interface offers the download only
+for an approved review, but the endpoint decides again, so the rule does not depend on the page. The document prints
+every checklist comment in full; the only caps are on the list of resolved threads (see `AttestationRenderer`).
 
 **Known limitations and planned follow-ups**: These are not implemented, and the subsystem has no requirement and no
 dependency for them. A provider for Azure Key Vault would keep the key in the vault and sign through the Azure SDK; the

@@ -640,13 +640,18 @@ review can be downloaded as a digitally signed PDF; see the next section.
 
 ## Signed Attestation
 
-When a review is **Approved**, its page shows **Download attestation (PDF)** beside the title, with a note about the
-key that signs the file. The PDF is made when you press the button and is not stored. It contains the review (project,
-review, repository and commits, the content fingerprint and the hash of every file), the checklist with every answer
-and justification, the comment threads, the sign-off of every reviewer slot with the record digest it was bound to,
-and the state of the audit trail (the number of entries, whether the chain is intact, and the head hash). The last
-section describes the signing key and what the signature proves. A review that is not Approved has no button; a direct
-request to its `attestation.pdf` address is refused with the message "The review is not complete" (status 409).
+When a review is **Approved**, its page shows **Download attestation (PDF)** on a line of its own below the title, with
+a note about the key that signs the file. The PDF is made when you press the button and is not stored. It contains the
+review (project, review, repository and commits, the content fingerprint and the hash of every file), the checklist
+with every answer and justification in full (a comment is never shortened), the comment threads, the sign-off of every
+reviewer slot with the record digest it was bound to, and the state of the audit trail (the number of entries, whether
+the chain is intact, and the head hash). The counts of open and resolved threads are exact. The first 100 resolved
+threads are listed, each with the start of its first comment (at most 300 characters), and a line says how many more
+there are; the full threads are in the review record. The last section describes the signing key and what the
+signature proves. A review that is not Approved has no button; a direct request to its `attestation.pdf` address is
+refused with the message "The review is not complete" (status 409). If the review changes while the PDF is being
+prepared (for example a reviewer changes an answer), nothing is signed or recorded and the request is also refused
+with status 409 ("The review changed while the attestation was being prepared; try again."); press the button again.
 Every download is recorded in the audit trail as `attestation.generated`.
 
 ### What a Verifier Sees
@@ -706,7 +711,8 @@ can sign as the server. The review page and the PDF say that the key is self-sig
   private key (Manage Private Keys in `certlm.msc`); for `CurrentUser\My`, the server must run as the user who owns the
   certificate. A key on a smart card or in a hardware module can be used when it is present.
 - *Set `RequireTrustedKey` to `true`* to make the server refuse a self-signed key, a certificate whose key usage does
-  not allow signing, and a certificate that is not valid now. This is all it checks: it does **not** check that the
+  not allow digital signatures or non-repudiation, and a certificate that is not valid now. This is all it checks: it
+  does **not** check that the
   certificate chains to a trusted root and does **not** check revocation.
 
 The server checks the key when it starts. A setting that cannot work (an unknown provider, a missing thumbprint, a
