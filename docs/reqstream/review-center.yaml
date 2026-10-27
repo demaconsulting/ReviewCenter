@@ -547,7 +547,7 @@ sections:
           - ReviewCenter-Web-Repositories
           - ReviewCenter-Hosting-RepositoryServices
         tests:
-          - RepositoriesPage_CreateForm_WithToken_StoresItWriteOnlyAndClearsFields
+          - NewRepositoryPage_CreateForm_WithToken_StoresItWriteOnlyAndClearsFields
           - StorageSubsystem_Repositories_PersistAcrossReopen
 
       - id: ReviewCenter-System-GitContent
