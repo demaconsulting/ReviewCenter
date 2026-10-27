@@ -1,7 +1,8 @@
 @* Routes: maps the requested URL to a page component (part of the App unit).
 
-   Unknown URLs fall through to a plain "not found" message so that a mistyped address gives the
-   user a clear answer instead of a blank page.
+   Unknown URLs fall through to a "Page not found" page, shown inside MainLayout so that it has the same header
+   and footer as every other page, and so that a mistyped address gives the user a clear answer and a way back
+   instead of a blank page.
 
    AuthorizeRouteView applies the [Authorize] rules of a page also when the user navigates inside an open
    interactive circuit, where the endpoint check does not run (RouteView would ignore them). A signed-out
@@ -36,7 +37,13 @@
         </AuthorizeRouteView>
     </Found>
     <NotFound>
-        <p>Page not found.</p>
+        <LayoutView Layout="typeof(MainLayout)">
+            <main class="page narrow" data-testid="not-found">
+                <h1>Page not found</h1>
+                <p>The address you asked for does not match any page. It may have been mistyped or the page may have moved.</p>
+                <p><a class="action outline" href="/projects" data-testid="not-found-projects-link">Back to projects</a></p>
+            </main>
+        </LayoutView>
     </NotFound>
 </Router>
 

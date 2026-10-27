@@ -20,7 +20,8 @@ N/A - standard test environment.
 - The root document contains the script that applies the stored appearance, and the script comes before the style
   sheet link.
 - The router renders the home page for the root URL.
-- The router renders the not-found message for a URL that no page handles.
+- The router renders the not-found page, with a link back to the projects page, for a URL that no page handles.
+- The not-found page is rendered inside the page frame, so the header link to the home page and the footer are present.
 - The router shows the creation form, and no review, for the address of the new-review form of a project.
 - The router applies the authorization rules of a page: a reviewer opening the users route sees the access denied
   message and not the page, an administrator sees the page, and a signed-out user opening a protected route sees
@@ -53,8 +54,13 @@ in the document, and the script comes before the style sheet link. This scenario
 home page is shown. This scenario is tested by `Routes_Render_RootUrl_RendersHomePage`.
 
 **Routes_Render_UnknownUrl_ShowsNotFoundMessage**: The navigation address is set to a URL that no page handles and
-`Routes` is rendered; the not-found message is shown. This scenario is tested by
-`Routes_Render_UnknownUrl_ShowsNotFoundMessage`.
+`Routes` is rendered; the not-found page is shown with its "Page not found" heading and the link back to the projects
+page. This scenario is tested by `Routes_Render_UnknownUrl_ShowsNotFoundMessage`.
+
+**Routes_Render_UnknownUrl_ShowsNotFoundInsidePageFrameWithHeaderAndFooter**: Nobody is signed in, the navigation
+address is set to a URL that no page handles and `Routes` is rendered; the not-found page, the single header link to the
+home page, and the footer with the link to the About page are all present. This scenario is tested by
+`Routes_Render_UnknownUrl_ShowsNotFoundInsidePageFrameWithHeaderAndFooter`.
 
 **Routes_Render_NewReviewRoute_ShowsFormNotReview**: A user is signed in, a project exists, the navigation address is
 the new-review address of the project and `Routes` is rendered; the new-review form is shown and the review page is

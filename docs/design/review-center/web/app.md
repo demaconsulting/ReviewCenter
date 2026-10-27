@@ -37,7 +37,9 @@ outlet, the `Routes` component, a second small inline script, and a script refer
 
 **Routes component**: A router that searches the application assembly for page components. For a matched URL it
 renders the page through an authorize route view, inside `MainLayout` as the default layout; for an unmatched URL it
-renders the message "Page not found.". The router prefers a fixed route to one with a parameter in the same place, so
+renders a "Page not found" page, also inside `MainLayout` so that it has the header and the footer, with a "Back to
+projects" button (`data-testid="not-found"` on the page, `not-found-projects-link` on the button). The router prefers a
+fixed route to one with a parameter in the same place, so
 the addresses of the creation forms (`/projects/new`, and `/projects/{project}/reviews/new`, for example) reach their
 own form pages and are not read as the address of a project or of a review called "new". The authorize route view
 applies the authorization attributes of the page also when the user navigates inside an open interactive session, where

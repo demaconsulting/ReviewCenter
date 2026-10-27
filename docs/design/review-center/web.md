@@ -135,7 +135,8 @@ registered git repositories.
 
 - *Type*: HTTP `GET`.
 - *Role*: Provider.
-- *Contract*: The shell is returned with a "Page not found." message in place of a page.
+- *Contract*: The shell is returned with a "Page not found" page, inside the header and footer of the page frame, in
+  place of a page.
 - *Constraints*: None.
 
 **Client script** (`/_framework/blazor.web.js`): Referenced by the shell.
@@ -158,8 +159,8 @@ registered git repositories.
 The subsystem uses the standard Blazor Server hosting model. `App` is rendered as static
 server-side markup: it emits the HTML document, the page head outlet, a small inline script that applies the stored
 appearance before the first paint, the router, and the client script reference. `Routes` (part of the `App` unit)
-matches the requested URL to a page component, with `HomePage` registered at the root route, and renders a plain
-not-found message for unmatched URLs. The routes that end in `new` (`/projects/new`, `/projects/{id}/reviews/new`,
+matches the requested URL to a page component, with `HomePage` registered at the root route, and renders a
+not-found page, inside `MainLayout`, for unmatched URLs. The routes that end in `new` (`/projects/new`, `/projects/{id}/reviews/new`,
 `/repositories/new`, `/users/new`) are matched before the parameterized routes of the same shape. Each interactive
 page opts in to interactive server rendering, so only the
 page, not the shell, holds a live connection. `HomePage`, `AboutPage`, `LoginPage`, and the help pages are static

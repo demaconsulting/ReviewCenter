@@ -332,7 +332,7 @@ is running.
   message when the project or review is unknown. `GET /repositories` returns the page where an administrator registers
   git repositories (administrators only). `GET /audit` returns the whole audit trail with the button that
   verifies its hash chain (administrators only).
-  Any other path returns the not-found message of the user interface. The client
+  Any other path returns the not-found page of the user interface. The client
   script for the live connection is served from `/_framework/blazor.web.js`.
 - *Constraints*: The server listens on the URL given with `--urls`, by default
   `http://localhost:5000`, which is reachable only from the local machine. TLS termination is

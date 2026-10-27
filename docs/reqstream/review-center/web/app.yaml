@@ -22,14 +22,15 @@ sections:
 
       - id: ReviewCenter-App-Routing
         title: >-
-          The App unit shall show the home page for the root URL and a not-found message for a
-          URL that no page handles.
+          The App unit shall show the home page for the root URL and, for a URL that no page handles, a
+          not-found page inside the same page frame (header and footer) as every other page.
         justification: |
           Users must reach the home page at the root address and must be told clearly when an
           address matches no page, instead of seeing a blank page.
         tests:
           - Routes_Render_RootUrl_RendersHomePage
           - Routes_Render_UnknownUrl_ShowsNotFoundMessage
+          - Routes_Render_UnknownUrl_ShowsNotFoundInsidePageFrameWithHeaderAndFooter
 
       - id: ReviewCenter-App-Header
         title: >-
@@ -51,6 +52,7 @@ sections:
           pages do not repeat it, and a second link to the same place would only confuse.
         tests:
           - MainLayout_Render_NobodySignedIn_ShowsFooterWithVersionAndAboutLink
+          - Routes_Render_UnknownUrl_ShowsNotFoundInsidePageFrameWithHeaderAndFooter
 
       - id: ReviewCenter-App-Navigation
         title: >-
@@ -83,6 +85,7 @@ sections:
           start of the commit identifier, enough to tell builds apart.
         tests:
           - MainLayout_Render_NobodySignedIn_ShowsFooterWithVersionAndAboutLink
+          - Routes_Render_UnknownUrl_ShowsNotFoundInsidePageFrameWithHeaderAndFooter
 
       - id: ReviewCenter-App-Theme
         title: >-

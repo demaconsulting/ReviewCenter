@@ -83,7 +83,29 @@ public class AppTests : PageTestBase
         var cut = Render<Routes>();
 
         // Assert: the not-found message is shown
-        Assert.Contains("Page not found.", cut.Markup);
+        Assert.Contains("Page not found", cut.Find("[data-testid='not-found'] h1").TextContent, StringComparison.Ordinal);
+        Assert.Equal("/projects", cut.Find("[data-testid='not-found-projects-link']").GetAttribute("href"));
+    }
+
+    /// <summary>
+    ///     Test that the not-found page of an unknown URL is shown inside the page frame, so it has the header
+    ///     with the product link and the footer like every other page.
+    /// </summary>
+    [Fact]
+    public void Routes_Render_UnknownUrl_ShowsNotFoundInsidePageFrameWithHeaderAndFooter()
+    {
+        // Arrange: nobody is signed in and the address matches no page
+        SignOut();
+        Services.GetRequiredService<NavigationManager>().NavigateTo("/does-not-exist");
+
+        // Act: render the router
+        var cut = Render<Routes>();
+
+        // Assert: the not-found page, the header brand link, and the footer are all present
+        Assert.NotEmpty(cut.FindAll("[data-testid='not-found']"));
+        Assert.Equal("/", Assert.Single(cut.FindAll("[data-testid='home-link']")).GetAttribute("href"));
+        Assert.Contains("DEMA Consulting", cut.Find("[data-testid='footer']").TextContent, StringComparison.Ordinal);
+        Assert.Equal("/about", cut.Find("[data-testid='about-link']").GetAttribute("href"));
     }
 
     /// <summary>
