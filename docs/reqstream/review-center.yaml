@@ -690,8 +690,10 @@ sections:
         title: >-
           The tool shall offer an HTTP API under /api, described by an OpenAPI document, with which a client that
           sends a personal access token can list the projects and reviews, read a review, create a review draft from
-          files or from the changes of a repository, and download the attestation of a signed review, with the same
-          rules as the web pages, but shall not let a token sign a review, arrange the reviewers, or open a web page.
+          files or from the changes of a repository, download the attestation of a signed review, and read the evidence
+          index of a project in the form that ReviewMark reads (with a token sent as a bearer token or as the
+          password of HTTP Basic credentials), with the same rules as the web pages, but shall not let a token sign a
+          review, arrange the reviewers, or open a web page.
         tags: [system]
         justification: |
           Creating a draft for every pull request from a pipeline and filing the attestation of a signed review with
@@ -701,8 +703,11 @@ sections:
           - ReviewCenter-Api-ReviewJourney
           - ReviewCenter-Api-Isolation
           - ReviewCenter-Api-Document
+          - ReviewCenter-Api-EvidenceJourney
+          - ReviewCenter-Evidence-Index
           - ReviewCenter-Hosting-ApiServices
         tests:
           - ApiSubsystem_ReviewJourney_CreateDraftReadAndDownloadAttestation_WorksEndToEnd
+          - ApiSubsystem_EvidenceJourney_BasicCredentials_ReadIndexAndFollowLink_WorksEndToEnd
           - ApiSubsystem_TokenPrincipal_SigningAndWebPages_AreNotReachable
           - CoreSubsystem_TokenActor_CreatesFlaggedReviewButCannotSign

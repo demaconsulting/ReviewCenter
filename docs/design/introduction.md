@@ -51,9 +51,7 @@ OTS items:
 The following topics are out of scope:
 
 - Design documents are not produced for the test projects or build pipeline CI configuration
-- Subsystems of the target architecture that are not implemented yet (Messaging) have no design documents yet,
-  and the parts of the Api subsystem that are planned for later slices (the `index.json` evidence endpoint) are not
-  designed here
+- Subsystems of the target architecture that are not implemented yet (Messaging) have no design documents yet
 - The internal design of OTS software items is excluded; only integration and usage design is documented
 
 ## Software Structure
@@ -96,9 +94,11 @@ The ReviewCenter system is divided as follows:
   the access tokens of private repositories; contains the GitRunner, GitSource, ReviewSetParser, and CredentialProtector
   units
 - **Evidence** (subsystem): produces the signed PDF attestation of a complete review; contains the PdfDocumentWriter,
-  AttestationRenderer, AttestationSigner, AttestationKeyProvider, AttestationService, and AttestationEndpoint units
-- **Api** (subsystem): the JSON API under `/api` for scripts and pipelines, with bearer-token authentication by personal
-  access tokens that is limited to that API, its endpoints, and its OpenAPI document; contains the
+  AttestationRenderer, AttestationSigner, AttestationKeyProvider, AttestationService, AttestationEndpoint, and
+  EvidenceIndexService units
+- **Api** (subsystem): the JSON API under `/api` for scripts and pipelines, with authentication by personal
+  access tokens (a bearer token, or the password of HTTP Basic credentials) that is limited to that API, its endpoints,
+  including the evidence index for ReviewMark, and its OpenAPI document; contains the
   ApiTokenAuthentication, ApiEndpoints, and ApiDocument units
 - **SelfTest** (subsystem): self-validation; contains the Validation unit
 - **Utilities** (subsystem): shared helpers; contains the PathHelpers unit
@@ -108,9 +108,8 @@ invocation, against a ReviewCenter server and write screenshots.
 
 The model is deliberately partial. It covers only the items that are implemented so far: the Program unit, the
 Cli, Hosting, Identity, Web, Core, Storage, ContentSources, Evidence, Api, SelfTest, and Utilities subsystems, and the
-Puppet system. The Messaging subsystem of the target architecture (`architecture.md`) is planned and deferred, and so
-is the `index.json` evidence endpoint of the Api subsystem; they will be added to the model, with their requirements
-and design documents, as they are implemented.
+Puppet system. The Messaging subsystem of the target architecture (`architecture.md`) is planned and deferred; it will be
+added to the model, with its requirements and design documents, as it is implemented.
 
 ## Folder Layout
 

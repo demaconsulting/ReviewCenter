@@ -4,14 +4,17 @@
 
 The `Api` subsystem is verified by subsystem tests defined in `ApiSubsystemTests.cs`. The tests run the real application
 in process (`TestWebApp`, the real server over a temporary SQLite database, with the real services, stores, and the
-default self-signed key provider) and drive it with the test browser (`TestBrowser`, a real HTTP client), which sends the
-requests with or without a bearer token or with the session cookie of a signed-in user. A token is created through the
+default self-signed key provider) and drive it with the test browser (`TestBrowser`, a real HTTP client), which sends
+the
+requests with or without a bearer token, with HTTP Basic credentials, or with the session cookie of a signed-in user. A
+token is created through the
 real `PersonalAccessTokenService`, as the account page does. The subsystem exists to join its units: the token that
 `PersonalAccessTokenService` creates and authenticates, the sign-in of a request by `ApiTokenAuthentication`, the routes
 of `ApiEndpoints` that call the services, and the document of `ApiDocument`. The units are verified in detail by their
 own unit tests: `ApiTokenAuthentication` (the accepted and refused tokens, the generic answer, the throttle, and the
 audit record), `ApiEndpoints` (the routes, the creation of reviews, the problem documents, and the statuses), and
-`ApiDocument` (the document and its snapshot). The token rules are verified in the `Core` subsystem, and the table in the
+`ApiDocument` (the document and its snapshot). The token rules are verified in the `Core` subsystem, and the table in
+the
 `Storage` subsystem.
 
 The Puppet end-to-end test of the browser was **not** extended for this subsystem: the API has no page, and real HTTP
@@ -30,6 +33,9 @@ provider with a scripted fake.
   the revocation.
 - A draft created from files is answered with 201, is flagged as created through the API, can be read back as not
   approved, and its attestation is refused with 409; the attestation of a complete review is a PDF.
+- The evidence index of a project is read with HTTP Basic credentials that carry a token as the password, its
+  attestation
+  address can be followed with the same credentials, and the same credentials are refused with 401 after the revocation.
 - A token can neither sign nor reach a page, and no route under `/api` signs or changes a reviewer slot; the session
   cookie is not accepted by the API.
 - The document of the API is served without a token and equals the copy that is kept in the documentation.
@@ -47,9 +53,19 @@ is not approved; the attestation of the draft is refused with 409; and the attes
 project (made by the test helper of the attestation endpoint tests) is downloaded as `application/pdf`. This scenario is
 tested by `ApiSubsystem_ReviewJourney_CreateDraftReadAndDownloadAttestation_WorksEndToEnd`.
 
+**ApiSubsystem_EvidenceJourney_BasicCredentials_ReadIndexAndFollowLink_WorksEndToEnd**: A project has a complete review
+with a
+review-set id, and a token is created. With Basic credentials that carry the token as the password, the evidence index
+is
+requested and lists the review; the attestation address of the entry is followed with the same credentials and answers a
+PDF;
+the token is revoked and the index is requested again, which is answered with 401. This scenario is tested by
+`ApiSubsystem_EvidenceJourney_BasicCredentials_ReadIndexAndFollowLink_WorksEndToEnd`.
+
 **ApiSubsystem_TokenPrincipal_SigningAndWebPages_AreNotReachable**: A post to a signing address under `/api` is answered
 with 404, because no such route exists; `SigningService.SignAsync` with an actor that came through the token is refused
-with `ActorNotAllowed`; and the account page requested with the token is redirected to the sign-in page. This scenario is
+with `ActorNotAllowed`; and the account page requested with the token is redirected to the sign-in page. This scenario
+is
 tested by `ApiSubsystem_TokenPrincipal_SigningAndWebPages_AreNotReachable`.
 
 **ApiDocument_Get_NoToken_DescribesTheApiWithBearerScheme** and **ApiDocument_Get_MatchesCommittedSnapshot**: The

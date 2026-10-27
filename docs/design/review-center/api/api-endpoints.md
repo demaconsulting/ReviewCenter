@@ -20,7 +20,8 @@ from a broken rule to a status and the helpers that build a problem description 
 The answers carry only what a program needs: a summary has no file count and no details; the details of a review hold
 the title, state, fingerprint, creator and the flag that the review was created through the API, the source of a review
 from a repository, the approval state and record digest, the slots (the primary and alternate reviewer are user names,
-and the signer is shown by display name), the counts of files, threads, and checklist answers, the blockers, and the next
+and the signer is shown by display name), the counts of files, threads, and checklist answers, the blockers, and the
+next
 step.
 
 #### Key Methods
@@ -40,7 +41,8 @@ step.
     limit that is derived from `ReviewLimits` (the Base64 text of the largest upload, the path and JSON framing of
     every file at the largest number of files, and 64 KiB for the other fields; the services stay authoritative for the
     limits themselves), enforced by the server as a 413, and answers 201 with a `Location` header, and
-  - `GET /api/projects/{projectId}/reviews/{reviewId}/attestation.pdf`.
+  - `GET /api/projects/{projectId}/reviews/{reviewId}/attestation.pdf`, and
+  - `GET /api/projects/{projectId}/evidence/index.json`.
 
   A catch-all route for every standard HTTP method (`GET`, `HEAD`, `POST`, `PUT`, `PATCH`, `DELETE`, `OPTIONS`) under
   `/api` is outside the group and open, so that an unknown address answers a JSON
@@ -58,7 +60,8 @@ step.
     field (`body` or `source`). A file whose content is not valid Base64 is a 400 that names the position
     (`files[i].contentBase64`) and never echoes the content.
   - A project that does not exist is a 404.
-  - With `files`, `ReviewService.CreateDraftAsync` is called; with `repository`, `ReviewService.CreateFromRepositoryAsync`
+  - With `files`, `ReviewService.CreateDraftAsync` is called; with `repository`,
+    `ReviewService.CreateFromRepositoryAsync`
     is called with the repository, the head and baseline revisions, and the selection. Every other rule (the number and
     size of files, the identifier, the title, the repository state) belongs to the service and arrives as a rule
     exception.
@@ -69,15 +72,30 @@ step.
 approval, blockers, and next step from `SigningService`, the thread counts from `ThreadService`, and the checklist
 counts from `ChecklistService`. The checklist counts follow the screen, so only the items of applicable sections count.
 
-**Download the attestation**: Asks `AttestationService` for the attestation of the review with the actor of the token and
+**Download the attestation**: Asks `AttestationService` for the attestation of the review with the actor of the token
+and
 passes the result to the shared `AttestationEndpoint.ToResult`, with a problem 404 for a review that does not exist. The
 answer is therefore the same as for the page route (200 with the PDF, 409 for a review that is not complete or that
 changed, 500 for an unusable key), always with `Cache-Control: no-store`, but as a problem description in JSON.
 
+**Read the evidence index**: Answers 404 for a project that does not exist. Otherwise it asks `EvidenceIndexService` for
+the
+entries of the project and writes them as `{"reviews":[{id, fingerprint, date, result, file}]}`, the document that
+ReviewMark reads as the `index.json` of a `url` evidence source. The result of every entry is `pass`. The `file` of an
+entry is
+the absolute address of the attestation of the review that the entry stands for, built by `AttestationUrl` from the
+scheme, the host (the `Host` header), and the path base of the request, so the address is the one the client used to
+reach
+the server; the scheme follows the forwarded protocol when the forwarded headers are enabled, and a reverse proxy must
+pass the `Host` header on. Every answer of the handler, including the 404 of an unknown project, has
+`Cache-Control: no-store`. An empty list is a normal answer.
+
 **ApiProblems.StatusOf**: Maps a rule to a status: the not-found rules (including a missing token) to 404; a duplicate
-review identifier, a disabled repository, and a changed record to 409; an unavailable git to 503, a git access failure to
+review identifier, a disabled repository, and a changed record to 409; an unavailable git to 503, a git access failure
+to
 502, and a git timeout to 504; a not allowed actor and a signing that is not allowed to 403; unreadable credentials to
-500; and every other rule to 400. **ToResult** builds the problem description with the message of the rule as the detail;
+500; and every other rule to 400. **ToResult** builds the problem description with the message of the rule as the
+detail;
 **NotFound** builds a 404; **ActorOf** builds the actor from a token principal (the user name, the display name, and the
 display id of the token, which is "unknown" when the claim is missing).
 
@@ -92,6 +110,7 @@ failures are answered before a handler runs, by `ApiTokenAuthentication`.
 
 - **ProjectService**, **ReviewService**, **SigningService**, **ThreadService**, **ChecklistService** — Core; the work.
 - **AttestationService**, **AttestationEndpoint** — Evidence; the attestation and the shared mapping of its result.
+- **EvidenceIndexService** — Evidence; the entries of the evidence index.
 - **ApiTokenAuthentication** — the policy of the group.
 - **Actor**, **DomainRuleException**, **DomainRule** — Core.
 

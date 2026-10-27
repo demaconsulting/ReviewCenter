@@ -42,9 +42,20 @@
                 registered git repository.</li>
             <li><code>GET /api/projects/{id}/reviews/{reviewId}/attestation.pdf</code>: the signed attestation PDF of an
                 approved review.</li>
+            <li><code>GET /api/projects/{id}/evidence/index.json</code>: the evidence index of a project, for
+                ReviewMark (see below).</li>
             <li><code>GET /api/openapi.json</code>: the OpenAPI document that describes all of this. It is open to
                 everyone and needs no token.</li>
         </ul>
+        <h2>Use a token with ReviewMark</h2>
+        <p>ReviewMark can read the evidence of your approved reviews from ReviewCenter. It sends the token with
+            HTTP Basic authentication, where the <strong>password</strong> is the token and the user name is ignored.
+            Every
+            address under <code>/api</code> accepts both ways of sending a token. Put the index of the project in the
+            <code>evidence-source</code> of <code>.reviewmark.yaml</code> as a <code>url</code> source, and give
+            ReviewMark the user name and the token through two environment variables. Only reviews that were planned
+            from a review-set, that are complete, and that have not changed since they were signed are listed, and
+            only as <strong>pass</strong>. The user guide has the details.</p>
         <h2>A review created through the API</h2>
         <p>A review created with a token starts as a <strong>Draft</strong>, like one created on the web pages. It is
             flagged <strong>created via API</strong>: the review data of the API says so (<code>createdViaApi</code>), and

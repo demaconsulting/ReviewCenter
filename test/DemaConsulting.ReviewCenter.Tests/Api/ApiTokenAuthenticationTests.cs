@@ -55,15 +55,19 @@ public class ApiTokenAuthenticationTests
     }
 
     /// <summary>
-    ///     Test that a request without a token, or with another kind of credential, gets 401 with the bearer
-    ///     challenge and a problem document.
+    ///     Test that a request without a usable token, or with another kind of credential, gets 401 with the bearer
+    ///     and Basic challenge and a problem document.
     /// </summary>
     /// <param name="authorization">The <c>Authorization</c> header value; <c>null</c> for none.</param>
     [Theory(Timeout = 60000)]
     [InlineData(null)]
     [InlineData("Basic YW5uOnNlY3JldA==")]
+    [InlineData("Basic !!not-base64!!")]
+    [InlineData("Basic YW5u")]
+    [InlineData("Basic YW5uOg==")]
+    [InlineData("Digest abc")]
     [InlineData("Bearer")]
-    public async Task ApiTokenAuthentication_Request_NoBearerToken_Answers401WithChallenge(string? authorization)
+    public async Task ApiTokenAuthentication_Request_NoUsableToken_Answers401WithChallenge(string? authorization)
     {
         // Arrange: an application and a request with the given header
         await using var app = await StartAsync();
@@ -77,10 +81,79 @@ public class ApiTokenAuthenticationTests
         // Act: send it
         var response = await client.SendAsync(request, TestContext.Current.CancellationToken);
 
-        // Assert: 401, a bearer challenge, a problem document
+        // Assert: 401, a challenge for both schemes, a problem document
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
         Assert.Contains("Bearer", response.Headers.WwwAuthenticate.Select(h => h.Scheme));
+        var basic = Assert.Single(response.Headers.WwwAuthenticate, h => h.Scheme == "Basic");
+        Assert.Contains("realm=\"ReviewCenter\"", basic.Parameter, StringComparison.Ordinal);
         Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
+    }
+
+    /// <summary>
+    ///     Test that HTTP Basic credentials authenticate the owner when the password is a token, whatever the user
+    ///     name is (ReviewMark sends Basic only), and that the use is recorded.
+    /// </summary>
+    /// <param name="username">The user name to send.</param>
+    [Theory(Timeout = 60000)]
+    [InlineData("reviewmark")]
+    [InlineData("")]
+    public async Task ApiTokenAuthentication_Request_BasicWithTokenAsPassword_AuthenticatesAsOwner(string username)
+    {
+        // Arrange: an application with a token that was never used
+        await using var app = await StartAsync();
+        var created = await CreateTokenAsync(app);
+        using var client = ClientFor(app, null);
+        client.DefaultRequestHeaders.Authorization = BasicHeader(username, created.Value);
+        var service = app.Services.GetRequiredService<PersonalAccessTokenService>();
+
+        // Act: call the API
+        var response = await client.GetAsync("/api/projects", TestContext.Current.CancellationToken);
+
+        // Assert: accepted as the owner of the token, and the use is recorded
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.NotNull(Assert.Single(await service.ListAsync(TestActors.Ann, TestContext.Current.CancellationToken)).LastUsed);
+    }
+
+    /// <summary>
+    ///     Test that a wrong Basic password gets exactly the answer of a wrong bearer token, is recorded in the audit
+    ///     trail without its value, and is throttled like any other refused token.
+    /// </summary>
+    [Fact(Timeout = 60000)]
+    public async Task ApiTokenAuthentication_Request_BasicWithWrongPassword_GetsTheSameGeneric401AndIsThrottledAndAudited()
+    {
+        // Arrange: a limit of three attempts, a good token, and a wrong token
+        await using var app = await StartAsync(new Dictionary<string, string?>
+        {
+            ["Identity:Throttle:MaxFailuresPerName"] = "3",
+            ["Identity:Throttle:MaxFailuresPerAddress"] = "1000"
+        });
+        var good = await CreateTokenAsync(app, "ann");
+        var wrong = "rcpat_" + new string('A', 43);
+        using var bearer = ClientFor(app, wrong);
+        using var basic = ClientFor(app, wrong, basic: true);
+
+        // Act: one refused attempt with each scheme
+        var bearerAnswer = await bearer.GetAsync("/api/projects", TestContext.Current.CancellationToken);
+        var basicAnswer = await basic.GetAsync("/api/projects", TestContext.Current.CancellationToken);
+
+        // Assert: the same 401, the same challenge and the same body
+        Assert.Equal(HttpStatusCode.Unauthorized, basicAnswer.StatusCode);
+        Assert.Equal(bearerAnswer.Headers.WwwAuthenticate.ToString(), basicAnswer.Headers.WwwAuthenticate.ToString());
+        Assert.Equal(
+            await bearerAnswer.Content.ReadAsStringAsync(TestContext.Current.CancellationToken),
+            await basicAnswer.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
+
+        // Act: one more refused attempt, then the good token with Basic
+        await basic.GetAsync("/api/projects", TestContext.Current.CancellationToken);
+        using var goodBasic = ClientFor(app, good.Value, basic: true);
+        var throttled = await goodBasic.GetAsync("/api/projects", TestContext.Current.CancellationToken);
+
+        // Assert: throttled as a problem document even for the good token, recorded without the value
+        Assert.Equal(HttpStatusCode.TooManyRequests, throttled.StatusCode);
+        var entries = await AuditAsync(app);
+        Assert.Contains(entries, e => e.Action == "token.use-failed");
+        Assert.Contains(entries, e => e.Action == "token.use-throttled");
+        Assert.All(entries, e => Assert.DoesNotContain(wrong, e.Detail, StringComparison.Ordinal));
     }
 
     /// <summary>
@@ -160,12 +233,19 @@ public class ApiTokenAuthenticationTests
         using var browser = await TestBrowser.SignedInAsync(app, "ann");
         Assert.Equal(HttpStatusCode.OK, (await browser.Client.GetAsync("/account", TestContext.Current.CancellationToken)).StatusCode);
 
-        // Act: call the API with the cookie only
+        // Act: call the API with the cookie only, and with the cookie and Basic credentials that are not a token
         var response = await browser.Client.GetAsync("/api/projects", TestContext.Current.CancellationToken);
+        using var withBasic = new HttpRequestMessage(HttpMethod.Get, "/api/projects");
+        withBasic.Headers.Authorization = BasicHeader("ann", TestBrowser.Password);
+        var basicResponse = await browser.Client.SendAsync(withBasic, TestContext.Current.CancellationToken);
 
         // Assert: refused like a request without credentials
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
         Assert.Contains("Bearer", response.Headers.WwwAuthenticate.Select(h => h.Scheme));
+        Assert.Contains("Basic", response.Headers.WwwAuthenticate.Select(h => h.Scheme));
+        Assert.Equal(HttpStatusCode.Unauthorized, basicResponse.StatusCode);
+        Assert.Contains("Bearer", basicResponse.Headers.WwwAuthenticate.Select(h => h.Scheme));
+        Assert.Contains("Basic", basicResponse.Headers.WwwAuthenticate.Select(h => h.Scheme));
     }
 
     /// <summary>
@@ -173,16 +253,19 @@ public class ApiTokenAuthenticationTests
     ///     the sign-out endpoint all treat the request as signed out.
     /// </summary>
     /// <param name="route">The page route to request.</param>
+    /// <param name="basic">Whether the token is sent as the password of HTTP Basic credentials.</param>
     [Theory(Timeout = 60000)]
-    [InlineData("/account")]
-    [InlineData("/projects/1/reviews/REV-1/attestation.pdf")]
-    public async Task ApiTokenAuthentication_Request_TokenOnWebPage_IsNotSignedIn(string route)
+    [InlineData("/account", false)]
+    [InlineData("/projects/1/reviews/REV-1/attestation.pdf", false)]
+    [InlineData("/account", true)]
+    [InlineData("/projects/1/reviews/REV-1/attestation.pdf", true)]
+    public async Task ApiTokenAuthentication_Request_TokenOnWebPage_IsNotSignedIn(string route, bool basic)
     {
         // Arrange: an application with a token and a complete review
         await using var app = await StartAsync();
         await AttestationEndpointTests.CreateReviewAsync(app, signed: true);
         var created = await CreateTokenAsync(app, "ann");
-        using var client = ClientFor(app, created.Value);
+        using var client = ClientFor(app, created.Value, basic);
 
         // Act: request the page with the token
         var response = await client.GetAsync(route, TestContext.Current.CancellationToken);
@@ -197,17 +280,21 @@ public class ApiTokenAuthenticationTests
     ///     negotiation of the pages: they answer the same with and without a token, and record nothing for the owner.
     /// </summary>
     /// <param name="route">The address to post to.</param>
+    /// <param name="basic">Whether the token is sent as the password of HTTP Basic credentials.</param>
     [Theory(Timeout = 60000)]
-    [InlineData("/_blazor/negotiate?negotiateVersion=1")]
-    [InlineData("/auth/logout")]
-    [InlineData("/auth/login")]
-    public async Task ApiTokenAuthentication_Request_TokenOnAuthAndBlazorRoutes_IsNotSignedIn(string route)
+    [InlineData("/_blazor/negotiate?negotiateVersion=1", false)]
+    [InlineData("/auth/logout", false)]
+    [InlineData("/auth/login", false)]
+    [InlineData("/_blazor/negotiate?negotiateVersion=1", true)]
+    [InlineData("/auth/logout", true)]
+    [InlineData("/auth/login", true)]
+    public async Task ApiTokenAuthentication_Request_TokenOnAuthAndBlazorRoutes_IsNotSignedIn(string route, bool basic)
     {
         // Arrange: an application with a token, the audit trail so far, and a client with and one without the token
         await using var app = await StartAsync();
         var created = await CreateTokenAsync(app, "ann");
         var before = (await AuditAsync(app)).Count;
-        using var withToken = ClientFor(app, created.Value);
+        using var withToken = ClientFor(app, created.Value, basic);
         using var withoutToken = ClientFor(app, null);
 
         // Act: post to the route with and without the token
@@ -241,22 +328,31 @@ public class ApiTokenAuthenticationTests
         await app.Services.GetRequiredService<PersonalAccessTokenService>()
             .RevokeAsync(TestActors.Ann, revoked.Token.Id, TestContext.Current.CancellationToken);
 
-        // Act: present each of them, one is accepted and two are refused
+        // Act: present each of them as a bearer token, one is accepted and two are refused; then as Basic passwords
         var statuses = new List<HttpStatusCode>();
-        foreach (var value in new[] { used.Value, unknown, revoked.Value })
+        foreach (var basic in new[] { false, true })
         {
-            using var client = ClientFor(app, value);
-            statuses.Add((await client.GetAsync("/api/projects", TestContext.Current.CancellationToken)).StatusCode);
+            foreach (var value in new[] { used.Value, unknown, revoked.Value })
+            {
+                using var client = ClientFor(app, value, basic);
+                statuses.Add((await client.GetAsync("/api/projects", TestContext.Current.CancellationToken)).StatusCode);
+            }
         }
 
-        // Assert: the three outcomes happened
-        Assert.Equal([HttpStatusCode.OK, HttpStatusCode.Unauthorized, HttpStatusCode.Unauthorized], statuses);
+        // Assert: the outcomes happened with both schemes
+        Assert.Equal(
+            [
+                HttpStatusCode.OK, HttpStatusCode.Unauthorized, HttpStatusCode.Unauthorized,
+                HttpStatusCode.OK, HttpStatusCode.Unauthorized, HttpStatusCode.Unauthorized
+            ],
+            statuses);
 
-        // Assert: the log is not empty (so the check is not vacuous) and nothing in it has a token or the prefix
+        // Assert: the log is not empty (so the check is not vacuous) and nothing in it has a token, the prefix, or
+        // the Base64 text of the Basic credentials
         var entries = logs.Entries;
         Assert.NotEmpty(entries);
         var forbidden = new[] { used.Value, revoked.Value, unknown }
-            .SelectMany(v => new[] { v, v["rcpat_".Length..] })
+            .SelectMany(v => new[] { v, v["rcpat_".Length..], BasicHeader("reviewmark", v).Parameter! })
             .Append("rcpat_")
             .ToList();
         foreach (var entry in entries)

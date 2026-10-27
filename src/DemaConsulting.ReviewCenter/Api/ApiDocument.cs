@@ -46,6 +46,11 @@ internal static class ApiDocument
     public const string SecuritySchemeName = "bearer";
 
     /// <summary>
+    ///     The name of the HTTP Basic security scheme in the document (the password is the token).
+    /// </summary>
+    public const string BasicSchemeName = "basic";
+
+    /// <summary>
     ///     The fixed version written to the document; changes only when the API changes incompatibly.
     /// </summary>
     public const string DocumentVersion = "1";
@@ -87,7 +92,7 @@ internal static class ApiDocument
     }
 
     /// <summary>
-    ///     Writes the fixed parts of the document: title, version, no servers, and the bearer scheme.
+    ///     Writes the fixed parts of the document: title, version, no servers, and the bearer and Basic schemes.
     /// </summary>
     /// <param name="document">The generated document.</param>
     private static void Describe(OpenApiDocument document)
@@ -97,9 +102,9 @@ internal static class ApiDocument
             Title = "ReviewCenter API",
             Version = DocumentVersion,
             Description =
-                "Read projects and reviews, create review drafts and download attestations with a personal access "
-                + "token (Authorization: Bearer rcpat_...). Reviewer slots and signatures can only be changed in the "
-                + "web pages."
+                "Read projects and reviews, create review drafts, download attestations and read the evidence index "
+                + "with a personal access token (bearer token, or HTTP Basic with the token as the password). "
+                + "Reviewer slots and signatures can only be changed in the web pages."
         };
 
         // The server address would come from the request host; leaving it out keeps the document identical everywhere
@@ -114,10 +119,18 @@ internal static class ApiDocument
                 Scheme = "bearer",
                 BearerFormat = "rcpat",
                 Description = "A personal access token created on the Account page."
+            },
+            [BasicSchemeName] = new OpenApiSecurityScheme
+            {
+                Type = SecuritySchemeType.Http,
+                Scheme = "basic",
+                Description =
+                    "HTTP Basic for tools that cannot send a bearer token, such as ReviewMark: the user name is "
+                    + "ignored and the password is a personal access token."
             }
         };
 
-        // Every operation of the document needs the token
+        // Every operation of the document needs the token, sent in either way
         foreach (var operation in document.Paths.Values.SelectMany(path => path.Operations?.Values.AsEnumerable() ?? []))
         {
             operation.Security =
@@ -125,6 +138,10 @@ internal static class ApiDocument
                 new OpenApiSecurityRequirement
                 {
                     [new OpenApiSecuritySchemeReference(SecuritySchemeName, document)] = []
+                },
+                new OpenApiSecurityRequirement
+                {
+                    [new OpenApiSecuritySchemeReference(BasicSchemeName, document)] = []
                 }
             ];
         }

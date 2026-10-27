@@ -5,9 +5,11 @@
 `ApiTokenAuthentication` is verified with tests defined in `ApiTokenAuthenticationTests.cs`. The tests start the real
 application in process (`TestWebApp`) over a temporary database, create tokens through the real
 `PersonalAccessTokenService` (`ApiTestSupport`), and send requests with the test browser or a plain HTTP client, with or
-without an `Authorization` header or the session cookie. The responses are examined for the status, the challenge header,
+without an `Authorization` header or the session cookie. The responses are examined for the status, the challenge
+header,
 the content type, and the body; the state of the tokens and the audit trail are read through the services. The throttle
-limit is lowered by a setting of the test, and the clock is a movable `TimeProvider` where the expiry of a token matters.
+limit is lowered by a setting of the test, and the clock is a movable `TimeProvider` where the expiry of a token
+matters.
 
 #### Test Environment
 
@@ -16,11 +18,14 @@ N/A - standard test environment (a temporary database is created by each test).
 #### Acceptance Criteria
 
 - All tests pass with zero failures.
-- A valid token is accepted and its last use is recorded, and the request acts as the owner of the token.
-- A request with no token, another kind of credential, or an incomplete bearer header is answered with 401, the bearer
-  challenge, and a problem document.
+- A valid token is accepted and its last use is recorded, and the request acts as the owner of the token, whether it is
+  sent as a bearer token or as the password of HTTP Basic credentials with any user name.
+- A request with no token, another kind of credential, an incomplete bearer header, or Basic credentials that cannot be
+  read or have no password is answered with 401, the bearer and Basic challenges, and a problem document.
+- A wrong Basic password is answered, throttled, and audited exactly like a wrong bearer token.
 - An unknown, malformed, revoked, expired, or disabled-owner token is answered with the same 401 body.
-- The session cookie does not authenticate the API, and a token does not sign in a web page, the sign-in and sign-out
+- The session cookie does not authenticate the API, and a token, sent either way, does not sign in a web page, the
+  sign-in and sign-out
   endpoints or the web socket negotiation.
 - Refused tokens are throttled per address with 429, without stopping people signing in with a password.
 - A refused token is audited once for each address and minute and the value is never recorded.
@@ -36,10 +41,23 @@ to the list of projects. The answer is 200 and the token has a last-used time af
 entry of the creation names the user and the display id of the token. This scenario is tested by
 `ApiTokenAuthentication_Request_ValidToken_ActsAsTheOwner`.
 
-**ApiTokenAuthentication_Request_NoBearerToken_Answers401WithChallenge**: The list of projects is requested with no
-header, with a `Basic` header, and with a bearer header without a value. Each answer is 401 with the `Bearer` challenge
-and a problem document. This scenario is tested by
-`ApiTokenAuthentication_Request_NoBearerToken_Answers401WithChallenge`.
+**ApiTokenAuthentication_Request_NoUsableToken_Answers401WithChallenge**: The list of projects is requested with no
+header, with a Basic header that is not Base64 text, has no colon, or has an empty password, with a Digest header, and
+with a
+bearer header without a value. Each answer is 401 with the Bearer and the Basic challenge and a problem document. This
+scenario is tested by `ApiTokenAuthentication_Request_NoUsableToken_Answers401WithChallenge`.
+
+**ApiTokenAuthentication_Request_BasicWithTokenAsPassword_AuthenticatesAsOwner**: A token that was never used is sent as
+the password of Basic credentials, with a user name and with an empty user name. The answer is 200 and the token has a
+last-used time afterwards. This scenario is tested by
+`ApiTokenAuthentication_Request_BasicWithTokenAsPassword_AuthenticatesAsOwner`.
+
+**ApiTokenAuthentication_Request_BasicWithWrongPassword_GetsTheSameGeneric401AndIsThrottledAndAudited**: With a limit of
+three, a wrong token is sent once as a bearer token and once as a Basic password; the status, the challenge, and the
+body
+are the same. After one more refused attempt a good token sent as Basic is answered with 429. The audit trail has the
+refusal and the throttling and no entry holds the wrong token. This scenario is tested by
+`ApiTokenAuthentication_Request_BasicWithWrongPassword_GetsTheSameGeneric401AndIsThrottledAndAudited`.
 
 **ApiTokenAuthentication_Request_RefusedTokens_AllGetTheSameGenericAnswer**: A revoked token, the token of a disabled
 owner, a well-formed unknown token, a malformed value, and a good token with a changed ending are presented. Each answer
@@ -51,11 +69,14 @@ days, and the same token is answered with 401. This scenario is tested by
 `ApiTokenAuthentication_Request_ExpiredToken_Answers401`.
 
 **ApiTokenAuthentication_Request_SessionCookie_IsNotAccepted**: A browser that is signed in requests the API with its
-cookie only. The answer is 401 with the bearer challenge. This scenario is tested by
+cookie only, and with its cookie and Basic credentials that are not a token. Each answer is 401 with both the
+`Bearer` and the `Basic` challenge. This scenario is tested by
 `ApiTokenAuthentication_Request_SessionCookie_IsNotAccepted`.
 
 **ApiTokenAuthentication_Request_TokenOnWebPage_IsNotSignedIn**: The account page and the attestation page route are
-requested with a valid token. Each answer is a redirect to the sign-in page, as for a signed-out request. This scenario
+requested with a valid token, sent as a bearer token and as a Basic password. Each answer is a redirect to the sign-in
+page, as
+for a signed-out request. This scenario
 is tested by `ApiTokenAuthentication_Request_TokenOnWebPage_IsNotSignedIn`.
 
 **ApiTokenAuthentication_Request_TooManyRefusals_AnswersTooManyRequests**: With a limit of three, three refused tokens
@@ -69,12 +90,14 @@ value. This scenario is tested by `ApiTokenAuthentication_Request_RefusedToken_I
 
 **ApiTokenAuthentication_Request_TokenOnAuthAndBlazorRoutes_IsNotSignedIn**: The web socket negotiation of the pages
 (`/_blazor/negotiate`) and the sign-out and sign-in endpoints (`/auth/logout`, `/auth/login`) are posted to once with a
-valid token and once without. The status and the redirect address are the same in both, no challenge is sent, and the
+valid token (sent as a bearer token and as a Basic password) and once without. The status and the redirect address are
+the same in both, no challenge is sent, and the
 audit trail has no new entry, so the token changed nothing and did not act as its owner. This scenario is tested by
 `ApiTokenAuthentication_Request_TokenOnAuthAndBlazorRoutes_IsNotSignedIn`.
 
 **ApiTokenAuthentication_Request_AnyOutcome_NeverLogsTheToken**: The application keeps its log in a capturing provider.
 A token is created, then presented while valid (200), a well-formed unknown value is presented, and a revoked token is
-presented (both 401). The log is not empty, and no message or structured property of any entry contains a token value,
-its secret part, or the token prefix. This scenario is tested by
+presented (both 401), each as a bearer token and as a Basic password. The log is not empty, and no message or structured
+property of any entry contains a token value, its secret part, its Base64 form in Basic credentials, or the token
+prefix. This scenario is tested by
 `ApiTokenAuthentication_Request_AnyOutcome_NeverLogsTheToken`.

@@ -81,6 +81,7 @@ input-files:
   - docs/verification/review-center/evidence/attestation-key-provider.md
   - docs/verification/review-center/evidence/attestation-service.md
   - docs/verification/review-center/evidence/attestation-endpoint.md
+  - docs/verification/review-center/evidence/evidence-index.md
   - docs/verification/review-center/api.md
   - docs/verification/review-center/api/api-token-authentication.md
   - docs/verification/review-center/api/api-endpoints.md

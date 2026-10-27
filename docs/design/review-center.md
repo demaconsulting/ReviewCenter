@@ -87,6 +87,7 @@ flowchart TD
         AttestationKeyProvider
         AttestationService
         AttestationEndpoint
+        EvidenceIndexService
     end
     subgraph Api
         ApiTokenAuthentication
@@ -231,6 +232,9 @@ flowchart TD
     ApiEndpoints --> ChecklistService
     ApiEndpoints --> AttestationService
     ApiEndpoints --> AttestationEndpoint
+    ApiEndpoints --> EvidenceIndexService
+    EvidenceIndexService --> ReviewService
+    EvidenceIndexService --> SigningService
     DatabaseSetup --> ReviewCenterDbContext
 ```
 
@@ -274,7 +278,8 @@ protect them, the content fingerprint of a review, the digest of a review record
 hash-chained audit trail. It
 depends on no other subsystem and on
 no library beyond the .NET runtime, and it defines the store interfaces and the password hasher interface that the
-`Storage` and `Identity` subsystems implement. The `Storage` subsystem keeps projects, reviews, users, and the audit trail
+`Storage` and `Identity` subsystems implement. The `Storage` subsystem keeps projects, reviews, users, and the audit
+trail
 in a
 database through
 Entity Framework Core. The pages call the Core services and never see the database; the
@@ -299,14 +304,19 @@ of the server by default, or a certificate of a certificate store whose private 
 proves that the document is unchanged and was produced by the holder of the key; it does not prove who the reviewers
 are (the sign-offs of the record do that) and carries no trusted time. Nothing is stored: the document is made when it
 is asked for. `ServerHost` wires it and checks the key at the start, and `ReviewPage` offers the download.
+`EvidenceIndexService` also lists the completed reviews of a project that were planned from a review-set, in the form of
+the
+`index.json` that ReviewMark reads as an evidence source; `ApiEndpoints` serves it.
 
 The `Api` subsystem lets scripts and pipelines work with the same data without a browser. Every request under `/api`
-is authenticated by `ApiTokenAuthentication`, an authentication scheme that accepts only
-`Authorization: Bearer <personal access token>`; a session cookie is not accepted there, and a token is not accepted
+is authenticated by `ApiTokenAuthentication`, an authentication scheme that accepts only a personal access token in
+the `Authorization` header, as a bearer token or as the password of HTTP Basic credentials (ReviewMark sends only the
+latter); a session cookie is not accepted there, and a token is not accepted
 anywhere else. `PersonalAccessTokenService` (in `Core`) creates, lists, revokes, and validates the tokens, which
 `PersonalAccessTokenStore` (in `Storage`) keeps as hashes only; a user creates and revokes tokens on `AccountPage`
 and sees the value once. `ApiEndpoints` maps the endpoints, which read projects and reviews, create a draft review
-from uploaded files or from a repository, and download the attestation of a complete review; every one of them calls
+from uploaded files or from a repository, download the attestation of a complete review, and read the evidence index of
+a project; every one of them calls
 the same Core services as the pages and acts as the owner of the token. Reviewer slots and signatures cannot be
 changed through the API: there is no route for them, and `SigningService` refuses an actor that came in with a token
 as a second line of defense. `ApiDocument` serves the OpenAPI description of the API at `/api/openapi.json`, which
@@ -425,7 +435,8 @@ is running.
   the signed PDF attestation of a complete review as a download (HTTP status 200 with `application/pdf`; 404 when the
   review does not exist, 409 when it is not complete, 500 when the signing key cannot be used; a signed-out request is
   redirected to `/login`).
-  Any other page request returns HTTP status 404 with the not-found page of the user interface, an HTML document with the
+  Any other page request returns HTTP status 404 with the not-found page of the user interface, an HTML document with
+  the
   header and the footer; a method other than GET and a path that ends in a file extension get a
   plain, empty 404, and an unknown address under `/api` gets a JSON problem 404. The client
   script for the live connection is served from `/_framework/blazor.web.js`.
@@ -445,7 +456,8 @@ is running.
   the server. The sign-in throttle uses the client address: without the setting behind a proxy, every user
   shares the address of the proxy, and with it but without a proxy that overwrites the header, a client can choose its
   own address and avoid the per-address and per-name limits (the lockout of the account still applies). The throttle
-  is set with `Identity:Throttle:MaxFailuresPerName` (default 5), `Identity:Throttle:MaxFailuresPerAddress` (default 20),
+  is set with `Identity:Throttle:MaxFailuresPerName` (default 5), `Identity:Throttle:MaxFailuresPerAddress` (default
+  20),
   and `Identity:Throttle:WindowSeconds` (default 300); an invalid value stops the start-up with an error. The server
   must still not be exposed to untrusted networks
   without TLS, because the password of a sign-in is sent in the request. An open page re-checks its user every
@@ -465,9 +477,10 @@ is running.
   review
   (200 with `application/pdf`). `GET /api/openapi.json` returns the OpenAPI description of these endpoints and needs no
   token. Errors are `application/problem+json` documents: 400 for a rejected request (with the field that is wrong), 401
-  for a missing or refused token (always the same answer, with `WWW-Authenticate: Bearer`), 403 for an action that is
-  not allowed, 404 for an unknown project, review, or address, 409 for a conflict or an attestation of a review that is
-  not complete, 429 when too many tokens were refused from one address, and 5xx for repository or key failures.
+  for a missing or refused token (always the same answer, with `WWW-Authenticate` headers for `Bearer` and `Basic`),
+  403 for an action that is not allowed, 404 for an unknown project, review, or address, 409 for a conflict or an
+  attestation of a review that is not complete, 429 when too many tokens were refused from one address, and 5xx for
+  repository or key failures.
 - *Constraints*: A token acts with the current role of its owner and stops working when it expires, is revoked, or its
   owner is disabled or locked out. A token cannot sign, change reviewer slots, or reach any page, and a session cookie
   cannot reach the API. The token is only a bearer secret: the server must not be exposed to untrusted networks
@@ -504,7 +517,8 @@ is running.
 - *Type*: Git command-line tool, file system, and configuration.
 - *Role*: Consumer (the server runs git and reads and writes the folders).
 - *Contract*: The server runs the installed `git` tool to read registered repositories into a local mirror folder
-  (`Git:CachePath`, by default `git-cache` beside the database; `Git:TimeoutSeconds`, 120 by default, 1 to 3600). The access
+  (`Git:CachePath`, by default `git-cache` beside the database; `Git:TimeoutSeconds`, 120 by default, 1 to 3600). The
+  access
   token of a private repository is stored encrypted with the Data Protection system, whose key ring is kept in a folder
   (`DataProtection:KeysPath`, by default `keys` beside the database).
 - *Constraints*: A usable git must be installed, or reading a repository fails with an error that says so. The key ring
@@ -517,7 +531,8 @@ is running.
 - *Type*: File system or certificate store, selected by configuration.
 - *Role*: Consumer (the server reads the key and signs with it).
 - *Contract*: Selected by the `Attestation` configuration section (`Attestation:Provider`, with the environment
-  variable `Attestation__Provider`: `SelfSigned`, the default, or `CertificateStore` with `Attestation:CertificateThumbprint`,
+  variable `Attestation__Provider`: `SelfSigned`, the default, or `CertificateStore` with
+  `Attestation:CertificateThumbprint`,
   `Attestation:StoreLocation`, and `Attestation:StoreName`; `Attestation:RequireTrustedKey` and
   `Attestation:SelfSignedFolder`). The default self-signed key is created on first use in an `attestation-selfsigned`
   folder inside the key ring folder. The private key of a certificate is never exported: the signature is made through
@@ -623,7 +638,8 @@ work the same way but call `ProjectService` and `ReviewService` in the handlers:
 review form carries its files to `ReviewService`, which validates them, computes the
 fingerprint with `Fingerprint`, and stores the review through `ReviewStore`; a form for a review from a repository
 carries the repository, the revisions, and the selection instead, and `ReviewService` reads the changes through
-`IGitRepositoryProvider` (`GitSource`), freezes them in the review, and stores it the same way. `ReviewPage` calls `ThreadService`
+`IGitRepositoryProvider` (`GitSource`), freezes them in the review, and stores it the same way. `ReviewPage` calls
+`ThreadService`
 to start, answer, resolve, and reopen comment threads on a file, passing the signed-in user as the author;
 `ThreadService` applies the comment rules and
 stores the threads through `ReviewStore`. `ReviewPage` and `ChecklistPage` call `ChecklistService`, which applies
@@ -637,12 +653,14 @@ answered by `AttestationEndpoint` after the same authorization: `AttestationServ
 that the review is approved, reads the record, has `AttestationRenderer` and `PdfDocumentWriter` produce the PDF, has
 `AttestationSigner` sign it with the key from `AttestationKeyProvider`, records the generation through `AuditService`,
 and the endpoint returns the signed bytes. A request under `/api` takes another way: the `ReviewCenterToken`
-scheme of `ApiTokenAuthentication` reads the bearer token, counts the attempt with `SignInThrottle`, asks
-`PersonalAccessTokenService` to validate the token (a hash lookup in `PersonalAccessTokenStore`, then the checks of
+scheme of `ApiTokenAuthentication` reads the token (a bearer token, or the password of HTTP Basic credentials),
+counts the attempt with `SignInThrottle`, asks `PersonalAccessTokenService` to validate the token (a hash lookup in
+`PersonalAccessTokenStore`, then the checks of
 expiry, revocation, and the owner), and on success builds a principal with the owner's name and role and a token
 claim; a refusal is audited through `AuditService` without the value and answered with a generic 401. `ApiEndpoints`
 then calls the same services as the pages (`ProjectService`, `ReviewService`, `SigningService` for the approval,
-`ThreadService` and `ChecklistService` for the counts, and `AttestationService`) and maps the result or the rule that
+`ThreadService` and `ChecklistService` for the counts, `AttestationService`, and `EvidenceIndexService` for the evidence
+index) and maps the result or the rule that
 was broken to a JSON answer. When the server is
 stopped, `ServerHost.RunAsync` returns 0; if the server cannot start, including because the
 database cannot be used, it reports the reason

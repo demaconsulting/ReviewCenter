@@ -731,6 +731,61 @@ public class SigningServiceTests
     }
 
     /// <summary>
+    ///     Test that the batch read gives for each review the same status as a single read, skips a review that does
+    ///     not exist, and loads the users once.
+    /// </summary>
+    [Fact]
+    public async Task SigningService_GetApprovalsAsync_SeveralReviews_EqualsSingleReadsAndLoadsUsersOnce()
+    {
+        // Arrange: a project with one ready review over a user store that counts list reads
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var store = new FakeReviewStore();
+        var clock = new MovableTimeProvider(_now);
+        var userStore = new CountingUserStore(new FakeUserStore());
+        var users = new UserService(userStore, new FakePasswordHasher(), clock);
+        var ann = await users.CreateAsync("ann", "Ann", UserRole.Reviewer, Password, cancellationToken);
+        var project = await new ProjectService(store, clock).CreateAsync("Apollo", null, cancellationToken);
+        var reviews = new ReviewService(store, clock);
+        await reviews.CreateDraftAsync(project.Id, "rev-1", "First", [new("a.txt", TestContent.A)], cancellationToken);
+        await reviews.CreateDraftAsync(project.Id, "rev-2", "Second", [new("b.txt", TestContent.A)], cancellationToken);
+        var signing = new SigningService(store, users, clock);
+        await signing.AddSlotAsync(TestActors.Ann, project.Id, "rev-1", ann.Id, null, cancellationToken);
+        var single = await signing.GetApprovalAsync(project.Id, "rev-1", cancellationToken);
+        var before = userStore.ListCount;
+
+        // Act: read the two reviews and a missing one in one batch
+        var batch = await signing.GetApprovalsAsync(project.Id, ["rev-1", "rev-2", "nope"], cancellationToken);
+
+        // Assert: the existing reviews are there, the status equals the single read, the users were read once
+        Assert.Equal(["rev-1", "rev-2"], batch.Keys.Order().ToArray());
+        Assert.Equivalent(single, batch["rev-1"]);
+        Assert.Equal(1, userStore.ListCount - before);
+    }
+
+    /// <summary>
+    ///     Test that the batch read of no reviews gives an empty result without reading the user list.
+    /// </summary>
+    [Fact]
+    public async Task SigningService_GetApprovalsAsync_NoReviews_ReturnsEmptyWithoutReadingUsers()
+    {
+        // Arrange: a user store that counts list reads
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var store = new FakeReviewStore();
+        var clock = new MovableTimeProvider(_now);
+        var userStore = new CountingUserStore(new FakeUserStore());
+        var users = new UserService(userStore, new FakePasswordHasher(), clock);
+        var project = await new ProjectService(store, clock).CreateAsync("Apollo", null, cancellationToken);
+        var signing = new SigningService(store, users, clock);
+
+        // Act: read an empty sequence of reviews
+        var batch = await signing.GetApprovalsAsync(project.Id, [], cancellationToken);
+
+        // Assert: nothing returned and the user list was never read
+        Assert.Empty(batch);
+        Assert.Equal(0, userStore.ListCount);
+    }
+
+    /// <summary>
     ///     Test that only enabled users are offered for a slot, and without anything secret.
     /// </summary>
     [Fact]

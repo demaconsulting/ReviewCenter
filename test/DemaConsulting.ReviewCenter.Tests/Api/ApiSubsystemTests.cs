@@ -94,6 +94,42 @@ public class ApiSubsystemTests
     }
 
     /// <summary>
+    ///     Test the evidence journey end to end, as ReviewMark runs it: with HTTP Basic credentials that carry a token
+    ///     as the password, a script reads the evidence index of a project, follows the link of its entry to the
+    ///     attestation, and once the token is revoked the same request is refused.
+    /// </summary>
+    [Fact(Timeout = 60000)]
+    public async Task ApiSubsystem_EvidenceJourney_BasicCredentials_ReadIndexAndFollowLink_WorksEndToEnd()
+    {
+        // Arrange: a complete review with a review-set id, and a token
+        await using var app = await StartAsync();
+        var projectId = await AttestationEndpointTests.CreateReviewAsync(app, signed: false);
+        var store = app.Services.GetRequiredService<IReviewStore>();
+        await EvidenceTestSupport.AddReviewAsync(store, TimeProvider.System, projectId, "REV-2", "Core-Logic", "one\n"u8.ToArray());
+        await EvidenceTestSupport.AnswerAllPassAsync(app.Services.GetRequiredService<ChecklistService>(), projectId, "REV-2");
+        var annId = (await app.Services.GetRequiredService<UserService>().GetAsync("ann", TestContext.Current.CancellationToken))!.Id;
+        var signing = app.Services.GetRequiredService<SigningService>();
+        var slotId = await EvidenceTestSupport.AddSlotAsync(signing, projectId, "REV-2", annId);
+        await EvidenceTestSupport.SignAsync(signing, projectId, "REV-2", slotId, EvidenceTestSupport.Ann, TestBrowser.Password);
+        var created = await CreateTokenAsync(app);
+        using var client = ClientFor(app, created.Value, basic: true);
+
+        // Act: read the index, follow the link of its entry, revoke the token and read the index again
+        var index = await client.GetAsync($"/api/projects/{projectId}/evidence/index.json", TestContext.Current.CancellationToken);
+        using var indexJson = await JsonAsync(index);
+        var file = Assert.Single(indexJson.RootElement.GetProperty("reviews").EnumerateArray()).GetProperty("file").GetString()!;
+        var pdf = await client.GetAsync(new Uri(file).PathAndQuery, TestContext.Current.CancellationToken);
+        await app.Services.GetRequiredService<PersonalAccessTokenService>()
+            .RevokeAsync(TestActors.Ann, created.Token.Id, TestContext.Current.CancellationToken);
+        var after = await client.GetAsync($"/api/projects/{projectId}/evidence/index.json", TestContext.Current.CancellationToken);
+
+        // Assert: the index lists the review, the link is a PDF, and the revoked token is refused
+        Assert.Equal(HttpStatusCode.OK, index.StatusCode);
+        Assert.Equal("application/pdf", pdf.Content.Headers.ContentType?.MediaType);
+        Assert.Equal(HttpStatusCode.Unauthorized, after.StatusCode);
+    }
+
+    /// <summary>
     ///     Test that a token never signs and never opens the web pages: the API has no signing route, the signing
     ///     service refuses an actor that came through a token, and the account page treats the token as signed out.
     /// </summary>

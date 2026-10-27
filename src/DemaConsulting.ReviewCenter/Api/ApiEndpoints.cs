@@ -27,8 +27,8 @@ using Microsoft.AspNetCore.Http.Metadata;
 namespace DemaConsulting.ReviewCenter.Api;
 
 /// <summary>
-///     The JSON API under <c>/api</c>: list projects and reviews, read a review, create a review and download the
-///     attestation, all with a personal access token.
+///     The JSON API under <c>/api</c>: list projects and reviews, read a review, create a review, download the
+///     attestation and read the evidence index, all with a personal access token.
 /// </summary>
 /// <remarks>
 ///     Every endpoint is in one group that requires the <c>Api</c> policy (the token scheme only), so no endpoint can
@@ -146,6 +146,17 @@ internal static class ApiEndpoints
             .ProducesProblem(StatusCodes.Status409Conflict)
             .ProducesProblem(StatusCodes.Status500InternalServerError);
 
+        group.MapGet("/projects/{projectId:int}/evidence/index.json", GetEvidenceIndexAsync)
+            .WithName("GetEvidenceIndex")
+            .WithSummary("Gets the evidence index of a project, in the format of a ReviewMark index.json.")
+            .WithDescription(
+                "Returns the completed reviews of the project that were planned from a review-set, one per review-set "
+                + "id and fingerprint, as {\"reviews\":[{id, fingerprint, date, result, file}]}. The result is always "
+                + "'pass'; 'file' is the absolute address of the signed attestation. Use it as the evidence-source of "
+                + "a .reviewmark.yaml file, with a personal access token as the Basic password.")
+            .Produces<EvidenceIndexDto>()
+            .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .ProducesProblem(StatusCodes.Status404NotFound);
         // Every other address under /api answers a JSON 404, with or without a token. A more specific route above wins
         // over this catch-all, so it only sees what nothing else handles
         endpoints.MapMethods(Prefix + "/{**rest}", AllMethods, () => ApiProblems.NotFound("The address does not exist."))
@@ -352,6 +363,55 @@ internal static class ApiEndpoints
             ApiProblems.ActorOf(http.User),
             http.RequestAborted);
         return AttestationEndpoint.ToResult(result, http, () => ApiProblems.NotFound("The review does not exist."));
+    }
+
+    /// <summary>
+    ///     Gets the evidence index of a project.
+    /// </summary>
+    /// <param name="projectId">The project number.</param>
+    /// <param name="http">The request context; supplies the address the attestation links are built from.</param>
+    /// <param name="projects">The project service.</param>
+    /// <param name="index">The evidence index service.</param>
+    /// <returns>The index, or 404 when the project does not exist.</returns>
+    private static async Task<IResult> GetEvidenceIndexAsync(
+        int projectId,
+        HttpContext http,
+        ProjectService projects,
+        EvidenceIndexService index)
+    {
+        // The index holds the addresses of signed documents behind a token: never cache any response of it in a
+        // shared cache, including the not-found problem
+        http.Response.Headers.CacheControl = "no-store";
+        if (await projects.GetAsync(projectId, http.RequestAborted) is null)
+        {
+            return ApiProblems.NotFound("The project does not exist.");
+        }
+
+        var entries = await index.BuildAsync(projectId, http.RequestAborted);
+        return TypedResults.Ok(new EvidenceIndexDto(
+            entries.Select(entry => new EvidenceEntryDto(
+                entry.Id,
+                entry.Fingerprint,
+                entry.Date,
+                "pass",
+                AttestationUrl(http.Request, projectId, entry.ReviewId))).ToList()));
+    }
+
+    /// <summary>
+    ///     Builds the absolute address of the attestation of a review from the address of the request.
+    /// </summary>
+    /// <param name="request">The request; supplies the scheme, the host and the path base.</param>
+    /// <param name="projectId">The project number.</param>
+    /// <param name="reviewId">The review identifier.</param>
+    /// <returns>The address, for example <c>https://host/api/projects/1/reviews/R-1/attestation.pdf</c>.</returns>
+    /// <remarks>
+    ///     The scheme follows the forwarded protocol when the forwarded headers are enabled; the host is the
+    ///     <c>Host</c> header of the request, so a reverse proxy must pass it on.
+    /// </remarks>
+    internal static string AttestationUrl(HttpRequest request, int projectId, string reviewId)
+    {
+        return $"{request.Scheme}://{request.Host}{request.PathBase}{Prefix}/projects/{projectId}"
+            + $"/reviews/{Uri.EscapeDataString(reviewId)}/attestation.pdf";
     }
 
     /// <summary>

@@ -37,6 +37,7 @@ includes:
   - docs/reqstream/review-center/evidence/attestation-key-provider.yaml
   - docs/reqstream/review-center/evidence/attestation-service.yaml
   - docs/reqstream/review-center/evidence/attestation-endpoint.yaml
+  - docs/reqstream/review-center/evidence/evidence-index.yaml
   - docs/reqstream/review-center/hosting.yaml
   - docs/reqstream/review-center/hosting/server-host.yaml
   - docs/reqstream/review-center/hosting/user-command.yaml

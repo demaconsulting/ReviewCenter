@@ -47,7 +47,7 @@ public class ApiDocumentTests
 
     /// <summary>
     ///     Test that the document is served without a token, describes the API operations with a fixed version,
-    ///     no server address and the bearer scheme, and requires the scheme for every operation.
+    ///     no server address and the bearer and Basic schemes, and requires one of them for every operation.
     /// </summary>
     [Fact(Timeout = 60000)]
     public async Task ApiDocument_Get_NoToken_DescribesTheApiWithBearerScheme()
@@ -68,16 +68,20 @@ public class ApiDocumentTests
         var scheme = root.GetProperty("components").GetProperty("securitySchemes").GetProperty("bearer");
         Assert.Equal("http", scheme.GetProperty("type").GetString());
         Assert.Equal("bearer", scheme.GetProperty("scheme").GetString());
+        var basicScheme = root.GetProperty("components").GetProperty("securitySchemes").GetProperty("basic");
+        Assert.Equal("http", basicScheme.GetProperty("type").GetString());
+        Assert.Equal("basic", basicScheme.GetProperty("scheme").GetString());
 
-        // Assert: only the API, every operation secured
+        // Assert: only the API, every operation secured with either scheme
         var paths = root.GetProperty("paths").EnumerateObject().ToList();
         Assert.Contains(paths, p => p.Name == "/api/projects");
         Assert.Contains(paths, p => p.Name == "/api/projects/{projectId}/reviews/{reviewId}/attestation.pdf");
+        Assert.Contains(paths, p => p.Name == "/api/projects/{projectId}/evidence/index.json");
         Assert.All(paths, p => Assert.StartsWith("/api/", p.Name, StringComparison.Ordinal));
         Assert.DoesNotContain(paths, p => p.Name.Contains("openapi", StringComparison.Ordinal));
         var operations = paths.SelectMany(p => p.Value.EnumerateObject()).Where(o => o.Value.ValueKind == System.Text.Json.JsonValueKind.Object).ToList();
         Assert.NotEmpty(operations);
-        Assert.All(operations, o => Assert.True(o.Value.TryGetProperty("security", out var security) && security.GetArrayLength() == 1));
+        Assert.All(operations, o => Assert.True(o.Value.TryGetProperty("security", out var security) && security.GetArrayLength() == 2));
     }
 
     /// <summary>

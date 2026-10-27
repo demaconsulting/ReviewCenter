@@ -1,6 +1,6 @@
 package ReviewCenter {
     part def ApiTokenAuthentication {
-        doc /* The authentication scheme and the authorization policy of the API: turns a bearer personal access token into the principal of its owner, marked as coming through a token, or into one generic 401 refusal; leaves requests without a token header to the other schemes; ignores the cookie on the API and the token everywhere else; throttles repeated failures per client address with the sign-in throttle; and records refused uses in the audit trail without a token value. */
+        doc /* The authentication scheme and the authorization policy of the API: turns a personal access token, sent as a bearer token or as the password of HTTP Basic credentials, into the principal of its owner, marked as coming through a token, or into one generic 401 refusal that also offers the Basic challenge; leaves requests without a token header to the other schemes; ignores the cookie on the API and the token everywhere else; throttles repeated failures per client address with the sign-in throttle; and records refused uses in the audit trail without a token value. */
 
         comment sourceRef /* Source: src/DemaConsulting.ReviewCenter/Api/ApiTokenAuthentication.cs */
         comment testRef /* Test: test/DemaConsulting.ReviewCenter.Tests/Api/ApiTokenAuthenticationTests.cs */

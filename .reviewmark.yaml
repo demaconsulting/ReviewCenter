@@ -744,6 +744,7 @@ reviews:
       - "src/DemaConsulting.ReviewCenter.Core/SlotRole.cs"
       - "src/DemaConsulting.ReviewCenter.Core/ReviewApproval.cs"
       - "test/**/Core/SigningServiceTests.cs"
+      - "test/**/Core/CountingUserStore.cs"
       - "test/**/Core/AuditEventTests.cs"
 
   # ReviewCenter - Core audit trail
@@ -1088,6 +1089,9 @@ reviews:
       - "docs/verification/review-center/evidence.md"
       - "docs/sysml2/model/review-center/evidence.sysml"
       - "test/**/Evidence/EvidenceSubsystemTests.cs"
+      - "test/**/Evidence/ReviewMarkContractTests.cs"
+      - "test/**/Evidence/EvidenceTestSupport.cs"
+      - "test/**/Evidence/TestData/evidence-index.golden.json"
       - "test/**/Evidence/AttestationFixture.cs"
       - "test/**/Evidence/FakeAttestationKeyProvider.cs"
       - "test/**/Evidence/PdfInspector.cs"
@@ -1199,6 +1203,22 @@ reviews:
       - "docs/sysml2/model/review-center/evidence/attestation-endpoint.sysml"
       - "src/**/Evidence/AttestationEndpoint.cs"
       - "test/**/Evidence/AttestationEndpointTests.cs"
+
+  - id: ReviewCenter-Evidence-EvidenceIndex
+    title: Review of ReviewCenter EvidenceIndexService unit implementation
+    context:
+      - docs/design/review-center.md
+      - docs/reqstream/review-center.yaml
+      - docs/design/review-center/evidence.md
+      - docs/reqstream/review-center/evidence.yaml
+    paths:
+      - "docs/reqstream/review-center/evidence/evidence-index.yaml"
+      - "docs/design/review-center/evidence/evidence-index.md"
+      - "docs/verification/review-center/evidence/evidence-index.md"
+      - "docs/sysml2/model/review-center/evidence/evidence-index.sysml"
+      - "src/**/Evidence/EvidenceIndexService.cs"
+      - "src/**/Evidence/EvidenceIndexEntry.cs"
+      - "test/**/Evidence/EvidenceIndexServiceTests.cs"
 
   # ReviewCenter - Api
   - id: ReviewCenter-Api

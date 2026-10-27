@@ -293,6 +293,7 @@ internal static class ServerHost
         services.AddSingleton<IAttestationRenderer, AttestationRenderer>();
         services.AddSingleton<IAttestationSigner, AttestationSigner>();
         services.AddSingleton<AttestationService>();
+        services.AddSingleton<EvidenceIndexService>();
     }
 
     /// <summary>

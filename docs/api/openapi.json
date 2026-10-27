@@ -2,7 +2,7 @@
   "openapi": "3.1.1",
   "info": {
     "title": "ReviewCenter API",
-    "description": "Read projects and reviews, create review drafts and download attestations with a personal access token (Authorization: Bearer rcpat_...). Reviewer slots and signatures can only be changed in the web pages.",
+    "description": "Read projects and reviews, create review drafts, download attestations and read the evidence index with a personal access token (bearer token, or HTTP Basic with the token as the password). Reviewer slots and signatures can only be changed in the web pages.",
     "version": "1"
   },
   "paths": {
@@ -42,6 +42,9 @@
         "security": [
           {
             "bearer": [ ]
+          },
+          {
+            "basic": [ ]
           }
         ]
       }
@@ -104,6 +107,9 @@
         "security": [
           {
             "bearer": [ ]
+          },
+          {
+            "basic": [ ]
           }
         ]
       },
@@ -231,6 +237,9 @@
         "security": [
           {
             "bearer": [ ]
+          },
+          {
+            "basic": [ ]
           }
         ]
       }
@@ -298,6 +307,9 @@
         "security": [
           {
             "bearer": [ ]
+          },
+          {
+            "basic": [ ]
           }
         ]
       }
@@ -378,6 +390,71 @@
         "security": [
           {
             "bearer": [ ]
+          },
+          {
+            "basic": [ ]
+          }
+        ]
+      }
+    },
+    "/api/projects/{projectId}/evidence/index.json": {
+      "get": {
+        "tags": [
+          "ApiEndpoints"
+        ],
+        "summary": "Gets the evidence index of a project, in the format of a ReviewMark index.json.",
+        "description": "Returns the completed reviews of the project that were planned from a review-set, one per review-set id and fingerprint, as {\"reviews\":[{id, fingerprint, date, result, file}]}. The result is always 'pass'; 'file' is the absolute address of the signed attestation. Use it as the evidence-source of a .reviewmark.yaml file, with a personal access token as the Basic password.",
+        "operationId": "GetEvidenceIndex",
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EvidenceIndexDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [ ]
+          },
+          {
+            "basic": [ ]
           }
         ]
       }
@@ -452,6 +529,55 @@
           }
         },
         "description": "The request to create a review: either uploaded files or a repository source, never both."
+      },
+      "EvidenceEntryDto": {
+        "required": [
+          "id",
+          "fingerprint",
+          "date",
+          "result",
+          "file"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The review-set id of the review (the ReviewMark review id)."
+          },
+          "fingerprint": {
+            "type": "string",
+            "description": "The content fingerprint of the review's file set."
+          },
+          "date": {
+            "type": "string",
+            "description": "The day of the latest signature, as a UTC date in `yyyy-MM-dd` form."
+          },
+          "result": {
+            "type": "string",
+            "description": "The result of the review; always `pass`."
+          },
+          "file": {
+            "type": "string",
+            "description": "The absolute address of the signed attestation of the review."
+          }
+        },
+        "description": "One completed review in the evidence index, as ReviewMark reads it."
+      },
+      "EvidenceIndexDto": {
+        "required": [
+          "reviews"
+        ],
+        "type": "object",
+        "properties": {
+          "reviews": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EvidenceEntryDto"
+            },
+            "description": "The completed reviews, one per review-set id and fingerprint, in a fixed order."
+          }
+        },
+        "description": "The evidence index of a project: the document ReviewMark reads as its `index.json`."
       },
       "HttpValidationProblemDetails": {
         "type": "object",
@@ -965,6 +1091,11 @@
         "description": "A personal access token created on the Account page.",
         "scheme": "bearer",
         "bearerFormat": "rcpat"
+      },
+      "basic": {
+        "type": "http",
+        "description": "HTTP Basic for tools that cannot send a bearer token, such as ReviewMark: the user name is ignored and the password is a personal access token.",
+        "scheme": "basic"
       }
     }
   },

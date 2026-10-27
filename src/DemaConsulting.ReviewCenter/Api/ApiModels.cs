@@ -170,6 +170,22 @@ internal sealed record CreateReviewRequest(
 internal sealed record SkippedFileDto(string Path, string Reason);
 
 /// <summary>
+///     One completed review in the evidence index, as ReviewMark reads it.
+/// </summary>
+/// <param name="Id">The review-set id of the review (the ReviewMark review id).</param>
+/// <param name="Fingerprint">The content fingerprint of the review's file set.</param>
+/// <param name="Date">The day of the latest signature, as a UTC date in <c>yyyy-MM-dd</c> form.</param>
+/// <param name="Result">The result of the review; always <c>pass</c>.</param>
+/// <param name="File">The absolute address of the signed attestation of the review.</param>
+internal sealed record EvidenceEntryDto(string Id, string Fingerprint, string Date, string Result, string File);
+
+/// <summary>
+///     The evidence index of a project: the document ReviewMark reads as its <c>index.json</c>.
+/// </summary>
+/// <param name="Reviews">The completed reviews, one per review-set id and fingerprint, in a fixed order.</param>
+internal sealed record EvidenceIndexDto(IReadOnlyList<EvidenceEntryDto> Reviews);
+
+/// <summary>
 ///     The answer to creating a review.
 /// </summary>
 /// <param name="Review">The review that was created.</param>

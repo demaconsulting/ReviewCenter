@@ -108,6 +108,14 @@ changes or deletes a signature. `UpdateSlotAsync` and `RemoveSlotAsync` return `
 - *Postconditions*: Nothing is stored. The record, slots, and signatures come from one `GetSnapshotAsync` read, so a
   concurrent change cannot make the digest, the blockers, and the signature status describe different states.
 
+**GetApprovalsAsync**: Computes the status of several reviews of a project.
+
+- *Parameters*: project identity, the review identifiers, and a cancellation token.
+- *Returns*: `Task<IReadOnlyDictionary<string, ReviewApproval>>` — the status of each review that exists, by review
+  identifier; a review that does not exist is absent. Each status equals the one `GetApprovalAsync` gives.
+- *Postconditions*: The user list is loaded once for the whole batch, not once for each review, and not at all when
+  there are no review identifiers; each review has its own snapshot read.
+
 **ListCandidatesAsync**: Lists the users that can be chosen for a slot.
 
 - *Returns*: `Task<IReadOnlyList<SlotMember>>` — the enabled users ordered by display name and then user name;

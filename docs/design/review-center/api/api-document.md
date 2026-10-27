@@ -5,13 +5,15 @@
 #### Purpose
 
 `ApiDocument` describes the API in the OpenAPI format and serves the description. Its single responsibility is to make a
-machine-readable contract that is generated from the real routes, is the same on every machine and run, and cannot change
+machine-readable contract that is generated from the real routes, is the same on every machine and run, and cannot
+change
 without a visible change in review.
 
 #### Data Model
 
 The unit is a static class with two extension methods and three constants: the address of the document
-(`/api/openapi.json`), the name of the security scheme (`bearer`), and the document version (`1`). It holds no state.
+(`/api/openapi.json`), the names of the security schemes (`bearer` and `basic`), and the document version (`1`). It
+holds no state.
 
 The committed snapshot `docs/api/openapi.json` is a file of the repository and not part of the program. The test that
 compares the generated document with it, and that can write it when the environment variable
@@ -47,8 +49,9 @@ command.
 - *Postconditions*: The generator describes only the routes whose path starts with `api/`, so the pages, the health
   check, and the sign-in endpoints are not part of the document. A document transformer sets the fixed parts: the title
   "ReviewCenter API", the version `1`, a description, no server list (an address would come from the request host and
-  differ between machines), the HTTP bearer security scheme `bearer` with the format `rcpat`, and the security
-  requirement of every operation.
+  differ between machines), the HTTP bearer security scheme `bearer` with the format `rcpat`, the HTTP Basic scheme
+  `basic` (the token is the
+  password), and the security requirements of every operation: bearer or basic, either one.
 
 **MapApiDocument**: Serves the document.
 
