@@ -107,7 +107,10 @@ not refuse it.
 usage does not allow digital signatures or non-repudiation, and a certificate that is not within its validity period. It
 checks **only** that. It does **not** check that the certificate chain leads to a trusted root and does **not** check
 revocation, because the server cannot know whom its readers trust. The rule is checked at start-up and again at every
-signing, so an expired certificate stops the attestation but not the server. Because the key is obtained at start-up, a
+signing, so a certificate that stops being valid while the server runs (an expired certificate) stops the attestation
+but not the server, and the review page then shows the reason instead of the download. A self-signed key and a
+certificate without a signing key usage cannot change while the server runs, so they are refused at start-up and the
+server does not start. Because the key is obtained at start-up, a
 configuration that cannot work fails at once, with an error that names the setting; the price is that a server whose key
 is in a hardware module that is not present does not start.
 

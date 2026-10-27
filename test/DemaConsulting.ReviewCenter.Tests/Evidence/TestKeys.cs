@@ -44,7 +44,18 @@ internal static class TestKeys
         X509KeyUsageFlags usage = X509KeyUsageFlags.DigitalSignature)
     {
         var rsa = RSA.Create(2048);
-        return Wrap("Test", SelfSigned(rsa, "CN=Test self-signed RSA", usage), [], rsa, requireTrusted);
+        return Wrap(AttestationOptions.SelfSignedProvider, SelfSigned(rsa, "CN=Test self-signed RSA", usage), [], rsa, requireTrusted);
+    }
+
+    /// <summary>
+    ///     Creates a self-signed RSA signing key as the certificate store provider reports it: a self-signed
+    ///     certificate that the administrator supplied.
+    /// </summary>
+    /// <returns>The key; the caller disposes it.</returns>
+    public static AttestationSigningKey SelfSignedFromStore()
+    {
+        var rsa = RSA.Create(2048);
+        return Wrap(AttestationOptions.CertificateStoreProvider, SelfSigned(rsa, "CN=Test store self-signed RSA"), [], rsa, false);
     }
 
     /// <summary>

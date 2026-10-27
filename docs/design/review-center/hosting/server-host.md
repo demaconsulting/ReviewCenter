@@ -81,7 +81,8 @@ response.
   The `Attestation` settings are bound, with an empty `SelfSignedFolder` becoming an `attestation-selfsigned` folder
   inside the folder from `ResolveKeysPath`, the key provider is registered through
   `AttestationKeyProviderFactory.Create`, and `AttestationRenderer`, `AttestationSigner`, and `AttestationService` are
-  registered as singletons (the first three as the interfaces `IAttestationRenderer` and `IAttestationSigner`).
+  registered as singletons (the first two as the interfaces `IAttestationRenderer` and `IAttestationSigner`;
+  `AttestationService` as the concrete class).
 
 The method is shared with `UserCommand` and `AuditCommand`, so that the command line works with exactly the services of
 the server. `UserService` must remain a single instance, because it serializes the changes to users in the process;

@@ -174,8 +174,9 @@ provider that the factory chooses from them, the renderer, the signer, and `Atte
 self-signed key is kept in `Attestation:SelfSignedFolder`, or in an `attestation-selfsigned` folder inside the folder of
 the Data Protection key ring, so that it persists and is backed up with the other keys. `CreateApplication` calls
 `ValidateAttestation` right after the key ring check: it obtains the signing key, and an `AttestationKeyException`
-(an unknown provider, a missing thumbprint, a certificate that is not in the store, `RequireTrustedKey` with the
-self-signed provider, or an unusable folder) becomes an `InvalidOperationException` "The attestation signing key is not
+(an unknown provider, a missing thumbprint, a certificate that is not in the store, `RequireTrustedKey` with a
+self-signed key or a certificate without a signing key usage, or an unusable folder) becomes an
+`InvalidOperationException` "The attestation signing key is not
 usable: ..." that names the setting. The same reasoning applies as for the database and the key ring: an operator who
 chose a certificate must learn at the start that the choice does not work. The price is that a server whose key is in a
 hardware module that is not present does not start. The endpoint `/projects/{projectId}/reviews/{reviewId}/attestation.pdf`

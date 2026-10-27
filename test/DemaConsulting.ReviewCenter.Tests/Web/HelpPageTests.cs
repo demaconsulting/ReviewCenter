@@ -124,6 +124,9 @@ public sealed class HelpPageTests : PageTestBase
         Assert.Contains("does <strong>not</strong> prove who the reviewers are", text, StringComparison.Ordinal);
         Assert.Contains("SELF-SIGNED KEY - NOT AN ORGANIZATION", text, StringComparison.Ordinal);
         Assert.Contains("Attestation:RequireTrustedKey", text, StringComparison.Ordinal);
+        Assert.Contains("the server does not start", text, StringComparison.Ordinal);
+        Assert.Contains("stops being valid while the server is running", text, StringComparison.Ordinal);
+        Assert.Contains("self-signed certificate supplied by the administrator", text, StringComparison.Ordinal);
         Assert.Contains("Attestation:Provider", text, StringComparison.Ordinal);
     }
 

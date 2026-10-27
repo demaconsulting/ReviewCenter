@@ -59,7 +59,9 @@ sections:
           The HelpPage unit shall serve a topic, Signed attestation, that explains what the signature of the
           attestation proves (integrity since the signing and the origin of the server key), what it does not prove
           (who the reviewers are, and when the signing happened), that the self-signed key is for development and test
-          only, how to use a certificate from a certificate store, and what RequireTrustedKey checks, with a
+          only, how to use a certificate from a certificate store, and what RequireTrustedKey checks (the server refuses
+          to start for a self-signed key or a certificate without a signing key usage, and the review page shows why
+          attestation is unavailable when a certificate stops being valid while the server runs), with a
           screenshot of the download of an approved review.
         justification: |
           The attestation is easy to take for more than it is. The place the user is sent from the review page must
