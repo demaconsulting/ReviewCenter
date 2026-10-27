@@ -22,6 +22,9 @@ N/A - standard test environment.
 - The router renders the home page for the root URL.
 - The router renders the not-found page, with a link back to the projects page, for a URL that no page handles.
 - The not-found page is rendered inside the page frame, so the header link to the home page and the footer are present.
+- A request to the real pipeline for an address that no page handles is answered with status 404 and the not-found page
+  with the header and the footer. A request under `/api`, a request for an address that ends in a file extension, and a
+  POST keep a plain 404 without the page.
 - The router shows the creation form, and no review, for the address of the new-review form of a project.
 - The router applies the authorization rules of a page: a reviewer opening the users route sees the access denied
   message and not the page, an administrator sees the page, and a signed-out user opening a protected route sees
@@ -61,6 +64,21 @@ page. This scenario is tested by `Routes_Render_UnknownUrl_ShowsNotFoundMessage`
 address is set to a URL that no page handles and `Routes` is rendered; the not-found page, the single header link to the
 home page, and the footer with the link to the About page are all present. This scenario is tested by
 `Routes_Render_UnknownUrl_ShowsNotFoundInsidePageFrameWithHeaderAndFooter`.
+
+**App_Request_UnknownPath_Returns404WithFramedNotFoundPage**: The pipeline is started in memory and an address that no
+page handles is requested; the response status is 404 and the document contains the not-found page, the header link to
+the home page, and the footer. This scenario is tested by `App_Request_UnknownPath_Returns404WithFramedNotFoundPage`.
+
+**App_Request_UnknownApiPath_Returns404WithoutPageFrame**: An unknown address under `/api` is requested; the status is
+404 and the body has neither the page frame nor the not-found text. This scenario is tested by
+`App_Request_UnknownApiPath_Returns404WithoutPageFrame`.
+
+**App_Request_UnknownFilePath_Returns404WithoutPageFrame**: A missing style sheet (`/missing.css`) is requested; the
+status is 404 and the body has no not-found text. This scenario is tested by
+`App_Request_UnknownFilePath_Returns404WithoutPageFrame`.
+
+**App_Request_PostToUnknownPath_Returns404WithoutPageFrame**: A POST to an unknown address is sent; the status is 404
+and the body has no not-found text. This scenario is tested by `App_Request_PostToUnknownPath_Returns404WithoutPageFrame`.
 
 **Routes_Render_NewReviewRoute_ShowsFormNotReview**: A user is signed in, a project exists, the navigation address is
 the new-review address of the project and `Routes` is rendered; the new-review form is shown and the review page is

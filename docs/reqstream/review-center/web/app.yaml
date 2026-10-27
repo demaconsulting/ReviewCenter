@@ -32,6 +32,23 @@ sections:
           - Routes_Render_UnknownUrl_ShowsNotFoundMessage
           - Routes_Render_UnknownUrl_ShowsNotFoundInsidePageFrameWithHeaderAndFooter
 
+      - id: ReviewCenter-App-NotFoundPage
+        title: >-
+          The App unit shall answer a request for a page that no page handles with HTTP status 404 and a "Page not
+          found" page that has the header and the footer and a button back to the projects page, and shall leave the
+          404 of an API address, of an address that ends in a file extension, and of a request that is not a GET or
+          HEAD without the page.
+        justification: |
+          A mistyped address must give the user a clear answer and a way back inside the familiar page frame, not a
+          blank page. A missing script, style sheet, or API address is read by a program, which needs the plain 404
+          and not an HTML document, and the 404 status keeps the answer honest for browsers and search engines.
+        tests:
+          - App_Request_UnknownPath_Returns404WithFramedNotFoundPage
+          - App_Request_UnknownApiPath_Returns404WithoutPageFrame
+          - App_Request_UnknownFilePath_Returns404WithoutPageFrame
+          - App_Request_PostToUnknownPath_Returns404WithoutPageFrame
+          - Routes_Render_UnknownUrl_ShowsNotFoundInsidePageFrameWithHeaderAndFooter
+
       - id: ReviewCenter-App-Header
         title: >-
           The App unit shall show in a header on every page the display name of the signed-in user, a link to the

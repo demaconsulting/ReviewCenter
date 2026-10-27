@@ -1,0 +1,15 @@
+@* NotFoundPage: the answer for an address that no page handles, at "/not-found" (part of the App unit).
+
+   The server re-executes a request that ended in 404 against this route (see ServerHost), and the Router shows it
+   for an address that does not match a page inside an open session. Like every page it is rendered inside
+   MainLayout, so the header and the footer are there, and it is open to everyone. The 404 status of the original
+   request is kept by the re-execution. *@
+@page "/not-found"
+
+<PageTitle>Page not found - ReviewCenter</PageTitle>
+
+<main class="page narrow" data-testid="not-found">
+    <h1>Page not found</h1>
+    <p>The address you asked for does not match any page. It may have been mistyped or the page may have moved.</p>
+    <p><a class="action outline" href="/projects" data-testid="not-found-projects-link">Back to projects</a></p>
+</main>

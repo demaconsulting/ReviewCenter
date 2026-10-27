@@ -7,9 +7,9 @@
 `App` is the HTML shell, URL router, and page frame of the web user interface. Its responsibilities are to wrap every
 page in a complete HTML document, to apply the stored appearance before the first paint, to select the page component
 for the requested URL, and to put the same menu bar header and the same footer around every page. A further part keeps
-an open page from going on with data after its user has ended. The unit consists of four Razor components, `App` (the
-shell), `Routes` (the router), `MainLayout` (the page frame, with a code-behind), and `SessionGate` (the guard of an
-open protected page).
+an open page from going on with data after its user has ended. The unit consists of five Razor components, `App` (the
+shell), `Routes` (the router), `MainLayout` (the page frame, with a code-behind), `SessionGate` (the guard of an
+open protected page), and `NotFoundPage` (the answer for an address that no page handles).
 
 #### Data Model
 
@@ -37,9 +37,8 @@ outlet, the `Routes` component, a second small inline script, and a script refer
 
 **Routes component**: A router that searches the application assembly for page components. For a matched URL it
 renders the page through an authorize route view, inside `MainLayout` as the default layout; for an unmatched URL it
-renders a "Page not found" page, also inside `MainLayout` so that it has the header and the footer, with a "Back to
-projects" button (`data-testid="not-found"` on the page, `not-found-projects-link` on the button). The router prefers a
-fixed route to one with a parameter in the same place, so
+renders `NotFoundPage` as the router's not-found page. The router prefers a fixed route to one with a parameter in the
+same place, so
 the addresses of the creation forms (`/projects/new`, and `/projects/{project}/reviews/new`, for example) reach their
 own form pages and are not read as the address of a project or of a review called "new". The authorize route view
 applies the authorization attributes of the page also when the user navigates inside an open interactive session, where
@@ -49,6 +48,14 @@ login page for a signed-out user; the link carries the requested address as `Ret
 `data-testid` values `access-denied`, `access-denied-projects-link` and `access-denied-login-link`. In production the
 router is part of the static shell, so the authorize route view only decides for the first request of a page; it cannot
 react when the state of an open page ends (see `SessionGate`).
+
+**NotFoundPage component**: The page at `/not-found`, open to everyone and rendered inside `MainLayout` like every page,
+so it has the header and the footer. It shows the heading "Page not found", a short explanation, and a "Back to
+projects" button. The elements have `data-testid` values `not-found` and `not-found-projects-link`. A request to the
+server for an address that no page handles never reaches the router, because it matches no endpoint; the `UseNotFoundPage`
+middleware of `ServerHost` therefore re-executes such a page request against `/not-found` and keeps the 404 status
+(see the Hosting subsystem), so the browser receives this page with status 404. The same page is the router's answer for
+an address that matches no page. Opening `/not-found` itself answers with status 200.
 
 **MainLayout component**: The page frame, rendered as static server-side markup (it needs no live connection). It
 reads the authentication state of the request once, so it keeps showing the name that was current when the page was

@@ -29,6 +29,9 @@ using DemaConsulting.ReviewCenter.Web;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.DataProtection.KeyManagement;
 using Microsoft.AspNetCore.DataProtection.Repositories;
+using Microsoft.AspNetCore.Diagnostics;
+using Microsoft.AspNetCore.Http.Features;
+using Microsoft.AspNetCore.Routing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 
@@ -56,6 +59,16 @@ internal static class ServerHost
     ///     The body returned by the health endpoint when the server is running.
     /// </summary>
     public const string HealthyText = "Healthy";
+
+    /// <summary>
+    ///     The route of the "Page not found" page that answers a page request no page handles.
+    /// </summary>
+    public const string NotFoundPath = "/not-found";
+
+    /// <summary>
+    ///     The address prefixes that belong to machine clients and keep a plain 404 without the page frame.
+    /// </summary>
+    private static readonly string[] ReservedPrefixes = ["/api", "/_framework", "/_blazor", "/_content"];
 
     /// <summary>
     ///     Builds the web application for the supplied command-line context without starting it.
@@ -132,6 +145,12 @@ internal static class ServerHost
         InitializeDatabase(app);
         ValidateAuthOptions(app);
         ValidateDataProtection(app);
+
+        // A page request that no page handles is answered with the framed "Page not found" page. This comes first
+        // so that its re-executed request is routed, authenticated, and authorized again like any other request;
+        // routing is then added here explicitly, because the automatic routing would sit before this middleware
+        UseNotFoundPage(app);
+        app.UseRouting();
 
         // Authentication and authorization must run before the endpoints they protect, and antiforgery
         // after them and before the Razor component and form endpoints it protects
@@ -319,6 +338,87 @@ internal static class ServerHost
     }
 
     /// <summary>
+    ///     Shows the "Page not found" page, with the header and footer, for a page request that ended in 404.
+    /// </summary>
+    /// <param name="app">The application whose pipeline receives the middleware. Must not be null.</param>
+    /// <remarks>
+    ///     A URL that no page handles matches no endpoint, so the router never sees it and the response would be
+    ///     empty. The middleware re-executes such a request against <see cref="NotFoundPath"/> with the 404 status
+    ///     kept (the built-in re-execution is not used because it would answer every empty 4xx or 5xx response,
+    ///     for example a 405 or a 400, with "Page not found"). Only GET and HEAD requests for a page are answered:
+    ///     the reserved prefixes of machine clients (<c>/api</c>, <c>/_framework</c>, <c>/_blazor</c>,
+    ///     <c>/_content</c>) and an address that ends in a file extension keep the plain 404. It must be placed
+    ///     before routing so that the re-executed request is routed again.
+    /// </remarks>
+    private static void UseNotFoundPage(WebApplication app)
+    {
+        app.UseWhen(
+            context => IsPageRequest(context.Request),
+            branch => branch.UseStatusCodePages(async status =>
+            {
+                var http = status.HttpContext;
+                if (http.Response.StatusCode != StatusCodes.Status404NotFound)
+                {
+                    return;
+                }
+
+                // Same steps as the framework re-execution: remember the original request, forget the endpoint
+                // that was chosen for it, and run the rest of the pipeline for the not-found address in a new scope
+                var originalPath = http.Request.Path;
+                var originalQuery = http.Request.QueryString;
+                var originalServices = http.RequestServices;
+
+                // Blazor reads this feature to see that the page is the answer to an earlier 404 and keeps the status
+                http.Features.Set<IStatusCodeReExecuteFeature>(new ReExecuteFeature
+                {
+                    OriginalPathBase = http.Request.PathBase.Value ?? string.Empty,
+                    OriginalPath = originalPath.Value ?? string.Empty,
+                    OriginalQueryString = originalQuery.HasValue ? originalQuery.Value : null,
+                    OriginalStatusCode = http.Response.StatusCode,
+                    Endpoint = http.GetEndpoint(),
+                    RouteValues = http.Features.Get<IRouteValuesFeature>()?.RouteValues
+                });
+                http.SetEndpoint(null);
+                http.Features.Get<IRouteValuesFeature>()?.RouteValues?.Clear();
+                http.Request.Path = NotFoundPath;
+                http.Request.QueryString = QueryString.Empty;
+                using var scope = originalServices.CreateScope();
+                http.RequestServices = scope.ServiceProvider;
+                try
+                {
+                    await status.Next(http);
+                }
+                finally
+                {
+                    http.Request.Path = originalPath;
+                    http.Request.QueryString = originalQuery;
+                    http.RequestServices = originalServices;
+                    http.Features.Set<IStatusCodeReExecuteFeature>(null);
+                }
+            }));
+    }
+
+    /// <summary>
+    ///     Tells whether a request asks for a page, which may be answered by the not-found page.
+    /// </summary>
+    /// <param name="request">The request to classify. Must not be null.</param>
+    /// <returns><c>true</c> for a GET or HEAD request outside the reserved prefixes and without a file extension.</returns>
+    private static bool IsPageRequest(HttpRequest request)
+    {
+        if (!HttpMethods.IsGet(request.Method) && !HttpMethods.IsHead(request.Method))
+        {
+            return false;
+        }
+
+        if (ReservedPrefixes.Any(prefix => request.Path.StartsWithSegments(prefix, StringComparison.OrdinalIgnoreCase)))
+        {
+            return false;
+        }
+
+        return !Path.HasExtension(request.Path.Value);
+    }
+
+    /// <summary>
     ///     Creates the database folder and schema for a built application.
     /// </summary>
     /// <param name="app">The built application whose services provide the database settings.</param>
@@ -462,5 +562,29 @@ internal static class ServerHost
 #pragma warning disable CA1848 // Single start-up entry; a LoggerMessage delegate adds no value here
         logger.LogInformation("ReviewCenter server started and listening on {Urls}", urls);
 #pragma warning restore CA1848
+    }
+
+    /// <summary>
+    ///     The record of the original request that <see cref="UseNotFoundPage"/> publishes while it re-executes.
+    /// </summary>
+    private sealed class ReExecuteFeature : IStatusCodeReExecuteFeature
+    {
+        /// <inheritdoc />
+        public string OriginalPathBase { get; set; } = string.Empty;
+
+        /// <inheritdoc />
+        public string OriginalPath { get; set; } = string.Empty;
+
+        /// <inheritdoc />
+        public string? OriginalQueryString { get; set; }
+
+        /// <inheritdoc />
+        public int OriginalStatusCode { get; set; }
+
+        /// <inheritdoc />
+        public Endpoint? Endpoint { get; set; }
+
+        /// <inheritdoc />
+        public RouteValueDictionary? RouteValues { get; set; }
     }
 }

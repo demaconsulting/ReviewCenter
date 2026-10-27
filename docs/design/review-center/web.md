@@ -135,8 +135,10 @@ registered git repositories.
 
 - *Type*: HTTP `GET`.
 - *Role*: Provider.
-- *Contract*: The shell is returned with a "Page not found" page, inside the header and footer of the page frame, in
-  place of a page.
+- *Contract*: The shell is returned with status 404 and a "Page not found" page, inside the header and footer of the
+  page frame, in place of a page (`/not-found` is re-executed for the request, see `UseNotFoundPage` of `ServerHost`).
+  A request that is not a page request (a method other than GET or HEAD, a path under `/api`, `/_framework`,
+  `/_blazor`, or `/_content`, or a path that ends in a file extension) keeps a plain, empty 404.
 - *Constraints*: None.
 
 **Client script** (`/_framework/blazor.web.js`): Referenced by the shell.
@@ -159,8 +161,9 @@ registered git repositories.
 The subsystem uses the standard Blazor Server hosting model. `App` is rendered as static
 server-side markup: it emits the HTML document, the page head outlet, a small inline script that applies the stored
 appearance before the first paint, the router, and the client script reference. `Routes` (part of the `App` unit)
-matches the requested URL to a page component, with `HomePage` registered at the root route, and renders a
-not-found page, inside `MainLayout`, for unmatched URLs. The routes that end in `new` (`/projects/new`, `/projects/{id}/reviews/new`,
+matches the requested URL to a page component, with `HomePage` registered at the root route, and renders the not-found
+page (`NotFoundPage`, registered at `/not-found`) inside `MainLayout` for unmatched URLs. The routes that end in `new`
+(`/projects/new`, `/projects/{id}/reviews/new`,
 `/repositories/new`, `/users/new`) are matched before the parameterized routes of the same shape. Each interactive
 page opts in to interactive server rendering, so only the
 page, not the shell, holds a live connection. `HomePage`, `AboutPage`, `LoginPage`, and the help pages are static

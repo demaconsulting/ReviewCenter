@@ -326,6 +326,7 @@ reviews:
       - "docs/verification/review-center/web/app.md"
       - "src/**/Web/App.razor"
       - "src/**/Web/Routes.razor"
+      - "src/**/Web/NotFoundPage.razor"
       - "src/**/Web/_Imports.razor"
       - "src/**/Web/MainLayout.razor"
       - "src/**/Web/MainLayout.razor.cs"

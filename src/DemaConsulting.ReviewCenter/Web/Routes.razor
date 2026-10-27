@@ -1,8 +1,9 @@
 @* Routes: maps the requested URL to a page component (part of the App unit).
 
-   Unknown URLs fall through to a "Page not found" page, shown inside MainLayout so that it has the same header
-   and footer as every other page, and so that a mistyped address gives the user a clear answer and a way back
-   instead of a blank page.
+   Unknown URLs fall through to NotFoundPage ("Page not found"), shown inside MainLayout so that it has the same
+   header and footer as every other page, and so that a mistyped address gives the user a clear answer and a way
+   back instead of a blank page. For a request to the server the same page is served by re-executing the 404
+   (see ServerHost), because a URL that no page handles never reaches this router.
 
    AuthorizeRouteView applies the [Authorize] rules of a page also when the user navigates inside an open
    interactive circuit, where the endpoint check does not run (RouteView would ignore them). A signed-out
@@ -13,7 +14,7 @@
    An open page whose user is disabled, removed or changed is handled by SessionGate inside the page. *@
 @using Microsoft.AspNetCore.Components.Authorization
 @inject NavigationManager Navigation
-<Router AppAssembly="typeof(Routes).Assembly">
+<Router AppAssembly="typeof(Routes).Assembly" NotFoundPage="typeof(NotFoundPage)">
     <Found Context="routeData">
         <AuthorizeRouteView RouteData="routeData" DefaultLayout="typeof(MainLayout)">
             <NotAuthorized Context="state">
@@ -36,15 +37,6 @@
             </NotAuthorized>
         </AuthorizeRouteView>
     </Found>
-    <NotFound>
-        <LayoutView Layout="typeof(MainLayout)">
-            <main class="page narrow" data-testid="not-found">
-                <h1>Page not found</h1>
-                <p>The address you asked for does not match any page. It may have been mistyped or the page may have moved.</p>
-                <p><a class="action outline" href="/projects" data-testid="not-found-projects-link">Back to projects</a></p>
-            </main>
-        </LayoutView>
-    </NotFound>
 </Router>
 
 @code {

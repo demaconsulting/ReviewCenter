@@ -71,6 +71,91 @@ public class AppTests : PageTestBase
     }
 
     /// <summary>
+    ///     Test that a request to the running server for an address that no page handles is answered with status 404
+    ///     and the framed not-found page, with the header brand link and the footer.
+    /// </summary>
+    [Fact]
+    public async Task App_Request_UnknownPath_Returns404WithFramedNotFoundPage()
+    {
+        // Arrange: start the real pipeline in memory
+        var logs = new CapturingLoggerProvider();
+        await using var app = await TestWebApp.StartAsync(logs, "serve", "--silent");
+        using var client = app.GetTestClient();
+
+        // Act: request an address that no page handles
+        var response = await client.GetAsync("/no-such-page?x=1", TestContext.Current.CancellationToken);
+        var html = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
+
+        // Assert: 404 with the not-found page inside the page frame
+        Assert.Equal(System.Net.HttpStatusCode.NotFound, response.StatusCode);
+        Assert.Contains("data-testid=\"not-found\"", html, StringComparison.Ordinal);
+        Assert.Contains("Page not found", html, StringComparison.Ordinal);
+        Assert.Contains("data-testid=\"home-link\"", html, StringComparison.Ordinal);
+        Assert.Contains("data-testid=\"footer\"", html, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    ///     Test that an unknown address under the reserved <c>/api</c> prefix keeps a plain 404 without the page frame.
+    /// </summary>
+    [Fact]
+    public async Task App_Request_UnknownApiPath_Returns404WithoutPageFrame()
+    {
+        // Arrange: start the real pipeline in memory
+        var logs = new CapturingLoggerProvider();
+        await using var app = await TestWebApp.StartAsync(logs, "serve", "--silent");
+        using var client = app.GetTestClient();
+
+        // Act: request an unknown machine-client address
+        var response = await client.GetAsync("/api/anything", TestContext.Current.CancellationToken);
+        var body = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
+
+        // Assert: 404 and no HTML page
+        Assert.Equal(System.Net.HttpStatusCode.NotFound, response.StatusCode);
+        Assert.DoesNotContain("data-testid=\"footer\"", body, StringComparison.Ordinal);
+        Assert.DoesNotContain("Page not found", body, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    ///     Test that an unknown address that ends in a file extension keeps a plain 404 without the page frame.
+    /// </summary>
+    [Fact]
+    public async Task App_Request_UnknownFilePath_Returns404WithoutPageFrame()
+    {
+        // Arrange: start the real pipeline in memory
+        var logs = new CapturingLoggerProvider();
+        await using var app = await TestWebApp.StartAsync(logs, "serve", "--silent");
+        using var client = app.GetTestClient();
+
+        // Act: request a missing style sheet
+        var response = await client.GetAsync("/missing.css", TestContext.Current.CancellationToken);
+        var body = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
+
+        // Assert: 404 and no HTML page
+        Assert.Equal(System.Net.HttpStatusCode.NotFound, response.StatusCode);
+        Assert.DoesNotContain("Page not found", body, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    ///     Test that a non-page request (a POST) to an unknown address keeps a plain 404 without the page frame.
+    /// </summary>
+    [Fact]
+    public async Task App_Request_PostToUnknownPath_Returns404WithoutPageFrame()
+    {
+        // Arrange: start the real pipeline in memory
+        var logs = new CapturingLoggerProvider();
+        await using var app = await TestWebApp.StartAsync(logs, "serve", "--silent");
+        using var client = app.GetTestClient();
+
+        // Act: post to an unknown address
+        var response = await client.PostAsync("/no-such-page", new StringContent(string.Empty), TestContext.Current.CancellationToken);
+        var body = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
+
+        // Assert: the 404 is not turned into the not-found page
+        Assert.Equal(System.Net.HttpStatusCode.NotFound, response.StatusCode);
+        Assert.DoesNotContain("Page not found", body, StringComparison.Ordinal);
+    }
+
+    /// <summary>
     ///     Test that the router shows a not-found message for an unknown URL.
     /// </summary>
     [Fact]

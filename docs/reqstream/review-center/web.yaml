@@ -26,6 +26,7 @@ sections:
         children:
           - ReviewCenter-App-Shell
           - ReviewCenter-App-Routing
+          - ReviewCenter-App-NotFoundPage
           - ReviewCenter-HomePage-Title
           - ReviewCenter-HomePage-Anonymous
           - ReviewCenter-HomePage-GetStarted
