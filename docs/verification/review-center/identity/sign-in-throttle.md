@@ -24,8 +24,8 @@ N/A - standard test environment. The tests need no database, no files, and no ne
 - A refused attempt uses up no slot.
 - A missing address or name is handled.
 - A flood of distinct keys cannot grow the table past its cap; when the table is full, expired counters are removed
-  first, and only then the oldest live counters are evicted, one at a time and only as far as needed, so the counters
-  of the current attempt and the recent ones are kept.
+  first (all of them, even when the clock has stepped backwards), and only then the oldest live counters are evicted,
+  one at a time and only as far as needed, so the counters of the current attempt and the recent ones are kept.
 - An attempt that needs one new key does not evict anything for the key that exists.
 - A success clears the counter of the name and gives the slot back to the address only when the window that was counted
   is still the current one; a window that has been replaced (after the window passed, an eviction, or `Reset`) is not
@@ -81,6 +81,12 @@ name key is new; the attempt makes room for one key, not two. This scenario is t
 **SignInThrottle_TryBegin_TableFullOfExpiredKeys_PrunesExpiredBeforeEvictingLiveOnes**: The table is full, its keys
 have expired, and a live key was added later; the expired keys are removed and the live counter survives. This
 scenario is tested by `SignInThrottle_TryBegin_TableFullOfExpiredKeys_PrunesExpiredBeforeEvictingLiveOnes`.
+
+**SignInThrottle_TryBegin_ClockSteppedBackwards_PrunesExpiredBeforeEvictingLiveOnes**: A live counter is created, the
+clock is stepped back and the table is filled with counters that then expire, so the live counter is first in the
+creation order but not the oldest by start time. A new attempt arrives when the table is full; all expired counters
+are removed wherever they are in the order and the live counter survives. This scenario is tested by
+`SignInThrottle_TryBegin_ClockSteppedBackwards_PrunesExpiredBeforeEvictingLiveOnes`.
 
 **SignInThrottle_Succeeded_AfterWindowRolledOver_DoesNotClearNewNameCounter**: A reservation is taken, the window
 passes, a new window of the name is counted, and then the success of the first reservation is reported; the counter of

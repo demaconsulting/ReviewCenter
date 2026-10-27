@@ -23,8 +23,10 @@ lower-cased with the invariant culture and cut to 64 characters, so a long name 
 `unknown`. An IPv6 address is one address as a whole (there is no grouping by prefix).
 
 **Order**: a linked list of the keys in the order their windows were created, oldest first. Windows have a fixed
-length and are created in clock order, so the expired windows are a prefix of the list and removing them (or the
-oldest ones) costs O(1) per removed key; there is never a scan of the whole table under the lock.
+length. While the clock only moves forward the expired windows are a prefix of the list, and removing that prefix (or
+the oldest ones) costs O(1) per removed key. A clock that steps backwards breaks this, because the creation order is then
+not the order of the start times; so the prefix is only a cheap first step, and the whole table is scanned only when
+it is full (see the table cap below).
 
 **Generation**: a `long` taken from a counter that only grows (not even `Reset` restarts it). A window gets a new
 generation when it is created, keeps it while it is counted in, and a window that replaces an expired one of the same
@@ -84,16 +86,20 @@ attempts.
 application itself never calls it. Generations are not reused, so reservations from before a reset stay stale.
 
 **Table cap**: The table holds at most `MaxKeys` (10,000) counters, so the memory use is bounded. Before a key is
-added, the windows that have passed are removed from the head of the order; when the table is still too full, only as
-many of the oldest windows as are needed are evicted (skipping the two keys of the current request, so at most two
-skips). The table is never cleared as a whole, so one flood of fresh keys cannot reset every counter at once. Each
-client address needs one address key and one name key per name it tries. Residual risk: one address creates at most
+added, the windows that have passed are removed from the head of the order; when the table would still pass the cap,
+all keys are scanned (at most 10,000, only on this full path) and every window that has passed is removed wherever it
+is in the order. When the table is still too full, only as many of the oldest windows (by creation order) as are
+needed are evicted (skipping the two keys of the current request, so at most two skips). Removed windows are never
+refunded to, because a reservation only matches the generation of its own window. The table is never cleared as a
+whole, so one flood of fresh keys cannot reset every counter at once. Each client address needs one address key and
+one name key per name it tries. Residual risk: one address creates at most
 `MaxFailuresPerAddress` name keys per window, so filling the table with live counters inside one window takes a few
 hundred source addresses (for example an IPv6 /64, or a forged forwarded header, see the limitations below) and about
 10,000 requests. Such a distributed flood can push out older counters, including its own, so the throttle degrades
 toward failing open for those clients; it never refuses anybody because of the cap, and the account lockout (kept in
 the database) still applies. A clock that steps backwards leaves a window in the table until time catches up; the
-limits still hold, because a counter checks its own age.
+limits still hold, because a counter checks its own age, and the scan of a full table removes expired windows
+wherever they are in the order.
 
 #### Error Handling
 

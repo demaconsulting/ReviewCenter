@@ -61,6 +61,7 @@ sections:
           - SignInThrottle_TryBegin_TableFull_EvictsOldestCountersAndKeepsRecentOnes
           - SignInThrottle_TryBegin_OneKeyMissing_DoesNotEvictForTheExistingAddressKey
           - SignInThrottle_TryBegin_TableFullOfExpiredKeys_PrunesExpiredBeforeEvictingLiveOnes
+          - SignInThrottle_TryBegin_ClockSteppedBackwards_PrunesExpiredBeforeEvictingLiveOnes
 
       - id: ReviewCenter-SignInThrottle-Reservation
         title: >-

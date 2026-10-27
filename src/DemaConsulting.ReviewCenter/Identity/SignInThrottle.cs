@@ -129,7 +129,14 @@ internal sealed class SignInThrottle
             }
 
             // Only keys that are not in the table need a new slot
-            var missing = (_windows.ContainsKey(nameKey) ? 0 : 1) + (_windows.ContainsKey(addressKey) ? 0 : 1);
+            var missing = MissingKeys(nameKey, addressKey);
+            if (_windows.Count + missing > MaxKeys)
+            {
+                // The table is full: look at every window, because a clock that stepped backwards breaks the order
+                PruneAllExpired(now, window);
+                missing = MissingKeys(nameKey, addressKey);
+            }
+
             MakeRoom(missing, nameKey, addressKey);
             var nameGeneration = Increment(nameKey, now, window);
             var addressGeneration = Increment(addressKey, now, window);
@@ -274,7 +281,9 @@ internal sealed class SignInThrottle
     }
 
     /// <summary>
-    ///     Removes the windows that have passed. Windows are created in clock order, so they are a prefix of the order.
+    ///     Removes the windows that have passed from the head of the order. This is cheap and is enough while the clock
+    ///     only moves forward; when the clock has stepped backwards the order is not the order of the start times, so
+    ///     this can stop early and <see cref="PruneAllExpired"/> finishes the work when the table is full.
     /// </summary>
     /// <param name="now">The current time.</param>
     /// <param name="window">The window length.</param>
@@ -293,7 +302,41 @@ internal sealed class SignInThrottle
     }
 
     /// <summary>
-    ///     Makes sure the table can take more keys: removes the oldest windows, and only as many as are needed.
+    ///     Removes every window that has passed, wherever it is in the order. It scans the whole table (at most
+    ///     <see cref="MaxKeys"/> windows), so it is used only when the table is full.
+    /// </summary>
+    /// <param name="now">The current time.</param>
+    /// <param name="window">The window length.</param>
+    private void PruneAllExpired(DateTimeOffset now, TimeSpan window)
+    {
+        var node = _order.First;
+        while (node is not null)
+        {
+            var next = node.Next;
+            var entry = _windows[node.Value];
+            if (now - entry.Start >= window)
+            {
+                RemoveWindow(node.Value, entry);
+            }
+
+            node = next;
+        }
+    }
+
+    /// <summary>
+    ///     Counts the keys of this attempt that are not in the table.
+    /// </summary>
+    /// <param name="nameKey">The name key of this attempt.</param>
+    /// <param name="addressKey">The address key of this attempt.</param>
+    /// <returns>The number of keys that need a new slot, 0 to 2.</returns>
+    private int MissingKeys(string nameKey, string addressKey)
+    {
+        return (_windows.ContainsKey(nameKey) ? 0 : 1) + (_windows.ContainsKey(addressKey) ? 0 : 1);
+    }
+
+    /// <summary>
+    ///     Makes sure the table can take more keys: removes the oldest windows by creation order, and only as many as
+    ///     are needed. The expired windows have already been removed by <see cref="PruneAllExpired"/>.
     /// </summary>
     /// <param name="missing">The number of keys that are about to be added.</param>
     /// <param name="nameKey">The name key of this attempt, which is never removed.</param>

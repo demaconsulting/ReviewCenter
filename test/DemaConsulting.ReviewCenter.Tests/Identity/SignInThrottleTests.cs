@@ -361,6 +361,35 @@ public class SignInThrottleTests
     }
 
     /// <summary>
+    ///     Test that a full table removes expired counters wherever they are in the creation order, so a clock that
+    ///     stepped backwards does not cause a live counter to be evicted before expired ones.
+    /// </summary>
+    [Fact]
+    public void SignInThrottle_TryBegin_ClockSteppedBackwards_PrunesExpiredBeforeEvictingLiveOnes()
+    {
+        // Arrange: a live name at its limit is created at +100 s; the clock then steps back to 0 and fills the table
+        var throttle = CreateWithHighAddressLimit(out var clock);
+        clock.Advance(TimeSpan.FromSeconds(100));
+        for (var i = 0; i < 3; i++)
+        {
+            Assert.True(Allowed(throttle, "10.0.0.1", "live"));
+        }
+
+        clock.Advance(TimeSpan.FromSeconds(-100));
+        FillTo(throttle, "10.0.0.2", "expiring", SignInThrottle.MaxKeys);
+        Assert.Equal(SignInThrottle.MaxKeys, throttle.KeyCount());
+
+        // Act: at +61 s the filler windows (started at 0) have passed, the live one (started at +100) has not
+        clock.Advance(TimeSpan.FromSeconds(61));
+        var allowed = Allowed(throttle, "10.0.0.3", "fresh");
+
+        // Assert: the expired fillers are gone and the live counter was not evicted, so its name is still refused
+        Assert.True(allowed);
+        Assert.True(throttle.KeyCount() < SignInThrottle.MaxKeys - 1000);
+        Assert.False(Allowed(throttle, "10.0.0.1", "live"));
+    }
+
+    /// <summary>
     ///     Test that a success from before a window rollover does not clear the new name counter.
     /// </summary>
     [Fact]
