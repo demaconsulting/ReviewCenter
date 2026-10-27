@@ -17,6 +17,8 @@ N/A - standard test environment (temporary SQLite databases are created by the t
 - All tests pass with zero failures.
 - The page is served to a visitor who is not signed in, and has the user name, password, and sign-in controls.
 - The error "Invalid user name or password." is shown only after a failed sign-in.
+- The message "Too many sign-in attempts. Try again in a few minutes." is shown when the error flag is `throttled`,
+  and the generic message is not.
 - The hidden return URL field carries only a local path, and `/` for any other value.
 - A failed sign-in comes back to this page with the error flag and the return URL kept.
 
@@ -33,3 +35,7 @@ for the login page is answered with status 200. This scenario is tested by `Sign
 **SignIn_Login_WrongPasswordWithReturnUrl_KeepsReturnUrlOnLoginPage**: Sign-in with a wrong password and a return URL
 is redirected to this page with the error flag and the same return URL. This scenario is tested by
 `SignIn_Login_WrongPasswordWithReturnUrl_KeepsReturnUrlOnLoginPage`.
+
+**SignIn_LoginPage_ThrottledError_ShowsTooManyAttemptsMessage**: The page is requested with the error flag
+`throttled`; it shows the "too many attempts" message and not the generic error. This scenario is tested by
+`SignIn_LoginPage_ThrottledError_ShowsTooManyAttemptsMessage`.

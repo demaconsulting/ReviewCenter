@@ -29,9 +29,9 @@ namespace DemaConsulting.ReviewCenter.Core;
 ///     change and remove slots, but only while the slot has no signature at all (current or out of date),
 ///     because a signature must always point to a slot that still describes who signed. A user occupies at
 ///     most one slot of a review.
-///     Signing needs the signer's password again: it is checked by <see cref="UserService.AuthenticateAsync"/>,
+///     Signing needs the signer's password again: it is checked by <see cref="UserService.ReauthenticateAsync"/>,
 ///     the same path the login uses, so the hasher, the lockout counting and the single generic failure are the
-///     same as at login. The signer is the <see cref="Actor"/> taken from the signed-in principal, never a form
+///     same as at login; a failure is recorded in the audit trail as <c>signature.reauth-failed</c>. The signer is the <see cref="Actor"/> taken from the signed-in principal, never a form
 ///     field, and the password is neither stored, logged nor put in a message. A signature is allowed only when
 ///     every applicable check is answered, none is answered Fail and no thread is open; otherwise the blockers
 ///     are returned as plain sentences. A signature is current only while its digest (see
@@ -388,8 +388,9 @@ public sealed class SigningService
                     "The review cannot be signed yet: " + string.Join("; ", blockers) + ".");
             }
 
-            // Re-authenticate through the login path, unchanged; every failure looks the same
-            var verified = await _users.AuthenticateAsync(actor.Username, password, cancellationToken);
+            // Re-authenticate through the login path (same hasher, lockout and generic failure); a failure is
+            // recorded as a failed re-authentication, not as a failed sign-in
+            var verified = await _users.ReauthenticateAsync(actor.Username, password, cancellationToken);
             if (verified is null || verified.Id != user.Id)
             {
                 throw new DomainRuleException(DomainRule.ReauthenticationFailed, "The password is incorrect.");

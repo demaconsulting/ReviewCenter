@@ -4,7 +4,8 @@
    antiforgery token), so signing in works without a live connection and the endpoint can set the cookie.
    The return address travels in a hidden field and is checked again by the endpoint. A failed attempt comes
    back here with "error=1"; the message is the same whatever went wrong, so it never reveals whether a user
-   name exists. *@
+   name exists. A client that made too many attempts comes back with "error=throttled" and a message that is
+   the same for every name; any other non-empty value shows the generic message. *@
 @page "/login"
 
 <PageTitle>Sign in - ReviewCenter</PageTitle>
@@ -26,7 +27,11 @@
                 <input id="login-password" name="password" type="password" autocomplete="current-password"
                        data-testid="login-password-input" />
             </div>
-            @if (Failed)
+            @if (Throttled)
+            {
+                <p class="error" role="alert" data-testid="login-throttled">Too many sign-in attempts. Try again in a few minutes.</p>
+            }
+            else if (Failed)
             {
                 <p class="error" role="alert" data-testid="login-error">Invalid user name or password.</p>
             }

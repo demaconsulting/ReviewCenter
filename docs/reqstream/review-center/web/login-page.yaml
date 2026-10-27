@@ -19,11 +19,16 @@ sections:
 
       - id: ReviewCenter-LoginPage-Error
         title: >-
-          The LoginPage unit shall show one message for a failed sign-in, whatever the reason, and shall keep a
-          local return address through a failed sign-in while ignoring one that leads to another site.
+          The LoginPage unit shall show one message for a failed sign-in, whatever the reason, shall show a
+          different message, saying that there were too many attempts and to try again in a few minutes, only
+          when the sign-in was refused by the throttle, and shall keep a local return address through a failed
+          sign-in while ignoring one that leads to another site.
         justification: |
           A message that differed by reason would tell an attacker which user names exist, and a return address
-          that could lead to another site would turn the login page into a way to send users elsewhere.
+          that could lead to another site would turn the login page into a way to send users elsewhere. The
+          throttle refuses by client address and not by account, so its message may differ without telling
+          anything about an account, and it tells a real user why the right password does not work now.
         tests:
           - SignIn_Login_WrongPasswordWithReturnUrl_KeepsReturnUrlOnLoginPage
           - SignIn_LoginPage_ErrorAndReturnUrl_AreShownSafely
+          - SignIn_LoginPage_ThrottledError_ShowsTooManyAttemptsMessage

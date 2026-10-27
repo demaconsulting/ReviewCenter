@@ -33,6 +33,7 @@ input-files:
   - docs/verification/review-center/identity.md
   - docs/verification/review-center/identity/password-hasher.md
   - docs/verification/review-center/identity/sign-in.md
+  - docs/verification/review-center/identity/sign-in-throttle.md
   - docs/verification/review-center/web.md
   - docs/verification/review-center/web/app.md
   - docs/verification/review-center/web/home-page.md

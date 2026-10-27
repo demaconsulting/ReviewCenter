@@ -47,7 +47,10 @@ public sealed record AuditEntryPage(IReadOnlyList<AuditEntry> Entries, bool HasO
 ///     <see cref="IReviewStore"/>); this service records the events that change no data and offers the
 ///     read and verification side. <see cref="TryRecordAsync"/> never throws for a storage failure, so a
 ///     problem with the trail cannot lock a person out; the failure is reported through the error hook given
-///     at construction. The service is stateless and thread-safe.
+///     at construction. <see cref="TryRecordCoalescedAsync"/> bounds how many rows a repeating event (one that
+///     anybody can trigger as often as they like) can add: the first event of a key in a one-minute window is
+///     stored and the repeats are only counted. The counts live in memory, behind one lock that is never held
+///     across an await, so the service is thread-safe; the state is per process and lost on restart.
 /// </remarks>
 public sealed class AuditService
 {
@@ -62,6 +65,16 @@ public sealed class AuditService
     private const int VerifyBatchSize = 500;
 
     /// <summary>
+    ///     The most keys <see cref="TryRecordCoalescedAsync"/> tracks at once; also the most rows per window.
+    /// </summary>
+    public const int MaxCoalescedKeys = 500;
+
+    /// <summary>
+    ///     The length of the window in which repeats of a coalesced event are only counted.
+    /// </summary>
+    private static readonly TimeSpan CoalesceWindow = TimeSpan.FromMinutes(1);
+
+    /// <summary>
     ///     The store that persists the trail.
     /// </summary>
     private readonly IAuditStore _store;
@@ -72,16 +85,33 @@ public sealed class AuditService
     private readonly Action<Exception>? _onError;
 
     /// <summary>
+    ///     The clock for the coalescing windows.
+    /// </summary>
+    private readonly TimeProvider _timeProvider;
+
+    /// <summary>
+    ///     Guards <see cref="_windows"/>; never held across an await.
+    /// </summary>
+    private readonly object _windowsLock = new();
+
+    /// <summary>
+    ///     For each coalesced key, when its current window started and how many repeats it has suppressed.
+    /// </summary>
+    private readonly Dictionary<string, (DateTimeOffset Start, int Suppressed)> _windows = new(StringComparer.Ordinal);
+
+    /// <summary>
     ///     Initializes a new instance of the <see cref="AuditService"/> class.
     /// </summary>
     /// <param name="store">The store that persists the trail. Must not be null.</param>
     /// <param name="onError">Receives the failure of a best-effort record, for logging; may be <c>null</c>.</param>
+    /// <param name="timeProvider">The clock for the coalescing windows; <c>null</c> for the system clock.</param>
     /// <exception cref="ArgumentNullException">Thrown when <paramref name="store"/> is null.</exception>
-    public AuditService(IAuditStore store, Action<Exception>? onError = null)
+    public AuditService(IAuditStore store, Action<Exception>? onError = null, TimeProvider? timeProvider = null)
     {
         ArgumentNullException.ThrowIfNull(store);
         _store = store;
         _onError = onError;
+        _timeProvider = timeProvider ?? TimeProvider.System;
     }
 
     /// <summary>
@@ -128,6 +158,68 @@ public sealed class AuditService
 
             return false;
         }
+    }
+
+    /// <summary>
+    ///     Records a repeating event on a best-effort basis, at most once per key and minute.
+    /// </summary>
+    /// <param name="draft">What to record. Must not be null.</param>
+    /// <param name="key">Identifies the repeating event (for example the action and the account); repeats of one key share a window. Must not be null.</param>
+    /// <param name="cancellationToken">Cancels the operation; cancellation is not swallowed.</param>
+    /// <returns><c>true</c> when an entry was stored; <c>false</c> when the event was only counted, dropped or storing failed.</returns>
+    /// <remarks>
+    ///     The first event of a key is stored at once and starts a one-minute window; repeats inside the window
+    ///     are only counted. The first event of the next window is stored with the count of the repeats of the
+    ///     previous window appended to its detail, because entries are immutable and the count can only ride on
+    ///     a later one. The count of the last window is never stored when the key does not occur again. At most
+    ///     <see cref="MaxCoalescedKeys"/> keys are tracked: when the table is full, expired keys are removed, and
+    ///     if it is still full a new key is dropped (neither stored nor counted), which also bounds the rows
+    ///     per minute.
+    /// </remarks>
+    public Task<bool> TryRecordCoalescedAsync(AuditDraft draft, string key, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(draft);
+        ArgumentNullException.ThrowIfNull(key);
+
+        int carried;
+        lock (_windowsLock)
+        {
+            var now = _timeProvider.GetUtcNow();
+            if (_windows.TryGetValue(key, out var window))
+            {
+                if (now - window.Start < CoalesceWindow)
+                {
+                    _windows[key] = (window.Start, window.Suppressed + 1);
+                    return Task.FromResult(false);
+                }
+
+                carried = window.Suppressed;
+            }
+            else
+            {
+                carried = 0;
+                if (_windows.Count >= MaxCoalescedKeys)
+                {
+                    var expired = _windows.Where(pair => now - pair.Value.Start >= CoalesceWindow).Select(pair => pair.Key).ToList();
+                    foreach (var expiredKey in expired)
+                    {
+                        _windows.Remove(expiredKey);
+                    }
+
+                    if (_windows.Count >= MaxCoalescedKeys)
+                    {
+                        return Task.FromResult(false);
+                    }
+                }
+            }
+
+            _windows[key] = (now, 0);
+        }
+
+        var stored = carried == 0
+            ? draft
+            : draft with { Detail = $"{draft.Detail}; {carried} more in the minute after the previous entry" };
+        return TryRecordAsync(stored, cancellationToken);
     }
 
     /// <summary>

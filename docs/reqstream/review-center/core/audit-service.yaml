@@ -25,6 +25,26 @@ sections:
           - AuditService_TryRecordAsync_Cancellation_Propagates
           - AuditService_TryRecordAsync_NullDraft_Throws
 
+      - id: ReviewCenter-AuditService-Coalesce
+        title: >-
+          The AuditService class shall, for events that a caller can repeat without limit, record the first event of a
+          key in a one-minute window and count the repeats of that key in the window instead of recording them,
+          shall put the number of counted repeats into the detail of the first event of the key in the next window,
+          shall keep at most a fixed number of keys, dropping events of new keys when the table is full of keys that
+          have not expired, and shall report a failure of the store like the best-effort operation does.
+        justification: |
+          Failed sign-ins of unknown names and attempts on locked accounts are not limited by the account lockout.
+          Recording each of them would let an attacker fill the audit trail, and its database, at will. One row per
+          key and minute keeps the attack visible and the growth bounded. The count of the last window is lost when
+          the key does not occur again, because entries of the trail are never changed.
+        tests:
+          - AuditService_TryRecordCoalescedAsync_RepeatsWithinWindow_StoresOnlyTheFirst
+          - AuditService_TryRecordCoalescedAsync_NextWindow_StoresEntryWithSuppressedCount
+          - AuditService_TryRecordCoalescedAsync_DifferentKeys_StoreSeparateEntries
+          - AuditService_TryRecordCoalescedAsync_TooManyKeys_DropsNewKeysUntilWindowPasses
+          - AuditService_TryRecordCoalescedAsync_StoreFailure_IsSwallowedAndReported
+          - AuditService_TryRecordCoalescedAsync_NullArguments_Throw
+
       - id: ReviewCenter-AuditService-List
         title: >-
           The AuditService class shall list the audit trail newest first, 50 entries to a page, for the whole trail

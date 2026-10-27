@@ -211,6 +211,7 @@ sections:
           - ReviewCenter-AuditChain-Verify
           - ReviewCenter-AuditChain-Text
           - ReviewCenter-AuditService-Record
+          - ReviewCenter-AuditService-Coalesce
           - ReviewCenter-AuditService-List
           - ReviewCenter-AuditService-Verify
           - ReviewCenter-ProjectService-Audit
@@ -220,6 +221,8 @@ sections:
           - ReviewCenter-SigningService-Audit
           - ReviewCenter-UserService-Audit
           - ReviewCenter-UserService-SignInAudit
+          - ReviewCenter-UserService-ReauthAudit
+          - ReviewCenter-SigningService-ReauthAudit
           - ReviewCenter-RepositoryService-Audit
         tests:
           - AuditService_RecordAsync_Draft_StoresEntryThatVerifies

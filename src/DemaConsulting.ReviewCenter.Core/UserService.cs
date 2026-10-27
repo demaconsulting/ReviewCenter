@@ -27,9 +27,10 @@ namespace DemaConsulting.ReviewCenter.Core;
 ///     The service is the single place where user rules live: the user name and display name rules, the
 ///     password policy (12 to 128 characters, no composition rules, not trimmed), the lockout (5 consecutive
 ///     failures lock the account for 5 minutes) and the guarantee that at least one enabled administrator
-///     remains. <see cref="AuthenticateAsync"/> answers every failure with the same <c>null</c> (unknown user,
-///     wrong password, disabled and locked out), so a caller cannot tell the cases apart. Operations that change
-///     an existing user run one at a time (a semaphore), which makes the last-administrator check and the
+///     remains. <see cref="AuthenticateAsync"/> and <see cref="ReauthenticateAsync"/> answer every failure with
+///     the same <c>null</c> (unknown user, wrong password, disabled and locked out), so a caller cannot tell the
+///     cases apart; the audit trail does tell them apart (see <see cref="AuthenticateAsync"/>). Operations that
+///     change an existing user run one at a time (a semaphore), which makes the last-administrator check and the
 ///     failure counter race-free; the service must therefore be a single instance (a singleton).
 ///     Passwords and hashes are never logged or put into messages.
 /// </remarks>
@@ -39,6 +40,11 @@ public sealed class UserService
     ///     The number of consecutive failed password checks that locks an account.
     /// </summary>
     private const int MaxFailedAttempts = 5;
+
+    /// <summary>
+    ///     The audit action code of a failed re-authentication (for example at signature time).
+    /// </summary>
+    private const string ReauthFailedAction = "signature.reauth-failed";
 
     /// <summary>
     ///     How long an account stays locked after too many failures.
@@ -189,10 +195,60 @@ public sealed class UserService
     ///     wrong one counts, and the fifth consecutive failure locks the account for 5 minutes. While the
     ///     account is locked, attempts are refused without counting, even with the right password.
     /// </returns>
-    public async Task<User?> AuthenticateAsync(
+    /// <remarks>
+    ///     Every failure is recorded in the audit trail as <c>auth.sign-in-failed</c> (wrong password, disabled
+    ///     account, unknown user), the lockout as <c>auth.locked-out</c>, and an attempt on a locked account as
+    ///     <c>auth.sign-in-locked</c>. For an unknown user the entry carries the typed name, made one line and
+    ///     cut to <see cref="ReviewLimits.MaxUsernameLength"/> characters, and never the password. The unknown
+    ///     user and locked account entries are coalesced (see <see cref="AuditService.TryRecordCoalescedAsync"/>),
+    ///     because nothing else limits how often they can be triggered.
+    /// </remarks>
+    public Task<User?> AuthenticateAsync(
         string? username,
         string? password,
         CancellationToken cancellationToken = default)
+    {
+        return AuthenticateCoreAsync(username, password, false, cancellationToken);
+    }
+
+    /// <summary>
+    ///     Checks the password of the signed-in user again, for an action that needs a fresh proof of identity
+    ///     (signing a review).
+    /// </summary>
+    /// <param name="username">The user name of the signed-in user; compared without regard to case.</param>
+    /// <param name="password">The password to check.</param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <returns>
+    ///     The user when the password is right and the account is enabled and not locked out; otherwise
+    ///     <c>null</c> for every failure. The rules and the failure counting are those of
+    ///     <see cref="AuthenticateAsync"/>.
+    /// </returns>
+    /// <remarks>
+    ///     A failure is recorded as <c>signature.reauth-failed</c> (with the reason in the detail) instead of
+    ///     <c>auth.sign-in-failed</c>, so the trail shows where the wrong password was typed. A refusal for a
+    ///     locked account is recorded too, once per minute and account.
+    /// </remarks>
+    public Task<User?> ReauthenticateAsync(
+        string? username,
+        string? password,
+        CancellationToken cancellationToken = default)
+    {
+        return AuthenticateCoreAsync(username, password, true, cancellationToken);
+    }
+
+    /// <summary>
+    ///     Checks a user name and password; the shared path of sign-in and re-authentication.
+    /// </summary>
+    /// <param name="username">The user name; compared without regard to case.</param>
+    /// <param name="password">The password to check.</param>
+    /// <param name="reauthentication"><c>true</c> when the check is a re-authentication; <c>false</c> for a sign-in.</param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <returns>The user, or <c>null</c> for every failure.</returns>
+    private async Task<User?> AuthenticateCoreAsync(
+        string? username,
+        string? password,
+        bool reauthentication,
+        CancellationToken cancellationToken)
     {
         await _gate.WaitAsync(cancellationToken);
         try
@@ -203,7 +259,7 @@ public sealed class UserService
             if (user is null)
             {
                 VerifyDummy(password);
-                await RecordFailureAsync(null, "unknown user", cancellationToken);
+                await RecordUnknownUserAsync(username, reauthentication, cancellationToken);
                 return null;
             }
 
@@ -211,19 +267,24 @@ public sealed class UserService
             if (IsLockedOut(user))
             {
                 VerifyDummy(password);
+                await RecordCoalescedAsync(
+                    user,
+                    reauthentication ? ReauthFailedAction : "auth.sign-in-locked",
+                    "account locked",
+                    cancellationToken);
                 return null;
             }
 
             if (!_hasher.Verify(user.PasswordHash, password ?? string.Empty))
             {
-                await RegisterFailureAsync(user, cancellationToken);
+                await RegisterFailureAsync(user, reauthentication, cancellationToken);
                 return null;
             }
 
             // A disabled account never signs in, however right the password is
             if (!user.Enabled)
             {
-                await RecordFailureAsync(user, "account disabled", cancellationToken);
+                await RecordFailureAsync(user, "account disabled", reauthentication, cancellationToken);
                 return null;
             }
 
@@ -361,7 +422,7 @@ public sealed class UserService
 
             if (!_hasher.Verify(user.PasswordHash, currentPassword ?? string.Empty))
             {
-                await RegisterFailureAsync(user, cancellationToken);
+                await RegisterFailureAsync(user, false, cancellationToken);
                 throw CurrentPasswordIncorrect();
             }
 
@@ -485,9 +546,10 @@ public sealed class UserService
     ///     Counts a failed password check and starts the lockout when the limit is reached.
     /// </summary>
     /// <param name="user">The user, as read from the store.</param>
+    /// <param name="reauthentication"><c>true</c> when the check was a re-authentication, which changes the action code recorded.</param>
     /// <param name="cancellationToken">Cancels the operation.</param>
     /// <returns>A task that completes when the state is stored.</returns>
-    private async Task RegisterFailureAsync(User user, CancellationToken cancellationToken)
+    private async Task RegisterFailureAsync(User user, bool reauthentication, CancellationToken cancellationToken)
     {
         user.FailedLoginCount++;
         var lockedOut = user.FailedLoginCount >= MaxFailedAttempts;
@@ -500,7 +562,7 @@ public sealed class UserService
 
         // The counter and the lockout are state, not events: the events below are recorded separately
         await _store.UpdateAsync(user, null, cancellationToken);
-        await RecordFailureAsync(user, "wrong password", cancellationToken);
+        await RecordFailureAsync(user, "wrong password", reauthentication, cancellationToken);
         if (lockedOut)
         {
             await RecordAsync(
@@ -512,15 +574,62 @@ public sealed class UserService
     }
 
     /// <summary>
-    ///     Records a refused sign-in on a best-effort basis.
+    ///     Records a refused sign-in or re-authentication of a known account on a best-effort basis.
     /// </summary>
-    /// <param name="user">The account that was tried, or <c>null</c> when there is none; the typed text is never recorded.</param>
-    /// <param name="reason">The reason: <c>wrong password</c>, <c>account disabled</c> or <c>unknown user</c>.</param>
+    /// <param name="user">The account that was tried.</param>
+    /// <param name="reason">The reason: <c>wrong password</c> or <c>account disabled</c>.</param>
+    /// <param name="reauthentication"><c>true</c> for a re-authentication (<c>signature.reauth-failed</c>); <c>false</c> for a sign-in (<c>auth.sign-in-failed</c>).</param>
     /// <param name="cancellationToken">Cancels the operation.</param>
     /// <returns>A task that completes when the entry is stored or its failure has been reported.</returns>
-    private Task RecordFailureAsync(User? user, string reason, CancellationToken cancellationToken)
+    private Task RecordFailureAsync(User user, string reason, bool reauthentication, CancellationToken cancellationToken)
     {
-        return RecordAsync(user, "auth.sign-in-failed", reason, cancellationToken);
+        // These two are bounded by the lockout (wrong password) or by the number of disabled accounts, so every
+        // one of them is recorded
+        return RecordAsync(user, reauthentication ? ReauthFailedAction : "auth.sign-in-failed", reason, cancellationToken);
+    }
+
+    /// <summary>
+    ///     Records the refusal of an unknown user name on a best-effort basis, coalesced.
+    /// </summary>
+    /// <param name="typedName">The name that was typed; recorded after cleaning (one line, at most <see cref="ReviewLimits.MaxUsernameLength"/> characters). The password is never passed here.</param>
+    /// <param name="reauthentication"><c>true</c> for a re-authentication; <c>false</c> for a sign-in.</param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <returns>A task that completes when the entry is stored, skipped or its failure has been reported.</returns>
+    private Task RecordUnknownUserAsync(string? typedName, bool reauthentication, CancellationToken cancellationToken)
+    {
+        var name = AuditText.Clean(typedName, ReviewLimits.MaxUsernameLength);
+        return RecordCoalescedAsync(
+            null,
+            reauthentication ? ReauthFailedAction : "auth.sign-in-failed",
+            $"unknown user, name '{name}'",
+            cancellationToken,
+            name);
+    }
+
+    /// <summary>
+    ///     Records a sign-in event on a best-effort basis, at most once per minute for the same action, reason and name.
+    /// </summary>
+    /// <param name="user">The account, or <c>null</c> for an unknown user (recorded as plain <c>unknown user</c>).</param>
+    /// <param name="action">The action code.</param>
+    /// <param name="detail">The detail text.</param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <param name="typedName">The cleaned typed name for an unknown user; the user name of <paramref name="user"/> is used when <c>null</c>.</param>
+    /// <returns>A task that completes when the entry is stored, skipped or its failure has been reported.</returns>
+    private Task RecordCoalescedAsync(
+        User? user,
+        string action,
+        string detail,
+        CancellationToken cancellationToken,
+        string? typedName = null)
+    {
+        if (_audit is null)
+        {
+            return Task.CompletedTask;
+        }
+
+        var name = (typedName ?? user?.Username ?? string.Empty).ToLowerInvariant();
+        var key = $"{action}|{(user is null ? "unknown" : "account")}|{name}";
+        return _audit.TryRecordCoalescedAsync(BuildDraft(user, action, detail), key, cancellationToken);
     }
 
     /// <summary>
@@ -538,10 +647,21 @@ public sealed class UserService
             return;
         }
 
-        var draft = user is null
+        await _audit.TryRecordAsync(BuildDraft(user, action, detail), cancellationToken);
+    }
+
+    /// <summary>
+    ///     Builds the audit draft of a sign-in event.
+    /// </summary>
+    /// <param name="user">The account, or <c>null</c> for an unknown user.</param>
+    /// <param name="action">The action code.</param>
+    /// <param name="detail">The detail text.</param>
+    /// <returns>The draft; the actor is the account, or the plain text <c>unknown user</c>.</returns>
+    private static AuditDraft BuildDraft(User? user, string action, string detail)
+    {
+        return user is null
             ? new AuditDraft(action, null, "unknown user", null, null, detail)
             : AuditDraft.By(new Actor(user.Username, user.DisplayName), action, detail);
-        await _audit.TryRecordAsync(draft, cancellationToken);
     }
 
     /// <summary>

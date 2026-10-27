@@ -33,6 +33,7 @@ input-files:
   - docs/design/review-center/identity.md
   - docs/design/review-center/identity/password-hasher.md
   - docs/design/review-center/identity/sign-in.md
+  - docs/design/review-center/identity/sign-in-throttle.md
   - docs/design/review-center/web.md
   - docs/design/review-center/web/app.md
   - docs/design/review-center/web/home-page.md

@@ -73,10 +73,14 @@ is one.
    Review it and try again."), so nobody signs something they have not seen.
 5. The slot has no signature of the current digest yet (`SigningNotAllowed`).
 6. There are no blockers (`SigningNotAllowed`, with the blockers in the message).
-7. The password is right: it is checked by `UserService.AuthenticateAsync`, the path the sign-in uses, so the hashing,
-   the lockout counting, and the generic failure are the same. Any failure (wrong, locked out, disabled, unknown) gives
+7. The password is right: it is checked by `UserService.ReauthenticateAsync`, which is the check the sign-in uses with
+   its own action code, so the hashing, the lockout counting, and the generic failure are the same. Any failure (wrong,
+   locked out, disabled, unknown) gives
    `ReauthenticationFailed` with the message "The password is incorrect." and signs nothing. A wrong password at a
-   signature counts toward the same lockout as at sign-in.
+   signature counts toward the same lockout as at sign-in, and `UserService` records the failure in the audit trail as
+   `signature.reauth-failed` (a wrong password, a locked account, and so on, never the password), so the trail shows
+   that the password was tried at a signature and not at sign-in. A signature attempt is not throttled by client
+   address: the signer is already signed in, and the lockout applies.
 8. The signature is stored by `IReviewStore.AddSignatureAsync`, which recomputes the digest inside a serializable
    transaction and refuses the signature when the record changed since step 4.
 
@@ -152,7 +156,8 @@ never contain a password or a hash. An infrastructure failure of the store passe
 #### Dependencies
 
 - **IReviewStore** — reads the record, the slots, and the signatures, and stores slots and signatures.
-- **UserService** — looks up users, lists them for the candidates, and re-authenticates the signer.
+- **UserService** — looks up users, lists them for the candidates, and re-authenticates the signer
+  (`ReauthenticateAsync`).
 - **RecordDigest** — calculates the digest of the record.
 - **ThreadService** — `NextStep` words the next step when signing is blocked.
 - **ChecklistState** — decides which sections apply and what the answers are.

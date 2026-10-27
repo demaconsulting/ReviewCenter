@@ -29,6 +29,7 @@ flowchart TD
     subgraph Identity
         PasswordHasher
         SignIn
+        SignInThrottle
         RevalidatingAuthenticationStateProvider
     end
     subgraph Web
@@ -123,6 +124,7 @@ flowchart TD
     AuditCommand --> DatabaseSetup
     AuditCommand --> AuditService
     SignIn --> UserService
+    SignIn --> SignInThrottle
     SignIn --> AuditService
     RevalidatingAuthenticationStateProvider --> SignIn
     RevalidatingAuthenticationStateProvider --> UserService
@@ -233,7 +235,8 @@ actions are handled on the server.
 
 The `Identity` subsystem is the web side of local accounts: `SignIn` configures cookie authentication and
 authorization, checks a password through `UserService`, signs the user in and out, and tells the pages who is signed
-in; `RevalidatingAuthenticationStateProvider` re-checks the user of every open page at a fixed interval with the same rule
+in; `SignInThrottle` limits the failed sign-in attempts per client address and typed name, in memory;
+`RevalidatingAuthenticationStateProvider` re-checks the user of every open page at a fixed interval with the same rule
 as the cookie check and ends the sign-in state of the page when the user is no longer valid; `PasswordHasher` hashes and
 verifies passwords with the password hasher of the ASP.NET Core shared framework.
 
@@ -315,9 +318,12 @@ before the identity slice, before the signature slice (it has no reviewer slot a
 audit trail (it has no audit table), before the repository registry (it has no `Repositories` table), or before reviews
 from a repository (its reviews have no source columns) must be
 deleted and created again, because there are no migrations.
-The limitations of the audit trail are also deliberate: a failed sign-in on an account that is already locked is not
-recorded, and failed sign-ins for unknown user names are not throttled; a wrong current password when signing or on
-the account page appears as `auth.sign-in-failed`; recording of
+The limitations of the audit trail are also deliberate: the throttle and the coalescing of repeated failure entries
+(one entry per key and minute, with a count of the suppressed repeats) are kept in memory, so they are per process and
+start again at a restart, and the count of the last window of a key is lost when the key does not recur; the typed
+name of an unknown user is recorded, cleaned and cut to 50 characters, but the address of the client is not recorded
+in the trail (only the web server log has it); a wrong current password on the account page appears as
+`auth.sign-in-failed`, and an attempt there on a locked account is not recorded; recording of
 sign-in, sign-out, failed sign-in, and lockout is best effort and a failure is only logged; and there is no export,
 retention, or archiving of the trail.
 
@@ -357,7 +363,9 @@ is running.
   tagline. `GET /health` returns HTTP status 200 with the plain text
   `Healthy`. `GET /login` returns the sign-in page; `POST /auth/login` checks the submitted user name and password
   and, on success, sets the authentication cookie and redirects to the page the user wanted (a path on this
-  site, otherwise `/`), and on failure redirects back to the login page with a generic message; `POST /auth/logout`
+  site, otherwise `/`), and on failure redirects back to the login page with a generic message (or, when the
+  sign-in throttle refuses the attempt, with a "too many attempts" message that is the same for known and unknown
+  user names); `POST /auth/logout`
   ends the session and redirects to `/`. Both posts require the antiforgery token of the form. `GET /account`
   returns the page where the signed-in user changes their password, and `GET /users` the page where an administrator
   manages users. `GET /projects` returns the projects page, `GET /projects/{id}` the page of one project,
@@ -382,7 +390,14 @@ is running.
   403). The cookie is HTTP-only, belongs to the session of the browser, and expires after a sliding period of
   `Auth:SessionHours` hours (default 8). The cookie is marked secure when the request is HTTPS, so behind a proxy that
   terminates TLS the forwarded headers must be enabled (the environment variable
-  `ASPNETCORE_FORWARDEDHEADERS_ENABLED` set to `true`). The server must still not be exposed to untrusted networks
+  `ASPNETCORE_FORWARDEDHEADERS_ENABLED` set to `true`). That setting makes the application take the client address
+  from `X-Forwarded-For` of any sender, so the proxy must set or overwrite that header and the server must be reachable
+  only through the proxy. The sign-in throttle uses the client address: without the setting behind a proxy, every user
+  shares the address of the proxy, and with it but without a proxy that overwrites the header, a client can choose its
+  own address and avoid the per-address and per-name limits (the lockout of the account still applies). The throttle
+  is set with `Identity:Throttle:MaxFailuresPerName` (default 5), `Identity:Throttle:MaxFailuresPerAddress` (default 20),
+  and `Identity:Throttle:WindowSeconds` (default 300); an invalid value stops the start-up with an error. The server
+  must still not be exposed to untrusted networks
   without TLS, because the password of a sign-in is sent in the request. An open page re-checks its user every
   `Auth:RevalidationSeconds` seconds (default 30, at least 5; a smaller value stops the start-up with an error).
 
@@ -563,7 +578,8 @@ result or the reason of a failure is reported through `Context`.
   state exists between connections.
 - Network exposure: by default the server listens on the loopback interface only; exposing it
   on other interfaces requires an explicit `--urls` value. The server does not terminate TLS itself, so beyond a
-  trusted network it must be put behind a proxy that does (with the forwarded headers enabled), because passwords
+  trusted network it must be put behind a proxy that does (with the forwarded headers enabled and the header
+  overwritten by the proxy), because passwords
   are sent in sign-in requests.
 - Persistence: the database provider is selected by configuration, and only SQLite is supported. The schema is
   created at start-up and not migrated (see the Storage subsystem design); a database created before the identity

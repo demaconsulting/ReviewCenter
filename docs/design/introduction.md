@@ -72,7 +72,8 @@ The ReviewCenter system is divided as follows:
   `user add` verb, and verifies the audit trail for the `audit verify` verb; contains the ServerHost, UserCommand, and
   AuditCommand units
 - **Identity** (subsystem): the web side of local accounts, cookie sign-in and authorization, and the periodic re-check
-  of the user of an open page; contains the PasswordHasher, SignIn, and RevalidatingAuthenticationStateProvider units
+  of the user of an open page, and the in-memory limit on failed sign-in attempts; contains the PasswordHasher, SignIn,
+  SignInThrottle, and RevalidatingAuthenticationStateProvider units
 - **Web** (subsystem): the Blazor Server user interface; contains the App unit (HTML shell, router, page frame with
   the menu bar and the footer, and the SessionGate that replaces an open page when its user is no longer signed in),
   the HomePage, AboutPage, and HelpPage units, the ProjectsPage, ProjectPage, PlanPage, ReviewPage, and ChecklistPage

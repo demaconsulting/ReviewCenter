@@ -8,13 +8,14 @@ The `Identity` subsystem lets a person sign in to the web server and tells the r
 It owns the connection between the local accounts of the `Core` subsystem and the ASP.NET Core authentication
 framework: how a password is hashed, how the sign-in and sign-out requests are handled, what the authentication
 cookie holds and when it is no longer accepted, and how the signed-in user is turned into the `Actor` that the Core
-services record with a comment or a checklist answer. It contains three units: `PasswordHasher`, the implementation of
+services record with a comment or a checklist answer. It contains four units: `PasswordHasher`, the implementation of
 the Core password hasher interface on top of the password hasher of the ASP.NET Core shared framework; `SignIn`,
 the cookie authentication setup, the `POST /auth/login` and `POST /auth/logout` endpoints, the return-URL check, the
 rule that decides whether a signed-in user is still valid, and the conversion between the signed-in principal and an
 `Actor`, together with its small options type `AuthOptions`, which is documented with `SignIn` as a supporting type;
-and `RevalidatingAuthenticationStateProvider`, which applies that rule to every open interactive page at a fixed
-interval. The types of the subsystem are internal to the application.
+`SignInThrottle`, the in-memory limit on sign-in attempts per client address and user name, with its options type
+`SignInThrottleOptions`; and `RevalidatingAuthenticationStateProvider`, which applies that rule to every open
+interactive page at a fixed interval. The types of the subsystem are internal to the application.
 The rules about accounts (the password policy, the lockout, the last administrator) are not here: they belong to
 `UserService` in the `Core` subsystem.
 
@@ -32,7 +33,8 @@ The rules about accounts (the password policy, the lockout, the last administrat
 
 - *Type*: In-process .NET static extension methods.
 - *Role*: Provider.
-- *Contract*: `AddSignIn` registers cookie authentication, authorization, the `Auth` options, and the revalidating
+- *Contract*: `AddSignIn` registers cookie authentication, authorization, the `Auth` options, the `Identity:Throttle`
+  options and the sign-in throttle, and the revalidating
   authentication state provider for open pages. `MapSignIn` maps the two endpoints below.
 - *Constraints*: `AddSignIn` must be called before the application is built, after the Razor components are added (its
   provider registration has to be the last one), and the application must use authentication and authorization before
@@ -42,12 +44,15 @@ The rules about accounts (the password policy, the lockout, the last administrat
 
 - *Type*: HTTP `POST` of a form with the fields `username`, `password`, and `returnUrl`.
 - *Role*: Provider.
-- *Contract*: Checks the password through `UserService`. On success it issues the authentication cookie and redirects
-  to the return URL when that is a path of this site, otherwise to `/`. On any failure it redirects to
+- *Contract*: Asks the sign-in throttle first. When the throttle refuses, it checks no password, sets no cookie and
+  redirects to `/login?error=throttled` (with the safe return URL when it is not `/`); the answer is the same for every
+  user name. Otherwise it checks the password through `UserService`. On success it issues the authentication cookie
+  and redirects to the return URL when that is a path of this site, otherwise to `/`. On any failure it redirects to
   `/login?error=1` (with the safe return URL when it is not `/`); the failure is the same for an unknown user, a
   wrong password, a disabled account, and a locked account.
 - *Constraints*: The antiforgery token is required; a request without a valid token is refused with HTTP status 400.
-  A successful sign-in is recorded as `auth.sign-in`, best-effort.
+  A successful sign-in is recorded as `auth.sign-in`, best-effort, and a refusal by the throttle as
+  `auth.sign-in-throttled`, best-effort and at most once per minute and typed name.
 
 **Logout endpoint** (`POST /auth/logout`): Ends the session.
 
@@ -67,6 +72,17 @@ The rules about accounts (the password policy, the lockout, the last administrat
   how many seconds pass between two checks of the signed-in user by an open page (default 30).
 - *Constraints*: A `SessionHours` value that is not greater than 0, or a `RevalidationSeconds` value below 5, stops the
   start-up with an error that names the setting.
+
+**Identity:Throttle settings**: The `Identity:Throttle` configuration section.
+
+- *Type*: Configuration (`appsettings.json` and environment variables such as `Identity__Throttle__MaxFailuresPerName`,
+  `Identity__Throttle__MaxFailuresPerAddress`, and `Identity__Throttle__WindowSeconds`).
+- *Role*: Consumer.
+- *Contract*: `MaxFailuresPerName` is how many sign-in attempts one client address may make for one user name in a
+  window (default 5). `MaxFailuresPerAddress` is how many it may make over all names (default 20).
+  `WindowSeconds` is the length of the window (default 300).
+- *Constraints*: A limit that is not greater than 0, a limit per address that is lower than the limit per name, or a
+  window that is not between 1 and 86400 seconds stops the start-up with an error that names the setting.
 
 **RevalidatingAuthenticationStateProvider (as the authentication state provider)**: Used by the framework for every
 open interactive page (circuit).
@@ -120,17 +136,33 @@ The pages never take the author of a comment or an answer from a form field. The
 authentication state, which works in a statically rendered page and on the live connection alike, and pass it to the
 Core services.
 
-Known limitations, all deliberate: the lockout counts failures per user name, not per source address,
-so someone who knows a user name can lock that account for 5 minutes at a time; and changing a password does
-not end the other sessions of the user. Behind a proxy that ends TLS, the server must be told to trust the forwarded
-headers so that the cookie is issued as `Secure`.
+Known limitations, all deliberate: the account lockout counts failures per user name, not per source address,
+so someone who knows a user name can lock that account for 5 minutes at a time (the sign-in throttle limits by
+address and name and does not change that); the throttle and the coalescing of audit events are kept in memory of one
+process and are lost on restart, so they fit a single server instance (see the `SignInThrottle` design); and changing
+a password does not end the other sessions of the user. Behind a proxy that ends TLS, the server must be told to
+trust the forwarded headers so that the cookie is issued as `Secure`; the same setting decides which client address the
+throttle sees. Without it the throttle sees the address of the proxy for every user. With
+`ASPNETCORE_FORWARDEDHEADERS_ENABLED=true` it sees the address in `X-Forwarded-For`, which the framework then accepts
+from any sender, so the proxy must set or overwrite that header and the server must be reachable only through the
+proxy.
+
+**Sign-in throttle**: Before the password is checked the login endpoint asks `SignInThrottle` whether the client
+address has attempts left, once per name and once over all names. A refused attempt is not authenticated at all and
+gets the throttled answer, which is the same for known and unknown names; the account lockout of `UserService` stays
+in force for the attempts that are let through. Signature re-authentication is not throttled by address: the user is
+already signed in, and the lockout applies.
 
 **Audit events of sign-in and sign-out**: The two endpoints record events that change no data in the audit trail
 through `AuditService.TryRecordAsync`: `auth.sign-in` after the cookie has been issued, and `auth.sign-out` before the
 cookie is removed, with the actor taken from the server-side principal of the request, never from the form. The
+login endpoint also records the refusal by the throttle, as `auth.sign-in-throttled` through
+`AuditService.TryRecordCoalescedAsync`, at most once per minute and typed name. The
 recording is awaited but best-effort: a failure is logged and never changes the response, so a broken audit trail
-cannot lock everybody out. Failed sign-ins and lockouts are recorded by `UserService` (see its design), because the
-endpoint cannot tell the reasons apart and must not either. The best-effort rule is a deliberate trade-off: an
+cannot lock everybody out. Failed sign-ins, attempts on locked accounts, and lockouts are recorded by `UserService`
+(see its design), because the endpoint cannot tell the reasons apart and must not either. The client address is not
+part of any audit entry: the entry has no place for it, and adding one would change the hash chain format. The
+best-effort rule is a deliberate trade-off: an
 attacker who can make the recording fail can sign in without an entry.
 
 An open page (a live connection) makes no request, so the cookie check never reaches it. A scoped

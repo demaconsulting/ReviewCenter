@@ -5,7 +5,9 @@
 #### Purpose
 
 `AuditService` is the way the rest of the system reads, records, and verifies the audit trail. Its responsibilities
-are to record the events that change no data (sign-in, sign-out, failed sign-in, lockout) on a best-effort basis,
+are to record the events that change no data (sign-in, sign-out, failed sign-in, attempts on a locked account, refusals
+by the sign-in throttle, failed re-authentication, lockout) on a best-effort basis, with a coalescing variant for events
+that a caller can repeat without limit,
 to read the trail one page at a time, and to verify the hash chain by streaming. It also defines the store contract
 `IAuditStore` and the page type `AuditEntryPage`. The events that belong to a change of data are *not* recorded by this
 service: they are recorded by the store in the same transaction as the change (see *Atomicity* below and the
@@ -40,9 +42,15 @@ entry in its own transaction.
 
 #### Data Model
 
-The service is stateless and thread-safe (it relies on the store, which is).
+The service is thread-safe. It relies on the store for the trail, and it keeps one small piece of state of its own for
+coalescing (see `TryRecordCoalescedAsync`): a dictionary from a key to the start of the current one-minute window and
+the number of events counted but not recorded in it, behind one lock that is never held across an await. The state is
+in memory of one process and is lost on restart. The service takes an optional `TimeProvider` (the system clock when
+none is given) so tests can move time.
 
 **PageSize**: `int` (constant) — 50 entries on a page.
+
+**MaxCoalescedKeys**: `int` (constant) — 500; the most keys the coalescing table holds.
 
 **AuditEntryPage**: the entries of one page, newest first, `HasOlder` and `HasNewer` (whether more entries lie beyond
 either end), and the cursors `OlderBefore` (the sequence of the last entry of the page) and `NewerAfter` (the sequence of
@@ -79,21 +87,36 @@ the short hash (8 hexadecimal characters) of the trimmed text (see `AuditChain`)
 | `repository.enabled`, `repository.disabled` | `repository 'name'` |
 | `auth.sign-in` | `signed in` |
 | `auth.sign-out` | `signed out` |
-| `auth.sign-in-failed` | `wrong password`, `account disabled`, or `unknown user` |
+| `auth.sign-in-failed` | `wrong password`, `account disabled`, or `unknown user, name '<typed>'` |
+| `auth.sign-in-locked` | `account locked` (an attempt on an account that is already locked) |
+| `auth.sign-in-throttled` | `too many attempts, name '<typed>'` (the sign-in throttle refused the attempt) |
+| `signature.reauth-failed` | as for sign-in: `wrong password`, `account disabled`, `account locked`, or unknown user |
 | `auth.locked-out` | `locked for 5 minutes after 5 failed attempts` |
+
+An event that is recorded through `TryRecordCoalescedAsync` can have the suffix `; N more in the minute after the
+previous entry` on its detail, where N is the number of events of the same key that were counted and not recorded.
+`auth.sign-in-locked`, `auth.sign-in-throttled`, and the unknown-user entries of `auth.sign-in-failed` and
+`signature.reauth-failed` are recorded this way; the other failures are not (they are bounded by the lockout).
 
 The anchor of `thread.started` is `line N`, `lines S-E`, or `(whole file)`; a line anchor on the baseline side has the
 suffix `(baseline)`, for example `line 3 (baseline)` and `lines 2-4 (baseline)`.
 
 The actor of an entry is the signed-in user, taken on the server from the authentication state and never from form
 input, stored as `Display Name (username)`. An action from the command line (`user add`) has the actor
-`command line`. For `auth.sign-in-failed` with an unknown user name the actor text is the literal `unknown user`: the
-name that was typed is never echoed into the trail, so the trail cannot be filled with attacker-chosen text. For a
-failure on an existing account the existing user is the actor. `thread.resolved` and `thread.reopened` are recorded for
+`command line`. For a failure with an unknown user name the actor text is the literal `unknown user` and the detail
+carries the typed name after it is cleaned: control characters become spaces, so it is one line, and it is cut to the
+length of a user name (the same limit as for a real name) with the store's text rules. Typed names are
+attacker-chosen text, so this cleaning and the cap are what keep the trail from being forged or filled with long text;
+a password is never recorded. For a failure on an existing account the existing user is the actor, and the typed name
+is not recorded again. For `auth.sign-in-throttled` there is no known account, so the actor text is the literal
+`not signed in` and the detail carries the cleaned typed name. The address of the client is **not** recorded in any
+entry: the entry has no field for it, and adding one would change the hash chain format; the address is only in the web
+server log. `thread.resolved` and `thread.reopened` are recorded for
 every successful call, even when the thread already had that state.
 
-Changes are recorded in the same transaction as the change; sign-in, sign-out, failed sign-in, and lockout are recorded
-on the best-effort path in their own transaction.
+Changes are recorded in the same transaction as the change; sign-in, sign-out, failed sign-in, attempts on a locked
+account, refusals by the throttle, failed re-authentication, and lockout are recorded on the best-effort path in their
+own transaction.
 
 #### Key Methods
 
@@ -111,6 +134,24 @@ on the best-effort path in their own transaction.
   swallowed; a failure of the hook itself is swallowed as well. Cancellation is **not** swallowed. The call is always
   awaited, so the entry exists when the call returns, but a failure never reaches the user: a problem with the trail
   cannot lock anybody out of signing in.
+
+**TryRecordCoalescedAsync**: Records a repeating event on a best-effort basis, at most once per key and minute.
+
+- *Parameters*: `AuditDraft draft`; `string key` — identifies the repeating event (the callers use the action, the
+  kind of refusal, and the lower-cased typed name); a cancellation token.
+- *Returns*: `true` when an entry was stored; `false` when the event was only counted, dropped, or storing failed.
+- *Preconditions*: `draft` and `key` are not null.
+- *Postconditions*: The first event of a key is stored (as by `TryRecordAsync`) and starts a window of one minute.
+  Repeats of the key inside the window are counted and not stored. The first event of the key after the window is
+  stored with the number of counted repeats appended to its detail (`; N more in the minute after the previous
+  entry`), because entries are immutable and a count can only ride on a later entry. At most `MaxCoalescedKeys` keys
+  are tracked: when the table is full, keys whose window has passed are removed, and when it is still full an event of
+  a new key is dropped (neither stored nor counted). The rows written for these events are therefore bounded by one
+  per key and minute and at most `MaxCoalescedKeys` keys per minute.
+
+Known and accepted losses: the count of the last window is never written when its key does not occur again; and the
+window and the counts are lost on restart. A failure of the store is handled as in `TryRecordAsync`. The check and
+the update of the table happen under the lock; the store is called after the lock is released.
 
 **ListAsync**: Reads one page of the trail, newest first.
 
@@ -138,12 +179,15 @@ sign-in event can be missing from the trail when the write fails. Null arguments
 
 #### Known Limitations
 
-- A failed attempt on an account that is **already locked** is not recorded; only the lockout itself is, which limits
-  flooding of the trail for existing accounts. Failed attempts for unknown user names (recorded as `unknown user`) are
-  not throttled in this slice, so an unauthenticated caller can grow the trail; rate limiting is a later hardening
-  step.
-- A wrong *current* password typed on the signing dialog or on the account page appears as `auth.sign-in-failed`,
-  because it passes through the same failure path of `UserService`; the action code does not tell where it happened.
+- Events that are recorded coalesced (attempts on a locked account, refusals by the throttle, failures for unknown
+  user names) are written once per key and minute, so the trail shows that an attack happened and roughly how long it
+  went on, not every attempt. The count of the last window can be lost (see `TryRecordCoalescedAsync`). The wrong
+  password and disabled-account failures of existing accounts are recorded every time; they are bounded by the
+  lockout.
+- A wrong *current* password typed on the account page appears as `auth.sign-in-failed` and its refusals on a locked
+  account are not recorded: that path (`ChangeOwnPasswordAsync`) was not changed. A wrong password typed on the signing
+  dialog is recorded as `signature.reauth-failed`.
+- The address of the client is not in the trail (see above).
 - The trail has no export and no retention or archiving function in this slice.
 - The chain is tamper-*evident*, not tamper-*proof*; see *What The Chain Proves And What It Does Not* in `AuditChain`.
   Removal of the newest entries, or a complete rewrite by someone with write access to the database, is not detected
@@ -158,8 +202,10 @@ sign-in event can be missing from the trail when the write fails. Null arguments
 
 #### Callers
 
-- **UserService** — records failed sign-ins and lockouts through `TryRecordAsync` (when an `AuditService` was supplied).
-- **SignIn** (Identity) — records sign-in and sign-out through `TryRecordAsync`.
+- **UserService** — records failed sign-ins, attempts on locked accounts, failed re-authentications, and lockouts
+  through `TryRecordAsync` and `TryRecordCoalescedAsync` (when an `AuditService` was supplied).
+- **SignIn** (Identity) — records sign-in and sign-out through `TryRecordAsync`, and refusals by the throttle through
+  `TryRecordCoalescedAsync`.
 - **HistoryPage** and **AuditPage** (Web) — list entries; the audit page also verifies the chain.
 - **AuditCommand** (Hosting) — verifies the chain for the `audit verify` verb.
 - **Services that change data** (`ProjectService`, `ReviewService`, `ThreadService`, `ChecklistService`,

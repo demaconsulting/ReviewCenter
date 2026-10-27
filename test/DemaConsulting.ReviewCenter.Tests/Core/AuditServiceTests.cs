@@ -31,11 +31,12 @@ public class AuditServiceTests
     ///     Creates a service over a new store.
     /// </summary>
     /// <param name="errors">Receives the failures the service reports.</param>
+    /// <param name="clock">The clock of the service (the coalescing windows); <c>null</c> for the system clock.</param>
     /// <returns>The service and its store.</returns>
-    private static (AuditService Service, FakeAuditStore Store) Create(List<Exception>? errors = null)
+    private static (AuditService Service, FakeAuditStore Store) Create(List<Exception>? errors = null, TimeProvider? clock = null)
     {
         var store = new FakeAuditStore(new FixedTimeProvider(new DateTimeOffset(2025, 3, 4, 5, 6, 7, TimeSpan.Zero)));
-        return (new AuditService(store, errors is null ? null : errors.Add), store);
+        return (new AuditService(store, errors is null ? null : errors.Add, clock), store);
     }
 
     /// <summary>
@@ -419,5 +420,141 @@ public class AuditServiceTests
         Assert.False(result.IsIntact);
         Assert.Equal(650, result.FirstBadSequence);
         Assert.Equal(649, result.Count);
+    }
+
+    /// <summary>
+    ///     Test that repeats of one key inside the window are counted and not stored.
+    /// </summary>
+    [Fact]
+    public async Task AuditService_TryRecordCoalescedAsync_RepeatsWithinWindow_StoresOnlyTheFirst()
+    {
+        // Arrange
+        var clock = new MovableTimeProvider(new DateTimeOffset(2025, 3, 4, 5, 6, 7, TimeSpan.Zero));
+        var (service, store) = Create(clock: clock);
+        var draft = new AuditDraft("auth.sign-in-failed", null, "unknown user", null, null, "unknown user, name 'x'");
+
+        // Act
+        var first = await service.TryRecordCoalescedAsync(draft, "k", TestContext.Current.CancellationToken);
+        clock.Advance(TimeSpan.FromSeconds(59));
+        var second = await service.TryRecordCoalescedAsync(draft, "k", TestContext.Current.CancellationToken);
+        var third = await service.TryRecordCoalescedAsync(draft, "k", TestContext.Current.CancellationToken);
+
+        // Assert: only the first event is stored
+        Assert.True(first);
+        Assert.False(second);
+        Assert.False(third);
+        Assert.Equal("unknown user, name 'x'", Assert.Single(store.Entries).Detail);
+    }
+
+    /// <summary>
+    ///     Test that the first event of the next window is stored with the count of the repeats suppressed before it.
+    /// </summary>
+    [Fact]
+    public async Task AuditService_TryRecordCoalescedAsync_NextWindow_StoresEntryWithSuppressedCount()
+    {
+        // Arrange
+        var clock = new MovableTimeProvider(new DateTimeOffset(2025, 3, 4, 5, 6, 7, TimeSpan.Zero));
+        var (service, store) = Create(clock: clock);
+        var draft = new AuditDraft("auth.sign-in-locked", "ann", "Ann", null, null, "account locked");
+        await service.TryRecordCoalescedAsync(draft, "k", TestContext.Current.CancellationToken);
+        await service.TryRecordCoalescedAsync(draft, "k", TestContext.Current.CancellationToken);
+        await service.TryRecordCoalescedAsync(draft, "k", TestContext.Current.CancellationToken);
+
+        // Act
+        clock.Advance(TimeSpan.FromMinutes(1));
+        var stored = await service.TryRecordCoalescedAsync(draft, "k", TestContext.Current.CancellationToken);
+        clock.Advance(TimeSpan.FromMinutes(1));
+        var storedAgain = await service.TryRecordCoalescedAsync(draft, "k", TestContext.Current.CancellationToken);
+
+        // Assert: the second row carries the 2 suppressed repeats, the third none
+        Assert.True(stored);
+        Assert.True(storedAgain);
+        Assert.Equal(
+            ["account locked", "account locked; 2 more in the minute after the previous entry", "account locked"],
+            store.Entries.Select(e => e.Detail).ToArray());
+    }
+
+    /// <summary>
+    ///     Test that different keys do not share a window.
+    /// </summary>
+    [Fact]
+    public async Task AuditService_TryRecordCoalescedAsync_DifferentKeys_StoreSeparateEntries()
+    {
+        // Arrange
+        var (service, store) = Create(clock: new MovableTimeProvider(DateTimeOffset.UnixEpoch));
+        var draft = new AuditDraft("auth.sign-in-failed", null, "unknown user", null, null, "d");
+
+        // Act
+        var a = await service.TryRecordCoalescedAsync(draft, "a", TestContext.Current.CancellationToken);
+        var b = await service.TryRecordCoalescedAsync(draft, "b", TestContext.Current.CancellationToken);
+
+        // Assert
+        Assert.True(a);
+        Assert.True(b);
+        Assert.Equal(2, store.Entries.Count);
+    }
+
+    /// <summary>
+    ///     Test that a full key table drops new keys until a window has passed, which bounds the rows per window.
+    /// </summary>
+    [Fact]
+    public async Task AuditService_TryRecordCoalescedAsync_TooManyKeys_DropsNewKeysUntilWindowPasses()
+    {
+        // Arrange
+        var clock = new MovableTimeProvider(DateTimeOffset.UnixEpoch);
+        var (service, store) = Create(clock: clock);
+        var draft = new AuditDraft("auth.sign-in-failed", null, "unknown user", null, null, "d");
+        for (var i = 0; i < AuditService.MaxCoalescedKeys; i++)
+        {
+            await service.TryRecordCoalescedAsync(draft, "key" + i, TestContext.Current.CancellationToken);
+        }
+
+        // Act
+        var whileFull = await service.TryRecordCoalescedAsync(draft, "one-too-many", TestContext.Current.CancellationToken);
+        clock.Advance(TimeSpan.FromMinutes(1));
+        var afterWindow = await service.TryRecordCoalescedAsync(draft, "one-too-many", TestContext.Current.CancellationToken);
+
+        // Assert
+        Assert.False(whileFull);
+        Assert.True(afterWindow);
+        Assert.Equal(AuditService.MaxCoalescedKeys + 1, store.Entries.Count);
+    }
+
+    /// <summary>
+    ///     Test that a storage failure of a coalesced record is swallowed and reported like any best-effort record.
+    /// </summary>
+    [Fact]
+    public async Task AuditService_TryRecordCoalescedAsync_StoreFailure_IsSwallowedAndReported()
+    {
+        // Arrange
+        var errors = new List<Exception>();
+        var (service, store) = Create(errors, new MovableTimeProvider(DateTimeOffset.UnixEpoch));
+        store.FailNextAppend = new InvalidOperationException("disk full");
+
+        // Act
+        var stored = await service.TryRecordCoalescedAsync(
+            new AuditDraft("auth.sign-in-locked", null, "x", null, null, "d"),
+            "k",
+            TestContext.Current.CancellationToken);
+
+        // Assert
+        Assert.False(stored);
+        Assert.Empty(store.Entries);
+        Assert.Equal("disk full", Assert.Single(errors).Message);
+    }
+
+    /// <summary>
+    ///     Test that a null draft or key is refused by the coalescing record.
+    /// </summary>
+    [Fact]
+    public async Task AuditService_TryRecordCoalescedAsync_NullArguments_Throw()
+    {
+        // Arrange
+        var (service, _) = Create();
+        var draft = AuditDraft.By(TestActors.Ann, "a.b", "c");
+
+        // Act / Assert
+        await Assert.ThrowsAsync<ArgumentNullException>(() => service.TryRecordCoalescedAsync(null!, "k", TestContext.Current.CancellationToken));
+        await Assert.ThrowsAsync<ArgumentNullException>(() => service.TryRecordCoalescedAsync(draft, null!, TestContext.Current.CancellationToken));
     }
 }

@@ -253,7 +253,7 @@ Rules:
 - **User name**: 3 to 50 letters, digits, `.`, `_`, or `-`; unique regardless of letter case.
 - **Password**: 12 to 128 characters, no other composition rules.
 - **Lockout**: after 5 failed sign-ins in a row a user name is locked for 5 minutes; a successful sign-in resets the
-  count.
+  count. The lockout is kept in the database. The sign-in throttle below is an additional limit by client address.
 - **Last administrator**: the last enabled administrator cannot be disabled or demoted.
 - **Sign-in session**: a session cookie that lasts 8 hours of activity by default; change it with the `Auth` setting
   below.
@@ -267,9 +267,32 @@ Rules:
 | `Auth:SessionHours`        | `Auth__SessionHours`        | Hours of sign-in session (default 8; above 0)             |
 | `Auth:RevalidationSeconds` | `Auth__RevalidationSeconds` | Seconds between open-page checks (default 30; at least 5) |
 
+**Sign-in throttle**: besides the lockout of a user name, the server limits the sign-in attempts of one client
+address, counted before the password is checked. By default an address may try one user name 5 times and all user
+names 20 times in 5 minutes; after that the login page says "Too many sign-in attempts. Try again in a few minutes."
+and refuses even the right password until the window has passed. The message is the same whether or not the user name
+exists. A successful sign-in gives its attempts back. The attempts are counted in memory in one server process, so the
+counters start again at a restart and are not shared between several server processes.
+
+| Setting                                   | Environment variable                        |
+| ----------------------------------------- | ------------------------------------------- |
+| `Identity:Throttle:MaxFailuresPerName`    | `Identity__Throttle__MaxFailuresPerName`    |
+| `Identity:Throttle:MaxFailuresPerAddress` | `Identity__Throttle__MaxFailuresPerAddress` |
+| `Identity:Throttle:WindowSeconds`         | `Identity__Throttle__WindowSeconds`         |
+
+`MaxFailuresPerName` is the attempts per address and user name (default 5; above 0), `MaxFailuresPerAddress` the
+attempts per address over all names (default 20; not below the per-name value), and `WindowSeconds` the length of the
+window (default 300; 1 to 86400).
+
+An invalid value stops the server at start-up with an error that names the setting.
+
 The sign-in cookie is marked Secure when the request arrives over HTTPS. Behind a reverse proxy that ends TLS, set
 `ASPNETCORE_FORWARDEDHEADERS_ENABLED=true` so that the server sees the original HTTPS scheme and marks the cookie
-Secure.
+Secure. The throttle uses the client address. Without that setting, behind a proxy, every user appears with the
+address of the proxy and so shares one set of limits. With the setting, the server takes the address from the
+`X-Forwarded-For` header from any sender, so the proxy must set or overwrite that header and the server must be
+reachable only through the proxy; otherwise a client can choose its own address and avoid the per-address limits (the
+lockout of the user name still applies).
 
 ## Reviewers and Signatures
 
@@ -336,6 +359,8 @@ The recorded actions are:
 | Users     | `user.created`, `user.enabled`, `user.disabled`, `user.role-changed`                          |
 | Passwords | `user.password-set-by-admin`, `user.password-changed`                                         |
 | Sign-in   | `auth.sign-in`, `auth.sign-out`, `auth.sign-in-failed`, `auth.locked-out`                     |
+| Sign-in   | `auth.sign-in-locked`, `auth.sign-in-throttled`                                               |
+| Signing   | `signature.reauth-failed`                                                                     |
 | Evidence  | `attestation.generated`                                                                       |
 
 ### What the Chain Proves, and What It Does Not
@@ -353,6 +378,14 @@ review has been approved.
 
 Sign-in, sign-out, failed sign-in, and lockout entries are recorded on a best-effort basis in their own transaction;
 if that cannot be stored, the sign-in itself is not blocked, and the failure is logged.
+
+Failed sign-ins are recorded for unknown user names too, with the actor `unknown user` and the typed name (made one
+line and cut to 50 characters; a password is never recorded), for attempts on a locked account (`auth.sign-in-locked`),
+for attempts refused by the sign-in throttle (`auth.sign-in-throttled`), and for a wrong password at a signature
+(`signature.reauth-failed`). So that a flood of attempts cannot flood the trail, repeats of the same kind for the same
+name are recorded once per minute; the next entry after that says how many were left out ("; N more in the minute after
+the previous entry"). The last count of a name that does not come back is not recorded, and this state is kept in
+memory, so it starts again at a restart. The trail does not hold the address of the client.
 
 ## Signed Attestation
 
@@ -604,8 +637,13 @@ non-zero exit code.
 - **Basic local accounts only**: there is no password reset, no email, no multi-factor sign-in, and no external
   identity provider. An administrator sets a new password for a user who forgot it. Serve over HTTPS (for example
   behind a reverse proxy) when the server is reachable from other machines.
-- **Lockout is per user name**: repeated failed sign-ins lock the user name, not the source address, so someone who
-  guesses wrongly on purpose can keep a user locked out for 5 minutes at a time.
+- **Lockout is per user name**: repeated failed sign-ins lock the user name, so someone who guesses wrongly on
+  purpose can keep a user locked out for 5 minutes at a time. The sign-in throttle (see
+  [Users and Sign-in](#users-and-sign-in)) limits attempts per client address, but it does not stop this.
+- **Sign-in throttle limits**: the throttle is kept in memory in one server process; it starts again at a restart,
+  and with several server processes each has its own counters. Users behind one shared address share its limit.
+  The address is only as reliable as the proxy setup (see the note on forwarded headers below), and signature
+  re-authentication is limited only by the lockout of the account.
 - **Sessions are not cut short at once**: a user who is disabled, removed, or changed is signed out of an open page
   only at its next check, so for up to the interval (30 seconds by default; `Auth:RevalidationSeconds`) the open
   page still accepts actions that are not re-checked, such as answering checks and adding comments and threads.
@@ -624,9 +662,11 @@ non-zero exit code.
 - **Audit trail limits**: the hash chain detects changes in the middle of the history, but not the removal of the
   newest entries or a complete rewrite by someone with write access to the database, unless the head hash was
   recorded elsewhere (see [Audit Trail](#audit-trail)); there is no external anchoring, no export, and no retention
-  or archiving of the trail. Failed attempts on an account that is already locked are not recorded. A wrong current
-  password at a signature or on the account page is recorded as `auth.sign-in-failed`, as it counts toward the same
-  lockout. Sign-in events are recorded on a best-effort basis.
+  or archiving of the trail. A wrong current
+  password on the account page is recorded as `auth.sign-in-failed`, and an attempt there on a locked account is not
+  recorded. The address of the client is not recorded in the trail (only the web server log has it). Repeated
+  failures are coalesced and the typed name of an unknown user is recorded (see [Audit Trail](#audit-trail)).
+  Sign-in events are recorded on a best-effort basis.
 - **Approval is computed**: the Approved or In review status is calculated from the record and its signatures each
   time it is shown; it is not a stored review state, and the review state is still Draft.
 - **Attestation limits**: the default signing key is self-signed (development and test only), the signing time is the

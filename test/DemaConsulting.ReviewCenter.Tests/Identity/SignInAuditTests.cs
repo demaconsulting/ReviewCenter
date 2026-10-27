@@ -74,10 +74,10 @@ public class SignInAuditTests
     }
 
     /// <summary>
-    ///     Test that a failed login for an unknown user is recorded without echoing the typed name or password.
+    ///     Test that a failed login for an unknown user records the typed name (cleaned) and never the password.
     /// </summary>
     [Fact]
-    public async Task SignIn_Login_UnknownUser_RecordsUnknownUserWithoutEchoingInput()
+    public async Task SignIn_Login_UnknownUser_RecordsCleanedTypedNameWithoutPassword()
     {
         // Arrange
         await using var app = await StartAsync();
@@ -85,13 +85,14 @@ public class SignInAuditTests
         const string TypedPassword = "typed-secret-password-1";
 
         // Act
-        await browser.LoginAsync("<i>mallory</i>", TypedPassword);
+        await browser.LoginAsync("mallory\r\nforged line", TypedPassword);
 
-        // Assert
+        // Assert: the name is on one line, the actor is the plain unknown user, the password is nowhere
         var entry = Assert.Single(await EntriesAsync(app, "auth.sign-in-failed"));
         Assert.Equal("unknown user", entry.ActorName);
-        Assert.Equal("unknown user", entry.Detail);
-        await AssertNoSecretsAsync(app, "mallory", TypedPassword);
+        Assert.Equal("unknown user, name 'mallory  forged line'", entry.Detail);
+        Assert.Null(entry.ActorUserId);
+        await AssertNoSecretsAsync(app, TypedPassword);
     }
 
     /// <summary>
@@ -117,13 +118,13 @@ public class SignInAuditTests
     }
 
     /// <summary>
-    ///     Test that repeated failures record the lockout, and that a login during the lockout is refused and not recorded.
+    ///     Test that repeated failures record the lockout once, and that a login during the lockout is refused.
     /// </summary>
     [Fact]
     public async Task SignIn_Login_RepeatedFailures_RecordsLockoutOnce()
     {
-        // Arrange
-        await using var app = await StartAsync();
+        // Arrange: a high throttle limit so that the account lockout is what stops the sixth attempt
+        await using var app = await StartAsync(perName: 100);
         await CreateUserAsync(app, "ann");
 
         // Act: five wrong passwords, then the right one while locked
@@ -142,6 +143,58 @@ public class SignInAuditTests
         Assert.Equal("locked for 5 minutes after 5 failed attempts", lockout.Detail);
         Assert.Empty(await EntriesAsync(app, "auth.sign-in"));
         await AssertNoSecretsAsync(app, "typo-attempt", TestBrowser.Password);
+    }
+
+    /// <summary>
+    ///     Test that logins on a locked account, however many, are recorded as one locked entry per minute.
+    /// </summary>
+    [Fact]
+    public async Task SignIn_Login_LockedAccount_RecordsOneSignInLockedEntry()
+    {
+        // Arrange: a locked account and a high throttle limit
+        await using var app = await StartAsync(perName: 100);
+        await CreateUserAsync(app, "ann");
+        using var browser = new TestBrowser(app);
+        for (var i = 0; i < 5; i++)
+        {
+            await browser.LoginAsync("ann", "typo-attempt-" + i);
+        }
+
+        // Act: three logins while the account is locked
+        for (var i = 0; i < 3; i++)
+        {
+            await browser.LoginAsync("ann", TestBrowser.Password);
+        }
+
+        // Assert: one entry for the user, without the password
+        var entry = Assert.Single(await EntriesAsync(app, "auth.sign-in-locked"));
+        Assert.Equal("Ann (ann)", entry.ActorName);
+        Assert.Equal("account locked", entry.Detail);
+        await AssertNoSecretsAsync(app, TestBrowser.Password);
+    }
+
+    /// <summary>
+    ///     Test that refusals by the throttle are recorded as one entry per minute and name, with the cleaned typed name.
+    /// </summary>
+    [Fact]
+    public async Task SignIn_Login_Throttled_RecordsOneThrottledEntryPerWindow()
+    {
+        // Arrange: a limit of two attempts per name
+        await using var app = await StartAsync(perName: 2);
+        using var browser = new TestBrowser(app);
+
+        // Act: two attempts that pass, then four that are refused
+        for (var i = 0; i < 6; i++)
+        {
+            await browser.LoginAsync("Mallory", "typed-secret-password-3");
+        }
+
+        // Assert: one throttled entry, and the two attempts that went through were recorded as unknown-user failures once
+        var entry = Assert.Single(await EntriesAsync(app, "auth.sign-in-throttled"));
+        Assert.Equal("not signed in", entry.ActorName);
+        Assert.Equal("too many attempts, name 'Mallory'", entry.Detail);
+        Assert.Single(await EntriesAsync(app, "auth.sign-in-failed"));
+        await AssertNoSecretsAsync(app, "typed-secret-password-3");
     }
 
     /// <summary>
@@ -231,10 +284,18 @@ public class SignInAuditTests
     /// <summary>
     ///     Starts the application over a temporary database.
     /// </summary>
+    /// <param name="perName">The throttle limit per name; <c>null</c> for the default.</param>
     /// <returns>The application.</returns>
-    private static async Task<WebApplication> StartAsync()
+    private static async Task<WebApplication> StartAsync(int? perName = null)
     {
-        return await TestWebApp.StartAsync(new CapturingLoggerProvider(), TestDatabase.NewConnectionString(), ["serve", "--silent"]);
+        var settings = perName is null
+            ? null
+            : new Dictionary<string, string?>
+            {
+                ["Identity:Throttle:MaxFailuresPerName"] = perName.Value.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                ["Identity:Throttle:MaxFailuresPerAddress"] = "1000"
+            };
+        return await TestWebApp.StartAsync(new CapturingLoggerProvider(), TestDatabase.NewConnectionString(), ["serve", "--silent"], settings);
     }
 
     /// <summary>

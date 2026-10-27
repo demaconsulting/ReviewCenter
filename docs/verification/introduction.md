@@ -30,6 +30,7 @@ This document covers the verification design for the following software items:
   - **Identity** subsystem
     - **PasswordHasher** — password hashing and verification
     - **SignIn** — cookie sign-in, authorization, and the signed-in actor
+    - **SignInThrottle** — in-memory limit on failed sign-in attempts
     - **RevalidatingAuthenticationStateProvider** — periodic re-check of the user of an open page
   - **Web** subsystem
     - **App** — HTML shell, router, page frame, and the session gate

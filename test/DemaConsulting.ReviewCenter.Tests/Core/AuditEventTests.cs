@@ -83,7 +83,7 @@ public class AuditEventTests
         var users = new FakeUserStore();
         var clock = new MovableTimeProvider(_now);
         var trail = new FakeAuditStore(clock);
-        var userService = new UserService(users, new FakePasswordHasher(), clock, new AuditService(trail));
+        var userService = new UserService(users, new FakePasswordHasher(), clock, new AuditService(trail, null, clock));
         var ids = new Dictionary<string, int>();
         foreach (var (username, name) in new[] { ("ann", "Ann"), ("bob", "Bob") })
         {
@@ -381,26 +381,153 @@ public class AuditEventTests
     }
 
     /// <summary>
-    ///     Test that an unknown user is recorded as plain "unknown user" without echoing what was typed.
+    ///     Test that an unknown user is recorded with the typed name, made one line and cut to the user name
+    ///     length limit, and never with the password.
     /// </summary>
     [Fact]
-    public async Task UserService_AuthenticateAsync_UnknownUser_RecordsUnknownUserWithoutEchoingInput()
+    public async Task UserService_AuthenticateAsync_UnknownUser_RecordsCleanedCappedTypedNameWithoutPassword()
     {
         // Arrange
         var fixture = await CreateAsync();
+        var typed = "mallory\r\nfake line\u0007" + new string('x', 200);
 
         // Act
-        var user = await fixture.UserService.AuthenticateAsync("<script>alert(1)</script>", "typed-secret-password", TestContext.Current.CancellationToken);
+        var user = await fixture.UserService.AuthenticateAsync(typed, "typed-secret-password", TestContext.Current.CancellationToken);
 
         // Assert
         Assert.Null(user);
         var entry = Assert.Single(fixture.Trail.Entries);
         Assert.Equal("auth.sign-in-failed", entry.Action);
         Assert.Equal("unknown user", entry.ActorName);
-        Assert.Equal("unknown user", entry.Detail);
         Assert.Null(entry.ActorUserId);
-        Assert.DoesNotContain("script", entry.ActorName + entry.Detail, StringComparison.Ordinal);
+        Assert.StartsWith("unknown user, name 'mallory  fake line ", entry.Detail, StringComparison.Ordinal);
+        Assert.EndsWith("...'", entry.Detail, StringComparison.Ordinal);
+        Assert.Equal("unknown user, name '".Length + ReviewLimits.MaxUsernameLength + 1, entry.Detail.Length);
+        Assert.DoesNotContain('\n', entry.Detail);
         Assert.DoesNotContain("typed-secret", entry.ActorName + entry.Detail, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    ///     Test that repeated attempts with the same unknown name are recorded once per window, then once more with the count.
+    /// </summary>
+    [Fact]
+    public async Task UserService_AuthenticateAsync_UnknownUserRepeated_RecordsOneEntryPerWindow()
+    {
+        // Arrange
+        var fixture = await CreateAsync();
+        for (var i = 0; i < 4; i++)
+        {
+            await fixture.UserService.AuthenticateAsync(i == 3 ? "MALLORY" : "mallory", "pw-" + i, TestContext.Current.CancellationToken);
+        }
+
+        // Act
+        fixture.Clock.Advance(TimeSpan.FromMinutes(1));
+        await fixture.UserService.AuthenticateAsync("mallory", "again", TestContext.Current.CancellationToken);
+        await fixture.UserService.AuthenticateAsync("other", "again", TestContext.Current.CancellationToken);
+
+        // Assert: name case does not matter for the window; another name has its own
+        Assert.Equal(
+            [
+                "unknown user, name 'mallory'",
+                "unknown user, name 'mallory'; 3 more in the minute after the previous entry",
+                "unknown user, name 'other'"
+            ],
+            fixture.Trail.Entries.Select(e => e.Detail).ToArray());
+    }
+
+    /// <summary>
+    ///     Test that attempts on a locked account are recorded once per window and account, even with the right password.
+    /// </summary>
+    [Fact]
+    public async Task UserService_AuthenticateAsync_LockedAccount_RecordsSignInLockedOncePerWindow()
+    {
+        // Arrange
+        var fixture = await CreateAsync();
+        for (var i = 0; i < 5; i++)
+        {
+            await fixture.UserService.AuthenticateAsync("ann", "wrong-" + i, TestContext.Current.CancellationToken);
+        }
+
+        // Act
+        var right = await fixture.UserService.AuthenticateAsync("ann", Password, TestContext.Current.CancellationToken);
+        await fixture.UserService.AuthenticateAsync("ann", "wrong again", TestContext.Current.CancellationToken);
+        await fixture.UserService.AuthenticateAsync("bob", "wrong-bob", TestContext.Current.CancellationToken);
+
+        // Assert
+        Assert.Null(right);
+        var locked = Assert.Single(fixture.Trail.Entries, e => e.Action == "auth.sign-in-locked");
+        Assert.Equal("Ann (ann)", locked.ActorName);
+        Assert.Equal("account locked", locked.Detail);
+        Assert.DoesNotContain(fixture.Trail.Entries, e => (e.Detail + e.ActorName).Contains("wrong", StringComparison.Ordinal) && e.Action != "auth.sign-in-failed");
+        Assert.Equal(1, fixture.Trail.Entries.Count(e => e.Action == "auth.sign-in-failed" && e.ActorName == "Bob (bob)"));
+    }
+
+    /// <summary>
+    ///     Test that a wrong password and a refusal on a locked account during re-authentication are recorded as
+    ///     a failed signature re-authentication, not as a failed sign-in.
+    /// </summary>
+    [Fact]
+    public async Task UserService_ReauthenticateAsync_WrongPasswordAndLockedAccount_RecordSignatureReauthFailed()
+    {
+        // Arrange
+        var fixture = await CreateAsync();
+
+        // Act
+        var wrong = await fixture.UserService.ReauthenticateAsync("ann", "typed-wrong-password", TestContext.Current.CancellationToken);
+        for (var i = 0; i < 4; i++)
+        {
+            await fixture.UserService.ReauthenticateAsync("ann", "wrong-" + i, TestContext.Current.CancellationToken);
+        }
+
+        var locked = await fixture.UserService.ReauthenticateAsync("ann", Password, TestContext.Current.CancellationToken);
+        var unknown = await fixture.UserService.ReauthenticateAsync("zed", "typed-wrong-password", TestContext.Current.CancellationToken);
+
+        // Assert
+        Assert.Null(wrong);
+        Assert.Null(locked);
+        Assert.Null(unknown);
+        var entries = fixture.Trail.Entries;
+        Assert.DoesNotContain(entries, e => e.Action is "auth.sign-in-failed" or "auth.sign-in-locked");
+        Assert.Equal(5, entries.Count(e => e.Action == "signature.reauth-failed" && e.Detail == "wrong password"));
+        Assert.Single(entries, e => e.Action == "signature.reauth-failed" && e.Detail == "account locked" && e.ActorName == "Ann (ann)");
+        Assert.Single(entries, e => e.Action == "signature.reauth-failed" && e.Detail == "unknown user, name 'zed'");
+        Assert.Single(entries, e => e.Action == "auth.locked-out");
+        Assert.DoesNotContain(entries, e => (e.Detail + e.ActorName).Contains("typed-wrong", StringComparison.Ordinal));
+    }
+
+    /// <summary>
+    ///     Test that a signature attempt with a wrong password and then on the locked account is recorded without the password.
+    /// </summary>
+    [Fact]
+    public async Task SigningService_SignAsync_WrongPasswordThenLocked_RecordsReauthFailedEntriesWithoutPassword()
+    {
+        // Arrange: a review that may be signed, and four wrong passwords already given
+        var fixture = await CreateAsync();
+        foreach (var item in DefaultChecklist.Current.Sections.SelectMany(s => s.Items))
+        {
+            await fixture.Checklists.SetAnswerAsync(fixture.ProjectId, "rev-1", item.Id, ChecklistOutcome.Pass, null, TestActors.Ann, TestContext.Current.CancellationToken);
+        }
+
+        var slot = await fixture.Signing.AddSlotAsync(TestActors.Ann, fixture.ProjectId, "rev-1", fixture.UserIds["ann"], null, TestContext.Current.CancellationToken);
+        var digest = (await fixture.Signing.GetApprovalAsync(fixture.ProjectId, "rev-1", TestContext.Current.CancellationToken))!.Digest;
+        for (var i = 0; i < 4; i++)
+        {
+            await fixture.UserService.ReauthenticateAsync("ann", "wrong-" + i, TestContext.Current.CancellationToken);
+        }
+
+        // Act: the fifth wrong password locks the account, the next attempt meets the lock
+        var firstFailure = await Record.ExceptionAsync(() => fixture.Signing.SignAsync(
+            TestActors.Ann, fixture.ProjectId, "rev-1", slot.Id, digest, "typed-wrong-password", TestContext.Current.CancellationToken));
+        var secondFailure = await Record.ExceptionAsync(() => fixture.Signing.SignAsync(
+            TestActors.Ann, fixture.ProjectId, "rev-1", slot.Id, digest, Password, TestContext.Current.CancellationToken));
+
+        // Assert: both refused as a failed re-authentication, and recorded without any password
+        Assert.Equal(DomainRule.ReauthenticationFailed, Assert.IsType<DomainRuleException>(firstFailure).Rule);
+        Assert.Equal(DomainRule.ReauthenticationFailed, Assert.IsType<DomainRuleException>(secondFailure).Rule);
+        var entries = fixture.Trail.Entries;
+        Assert.Equal(5, entries.Count(e => e.Action == "signature.reauth-failed" && e.Detail == "wrong password"));
+        Assert.Single(entries, e => e.Action == "signature.reauth-failed" && e.Detail == "account locked");
+        Assert.DoesNotContain(entries, e => (e.Detail + e.ActorName).Contains("typed-wrong", StringComparison.Ordinal));
     }
 
     /// <summary>
@@ -444,10 +571,10 @@ public class AuditEventTests
     }
 
     /// <summary>
-    ///     Test that the fifth failure records the lockout once, and that attempts during the lockout are not recorded.
+    ///     Test that the fifth failure records the lockout once.
     /// </summary>
     [Fact]
-    public async Task UserService_AuthenticateAsync_FifthFailure_RecordsLockoutOnceAndLockedAttemptsAreNotRecorded()
+    public async Task UserService_AuthenticateAsync_FifthFailure_RecordsLockoutOnce()
     {
         // Arrange
         var fixture = await CreateAsync();
@@ -457,9 +584,6 @@ public class AuditEventTests
         {
             await fixture.UserService.AuthenticateAsync("ann", "wrong-" + i, TestContext.Current.CancellationToken);
         }
-
-        await fixture.UserService.AuthenticateAsync("ann", Password, TestContext.Current.CancellationToken);
-        await fixture.UserService.AuthenticateAsync("ann", "wrong again", TestContext.Current.CancellationToken);
 
         // Assert
         var entries = fixture.Trail.Entries;

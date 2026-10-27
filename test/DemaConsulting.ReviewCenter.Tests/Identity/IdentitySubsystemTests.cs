@@ -99,4 +99,48 @@ public class IdentitySubsystemTests
         Assert.True(before);
         Assert.False(after);
     }
+
+    /// <summary>
+    ///     Test that the throttle, the user service and the audit trail work together: repeated wrong passwords
+    ///     for one name are refused with the throttle answer, the right password is then refused too, and the
+    ///     trail has one failure entry and one throttled entry without the passwords.
+    /// </summary>
+    [Fact]
+    public async Task IdentitySubsystem_Throttle_RepeatedFailures_AreRefusedAndAuditedOncePerWindow()
+    {
+        // Arrange: an application with a limit of three attempts per name and one user
+        await using var app = await TestWebApp.StartAsync(
+            new CapturingLoggerProvider(),
+            null,
+            ["serve", "--silent"],
+            new Dictionary<string, string?>
+            {
+                ["Identity:Throttle:MaxFailuresPerName"] = "3",
+                ["Identity:Throttle:MaxFailuresPerAddress"] = "50"
+            });
+        var users = app.Services.GetRequiredService<UserService>();
+        await users.CreateAsync("ann", "Ann Example", UserRole.Reviewer, TestBrowser.Password, TestContext.Current.CancellationToken);
+        using var browser = new TestBrowser(app);
+
+        // Act: three wrong attempts, then two more with the right password
+        var wrong = new List<string?>();
+        for (var i = 0; i < 3; i++)
+        {
+            wrong.Add((await browser.LoginAsync("ann", "wrong-attempt-" + i)).Headers.Location?.OriginalString);
+        }
+
+        var refused = await browser.LoginAsync("ann", TestBrowser.Password);
+        await browser.LoginAsync("ann", TestBrowser.Password);
+        var page = await browser.GetPageAsync("/login?error=throttled");
+
+        // Assert: generic answers first, then the throttle answer; the page says so; the trail has one entry each
+        Assert.All(wrong, location => Assert.Equal("/login?error=1", location));
+        Assert.Equal("/login?error=throttled", refused.Headers.Location?.OriginalString);
+        Assert.NotNull(page.QuerySelector("[data-testid='login-throttled']"));
+        var audit = app.Services.GetRequiredService<AuditService>();
+        var entries = (await audit.ListAsync(null, null, null, null, TestContext.Current.CancellationToken)).Entries;
+        Assert.Equal(3, entries.Count(e => e.Action == "auth.sign-in-failed"));
+        Assert.Single(entries, e => e.Action == "auth.sign-in-throttled");
+        Assert.DoesNotContain(entries, e => e.Detail.Contains("wrong-attempt", StringComparison.Ordinal));
+    }
 }
