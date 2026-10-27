@@ -26,6 +26,8 @@ N/A - standard test environment.
 - A session length that is not positive is reported with an error that names the `Auth:SessionHours` setting.
 - A re-check interval of open pages below 5 seconds is reported with an error that names the
   `Auth:RevalidationSeconds` setting.
+- A git timeout (`Git:TimeoutSeconds`) outside 1 to 3600 seconds is reported with an error that names the setting;
+  1 and 3600 are accepted.
 - An unsupported database provider and an unusable database location are reported as the error "Failed to prepare
   the database", and `RunAsync` returns exit code 1 for each.
 - The repository registry, the git source, and the token protector are registered as shared instances; the git cache and
@@ -88,6 +90,11 @@ is tested by `ServerHost_CreateApplication_NonPositiveSessionHours_ThrowsClearEr
 setting `Auth:RevalidationSeconds` set to 4, below the minimum of 5; an `InvalidOperationException` whose message names
 the setting is thrown. This scenario is tested by
 `ServerHost_CreateApplication_RevalidationSecondsBelowMinimum_ThrowsClearError`.
+
+**ServerHost_CreateApplication_GitTimeoutOutOfRange_ThrowsClearError**: A theory over 0, -5, and 3601: the pipeline is built
+with the setting `Git:TimeoutSeconds` set to that value; an `InvalidOperationException` whose message names the setting
+is thrown. **ServerHost_CreateApplication_GitTimeoutAtLimits_Starts**: a theory over 1 and 3600: the pipeline is built
+and the configured value is in effect. These scenarios are tested by the tests of those names.
 
 **ServerHost_AddServices_Configured_RegistersUserService**: The real pipeline is started on an in-memory server and
 a user is created through the `UserService` taken from the application services; the user is stored with a database

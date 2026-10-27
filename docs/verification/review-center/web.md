@@ -44,7 +44,9 @@ N/A - standard test environment (temporary SQLite databases are created by the t
   `ReviewCenter-Web-SessionEnd` in `web.yaml`), together with the `Identity` subsystem test of the provider that ends
   the state.
 - A user with the Admin role who opens `/repositories` is shown the page of the registry; a reviewer is refused.
-- Every interactive element of every page has a `data-testid`.
+- Every interactive element of every page has a `data-testid`, no identifier repeats within a page, and the breadcrumb links
+  have their own identifiers (`breadcrumb-projects-link`, `breadcrumb-repositories-link`, `breadcrumb-users-link`),
+  distinct from the header tabs.
 - The creation of a review from a repository (source choice, repository form, refusals, and skipped entries) and the
   display of the change kinds, the source, and the Diff / Head / Baseline views need a live connection, so they are
   verified at unit level by the component tests of `ProjectPage` and `ReviewPage` (see the children of the requirement
@@ -98,10 +100,16 @@ is tested by
 `WebSubsystem_Stylesheet_DiffRules_KeepCodeScrollingInsideItself`. The measured width of the page at 390 by 844
 pixels is checked in a real browser by the acceptance walk-through.
 
-**WebSubsystem_Stylesheet_ThreadLink_IsQuietTextLink**: The stylesheet source is read and the `a.thread-link` rule is
-checked: it has no background and no padding, is underlined, and does not fill with the accent color, so the link of
-a thread looks like a quiet text link and not like the Resolve and Reply buttons. This scenario is tested by
-`WebSubsystem_Stylesheet_ThreadLink_IsQuietTextLink`.
+**WebSubsystem_Stylesheet_ThreadLink_IsButtonStyled**: The stylesheet source is read and checked: no `a.thread-link`
+rule makes
+the link look like plain text, and the thread header sizes the link like the buttons beside it, so the link and the Copy
+link button of a thread look alike. This scenario is tested by `WebSubsystem_Stylesheet_ThreadLink_IsButtonStyled`.
+
+**WebSubsystem_Stylesheet_DiffCommentControl_ShowsOnHoverFocusAndTouch**: The stylesheet source is read and the rules of
+the `+` control of a diff row are checked: it is hidden with `opacity: 0`, shown on row hover, focus within the row, a
+selected row, and keyboard focus, always shown under `@media (hover: none)`, and never taken out of the layout or the
+tab order with `display: none` or `visibility: hidden`. This scenario is tested by
+`WebSubsystem_Stylesheet_DiffCommentControl_ShowsOnHoverFocusAndTouch`.
 
 **Routes_DeepLink_SignedOut_LoginLinkKeepsEscapesAndQuery**: The router is rendered for a signed-out visitor at the
 address of a line link of a file whose name has a space and a hash, with a baseline side. The "Sign in required" link
@@ -134,6 +142,14 @@ plan page and the project page of a missing project, a review, a missing review,
 requested over the in-memory server; every link, button, visible input, select, and text area in each response has a
 `data-testid` in kebab-case. This scenario is tested by
 `WebSubsystem_AllPages_EveryInteractiveElementHasTestId`.
+
+**WebSubsystem_AllPages_TestIdsAreUniqueAndBreadcrumbsDistinct**: A user with the Admin role is signed in and the project
+page, the new review page, the plan page, the review page, its checklist page, its history page, the new repository
+page, and the new user page are requested. In each response no `data-testid` value occurs twice, the breadcrumb link
+has its prefixed identifier (`breadcrumb-projects-link`, `breadcrumb-repositories-link`, or
+`breadcrumb-users-link`), and the
+header tab of the same name occurs exactly once. This scenario is tested by
+`WebSubsystem_AllPages_TestIdsAreUniqueAndBreadcrumbsDistinct`.
 
 **Repositories page**: The page of the repository registry is verified by its unit tests, which render it with the
 component test host. It lists repositories with the token state only and no delete control, which is tested by

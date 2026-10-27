@@ -269,6 +269,28 @@ public class AppTests : PageTestBase
     }
 
     /// <summary>
+    ///     Test that the document defines the browser helper behind the "Copy link" button: the clipboard API with
+    ///     a hidden-textarea fallback for pages that are not a secure context.
+    /// </summary>
+    [Fact]
+    public async Task App_Render_ServedAtRoot_DefinesCopyTextHelper()
+    {
+        // Arrange: start the real pipeline in memory
+        var logs = new CapturingLoggerProvider();
+        await using var app = await TestWebApp.StartAsync(logs, "serve", "--silent");
+        using var client = app.GetTestClient();
+
+        // Act: request the root document
+        var html = await client.GetStringAsync("/", Xunit.TestContext.Current.CancellationToken);
+
+        // Assert: the helper, the clipboard API and the fallback are all there
+        Assert.Contains("copyText", html, StringComparison.Ordinal);
+        Assert.Contains("navigator.clipboard", html, StringComparison.Ordinal);
+        Assert.Contains("createElement('textarea')", html, StringComparison.Ordinal);
+        Assert.Contains("execCommand('copy')", html, StringComparison.Ordinal);
+    }
+
+    /// <summary>
     ///     Test that the address of the new-review form is handled by the form, not by a review called "new".
     /// </summary>
     [Fact]

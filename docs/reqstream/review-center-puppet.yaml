@@ -7,9 +7,9 @@
 #   (act, look at the screenshot or page text, decide, act) against a ReviewCenter server that
 #   the agent starts separately
 # - Puppet is a separate software system that is not part of the distributed ReviewCenter package
-# - System requirements are validated by the single real-browser end-to-end test, which is linked
-#   with the windows@ and ubuntu@ filters to prove it passed on both supported platforms. CI
-#   installs Chromium and makes a missing browser fail that test.
+# - System requirements are validated by the real-browser end-to-end tests, which are linked
+#   with the windows@ and ubuntu@ filters to prove they passed on both supported platforms. CI
+#   installs Chromium and makes a missing browser fail those tests.
 
 sections:
   - title: ReviewCenterPuppet Requirements
@@ -51,6 +51,8 @@ sections:
         tests:
           - windows@PuppetEndToEnd_StartDriveStop_SignInProjectAndTheme_WorksAgainstRealServer
           - ubuntu@PuppetEndToEnd_StartDriveStop_SignInProjectAndTheme_WorksAgainstRealServer
+          - windows@PuppetEndToEnd_ReviewDiff_HoverRevealsLineCommentAndClickOpensComposer_WorksAgainstRealServer
+          - ubuntu@PuppetEndToEnd_ReviewDiff_HoverRevealsLineCommentAndClickOpensComposer_WorksAgainstRealServer
 
       - id: ReviewCenterPuppet-System-VisualCheck
         title: >-

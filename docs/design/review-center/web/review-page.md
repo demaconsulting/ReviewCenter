@@ -92,7 +92,7 @@ password field after every signing attempt.
 expanded. **FocusedThreadId**: the thread chosen in the index, whose lines and card are highlighted. The page also
 keeps the test id to scroll to after the next render. All of these are cleared when the route parameters change.
 
-Test identifiers: `review-page` (root), `projects-link`, `project-link`, `review-loading`,
+Test identifiers: `review-page` (root), `breadcrumb-projects-link`, `project-link`, `review-loading`,
 `review-not-found`, `review-title`, `review-approval`, `next-step`, `review-summary` (the summary strip),
 `checklist-card` (its checklist cell), `checklist-progress-summary`, `checklist-link`, `summary-reviewers`,
 `summary-threads`, `reviewers-card`, `slots-empty`, `slot-{id}`, `slot-label-{id}`, `slot-primary-{id}`,
@@ -110,7 +110,8 @@ Test identifiers: `review-page` (root), `projects-link`, `project-link`, `review
 `selected-file-path`, `file-binary-notice`, `file-empty-notice`, `new-thread-form`,
 `thread-start-line-input`, `thread-end-line-input`, `thread-target`, `thread-text-input`, `thread-error`,
 `start-thread-button`, `thread-cancel-button` and `thread-whole-file-button` (only in the form under a diff row),
-`file-content`, `code-line-{n}`, `line-comment-{n}`, `line-no-{n}`, `line-marker-{n}`,
+`file-content`, `code-line-{n}`, `line-comment-{n}`, `line-no-{n}`, `line-marker-{n}`, `thread-link-{id}`,
+`thread-copy-link-{id}`, `thread-copy-status-{id}`,
 `line-text-{n}` (all by 1-based line number), `file-kind-{index}` (the change kind of a file in the list, shown for
 reviews from a repository only), `selected-file-kind`, `file-version-toggle` (shown when the file can be compared),
 `view-diff-button`, `view-head-button`, `view-baseline-button`, `baseline-note`, `baseline-content`,
@@ -205,7 +206,12 @@ Head view); a binary file shows the binary notice.
 controls are the ones of the thread list), `Composer` (the new-thread form, drawn under the selected row), and the
 event `OnComment`, which carries a `DiffCommentRequest(Side, Line, Extend)`. The control of a left cell asks for the
 Baseline side and its baseline line number (a removed line, or the baseline copy of an unchanged line); the control
-of a right cell asks for the Head side and its head line number. A thread is drawn under the row of the last line of
+of a right cell asks for the Head side and its head line number. The control is a button in the gutter of every cell
+that is revealed by the stylesheet when the row is hovered, has keyboard focus inside it (`:focus-within`), or is the
+selected row, and is always shown on a device without hover (`@media (hover: none)`). It is hidden with `opacity`, not
+`display` or `visibility`, so it keeps its place and its tab stop and a driver such as Puppet can still click it
+(`puppet hover diff-row-{i}`, then `puppet click diff-comment-{i}`). The Head view keeps its always visible
+`line-comment-{n}` button. A thread is drawn under the row of the last line of
 its anchor, across the full width, and the cell of its side is marked. The component holds only which collapsed runs
 the reader has expanded; every other state is the page's.
 
@@ -246,9 +252,10 @@ thread, a resolved thread is expanded, and the first line of its anchor (a row o
 line, or the thread card for a whole-file thread) becomes the scroll target. A file that can be compared words the
 anchor of a thread and of an index row as "Before: line N" or "After: lines N-M" (the side is the thread's
 `ThreadSide`; this applies to every file of a review with a baseline commit, an added file included); other files
-keep "Line N". Each thread card has a `thread-link-{id}` anchor, a plain, small, muted text link (class
-`thread-link`, not the button-style `action`) to the thread's address, so it does not compete with Resolve and
-Reply. The index rows come from `ThreadService.BuildIndex` and the next-step line from
+keep "Line N". Each thread card has a `thread-link-{id}` anchor (class `thread-link action outline small`, so it is
+button-styled like the buttons beside it) to the thread's address, and a `thread-copy-link-{id}` button ("Copy link")
+that copies the absolute address, with a `thread-copy-status-{id}` live region for the feedback. The index rows come
+from `ThreadService.BuildIndex` and the next-step line from
 `Approval.NextStep` (which `SigningService` builds with `ThreadService.NextStep`, given the checklist progress and the
 number of checks answered Fail, and words itself for missing slots and signatures), so the page holds no ordering or
 wording rules of its own.
@@ -324,8 +331,15 @@ line that is not a number or does not exist) sets `DeepLinkMessage`, shown above
 link of the file or thread; the page replaces the address of the browser by it with `history.replaceState`, so the
 address bar always holds a shareable link and the back button is not filled with entries. `NavigateTo` with
 replacement is not used, because the router would re-initialize the page and lose what is typed. The view mode (Diff,
-Head, Baseline) is not part of the address, so a reload shows the Diff view. Each thread card has the plain anchor
-`thread-link-{id}` with the link of the thread (a plain, small, muted text link, class `thread-link`). **ReviewLinks**
+Head, Baseline) is not part of the address, so a reload shows the Diff view. Each thread card has the anchor
+`thread-link-{id}` with the link of the thread (class `thread-link action outline small`) and the button
+`thread-copy-link-{id}` (the label stays "Copy link"). **CopyThreadLinkAsync** makes the address absolute with `NavigationManager.ToAbsoluteUri`,
+calls the browser function `reviewCenter.copyText` (defined in `App`) and shows "Copied" in the status region next to
+the button, or "Copy failed" when the browser answers false, throws, or is gone. The feedback is cleared two seconds
+after the latest click on that thread: each thread has its own timer (a `CancellationTokenSource` used with
+`Task.Delay` on the injected `TimeProvider`), a new click cancels and replaces the previous timer, and the page cancels
+all timers when it is disposed. The timer runs in a continuation that does not block the click handler and ignores a
+page that no longer exists. **ReviewLinks**
 builds all of these addresses: it escapes the review
 identifier and each path segment with `Uri.EscapeDataString` and joins them with `/`, and writes `?line=N&side=...`
 only when a line is given.
@@ -363,9 +377,9 @@ raises no other errors of its own.
 - **FileText** — decides whether a file is text and splits it into lines.
 - **SignIn** — `GetActorAsync` supplies the signed-in user from the authentication state.
 - **ProjectService** — reads the name of the owning project for the breadcrumb.
-- **ASP.NET Core Blazor components** — the component base class, events, JavaScript interop, the router, and the
-  interactive server render mode.
-- **App** — defines the scroll function and the address replacement function that the page calls.
+- **ASP.NET Core Blazor components** — the component base class, events, JavaScript interop, `NavigationManager` (to
+  make a thread address absolute), the router, and the interactive server render mode.
+- **App** — defines the scroll, address replacement and clipboard copy functions that the page calls.
 - **ReviewLinks** — builds the addresses of the review, its files and lines, and its threads, and the address of the
   attestation download; it is a part of this unit.
 - **IAttestationKeyProvider**, **AttestationKeyInfo** (`Evidence`) — the status and description of the signing key that

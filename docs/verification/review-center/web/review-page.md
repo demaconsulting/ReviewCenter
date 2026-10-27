@@ -554,13 +554,33 @@ names.
 address and gains no history entry; opening a deep link does not rewrite the address. These scenarios are tested by the
 tests of those names.
 
-**ReviewPage_Thread_ShowsPlainLinkToItsAddress**: every thread, in the diff and in a list, has an anchor whose text is
-"Link", whose `href` is the thread address, and whose class is `thread-link` and not the button-style `action`. This
-scenario is tested by the test of that name.
+**ReviewPage_Thread_ShowsLinkButtonAndCopyLinkControl**: every thread, in the diff and in a list, has an anchor whose
+text is "Link", whose `href` is the thread address, and whose classes are `thread-link` and the button-style `action`,
+and a `button` of type `button` with the text "Copy link" beside it. This scenario is tested by the test of that name.
 
-**WebSubsystem_Stylesheet_ThreadLink_IsQuietTextLink**: the stylesheet gives `a.thread-link` no background, no
-padding and an underline, and no accent fill, so the link does not look like a button. This scenario is tested by
-the test of that name.
+**ReviewPage_CopyLink_Click_CopiesAbsoluteThreadAddressAndShowsCopied**: with the browser function
+`reviewCenter.copyText` answering true, a click on "Copy link" calls it once with the absolute address
+(`http://localhost` plus the thread address), the status region reads "Copied" while the button keeps reading
+"Copy link", and after the fake clock is advanced by two seconds the status is empty (awaited, as the clearing runs
+through the renderer). **ReviewPage_CopyLink_SecondClick_KeepsFeedbackUntilTwoSecondsAfterTheLatestClick**: with
+a manual clock, two clicks 1.5 seconds apart and the clock advanced by another 1.5 seconds, the status still reads
+"Copied" (the timer of the first click does not clear the feedback of the second); after 0.6 seconds more it is empty.
+**ReviewPage_CopyLink_ClipboardFails_ShowsCopyFailed**:
+with the function answering false the status reads "Copy failed", the button still reads "Copy link", and the thread
+link is unchanged. These scenarios are tested by the tests of those names.
+
+**WebSubsystem_Stylesheet_ThreadLink_IsButtonStyled**: the stylesheet has no `a.thread-link` rule that strips the
+button look, and the thread header gives the link and the buttons the same padding and font size. This scenario is
+tested by the test of that name.
+
+**WebSubsystem_Stylesheet_DiffCommentControl_ShowsOnHoverFocusAndTouch**: the stylesheet hides the `+` control of a diff
+row with `opacity: 0`, reveals it on row hover, focus within the row, a selected row, and keyboard focus, shows it
+always under `@media (hover: none)`, and never uses `display: none` or `visibility: hidden` for it, so it stays in the tab
+order. This scenario is tested by the test of that name. A real browser has the hover state, so the reach is also proven
+end to end by the Puppet test
+`PuppetEndToEnd_ReviewDiff_HoverRevealsLineCommentAndClickOpensComposer_WorksAgainstRealServer` (`hover` on a row reveals
+its `+`, a `click` on it opens the composer; see the verification of ReviewCenterPuppet), and by the acceptance
+walk-through with Puppet (`puppet hover` on a row, a screenshot, then `puppet click` on its `+`).
 
 **ReviewPage_RoundTrip_LinkFromBuilder_OpensTheSameFileAndLine**: a theory over file paths with nested directories,
 spaces, `#`, `?`, `%`, a literal `%2F`, a literal `%20`, `+`, `&` and non-ASCII letters, next to a decoy file; the link

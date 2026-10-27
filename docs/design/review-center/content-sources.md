@@ -57,9 +57,10 @@ only the Core interfaces.
 - *Type*: Configuration (`appsettings.json` and environment variables).
 - *Role*: Consumer.
 - *Contract*: `CachePath` is the folder of the mirrors (empty for a `git-cache` folder beside the database) and
-  `TimeoutSeconds` is the longest time a single git command may run (120 by default; a value below 1 selects the
-  default).
-- *Constraints*: None.
+  `TimeoutSeconds` is the longest time a single git command may run (120 by default; it must be from 1 to 3600, or
+  the server refuses to start with "Invalid git settings: Git:TimeoutSeconds must be between 1 and 3600 seconds.").
+- *Constraints*: A `TimeoutSeconds` outside 1 to 3600 is refused at start-up by `Hosting`. A value below 1 can only
+  reach `GitOptions` when the class is built directly, and then counts as the default (120 seconds).
 
 **git (consumed)**: The installed git command-line tool.
 

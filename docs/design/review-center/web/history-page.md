@@ -31,7 +31,7 @@ All of this text comes from the trail and is rendered as plain text: Razor encod
 rendered, so a hostile text in an entry (for example a display name that contains markup) is shown as text.
 
 Every interactive element and key value has a stable `data-testid` (see the test identifier rule of the Web
-subsystem): `history-page` (root), `home-link`, `projects-link`, `project-link`, `review-link`, `history-loading`,
+subsystem): `history-page` (root), `breadcrumb-projects-link`, `project-link`, `review-link`, `history-loading`,
 `history-not-found`, `history-review-title`, `history-empty`, `history-table`, and per row `history-row`,
 `history-time`, `history-actor`, `history-action`, and `history-detail`, then `history-newer`, `history-older`, and
 `history-back`.

@@ -385,7 +385,8 @@ removed lines sits next to the run of added lines that replaces it, and a cell w
 and grey. Unchanged lines show on both sides. Unchanged lines far from a change are collapsed behind a **Show N
 unchanged lines** button, and the page scrolls to the first change when you open the file. On a narrow screen, such as
 a phone, each row stacks: the baseline cell above the head cell, with the empty cells hidden. To comment on a line,
-click the **+** at the start of its cell: a form opens under the row saying what you are commenting on, for example
+point at the line (or tab to it) and click the **+** that appears at the start of its cell (on a touch screen it is
+always shown): a form opens under the row saying what you are commenting on, for example
 "Comment on line 10 (before)". The **+** in the left cell comments on the baseline with the baseline line number, and
 the **+** in the right cell on the head with the head line number; hold Shift while you click another line on the
 same side, or fill in "Through line", to comment on a range. **Cancel** closes the form and **Comment on the whole
@@ -541,9 +542,10 @@ page you came from. Copy the address and send it to a colleague.
 | `/projects/{id}/reviews/{reviewId}/files/{path}?line=12&side=baseline` | The same for baseline line 12 |
 | `/projects/{id}/reviews/{reviewId}/threads/{threadId}` | The thread's file, scrolled to the highlighted thread |
 
-Every thread has a small **Link** next to its state, shown as a plain text link; it is an ordinary link, so you can
-also copy it with the context
-menu of your browser (there is no separate copy button). Characters in a file path that need escaping in an address
+Every thread has a **Link** next to its state, shown as a button; it opens the thread's address. Next to it,
+**Copy link** copies the full address to the clipboard and briefly shows "Copied" next to the button (or "Copy failed"
+when the browser does not allow it; the **Link** can still be copied with the context menu of your browser). Characters
+in a file path that need escaping in an address
 (spaces, `#`, `?`, `%`, and letters outside the English alphabet) are escaped for you in the links the page builds.
 
 Reloading a link shows the same file, line or thread, always as the diff when the file has one (the choice between the
@@ -909,7 +911,7 @@ encoded forms are removed from every error message and log line. Git never asks 
 | ------------------------- | -------------------------- | ------------------------------------------------------- |
 | `DataProtection:KeysPath` | `DataProtection__KeysPath` | Key ring folder (default `keys` beside the database)    |
 | `Git:CachePath`           | `Git__CachePath`           | Mirror folder (default `git-cache` beside the database) |
-| `Git:TimeoutSeconds`      | `Git__TimeoutSeconds`      | Time limit of every git call in seconds (default 120)   |
+| `Git:TimeoutSeconds`      | `Git__TimeoutSeconds`      | Git call time limit in seconds (default 120; 1 to 3600) |
 
 ### How Repositories Are Read
 
@@ -919,7 +921,9 @@ a revision that starts with `-` or contains a space or a control character is re
 know gives a clear "unknown revision" message. The changed files between two revisions are listed with a rename counted
 as a delete and an add; without a baseline revision every file of the revision is listed. Symbolic links and submodules
 are skipped with a note, and the per-file and total size limits are the same as for an upload, checked before a file is
-read. A call that runs longer than `Git:TimeoutSeconds` is stopped together with its child processes.
+read. A call that runs longer than `Git:TimeoutSeconds` is stopped together with its child processes. The value must
+be from 1 to 3600; the server refuses to start with an error that names `Git:TimeoutSeconds` for any other number
+(earlier versions treated 0 or a negative value as the default).
 
 Redirects are not followed, so a location that redirects (for example one that needs the `.git` ending) must be entered
 in its final form. If the cache folder cannot be written, or its path is malformed or too long, the operation fails with

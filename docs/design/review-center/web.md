@@ -368,8 +368,10 @@ Every interactive element (`a`, `button`, `input`, `select`, `textarea`) of ever
 stable, kebab-case `data-testid` attribute, so that every interactive element can be addressed by automated
 tests and by the Puppet tool without depending on text, position, or style. Key displayed values have identifiers
 too, and elements that repeat carry the review id, project id, or list index in the identifier. Each page root is
-a `main` element with its own identifier. The rule is enforced by a test that renders every page and checks
-every interactive element.
+a `main` element with its own identifier. An identifier never repeats within a page: the header tabs have the
+unprefixed identifiers `projects-link`, `repositories-link`, and `users-link`, and the breadcrumb links of the pages
+below them are prefixed `breadcrumb-` (for example `breadcrumb-projects-link`). The rule is enforced by tests that render
+every page and check every interactive element and the uniqueness of the identifiers.
 
 #### Limitations
 

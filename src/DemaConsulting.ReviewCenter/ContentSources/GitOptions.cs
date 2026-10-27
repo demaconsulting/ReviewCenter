@@ -40,17 +40,29 @@ public sealed class GitOptions
     public const int DefaultTimeoutSeconds = 120;
 
     /// <summary>
+    ///     The smallest accepted timeout of one git call, in seconds.
+    /// </summary>
+    public const int MinimumTimeoutSeconds = 1;
+
+    /// <summary>
+    ///     The largest accepted timeout of one git call, in seconds.
+    /// </summary>
+    public const int MaximumTimeoutSeconds = 3600;
+
+    /// <summary>
     ///     Gets or sets the folder that holds the bare mirror clones, one <c>repo-{id}</c> folder per repository.
     /// </summary>
     public string? CachePath { get; set; }
 
     /// <summary>
-    ///     Gets or sets the timeout of every git call, in seconds. A value below one means the default.
+    ///     Gets or sets the timeout of every git call, in seconds. It must be from 1 to 3600; the host checks
+    ///     this at start-up.
     /// </summary>
     public int TimeoutSeconds { get; set; } = DefaultTimeoutSeconds;
 
     /// <summary>
     ///     Gets the effective timeout of one git call.
     /// </summary>
+    /// <remarks>A value below one (possible only when the class is built directly) falls back to the default.</remarks>
     internal TimeSpan Timeout => TimeSpan.FromSeconds(TimeoutSeconds < 1 ? DefaultTimeoutSeconds : TimeoutSeconds);
 }

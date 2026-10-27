@@ -6,7 +6,8 @@
    so everything outside a page stays cheap, static HTML. It also carries one tiny script: the scroll
    helper that the review page calls to bring a thread's lines into view (Blazor cannot scroll by itself) and the
    helper that replaces the address in the address bar by the link of the file or thread shown (history.replaceState:
-   no navigation and no history entry, so the page keeps its state). A second script in the head applies the stored
+   no navigation and no history entry, so the page keeps its state) and the copy helper behind a thread's
+   "Copy link" button (clipboard API, with a textarea fallback outside secure contexts). A second script in the head applies the stored
    light/dark/system appearance before the first paint. *@
 <!DOCTYPE html>
 <html lang="en">
@@ -73,6 +74,30 @@
                 if (typeof url === 'string' && url.charAt(0) === '/' && url.charAt(1) !== '/') {
                     history.replaceState(history.state, '', url);
                 }
+            },
+            copyText: function (text) {
+                // Resolves true when the text reached the clipboard and false otherwise; never rejects. The
+                // clipboard API needs a secure context, so a hidden textarea and execCommand('copy') is the fallback.
+                var fallback = function () {
+                    var box = document.createElement('textarea');
+                    box.value = text;
+                    box.setAttribute('readonly', '');
+                    box.style.position = 'fixed';
+                    box.style.opacity = '0';
+                    document.body.appendChild(box);
+                    try {
+                        box.select();
+                        return document.execCommand('copy');
+                    } catch (e) {
+                        return false;
+                    } finally {
+                        document.body.removeChild(box);
+                    }
+                };
+                if (window.isSecureContext && navigator.clipboard) {
+                    return navigator.clipboard.writeText(text).then(function () { return true; }, function () { return fallback(); });
+                }
+                return Promise.resolve(fallback());
             }
         });
     </script>

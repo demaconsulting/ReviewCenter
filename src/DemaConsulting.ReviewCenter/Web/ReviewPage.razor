@@ -33,7 +33,7 @@
 <SessionGate>
 <main class="page review-page" data-testid="review-page" data-interactive="@InteractiveMarker">
     <nav class="breadcrumb">
-        <a href="/projects" data-testid="projects-link">Projects</a>
+        <a href="/projects" data-testid="breadcrumb-projects-link">Projects</a>
         <span aria-hidden="true">/</span>
         <a href="/projects/@ProjectId" data-testid="project-link">@(ProjectName ?? $"Project {ProjectId}")</a>
         @if (Review is not null)
@@ -326,8 +326,12 @@
                     <span class="path" data-testid="thread-anchor-@threadId">@AnchorLabel(item)</span>
                     <span class="badge @(resolved ? "resolved" : null)" data-testid="thread-state-@threadId">@item.State</span>
                     <span class="muted" data-testid="thread-count-@threadId">@CommentCountLabel(item)</span>
-                    <a class="thread-link" href="@ReviewLinks.ForThread(ProjectId, ReviewId, threadId)"
+                    <a class="thread-link action outline small" href="@ReviewLinks.ForThread(ProjectId, ReviewId, threadId)"
                        aria-label="Link to thread @threadId" data-testid="thread-link-@threadId">Link</a>
+                    <button type="button" class="secondary" data-testid="thread-copy-link-@threadId"
+                            aria-label="Copy link to thread @threadId"
+                            @onclick="() => CopyThreadLinkAsync(threadId)">Copy link</button>
+                    <span class="muted" role="status" data-testid="thread-copy-status-@threadId">@CopyStatusFor(threadId)</span>
                     @if (resolved)
                     {
                         <button type="button" class="secondary" data-testid="thread-expand-@threadId"

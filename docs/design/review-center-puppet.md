@@ -12,7 +12,8 @@ ReviewCenterPuppet, called Puppet in this chapter, is a development tool that le
 drive the real ReviewCenter web application in a browser. A coding agent works at a shell, one command per call,
 and loops: act, look at a screenshot or at the page text, decide, act again. Puppet therefore keeps ONE persistent
 headless Chromium open between commands. `puppet start` spawns a detached daemon process that owns the browser; every
-other command, such as `puppet click projects-link`, is a thin client that sends one request to the daemon, prints the
+other command, such as `puppet click projects-link` (the header tab), is a thin client that sends one request to the
+daemon, prints the
 answer, and exits. The ReviewCenter server is started separately by the caller (for example with `dotnet watch`).
 The tool is a single console application on net10.0 built from `tools/puppet`; the same executable is the client and,
 through the hidden verb `daemon`, the daemon.
@@ -114,5 +115,6 @@ N/A - Puppet is a development tool and is not a safety-classified software item.
 - Hover persistence: the mouse position lives in the Playwright page, so a hover stays until the mouse moves again;
   `screenshot`, `viewport`, and `theme` do not move the mouse. Only `reset`, which creates a new browser context and
   clears cookies and storage, loses it.
-- Testability: the units are tested directly; one end-to-end test starts the real daemon against the real server in
-  real Chromium.
+- Testability: the units are tested directly; two end-to-end tests start the real daemon against the real server in
+  real Chromium. The second one covers hover-then-click on a hover-revealed control of a real review diff (the **+**
+  of a diff line).

@@ -52,7 +52,8 @@ The current release provides:
   content, the two commits, and the selection are copied into the database when the review is created, so later
   commits do not change the review. The review page shows each file as Added, Modified, or Deleted; every file of a
   review that has a baseline commit opens as a **Diff** (the baseline and the head side by side, unchanged lines
-  collapsed, a **+** on every line to comment on it; an added file shows all its lines as added, a deleted file all
+  collapsed, a **+** on every line to comment on it, shown when you point at or tab to the line; an added file shows
+  all its lines as added, a deleted file all
   as removed) and can also be read as **Head** (not for a deleted file) or as a read-only **Baseline** (not for an
   added file). Uploads and reviews without a baseline commit show the numbered head only.
   A signature binds the repository, both commits, the selection, and every change (see
@@ -68,7 +69,7 @@ The current release provides:
   thread index of all files (open by default, or all, or resolved) jumps to the thread's lines, resolved threads are
   collapsed to one line, and the file list shows the open threads per file
 - **Sharing Links**: every file, line and thread of a review has a stable link; the address bar always holds one, each
-  thread has a **Link**, and signing in brings you back to the link you opened (see
+  thread has a **Link** and a **Copy link** button, and signing in brings you back to the link you opened (see
   [Sharing links](#sharing-links))
 - **Review Checklist**: every new review gets a checklist of 14 sections and 58 checks, taken from the
   [Continuous Compliance review template][link-review-template]; a checklist page (linked from the review page,
@@ -476,7 +477,7 @@ character. Matching is case-sensitive.
 | ------------------------- | -------------------------- | ------------------------------------------------------- |
 | `DataProtection:KeysPath` | `DataProtection__KeysPath` | Key ring folder (default `keys` beside the database)    |
 | `Git:CachePath`           | `Git__CachePath`           | Mirror folder (default `git-cache` beside the database) |
-| `Git:TimeoutSeconds`      | `Git__TimeoutSeconds`      | Time limit of every git call in seconds (default 120)   |
+| `Git:TimeoutSeconds`      | `Git__TimeoutSeconds`      | Git call time limit in seconds (default 120; 1 to 3600) |
 
 > **Warning: back up the key ring, and protect it.** The tokens are only as safe as the key ring folder. The keys are
 > **not** encrypted at rest, so on Linux protect the folder with file permissions (the server creates it readable only
@@ -510,8 +511,9 @@ The review page shows the change kind of every file. Every file of a review that
 **Diff**: "x added, y removed", the
 baseline on the left and the head on the right (stacked on a narrow screen), each with its own line numbers, a run of
 removed lines next to the run of added lines that replaces it, and the unchanged lines collapsed behind **Show N
-unchanged lines**. Click the **+** on a line to comment on it; the left side is commented on in the baseline and the
-right side in the head, and the thread list says "Before: line N" or "After: line N". A modified file can also be read as
+unchanged lines**. Point at a line (or tab to it) and click the **+** that appears to comment on it; the left side is
+commented on in the baseline and the right side in the head, and the thread list says "Before: line N" or
+"After: line N". A modified file can also be read as
 **Head** (the numbered lines with their comments) or as **Baseline** (read-only), and a file too large to compare
 line by line (more than 10,000 lines on either side, or more than 2,000 added and removed lines together) offers
 those two. A deleted file opens on its removed lines and accepts comments on them or on the whole file; it offers
@@ -569,10 +571,11 @@ review page shows the set of a planned review as **Review set** in the Details.
 ## Sharing Links
 
 Every file, line and thread of a review has a stable link, and the address bar of the browser always holds the link of
-what is shown (choosing a file or a thread changes it without adding history entries): `.../reviews/{reviewId}/files/{path}`
-opens a file, `?line=N&side=head|baseline` adds a highlighted line, and `.../reviews/{reviewId}/threads/{threadId}`
-opens the thread. Each thread has a **Link**. A link to something that does not exist shows a message and a way back to
-the file list, and a signed-out visitor is returned to the same link after signing in. The user guide has the details.
+what is shown (choosing a file or a thread changes it without adding history entries):
+`.../reviews/{reviewId}/files/{path}` opens a file, `?line=N&side=head|baseline` adds a highlighted line, and
+`.../reviews/{reviewId}/threads/{threadId}` opens the thread. Each thread has a **Link** and a **Copy link** button. A
+link to something that does not exist shows a message and a way back to the file list, and a signed-out visitor is
+returned to the same link after signing in. The user guide has the details.
 
 ## Data Location and Database Settings
 
