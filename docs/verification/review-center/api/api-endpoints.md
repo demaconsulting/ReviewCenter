@@ -47,6 +47,10 @@ slot with its reviewers and who signed; the other is 404. This scenario is teste
 **ApiEndpoints_Request_NoToken_Answers401**: Each route (the three reads, the creation, and the attestation) is requested
 without a token. Each answer is 401. This scenario is tested by `ApiEndpoints_Request_NoToken_Answers401`.
 
+**ApiEndpoints_CreateReview_NoTokenOddBody_Answers401**: A creation request without a token and with a body that is
+not JSON (plain text, or malformed JSON) is refused with 401, never with 415 or 400, because authentication comes
+before the body is read. This scenario is tested by `ApiEndpoints_CreateReview_NoTokenOddBody_Answers401`.
+
 **ApiEndpoints_CreateReview_Upload_CreatesDraftFlaggedAsApi**: A review is created from two uploaded files. The answer is
 201 with the address of the review, the details, and no skipped files; the review is flagged as created through the API,
 and the audit entry names the display id of the token. This scenario is tested by

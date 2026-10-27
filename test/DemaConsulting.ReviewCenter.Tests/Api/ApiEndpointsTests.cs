@@ -166,6 +166,33 @@ public class ApiEndpointsTests
     }
 
     /// <summary>
+    ///     Test that authentication comes before the body is looked at: a creation request without a token is
+    ///     refused with 401 whatever its content type or body, never with 415 or 400.
+    /// </summary>
+    /// <param name="contentType">The content type of the body.</param>
+    /// <param name="body">The body.</param>
+    [Theory(Timeout = 60000)]
+    [InlineData("text/plain", "not json")]
+    [InlineData("application/json", "{ not json")]
+    public async Task ApiEndpoints_CreateReview_NoTokenOddBody_Answers401(string contentType, string body)
+    {
+        // Arrange: an application with a project and a request whose body would otherwise be refused
+        await using var app = await StartAsync();
+        await AttestationEndpointTests.CreateReviewAsync(app, signed: true);
+        using var client = ClientFor(app, null);
+        using var request = new HttpRequestMessage(HttpMethod.Post, "/api/projects/1/reviews")
+        {
+            Content = new StringContent(body, System.Text.Encoding.UTF8, contentType)
+        };
+
+        // Act: send it without a token
+        var response = await client.SendAsync(request, TestContext.Current.CancellationToken);
+
+        // Assert: refused before the body is read
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    /// <summary>
     ///     Test that a review can be created from uploaded files, that the answer carries the details and the
     ///     address of the review, and that the review and the audit entry say it was created through a token.
     /// </summary>
