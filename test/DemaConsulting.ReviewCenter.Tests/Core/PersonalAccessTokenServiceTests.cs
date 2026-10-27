@@ -526,6 +526,27 @@ public class PersonalAccessTokenServiceTests
     }
 
     /// <summary>
+    ///     Test that a burst of requests that all read the same stale last-used time writes it only once.
+    /// </summary>
+    [Fact]
+    public async Task PersonalAccessTokenService_Authenticate_ParallelBurst_TouchesOnce()
+    {
+        // Arrange: a token never used, and a store whose lookup returns the same snapshot to every request
+        var (service, tokens, _, _, _) = await CreateAsync();
+        var created = await service.CreateAsync(TestActors.Ann, "build server", 90, TestContext.Current.CancellationToken);
+        var snapshot = await tokens.FindByHashAsync(created.Token.TokenHash, TestContext.Current.CancellationToken);
+        tokens.FindOverride = _ => snapshot;
+
+        // Act: four requests that all see a token that was never used
+        var results = await Task.WhenAll(Enumerable.Range(0, 4).Select(
+            _ => service.AuthenticateAsync(created.Value, TestContext.Current.CancellationToken)));
+
+        // Assert: all are accepted, and the store was written once
+        Assert.All(results, r => Assert.Equal(TokenFailure.None, r.Failure));
+        Assert.Equal(1, tokens.TouchCount);
+    }
+
+    /// <summary>
     ///     Test that an unknown or disabled owner cannot create or list tokens.
     /// </summary>
     [Fact]

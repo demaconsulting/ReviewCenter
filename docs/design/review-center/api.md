@@ -32,7 +32,8 @@ validate, and revoke them, and `AccountPage` of `Web` is where a user manages th
   - `POST /api/projects/{projectId}/reviews` creates a draft review from `files` or from a `repository` (exactly one of
     them) and answers 201 with a `Location` header and the created review.
   - `GET /api/projects/{projectId}/reviews/{reviewId}/attestation.pdf` returns the signed PDF of a complete review.
-  - Any other address under `/api`, with any method, answers a JSON problem 404.
+  - Any other address under `/api`, with any standard HTTP method (`GET`, `HEAD`, `POST`, `PUT`, `PATCH`, `DELETE`,
+    `OPTIONS`), answers a JSON problem 404.
   - A failure is a problem description (`application/problem+json`).
 - *Constraints*: There is no route that signs, changes a reviewer slot, or creates or revokes a token; the actor of every
   call is the owner of the token, acting with the role that the owner has now.

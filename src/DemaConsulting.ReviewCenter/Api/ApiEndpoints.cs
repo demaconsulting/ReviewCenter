@@ -36,7 +36,8 @@ namespace DemaConsulting.ReviewCenter.Api;
 ///     validation, audit trail) are identical. A failed domain rule becomes a problem document through one filter
 ///     (see <see cref="ApiProblems"/>). Nothing here can sign: reviewer slots and signatures are refused for a token
 ///     actor by <see cref="SigningService"/>, and no route for them exists. An unknown address under <c>/api</c> is
-///     answered with a JSON 404, also without a token, so the API never falls through to the web pages. The class is
+///     answered with a JSON 404 for every standard HTTP method, also without a token, so the API never falls through
+///     to the web pages. The class is
 ///     stateless and thread-safe.
 /// </remarks>
 internal static class ApiEndpoints
@@ -58,7 +59,7 @@ internal static class ApiEndpoints
         + (64 * 1024);
 
     /// <summary>
-    ///     The HTTP methods the catch-all route answers with a 404.
+    ///     The standard HTTP methods (GET, HEAD, POST, PUT, PATCH, DELETE, OPTIONS) the catch-all route answers with a 404.
     /// </summary>
     private static readonly string[] AllMethods = ["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"];
 
@@ -117,7 +118,7 @@ internal static class ApiEndpoints
                 + "of 'files' and 'repository'. The review is recorded as created with an API token. Reviewer slots and "
                 + "signatures cannot be changed with an API token.")
             .WithMetadata(new BodySizeLimit())
-            .Accepts<CreateReviewRequest>(isOptional: true, "application/json")
+            .Accepts<CreateReviewRequest>(isOptional: false, "application/json")
             .Produces<CreatedReviewDto>(StatusCodes.Status201Created)
             .ProducesValidationProblem()
             .ProducesProblem(StatusCodes.Status401Unauthorized)

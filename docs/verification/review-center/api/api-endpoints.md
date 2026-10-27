@@ -26,7 +26,8 @@ N/A - standard test environment (a temporary database and key folder are created
 - A file count, file size or total size beyond the review limits is a 400 problem, a body over the limit of the endpoint
   is a 413, and no review is created in these cases.
 - The attestation of a complete review is a PDF, of a review that is not complete a 409 problem.
-- An unknown address under `/api` is a JSON 404 for every method, and there is no route that signs or changes a slot.
+- An unknown address under `/api` is a JSON 404 for every standard HTTP method (`GET`, `HEAD`, `POST`, `PUT`, `PATCH`,
+  `DELETE`, `OPTIONS`), and there is no route that signs or changes a slot.
 
 #### Test Scenarios
 
@@ -72,9 +73,9 @@ file that is not Base64, and with no body are sent. Each answer is a 400 problem
 the status in it, with no exception name, namespace, or stack trace in the text, and no review is created. This scenario
 is tested by `ApiEndpoints_CreateReview_MalformedJson_Answers400Problem`.
 
-**ApiEndpoints_CreateReview_NotJsonContentType_Answers415Problem**: A body is sent with the content type `text/plain`
-and with no content type. Each answer is a 415 problem document, and no review is created. This scenario is tested by
-`ApiEndpoints_CreateReview_NotJsonContentType_Answers415Problem`.
+**ApiEndpoints_CreateReview_NotJsonContentType_Answers415Problem**: A valid review body in JSON is sent with the content
+type `text/plain` and with no content type. Each answer is a 415 problem document, no review is created, and no audit
+entry is added. This scenario is tested by `ApiEndpoints_CreateReview_NotJsonContentType_Answers415Problem`.
 
 **ApiEndpoints_CreateReview_FileLimits_Answer400Problem**: A review with one file more than the limit, a review with one
 file one byte over the size limit of a file, and a review of files that together are one byte over the total limit are

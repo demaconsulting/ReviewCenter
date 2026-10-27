@@ -43,8 +43,11 @@ sections:
 
       - id: ReviewCenter-PersonalAccessTokenStore-Touch
         title: >-
-          The PersonalAccessTokenStore unit shall change only the time of last use of a token when it is used.
+          The PersonalAccessTokenStore unit shall change only the time of last use of a token when it is used, and only
+          if the stored time is still the one the caller read, so that of several concurrent uses exactly one writes.
         justification: |
-          Recording a use must not change any other property of a token, such as its expiry or revocation.
+          Recording a use must not change any other property of a token, such as its expiry or revocation. A burst of
+          requests that read the same stale time must not each write it, or the throttle of the writes would not hold.
         tests:
           - PersonalAccessTokenStore_TouchAsync_Token_ChangesOnlyLastUsed
+          - PersonalAccessTokenStore_TouchAsync_ParallelSameExpected_WritesOnce

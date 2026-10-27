@@ -129,12 +129,20 @@ internal sealed class PersonalAccessTokenStore(IDbContextFactory<ReviewCenterDbC
     }
 
     /// <inheritdoc />
-    public async Task TouchAsync(int tokenId, DateTimeOffset when, CancellationToken cancellationToken = default)
+    public async Task<bool> TouchAsync(
+        int tokenId,
+        DateTimeOffset? expectedLastUsed,
+        DateTimeOffset when,
+        CancellationToken cancellationToken = default)
     {
-        // A targeted update of one column: no entity is loaded, so a concurrent revoke is never overwritten
+        // One conditional update of one column: no entity is loaded, so a concurrent revoke is never overwritten, and
+        // only one of several callers that saw the same last-used value changes a row. The condition is an equality
+        // because the SQLite provider cannot compare DateTimeOffset values with < or >; EF turns a null expected value
+        // into IS NULL
         await using var context = await factory.CreateDbContextAsync(cancellationToken);
-        await context.PersonalAccessTokens
-            .Where(t => t.Id == tokenId)
+        var changed = await context.PersonalAccessTokens
+            .Where(t => t.Id == tokenId && t.LastUsed == expectedLastUsed)
             .ExecuteUpdateAsync(setters => setters.SetProperty(t => t.LastUsed, when), cancellationToken);
+        return changed > 0;
     }
 }

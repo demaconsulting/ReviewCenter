@@ -133,7 +133,8 @@
                 "$ref": "#/components/schemas/CreateReviewRequest"
               }
             }
-          }
+          },
+          "required": true
         },
         "responses": {
           "201": {

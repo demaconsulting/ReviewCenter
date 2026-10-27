@@ -357,10 +357,11 @@ public sealed class PersonalAccessTokenService
             return new TokenValidation(TokenFailure.OwnerLockedOut, token, null);
         }
 
-        // Record the use, but not more often than the granularity
+        // Record the use, but not more often than the granularity. The store applies the change only if the last-used
+        // moment is still the one read above, so a burst of requests writes once
         if (token.LastUsed is not { } lastUsed || now - lastUsed >= ReviewLimits.TokenLastUsedGranularity)
         {
-            await _store.TouchAsync(token.Id, now, cancellationToken);
+            await _store.TouchAsync(token.Id, token.LastUsed, now, cancellationToken);
         }
 
         return new TokenValidation(TokenFailure.None, token, token.User);

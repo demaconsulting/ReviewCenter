@@ -32,7 +32,8 @@ audit trail, or in a claim gives nothing away. It lets the owner tell the tokens
 **IPersonalAccessTokenStore**: the persistence interface, with `AddAsync` (stores the token and an audit entry that is
 built from the stored token), `ListForUserAsync` (newest first), `FindByHashAsync` (the token with its owner loaded, or
 `null`), `RevokeAsync` (marks a token of the given owner revoked and saves the audit entry; `null` when the token is not
-found, belongs to someone else, or is already revoked), and `TouchAsync` (sets the last-used time and writes no audit
+found, belongs to someone else, or is already revoked), and `TouchAsync` (sets the last-used time only if the stored
+value is still the one the caller read, returns whether it wrote, and writes no audit
 entry). It is implemented by `PersonalAccessTokenStore` in the `Storage` subsystem.
 
 **TokenFailure**: the reason a presented token was refused, for the audit trail only: `None` (accepted), `Malformed`,
@@ -85,7 +86,9 @@ stored hash is compared once more with the computed one in constant time, so the
 comparison alone; the token is not revoked (`Revoked`); it has not expired (`Expired`); the owner is enabled
 (`OwnerDisabled`); and the owner is not locked out (`OwnerLockedOut`). The role of the owner is the one in the owner
 object that was just read, so a changed role applies at once. When the token is accepted and its last-used time is
-older than 5 minutes, the store is asked to update it, so a busy script does not write on every request; this update is
+older than 5 minutes, the store is asked to update it, passing the last-used time that was read, so a busy script does
+not write on every request and a burst of requests that read the same value writes once (the store applies the update
+only to the value that was read); this update is
 not audited. The failure reason never reaches a caller outside the system.
 
 #### Error Handling

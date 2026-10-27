@@ -123,11 +123,22 @@ internal sealed class FakePersonalAccessTokenStore(FakeUserStore users) : IPerso
     }
 
     /// <inheritdoc />
-    public Task TouchAsync(int tokenId, DateTimeOffset when, CancellationToken cancellationToken = default)
+    public Task<bool> TouchAsync(
+        int tokenId,
+        DateTimeOffset? expectedLastUsed,
+        DateTimeOffset when,
+        CancellationToken cancellationToken = default)
     {
+        // The same compare-and-set as the real store
+        var token = _tokens.First(t => t.Id == tokenId);
+        if (token.LastUsed != expectedLastUsed)
+        {
+            return Task.FromResult(false);
+        }
+
         TouchCount++;
-        _tokens.First(t => t.Id == tokenId).LastUsed = when;
-        return Task.CompletedTask;
+        token.LastUsed = when;
+        return Task.FromResult(true);
     }
 
     /// <summary>

@@ -21,6 +21,7 @@ N/A - standard test environment (a temporary SQLite database file is created by 
 - A revocation sets the time once and audits it; a second revocation, a token of another user, and a missing token change
   nothing and write no entry.
 - A use changes only the last-used time, writes no audit entry, and does not undo a revocation.
+- Of several parallel uses that read the same last-used time exactly one writes.
 
 #### Test Scenarios
 
@@ -48,3 +49,8 @@ This scenario is tested by `PersonalAccessTokenStore_RevokeAsync_OwnToken_Revoke
 **PersonalAccessTokenStore_TouchAsync_Token_ChangesOnlyLastUsed**: A use of a token and a use of a revoked token are
 recorded. Only the last-used time changes, no audit entry is written, and the revocation stays. This scenario is tested
 by `PersonalAccessTokenStore_TouchAsync_Token_ChangesOnlyLastUsed`.
+
+**PersonalAccessTokenStore_TouchAsync_ParallelSameExpected_WritesOnce**: Eight uses run in parallel against a SQLite
+database, all having read the same last-used time (none for a token never used, or an earlier time). Exactly one returns
+true and its time is stored; a later use that still holds the old time returns false and changes nothing. This scenario
+is tested by `PersonalAccessTokenStore_TouchAsync_ParallelSameExpected_WritesOnce`.

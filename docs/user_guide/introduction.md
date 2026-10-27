@@ -886,7 +886,8 @@ browser.
 - A request that is not valid is answered **400** with the fields at fault; a project, review, or repository that does
   not exist **404**; a review identifier that is already used, a disabled repository, or an attestation of a review
   that is not complete **409**; and a git repository that is not reachable **502**, **503**, or **504**.
-- Any other address under `/api` is answered with a JSON **404**, with or without a token.
+- Any other address under `/api` is answered with a JSON **404**, with or without a token, for every standard HTTP
+  method (`GET`, `HEAD`, `POST`, `PUT`, `PATCH`, `DELETE`, `OPTIONS`).
 - The server behind a reverse proxy needs the setting described in Secure Cookie Behind a Reverse Proxy, or all clients
   share one address and one throttle.
 

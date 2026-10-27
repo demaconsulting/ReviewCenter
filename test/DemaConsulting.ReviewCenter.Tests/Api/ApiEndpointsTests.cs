@@ -587,7 +587,8 @@ public class ApiEndpointsTests
 
     /// <summary>
     ///     Test that a request body that does not say it is JSON is refused with 415 and a problem document, with a
-    ///     content type of another kind or with none, and that nothing is created.
+    ///     content type of another kind or with none, even when the body is a valid review in JSON, and that nothing is
+    ///     created: no review and no audit entry for a review.
     /// </summary>
     /// <param name="contentType">The content type of the body; <c>null</c> for none.</param>
     [Theory(Timeout = 60000)]
@@ -600,7 +601,16 @@ public class ApiEndpointsTests
         var token = await CreateTokenAsync(app);
         var project = await app.Services.GetRequiredService<ProjectService>().CreateAsync("Apollo", null, TestContext.Current.CancellationToken);
         using var client = ClientFor(app, token.Value);
-        using var content = new ByteArrayContent("""{"id":"X-1","title":"T","files":[]}"""u8.ToArray());
+        var auditBefore = (await AuditAsync(app)).Count;
+
+        // A valid review body, so only the missing JSON content type can stop it
+        var json = System.Text.Json.JsonSerializer.Serialize(new
+        {
+            id = "X-1",
+            title = "T",
+            files = new[] { UploadOf("a.txt", 3) }
+        });
+        using var content = new ByteArrayContent(System.Text.Encoding.UTF8.GetBytes(json));
         if (contentType is not null)
         {
             content.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue(contentType);
@@ -609,10 +619,11 @@ public class ApiEndpointsTests
         // Act: send the body without the JSON content type
         var response = await client.PostAsync($"/api/projects/{project.Id}/reviews", content, TestContext.Current.CancellationToken);
 
-        // Assert: 415 as a problem document, and no review
+        // Assert: 415 as a problem document, no review, and no new audit entry
         Assert.Equal(HttpStatusCode.UnsupportedMediaType, response.StatusCode);
         Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
         Assert.Empty(await app.Services.GetRequiredService<ReviewService>().ListAsync(project.Id, TestContext.Current.CancellationToken));
+        Assert.Equal(auditBefore, (await AuditAsync(app)).Count);
     }
 
     /// <summary>

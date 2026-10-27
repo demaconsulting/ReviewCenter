@@ -40,8 +40,15 @@ by the creation time and then the identity, because SQLite cannot order a time w
   audited then).
 - *Postconditions*: The revocation time and the audit entry are stored together.
 
-**TouchAsync**: Sets the last-used time of a token with one update statement that changes that column only, so it never
-overwrites a revocation that happens at the same time. It is not audited and does not use the audit gate.
+**TouchAsync**: Sets the last-used time of a token, but only if the stored value is still the one the caller read.
+
+- *Parameters*: The identity of the token, the last-used time the caller read (null for a token never used), the new
+  time, and a cancellation token.
+- *Returns*: True when the time was stored, false when another caller changed it first.
+- *Postconditions*: One conditional update statement (`WHERE Id = @id AND LastUsed = @expected`) changes that column only,
+  so of several concurrent callers that read the same value exactly one writes, and a revocation that happens at the
+  same time is never overwritten. The condition is an equality because the SQLite provider cannot compare
+  `DateTimeOffset` values with `<` or `>`. It is not audited and does not use the audit gate.
 
 #### Error Handling
 

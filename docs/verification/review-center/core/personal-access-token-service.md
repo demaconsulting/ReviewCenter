@@ -24,7 +24,7 @@ N/A - standard test environment (no external resource is needed).
 - No more than 20 tokens are active, where revoked and expired tokens do not count.
 - Only the right value authenticates; a malformed value, a revoked or expired token, a disabled or locked owner, and a
   row with another hash are refused.
-- The last use is written at most once in five minutes.
+- The last use is written at most once in five minutes, also for a burst of parallel requests.
 - A user revokes only their own tokens, and an actor that came through a token can neither create nor revoke.
 - The creation and the revocation are audited with the display id and without the value.
 
@@ -91,6 +91,11 @@ store. This scenario is tested by `PersonalAccessTokenService_Authenticate_Malfo
 **PersonalAccessTokenService_Authenticate_Touch_AtMostOncePerFiveMinutes**: A token is used several times within five
 minutes and then after five minutes. The last-used time is written once for the first use and again only after the five
 minutes. This scenario is tested by `PersonalAccessTokenService_Authenticate_Touch_AtMostOncePerFiveMinutes`.
+
+**PersonalAccessTokenService_Authenticate_ParallelBurst_TouchesOnce**: Four requests run in parallel and all read the same
+snapshot of a token that was never used. All are accepted and the store is written once, because the store applies the
+update only to the last-used time that was read. This scenario is tested by
+`PersonalAccessTokenService_Authenticate_ParallelBurst_TouchesOnce`.
 
 **PersonalAccessTokenService_Revoke_OwnToken_StopsWorkingAndIsAudited**: A user revokes their own token. It stops working
 at once and the revocation is recorded. This scenario is tested by

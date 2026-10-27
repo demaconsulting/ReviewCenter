@@ -78,8 +78,9 @@ sections:
 
       - id: ReviewCenter-ApiEndpoints-Errors
         title: >-
-          The ApiEndpoints unit shall answer an address under /api that does not exist with a JSON problem document
-          and status 404, not with a web page.
+          The ApiEndpoints unit shall answer an address under /api that does not exist, with any standard HTTP method
+          (GET, HEAD, POST, PUT, PATCH, DELETE, OPTIONS), with a JSON problem document and status 404, not with a web
+          page.
         justification: |
           A script that mistypes an address must get an answer it can read, not the HTML of the not-found page.
         tests:

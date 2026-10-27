@@ -34,14 +34,16 @@ step.
   - `GET /api/projects`,
   - `GET /api/projects/{projectId}/reviews` (the project number must be an integer),
   - `GET /api/projects/{projectId}/reviews/{reviewId}`,
-  - `POST /api/projects/{projectId}/reviews`, which accepts a JSON body (the content type must be JSON; a request with
-    another content type or none is answered by a second `POST` route of lower priority with a 415 problem) up to a
+  - `POST /api/projects/{projectId}/reviews`, which requires a JSON body (the OpenAPI description marks the body as
+    required; the content type must be JSON, and a request with another content type or none is answered by a second
+    `POST` route of lower priority with a 415 problem, before any body is read) up to a
     limit that is derived from `ReviewLimits` (the Base64 text of the largest upload, the path and JSON framing of
     every file at the largest number of files, and 64 KiB for the other fields; the services stay authoritative for the
     limits themselves), enforced by the server as a 413, and answers 201 with a `Location` header, and
   - `GET /api/projects/{projectId}/reviews/{reviewId}/attestation.pdf`.
 
-  A catch-all route for every method under `/api` is outside the group and open, so that an unknown address answers a JSON
+  A catch-all route for every standard HTTP method (`GET`, `HEAD`, `POST`, `PUT`, `PATCH`, `DELETE`, `OPTIONS`) under
+  `/api` is outside the group and open, so that an unknown address answers a JSON
   404 with or without a token and never falls through to the pages. It is excluded from the OpenAPI description and has
   the lowest priority, so every other route, including the 415 route, wins over it.
 

@@ -236,14 +236,51 @@ public class PersonalAccessTokenStoreTests
         var auditCountBefore = await CountAuditAsync(db);
 
         // Act: record a use
-        await db.Tokens.TouchAsync(token.Id, _created.AddHours(2), cancellationToken);
+        var written = await db.Tokens.TouchAsync(token.Id, null, _created.AddHours(2), cancellationToken);
         var read = (await db.Tokens.FindByHashAsync(Hash('a'), cancellationToken))!;
 
         // Assert: the use is recorded, the revocation and every other value is untouched, no audit entry was added
+        Assert.True(written);
         Assert.Equal(_created.AddHours(2), read.LastUsed);
         Assert.Equal(_created.AddHours(1), read.Revoked);
         Assert.Equal(_created.AddDays(90), read.Expires);
         Assert.Equal(auditCountBefore, await CountAuditAsync(db));
+    }
+
+    /// <summary>
+    ///     Test that several parallel uses that all saw the same last-used value (never used, or a stale time) write
+    ///     exactly once, and that a use that saw an older value than the stored one writes nothing.
+    /// </summary>
+    /// <param name="stale">Whether the token was used before; <c>false</c> for a token never used.</param>
+    [Theory(Timeout = 60000)]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task PersonalAccessTokenStore_TouchAsync_ParallelSameExpected_WritesOnce(bool stale)
+    {
+        // Arrange: a token that was never used, or used long ago
+        using var db = new TestStore();
+        var ann = await AddUserAsync(db);
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var token = await db.Tokens.AddAsync(NewToken(ann, Hash('a')), t => Draft(t, "token.created"), cancellationToken);
+        DateTimeOffset? seen = stale ? _created.AddHours(1) : null;
+        if (stale)
+        {
+            Assert.True(await db.Tokens.TouchAsync(token.Id, null, seen!.Value, cancellationToken));
+        }
+
+        // Act: eight parallel uses that all read the same last-used value
+        var results = await Task.WhenAll(Enumerable.Range(1, 8).Select(
+            i => Task.Run(() => db.Tokens.TouchAsync(token.Id, seen, _created.AddHours(2 + i), cancellationToken), cancellationToken)));
+        var read = (await db.Tokens.FindByHashAsync(Hash('a'), cancellationToken))!;
+
+        // Assert: exactly one wrote, and its moment is the stored one
+        Assert.Equal(1, results.Count(r => r));
+        Assert.NotNull(read.LastUsed);
+        Assert.NotEqual(seen, read.LastUsed);
+
+        // A late caller that still holds the old value changes nothing
+        Assert.False(await db.Tokens.TouchAsync(token.Id, seen, _created.AddHours(20), cancellationToken));
+        Assert.Equal(read.LastUsed, (await db.Tokens.FindByHashAsync(Hash('a'), cancellationToken))!.LastUsed);
     }
 
     /// <summary>

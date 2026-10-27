@@ -79,11 +79,21 @@ public interface IPersonalAccessTokenStore
         CancellationToken cancellationToken = default);
 
     /// <summary>
-    ///     Records that a token was used; changes only <see cref="PersonalAccessToken.LastUsed"/> and is not audited.
+    ///     Records that a token was used, but only if its last-used moment is still the one the caller saw; changes only
+    ///     <see cref="PersonalAccessToken.LastUsed"/> and is not audited.
     /// </summary>
     /// <param name="tokenId">The identity of the token.</param>
+    /// <param name="expectedLastUsed">
+    ///     The last-used moment the caller read (<c>null</c> for a token never used). The moment is stored only when
+    ///     the stored value is still equal to this one, as one atomic update, so of several concurrent callers that
+    ///     read the same value exactly one writes.
+    /// </param>
     /// <param name="when">The moment of the use.</param>
     /// <param name="cancellationToken">Cancels the operation.</param>
-    /// <returns>A task that completes when the moment is stored.</returns>
-    Task TouchAsync(int tokenId, DateTimeOffset when, CancellationToken cancellationToken = default);
+    /// <returns><c>true</c> when the moment was stored; <c>false</c> when another caller changed it first.</returns>
+    Task<bool> TouchAsync(
+        int tokenId,
+        DateTimeOffset? expectedLastUsed,
+        DateTimeOffset when,
+        CancellationToken cancellationToken = default);
 }

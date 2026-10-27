@@ -67,12 +67,13 @@ sections:
       - id: ReviewCenter-PersonalAccessTokenService-LastUsed
         title: >-
           The PersonalAccessTokenService unit shall record the time of the last use of a token when it is
-          authenticated, at most once in five minutes for one token.
+          authenticated, at most once in five minutes for one token, also when several requests arrive at once.
         justification: |
           The owner can tell a token that is no longer used and revoke it. Writing at most once in five minutes
           keeps a script that calls the API often from writing to the database on every request.
         tests:
           - PersonalAccessTokenService_Authenticate_Touch_AtMostOncePerFiveMinutes
+          - PersonalAccessTokenService_Authenticate_ParallelBurst_TouchesOnce
 
       - id: ReviewCenter-PersonalAccessTokenService-Revoke
         title: >-
