@@ -315,10 +315,13 @@ address bar always holds a shareable link and the back button is not filled with
 replacement is not used, because the router would re-initialize the page and lose what is typed. The view mode (Diff,
 Head, Baseline) is not part of the address, so a reload shows the Diff view. Each thread card has the anchor
 `thread-link-{id}` with the link of the thread (class `thread-link action outline small`) and the button
-`thread-copy-link-{id}`. **CopyThreadLinkAsync** makes the address absolute with `NavigationManager.ToAbsoluteUri`,
-calls the browser function `reviewCenter.copyText` (defined in `App`) and shows "Copied" on the button and in the status
-region, or "Copy failed" when the browser answers false, throws, or is gone; the feedback is cleared after two seconds
-by a continuation that does not block the click handler and ignores a page that no longer exists. **ReviewLinks**
+`thread-copy-link-{id}` (the label stays "Copy link"). **CopyThreadLinkAsync** makes the address absolute with `NavigationManager.ToAbsoluteUri`,
+calls the browser function `reviewCenter.copyText` (defined in `App`) and shows "Copied" in the status region next to
+the button, or "Copy failed" when the browser answers false, throws, or is gone. The feedback is cleared two seconds
+after the latest click on that thread: each thread has its own timer (a `CancellationTokenSource` used with
+`Task.Delay` on the injected `TimeProvider`), a new click cancels and replaces the previous timer, and the page cancels
+all timers when it is disposed. The timer runs in a continuation that does not block the click handler and ignores a
+page that no longer exists. **ReviewLinks**
 builds all of these addresses: it escapes the review
 identifier and each path segment with `Uri.EscapeDataString` and joins them with `/`, and writes `?line=N&side=...`
 only when a line is given.

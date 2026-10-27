@@ -448,6 +448,7 @@ sections:
           - ReviewPage_OpenDeepLink_DoesNotReplaceAddress
           - ReviewPage_Thread_ShowsLinkButtonAndCopyLinkControl
           - ReviewPage_CopyLink_Click_CopiesAbsoluteThreadAddressAndShowsCopied
+          - ReviewPage_CopyLink_SecondClick_KeepsFeedbackUntilTwoSecondsAfterTheLatestClick
           - ReviewPage_CopyLink_ClipboardFails_ShowsCopyFailed
           - WebSubsystem_Stylesheet_ThreadLink_IsButtonStyled
           - ReviewPage_RoundTrip_LinkFromBuilder_OpensTheSameFileAndLine

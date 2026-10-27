@@ -553,14 +553,18 @@ and a `button` of type `button` with the text "Copy link" beside it. This scenar
 
 **ReviewPage_CopyLink_Click_CopiesAbsoluteThreadAddressAndShowsCopied**: with the browser function
 `reviewCenter.copyText` answering true, a click on "Copy link" calls it once with the absolute address
-(`http://localhost` plus the thread address), the button and the status region read "Copied", and after the delay
-(awaited for up to five seconds) the button reads "Copy link" again and the status is empty. **ReviewPage_CopyLink_ClipboardFails_ShowsCopyFailed**:
+(`http://localhost` plus the thread address), the status region reads "Copied" while the button keeps reading
+"Copy link", and after the fake clock is advanced by two seconds the status is empty (awaited, as the clearing runs
+through the renderer). **ReviewPage_CopyLink_SecondClick_KeepsFeedbackUntilTwoSecondsAfterTheLatestClick**: with
+a manual clock, two clicks 1.5 seconds apart and the clock advanced by another 1.5 seconds, the status still reads
+"Copied" (the timer of the first click does not clear the feedback of the second); after 0.6 seconds more it is empty.
+**ReviewPage_CopyLink_ClipboardFails_ShowsCopyFailed**:
 with the function answering false the status reads "Copy failed", the button still reads "Copy link", and the thread
 link is unchanged. These scenarios are tested by the tests of those names.
 
 **WebSubsystem_Stylesheet_ThreadLink_IsButtonStyled**: the stylesheet has no `a.thread-link` rule that strips the
-button look, and the thread header gives the link and the buttons the same padding. This scenario is tested by the test
-of that name.
+button look, and the thread header gives the link and the buttons the same padding and font size. This scenario is
+tested by the test of that name.
 
 **WebSubsystem_Stylesheet_DiffCommentControl_ShowsOnHoverFocusAndTouch**: the stylesheet hides the `+` control of a diff
 row with `opacity: 0`, reveals it on row hover, focus within the row, a selected row, and keyboard focus, shows it

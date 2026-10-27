@@ -540,9 +540,9 @@ page you came from. Copy the address and send it to a colleague.
 | `/projects/{id}/reviews/{reviewId}/threads/{threadId}` | The thread's file, scrolled to the highlighted thread |
 
 Every thread has a **Link** next to its state, shown as a button; it opens the thread's address. Next to it,
-**Copy link** copies the full address to the clipboard and briefly shows "Copied" (or "Copy failed" when the browser
-does not allow it; the **Link** can still be copied with the context menu of your browser). Characters in a file
-path that need escaping in an address
+**Copy link** copies the full address to the clipboard and briefly shows "Copied" next to the button (or "Copy failed"
+when the browser does not allow it; the **Link** can still be copied with the context menu of your browser). Characters
+in a file path that need escaping in an address
 (spaces, `#`, `?`, `%`, and letters outside the English alphabet) are escaped for you in the links the page builds.
 
 Reloading a link shows the same file, line or thread, always as the diff when the file has one (the choice between the

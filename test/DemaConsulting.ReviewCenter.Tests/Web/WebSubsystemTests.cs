@@ -385,6 +385,7 @@ public partial class WebSubsystemTests
         // like the buttons beside it
         Assert.DoesNotMatch(@"a\.thread-link\s*\{", css);
         Assert.Matches(@"\.thread-head button,\s*\.thread-head a\.action\s*\{[^}]*padding:", css);
+        Assert.Matches(@"\.thread-head button,\s*\.thread-head a\.action\s*\{[^}]*font-size:", css);
     }
 
     /// <summary>

@@ -610,8 +610,8 @@ public class ReviewDeepLinkTests : PageTestBase
     }
 
     /// <summary>
-    ///     Tests that pressing "Copy link" hands the browser the absolute address of the thread, shows "Copied", and
-    ///     goes back to "Copy link" after a short delay.
+    ///     Tests that pressing "Copy link" hands the browser the absolute address of the thread, shows "Copied" in the
+    ///     status next to the button (which keeps reading "Copy link"), and clears it after a short delay.
     /// </summary>
     [Fact]
     public async Task ReviewPage_CopyLink_Click_CopiesAbsoluteThreadAddressAndShowsCopied()
@@ -621,21 +621,59 @@ public class ReviewDeepLinkTests : PageTestBase
         var thread = await StartAsync(projectId, ModPath, 15, ThreadSide.Head);
         JSInterop.Setup<bool>("reviewCenter.copyText", _ => true).SetResult(true);
         var cut = Open(ReviewLinks.ForFile(projectId, "REV-1", ModPath));
+        var button = $"[data-testid='thread-copy-link-{thread.Id}']";
+        var status = $"[data-testid='thread-copy-status-{thread.Id}']";
 
         // Act: press the button
-        await cut.Find($"[data-testid='thread-copy-link-{thread.Id}']").ClickAsync();
+        await cut.Find(button).ClickAsync();
 
         // Assert: the browser was asked to copy the absolute address, once
         var call = Assert.Single(JSInterop.Invocations, i => i.Identifier == "reviewCenter.copyText");
         Assert.Equal("http://localhost" + ReviewLinks.ForThread(projectId, "REV-1", thread.Id), call.Arguments[0]);
 
-        // Assert: the button and the status say Copied, then go back
-        Assert.Equal("Copied", cut.Find($"[data-testid='thread-copy-link-{thread.Id}']").TextContent);
-        Assert.Equal("Copied", cut.Find($"[data-testid='thread-copy-status-{thread.Id}']").TextContent);
-        await cut.WaitForAssertionAsync(
-            () => Assert.Equal("Copy link", cut.Find($"[data-testid='thread-copy-link-{thread.Id}']").TextContent),
-            TimeSpan.FromSeconds(5));
-        Assert.Equal(string.Empty, cut.Find($"[data-testid='thread-copy-status-{thread.Id}']").TextContent);
+        // Assert: only the status says Copied; the button keeps its label
+        Assert.Equal("Copied", cut.Find(status).TextContent);
+        Assert.Equal("Copy link", cut.Find(button).TextContent);
+
+        // Act: let the feedback time run out
+        Time.Advance(TimeSpan.FromSeconds(2));
+
+        // Assert: the status is cleared and the button label never changed
+        await cut.WaitForAssertionAsync(() => Assert.Equal(string.Empty, cut.Find(status).TextContent));
+        Assert.Equal("Copy link", cut.Find(button).TextContent);
+    }
+
+    /// <summary>
+    ///     Tests that a second click on the same thread keeps the feedback for the full time after that click, rather
+    ///     than the time left of the first click.
+    /// </summary>
+    [Fact]
+    public async Task ReviewPage_CopyLink_SecondClick_KeepsFeedbackUntilTwoSecondsAfterTheLatestClick()
+    {
+        // Arrange: a thread, and a browser that copies successfully
+        var projectId = await CreateReviewAsync();
+        var thread = await StartAsync(projectId, ModPath, 15, ThreadSide.Head);
+        JSInterop.Setup<bool>("reviewCenter.copyText", _ => true).SetResult(true);
+        var cut = Open(ReviewLinks.ForFile(projectId, "REV-1", ModPath));
+        var button = $"[data-testid='thread-copy-link-{thread.Id}']";
+        var status = $"[data-testid='thread-copy-status-{thread.Id}']";
+
+        // Act: click, wait 1.5 s, click again, then pass the moment (2 s after the first click) at which the
+        // first click's timer would have cleared the feedback
+        await cut.Find(button).ClickAsync();
+        Time.Advance(TimeSpan.FromSeconds(1.5));
+        await cut.Find(button).ClickAsync();
+        Time.Advance(TimeSpan.FromSeconds(1.5));
+
+        // Assert: a stale timer, if any, has had time to run, and the feedback of the second click is still there
+        await Task.Delay(TimeSpan.FromMilliseconds(200), TestContext.Current.CancellationToken);
+        Assert.Equal("Copied", cut.Find(status).TextContent);
+
+        // Act: pass 2 s after the second click
+        Time.Advance(TimeSpan.FromSeconds(0.6));
+
+        // Assert: the feedback is cleared
+        await cut.WaitForAssertionAsync(() => Assert.Equal(string.Empty, cut.Find(status).TextContent));
     }
 
     /// <summary>

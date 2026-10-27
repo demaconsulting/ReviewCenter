@@ -50,7 +50,7 @@ namespace DemaConsulting.ReviewCenter.Web;
 ///     or thread replaces the address in the address bar by the matching link, without a history entry. Every
 ///     thread shows a "Link" to its address and a "Copy link" button that copies the absolute address.
 /// </remarks>
-public partial class ReviewPage : ComponentBase
+public partial class ReviewPage : ComponentBase, IDisposable
 {
     /// <summary>
     ///     Backing field for <see cref="InteractiveMarker"/>; flips to <c>true</c> after the first render
@@ -59,7 +59,8 @@ public partial class ReviewPage : ComponentBase
     private bool _interactive;
 
     /// <summary>
-    ///     How long the "Copied" or "Copy failed" feedback of the "Copy link" button stays visible.
+    ///     How long the "Copied" or "Copy failed" feedback of the "Copy link" button stays visible after the
+    ///     latest click on that thread.
     /// </summary>
     private static readonly TimeSpan CopyFeedbackDuration = TimeSpan.FromSeconds(2);
 
@@ -67,6 +68,12 @@ public partial class ReviewPage : ComponentBase
     ///     The outcome of the last "Copy link" click, by thread identity; a thread without an entry shows none.
     /// </summary>
     private readonly Dictionary<int, CopyFeedback> _copyFeedback = [];
+
+    /// <summary>
+    ///     The pending feedback timer of each thread, by thread identity; a new click replaces and cancels the
+    ///     previous one, so the latest click always gets the full duration.
+    /// </summary>
+    private readonly Dictionary<int, CancellationTokenSource> _copyTimers = [];
 
     /// <summary>
     ///     The outcome of a "Copy link" click, shown briefly next to the button.
@@ -177,6 +184,12 @@ public partial class ReviewPage : ComponentBase
     /// </summary>
     [Inject]
     private NavigationManager Navigation { get; set; } = null!;
+
+    /// <summary>
+    ///     Gets or sets the clock that times the "Copy link" feedback, supplied by dependency injection.
+    /// </summary>
+    [Inject]
+    private TimeProvider Time { get; set; } = null!;
 
     /// <summary>
     ///     Gets or sets the authentication state of the current user, supplied by dependency injection.
@@ -912,30 +925,81 @@ public partial class ReviewPage : ComponentBase
 
         _copyFeedback[threadId] = copied ? CopyFeedback.Copied : CopyFeedback.Failed;
 
+        // Restart the timer of this thread: the latest click gets the full duration
+        _copyTimers.Remove(threadId, out var previous);
+        var timer = new CancellationTokenSource();
+        _copyTimers[threadId] = timer;
+
         // Clear the feedback later without holding up the click handler
-        _ = ClearCopyFeedbackAsync(threadId);
+        _ = ClearCopyFeedbackAsync(threadId, timer);
+
+        if (previous is not null)
+        {
+            await previous.CancelAsync();
+            previous.Dispose();
+        }
     }
 
     /// <summary>
-    ///     Clears the feedback of a thread after a short delay.
+    ///     Clears the feedback of a thread after a short delay, unless a newer click has replaced the timer.
     /// </summary>
     /// <param name="threadId">The identity of the thread.</param>
-    /// <returns>A task that completes when the feedback has been cleared or the page is gone.</returns>
-    private async Task ClearCopyFeedbackAsync(int threadId)
+    /// <param name="timer">The timer of the click that started this delay; cancelled by a newer click.</param>
+    /// <returns>A task that completes when the feedback has been cleared, the timer replaced or the page is gone.</returns>
+    private async Task ClearCopyFeedbackAsync(int threadId, CancellationTokenSource timer)
     {
-        await Task.Delay(CopyFeedbackDuration);
         try
         {
+            await Task.Delay(CopyFeedbackDuration, Time, timer.Token);
             await InvokeAsync(() =>
             {
-                _copyFeedback.Remove(threadId);
-                StateHasChanged();
+                // A newer click may have replaced the timer while the delay was completing
+                if (_copyTimers.TryGetValue(threadId, out var current) && ReferenceEquals(current, timer))
+                {
+                    _copyTimers.Remove(threadId);
+                    timer.Dispose();
+                    _copyFeedback.Remove(threadId);
+                    StateHasChanged();
+                }
             });
+        }
+        catch (OperationCanceledException)
+        {
+            // A newer click or the end of the page cancelled this timer; the newer timer clears the feedback
         }
         catch (ObjectDisposedException)
         {
             // The page is gone; there is nothing left to update
         }
+    }
+
+    /// <summary>
+    ///     Cancels the pending "Copy link" feedback timers when the page goes away.
+    /// </summary>
+    public void Dispose()
+    {
+        Dispose(true);
+        GC.SuppressFinalize(this);
+    }
+
+    /// <summary>
+    ///     Cancels the pending "Copy link" feedback timers.
+    /// </summary>
+    /// <param name="disposing"><c>true</c> when called from <see cref="Dispose()"/>.</param>
+    protected virtual void Dispose(bool disposing)
+    {
+        if (!disposing)
+        {
+            return;
+        }
+
+        foreach (var timer in _copyTimers.Values)
+        {
+            timer.Cancel();
+            timer.Dispose();
+        }
+
+        _copyTimers.Clear();
     }
 
     /// <summary>

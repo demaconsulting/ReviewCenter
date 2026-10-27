@@ -574,6 +574,10 @@ a.action:active {
 .thread-head a.action {
     margin: 0;
     padding: 0.25rem 0.75rem;
+    box-sizing: border-box;
+    font-size: 0.9rem;
+    font-weight: 600;
+    line-height: 1.25rem;
 }
 
 .thread-head .badge + .muted {

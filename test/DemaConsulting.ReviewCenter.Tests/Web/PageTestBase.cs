@@ -60,6 +60,8 @@ public abstract class PageTestBase : BunitContext
         var store = new FakeReviewStore();
         Store = store;
         var clock = new FixedTimeProvider(new DateTimeOffset(2025, 3, 4, 5, 6, 7, TimeSpan.Zero));
+        Time = new ManualTimeProvider(new DateTimeOffset(2025, 3, 4, 5, 6, 7, TimeSpan.Zero));
+        Services.AddSingleton<TimeProvider>(Time);
         Projects = new ProjectService(store, clock);
         Threads = new ThreadService(store, clock);
         Checklists = new ChecklistService(store, clock);
@@ -91,6 +93,12 @@ public abstract class PageTestBase : BunitContext
         Services.AddAuthorizationCore();
         Services.AddCascadingAuthenticationState();
     }
+
+    /// <summary>
+    ///     Gets the clock the pages use for timed feedback; a test moves it with
+    ///     <see cref="ManualTimeProvider.Advance"/>.
+    /// </summary>
+    internal ManualTimeProvider Time { get; }
 
     /// <summary>
     ///     Gets the in-memory store behind the services, for arranging data the services would not create.
@@ -284,6 +292,129 @@ public abstract class PageTestBase : BunitContext
         {
             _state = Create(username, displayName, role);
             NotifyAuthenticationStateChanged(Task.FromResult(_state));
+        }
+    }
+}
+
+/// <summary>
+///     A <see cref="TimeProvider"/> whose clock only moves when a test calls <see cref="Advance"/>.
+/// </summary>
+/// <remarks>
+///     Only one-shot timers are supported (the period is ignored), which is all that
+///     <see cref="Task.Delay(TimeSpan, TimeProvider, CancellationToken)"/> needs. A timer fires on the thread
+///     that calls <see cref="Advance"/>, once the clock has reached its due time.
+/// </remarks>
+internal sealed class ManualTimeProvider(DateTimeOffset now) : TimeProvider
+{
+    /// <summary>
+    ///     Guards <see cref="_now"/> and <see cref="_timers"/>.
+    /// </summary>
+    private readonly object _lock = new();
+
+    /// <summary>
+    ///     The timers that have not been disposed.
+    /// </summary>
+    private readonly List<ManualTimer> _timers = [];
+
+    /// <summary>
+    ///     The current instant of the clock.
+    /// </summary>
+    private DateTimeOffset _now = now;
+
+    /// <inheritdoc />
+    public override DateTimeOffset GetUtcNow()
+    {
+        lock (_lock)
+        {
+            return _now;
+        }
+    }
+
+    /// <inheritdoc />
+    public override ITimer CreateTimer(TimerCallback callback, object? state, TimeSpan dueTime, TimeSpan period)
+    {
+        var timer = new ManualTimer(this, callback, state);
+        lock (_lock)
+        {
+            _timers.Add(timer);
+        }
+
+        timer.Change(dueTime, period);
+        return timer;
+    }
+
+    /// <summary>
+    ///     Moves the clock forward and fires every timer that has become due.
+    /// </summary>
+    /// <param name="amount">How far to move the clock.</param>
+    public void Advance(TimeSpan amount)
+    {
+        List<ManualTimer> due;
+        lock (_lock)
+        {
+            _now += amount;
+            due = [.. _timers.Where(timer => timer.DueTime <= _now)];
+            foreach (var timer in due)
+            {
+                // One-shot: a fired timer waits until it is changed again
+                timer.DueTime = null;
+            }
+        }
+
+        foreach (var timer in due)
+        {
+            timer.Fire();
+        }
+    }
+
+    /// <summary>
+    ///     A one-shot timer of the provider.
+    /// </summary>
+    /// <param name="owner">The provider that created the timer.</param>
+    /// <param name="callback">The method to call when the timer fires.</param>
+    /// <param name="state">The state passed to the callback.</param>
+    private sealed class ManualTimer(ManualTimeProvider owner, TimerCallback callback, object? state) : ITimer
+    {
+        /// <summary>
+        ///     Gets or sets the instant at which the timer fires, or <c>null</c> when it is not running; guarded by
+        ///     the lock of the owner.
+        /// </summary>
+        public DateTimeOffset? DueTime { get; set; }
+
+        /// <inheritdoc />
+        public bool Change(TimeSpan dueTime, TimeSpan period)
+        {
+            lock (owner._lock)
+            {
+                DueTime = dueTime == Timeout.InfiniteTimeSpan ? null : owner._now + dueTime;
+            }
+
+            return true;
+        }
+
+        /// <summary>
+        ///     Calls the callback of the timer.
+        /// </summary>
+        public void Fire()
+        {
+            callback(state);
+        }
+
+        /// <inheritdoc />
+        public void Dispose()
+        {
+            lock (owner._lock)
+            {
+                DueTime = null;
+                owner._timers.Remove(this);
+            }
+        }
+
+        /// <inheritdoc />
+        public ValueTask DisposeAsync()
+        {
+            Dispose();
+            return ValueTask.CompletedTask;
         }
     }
 }

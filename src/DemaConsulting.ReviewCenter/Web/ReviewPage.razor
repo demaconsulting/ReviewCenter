@@ -312,7 +312,7 @@
                        aria-label="Link to thread @threadId" data-testid="thread-link-@threadId">Link</a>
                     <button type="button" class="secondary" data-testid="thread-copy-link-@threadId"
                             aria-label="Copy link to thread @threadId"
-                            @onclick="() => CopyThreadLinkAsync(threadId)">@(CopyFeedbackFor(threadId) == CopyFeedback.Copied ? "Copied" : "Copy link")</button>
+                            @onclick="() => CopyThreadLinkAsync(threadId)">Copy link</button>
                     <span class="muted" role="status" data-testid="thread-copy-status-@threadId">@CopyStatusFor(threadId)</span>
                     @if (resolved)
                     {
