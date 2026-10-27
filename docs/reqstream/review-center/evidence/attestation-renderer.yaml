@@ -1,0 +1,100 @@
+---
+# Software Unit Requirements for the AttestationRenderer Class
+#
+# The AttestationRenderer class turns the record of a completed review into the unsigned attestation PDF, with the
+# PdfDocumentWriter class. It states what the record contains, which key will sign it, and what the signature proves
+# and does not prove.
+
+sections:
+  - title: AttestationRenderer Unit Requirements
+    requirements:
+      - id: ReviewCenter-AttestationRenderer-Review
+        title: >-
+          The AttestationRenderer class shall show the identity of the review, its project, its revisions or the fact
+          that its files were uploaded, its content fingerprint, and a list of its files with their status.
+        justification: |
+          A reader of the attestation must be able to tell which review and which content it is about, and to compare
+          the fingerprint with the one the tool shows, without opening the tool.
+        tests:
+          - AttestationRenderer_Render_Document_ShowsReviewIdentityRevisionsAndFingerprint
+          - AttestationRenderer_Render_UploadedReview_SaysFilesWereUploaded
+          - AttestationRenderer_Render_Document_ListsFilesWithStatus
+
+      - id: ReviewCenter-AttestationRenderer-Findings
+        title: >-
+          The AttestationRenderer class shall show every checklist answer with its comment in full, never truncated, say
+          so when the review has no checklist, and summarize the comment threads with exact counts of open and
+          resolved threads.
+        justification: |
+          The approval is based on what the reviewers found and answered. An attestation that left it out would prove
+          that someone signed, but not what they were signing, and a comment that is cut is a reviewer answer that the
+          signed evidence no longer shows.
+        tests:
+          - AttestationRenderer_Render_Document_ShowsChecklistAnswersAndComments
+          - AttestationRenderer_Render_LongChecklistComment_IsPrintedInFull
+          - AttestationRenderer_Render_VeryLongChecklistComment_RunsOverPagesWithoutLoss
+          - AttestationRenderer_Render_NoChecklist_SaysSo
+          - AttestationRenderer_Render_Document_SummarizesThreads
+
+      - id: ReviewCenter-AttestationRenderer-ThreadLimit
+        title: >-
+          The AttestationRenderer class shall list at most 100 resolved threads, in the order of the document, and
+          when there are more shall add one line saying how many more resolved threads there are, while the printed
+          counts of open and resolved threads stay exact.
+        justification: |
+          A review can hold any number of resolved threads, and the document is made in memory for every request, so
+          its size must be bounded. Only this list is capped; checklist comments are never cut. The line and the exact
+          count tell the reader what the list leaves out.
+        tests:
+          - AttestationRenderer_Render_MoreResolvedThreadsThanTheCap_ListsTheCapAndCountsTheRest
+          - AttestationRenderer_Render_ExactlyTheCapOfResolvedThreads_ListsAllWithoutAMoreLine
+
+      - id: ReviewCenter-AttestationRenderer-SignOffs
+        title: >-
+          The AttestationRenderer class shall show every reviewer slot with the signer, the time of the signature, and
+          the digest the signature covers, the head of the audit trail, and the version of the tool.
+        justification: |
+          The in-record signatures are the evidence of who approved. The audit head ties the document to the audit
+          trail, and the tool version tells a reader which rules produced it.
+        tests:
+          - AttestationRenderer_Render_Document_ShowsSlotsSignersTimestampsAndDigests
+          - AttestationRenderer_Render_Document_ShowsSlotDigestOnOneLine
+          - AttestationRenderer_Render_Document_ShowsAuditHeadAndToolVersion
+
+      - id: ReviewCenter-AttestationRenderer-KeyStatement
+        title: >-
+          The AttestationRenderer class shall name the subject and the issuer of the signing certificate and print no
+          warning for an organization key, and shall print a prominent notice that the key is self-signed, not an
+          organization key, and for development and test only, for a self-signed key.
+        justification: |
+          A document that looks official but is signed with a key that anyone can create must say so on its face.
+          Whoever reads a printed copy never sees the user interface.
+        tests:
+          - AttestationRenderer_Render_SelfSignedKey_PrintsTheNotice
+          - AttestationRenderer_Render_OrganizationKey_PrintsSubjectIssuerAndNoNotice
+
+      - id: ReviewCenter-AttestationRenderer-ProvesStatement
+        title: >-
+          The AttestationRenderer class shall state in the document what the signature proves (integrity since signing
+          and the origin of the server key), and that it does not prove who the reviewers are, that the reviewer
+          identity is the re-authenticated signatures in the record, and that the signing time is the clock of the
+          server and not a trusted timestamp.
+        justification: |
+          A digital signature is easy to overstate. The document must not claim more than the server can stand behind.
+        tests:
+          - AttestationRenderer_Render_Document_ExplainsWhatTheSignatureProves
+
+      - id: ReviewCenter-AttestationRenderer-Output
+        title: >-
+          The AttestationRenderer class shall set the properties of the document from the fingerprint and the review
+          identity, write the same bytes for the same document, continue onto further pages when the review is large,
+          show characters outside the standard encoding as question marks, and reject a missing document.
+        justification: |
+          Reviews differ greatly in size and in the characters in their names. The result must still be a complete
+          document that is the same every time for the same input.
+        tests:
+          - AttestationRenderer_Render_Document_SetsMetadataWithFingerprintAndReviewId
+          - AttestationRenderer_Render_SameDocument_ProducesIdenticalBytes
+          - AttestationRenderer_Render_ManyFiles_BreaksIntoSeveralPages
+          - AttestationRenderer_Render_UnicodeNames_AreReplacedByQuestionMarks
+          - AttestationRenderer_Render_NullDocument_Throws

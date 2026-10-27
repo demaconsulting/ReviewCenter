@@ -155,3 +155,33 @@ sections:
           operator must learn that at start-up and correct the setting.
         tests:
           - ServerHost_CreateApplication_KeyRingFolderNotWritable_ThrowsClearError
+
+      - id: ReviewCenter-ServerHost-AttestationServices
+        title: >-
+          The ServerHost class shall register the attestation key provider chosen by the Attestation settings, the
+          renderer, the signer, and the attestation service once for the whole process, keep the self-signed key in
+          Attestation:SelfSignedFolder or, by default, in a folder beside the Data Protection keys, and map the
+          download of the attestation of a review.
+        justification: |
+          The composition root is the one place that connects the Evidence subsystem to the audit trail, the signing
+          service, and the settings. The default folder keeps the self-signed key with the other keys so that it
+          persists across restarts.
+        tests:
+          - ServerHost_CreateApplication_NoAttestationSettings_CreatesSelfSignedKeyBesideTheDataProtectionKeys
+          - ServerHost_CreateApplication_SelfSignedFolderConfigured_KeepsTheKeyThere
+
+      - id: ReviewCenter-ServerHost-AttestationKeyFailure
+        title: >-
+          The ServerHost class shall obtain the signing key at start-up and fail, before serving requests, with an
+          error that says the attestation signing key is not usable and names the setting at fault, when the provider
+          is unknown, the thumbprint is missing, the certificate is not in the store, RequireTrustedKey is set with the
+          SelfSigned provider, or the self-signed folder cannot be used.
+        justification: |
+          An operator who chose a certificate must learn at start-up that the choice does not work, and must not find
+          out at the first download. A provider that would not accept the key later would be a trap.
+        tests:
+          - ServerHost_CreateApplication_UnknownAttestationProvider_ThrowsClearError
+          - ServerHost_CreateApplication_CertificateStoreWithoutThumbprint_ThrowsClearError
+          - ServerHost_CreateApplication_CertificateNotInStore_ThrowsClearError
+          - ServerHost_CreateApplication_RequireTrustedKeyWithSelfSignedProvider_ThrowsClearError
+          - ServerHost_CreateApplication_SelfSignedFolderIsAFile_ThrowsClearError

@@ -24,7 +24,8 @@ using DemaConsulting.ReviewCenter.Core;
 namespace DemaConsulting.ReviewCenter.Web;
 
 /// <summary>
-///     Builds the stable addresses of a review, of one of its files (optionally at a line) and of one of its threads.
+///     Builds the stable addresses of a review, of one of its files (optionally at a line), of one of its threads and of
+///     its signed PDF attestation.
 /// </summary>
 /// <remarks>
 ///     Every variable part (the review id and each segment of a file path) is escaped once with
@@ -82,6 +83,17 @@ public static class ReviewLinks
 
         var sideText = side == ThreadSide.Baseline ? BaselineSide : HeadSide;
         return string.Create(CultureInfo.InvariantCulture, $"{address}?line={number}&side={sideText}");
+    }
+
+    /// <summary>
+    ///     Builds the address of the signed PDF attestation of a review.
+    /// </summary>
+    /// <param name="projectId">The identity of the owning project.</param>
+    /// <param name="reviewId">The review id. Must not be null.</param>
+    /// <returns>For example <c>/projects/3/reviews/REV-1/attestation.pdf</c>.</returns>
+    public static string ForAttestation(int projectId, string reviewId)
+    {
+        return $"{ForReview(projectId, reviewId)}/attestation.pdf";
     }
 
     /// <summary>

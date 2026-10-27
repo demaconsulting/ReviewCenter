@@ -121,6 +121,23 @@ public class ReviewLinksTests
     }
 
     /// <summary>
+    ///     Test that an attestation address is built from the project and the (escaped) review identifier.
+    /// </summary>
+    [Fact]
+    public void ReviewLinks_ForAttestation_ProjectAndReview_BuildsAddress()
+    {
+        // Arrange: (none)
+
+        // Act: build the addresses
+        var plain = ReviewLinks.ForAttestation(3, "REV-1");
+        var escaped = ReviewLinks.ForAttestation(3, "a b/c");
+
+        // Assert: the file name of the endpoint follows the review, and the identifier is escaped
+        Assert.Equal("/projects/3/reviews/REV-1/attestation.pdf", plain);
+        Assert.Equal("/projects/3/reviews/a%20b%2Fc/attestation.pdf", escaped);
+    }
+
+    /// <summary>
     ///     Test that every address is a local path that is safe as a sign-in return address.
     /// </summary>
     [Fact]
@@ -132,7 +149,8 @@ public class ReviewLinksTests
             ReviewLinks.ForReview(1, "REV-1"),
             ReviewLinks.ForFile(1, "REV-1", "//evil.example/x", 2, ThreadSide.Baseline),
             ReviewLinks.ForFile(1, "REV-1", "\\evil\\x"),
-            ReviewLinks.ForThread(1, "REV-1", 4)
+            ReviewLinks.ForThread(1, "REV-1", 4),
+            ReviewLinks.ForAttestation(1, "REV-1")
         };
 
         // Act and Assert: the sign-in check keeps each address as it is

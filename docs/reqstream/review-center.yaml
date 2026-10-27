@@ -631,3 +631,30 @@ sections:
           - ReviewCenter-Web-PlanReviews
         tests:
           - ReviewPlanner_CreateAsync_RealGit_LastReviewedBaselineThenAlreadyFiled
+
+      - id: ReviewCenter-System-Attestation
+        title: >-
+          The tool shall let a signed-in user download, for a review that every reviewer slot has signed, a PDF
+          attestation of the review that is digitally signed by the server with an RSA or an ECDSA key (a self-signed
+          key that the server creates, or a certificate from a certificate store that an operator names), that states
+          the content, the checklist, the threads, the sign-offs, and the head of the audit trail, that says what the
+          signature proves and does not prove and which kind of key signed it, that is refused for a review that is not
+          approved, and whose release is recorded in the audit trail.
+        tags: [system]
+        justification: |
+          Approval inside a tool is of little use to an auditor who does not have access to it. A signed, portable
+          document that is honest about what it proves lets the approval be filed and checked elsewhere. It adds
+          integrity and the origin of the server key to the in-record signatures that identify the reviewers.
+        children:
+          - ReviewCenter-Evidence-Document
+          - ReviewCenter-Evidence-Signature
+          - ReviewCenter-Evidence-Key
+          - ReviewCenter-Evidence-Honesty
+          - ReviewCenter-Evidence-Release
+          - ReviewCenter-Hosting-AttestationServices
+          - ReviewCenter-Hosting-AttestationKeyFailure
+          - ReviewCenter-Web-Attestation
+        tests:
+          - EvidenceSubsystem_CompletedReview_IsOfferedAndDownloadedAsSignedPdf
+          - AttestationEndpoint_Get_CompleteReview_ReturnsSignedPdfDownloadAndRecordsEvent
+          - EvidenceSubsystem_ReviewNotComplete_IsNotOfferedAndRefused

@@ -83,6 +83,11 @@ The current release provides:
   exact record that was reviewed (the content fingerprint, the checklist answers, and the threads with their
   comments), so a later change makes it out of date and the slot can be signed again; the review page and the
   project page show the review as Approved or In review (see [Reviewers and Signatures](#reviewers-and-signatures))
+- **Signed Attestation**: once a review is Approved, the review page offers **Download attestation (PDF)**: a PDF of
+  the review (content, checklist, comment threads, sign-offs, and the head of the audit trail) that the server signs
+  digitally with a key it holds, so that any PDF reader can show whether the file was changed after signing. The key is
+  a self-signed key by default (development and test only) or a certificate from a certificate store; every download is
+  recorded in the audit trail (see [Signed Attestation](#signed-attestation))
 - **Audit Trail**: every change (projects, reviews, comments, checklist answers, reviewer slots, signatures, and
   users) and every sign-in, sign-out, failed sign-in, and lockout is recorded with the time, the person, the action,
   and a short detail, and is stored in the same database transaction as the change; entries are chained by SHA-256
@@ -294,6 +299,8 @@ signatures are kept. A slot that has any signature, current or out of date, cann
 If the record changes while a reviewer is signing, the signature is refused and the page asks the reviewer to review
 the record again.
 
+An Approved review can be downloaded as a digitally signed PDF; see [Signed Attestation](#signed-attestation).
+
 ## Audit Trail
 
 Every change that the application makes to projects, reviews, comments, checklists, reviewer slots, signatures, and
@@ -330,6 +337,7 @@ The recorded actions are:
 | Users     | `user.created`, `user.enabled`, `user.disabled`, `user.role-changed`                          |
 | Passwords | `user.password-set-by-admin`, `user.password-changed`                                         |
 | Sign-in   | `auth.sign-in`, `auth.sign-out`, `auth.sign-in-failed`, `auth.locked-out`                     |
+| Evidence  | `attestation.generated`                                                                       |
 
 ### What the Chain Proves, and What It Does Not
 
@@ -346,6 +354,99 @@ review has been approved.
 
 Sign-in, sign-out, failed sign-in, and lockout entries are recorded on a best-effort basis in their own transaction;
 if that cannot be stored, the sign-in itself is not blocked, and the failure is logged.
+
+## Signed Attestation
+
+When every reviewer slot of a review has a current signature (the review is **Approved**), the review page shows
+**Download attestation (PDF)**, with a note on the key that signs it. The PDF is made when it is requested and is not
+stored. It states the project, the review, the repository and commits, the content fingerprint and the hash of every
+file, the checklist with every answer and comment, the comment threads, the sign-off of every reviewer slot with the
+record digest it bound to, and the head of the audit trail (entry count and head hash) at that moment. It carries a
+digital signature that PDF readers such as Adobe Acrobat show and verify. A review that is not Approved has no
+download; a direct request is answered with HTTP status 409, which is also the answer when the review changes while
+the PDF is being prepared (nothing is signed or recorded then; ask again). Checklist comments are printed in full; of
+the resolved threads the first 100 are listed (counts stay exact) and a line says how many more there are. Each
+download is recorded in the audit trail
+(`attestation.generated`).
+
+### What the Signature Proves, and What It Does Not
+
+The signature **proves** that the PDF has not been changed since it was signed, and that it was signed by the holder of
+the key named in the file (the subject and thumbprint of the certificate are printed in the document and are part of
+the signature).
+
+It does **not** prove who the reviewers are. Reviewers are identified by their own signatures in the review record,
+which ReviewCenter made after asking each one for the password again; the PDF lists them, and vouches for them only as
+far as the signing key is trusted. It does **not** prove when the file was signed: the signing time is the clock of the
+server, and there is no time stamp authority in this release. It does not make the content of the review correct; it
+shows what the record said when the PDF was made.
+
+### Configuration
+
+The key is chosen in the `Attestation` section of `appsettings.json`, or with environment variables, which take
+precedence (a double underscore stands for the colon, for example `Attestation__Provider`):
+
+`Provider` is `SelfSigned` or `CertificateStore`; the settings marked "Store" apply to `CertificateStore` only.
+
+| Setting                             | Environment variable                 | Meaning                               |
+| ----------------------------------- | ------------------------------------ | ------------------------------------- |
+| `Attestation:Provider`              | `Attestation__Provider`              | Key source; default `SelfSigned`      |
+| `Attestation:RequireTrustedKey`     | `Attestation__RequireTrustedKey`     | Refuse unsuitable keys; default false |
+| `Attestation:CertificateThumbprint` | `Attestation__CertificateThumbprint` | Store: certificate thumbprint         |
+| `Attestation:StoreLocation`         | `Attestation__StoreLocation`         | Store: `CurrentUser` or `LocalMachine`|
+| `Attestation:StoreName`             | `Attestation__StoreName`             | Store: store name; default `My`       |
+| `Attestation:SelfSignedFolder`      | `Attestation__SelfSignedFolder`      | Folder of the self-signed key file    |
+
+```powershell
+# Windows: sign with an organization certificate of the account that runs the server
+$env:Attestation__Provider = "CertificateStore"
+$env:Attestation__CertificateThumbprint = "0123456789ABCDEF0123456789ABCDEF01234567"
+$env:Attestation__RequireTrustedKey = "true"
+.\reviewcenter.exe serve
+```
+
+The server checks the key when it starts. A setting that cannot work (an unknown provider, a missing thumbprint, a
+certificate that is not in the store, or `RequireTrustedKey` with a self-signed key or a certificate without a signing
+key usage) stops the start with a message that names the setting. A certificate whose private key is in a hardware
+module that is not present therefore also stops the start. If the key becomes unusable later (for example the
+certificate expires while the server runs), the review page shows the problem instead of the button.
+
+### Choosing the Key
+
+- **Self-signed (the default)**: on first use the server creates an RSA key with a self-signed certificate, and keeps it
+  in `attestation-selfsigned/attestation-selfsigned.pfx` inside the folder of the Data Protection keys (see
+  [Repositories and Credentials](#repositories-and-credentials)), or in `Attestation:SelfSignedFolder`. It is **for
+  development and test only**: the file has no password, so protect the folder with file permissions and back it up
+  with the keys, and PDF readers will report that the signer is not trusted. The review page and the PDF say that the
+  key is self-signed and is not an organization key. (A self-signed certificate that an administrator supplies through
+  the certificate store is described on the review page as supplied by the administrator, not as generated by the
+  server.)
+- **Certificate store**: for real use, set `Attestation:Provider` to `CertificateStore` and name the certificate by its
+  thumbprint. The account that runs the server must be able to use the private key. The key is used where it is and is
+  **never exported**, so it can be in the Windows key store, on a smart card, or in a hardware module. Use a
+  **document-signing certificate**, one whose key usage allows digital signatures or non-repudiation. A certificate
+  that is for code signing only is not suited to signing a PDF; the server logs a warning for it. A certificate from an
+  internal certificate authority is fine, as long as the readers of the PDF trust that authority: distribute its root
+  certificate to them.
+- **`RequireTrustedKey`**: when `true`, the server refuses a self-signed key, a certificate whose key usage does not
+  allow digital signatures or non-repudiation, and a certificate that is not valid now. This is all it checks. It does
+  **not** check that the
+  certificate chains to a root that the readers trust and does **not** check revocation, because the server cannot know
+  whom its readers trust.
+
+### Finding the Thumbprint
+
+On Windows, run `Get-ChildItem Cert:\CurrentUser\My` in PowerShell (or `Cert:\LocalMachine\My`), or open the certificate
+and read the **Thumbprint** on the **Details** tab. Spaces in the value are ignored.
+
+### Limitations
+
+- The default key is self-signed and is not an organization key; there is no signing without a key of the server.
+- There is no time stamp authority: the signing time is the server clock, and the signature cannot prove the time.
+- A key vault is not supported yet; the key must be in a certificate store the server can open. Signing with a key in
+  Azure Key Vault and with an RFC 3161 time stamp authority are planned, not implemented.
+- Whether the signing key is trusted is for the reader and the organization to decide; ReviewCenter does not validate
+  the chain or the revocation of the certificate.
 
 ## Repositories and Credentials
 
@@ -531,6 +632,9 @@ non-zero exit code.
   lockout. Sign-in events are recorded on a best-effort basis.
 - **Approval is computed**: the Approved or In review status is calculated from the record and its signatures each
   time it is shown; it is not a stored review state, and the review state is still Draft.
+- **Attestation limits**: the default signing key is self-signed (development and test only), the signing time is the
+  server clock with no time stamp authority, and the signature does not identify the reviewers; see
+  [Signed Attestation](#signed-attestation).
 - **Comments are not live**: comments posted by other people appear when you reload the page or take an action on it.
 - **Upload limits**: at most 200 files per review, 2 MiB per file, and 20 MiB per review. Only the file name of each
   uploaded file is kept, so two files with the same name cannot be in one review.
@@ -624,6 +728,7 @@ Planned but not yet implemented:
 - EF Core database migrations with an explicit `migrate` command, and further database providers
   (PostgreSQL, SQL Server)
 - PDF/A evidence export of review records
+- Signing attestations with a key in Azure Key Vault (the key stays in the vault), and RFC 3161 time stamps for them
 - AI-assisted review (planned to use an Azure OpenAI Service account)
 
 ## Contributing

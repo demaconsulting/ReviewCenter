@@ -292,6 +292,15 @@ matches no changed file is refused with the nothing-to-review message and nothin
 `NewReviewPage_CreateForm_EmptySelection_ShowsNothingToReviewAndCreatesNothing`. The digest that binds to the source,
 the selection, and each change is tested by `RecordDigest_Compute_SourceChange_ChangesDigest`.
 
+**Signed attestation**: A review is completed by the signature of its reviewer, and a signed-in user opens the review
+page, which offers the download of the attestation; the download is a PDF whose signature verifies and that carries the
+notice of the self-signed key, and the audit trail records one `attestation.generated` event. A review that is not
+complete is not offered and is refused. These scenarios are tested by
+`EvidenceSubsystem_CompletedReview_IsOfferedAndDownloadedAsSignedPdf` and
+`EvidenceSubsystem_ReviewNotComplete_IsNotOfferedAndRefused`. The system requirement is also traced to the HTTP test of
+the endpoint, `AttestationEndpoint_Get_CompleteReview_ReturnsSignedPdfDownloadAndRecordsEvent`. The Puppet end-to-end
+test was not extended for this slice (see the verification of the `Evidence` subsystem).
+
 **Persistence across restart**: A project is stored, the server is stopped and started again on the same
 database file, and a signed-in user sees the project on the projects page. This scenario is tested by
 `HostingSubsystem_Startup_DatabaseConfigured_ServesStoredProjectsAfterRestart`.

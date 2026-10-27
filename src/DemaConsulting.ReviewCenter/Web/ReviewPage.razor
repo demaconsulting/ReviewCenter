@@ -62,6 +62,24 @@
             <a class="action outline" href="/projects/@ProjectId/reviews/@ReviewId/history" data-testid="history-link">History</a>
         </div>
 
+        @if (Approval?.IsApproved == true)
+        {
+            @* The signed PDF is offered only for a complete review, and only when the signing key can be used *@
+            var attestationKey = AttestationKeys.Describe();
+            <p class="status" data-testid="attestation">
+                @if (attestationKey.IsAvailable)
+                {
+                    <a class="action outline" href="@ReviewLinks.ForAttestation(ProjectId, ReviewId)" download="@DemaConsulting.ReviewCenter.Evidence.AttestationService.FileNameFor(ProjectId, ReviewId)" data-testid="attestation-download-button">Download attestation (PDF)</a>
+                    <span class="muted" data-testid="attestation-note">@AttestationNote(attestationKey.Info!)</span>
+                    <a class="action outline small" href="/help/signed-attestation" data-testid="attestation-help-link">About attestations</a>
+                }
+                else
+                {
+                    <span class="error" role="alert" data-testid="attestation-key-problem">Attestation is unavailable: @attestationKey.Problem</span>
+                }
+            </p>
+        }
+
         <p class="status"><strong>Next step:</strong> <span data-testid="next-step">@Approval?.NextStep</span></p>
 
         <section class="summary-strip" data-testid="review-summary" aria-label="Review summary">

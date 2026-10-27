@@ -11,7 +11,9 @@ package ReviewCenter {
      * with a content fingerprint of each review. Every change is recorded in a
      * hash-chained audit trail that makes later edits of the history evident.
      * Administrators register git repositories, with access tokens that are stored
-     * encrypted, as the sources of review content.
+     * encrypted, as the sources of review content. A complete review can be
+     * downloaded as a digitally signed PDF attestation, signed with a key of the
+     * server.
      */
 
     part def ReviewCenterSystem {
@@ -32,5 +34,6 @@ package ReviewCenter {
         part core : CoreSubsystem;
         part storage : StorageSubsystem;
         part contentSources : ContentSourcesSubsystem;
+        part evidence : EvidenceSubsystem;
     }
 }

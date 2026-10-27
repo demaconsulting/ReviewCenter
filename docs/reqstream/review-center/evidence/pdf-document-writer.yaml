@@ -1,0 +1,58 @@
+---
+# Software Unit Requirements for the PdfDocumentWriter Class
+#
+# The PdfDocumentWriter class writes a small, plain PDF 1.4 document from headings, paragraphs, and label and value
+# rows, with a header and a footer on every A4 page. It has no dependency and does not compress or embed fonts.
+
+sections:
+  - title: PdfDocumentWriter Unit Requirements
+    requirements:
+      - id: ReviewCenter-PdfDocumentWriter-Structure
+        title: >-
+          The PdfDocumentWriter class shall write a PDF 1.4 document of A4 pages with a classic cross-reference table,
+          at least one page, a header and a footer with a page number on every page, new pages as the content grows,
+          and the document properties it was given.
+        justification: |
+          The attestation must open in every PDF reader and must be able to grow with the review. A plain and
+          well-known file structure also lets the signer add a signature to it as an incremental update.
+        tests:
+          - PdfDocumentWriter_Build_EmptyDocument_HasOnePageAndPdfFraming
+          - PdfDocumentWriter_Build_LongBody_BreaksIntoNumberedPages
+          - PdfDocumentWriter_Build_Info_RecordsMetadata
+
+      - id: ReviewCenter-PdfDocumentWriter-Deterministic
+        title: >-
+          The PdfDocumentWriter class shall write the same bytes for the same input.
+        justification: |
+          Two attestations of the same record must differ only where the record or the signature differs, so that a
+          difference can be explained and a test can compare the output.
+        tests:
+          - PdfDocumentWriter_Build_SameInput_ProducesIdenticalBytes
+
+      - id: ReviewCenter-PdfDocumentWriter-Layout
+        title: >-
+          The PdfDocumentWriter class shall wrap a paragraph at word boundaries within the width of the text, break a
+          word that is wider than a line between characters, start a new line at every line feed, and wrap the value
+          of a row beside its label.
+        justification: |
+          File names, digests, and comments have no fixed length. Text that ran past the edge of the page would be cut
+          off in the document that is meant to be complete evidence.
+        tests:
+          - PdfDocumentWriter_Paragraph_LongText_WrapsAtWordsWithinTheTextWidth
+          - PdfDocumentWriter_Paragraph_WordWiderThanTheLine_IsBrokenBetweenCharacters
+          - PdfDocumentWriter_Paragraph_LineFeeds_StartNewLines
+          - PdfDocumentWriter_Row_LongValue_WrapsBesideTheLabel
+
+      - id: ReviewCenter-PdfDocumentWriter-Text
+        title: >-
+          The PdfDocumentWriter class shall escape parentheses and the backslash so that text reads back unchanged,
+          and shall show a character that the standard WinAnsi encoding of the built-in fonts does not have as a
+          question mark.
+        justification: |
+          The document uses the standard fonts that every reader has, so it needs no embedded font. A reviewer name
+          or a file name with a character outside that encoding must not corrupt the file; showing a question mark
+          is the honest and safe result.
+        tests:
+          - PdfDocumentWriter_Paragraph_ParenthesesAndBackslash_AreEscapedAndReadBackIntact
+          - PdfDocumentWriter_ToWinAnsi_Text_KeepsWinAnsiAndReplacesTheRest
+          - PdfDocumentWriter_Paragraph_UnicodeBeyondWinAnsi_IsShownAsQuestionMarks

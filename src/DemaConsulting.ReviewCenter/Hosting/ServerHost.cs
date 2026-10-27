@@ -23,6 +23,7 @@ using System.Security.Cryptography;
 using DemaConsulting.ReviewCenter.Cli;
 using DemaConsulting.ReviewCenter.ContentSources;
 using DemaConsulting.ReviewCenter.Core;
+using DemaConsulting.ReviewCenter.Evidence;
 using DemaConsulting.ReviewCenter.Identity;
 using DemaConsulting.ReviewCenter.Storage;
 using DemaConsulting.ReviewCenter.Web;
@@ -147,6 +148,7 @@ internal static class ServerHost
         ValidateAuthOptions(app);
         ValidateGitOptions(app);
         ValidateDataProtection(app);
+        ValidateAttestation(app);
 
         // A page request that no page handles is answered with the framed "Page not found" page. This comes first
         // so that its re-executed request is routed, authenticated, and authorized again like any other request;
@@ -172,6 +174,9 @@ internal static class ServerHost
 
         // Login and logout
         app.MapSignIn();
+
+        // The signed PDF attestation of a completed review
+        app.MapAttestation();
 
         // The UI: every page lives under the App root component
         app.MapRazorComponents<App>().AddInteractiveServerRenderMode();
@@ -251,6 +256,29 @@ internal static class ServerHost
         services.AddSingleton<IGitRepositoryProvider, GitSource>();
         services.AddSingleton<IReviewSetParser, ReviewMarkConfigParser>();
         services.AddSingleton<ReviewPlanner>();
+
+        // The attestation: the signing key (SelfSigned by default, or a certificate from a store), the PDF
+        // renderer and signer, and the service that ties them to the review. The self-signed key is kept in a
+        // subfolder of the Data Protection keys folder, which is known to be writable and private to the server
+        services.AddOptions<AttestationOptions>()
+            .Bind(configuration.GetSection(AttestationOptions.SectionName))
+            .PostConfigure<IOptions<DataProtectionSettings>, IOptions<DatabaseOptions>>((attestation, settings, database) =>
+            {
+                if (string.IsNullOrWhiteSpace(attestation.SelfSignedFolder))
+                {
+                    attestation.SelfSignedFolder = Path.Combine(
+                        ResolveKeysPath(settings.Value, database.Value),
+                        "attestation-selfsigned");
+                }
+            });
+        services.AddSingleton(provider => provider.GetRequiredService<IOptions<AttestationOptions>>().Value);
+        services.AddSingleton(provider => AttestationKeyProviderFactory.Create(
+            provider.GetRequiredService<AttestationOptions>(),
+            provider.GetRequiredService<TimeProvider>(),
+            provider.GetRequiredService<ILoggerFactory>()));
+        services.AddSingleton<IAttestationRenderer, AttestationRenderer>();
+        services.AddSingleton<IAttestationSigner, AttestationSigner>();
+        services.AddSingleton<AttestationService>();
     }
 
     /// <summary>
@@ -536,6 +564,30 @@ internal static class ServerHost
                 $"The Data Protection key ring folder '{folder}' is not writable: {ex.Message}{cause} " +
                 "Set DataProtection:KeysPath to a folder the server can write to and keep.",
                 ex);
+        }
+    }
+
+    /// <summary>
+    ///     Checks at start-up that the attestation signing key can be used, so that a wrong setting stops the
+    ///     start-up with a clear message instead of failing when a user asks for an attestation.
+    /// </summary>
+    /// <param name="app">The built application; it is disposed before the exception is thrown.</param>
+    /// <exception cref="InvalidOperationException">Thrown when the key provider is unknown or the key is not usable.</exception>
+    /// <remarks>
+    ///     This resolves the key provider (an unknown <c>Attestation:Provider</c> fails here) and loads the key; it
+    ///     applies the <c>Attestation:RequireTrustedKey</c> policy. The key never signs anything at start-up, so a
+    ///     smart card is not asked for its PIN.
+    /// </remarks>
+    private static void ValidateAttestation(WebApplication app)
+    {
+        try
+        {
+            app.Services.GetRequiredService<IAttestationKeyProvider>().GetSigningKey();
+        }
+        catch (AttestationKeyException ex)
+        {
+            ((IDisposable)app).Dispose();
+            throw new InvalidOperationException($"The attestation signing key is not usable: {ex.Message}", ex);
         }
     }
 

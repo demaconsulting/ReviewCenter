@@ -21,6 +21,7 @@
 using DemaConsulting.ReviewCenter.Cli;
 using DemaConsulting.ReviewCenter.ContentSources;
 using DemaConsulting.ReviewCenter.Core;
+using DemaConsulting.ReviewCenter.Evidence;
 using DemaConsulting.ReviewCenter.Hosting;
 using DemaConsulting.ReviewCenter.Storage;
 using Microsoft.AspNetCore.Builder;
@@ -256,6 +257,167 @@ public class ServerHostTests
 
         // Assert: the message names the setting
         Assert.Contains("Auth:RevalidationSeconds", exception.Message, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    ///     Test that an attestation provider that does not exist stops the build with an error naming the setting.
+    /// </summary>
+    [Fact]
+    public void ServerHost_CreateApplication_UnknownAttestationProvider_ThrowsClearError()
+    {
+        // Arrange: configuration that selects a provider the product does not have
+        using var context = Context.Create(["serve", "--silent"]);
+        var options = AttestationHostOptions(("Attestation:Provider", "Pfx"));
+
+        // Act: create the application
+        var exception = Assert.Throws<InvalidOperationException>(() => ServerHost.CreateApplication(context, options));
+
+        // Assert: the message names the setting
+        Assert.Contains("The attestation signing key is not usable", exception.Message, StringComparison.Ordinal);
+        Assert.Contains("Attestation:Provider", exception.Message, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    ///     Test that the certificate store provider without a thumbprint stops the build with an error naming the setting.
+    /// </summary>
+    [Fact]
+    public void ServerHost_CreateApplication_CertificateStoreWithoutThumbprint_ThrowsClearError()
+    {
+        // Arrange: configuration that selects the certificate store and no certificate
+        using var context = Context.Create(["serve", "--silent"]);
+        var options = AttestationHostOptions(("Attestation:Provider", "CertificateStore"));
+
+        // Act: create the application
+        var exception = Assert.Throws<InvalidOperationException>(() => ServerHost.CreateApplication(context, options));
+
+        // Assert: the message names the setting
+        Assert.Contains("Attestation:CertificateThumbprint", exception.Message, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    ///     Test that a certificate that is not in the store stops the build with an error naming the thumbprint.
+    /// </summary>
+    [Fact]
+    public void ServerHost_CreateApplication_CertificateNotInStore_ThrowsClearError()
+    {
+        // Arrange: configuration that names a certificate that does not exist
+        var thumbprint = new string('B', 40);
+        using var context = Context.Create(["serve", "--silent"]);
+        var options = AttestationHostOptions(
+            ("Attestation:Provider", "CertificateStore"),
+            ("Attestation:CertificateThumbprint", thumbprint));
+
+        // Act: create the application
+        var exception = Assert.Throws<InvalidOperationException>(() => ServerHost.CreateApplication(context, options));
+
+        // Assert: the thumbprint is named
+        Assert.Contains(thumbprint, exception.Message, StringComparison.Ordinal);
+        Assert.Contains("was not found", exception.Message, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    ///     Test that a trusted key that is required stops the build while the key is the self-signed default.
+    /// </summary>
+    [Fact]
+    public void ServerHost_CreateApplication_RequireTrustedKeyWithSelfSignedProvider_ThrowsClearError()
+    {
+        // Arrange: configuration that requires a trusted key and keeps the self-signed provider
+        using var context = Context.Create(["serve", "--silent"]);
+        var options = AttestationHostOptions(("Attestation:RequireTrustedKey", "true"));
+
+        // Act: create the application
+        var exception = Assert.Throws<InvalidOperationException>(() => ServerHost.CreateApplication(context, options));
+
+        // Assert: the message names the setting and the reason
+        Assert.Contains("Attestation:RequireTrustedKey", exception.Message, StringComparison.Ordinal);
+        Assert.Contains("self-signed", exception.Message, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    ///     Test that a folder for the self-signed key that cannot be used stops the build with an error naming the setting.
+    /// </summary>
+    [Fact]
+    public void ServerHost_CreateApplication_SelfSignedFolderIsAFile_ThrowsClearError()
+    {
+        // Arrange: a file where the folder of the key should be
+        var file = Path.Combine(Path.GetTempPath(), "ReviewCenterTests-" + Guid.NewGuid().ToString("N"));
+        File.WriteAllText(file, "not a folder");
+        using var context = Context.Create(["serve", "--silent"]);
+        var options = AttestationHostOptions(("Attestation:SelfSignedFolder", file));
+
+        try
+        {
+            // Act: create the application
+            var exception = Assert.Throws<InvalidOperationException>(() => ServerHost.CreateApplication(context, options));
+
+            // Assert: the message names the setting
+            Assert.Contains("Attestation:SelfSignedFolder", exception.Message, StringComparison.Ordinal);
+        }
+        finally
+        {
+            File.Delete(file);
+        }
+    }
+
+    /// <summary>
+    ///     Test that without any attestation setting the server creates its self-signed key beside the data
+    ///     protection keys, and keeps it across a restart.
+    /// </summary>
+    [Fact]
+    public async Task ServerHost_CreateApplication_NoAttestationSettings_CreatesSelfSignedKeyBesideTheDataProtectionKeys()
+    {
+        // Arrange: a database in a folder of its own, so that the key folder is known
+        var folder = Path.Combine(Path.GetTempPath(), "ReviewCenterTests-" + Guid.NewGuid().ToString("N"));
+        var connectionString = $"Data Source={Path.Combine(folder, "rc.db")};Pooling=False";
+        var expected = Path.Combine(folder, "keys", "attestation-selfsigned", SelfSignedKeyProvider.FileName);
+        var logs = new CapturingLoggerProvider();
+
+        try
+        {
+            // Act: start twice on the same folder
+            string first;
+            await using (var app = await TestWebApp.StartAsync(logs, connectionString, ["serve", "--silent"]))
+            {
+                first = app.Services.GetRequiredService<IAttestationKeyProvider>().GetSigningKey().Info.Thumbprint;
+            }
+
+            await using var again = await TestWebApp.StartAsync(logs, connectionString, ["serve", "--silent"]);
+            var second = again.Services.GetRequiredService<IAttestationKeyProvider>().GetSigningKey().Info.Thumbprint;
+
+            // Assert: the key file is where it should be, and the key is the same after the restart
+            Assert.True(File.Exists(expected));
+            Assert.Equal(first, second);
+        }
+        finally
+        {
+            Directory.Delete(folder, recursive: true);
+        }
+    }
+
+    /// <summary>
+    ///     Test that the folder of the self-signed key can be chosen with the settings.
+    /// </summary>
+    [Fact]
+    public async Task ServerHost_CreateApplication_SelfSignedFolderConfigured_KeepsTheKeyThere()
+    {
+        // Arrange: a folder chosen for the key
+        var folder = Path.Combine(Path.GetTempPath(), "ReviewCenterTests-" + Guid.NewGuid().ToString("N"));
+        using var context = Context.Create(["serve", "--silent"]);
+        var options = AttestationHostOptions(("Attestation:SelfSignedFolder", folder));
+
+        try
+        {
+            // Act: create the application, which loads the key
+            await using var app = ServerHost.CreateApplication(context, options);
+
+            // Assert: the key is in that folder
+            Assert.True(File.Exists(Path.Combine(folder, SelfSignedKeyProvider.FileName)));
+            Assert.True(app.Services.GetRequiredService<IAttestationKeyProvider>().Describe().IsAvailable);
+        }
+        finally
+        {
+            Directory.Delete(folder, recursive: true);
+        }
     }
 
     /// <summary>
@@ -544,6 +706,30 @@ public class ServerHostTests
         {
             Directory.Delete(folder, recursive: true);
         }
+    }
+
+    /// <summary>
+    ///     Creates host options with attestation settings and a throwaway database.
+    /// </summary>
+    /// <param name="settings">The settings as configuration keys and values.</param>
+    /// <returns>The options.</returns>
+    private static ServerHostOptions AttestationHostOptions(params (string Key, string Value)[] settings)
+    {
+        return new ServerHostOptions
+        {
+            MapStaticAssets = false,
+            ConfigureBuilder = builder =>
+            {
+                builder.WebHost.UseTestServer();
+                var values = new Dictionary<string, string?> { ["Database:ConnectionString"] = TestDatabase.NewConnectionString() };
+                foreach (var (key, value) in settings)
+                {
+                    values[key] = value;
+                }
+
+                builder.Configuration.AddInMemoryCollection(values);
+            }
+        };
     }
 
     /// <summary>

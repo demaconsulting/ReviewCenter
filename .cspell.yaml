@@ -96,6 +96,23 @@ words:
   - yamlfix
   - yamldotnet
   - slnx
+  - selfsigned
+  - certificatestore
+  - certlm
+  - certmgr
+  - Oids
+  - Acro
+  - Annot
+  - Annots
+  - endobj
+  - nendobj
+  - endstream
+  - nendstream
+  - startxref
+  - nstartxref
+  - FEFF
+  - zhang
+  - Cquoted
 
 # Exclude common build artifacts, dependencies, and vendored third-party code
 ignorePaths:
