@@ -348,20 +348,86 @@ public partial class WebSubsystemTests
     }
 
     /// <summary>
-    ///     Test that the stylesheet shows the per-thread link as a quiet text link, not as the filled button the
-    ///     other action links use.
+    ///     Test that the stylesheet reveals the + control of a diff line on row hover and keyboard focus (and always
+    ///     on touch screens) without removing it from the layout or the tab order.
     /// </summary>
     [Fact]
-    public async Task WebSubsystem_Stylesheet_ThreadLink_IsQuietTextLink()
+    public async Task WebSubsystem_Stylesheet_DiffCommentControl_ShowsOnHoverFocusAndTouch()
     {
         // Arrange and Act: read the stylesheet the shell links to
         var css = await ReadStylesheetAsync();
 
-        // Assert: the thread link has no background and no padding, is underlined, and is not filled with the accent
-        Assert.Matches(@"a\.thread-link\s*\{[^}]*background:\s*none;", css);
-        Assert.Matches(@"a\.thread-link\s*\{[^}]*padding:\s*0;", css);
-        Assert.Matches(@"a\.thread-link\s*\{[^}]*text-decoration:\s*underline;", css);
-        Assert.DoesNotMatch(@"a\.thread-link\s*\{[^}]*background:\s*var\(--accent\)", css);
+        // Assert: hidden by opacity by default, revealed on hover, focus within, a selected row and focus-visible
+        Assert.Matches(@"\.diff-row \.line-comment\s*\{[^}]*opacity:\s*0;", css);
+        Assert.Matches(
+            @"\.diff-row:hover \.line-comment,\s*\.diff-row:focus-within \.line-comment,[^{]*\.diff-row \.line-comment:focus-visible\s*\{[^}]*opacity:\s*1;",
+            css);
+
+        // Assert: always visible where there is no hover
+        Assert.Matches(@"@media \(hover: none\)\s*\{\s*\.diff-row \.line-comment\s*\{[^}]*opacity:\s*1;", css);
+
+        // Assert: never taken out of the layout or the tab order
+        Assert.DoesNotMatch(@"\.line-comment[^{]*\{[^}]*display:\s*none", css);
+        Assert.DoesNotMatch(@"\.line-comment[^{]*\{[^}]*visibility:\s*hidden", css);
+    }
+
+    /// <summary>
+    ///     Test that the stylesheet shows the per-thread link as a button-styled link, not as the quiet underlined
+    ///     text link it used to be.
+    /// </summary>
+    [Fact]
+    public async Task WebSubsystem_Stylesheet_ThreadLink_IsButtonStyled()
+    {
+        // Arrange and Act: read the stylesheet the shell links to
+        var css = await ReadStylesheetAsync();
+
+        // Assert: no dedicated rule strips the link of its button look, and the thread header sizes the link
+        // like the buttons beside it
+        Assert.DoesNotMatch(@"a\.thread-link\s*\{", css);
+        Assert.Matches(@"\.thread-head button,\s*\.thread-head a\.action\s*\{[^}]*padding:", css);
+    }
+
+    /// <summary>
+    ///     Test that no test id repeats within a page, and that the breadcrumb links of the pages have their own
+    ///     ids, distinct from the header tabs.
+    /// </summary>
+    [Fact]
+    public async Task WebSubsystem_AllPages_TestIdsAreUniqueAndBreadcrumbsDistinct()
+    {
+        // Arrange: start the real pipeline with data, so list rows and forms are all rendered
+        var logs = new CapturingLoggerProvider();
+        await using var app = await TestWebApp.StartAsync(logs, "serve", "--silent");
+        using var browser = await TestBrowser.SignedInAsync(app, "root", UserRole.Admin);
+        var client = browser.Client;
+        var project = await app.Services.GetRequiredService<ProjectService>()
+            .CreateAsync("Apollo", "Moon landing", TestContext.Current.CancellationToken);
+        await app.Services.GetRequiredService<ReviewService>().CreateDraftAsync(
+            project.Id, "rev-1", "First review", [new("a.txt", TestContent.A)], TestContext.Current.CancellationToken);
+        var reviews = $"/projects/{project.Id}/reviews/rev-1";
+        (string Route, string Breadcrumb, string Header)[] pages =
+        [
+            ($"/projects/{project.Id}", "breadcrumb-projects-link", "projects-link"),
+            ($"/projects/{project.Id}/reviews/new", "breadcrumb-projects-link", "projects-link"),
+            ($"/projects/{project.Id}/plan", "breadcrumb-projects-link", "projects-link"),
+            (reviews, "breadcrumb-projects-link", "projects-link"),
+            ($"{reviews}/checklist", "breadcrumb-projects-link", "projects-link"),
+            ($"{reviews}/history", "breadcrumb-projects-link", "projects-link"),
+            ("/repositories/new", "breadcrumb-repositories-link", "repositories-link"),
+            ("/users/new", "breadcrumb-users-link", "users-link")
+        ];
+
+        foreach (var (route, breadcrumb, header) in pages)
+        {
+            // Act: render the page
+            var document = await ParseAsync(client, route);
+            var ids = document.QuerySelectorAll("[data-testid]").Select(e => e.GetAttribute("data-testid")!).ToList();
+
+            // Assert: no id repeats, the breadcrumb link has its own id, and the header tab keeps its id
+            var repeated = ids.GroupBy(id => id).Where(g => g.Count() > 1).Select(g => g.Key).ToList();
+            Assert.True(repeated.Count == 0, $"'{route}' repeats the test ids: {string.Join(", ", repeated)}.");
+            Assert.NotNull(document.QuerySelector($"[data-testid='{breadcrumb}']"));
+            Assert.Single(ids, header);
+        }
     }
 
     /// <summary>

@@ -571,6 +571,7 @@ sections:
           - ReviewCenter-ContentSources-Errors
           - ReviewCenter-ContentSources-DisabledRepository
           - ReviewCenter-Core-FileSelection
+          - ReviewCenter-Hosting-GitSettings
         tests:
           - ContentSourcesSubsystem_RegisteredRepository_IsReadThroughTheRealGitSource
           - ContentSourcesSubsystem_DisabledRepository_IsNotAvailableForReading

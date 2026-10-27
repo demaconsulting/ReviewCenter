@@ -259,6 +259,70 @@ public class ServerHostTests
     }
 
     /// <summary>
+    ///     Test that a git timeout outside 1 to 3600 seconds stops the build with an error naming the setting.
+    /// </summary>
+    /// <param name="seconds">The configured timeout.</param>
+    [Theory]
+    [InlineData("0")]
+    [InlineData("-5")]
+    [InlineData("3601")]
+    public void ServerHost_CreateApplication_GitTimeoutOutOfRange_ThrowsClearError(string seconds)
+    {
+        // Arrange: configuration with an out-of-range git timeout
+        using var context = Context.Create(["serve", "--silent"]);
+        var options = GitTimeoutOptions(seconds);
+
+        // Act: create the application
+        var exception = Assert.Throws<InvalidOperationException>(() => ServerHost.CreateApplication(context, options));
+
+        // Assert: the message names the setting
+        Assert.Contains("Git:TimeoutSeconds", exception.Message, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    ///     Test that the smallest and largest accepted git timeouts let the application build.
+    /// </summary>
+    /// <param name="seconds">The configured timeout.</param>
+    [Theory]
+    [InlineData("1")]
+    [InlineData("3600")]
+    public void ServerHost_CreateApplication_GitTimeoutAtLimits_Starts(string seconds)
+    {
+        // Arrange: configuration with a git timeout on a limit
+        using var context = Context.Create(["serve", "--silent"]);
+        var options = GitTimeoutOptions(seconds);
+
+        // Act: create the application
+        using var app = ServerHost.CreateApplication(context, options);
+
+        // Assert: the configured value is in effect
+        var git = app.Services.GetRequiredService<GitOptions>();
+        Assert.Equal(int.Parse(seconds, System.Globalization.CultureInfo.InvariantCulture), git.TimeoutSeconds);
+    }
+
+    /// <summary>
+    ///     Builds host options for an in-memory server with a git timeout.
+    /// </summary>
+    /// <param name="seconds">The configured timeout, as text.</param>
+    /// <returns>The host options.</returns>
+    private static ServerHostOptions GitTimeoutOptions(string seconds)
+    {
+        return new ServerHostOptions
+        {
+            MapStaticAssets = false,
+            ConfigureBuilder = builder =>
+            {
+                builder.WebHost.UseTestServer();
+                builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
+                {
+                    ["Database:ConnectionString"] = TestDatabase.NewConnectionString(),
+                    ["Git:TimeoutSeconds"] = seconds
+                });
+            }
+        };
+    }
+
+    /// <summary>
     ///     Test that the host registers the user service next to the other domain services.
     /// </summary>
     [Fact]

@@ -573,10 +573,10 @@ public class ReviewDeepLinkTests : PageTestBase
     }
 
     /// <summary>
-    ///     Tests that each thread shows a plain, unobtrusive link to its address, not styled as a button.
+    ///     Tests that each thread shows a button-styled link to its address and a "Copy link" button.
     /// </summary>
     [Fact]
-    public async Task ReviewPage_Thread_ShowsPlainLinkToItsAddress()
+    public async Task ReviewPage_Thread_ShowsLinkButtonAndCopyLinkControl()
     {
         // Arrange: threads in the diff and on a whole file
         var projectId = await CreateReviewAsync();
@@ -590,15 +590,75 @@ public class ReviewDeepLinkTests : PageTestBase
         var diffText = diffLink.TextContent;
         var diffHref = diffLink.GetAttribute("href");
         var diffClasses = diffLink.ClassList.ToArray();
+        var diffCopy = diff.Find($"[data-testid='thread-copy-link-{inDiff.Id}']");
         var list = Open(ReviewLinks.ForFile(projectId, "REV-1", NewPath));
+        var listCopy = list.Find($"[data-testid='thread-copy-link-{whole.Id}']");
 
-        // Assert: the link is a plain anchor to the thread address, with the quiet style and not the button style
+        // Assert: the link is an anchor to the thread address with the button style
         Assert.Equal("a", diffTag);
         Assert.Equal("Link", diffText);
         Assert.Contains("thread-link", diffClasses);
-        Assert.DoesNotContain("action", diffClasses);
+        Assert.Contains("action", diffClasses);
         Assert.Equal(ReviewLinks.ForThread(projectId, "REV-1", inDiff.Id), diffHref);
         Assert.Equal(ReviewLinks.ForThread(projectId, "REV-1", whole.Id), list.Find($"[data-testid='thread-link-{whole.Id}']").GetAttribute("href"));
+
+        // Assert: a "Copy link" button sits beside it, in the diff and in the whole-file list
+        Assert.Equal("button", diffCopy.TagName.ToLowerInvariant());
+        Assert.Equal("button", diffCopy.GetAttribute("type"));
+        Assert.Equal("Copy link", diffCopy.TextContent);
+        Assert.Equal("Copy link", listCopy.TextContent);
+    }
+
+    /// <summary>
+    ///     Tests that pressing "Copy link" hands the browser the absolute address of the thread, shows "Copied", and
+    ///     goes back to "Copy link" after a short delay.
+    /// </summary>
+    [Fact]
+    public async Task ReviewPage_CopyLink_Click_CopiesAbsoluteThreadAddressAndShowsCopied()
+    {
+        // Arrange: a thread, and a browser that copies successfully
+        var projectId = await CreateReviewAsync();
+        var thread = await StartAsync(projectId, ModPath, 15, ThreadSide.Head);
+        JSInterop.Setup<bool>("reviewCenter.copyText", _ => true).SetResult(true);
+        var cut = Open(ReviewLinks.ForFile(projectId, "REV-1", ModPath));
+
+        // Act: press the button
+        await cut.Find($"[data-testid='thread-copy-link-{thread.Id}']").ClickAsync();
+
+        // Assert: the browser was asked to copy the absolute address, once
+        var call = Assert.Single(JSInterop.Invocations, i => i.Identifier == "reviewCenter.copyText");
+        Assert.Equal("http://localhost" + ReviewLinks.ForThread(projectId, "REV-1", thread.Id), call.Arguments[0]);
+
+        // Assert: the button and the status say Copied, then go back
+        Assert.Equal("Copied", cut.Find($"[data-testid='thread-copy-link-{thread.Id}']").TextContent);
+        Assert.Equal("Copied", cut.Find($"[data-testid='thread-copy-status-{thread.Id}']").TextContent);
+        await cut.WaitForAssertionAsync(
+            () => Assert.Equal("Copy link", cut.Find($"[data-testid='thread-copy-link-{thread.Id}']").TextContent),
+            TimeSpan.FromSeconds(5));
+        Assert.Equal(string.Empty, cut.Find($"[data-testid='thread-copy-status-{thread.Id}']").TextContent);
+    }
+
+    /// <summary>
+    ///     Tests that a browser that cannot copy is reported as "Copy failed" and the thread keeps working.
+    /// </summary>
+    [Fact]
+    public async Task ReviewPage_CopyLink_ClipboardFails_ShowsCopyFailed()
+    {
+        // Arrange: a thread, and a browser that refuses to copy
+        var projectId = await CreateReviewAsync();
+        var thread = await StartAsync(projectId, ModPath, 15, ThreadSide.Head);
+        JSInterop.Setup<bool>("reviewCenter.copyText", _ => true).SetResult(false);
+        var cut = Open(ReviewLinks.ForFile(projectId, "REV-1", ModPath));
+
+        // Act: press the button
+        await cut.Find($"[data-testid='thread-copy-link-{thread.Id}']").ClickAsync();
+
+        // Assert: the failure is shown, the button still reads Copy link, and the thread link is still there
+        Assert.Equal("Copy failed", cut.Find($"[data-testid='thread-copy-status-{thread.Id}']").TextContent);
+        Assert.Equal("Copy link", cut.Find($"[data-testid='thread-copy-link-{thread.Id}']").TextContent);
+        Assert.Equal(
+            ReviewLinks.ForThread(projectId, "REV-1", thread.Id),
+            cut.Find($"[data-testid='thread-link-{thread.Id}']").GetAttribute("href"));
     }
 
     /// <summary>

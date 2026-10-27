@@ -42,7 +42,7 @@ its kind (the name of the domain rule, `Input`, or `Unexpected`), which the erro
 
 **InteractiveMarker**: as for the other pages.
 
-Test identifiers: `plan-page` (root), `home-link`, `projects-link`, `plan-breadcrumb-project`, `plan-page-loading`,
+Test identifiers: `plan-page` (root), `breadcrumb-projects-link`, `plan-breadcrumb-project`, `plan-page-loading`,
 `plan-project-not-found`, `plan-heading`, `plan-help`, `plan-no-repository`; the form: `plan-form`,
 `plan-repository-select`, `plan-head-input`, `plan-baseline` (the group), `plan-baseline-none`,
 `plan-baseline-explicit`, `plan-baseline-last`, `plan-baseline-input` (only for the explicit mode), and

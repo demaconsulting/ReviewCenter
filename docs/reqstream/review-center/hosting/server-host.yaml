@@ -74,6 +74,18 @@ sections:
           - SignIn_PublicPage_Anonymous_IsServed
           - SignIn_ProtectedPage_Anonymous_RedirectsToLogin
 
+      - id: ReviewCenter-ServerHost-GitSettings
+        title: >-
+          The ServerHost class shall fail with an error that names Git:TimeoutSeconds, before it serves any request,
+          when that value, the time limit of every git call in seconds (120 by default), is not between 1 and 3600.
+        justification: |
+          A zero, negative or huge limit would either silently fall back to a default the operator did not choose
+          or let a hung git call block a repository for hours, so a wrong value must stop the server at start-up
+          with a message that names the setting.
+        tests:
+          - ServerHost_CreateApplication_GitTimeoutOutOfRange_ThrowsClearError
+          - ServerHost_CreateApplication_GitTimeoutAtLimits_Starts
+
       - id: ReviewCenter-ServerHost-DatabaseFailure
         title: >-
           The ServerHost class shall fail with an error that begins Failed to prepare the database when the

@@ -47,7 +47,8 @@ namespace DemaConsulting.ReviewCenter.Web;
 ///     the threads of every file through <see cref="ThreadService.BuildIndex"/>; choosing a row selects its
 ///     file, highlights its lines and asks the browser to scroll them into view. The page can also be opened at a
 ///     file, a line of a file or a thread through a stable address (see <see cref="ReviewLinks"/>); choosing a file
-///     or thread replaces the address in the address bar by the matching link, without a history entry.
+///     or thread replaces the address in the address bar by the matching link, without a history entry. Every
+///     thread shows a "Link" to its address and a "Copy link" button that copies the absolute address.
 /// </remarks>
 public partial class ReviewPage : ComponentBase
 {
@@ -56,6 +57,31 @@ public partial class ReviewPage : ComponentBase
     ///     on a live circuit.
     /// </summary>
     private bool _interactive;
+
+    /// <summary>
+    ///     How long the "Copied" or "Copy failed" feedback of the "Copy link" button stays visible.
+    /// </summary>
+    private static readonly TimeSpan CopyFeedbackDuration = TimeSpan.FromSeconds(2);
+
+    /// <summary>
+    ///     The outcome of the last "Copy link" click, by thread identity; a thread without an entry shows none.
+    /// </summary>
+    private readonly Dictionary<int, CopyFeedback> _copyFeedback = [];
+
+    /// <summary>
+    ///     The outcome of a "Copy link" click, shown briefly next to the button.
+    /// </summary>
+    private enum CopyFeedback
+    {
+        /// <summary>No feedback is shown.</summary>
+        None,
+
+        /// <summary>The address was copied.</summary>
+        Copied,
+
+        /// <summary>The browser refused the copy.</summary>
+        Failed
+    }
 
     /// <summary>
     ///     The test id of the element to scroll into view after the next render, or <c>null</c>.
@@ -145,6 +171,12 @@ public partial class ReviewPage : ComponentBase
     /// </summary>
     [Inject]
     private IJSRuntime JS { get; set; } = null!;
+
+    /// <summary>
+    ///     Gets or sets the navigation manager used to make a thread address absolute, supplied by dependency injection.
+    /// </summary>
+    [Inject]
+    private NavigationManager Navigation { get; set; } = null!;
 
     /// <summary>
     ///     Gets or sets the authentication state of the current user, supplied by dependency injection.
@@ -824,6 +856,85 @@ public partial class ReviewPage : ComponentBase
         if (!ExpandedThreads.Remove(threadId))
         {
             ExpandedThreads.Add(threadId);
+        }
+    }
+
+    /// <summary>
+    ///     Gets the outcome of the last "Copy link" click for a thread.
+    /// </summary>
+    /// <param name="threadId">The identity of the thread.</param>
+    /// <returns>The feedback to show, or <see cref="CopyFeedback.None"/> after it has been cleared.</returns>
+    private CopyFeedback CopyFeedbackFor(int threadId)
+    {
+        return _copyFeedback.GetValueOrDefault(threadId);
+    }
+
+    /// <summary>
+    ///     Gets the live-region text shown next to the "Copy link" button of a thread.
+    /// </summary>
+    /// <param name="threadId">The identity of the thread.</param>
+    /// <returns>The text to announce, or an empty string when there is nothing to report.</returns>
+    private string CopyStatusFor(int threadId)
+    {
+        return CopyFeedbackFor(threadId) switch
+        {
+            CopyFeedback.Copied => "Copied",
+            CopyFeedback.Failed => "Copy failed",
+            _ => string.Empty
+        };
+    }
+
+    /// <summary>
+    ///     Copies the absolute address of a thread to the clipboard and shows brief feedback.
+    /// </summary>
+    /// <param name="threadId">The identity of the thread.</param>
+    /// <returns>A task that completes when the browser has answered; the feedback is cleared later.</returns>
+    /// <remarks>
+    ///     The address is made absolute with <see cref="NavigationManager.ToAbsoluteUri(string)"/> so it can be
+    ///     pasted anywhere. A browser that refuses the copy, or that is gone, is reported as "Copy failed".
+    /// </remarks>
+    private async Task CopyThreadLinkAsync(int threadId)
+    {
+        var url = Navigation.ToAbsoluteUri(ReviewLinks.ForThread(ProjectId, ReviewId, threadId)).ToString();
+        var copied = false;
+        try
+        {
+            copied = await JS.InvokeAsync<bool>("reviewCenter.copyText", url);
+        }
+        catch (JSDisconnectedException)
+        {
+            // The browser went away; there is nothing to copy to
+        }
+        catch (JSException)
+        {
+            // The browser script failed; report it like a refused copy
+        }
+
+        _copyFeedback[threadId] = copied ? CopyFeedback.Copied : CopyFeedback.Failed;
+
+        // Clear the feedback later without holding up the click handler
+        _ = ClearCopyFeedbackAsync(threadId);
+    }
+
+    /// <summary>
+    ///     Clears the feedback of a thread after a short delay.
+    /// </summary>
+    /// <param name="threadId">The identity of the thread.</param>
+    /// <returns>A task that completes when the feedback has been cleared or the page is gone.</returns>
+    private async Task ClearCopyFeedbackAsync(int threadId)
+    {
+        await Task.Delay(CopyFeedbackDuration);
+        try
+        {
+            await InvokeAsync(() =>
+            {
+                _copyFeedback.Remove(threadId);
+                StateHasChanged();
+            });
+        }
+        catch (ObjectDisposedException)
+        {
+            // The page is gone; there is nothing left to update
         }
     }
 

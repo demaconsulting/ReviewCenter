@@ -247,14 +247,16 @@ sections:
       - id: ReviewCenter-Web-TestIds
         title: >-
           The Web subsystem shall give every interactive element (link, button, input, select, and text area) of
-          every page a stable, lowercase hyphenated data-testid attribute, so that automated tests and the
+          every page a stable, lowercase hyphenated data-testid attribute that is unique within the page (the
+          breadcrumb links are distinct from the header tabs), so that automated tests and the
           Puppet tool can address it without depending on its text or layout.
         justification: |
           Tests that locate elements by visible text or position break whenever wording or layout changes. A
           stable identifier on every interactive element keeps the automated tests and the Puppet tool working
-          as the pages evolve.
+          as the pages evolve, and a repeated identifier would make a selector match the wrong element.
         tests:
           - WebSubsystem_AllPages_EveryInteractiveElementHasTestId
+          - WebSubsystem_AllPages_TestIdsAreUniqueAndBreadcrumbsDistinct
           - ReviewPage_Render_ThreadControls_EveryInteractiveElementHasTestId
           - ReviewPage_Render_ReviewersCard_EveryInteractiveElementHasTestId
 
@@ -349,6 +351,7 @@ sections:
           - ReviewCenter-ReviewPage-DiffLayout
         tests:
           - WebSubsystem_Stylesheet_DiffRules_KeepCodeScrollingInsideItself
+          - WebSubsystem_Stylesheet_DiffCommentControl_ShowsOnHoverFocusAndTouch
 
       - id: ReviewCenter-Web-DeepLinks
         title: >-
@@ -364,7 +367,7 @@ sections:
           - ReviewCenter-SignIn-ReturnDeepLink
         tests:
           - Routes_DeepLink_SignedOut_LoginLinkKeepsEscapesAndQuery
-          - WebSubsystem_Stylesheet_ThreadLink_IsQuietTextLink
+          - WebSubsystem_Stylesheet_ThreadLink_IsButtonStyled
 
       - id: ReviewCenter-Web-PlanReviews
         title: >-

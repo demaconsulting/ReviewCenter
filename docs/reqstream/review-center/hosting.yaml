@@ -71,6 +71,19 @@ sections:
           - ServerHost_CreateApplication_NonPositiveSessionHours_ThrowsClearError
           - ServerHost_CreateApplication_RevalidationSecondsBelowMinimum_ThrowsClearError
 
+      - id: ReviewCenter-Hosting-GitSettings
+        title: >-
+          The Hosting subsystem shall refuse to start, with an error that names Git:TimeoutSeconds, when the time
+          limit of a git call is not between 1 and 3600 seconds.
+        justification: |
+          An operator who mistypes the limit must learn it at start-up, not when the first repository call hangs
+          or is cut short.
+        children:
+          - ReviewCenter-ServerHost-GitSettings
+        tests:
+          - ServerHost_CreateApplication_GitTimeoutOutOfRange_ThrowsClearError
+          - ServerHost_CreateApplication_GitTimeoutAtLimits_Starts
+
       - id: ReviewCenter-Hosting-UserAdd
         title: >-
           The Hosting subsystem shall create a user in the configured database when the user add verb is run,

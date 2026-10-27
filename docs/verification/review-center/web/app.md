@@ -53,6 +53,10 @@ document is requested; the appearance script (found by the storage key of the ch
 in the document, and the script comes before the style sheet link. This scenario is tested by
 `App_Render_ServedAtRoot_AppliesStoredThemeBeforeStyleSheet`.
 
+**App_Render_ServedAtRoot_DefinesCopyTextHelper**: The pipeline is started in memory and the root document is requested;
+the document defines `copyText`, uses `navigator.clipboard`, and has the fallback that creates a text area and calls
+`document.execCommand('copy')`. This scenario is tested by `App_Render_ServedAtRoot_DefinesCopyTextHelper`.
+
 **Routes_Render_RootUrl_RendersHomePage**: The navigation address is set to the root URL and `Routes` is rendered; the
 home page is shown. This scenario is tested by `Routes_Render_RootUrl_RendersHomePage`.
 

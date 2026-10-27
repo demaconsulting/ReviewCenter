@@ -14,8 +14,10 @@ account, and to give back the result with every secret removed. It also owns the
 
 - **CachePath**: `string` — the folder of the mirrors; empty until `Hosting` fills in the default (a `git-cache`
   folder beside the database).
-- **TimeoutSeconds**: `int` — the time limit of one git command; 120 by default.
-- **Timeout**: `TimeSpan` — the limit as a duration; a value below 1 second counts as the default.
+- **TimeoutSeconds**: `int` — the time limit of one git command; 120 by default, and from 1 to 3600 (checked at
+  start-up by `Hosting`).
+- **Timeout**: `TimeSpan` — the limit as a duration; a value below 1 second (only possible when the class is built
+  directly) counts as the default.
 
 **GitResult** (supporting type): the exit code, the standard output as bytes, and the standard error as redacted text.
 

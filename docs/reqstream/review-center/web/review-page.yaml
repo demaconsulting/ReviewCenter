@@ -192,11 +192,13 @@ sections:
           cell and to the Head version with the head line number for a control in the right cell, state the version
           and lines in plain words ("Comment on line 10 (before)"), extend the selection with Shift-click or a
           "Through line" field only within one version, and offer Cancel and a whole-file comment that keeps the
-          typed text.
+          typed text. The control shall appear when the row is hovered or has keyboard focus (and always on screens
+          without hover), and shall stay reachable with the keyboard.
         justification: |
           The left cell shows the baseline and the right cell the head, so the cell chosen says which version the
           comment is about, with the number the reader sees. Keeping a range within one version prevents mixing two
-          numberings, and the plain wording tells the reader what the comment will be attached to.
+          numberings, and the plain wording tells the reader what the comment will be attached to. Showing the
+          control only where the reader points keeps the diff calm without hiding it from keyboard or touch users.
         tests:
           - ReviewPage_DiffView_CommentOnRemovedLine_StartsBaselineThread
           - ReviewPage_DiffView_CommentOnAddedAndContextLines_StartsHeadThreads
@@ -205,6 +207,7 @@ sections:
           - ReviewPage_DiffView_ThroughLineField_ExtendsTheRange
           - ReviewPage_DiffView_CancelAndWholeFileOption_BehaveAsLabelled
           - ReviewPage_DiffView_AddedFile_CommentOnLine_StartsHeadThreadUnderTheRow
+          - WebSubsystem_Stylesheet_DiffCommentControl_ShowsOnHoverFocusAndTouch
 
       - id: ReviewCenter-ReviewPage-DiffThreads
         title: >-
@@ -410,12 +413,14 @@ sections:
           the form /files/{path} with an optional line and side, or /threads/{id}), showing the file in the diff,
           scrolling to the line or thread and highlighting it; shall replace the address of the browser, without a
           history entry and without reloading the page, with the link of the file or thread the reader chooses;
-          shall show on every thread a plain, unobtrusive link (not styled as a button) to its address; and shall
-          build every link by escaping each path segment once, so the router returns the same file path.
+          shall show on every thread a button-styled link to its address and a Copy link button that copies the
+          absolute address to the clipboard and confirms with a brief message (or reports that the copy failed); and
+          shall build every link by escaping each path segment once, so the router returns the same file path.
         justification: |
           A link that names one file, line or thread is how reviewers point each other at a finding. An address bar
-          that always holds a shareable link needs no extra step, and escaping once and decoding once keeps names
-          with spaces, hashes, question marks, percent signs and non-ASCII letters working.
+          that always holds a shareable link needs no extra step, a Copy link button saves the reviewer from
+          selecting the address by hand, and escaping once and decoding once keeps names with spaces, hashes,
+          question marks, percent signs and non-ASCII letters working.
         tests:
           - ReviewLinks_ForReview_ProjectAndReview_BuildsAddress
           - ReviewLinks_ForFile_Path_EscapesEachSegment
@@ -441,8 +446,10 @@ sections:
           - ReviewPage_ThreadAddress_OverHttp_RendersFileAndHighlightedThread
           - ReviewPage_Choose_FileAndThread_ReplacesAddressWithoutNavigating
           - ReviewPage_OpenDeepLink_DoesNotReplaceAddress
-          - ReviewPage_Thread_ShowsPlainLinkToItsAddress
-          - WebSubsystem_Stylesheet_ThreadLink_IsQuietTextLink
+          - ReviewPage_Thread_ShowsLinkButtonAndCopyLinkControl
+          - ReviewPage_CopyLink_Click_CopiesAbsoluteThreadAddressAndShowsCopied
+          - ReviewPage_CopyLink_ClipboardFails_ShowsCopyFailed
+          - WebSubsystem_Stylesheet_ThreadLink_IsButtonStyled
           - ReviewPage_RoundTrip_LinkFromBuilder_OpensTheSameFileAndLine
 
       - id: ReviewCenter-ReviewPage-DeepLinksNotFound

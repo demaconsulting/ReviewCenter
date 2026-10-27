@@ -1,6 +1,6 @@
 package ReviewCenter {
     part def GitRunner {
-        doc /* Runs the git command as a child process without a shell, with an argument list, a curated environment, and an access token passed only through the environment of the child process, redacts secrets from output and errors, enforces a timeout that ends the whole process tree, and checks the installed git version. Also defines the git settings. */
+        doc /* Runs the git command as a child process without a shell, with an argument list, a curated environment, and an access token passed only through the environment of the child process, redacts secrets from output and errors, enforces a timeout that ends the whole process tree, and checks the installed git version. Also defines the git settings, whose timeout (`Git:TimeoutSeconds`) is validated at start-up to 1 to 3600 seconds. */
 
         comment sourceRef /* Source: src/DemaConsulting.ReviewCenter/ContentSources/GitRunner.cs and GitOptions.cs */
         comment testRef /* Test: test/DemaConsulting.ReviewCenter.Tests/ContentSources/GitRunnerTests.cs */

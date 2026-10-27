@@ -31,7 +31,10 @@ outlet, the `Routes` component, a second small inline script, and a script refer
   value. The script does not use the server and the choice never leaves the browser.
 - The second script, at the end of the body, defines `window.reviewCenter.scrollToTestId` (the review page calls it to
   bring the selected file's code, a thread's first line, or the new-thread form into view; Blazor cannot scroll by
-  itself) and `window.reviewCenter.replaceUrl` (the review page calls it to put the link of the chosen file or thread in
+  itself), `window.reviewCenter.copyText` (the review page calls it for the "Copy link" button: it returns a promise of
+  true when the text reached the clipboard, using `navigator.clipboard.writeText` in a secure context and otherwise, or
+  when that is refused, a hidden text area with `document.execCommand('copy')`; it never rejects) and
+  `window.reviewCenter.replaceUrl` (the review page calls it to put the link of the chosen file or thread in
   the address bar with `history.replaceState`, which adds no history entry and does not run the router; it accepts only
   a path that starts with a single `/`).
 
