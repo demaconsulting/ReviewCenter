@@ -63,14 +63,20 @@ public class ReviewMarkContractTests
     ];
 
     /// <summary>
+    ///     The index of the fixed project, generated once for all tests of the class: starting the application and
+    ///     signing the reviews with the real password hasher is slow, and the result is the same every time.
+    /// </summary>
+    private static readonly Lazy<Task<string>> SharedIndex = new(() => GenerateIndexAsync(CancellationToken.None));
+
+    /// <summary>
     ///     Test that the index of the fixed project is the committed golden file, byte for byte after the line endings
     ///     are normalized.
     /// </summary>
-    [Fact(Timeout = 60000)]
+    [Fact(Timeout = 180000)]
     public async Task ReviewMarkContract_GoldenIndex_MatchesCommittedFile()
     {
         // Arrange: the index of the fixed project, as indented JSON, and the golden file
-        var text = await GenerateIndexAsync(TestContext.Current.CancellationToken);
+        var text = await SharedIndex.Value.WaitAsync(TestContext.Current.CancellationToken);
         var generated = Normalize(JsonSerializer.Serialize(JsonDocument.Parse(text).RootElement, new JsonSerializerOptions { WriteIndented = true }));
         var path = Path.Combine(FindRepositoryRoot(), "test", "DemaConsulting.ReviewCenter.Tests", "Evidence", "TestData", "evidence-index.golden.json");
 
@@ -85,11 +91,11 @@ public class ReviewMarkContractTests
     ///     Test that the index has the schema ReviewMark reads and that ReviewMark's reader loads every entry without
     ///     overwriting another.
     /// </summary>
-    [Fact(Timeout = 60000)]
+    [Fact(Timeout = 180000)]
     public async Task ReviewMarkContract_Index_HasTheSchemaReviewMarkReads()
     {
         // Arrange: the index of the fixed project
-        var text = await GenerateIndexAsync(TestContext.Current.CancellationToken);
+        var text = await SharedIndex.Value.WaitAsync(TestContext.Current.CancellationToken);
         using var document = JsonDocument.Parse(text);
         var root = document.RootElement;
 
@@ -122,11 +128,11 @@ public class ReviewMarkContractTests
     ///     Test that the fingerprints in the index are the ones ReviewMark's algorithm gives for the same files, and
     ///     that the known vectors agree with it too.
     /// </summary>
-    [Fact(Timeout = 60000)]
+    [Fact(Timeout = 180000)]
     public async Task ReviewMarkContract_IndexFingerprint_EqualsReviewMarkAlgorithm()
     {
         // Arrange: the index of the fixed project, as ReviewMark reads it
-        var index = ReadLikeReviewMark(await GenerateIndexAsync(TestContext.Current.CancellationToken), out _);
+        var index = ReadLikeReviewMark(await SharedIndex.Value.WaitAsync(TestContext.Current.CancellationToken), out _);
 
         // Assert: every listed review has the fingerprint of the independent implementation
         foreach (var review in Reviews.Where(r => r.SetId is not null && r.Signed))
@@ -149,11 +155,11 @@ public class ReviewMarkContractTests
     ///     review, stale for another fingerprint of a listed id (naming the newest entry by its date), missing for an
     ///     id that is not listed.
     /// </summary>
-    [Fact(Timeout = 60000)]
+    [Fact(Timeout = 180000)]
     public async Task ReviewMarkContract_Index_FollowsReviewMarkSemantics()
     {
         // Arrange: the index of the fixed project, as ReviewMark reads it
-        var index = ReadLikeReviewMark(await GenerateIndexAsync(TestContext.Current.CancellationToken), out _);
+        var index = ReadLikeReviewMark(await SharedIndex.Value.WaitAsync(TestContext.Current.CancellationToken), out _);
 
         // Act and Assert: current, stale (with the newest date), missing
         Assert.Equal("current", Classify(index, "Core-Logic", FingerprintAB));
