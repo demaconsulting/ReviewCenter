@@ -1,0 +1,109 @@
+---
+# Software Unit Requirements for the AttestationKeyProvider Unit
+#
+# The AttestationKeyProvider unit finds the key that signs the attestation. It consists of the provider interface
+# and its status, the base class that loads and caches the key, the SelfSignedKeyProvider and
+# CertificateStoreKeyProvider classes, the factory that chooses between them from the Attestation settings, the
+# policy that enforces RequireTrustedKey and warns about unsuitable certificates, and the key and exception types.
+
+sections:
+  - title: AttestationKeyProvider Unit Requirements
+    requirements:
+      - id: ReviewCenter-AttestationKeyProvider-Selection
+        title: >-
+          The AttestationKeyProvider unit shall choose the SelfSigned provider when no provider or SelfSigned is
+          configured and the CertificateStore provider when CertificateStore is configured, and shall refuse any other
+          value with an error that names the Attestation:Provider setting.
+        justification: |
+          Which key signs the attestation is the most important choice of an operator. A misspelled value must stop the
+          server with a clear message and never silently fall back to a different kind of key.
+        tests:
+          - AttestationKeyProviderFactory_Create_BlankOrSelfSigned_SelectsSelfSignedProvider
+          - AttestationKeyProviderFactory_Create_CertificateStore_SelectsCertificateStoreProvider
+          - AttestationKeyProviderFactory_Create_UnknownProvider_ThrowsNamingTheSetting
+
+      - id: ReviewCenter-AttestationKeyProvider-SelfSigned
+        title: >-
+          The SelfSignedKeyProvider class shall create an RSA key with a self-signed certificate of a limited validity
+          period in a file in the configured folder when none exists, reload and use the same key afterwards, return
+          the same key on every call, and let concurrent first uses end with one key for everyone.
+        justification: |
+          A new installation must produce an attestation without any configuration, so the server makes a key of its
+          own. The key must persist, because attestations signed with different keys after every restart could not be
+          compared, and concurrent requests must not each create a different key.
+        tests:
+          - SelfSignedKeyProvider_GetSigningKey_FirstUse_CreatesSelfSignedKeyFile
+          - SelfSignedKeyProvider_GetSigningKey_FirstUse_SetsTheValidityPeriod
+          - SelfSignedKeyProvider_GetSigningKey_ExistingFile_ReloadsTheSameKeyAndSigns
+          - SelfSignedKeyProvider_GetSigningKey_RepeatedCalls_ReturnTheSameKey
+          - SelfSignedKeyProvider_GetSigningKey_ConcurrentFirstUse_CreatesOneKeyForEveryone
+
+      - id: ReviewCenter-AttestationKeyProvider-SelfSignedWarning
+        title: >-
+          The SelfSignedKeyProvider class shall log a warning that the key is self-signed and for development and test
+          only when it creates or loads the key, and shall not log any secret.
+        justification: |
+          The operator must be told that the default key is not an organization key, and a log is one place where a
+          secret must never appear.
+        tests:
+          - SelfSignedKeyProvider_GetSigningKey_FirstUse_LogsSelfSignedWarningWithoutSecrets
+
+      - id: ReviewCenter-AttestationKeyProvider-SelfSignedErrors
+        title: >-
+          The SelfSignedKeyProvider class shall report a folder that is not set, a folder that is a file, and a key
+          file that cannot be read as an attestation key error that names the setting or the file.
+        justification: |
+          An operator can correct a problem only when the message names the setting or the file that has it.
+        tests:
+          - SelfSignedKeyProvider_GetSigningKey_FolderNotSet_ThrowsNamingTheSetting
+          - SelfSignedKeyProvider_GetSigningKey_FolderIsAFile_ThrowsNamingTheSetting
+          - SelfSignedKeyProvider_GetSigningKey_CorruptFile_ThrowsNamingTheFile
+
+      - id: ReviewCenter-AttestationKeyProvider-CertificateStore
+        title: >-
+          The CertificateStoreKeyProvider class shall find the certificate with the configured thumbprint in the
+          configured store and location, accept a thumbprint copied from a certificate dialog, keep the handle of the
+          private key without exporting it, and report an unknown location, a malformed thumbprint, a certificate that
+          is not in the store, and a certificate without a private key as errors that name the setting.
+        justification: |
+          An organization key lives in a certificate store, on a smart card, or in a hardware module, and the server
+          must use it where it is. The thumbprint is usually copied from a dialog together with invisible characters.
+        tests:
+          - CertificateStoreKeyProvider_NormalizeThumbprint_CopiedText_GivesUpperCaseHex
+          - CertificateStoreKeyProvider_NormalizeThumbprint_MissingOrMalformed_ThrowsNamingTheSetting
+          - CertificateStoreKeyProvider_GetSigningKey_UnknownStoreLocation_ThrowsNamingTheSetting
+          - CertificateStoreKeyProvider_GetSigningKey_CertificateNotInStore_ThrowsNamingThumbprintAndStore
+          - CertificateStoreKeyProvider_GetSigningKey_CertificateInStore_FindsItAndSigns
+          - CertificateStoreKeyProvider_GetSigningKey_CertificateWithoutPrivateKey_Throws
+          - CertificateStoreKeyProvider_GetSigningKey_ConfiguredForTheServer_StartsWithTheCertificate
+
+      - id: ReviewCenter-AttestationKeyProvider-RequireTrustedKey
+        title: >-
+          The AttestationKeyProvider unit shall, when RequireTrustedKey is set, refuse a self-signed certificate, a
+          certificate whose key usage does not allow digital signatures or non-repudiation, and a certificate that is
+          not within its validity period, on every call and not only the first, and shall accept an organization
+          certificate; the check shall not claim to check chain trust or revocation.
+        justification: |
+          An organization that requires an organization key must not get an attestation signed with anything else. A
+          certificate can expire while the server runs, so the rule applies to every signing. Naming what is checked
+          keeps the setting from being read as a promise of trust that the server does not examine.
+        tests:
+          - AttestationKeyPolicy_Enforce_PolicyOff_AcceptsSelfSignedKey
+          - AttestationKeyPolicy_Enforce_TrustedKeyRequiredAndSelfSigned_Throws
+          - AttestationKeyPolicy_Enforce_TrustedKeyRequiredAndOrganizationKey_Accepts
+          - AttestationKeyPolicy_Enforce_TrustedKeyRequiredAndNoSigningUsage_Throws
+          - AttestationKeyPolicy_Enforce_TrustedKeyRequiredAndOutsideValidity_Throws
+          - AttestationKeyPolicy_HasSigningKeyUsage_Usage_AllowsOnlyDigitalSignatureOrNonRepudiation
+          - AttestationKeyPolicy_HasSigningKeyUsage_NoExtension_AllowsSigning
+          - SelfSignedKeyProvider_GetSigningKey_RequireTrustedKey_IsCheckedOnEveryCall
+          - CertificateStoreKeyProvider_GetSigningKey_RequireTrustedKeyAndSelfSignedCertificate_Throws
+
+      - id: ReviewCenter-AttestationKeyProvider-CodeSigningWarning
+        title: >-
+          The AttestationKeyProvider unit shall warn, without refusing the certificate, when the extended key usage of
+          a certificate allows code signing only and not document signing.
+        justification: |
+          A code-signing certificate is not meant for documents and many PDF readers do not accept it, but some
+          organizations have only such a certificate. The operator should know, and the decision stays with them.
+        tests:
+          - AttestationKeyPolicy_Warnings_ExtendedKeyUsage_WarnsOnlyForCodeSigningOnly

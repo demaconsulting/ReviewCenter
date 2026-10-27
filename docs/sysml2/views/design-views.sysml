@@ -40,6 +40,10 @@ package ReviewCenter {
         expose ContentSourcesSubsystem;
     }
 
+    view EvidenceView {
+        expose EvidenceSubsystem;
+    }
+
     view SelfTestView {
         expose SelfTestSubsystem;
     }

@@ -21,8 +21,10 @@
 using System.Security.Claims;
 using Bunit;
 using DemaConsulting.ReviewCenter.Core;
+using DemaConsulting.ReviewCenter.Evidence;
 using DemaConsulting.ReviewCenter.Identity;
 using DemaConsulting.ReviewCenter.Tests.Core;
+using DemaConsulting.ReviewCenter.Tests.Evidence;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.Components.Server;
@@ -83,6 +85,10 @@ public abstract class PageTestBase : BunitContext
         Planner = new ReviewPlanner(store, Reviews, Repositories, Git, Signing, SetParser);
         Services.AddSingleton(Planner);
         Services.AddSingleton<AuthenticationStateProvider>(_authentication);
+
+        // The review page offers the attestation; the default key is an in-memory self-signed key, and a test that
+        // needs another key or a problem registers its own provider before the first render
+        Services.AddSingleton<IAttestationKeyProvider>(_ => new FakeAttestationKeyProvider(TestKeys.SelfSignedRsa()));
 
         // bUnit pre-registers placeholder authorization services that throw when used; replace them with the
         // real ones so that AuthorizeRouteView evaluates the [Authorize] attributes of the pages

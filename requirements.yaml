@@ -25,6 +25,13 @@ includes:
   - docs/reqstream/review-center/content-sources/git-source.yaml
   - docs/reqstream/review-center/content-sources/credential-protector.yaml
   - docs/reqstream/review-center/content-sources/review-set-parser.yaml
+  - docs/reqstream/review-center/evidence.yaml
+  - docs/reqstream/review-center/evidence/pdf-document-writer.yaml
+  - docs/reqstream/review-center/evidence/attestation-renderer.yaml
+  - docs/reqstream/review-center/evidence/attestation-signer.yaml
+  - docs/reqstream/review-center/evidence/attestation-key-provider.yaml
+  - docs/reqstream/review-center/evidence/attestation-service.yaml
+  - docs/reqstream/review-center/evidence/attestation-endpoint.yaml
   - docs/reqstream/review-center/hosting.yaml
   - docs/reqstream/review-center/hosting/server-host.yaml
   - docs/reqstream/review-center/hosting/user-command.yaml
@@ -93,3 +100,4 @@ includes:
   - docs/reqstream/ots/git.yaml
   - docs/reqstream/ots/filesystemglobbing.yaml
   - docs/reqstream/ots/yamldotnet.yaml
+  - docs/reqstream/ots/pkcs.yaml

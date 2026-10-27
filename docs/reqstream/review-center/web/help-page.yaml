@@ -53,3 +53,16 @@ sections:
           the index and not to a blank page or the general not-found message.
         tests:
           - HelpNotFoundPage_Render_UnknownTopic_ShowsMessageAndIndexLink
+
+      - id: ReviewCenter-HelpPage-AttestationTopic
+        title: >-
+          The HelpPage unit shall serve a topic, Signed attestation, that explains what the signature of the
+          attestation proves (integrity since the signing and the origin of the server key), what it does not prove
+          (who the reviewers are, and when the signing happened), that the self-signed key is for development and test
+          only, how to use a certificate from a certificate store, and what RequireTrustedKey checks, with a
+          screenshot of the download of an approved review.
+        justification: |
+          The attestation is easy to take for more than it is. The place the user is sent from the review page must
+          say plainly what the document proves and how to make it carry weight.
+        tests:
+          - HelpAttestationPage_Render_ExplainsWhatTheSignatureProvesAndTheKey

@@ -22,6 +22,7 @@ The following OTS items have integration design documentation:
 - git (_git.md_) — source control program that the ContentSources subsystem runs to read repositories
 - Entity Framework Core (_efcore.md_) — object-relational mapper and SQLite provider used for persistence
 - Pandoc (_pandoc.md_) — Markdown-to-HTML conversion tool
+- System.Security.Cryptography.Pkcs (_pkcs.md_) — CMS signing library used to sign the PDF attestations
 - Playwright (_playwright.md_) — browser automation library used by the Puppet developer tool
 - ReqStream (_reqstream.md_) — requirements traceability tool
 - ReviewMark (_reviewmark.md_) — file review enforcement tool

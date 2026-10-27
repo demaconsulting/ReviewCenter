@@ -1027,6 +1027,130 @@ reviews:
       - "src/DemaConsulting.ReviewCenter.Core/ICredentialProtector.cs"
       - "test/**/ContentSources/CredentialProtectorTests.cs"
 
+  # ReviewCenter - Evidence
+  - id: ReviewCenter-Evidence
+    title: Review of ReviewCenter Evidence subsystem architecture and interfaces
+    context:
+      - docs/design/review-center.md
+      - docs/reqstream/review-center.yaml
+    paths:
+      - "docs/reqstream/review-center/evidence.yaml"
+      - "docs/design/review-center/evidence.md"
+      - "docs/verification/review-center/evidence.md"
+      - "docs/sysml2/model/review-center/evidence.sysml"
+      - "test/**/Evidence/EvidenceSubsystemTests.cs"
+      - "test/**/Evidence/AttestationFixture.cs"
+      - "test/**/Evidence/FakeAttestationKeyProvider.cs"
+      - "test/**/Evidence/PdfInspector.cs"
+      - "test/**/Evidence/TestKeys.cs"
+
+  - id: ReviewCenter-Evidence-PdfDocumentWriter
+    title: Review of ReviewCenter PdfDocumentWriter unit implementation
+    context:
+      - docs/design/review-center.md
+      - docs/reqstream/review-center.yaml
+      - docs/design/review-center/evidence.md
+      - docs/reqstream/review-center/evidence.yaml
+    paths:
+      - "docs/reqstream/review-center/evidence/pdf-document-writer.yaml"
+      - "docs/design/review-center/evidence/pdf-document-writer.md"
+      - "docs/verification/review-center/evidence/pdf-document-writer.md"
+      - "docs/sysml2/model/review-center/evidence/pdf-document-writer.sysml"
+      - "src/**/Evidence/PdfDocumentWriter.cs"
+      - "src/**/Evidence/PdfDocumentInfo.cs"
+      - "src/**/Evidence/PdfFont.cs"
+      - "test/**/Evidence/PdfDocumentWriterTests.cs"
+
+  - id: ReviewCenter-Evidence-AttestationRenderer
+    title: Review of ReviewCenter AttestationRenderer unit implementation
+    context:
+      - docs/design/review-center.md
+      - docs/reqstream/review-center.yaml
+      - docs/design/review-center/evidence.md
+      - docs/reqstream/review-center/evidence.yaml
+    paths:
+      - "docs/reqstream/review-center/evidence/attestation-renderer.yaml"
+      - "docs/design/review-center/evidence/attestation-renderer.md"
+      - "docs/verification/review-center/evidence/attestation-renderer.md"
+      - "docs/sysml2/model/review-center/evidence/attestation-renderer.sysml"
+      - "src/**/Evidence/AttestationRenderer.cs"
+      - "src/**/Evidence/IAttestationRenderer.cs"
+      - "src/**/Evidence/AttestationDocument.cs"
+      - "test/**/Evidence/AttestationRendererTests.cs"
+
+  - id: ReviewCenter-Evidence-AttestationSigner
+    title: Review of ReviewCenter AttestationSigner unit implementation
+    context:
+      - docs/design/review-center.md
+      - docs/reqstream/review-center.yaml
+      - docs/design/review-center/evidence.md
+      - docs/reqstream/review-center/evidence.yaml
+    paths:
+      - "docs/reqstream/review-center/evidence/attestation-signer.yaml"
+      - "docs/design/review-center/evidence/attestation-signer.md"
+      - "docs/verification/review-center/evidence/attestation-signer.md"
+      - "docs/sysml2/model/review-center/evidence/attestation-signer.sysml"
+      - "src/**/Evidence/AttestationSigner.cs"
+      - "src/**/Evidence/IAttestationSigner.cs"
+      - "test/**/Evidence/AttestationSignerTests.cs"
+
+  - id: ReviewCenter-Evidence-AttestationKeyProvider
+    title: Review of ReviewCenter AttestationKeyProvider unit implementation
+    context:
+      - docs/design/review-center.md
+      - docs/reqstream/review-center.yaml
+      - docs/design/review-center/evidence.md
+      - docs/reqstream/review-center/evidence.yaml
+    paths:
+      - "docs/reqstream/review-center/evidence/attestation-key-provider.yaml"
+      - "docs/design/review-center/evidence/attestation-key-provider.md"
+      - "docs/verification/review-center/evidence/attestation-key-provider.md"
+      - "docs/sysml2/model/review-center/evidence/attestation-key-provider.sysml"
+      - "src/**/Evidence/AttestationKeyProviderFactory.cs"
+      - "src/**/Evidence/AttestationKeyProviderBase.cs"
+      - "src/**/Evidence/SelfSignedKeyProvider.cs"
+      - "src/**/Evidence/CertificateStoreKeyProvider.cs"
+      - "src/**/Evidence/AttestationKeyPolicy.cs"
+      - "src/**/Evidence/IAttestationKeyProvider.cs"
+      - "src/**/Evidence/AttestationSigningKey.cs"
+      - "src/**/Evidence/AttestationKeyInfo.cs"
+      - "src/**/Evidence/AttestationKeyException.cs"
+      - "src/**/Evidence/AttestationOptions.cs"
+      - "test/**/Evidence/AttestationKeyPolicyTests.cs"
+      - "test/**/Evidence/SelfSignedKeyProviderTests.cs"
+      - "test/**/Evidence/CertificateStoreKeyProviderTests.cs"
+
+  - id: ReviewCenter-Evidence-AttestationService
+    title: Review of ReviewCenter AttestationService unit implementation
+    context:
+      - docs/design/review-center.md
+      - docs/reqstream/review-center.yaml
+      - docs/design/review-center/evidence.md
+      - docs/reqstream/review-center/evidence.yaml
+    paths:
+      - "docs/reqstream/review-center/evidence/attestation-service.yaml"
+      - "docs/design/review-center/evidence/attestation-service.md"
+      - "docs/verification/review-center/evidence/attestation-service.md"
+      - "docs/sysml2/model/review-center/evidence/attestation-service.sysml"
+      - "src/**/Evidence/AttestationService.cs"
+      - "src/**/Evidence/AttestationResult.cs"
+      - "test/**/Evidence/AttestationServiceTests.cs"
+
+  - id: ReviewCenter-Evidence-AttestationEndpoint
+    title: Review of ReviewCenter AttestationEndpoint unit implementation
+    context:
+      - docs/design/review-center.md
+      - docs/reqstream/review-center.yaml
+      - docs/design/review-center/evidence.md
+      - docs/reqstream/review-center/evidence.yaml
+    paths:
+      - "docs/reqstream/review-center/evidence/attestation-endpoint.yaml"
+      - "docs/design/review-center/evidence/attestation-endpoint.md"
+      - "docs/verification/review-center/evidence/attestation-endpoint.md"
+      - "docs/sysml2/model/review-center/evidence/attestation-endpoint.sysml"
+      - "src/**/Evidence/AttestationEndpoint.cs"
+      - "test/**/Evidence/AttestationEndpointTests.cs"
+
   # ReviewCenterPuppet - Specials (separate software system, development tool)
   - id: ReviewCenterPuppet-Architecture
     title: Review of ReviewCenterPuppet system architecture and end-to-end operation
@@ -1186,6 +1310,13 @@ reviews:
       - "docs/reqstream/ots/pandoc.yaml"
       - "docs/design/ots/pandoc.md"
       - "docs/verification/ots/pandoc.md"
+
+  - id: OTS-Pkcs
+    title: Review of System.Security.Cryptography.Pkcs OTS verification evidence
+    paths:
+      - "docs/reqstream/ots/pkcs.yaml"
+      - "docs/design/ots/pkcs.md"
+      - "docs/verification/ots/pkcs.md"
 
   - id: OTS-Playwright
     title: Review of Playwright OTS verification evidence

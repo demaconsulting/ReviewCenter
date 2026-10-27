@@ -14,7 +14,8 @@ source file:
 - `HelpPage` (`HelpPage.razor`): the index.
 - `HelpTopicFrame` (`HelpTopicFrame.razor`): the common frame of a topic page.
 - The topic pages `HelpGettingStartedPage`, `HelpCreatingReviewPage`, `HelpReadingReviewPage`, `HelpCommentsPage`,
-  `HelpChecklistPage`, `HelpSigningPage`, `HelpAuditPage`, and `HelpPlanningPage`: the text of one topic each.
+  `HelpChecklistPage`, `HelpSigningPage`, `HelpAuditPage`, `HelpPlanningPage`, and `HelpAttestationPage`: the text of one
+  topic each.
 - `HelpNotFoundPage` (`HelpNotFoundPage.razor`): the catch-all for an unknown address.
 - `HelpTopics` (`HelpTopics.cs`): the list of topics.
 
@@ -41,6 +42,16 @@ The browser title is the title of the topic followed by "Help - ReviewCenter".
 slug. The text is in cards (`card`), with figures for the screenshots. The screenshots are image files under
 `wwwroot/help/`, requested with a path that begins `/help/`, loaded lazily, and each has alternative text that describes
 what the picture shows and a caption.
+
+**Signed attestation topic** (`HelpAttestationPage`, slug `signed-attestation`): The topic after Reviewers and signing
+that explains the signed PDF of a complete review. It says when the download is offered and what the PDF lists; what the
+signature proves (the content has not changed since the signing, and it was produced by the holder of the server key
+named in the document) and what it does not (who the reviewers are, which is shown by the sign-offs in the record, and a
+trusted signing time, because the time is the clock of the server and there is no time stamp authority); that the
+default key is self-signed, not an organization key, and for development and test only; how an administrator points the
+server at a certificate of a certificate store (`Attestation:Provider` and the thumbprint, a document-signing
+certificate, a key that is never exported); and what `Attestation:RequireTrustedKey` does. It has one screenshot,
+`signed-attestation-1.png`, of the review page with the download button and the key note.
 
 **HelpNotFoundPage component**: It routes `/help/{*Slug}`, a catch-all with a parameter. The router prefers the fixed
 routes of the topic pages, so only an address that is not a topic reaches it. It shows a message that there is no help

@@ -1,0 +1,31 @@
+---
+# System.Security.Cryptography.Pkcs OTS Software Requirements
+#
+# Requirements for the System.Security.Cryptography.Pkcs library, which the Evidence subsystem uses to build the
+# CMS (PKCS  # 7) signature that is embedded in the signed attestation PDF.
+
+sections:
+  - title: OTS Software Requirements
+    sections:
+      - title: System.Security.Cryptography.Pkcs Requirements
+        requirements:
+          - id: ReviewCenter-OTS-Pkcs-DetachedSignature
+            title: >-
+              System.Security.Cryptography.Pkcs shall create a detached CMS signature with the SHA-256 digest
+              algorithm over a given byte sequence with an RSA or an ECDSA private key, including a key whose
+              private part cannot be exported, shall embed the signer certificate and any given intermediate
+              certificates, and shall produce a signature that the library itself verifies against the signed bytes
+              and that no longer verifies when a byte of the signed content is changed.
+            justification: |
+              The signature of the attestation PDF is a CMS signature over the byte ranges of the document, made with
+              a key that can be held in a certificate store, a smart card, or a hardware module and so must never be
+              exported. Passing tests that sign with RSA and ECDSA keys, with a key that cannot be exported, and with
+              a certificate chain, verify the result, and change the signed content confirm that the library gives
+              the Evidence subsystem exactly what a PDF reader needs.
+            tags: [ots]
+            tests:
+              - AttestationSigner_Sign_RsaKey_ProducesVerifiableDetachedSignature
+              - AttestationSigner_Sign_EcdsaKey_ProducesVerifiableDetachedSignature
+              - AttestationSigner_Sign_NonExportableKey_ProducesVerifiableSignature
+              - AttestationSigner_Sign_OrganizationKeyWithChain_EmbedsTheChainCertificates
+              - AttestationSigner_Sign_TamperedContent_SignatureNoLongerVerifies

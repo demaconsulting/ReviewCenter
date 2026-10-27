@@ -6,7 +6,8 @@
 
 The ReviewCenter is an ASP.NET Core web service with a companion command-line interface,
 built on .NET. It is structured as one system containing one top-level unit (`Program`) and
-nine subsystems (`Cli`, `SelfTest`, `Utilities`, `Hosting`, `Identity`, `Web`, `Core`, `Storage`, `ContentSources`):
+ten subsystems (`Cli`, `SelfTest`, `Utilities`, `Hosting`, `Identity`, `Web`, `Core`, `Storage`, `ContentSources`,
+`Evidence`):
 
 ```mermaid
 flowchart TD
@@ -76,6 +77,14 @@ flowchart TD
         GitSource
         CredentialProtector
     end
+    subgraph Evidence
+        PdfDocumentWriter
+        AttestationRenderer
+        AttestationSigner
+        AttestationKeyProvider
+        AttestationService
+        AttestationEndpoint
+    end
     Program --> Context
     Program --> Validation
     Program --> ServerHost
@@ -103,6 +112,8 @@ flowchart TD
     ServerHost --> RepositoryService
     ServerHost --> GitSource
     ServerHost --> CredentialProtector
+    ServerHost --> AttestationKeyProvider
+    ServerHost --> AttestationEndpoint
     UserCommand --> Context
     UserCommand --> ServerHost
     UserCommand --> DatabaseSetup
@@ -150,6 +161,7 @@ flowchart TD
     ReviewPage --> ChecklistService
     ReviewPage --> SigningService
     ReviewPage --> SignIn
+    ReviewPage --> AttestationKeyProvider
     ReviewPage --> HistoryPage
     ChecklistPage --> ReviewService
     ChecklistPage --> ChecklistService
@@ -182,6 +194,14 @@ flowchart TD
     RepositoryStore --> ReviewCenterDbContext
     GitSource --> GitRunner
     GitSource --> RevisionValidator
+    AttestationEndpoint --> AttestationService
+    AttestationEndpoint --> SignIn
+    AttestationService --> AttestationKeyProvider
+    AttestationService --> AttestationRenderer
+    AttestationService --> AttestationSigner
+    AttestationService --> SigningService
+    AttestationService --> AuditService
+    AttestationRenderer --> PdfDocumentWriter
     DatabaseSetup --> ReviewCenterDbContext
 ```
 
@@ -239,6 +259,16 @@ repositories belongs to `Core` (`RepositoryService`, with `SelectionMatcher` and
 the changed files between an optional baseline and a head revision through `GitSource`, filtered by a selection, and
 freezes them in the review.
 
+The `Evidence` subsystem turns a complete review into evidence that can be kept outside the system: a signed PDF
+attestation. `AttestationEndpoint` serves the download to a signed-in user; `AttestationService` checks that the review
+is approved, builds the document description from the record, has `AttestationRenderer` lay it out (with
+`PdfDocumentWriter` as the PDF writer), has `AttestationSigner` add a detached CMS signature that covers the document
+with the key from `AttestationKeyProvider`, and records the generation in the audit trail. The key is a self-signed key
+of the server by default, or a certificate of a certificate store whose private key is never exported. The signature
+proves that the document is unchanged and was produced by the holder of the key; it does not prove who the reviewers
+are (the sign-offs of the record do that) and carries no trusted time. Nothing is stored: the document is made when it
+is asked for. `ServerHost` wires it and checks the key at the start, and `ReviewPage` offers the download.
+
 The system is a single process with one database; there is no separate service tier. Users are local accounts
 with a user name, a display name, a role (Reviewer or Admin), and a password that is stored only as a hash. A user
 signs in on the login page and stays signed in through a cookie; every page except the home page and the login page
@@ -258,7 +288,11 @@ version), and gives every file, line and thread a stable link (the address bar a
 for a review in
 slots (a primary reviewer and an optional alternate), and a named reviewer signs the review after confirming the
 password again; a signature is bound to a digest of the review record, so it goes out of date when the record changes,
-and a review is Approved only while every slot has a current signature. A review without a slot is In review.
+and a review is Approved only while every slot has a current signature. A review without a slot is In review. An
+Approved review can be downloaded as a digitally signed PDF attestation; the signature is made with a key of the server
+(a self-signed key by default, or a certificate from a certificate store), proves that the document is unchanged and
+comes from the holder of that key, and does not prove who the reviewers are or when it was signed (the reviewers are
+identified by the signatures in the record, and there is no time stamp authority in this version).
 
 Everything that changes data, and every sign-in, sign-out, failed sign-in, and lockout, is recorded in an append-only
 audit trail. Each entry carries the hash of the entry before it, so the entries form a hash chain. The change and its
@@ -331,7 +365,10 @@ is running.
   `GET /projects/{id}/reviews/{reviewId}/history` the history of one review; these pages show a "does not exist"
   message when the project or review is unknown. `GET /repositories` returns the page where an administrator registers
   git repositories (administrators only). `GET /audit` returns the whole audit trail with the button that
-  verifies its hash chain (administrators only).
+  verifies its hash chain (administrators only). `GET /projects/{projectId}/reviews/{reviewId}/attestation.pdf` returns
+  the signed PDF attestation of a complete review as a download (HTTP status 200 with `application/pdf`; 404 when the
+  review does not exist, 409 when it is not complete, 500 when the signing key cannot be used; a signed-out request is
+  redirected to `/login`).
   Any other page request returns HTTP status 404 with the not-found page of the user interface, an HTML document with the
   header and the footer; a request under `/api`, a method other than GET, and a path that ends in a file extension get a
   plain, empty 404. The client
@@ -385,6 +422,22 @@ is running.
   unreadable. The keys are not encrypted at rest, so the folder must be protected by file permissions and backed up with
   the database.
 
+**Attestation signing key**: The key that signs the PDF attestations.
+
+- *Type*: File system or certificate store, selected by configuration.
+- *Role*: Consumer (the server reads the key and signs with it).
+- *Contract*: Selected by the `Attestation` configuration section (`Attestation:Provider`, with the environment
+  variable `Attestation__Provider`: `SelfSigned`, the default, or `CertificateStore` with `Attestation:CertificateThumbprint`,
+  `Attestation:StoreLocation`, and `Attestation:StoreName`; `Attestation:RequireTrustedKey` and
+  `Attestation:SelfSignedFolder`). The default self-signed key is created on first use in an `attestation-selfsigned`
+  folder inside the key ring folder. The private key of a certificate is never exported: the signature is made through
+  the store, smart card, or hardware module.
+- *Constraints*: The key must be usable at the start, or `serve` does not start. The self-signed key is for development
+  and test; its file has no password and must be protected by file permissions and backed up with the key ring, and its
+  loss changes the signing key. `Attestation:RequireTrustedKey` only refuses a self-signed key and a certificate that
+  is not suited to document signing or not valid; it does not validate a chain or check revocation. The Azure Key Vault
+  provider and an RFC 3161 time stamp authority are planned and not implemented.
+
 **Standard Output**: Normal program output written to `Console.Out`.
 
 - *Type*: Standard I/O.
@@ -435,6 +488,8 @@ is running.
   ASP.NET Core integration design in the OTS chapter.
 - **Microsoft.Extensions.Identity.Core**: provides the password hasher used by the `Identity` subsystem. It is part
   of the ASP.NET Core shared framework, so it needs no package reference.
+- **System.Security.Cryptography.Pkcs**: provides the CMS (PKCS #7) detached signature of the PDF attestation in the
+  `Evidence` subsystem; see the PKCS integration design in the OTS chapter.
 
 ## Risk Control Measures
 
@@ -485,7 +540,11 @@ calls `SigningService` to add, change, and remove reviewer slots and to sign: th
 `UserService` to check the password again, takes the digest of the record from `RecordDigest`, and stores the
 signature through `ReviewStore`, which checks the digest once more inside the database transaction. `ProjectPage`
 calls `SigningService` to show whether each review is Approved. `AccountPage` and
-`UsersPage` call `UserService`, which stores users through `UserStore`. When the server is
+`UsersPage` call `UserService`, which stores users through `UserStore`. A request for the attestation of a review is
+answered by `AttestationEndpoint` after the same authorization: `AttestationService` checks through `SigningService`
+that the review is approved, reads the record, has `AttestationRenderer` and `PdfDocumentWriter` produce the PDF, has
+`AttestationSigner` sign it with the key from `AttestationKeyProvider`, records the generation through `AuditService`,
+and the endpoint returns the signed bytes. When the server is
 stopped, `ServerHost.RunAsync` returns 0; if the server cannot start, including because the
 database cannot be used, it reports the reason
 through `Context.WriteError` and returns 1, which makes `Context.ExitCode` 1.

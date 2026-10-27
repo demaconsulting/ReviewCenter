@@ -60,6 +60,20 @@ a restart, and the clear error for a key ring folder that cannot be written are 
 `ServerHost_ResolveKeysPath_ConfiguredOrDefault_ChoosesTheFolder`. The registration of the review planner and of the
 parser of the review-set file is verified by `ServerHost_AddServices_Configured_RegistersReviewPlannerAndParser`.
 
+**Attestation services and the start-up check**: Starting the real pipeline with no attestation setting creates the
+self-signed key in an `attestation-selfsigned` folder beside the Data Protection keys and keeps the same key across a
+restart, which is tested by
+`ServerHost_CreateApplication_NoAttestationSettings_CreatesSelfSignedKeyBesideTheDataProtectionKeys`; a chosen folder is
+used, which is tested by `ServerHost_CreateApplication_SelfSignedFolderConfigured_KeepsTheKeyThere`. Each setting that
+cannot work stops the start with a message that names it, which is tested by
+`ServerHost_CreateApplication_UnknownAttestationProvider_ThrowsClearError`,
+`ServerHost_CreateApplication_CertificateStoreWithoutThumbprint_ThrowsClearError`,
+`ServerHost_CreateApplication_CertificateNotInStore_ThrowsClearError`,
+`ServerHost_CreateApplication_RequireTrustedKeyWithSelfSignedProvider_ThrowsClearError`, and
+`ServerHost_CreateApplication_SelfSignedFolderIsAFile_ThrowsClearError`. The registration of the certificate store
+provider is verified by `CertificateStoreKeyProvider_GetSigningKey_ConfiguredForTheServer_StartsWithTheCertificate`,
+which skips when the store is unavailable.
+
 **Audit verify verb**: The `AuditCommand` unit tests run the verb over a real database. An intact trail gives the
 entry count and exit code 0, which is tested by `AuditCommand_Run_IntactTrail_ReportsEntryCountWithExitCodeZero`, and
 a tampered entry gives the first bad entry and exit code 1, which is tested by

@@ -389,3 +389,20 @@ sections:
         tests:
           - PlanPage_Create_TickedRows_ShowsResultWithLinksAndCreatesReviews
           - PlanPage_ShowPlan_SetsNeedingReview_ShowsSummaryTickedRowsAndCollapsedEmpties
+
+      - id: ReviewCenter-Web-Attestation
+        title: >-
+          The Web subsystem shall offer the signed attestation of a review on the review page only when the review is
+          approved, as a download of the PDF that says which kind of key will sign it, with a link to a help topic that
+          explains what the signature proves and what it does not, and shall show why it is unavailable instead of the
+          download when the signing key cannot be used.
+        justification: |
+          A user who completes a review needs the evidence at hand and needs to know how much it is worth. The
+          reader of the user interface must see that the default key is not an organization key before taking the
+          document anywhere.
+        children:
+          - ReviewCenter-ReviewPage-Attestation
+          - ReviewCenter-HelpPage-AttestationTopic
+        tests:
+          - ReviewPage_Render_ReviewApprovedWithSelfSignedKey_OffersAttestationDownloadWithKeyNote
+          - HelpAttestationPage_Render_ExplainsWhatTheSignatureProvesAndTheKey

@@ -1,0 +1,44 @@
+@* HelpAttestationPage: help topic "Signed attestation" at "/help/signed-attestation". Static text and a screenshot. *@
+@page "/help/signed-attestation"
+
+<HelpTopicFrame Slug="signed-attestation">
+    <section class="card">
+        <ul>
+            <li>When every slot of a review is signed for its current state (the review is <strong>Approved</strong>),
+                the review page offers <strong>Download attestation (PDF)</strong>. Until then the button is not shown.</li>
+            <li>The PDF is created when you ask for it; ReviewCenter does not store it. It lists the project, the review,
+                the repository revisions and the content fingerprint, every file with its status, the checklist with
+                each answer and comment, the comment threads, who signed each reviewer slot and when, and the audit trail
+                anchor at that moment.</li>
+            <li>The PDF carries a <strong>digital signature</strong> that PDF readers such as Adobe Acrobat show and
+                verify. Any change to the file after it was signed is reported by the reader.</li>
+            <li>Each download is recorded in the audit trail.</li>
+        </ul>
+        <figure class="help-figure">
+            <img class="help-shot" src="/help/signed-attestation-1.png" loading="lazy"
+                 alt="The title row of an approved review with the Download attestation (PDF) button and a note about the signing key." />
+            <figcaption>The download button of an approved review.</figcaption>
+        </figure>
+        <h2>What the signature proves</h2>
+        <ul>
+            <li>It proves that the document has not changed since it was signed, and that it was produced by the holder of
+                the signing key named in the document (the certificate subject and thumbprint are printed in it).</li>
+            <li>It does <strong>not</strong> prove who the reviewers are. ReviewCenter authenticated the reviewers when
+                they signed, and recorded their sign-offs; the PDF lists those sign-offs, with the record digest each
+                one bound to. The PDF vouches for them only as far as you trust the signing key.</li>
+            <li>The signing time is the server clock. It is not a trusted timestamp.</li>
+        </ul>
+        <h2>The signing key</h2>
+        <ul>
+            <li>By default ReviewCenter creates a <strong>self-signed</strong> key on first use and keeps it beside its
+                Data Protection keys. The PDF and the review page say so: <em>SELF-SIGNED KEY - NOT AN ORGANIZATION
+                KEY</em>. Use it for development and test only; PDF readers will say the signer is not trusted.</li>
+            <li>For real use an administrator points ReviewCenter at an organization certificate in a certificate store
+                (<code>Attestation:Provider</code> set to <code>CertificateStore</code>, with the certificate's
+                thumbprint). The private key stays in the store, smart card or hardware module and is never exported. Use
+                a document-signing certificate (key usage digital signature or non-repudiation).</li>
+            <li>An administrator can set <code>Attestation:RequireTrustedKey</code> to refuse a self-signed or unsuitable
+                key. The review page then shows why attestation is unavailable instead of the button.</li>
+        </ul>
+    </section>
+</HelpTopicFrame>

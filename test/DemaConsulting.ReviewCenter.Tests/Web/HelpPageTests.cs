@@ -109,6 +109,25 @@ public sealed class HelpPageTests : PageTestBase
     }
 
     /// <summary>
+    ///     Test that the attestation topic explains what the signature proves and does not prove, and the signing key.
+    /// </summary>
+    [Fact]
+    public void HelpAttestationPage_Render_ExplainsWhatTheSignatureProvesAndTheKey()
+    {
+        // Act: render the topic page
+        var page = Render<HelpAttestationPage>();
+
+        // Assert: the button, the limit of the proof, and the key settings are described
+        var text = page.Markup;
+        Assert.Equal("Signed attestation", page.Find("h1").TextContent);
+        Assert.Contains("Download attestation (PDF)", text, StringComparison.Ordinal);
+        Assert.Contains("does <strong>not</strong> prove who the reviewers are", text, StringComparison.Ordinal);
+        Assert.Contains("SELF-SIGNED KEY - NOT AN ORGANIZATION", text, StringComparison.Ordinal);
+        Assert.Contains("Attestation:RequireTrustedKey", text, StringComparison.Ordinal);
+        Assert.Contains("Attestation:Provider", text, StringComparison.Ordinal);
+    }
+
+    /// <summary>
     ///     Test that an unknown help address shows a friendly message and a link back to the index.
     /// </summary>
     [Fact]

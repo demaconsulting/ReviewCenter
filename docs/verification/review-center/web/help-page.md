@@ -25,6 +25,8 @@ N/A - standard test environment.
   points to the following topic and is absent on the last page.
 - No page of the help contains a link that begins with `#`.
 - The not-found page shows its message and a link to `/help`.
+- The Signed attestation topic describes the download, what the signature proves and does not prove, the self-signed
+  key, the certificate store settings, and `Attestation:RequireTrustedKey`.
 
 #### Test Scenarios
 
@@ -42,3 +44,9 @@ is tested by `HelpTopicPages_Render_EveryTopicHasAPageWithValidNavigation`.
 **HelpNotFoundPage_Render_UnknownTopic_ShowsMessageAndIndexLink**: The not-found page is rendered for a slug that is
 not a topic; the message is shown and the index link points to `/help`. This scenario is tested by
 `HelpNotFoundPage_Render_UnknownTopic_ShowsMessageAndIndexLink`.
+
+**HelpAttestationPage_Render_ExplainsWhatTheSignatureProvesAndTheKey**: The Signed attestation page is rendered; the
+heading is "Signed attestation", and the text names the button "Download attestation (PDF)", says that the signature
+does not prove who the reviewers are, shows the label "SELF-SIGNED KEY - NOT AN ORGANIZATION KEY", and names the
+settings `Attestation:Provider` and `Attestation:RequireTrustedKey`. This scenario is tested by
+`HelpAttestationPage_Render_ExplainsWhatTheSignatureProvesAndTheKey`.

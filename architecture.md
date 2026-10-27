@@ -316,7 +316,12 @@ The architecture above is the target design. Only the first two slices are imple
   version 4 and binds the side. Links address one file, line (`?line=`, `&side=baseline`), or thread
   (`/reviews/{id}/threads/{n}`), survive a sign-in (`ReturnUrl`, open-redirect safe), and the address follows the
   selection (`replaceUrl`). Development databases created before this slice must be recreated.
-- **Planned and deferred**: Api, Evidence, Messaging, the review lifecycle beyond `Draft`, and the rest of Core and
+- **Implemented, slice 8 (signed PDF attestation)**: the Evidence subsystem (`PdfDocumentWriter`,
+  `AttestationRenderer`, `AttestationSigner`, `AttestationKeyProvider`, `AttestationService`, `AttestationEndpoint`)
+  makes a signed PDF of an Approved review at `/projects/{id}/reviews/{reviewId}/attestation.pdf`, signed with a
+  self-signed key (development and test) or a certificate from a certificate store, and records `attestation.generated`.
+  Azure Key Vault and an RFC 3161 time stamp authority are planned, not implemented.
+- **Planned and deferred**: Api, Messaging, the review lifecycle beyond `Draft`, and the rest of Core and
   Storage. They have no code, requirements,
   design documents, or verification documents yet, so the SysML2 model and the design documentation describe the
   implemented items only and are deliberately partial.

@@ -1,0 +1,105 @@
+---
+# Evidence Subsystem Requirements
+#
+# PURPOSE:
+# - Define requirements for the ReviewCenter Evidence subsystem
+# - The Evidence subsystem spans the PdfDocumentWriter, AttestationRenderer, AttestationSigner, AttestationKeyProvider,
+#   AttestationService, and AttestationEndpoint units: it produces the signed PDF attestation of a completed review
+# - Subsystem requirements describe the externally visible behavior of the download; the subsystem tests run the real
+#   server in process against a review that was signed by two users
+
+sections:
+  - title: Evidence Subsystem Requirements
+    requirements:
+      - id: ReviewCenter-Evidence-Document
+        title: >-
+          The Evidence subsystem shall produce, for a completed review, a PDF document that states the review, its
+          content fingerprint, its files, its checklist answers, its threads, its reviewer sign-offs, the head of the
+          audit trail, and the key that signed it, in the same bytes for the same input.
+        justification: |
+          The approval of a review must be portable. A document that holds what was reviewed and who signed, and that
+          is the same when it is made again, can be filed, printed, and checked outside the tool.
+        children:
+          - ReviewCenter-PdfDocumentWriter-Structure
+          - ReviewCenter-PdfDocumentWriter-Deterministic
+          - ReviewCenter-PdfDocumentWriter-Layout
+          - ReviewCenter-PdfDocumentWriter-Text
+          - ReviewCenter-AttestationRenderer-Review
+          - ReviewCenter-AttestationRenderer-Findings
+          - ReviewCenter-AttestationRenderer-SignOffs
+          - ReviewCenter-AttestationRenderer-Output
+        tests:
+          - EvidenceSubsystem_CompletedReview_IsOfferedAndDownloadedAsSignedPdf
+
+      - id: ReviewCenter-Evidence-Signature
+        title: >-
+          The Evidence subsystem shall sign the document with a detached CMS signature (adbe.pkcs7.detached, SHA-256)
+          made with an RSA or an ECDSA key that is never exported, keep the content the reviewers saw unchanged, embed
+          the certificate chain, and make any later change of the signed content show.
+        justification: |
+          Integrity since the signing and the origin of the key are what a digital signature gives. They are worth
+          something only when a PDF reader or any CMS library can check them without ReviewCenter.
+        children:
+          - ReviewCenter-AttestationSigner-Signature
+          - ReviewCenter-AttestationSigner-NonExportableKey
+          - ReviewCenter-AttestationSigner-Structure
+          - ReviewCenter-AttestationSigner-TamperEvident
+          - ReviewCenter-AttestationSigner-Chain
+          - ReviewCenter-AttestationSigner-Deterministic
+          - ReviewCenter-AttestationSigner-Refusals
+          - ReviewCenter-OTS-Pkcs-DetachedSignature
+        tests:
+          - EvidenceSubsystem_CompletedReview_IsOfferedAndDownloadedAsSignedPdf
+
+      - id: ReviewCenter-Evidence-Key
+        title: >-
+          The Evidence subsystem shall sign with a key that the operator chooses between a self-signed key that the
+          server creates and keeps for itself and a certificate in a certificate store, shall refuse a key that does not
+          meet the RequireTrustedKey rule, and shall tell the user and the reader of the document which kind of key
+          signed it.
+        justification: |
+          A new installation must work without configuration, and an organization must be able to sign with a key that
+          it controls. Nobody should mistake the default key for an organization key.
+        children:
+          - ReviewCenter-AttestationKeyProvider-Selection
+          - ReviewCenter-AttestationKeyProvider-SelfSigned
+          - ReviewCenter-AttestationKeyProvider-SelfSignedWarning
+          - ReviewCenter-AttestationKeyProvider-SelfSignedErrors
+          - ReviewCenter-AttestationKeyProvider-CertificateStore
+          - ReviewCenter-AttestationKeyProvider-RequireTrustedKey
+          - ReviewCenter-AttestationKeyProvider-CodeSigningWarning
+          - ReviewCenter-AttestationRenderer-KeyStatement
+        tests:
+          - EvidenceSubsystem_CompletedReview_IsOfferedAndDownloadedAsSignedPdf
+
+      - id: ReviewCenter-Evidence-Honesty
+        title: >-
+          The Evidence subsystem shall state in the document that the signature proves integrity since the signing and
+          the origin of the server key, and does not prove who the reviewers are or when the signing happened.
+        justification: |
+          A reader who takes a signature for more than it is would be misled by the tool that made it.
+        children:
+          - ReviewCenter-AttestationRenderer-ProvesStatement
+        tests:
+          - EvidenceSubsystem_CompletedReview_IsOfferedAndDownloadedAsSignedPdf
+
+      - id: ReviewCenter-Evidence-Release
+        title: >-
+          The Evidence subsystem shall release the attestation only of a completed review, to a signed-in user, on
+          demand and without keeping it, shall record each release in the audit trail, and shall refuse an incomplete
+          review and an unusable key with a status that tells them apart.
+        justification: |
+          The attestation is evidence of completion. Generating it on demand means that it always shows the current
+          audit head, and recording each release keeps the trail complete about who took a copy.
+        children:
+          - ReviewCenter-AttestationService-Approved
+          - ReviewCenter-AttestationService-Document
+          - ReviewCenter-AttestationService-KeyUnavailable
+          - ReviewCenter-AttestationService-Audit
+          - ReviewCenter-AttestationService-Arguments
+          - ReviewCenter-AttestationEndpoint-Authorization
+          - ReviewCenter-AttestationEndpoint-Download
+          - ReviewCenter-AttestationEndpoint-Statuses
+        tests:
+          - EvidenceSubsystem_CompletedReview_IsOfferedAndDownloadedAsSignedPdf
+          - EvidenceSubsystem_ReviewNotComplete_IsNotOfferedAndRefused

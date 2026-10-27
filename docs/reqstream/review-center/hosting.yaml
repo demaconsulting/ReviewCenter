@@ -154,3 +154,35 @@ sections:
           - ReviewCenter-ServerHost-KeyRingFailure
         tests:
           - ServerHost_CreateApplication_KeyRingFolderNotWritable_ThrowsClearError
+
+      - id: ReviewCenter-Hosting-AttestationServices
+        title: >-
+          The Hosting subsystem shall make the signed attestation available to the pages and to clients, mapping the
+          download of the attestation of a review and registering the key provider chosen by the Attestation settings,
+          with the self-signed key kept in a folder that defaults to a folder beside the Data Protection keys.
+        justification: |
+          The attestation can only be offered when the server connects the Evidence subsystem to the services it
+          reads, and a default beside the keys means a new installation works without configuration and that the
+          key is kept and backed up with the other keys.
+        children:
+          - ReviewCenter-ServerHost-AttestationServices
+        tests:
+          - ServerHost_CreateApplication_NoAttestationSettings_CreatesSelfSignedKeyBesideTheDataProtectionKeys
+          - ServerHost_CreateApplication_SelfSignedFolderConfigured_KeepsTheKeyThere
+
+      - id: ReviewCenter-Hosting-AttestationKeyFailure
+        title: >-
+          The Hosting subsystem shall report an attestation key that cannot be used as an error that names the
+          Attestation setting at fault, without starting to serve requests.
+        justification: |
+          An attestation that cannot be signed would be found out by the first user who tries, long after the start.
+          Stopping immediately with a clear message lets the operator fix the setting. The price is that a server
+          whose key is on a hardware module that is not present does not start.
+        children:
+          - ReviewCenter-ServerHost-AttestationKeyFailure
+        tests:
+          - ServerHost_CreateApplication_UnknownAttestationProvider_ThrowsClearError
+          - ServerHost_CreateApplication_CertificateStoreWithoutThumbprint_ThrowsClearError
+          - ServerHost_CreateApplication_CertificateNotInStore_ThrowsClearError
+          - ServerHost_CreateApplication_RequireTrustedKeyWithSelfSignedProvider_ThrowsClearError
+          - ServerHost_CreateApplication_SelfSignedFolderIsAFile_ThrowsClearError
