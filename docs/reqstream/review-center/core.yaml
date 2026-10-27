@@ -212,6 +212,7 @@ sections:
           - ReviewCenter-AuditChain-Text
           - ReviewCenter-AuditService-Record
           - ReviewCenter-AuditService-Coalesce
+          - ReviewCenter-AuditService-CoalesceOverflow
           - ReviewCenter-AuditService-List
           - ReviewCenter-AuditService-Verify
           - ReviewCenter-ProjectService-Audit

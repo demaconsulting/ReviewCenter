@@ -25,9 +25,11 @@ N/A - standard test environment.
   returns only that review, also over more than one page; when both positions are given the older one wins.
 - Verification of an untouched trail is intact and reads in batches; an empty trail is intact; a tampered entry in a
   later batch is reported with its sequence.
-- The coalescing record stores the first event of a key in a minute and drops the repeats; the first event of the next
-  minute is stored with the count of the dropped repeats; different keys do not share a minute; a full key table drops
-  new keys until a minute has passed; a store failure is swallowed and reported; null arguments are refused.
+- The coalescing record stores the first event of a key in a minute and does not store the repeats; the first event of
+  the next minute is stored with the count of the repeats; different keys do not share a minute; a full key table does
+  not store new keys until a minute has passed, and writes one `audit.events-suppressed` entry and one error report per
+  minute (the next one carries the previous count); a cancelled call throws before it changes the table; a store
+  failure is swallowed and reported; null arguments are refused.
 
 #### Test Scenarios
 
@@ -59,9 +61,30 @@ after the previous entry". After another minute the next entry carries no count.
 **AuditService_TryRecordCoalescedAsync_DifferentKeys_StoreSeparateEntries**: Two keys are recorded; both are stored.
 This scenario is tested by `AuditService_TryRecordCoalescedAsync_DifferentKeys_StoreSeparateEntries`.
 
-**AuditService_TryRecordCoalescedAsync_TooManyKeys_DropsNewKeysUntilWindowPasses**: The table is filled with the largest
-number of keys; a new key is dropped, and stored after the minute has passed. This scenario is tested by
-`AuditService_TryRecordCoalescedAsync_TooManyKeys_DropsNewKeysUntilWindowPasses`.
+**AuditService_TryRecordCoalescedAsync_TooManyKeys_DoesNotStoreNewKeysUntilWindowPasses**: The table is filled with the
+largest number of keys; a new key is not stored (only the overflow entry is), and is stored after the minute has
+passed. This scenario is tested by
+`AuditService_TryRecordCoalescedAsync_TooManyKeys_DoesNotStoreNewKeysUntilWindowPasses`.
+
+**AuditService_TryRecordCoalescedAsync_TableFull_WritesOneOverflowRowAndReportsOncePerWindow**: With a full table,
+several events of new keys write exactly one `audit.events-suppressed` entry and call the error hook once. This
+scenario is tested by `AuditService_TryRecordCoalescedAsync_TableFull_WritesOneOverflowRowAndReportsOncePerWindow`.
+
+**AuditService_TryRecordCoalescedAsync_TableFullNextWindow_OverflowRowCarriesPreviousCount**: After an overflow window
+that suppressed events, the next overflow window writes a new entry that carries the number suppressed before. This
+scenario is tested by `AuditService_TryRecordCoalescedAsync_TableFullNextWindow_OverflowRowCarriesPreviousCount`.
+
+**AuditService_TryRecordCoalescedAsync_TableFullAndHookThrows_StillReturnsFalse**: The error hook throws while the
+table is full; the call still returns `false` and throws nothing. This scenario is tested by
+`AuditService_TryRecordCoalescedAsync_TableFullAndHookThrows_StillReturnsFalse`.
+
+**AuditService_TryRecordCoalescedAsync_CancelledRepeat_ThrowsAndDoesNotCountTheRepeat**: A repeat with a cancelled token
+throws `OperationCanceledException` and is not counted, so the next window shows the right count. This scenario is
+tested by `AuditService_TryRecordCoalescedAsync_CancelledRepeat_ThrowsAndDoesNotCountTheRepeat`.
+
+**AuditService_TryRecordCoalescedAsync_CancelledFirstEvent_ThrowsAndDoesNotStartWindow**: A first event with a
+cancelled token throws and starts no window, so a later event of the key is stored. This scenario is tested by
+`AuditService_TryRecordCoalescedAsync_CancelledFirstEvent_ThrowsAndDoesNotStartWindow`.
 
 **AuditService_TryRecordCoalescedAsync_StoreFailure_IsSwallowedAndReported**: The store fails; the call returns `false`,
 nothing is stored, and the hook receives the failure. This scenario is tested by

@@ -49,7 +49,8 @@ public sealed record AuditEntryPage(IReadOnlyList<AuditEntry> Entries, bool HasO
 ///     problem with the trail cannot lock a person out; the failure is reported through the error hook given
 ///     at construction. <see cref="TryRecordCoalescedAsync"/> bounds how many rows a repeating event (one that
 ///     anybody can trigger as often as they like) can add: the first event of a key in a one-minute window is
-///     stored and the repeats are only counted. The counts live in memory, behind one lock that is never held
+///     stored and the repeats are only counted; when the table of keys is full the events of new keys are
+///     counted in one overflow window that stores a single <see cref="OverflowAction"/> entry. The counts live in memory, behind one lock that is never held
 ///     across an await, so the service is thread-safe; the state is per process and lost on restart.
 /// </remarks>
 public sealed class AuditService
@@ -68,6 +69,11 @@ public sealed class AuditService
     ///     The most keys <see cref="TryRecordCoalescedAsync"/> tracks at once; also the most rows per window.
     /// </summary>
     public const int MaxCoalescedKeys = 500;
+
+    /// <summary>
+    ///     The action of the entry that tells events were suppressed because the table of coalesced keys was full.
+    /// </summary>
+    public const string OverflowAction = "audit.events-suppressed";
 
     /// <summary>
     ///     The length of the window in which repeats of a coalesced event are only counted.
@@ -98,6 +104,16 @@ public sealed class AuditService
     ///     For each coalesced key, when its current window started and how many repeats it has suppressed.
     /// </summary>
     private readonly Dictionary<string, (DateTimeOffset Start, int Suppressed)> _windows = new(StringComparer.Ordinal);
+
+    /// <summary>
+    ///     When the current overflow window started (the first event suppressed because the table was full); <c>null</c> for none.
+    /// </summary>
+    private DateTimeOffset? _overflowStart;
+
+    /// <summary>
+    ///     How many events the current overflow window has suppressed, the one that started it included.
+    /// </summary>
+    private int _overflowSuppressed;
 
     /// <summary>
     ///     Initializes a new instance of the <see cref="AuditService"/> class.
@@ -147,16 +163,24 @@ public sealed class AuditService
         catch (Exception ex)
         {
             // Best effort: the caller's own work (for example a sign-in) must not fail because the trail did
-            try
-            {
-                _onError?.Invoke(ex);
-            }
-            catch (Exception)
-            {
-                // The hook is only for diagnostics; its failure must not surface either
-            }
-
+            ReportError(ex);
             return false;
+        }
+    }
+
+    /// <summary>
+    ///     Passes a failure to the error hook; a failing hook is swallowed.
+    /// </summary>
+    /// <param name="exception">The failure to report.</param>
+    private void ReportError(Exception exception)
+    {
+        try
+        {
+            _onError?.Invoke(exception);
+        }
+        catch (Exception)
+        {
+            // The hook is only for diagnostics; its failure must not surface either
         }
     }
 
@@ -166,22 +190,31 @@ public sealed class AuditService
     /// <param name="draft">What to record. Must not be null.</param>
     /// <param name="key">Identifies the repeating event (for example the action and the account); repeats of one key share a window. Must not be null.</param>
     /// <param name="cancellationToken">Cancels the operation; cancellation is not swallowed.</param>
-    /// <returns><c>true</c> when an entry was stored; <c>false</c> when the event was only counted, dropped or storing failed.</returns>
+    /// <returns><c>true</c> when an entry was stored; <c>false</c> when the event was only counted, suppressed or storing failed.</returns>
+    /// <exception cref="OperationCanceledException">Thrown when cancellation was already requested (nothing is counted or started) or is requested while storing.</exception>
     /// <remarks>
     ///     The first event of a key is stored at once and starts a one-minute window; repeats inside the window
     ///     are only counted. The first event of the next window is stored with the count of the repeats of the
     ///     previous window appended to its detail, because entries are immutable and the count can only ride on
-    ///     a later one. The count of the last window is never stored when the key does not occur again. At most
-    ///     <see cref="MaxCoalescedKeys"/> keys are tracked: when the table is full, expired keys are removed, and
-    ///     if it is still full a new key is dropped (neither stored nor counted), which also bounds the rows
-    ///     per minute.
+    ///     a later one. The count of the last window is never stored when the key does not occur again. An event
+    ///     whose cancellation was already requested changes nothing. At most <see cref="MaxCoalescedKeys"/> keys
+    ///     are tracked: when the table is full, expired keys are removed, and if it is still full the event of a
+    ///     new key is only counted in an overflow window. The first suppressed event of an overflow window stores
+    ///     one <see cref="OverflowAction"/> entry (with the count of the previous overflow window) and reports
+    ///     the saturation once to the error hook, so the rows per minute stay bounded and the gap is visible.
+    ///     A cancellation that arrives while the first event of a window is being stored loses that event for
+    ///     the window, as a store failure does.
     /// </remarks>
-    public Task<bool> TryRecordCoalescedAsync(AuditDraft draft, string key, CancellationToken cancellationToken = default)
+    public async Task<bool> TryRecordCoalescedAsync(AuditDraft draft, string key, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(draft);
         ArgumentNullException.ThrowIfNull(key);
 
-        int carried;
+        // A cancelled request must not count a repeat or start a window
+        cancellationToken.ThrowIfCancellationRequested();
+
+        var carried = 0;
+        int? overflowCarried = null;
         lock (_windowsLock)
         {
             var now = _timeProvider.GetUtcNow();
@@ -190,36 +223,73 @@ public sealed class AuditService
                 if (now - window.Start < CoalesceWindow)
                 {
                     _windows[key] = (window.Start, window.Suppressed + 1);
-                    return Task.FromResult(false);
+                    return false;
                 }
 
                 carried = window.Suppressed;
             }
-            else
+            else if (_windows.Count >= MaxCoalescedKeys && !TryMakeRoom(now))
             {
-                carried = 0;
-                if (_windows.Count >= MaxCoalescedKeys)
+                if (_overflowStart is { } overflowStart && now - overflowStart < CoalesceWindow)
                 {
-                    var expired = _windows.Where(pair => now - pair.Value.Start >= CoalesceWindow).Select(pair => pair.Key).ToList();
-                    foreach (var expiredKey in expired)
-                    {
-                        _windows.Remove(expiredKey);
-                    }
-
-                    if (_windows.Count >= MaxCoalescedKeys)
-                    {
-                        return Task.FromResult(false);
-                    }
+                    _overflowSuppressed++;
+                    return false;
                 }
+
+                // The first suppressed event of a new overflow window: it is counted, and the row is stored below
+                overflowCarried = _overflowSuppressed;
+                _overflowStart = now;
+                _overflowSuppressed = 1;
             }
 
-            _windows[key] = (now, 0);
+            if (overflowCarried is null)
+            {
+                _windows[key] = (now, 0);
+            }
+        }
+
+        if (overflowCarried is { } previous)
+        {
+            await RecordOverflowAsync(previous, cancellationToken);
+            return false;
         }
 
         var stored = carried == 0
             ? draft
             : draft with { Detail = $"{draft.Detail}; {carried} more in the minute after the previous entry" };
-        return TryRecordAsync(stored, cancellationToken);
+        return await TryRecordAsync(stored, cancellationToken);
+    }
+
+    /// <summary>
+    ///     Removes the expired keys from a full table; the caller holds <see cref="_windowsLock"/>.
+    /// </summary>
+    /// <param name="now">The current time.</param>
+    /// <returns><c>true</c> when there is room for one more key.</returns>
+    private bool TryMakeRoom(DateTimeOffset now)
+    {
+        var expired = _windows.Where(pair => now - pair.Value.Start >= CoalesceWindow).Select(pair => pair.Key).ToList();
+        foreach (var expiredKey in expired)
+        {
+            _windows.Remove(expiredKey);
+        }
+
+        return _windows.Count < MaxCoalescedKeys;
+    }
+
+    /// <summary>
+    ///     Stores the one entry of an overflow window and reports the saturation to the error hook.
+    /// </summary>
+    /// <param name="previousSuppressed">The number of events suppressed in the previous overflow window.</param>
+    /// <param name="cancellationToken">Cancels the operation; cancellation is not swallowed.</param>
+    private async Task RecordOverflowAsync(int previousSuppressed, CancellationToken cancellationToken)
+    {
+        ReportError(new InvalidOperationException(
+            $"Audit coalescing table full ({MaxCoalescedKeys} keys); events of new keys are suppressed"));
+
+        var detail = previousSuppressed == 0
+            ? "tracking table full, events of new keys are not recorded"
+            : $"{previousSuppressed} events suppressed in the previous window, tracking table full";
+        await TryRecordAsync(new AuditDraft(OverflowAction, null, "audit service", null, null, detail), cancellationToken);
     }
 
     /// <summary>

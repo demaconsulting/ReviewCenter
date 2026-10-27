@@ -212,7 +212,8 @@ internal static class SignIn
                 // Over the limit: nothing is checked (even a right password is refused), so the answer is the same
                 // for every name; the refusal is recorded once per minute and name
                 var address = ClientAddress(http);
-                if (!throttle.TryBegin(address, username))
+                var reservation = throttle.TryBegin(address, username);
+                if (reservation is null)
                 {
                     var typed = AuditText.Clean(username, ReviewLimits.MaxUsernameLength);
                     await audit.TryRecordCoalescedAsync(
@@ -231,7 +232,7 @@ internal static class SignIn
                 }
 
                 // The attempt does not count against the client any more
-                throttle.Succeeded(address, username);
+                throttle.Succeeded(reservation);
 
                 await http.SignInAsync(
                     CookieAuthenticationDefaults.AuthenticationScheme,

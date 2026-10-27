@@ -83,17 +83,31 @@ limit per name, and the window must be between 1 second and one day; the error n
 parameters, which makes it require the antiforgery token. The return URL is reduced with `SafeReturnUrl`. The client
 address is the address of the connection (see the limitations in the `SignInThrottle` design), with an IPv4 address
 that is mapped into IPv6 shown as IPv4. First the endpoint asks `SignInThrottle.TryBegin` with the client address
-and the typed name. When the throttle refuses, nothing else is checked, even a right password is not looked at, no
+and the typed name, which returns a reservation or, when the throttle refuses, `null`. When the throttle refuses,
+nothing else is checked, even a right password is not looked at, no
 cookie is set, a `auth.sign-in-throttled` entry is recorded (see below), and the response redirects to
 `/login?error=throttled`, with `&ReturnUrl=` as for a failure. The answer is the same for every user name, so it does
 not reveal which names exist. Otherwise the user name and password are checked with
-`UserService.AuthenticateAsync`. On success `SignInThrottle.Succeeded` gives the attempts back, the principal (see
+`UserService.AuthenticateAsync`. On success `SignInThrottle.Succeeded` gives the attempts back (it is given the
+reservation that `TryBegin` returned, so it only touches the windows that attempt was counted in), the principal (see
 Claims) is signed in with the cookie scheme as a session cookie and the response redirects to the safe return URL. On
 failure the response redirects to `/login?error=1`, adding `&ReturnUrl=` with the escaped safe return URL when it is
 not `/`, so a second attempt still leads to the place the user wanted. The failure is the same for an unknown user, a
 wrong password, a disabled account, and a locked account, so the response does not reveal which user names exist or
 that an account is locked. The throttled answer is the only different one, and it depends on the client address and
 the typed name, not on the account.
+
+Known limitations of the login (see also the `SignInThrottle` and `UserService` designs):
+
+- The client address comes from the connection or, with `ASPNETCORE_FORWARDEDHEADERS_ENABLED=true`, from
+  `X-Forwarded-For`, which the framework trusts from any sender. The server does not restrict which proxies it
+  trusts; keeping the header trustworthy (the proxy overwrites it and is the only route to the server) is the
+  responsibility of the deployment. Otherwise a client can choose its own address and avoid the per-address and
+  per-name limits; the lockout of the user name still applies.
+- The lockout is per user name, so anyone who knows a name can keep that account locked for 5 minutes at a time, also
+  from an address that the throttle allows. This is an accepted trade-off.
+- The response time can differ slightly between a known and an unknown user (see the `UserService` design). This is
+  not mitigated further.
 After the cookie has been issued, the sign-in is recorded as `auth.sign-in` through `AuditService.TryRecordAsync`
 (awaited, best-effort: a failure is logged and never changes the response).
 

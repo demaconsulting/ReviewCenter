@@ -14,7 +14,7 @@ sections:
           number of attempts of the same client address were counted in the current window, shall count an attempt
           the same way whether or not the user name exists, shall not count a refused attempt, shall count each
           client address separately, shall start counting again when the window has passed, and shall give the
-          attempts of the name back when its sign-in succeeded.
+          attempts of the name back when its sign-in succeeded (see the reservation requirement).
         justification: |
           Online password guessing must become slow for one client, both against one account and across many
           accounts, without one client being able to lock other clients out. Counting by name only would let a
@@ -46,10 +46,37 @@ sections:
       - id: ReviewCenter-SignInThrottle-Bounded
         title: >-
           The SignInThrottle unit shall keep no more than a fixed number of counters in memory, removing expired
-          counters first and, when that is not enough, starting again with no counters.
+          counters first and, when that is not enough, removing only as many of the oldest counters as are needed,
+          and never all counters at once.
         justification: |
           Names and addresses come from the caller, so an attacker could otherwise make the server use memory
-          without limit by trying many different names. Starting again lets some attempts through, but the
-          account lockout still applies, and a server that runs out of memory helps nobody.
+          without limit by trying many different names. Clearing the whole table would let one flood of fresh names
+          reset every counter at once, including the counters of the attacker. Removing the oldest counters only
+          as needed keeps the recent ones; a distributed flood that creates as many fresh counters as the cap
+          inside one window can still push out older counters, so the throttle then lets some attempts through,
+          but the account lockout (kept in the database) still applies, and a server that runs out of memory
+          helps nobody.
         tests:
           - SignInThrottle_TryBegin_ManyDistinctKeys_KeepsTableBounded
+          - SignInThrottle_TryBegin_TableFull_EvictsOldestCountersAndKeepsRecentOnes
+          - SignInThrottle_TryBegin_OneKeyMissing_DoesNotEvictForTheExistingAddressKey
+          - SignInThrottle_TryBegin_TableFullOfExpiredKeys_PrunesExpiredBeforeEvictingLiveOnes
+
+      - id: ReviewCenter-SignInThrottle-Reservation
+        title: >-
+          The SignInThrottle unit shall give an attempt a reservation when it counts it, and shall give the attempts
+          back for a successful sign-in only to the counters that the reservation counted in, leaving counters that
+          have been removed or started again unchanged, and only once per reservation.
+        justification: |
+          Hashing a password takes time, so a counter can be removed or started again between the start of an
+          attempt and its success. Giving back by key alone would then clear or reduce a newer counter that
+          belongs to other attempts and let a client exceed its limits. A reservation that is given back once
+          cannot be used to refund more than was counted.
+        tests:
+          - SignInThrottle_Succeeded_ClearsNameCounterAndReturnsAddressSlot
+          - SignInThrottle_Succeeded_AfterWindowRolledOver_DoesNotClearNewNameCounter
+          - SignInThrottle_Succeeded_AfterWindowRolledOver_DoesNotRefundNewAddressCounter
+          - SignInThrottle_Succeeded_AfterEviction_DoesNotTouchRecreatedWindows
+          - SignInThrottle_Succeeded_CalledTwiceWithOneReservation_RefundsOnce
+          - SignInThrottle_Succeeded_NullReservation_Throws
+          - SignInThrottle_Reset_DoesNotReuseGenerations

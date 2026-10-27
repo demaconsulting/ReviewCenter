@@ -12,16 +12,29 @@ options type `SignInThrottleOptions`.
 #### Data Model
 
 `SignInThrottle` is an internal sealed class, registered as a singleton, so the counters live as long as the server
-process. All state is one dictionary behind one lock, so the class is thread-safe.
+process. All state (one dictionary and one ordered list of the same keys) is behind one lock, so the class is
+thread-safe.
 
-**Counters**: a dictionary from a key to the start of a fixed window and the number of attempts counted in it. Two
+**Counters**: a dictionary from a key to a window object that holds the start of a fixed window, the number of
+attempts counted in it, a generation number, and the position of the key in the creation order. Two
 kinds of key exist: `n|{address}|{name}` counts the attempts of one client address for one user name (the name
 lower-cased with the invariant culture and cut to 64 characters, so a long name cannot make a long key), and
 `a|{address}` counts all attempts of one client address. A missing or empty address is counted as the single address
 `unknown`. An IPv6 address is one address as a whole (there is no grouping by prefix).
 
+**Order**: a linked list of the keys in the order their windows were created, oldest first. Windows have a fixed
+length and are created in clock order, so the expired windows are a prefix of the list and removing them (or the
+oldest ones) costs O(1) per removed key; there is never a scan of the whole table under the lock.
+
+**Generation**: a `long` taken from a counter that only grows (not even `Reset` restarts it). A window gets a new
+generation when it is created, keeps it while it is counted in, and a window that replaces an expired one of the same
+key gets a new one. The generation identifies the window a reservation was counted in.
+
 **Window**: a counter whose window started more than `WindowSeconds` ago counts as 0. The window is fixed, not
 sliding: it starts with the first attempt of the key and the count starts again after it ends.
+
+**Reservation**: a small object returned by `TryBegin`. It holds the two keys that were counted, the generation of
+each window, and a flag that tells whether it has been given back.
 
 **MaxKeys**: `int` (constant) — 10,000; the most keys held.
 
@@ -39,10 +52,14 @@ neither is renamed here.
 **TryBegin**: Counts a sign-in attempt, unless the client has used up its attempts.
 
 - *Parameters*: `string? clientAddress`, `string? username` — the typed name; a null value is treated as empty.
-- *Returns*: `bool` — `true` when the attempt may go on and has been counted; `false` when the counter of the name or
+- *Returns*: a reservation when the attempt may go on and has been counted; `null` when the counter of the name or
   the counter of the address has reached its limit in the current window.
-- *Postconditions*: When `false` is returned nothing is counted, so a refused attempt never extends a refusal. When
-  `true` is returned both counters have been increased.
+- *Postconditions*: When `null` is returned nothing is counted, so a refused attempt never extends a refusal. When a
+  reservation is returned both counters have been increased and the reservation names the window of each.
+
+The windows that have passed are removed first. Only the keys that are not in the table need a new slot (a request
+whose address key exists needs one slot, not two); when the table would pass `MaxKeys`, only as many of the oldest
+windows as are needed are removed (never the two keys of this request), see the table cap below.
 
 The attempt is counted before the password is checked (reserve first, give back on success), not after the failure.
 Counting after the failure would let a burst of parallel requests all pass the check before any of them was counted.
@@ -51,21 +68,32 @@ on the account.
 
 **Succeeded**: Gives the slots of a successful sign-in back.
 
-- *Parameters*: `string? clientAddress`, `string? username` — as given to `TryBegin`.
-- *Postconditions*: The counter of the address and name is removed, and the counter of the address is decreased by one
-  (and removed when it reaches 0).
+- *Parameters*: `Reservation reservation` — as returned by `TryBegin`; a null value raises `ArgumentNullException`.
+- *Postconditions*: The reservation is marked as given back; a second call with it changes nothing. For the name
+  counter and for the address counter separately, and only when the window in the table is still the window the
+  reservation was counted in (same generation): the name counter is removed, and the address counter is decreased by
+  one (and removed when it reaches 0). A window that has been removed or started again is left alone.
 
 A user who types the password wrong twice and then right is therefore not closer to the limit than before. Because
 the address counter keeps the attempts of other names, a client that signs in correctly does not erase the attempts it
-made on other names.
+made on other names. Because hashing a password takes time, a window can end and a new one start between `TryBegin`
+and `Succeeded`; the generation keeps such a late success from clearing or reducing counters that belong to later
+attempts.
 
 **Reset**: Forgets every counter. It exists for tests (a test host that is reused can start from nothing); the
-application itself never calls it.
+application itself never calls it. Generations are not reused, so reservations from before a reset stay stale.
 
-**Table cap**: Before a key is added and the table would pass `MaxKeys`, keys whose window has passed are removed; when
-the table is still too full it is cleared. The throttle therefore fails open when a flood of distinct names fills it,
-for the benefit of a bounded memory use and of users who are not flooding; the account lockout is kept in the database
-and still applies. Each client address needs one address key and one name key per name it tries.
+**Table cap**: The table holds at most `MaxKeys` (10,000) counters, so the memory use is bounded. Before a key is
+added, the windows that have passed are removed from the head of the order; when the table is still too full, only as
+many of the oldest windows as are needed are evicted (skipping the two keys of the current request, so at most two
+skips). The table is never cleared as a whole, so one flood of fresh keys cannot reset every counter at once. Each
+client address needs one address key and one name key per name it tries. Residual risk: one address creates at most
+`MaxFailuresPerAddress` name keys per window, so filling the table with live counters inside one window takes a few
+hundred source addresses (for example an IPv6 /64, or a forged forwarded header, see the limitations below) and about
+10,000 requests. Such a distributed flood can push out older counters, including its own, so the throttle degrades
+toward failing open for those clients; it never refuses anybody because of the cap, and the account lockout (kept in
+the database) still applies. A clock that steps backwards leaves a window in the table until time catches up; the
+limits still hold, because a counter checks its own age.
 
 #### Error Handling
 
@@ -81,12 +109,16 @@ Documented limitations, all deliberate:
   instance that the tool is run as.
 - The throttle limits by client address. Without a forwarded-headers setup the address is the address of the direct
   connection, which behind a reverse proxy is the proxy: all users then share one set of counters, and the limit per
-  address is reached sooner. With `ASPNETCORE_FORWARDEDHEADERS_ENABLED=true` the address is taken from the
-  `X-Forwarded-For` header. The framework then trusts that header from any sender, so the proxy must set or overwrite
-  it and the server must be reachable only through the proxy; otherwise a client can choose its own address and avoid
-  both limits (the account lockout still applies).
+  address is reached sooner. With `ASPNETCORE_FORWARDEDHEADERS_ENABLED=true` the framework trusts `X-Forwarded-For`
+  from any sender; the server does not restrict which proxies it trusts. Keeping the header trustworthy is the
+  responsibility of the deployment: the proxy must overwrite the header and be the only route to the server.
+  Otherwise a client can choose its own address and avoid the per-address and per-name limits (the lockout of the
+  user name still applies). This is a known limitation that is not mitigated in the code.
+- The lockout is per user name, so anyone who knows a user name can keep that account locked for 5 minutes at a time,
+  also from an address that the throttle allows. The throttle limits how often one address can try; it does not
+  prevent this. This is an accepted trade-off of locking by user name.
 - Several users behind one shared address (an office network address) share the limit per address.
-- The cap on the table fails open (see above).
+- The cap on the table evicts the oldest counters under a distributed flood (see the table cap above).
 
 #### Dependencies
 
@@ -95,7 +127,7 @@ Documented limitations, all deliberate:
 
 #### Callers
 
-- **SignIn** — the login endpoint calls `TryBegin` before the password is checked and `Succeeded` after a successful
-  sign-in; `AddSignIn` registers the options and the singleton.
+- **SignIn** — the login endpoint calls `TryBegin` before the password is checked and `Succeeded` with the
+  reservation after a successful sign-in; `AddSignIn` registers the options and the singleton.
 - **ServerHost** — reads the options once at start-up to report invalid settings.
 - Tests — call `Reset` and `KeyCount`.

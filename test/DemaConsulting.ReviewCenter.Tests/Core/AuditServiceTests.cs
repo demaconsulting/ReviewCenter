@@ -56,6 +56,22 @@ public class AuditServiceTests
     }
 
     /// <summary>
+    ///     Records one coalesced event for each of the given number of distinct keys.
+    /// </summary>
+    /// <param name="service">The service.</param>
+    /// <param name="draft">The event to record.</param>
+    /// <param name="prefix">The start of every key.</param>
+    /// <param name="count">The number of keys.</param>
+    /// <returns>A task that completes when the events are recorded.</returns>
+    private static async Task RecordKeys(AuditService service, AuditDraft draft, string prefix, int count)
+    {
+        for (var i = 0; i < count; i++)
+        {
+            await service.TryRecordCoalescedAsync(draft, prefix + i, TestContext.Current.CancellationToken);
+        }
+    }
+
+    /// <summary>
     ///     Test that the constructor refuses a null store.
     /// </summary>
     [Fact]
@@ -495,29 +511,159 @@ public class AuditServiceTests
     }
 
     /// <summary>
-    ///     Test that a full key table drops new keys until a window has passed, which bounds the rows per window.
+    ///     Test that a full key table does not store events of new keys until a window has passed, which bounds the rows per window.
     /// </summary>
     [Fact]
-    public async Task AuditService_TryRecordCoalescedAsync_TooManyKeys_DropsNewKeysUntilWindowPasses()
+    public async Task AuditService_TryRecordCoalescedAsync_TooManyKeys_DoesNotStoreNewKeysUntilWindowPasses()
     {
         // Arrange
         var clock = new MovableTimeProvider(DateTimeOffset.UnixEpoch);
         var (service, store) = Create(clock: clock);
         var draft = new AuditDraft("auth.sign-in-failed", null, "unknown user", null, null, "d");
-        for (var i = 0; i < AuditService.MaxCoalescedKeys; i++)
-        {
-            await service.TryRecordCoalescedAsync(draft, "key" + i, TestContext.Current.CancellationToken);
-        }
+        await RecordKeys(service, draft, "key", AuditService.MaxCoalescedKeys);
 
         // Act
         var whileFull = await service.TryRecordCoalescedAsync(draft, "one-too-many", TestContext.Current.CancellationToken);
         clock.Advance(TimeSpan.FromMinutes(1));
         var afterWindow = await service.TryRecordCoalescedAsync(draft, "one-too-many", TestContext.Current.CancellationToken);
 
-        // Assert
+        // Assert: the 500 keys, one overflow row for the suppressed event, and the event of the next window
         Assert.False(whileFull);
         Assert.True(afterWindow);
+        Assert.Equal(AuditService.MaxCoalescedKeys + 2, store.Entries.Count);
+        Assert.Equal(AuditService.OverflowAction, store.Entries[AuditService.MaxCoalescedKeys].Action);
+        Assert.Equal("d", store.Entries[^1].Detail);
+    }
+
+    /// <summary>
+    ///     Test that a cancelled repeat throws and is not counted as a suppressed repeat.
+    /// </summary>
+    [Fact]
+    public async Task AuditService_TryRecordCoalescedAsync_CancelledRepeat_ThrowsAndDoesNotCountTheRepeat()
+    {
+        // Arrange
+        var clock = new MovableTimeProvider(DateTimeOffset.UnixEpoch);
+        var (service, store) = Create(clock: clock);
+        var draft = new AuditDraft("auth.sign-in-locked", "ann", "Ann", null, null, "account locked");
+        await service.TryRecordCoalescedAsync(draft, "k", TestContext.Current.CancellationToken);
+
+        // Act
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            () => service.TryRecordCoalescedAsync(draft, "k", new CancellationToken(true)));
+        clock.Advance(TimeSpan.FromMinutes(1));
+        await service.TryRecordCoalescedAsync(draft, "k", TestContext.Current.CancellationToken);
+
+        // Assert: the next entry carries no count, because the cancelled repeat was not counted
+        Assert.Equal(["account locked", "account locked"], store.Entries.Select(e => e.Detail).ToArray());
+    }
+
+    /// <summary>
+    ///     Test that a cancelled first event throws and does not start a window, so the key is stored later.
+    /// </summary>
+    [Fact]
+    public async Task AuditService_TryRecordCoalescedAsync_CancelledFirstEvent_ThrowsAndDoesNotStartWindow()
+    {
+        // Arrange
+        var (service, store) = Create(clock: new MovableTimeProvider(DateTimeOffset.UnixEpoch));
+        var draft = new AuditDraft("auth.sign-in-locked", "ann", "Ann", null, null, "account locked");
+
+        // Act
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            () => service.TryRecordCoalescedAsync(draft, "k", new CancellationToken(true)));
+        var emptyAfterCancel = store.Entries.Count == 0;
+        var stored = await service.TryRecordCoalescedAsync(draft, "k", TestContext.Current.CancellationToken);
+
+        // Assert: nothing was stored by the cancelled call, and the same key is stored at once afterwards
+        Assert.True(emptyAfterCancel);
+        Assert.True(stored);
+        Assert.Single(store.Entries);
+    }
+
+    /// <summary>
+    ///     Test that a full table writes one overflow entry and reports once per window, while existing keys still coalesce.
+    /// </summary>
+    [Fact]
+    public async Task AuditService_TryRecordCoalescedAsync_TableFull_WritesOneOverflowRowAndReportsOncePerWindow()
+    {
+        // Arrange
+        var errors = new List<Exception>();
+        var (service, store) = Create(errors, new MovableTimeProvider(DateTimeOffset.UnixEpoch));
+        var draft = new AuditDraft("auth.sign-in-throttled", null, "not signed in", null, null, "d");
+        await RecordKeys(service, draft, "key", AuditService.MaxCoalescedKeys);
+
+        // Act: ten events of new keys, and one more event of a key that is tracked
+        var results = new List<bool>();
+        for (var i = 0; i < 10; i++)
+        {
+            results.Add(await service.TryRecordCoalescedAsync(draft, "new" + i, TestContext.Current.CancellationToken));
+        }
+
+        var tracked = await service.TryRecordCoalescedAsync(draft, "key0", TestContext.Current.CancellationToken);
+
+        // Assert
+        Assert.All(results, Assert.False);
+        Assert.False(tracked);
         Assert.Equal(AuditService.MaxCoalescedKeys + 1, store.Entries.Count);
+        var overflow = store.Entries[^1];
+        Assert.Equal(AuditService.OverflowAction, overflow.Action);
+        Assert.Equal("audit service", overflow.ActorName);
+        Assert.StartsWith("tracking table full", overflow.Detail, StringComparison.Ordinal);
+        var error = Assert.Single(errors);
+        Assert.IsType<InvalidOperationException>(error);
+        Assert.Contains("table full", error.Message, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    ///     Test that the overflow entry of the next window carries the number of events suppressed in the previous one.
+    /// </summary>
+    [Fact]
+    public async Task AuditService_TryRecordCoalescedAsync_TableFullNextWindow_OverflowRowCarriesPreviousCount()
+    {
+        // Arrange: the table is full at t0; four events are suppressed from t0+59 s on, the table is refilled at t0+60 s
+        var errors = new List<Exception>();
+        var clock = new MovableTimeProvider(DateTimeOffset.UnixEpoch);
+        var (service, store) = Create(errors, clock);
+        var draft = new AuditDraft("auth.sign-in-throttled", null, "not signed in", null, null, "d");
+        await RecordKeys(service, draft, "a", AuditService.MaxCoalescedKeys);
+        clock.Advance(TimeSpan.FromSeconds(59));
+        await RecordKeys(service, draft, "x", 4);
+        clock.Advance(TimeSpan.FromSeconds(1));
+        await RecordKeys(service, draft, "b", AuditService.MaxCoalescedKeys);
+
+        // Act: the first overflow window ends at t0+119 s while the table is still full of live keys
+        clock.Advance(TimeSpan.FromSeconds(59));
+        await RecordKeys(service, draft, "y", 3);
+
+        // Assert: one overflow entry and one report per window, the second one with the count of the first
+        var overflow = store.Entries.Where(e => e.Action == AuditService.OverflowAction).ToArray();
+        Assert.Equal(2, overflow.Length);
+        Assert.Equal("tracking table full, events of new keys are not recorded", overflow[0].Detail);
+        Assert.Equal("4 events suppressed in the previous window, tracking table full", overflow[1].Detail);
+        Assert.Equal(2, errors.Count);
+    }
+
+    /// <summary>
+    ///     Test that a failing store and a failing error hook cannot make the overflow handling throw.
+    /// </summary>
+    [Fact]
+    public async Task AuditService_TryRecordCoalescedAsync_TableFullAndHookThrows_StillReturnsFalse()
+    {
+        // Arrange
+        var store = new FakeAuditStore(new FixedTimeProvider(new DateTimeOffset(2025, 3, 4, 5, 6, 7, TimeSpan.Zero)));
+        var service = new AuditService(
+            store,
+            _ => throw new InvalidOperationException("hook failed"),
+            new MovableTimeProvider(DateTimeOffset.UnixEpoch));
+        var draft = new AuditDraft("auth.sign-in-throttled", null, "not signed in", null, null, "d");
+        await RecordKeys(service, draft, "key", AuditService.MaxCoalescedKeys);
+        store.FailNextAppend = new InvalidOperationException("disk full");
+
+        // Act
+        var result = await service.TryRecordCoalescedAsync(draft, "new", TestContext.Current.CancellationToken);
+
+        // Assert: nothing escaped, and nothing but the 500 entries was stored
+        Assert.False(result);
+        Assert.Equal(AuditService.MaxCoalescedKeys, store.Entries.Count);
     }
 
     /// <summary>

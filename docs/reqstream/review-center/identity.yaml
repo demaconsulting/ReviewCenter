@@ -52,6 +52,7 @@ sections:
           - ReviewCenter-SignInThrottle-Limits
           - ReviewCenter-SignInThrottle-Options
           - ReviewCenter-SignInThrottle-Bounded
+          - ReviewCenter-SignInThrottle-Reservation
         tests:
           - IdentitySubsystem_Throttle_RepeatedFailures_AreRefusedAndAuditedOncePerWindow
 

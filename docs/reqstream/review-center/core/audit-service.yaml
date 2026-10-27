@@ -30,20 +30,42 @@ sections:
           The AuditService class shall, for events that a caller can repeat without limit, record the first event of a
           key in a one-minute window and count the repeats of that key in the window instead of recording them,
           shall put the number of counted repeats into the detail of the first event of the key in the next window,
-          shall keep at most a fixed number of keys, dropping events of new keys when the table is full of keys that
-          have not expired, and shall report a failure of the store like the best-effort operation does.
+          shall keep at most a fixed number of keys (see the overflow requirement for a full table), shall neither
+          count nor start a window for an event whose cancellation was already requested and shall not swallow
+          cancellation, and shall report a failure of the store like the best-effort operation does.
         justification: |
-          Failed sign-ins of unknown names and attempts on locked accounts are not limited by the account lockout.
-          Recording each of them would let an attacker fill the audit trail, and its database, at will. One row per
-          key and minute keeps the attack visible and the growth bounded. The count of the last window is lost when
-          the key does not occur again, because entries of the trail are never changed.
+          Failed sign-ins of unknown names and attempts on locked or disabled accounts are not limited by the
+          account lockout. Recording each of them would let an attacker fill the audit trail, and its database, at
+          will. One row per key and minute keeps the attack visible and the growth bounded. The count of the last
+          window is lost when the key does not occur again, because entries of the trail are never changed. A
+          request that its caller has cancelled must not change the counts, or the trail would show too few
+          repeats or lose the first event of a window.
         tests:
           - AuditService_TryRecordCoalescedAsync_RepeatsWithinWindow_StoresOnlyTheFirst
           - AuditService_TryRecordCoalescedAsync_NextWindow_StoresEntryWithSuppressedCount
           - AuditService_TryRecordCoalescedAsync_DifferentKeys_StoreSeparateEntries
-          - AuditService_TryRecordCoalescedAsync_TooManyKeys_DropsNewKeysUntilWindowPasses
+          - AuditService_TryRecordCoalescedAsync_CancelledRepeat_ThrowsAndDoesNotCountTheRepeat
+          - AuditService_TryRecordCoalescedAsync_CancelledFirstEvent_ThrowsAndDoesNotStartWindow
+          - AuditService_TryRecordCoalescedAsync_TooManyKeys_DoesNotStoreNewKeysUntilWindowPasses
           - AuditService_TryRecordCoalescedAsync_StoreFailure_IsSwallowedAndReported
           - AuditService_TryRecordCoalescedAsync_NullArguments_Throw
+
+      - id: ReviewCenter-AuditService-CoalesceOverflow
+        title: >-
+          The AuditService class, when its table of coalesced keys is full of keys that have not expired, shall count
+          the events of new keys instead of recording them, shall record at most one audit entry per one-minute window
+          that says that events were suppressed (with the count of the previous window), and shall report the
+          saturation to the error hook at most once per window.
+        justification: |
+          The keys come from the caller (for example typed user names), so an attacker can fill the table. Dropping
+          events silently would let an attacker hide behind the flood; one bounded row per minute and one report to
+          the operator make the gap visible without letting the trail grow. Existing keys keep coalescing, so the
+          rows per minute stay bounded by the table size plus one.
+        tests:
+          - AuditService_TryRecordCoalescedAsync_TooManyKeys_DoesNotStoreNewKeysUntilWindowPasses
+          - AuditService_TryRecordCoalescedAsync_TableFull_WritesOneOverflowRowAndReportsOncePerWindow
+          - AuditService_TryRecordCoalescedAsync_TableFullNextWindow_OverflowRowCarriesPreviousCount
+          - AuditService_TryRecordCoalescedAsync_TableFullAndHookThrows_StillReturnsFalse
 
       - id: ReviewCenter-AuditService-List
         title: >-

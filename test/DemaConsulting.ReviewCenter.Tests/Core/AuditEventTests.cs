@@ -571,6 +571,89 @@ public class AuditEventTests
     }
 
     /// <summary>
+    ///     Test that repeated sign-ins on a disabled account are recorded once per window and account, with the count carried to the next window.
+    /// </summary>
+    [Fact]
+    public async Task UserService_AuthenticateAsync_DisabledAccountRepeated_RecordsOneEntryPerWindow()
+    {
+        // Arrange
+        var fixture = await CreateAsync();
+        await fixture.UserService.SetEnabledAsync("bob", false, Actor.CommandLine, TestContext.Current.CancellationToken);
+        await fixture.UserService.SetEnabledAsync("ann", false, Actor.CommandLine, TestContext.Current.CancellationToken);
+
+        // Act: four attempts on bob (one in upper case) and one on ann, then one more on bob after the window
+        foreach (var name in new[] { "bob", "BOB", "bob", "bob", "ann" })
+        {
+            await fixture.UserService.AuthenticateAsync(name, Password, TestContext.Current.CancellationToken);
+        }
+
+        fixture.Clock.Advance(TimeSpan.FromMinutes(1));
+        await fixture.UserService.AuthenticateAsync("bob", Password, TestContext.Current.CancellationToken);
+
+        // Assert
+        Assert.All(fixture.Trail.Entries, e => Assert.Equal("auth.sign-in-failed", e.Action));
+        Assert.Equal(
+            [
+                "Bob (bob): account disabled",
+                "Ann (ann): account disabled",
+                "Bob (bob): account disabled; 3 more in the minute after the previous entry"
+            ],
+            fixture.Trail.Entries.Select(e => $"{e.ActorName}: {e.Detail}").ToArray());
+    }
+
+    /// <summary>
+    ///     Test that repeated re-authentications on a disabled account are recorded once per window as a failed signature re-authentication.
+    /// </summary>
+    [Fact]
+    public async Task UserService_ReauthenticateAsync_DisabledAccountRepeated_RecordsOneSignatureReauthFailedPerWindow()
+    {
+        // Arrange
+        var fixture = await CreateAsync();
+        await fixture.UserService.SetEnabledAsync("bob", false, Actor.CommandLine, TestContext.Current.CancellationToken);
+
+        // Act
+        for (var i = 0; i < 4; i++)
+        {
+            await fixture.UserService.ReauthenticateAsync("bob", Password, TestContext.Current.CancellationToken);
+        }
+
+        fixture.Clock.Advance(TimeSpan.FromMinutes(1));
+        await fixture.UserService.ReauthenticateAsync("bob", Password, TestContext.Current.CancellationToken);
+
+        // Assert
+        Assert.All(fixture.Trail.Entries, e => Assert.Equal("signature.reauth-failed", e.Action));
+        Assert.Equal(
+            ["account disabled", "account disabled; 3 more in the minute after the previous entry"],
+            fixture.Trail.Entries.Select(e => e.Detail).ToArray());
+    }
+
+    /// <summary>
+    ///     Test that a disabled reason and a locked reason of one account in one window are both recorded, because the reason is part of the key.
+    /// </summary>
+    [Fact]
+    public async Task UserService_ReauthenticateAsync_DisabledThenLockedInOneMinute_RecordsBothReasons()
+    {
+        // Arrange: bob is disabled and a re-authentication with the right password is refused
+        var fixture = await CreateAsync();
+        await fixture.UserService.SetEnabledAsync("bob", false, Actor.CommandLine, TestContext.Current.CancellationToken);
+        await fixture.UserService.ReauthenticateAsync("bob", Password, TestContext.Current.CancellationToken);
+
+        // Act: five wrong passwords lock the account, then the right password meets the lock
+        for (var i = 0; i < 5; i++)
+        {
+            await fixture.UserService.ReauthenticateAsync("bob", "wrong-" + i, TestContext.Current.CancellationToken);
+        }
+
+        await fixture.UserService.ReauthenticateAsync("bob", Password, TestContext.Current.CancellationToken);
+
+        // Assert
+        var entries = fixture.Trail.Entries.Where(e => e.Action == "signature.reauth-failed").ToArray();
+        Assert.Single(entries, e => e.Detail == "account disabled");
+        Assert.Single(entries, e => e.Detail == "account locked");
+        Assert.Equal(5, entries.Count(e => e.Detail == "wrong password"));
+    }
+
+    /// <summary>
     ///     Test that the fifth failure records the lockout once.
     /// </summary>
     [Fact]

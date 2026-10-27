@@ -23,7 +23,14 @@ N/A - standard test environment. The tests need no database, no files, and no ne
 - A success clears the counter of the name and gives one slot back to the counter of the address.
 - A refused attempt uses up no slot.
 - A missing address or name is handled.
-- A flood of distinct keys cannot grow the table past its cap.
+- A flood of distinct keys cannot grow the table past its cap; when the table is full, expired counters are removed
+  first, and only then the oldest live counters are evicted, one at a time and only as far as needed, so the counters
+  of the current attempt and the recent ones are kept.
+- An attempt that needs one new key does not evict anything for the key that exists.
+- A success clears the counter of the name and gives the slot back to the address only when the window that was counted
+  is still the current one; a window that has been replaced (after the window passed, an eviction, or `Reset`) is not
+  touched, and a reservation gives its slot back only once.
+- A null reservation is refused.
 - The settings default to 5 per name, 20 per address, and 300 seconds, under the section `Identity:Throttle`.
 
 #### Test Scenarios
@@ -62,6 +69,42 @@ like any other key (three allowed, the fourth refused), and an empty address is 
 **SignInThrottle_TryBegin_ManyDistinctKeys_KeepsTableBounded**: As many distinct names as the cap are tried from one
 address, with a high address limit; all are allowed and the number of keys never passes the cap. This scenario is
 tested by `SignInThrottle_TryBegin_ManyDistinctKeys_KeepsTableBounded`.
+
+**SignInThrottle_TryBegin_TableFull_EvictsOldestCountersAndKeepsRecentOnes**: The table is full of live keys and more
+attempts arrive; the oldest counters are evicted and the recent ones, also the counter of the address, are kept. This
+scenario is tested by `SignInThrottle_TryBegin_TableFull_EvictsOldestCountersAndKeepsRecentOnes`.
+
+**SignInThrottle_TryBegin_OneKeyMissing_DoesNotEvictForTheExistingAddressKey**: The address key exists and only the
+name key is new; the attempt makes room for one key, not two. This scenario is tested by
+`SignInThrottle_TryBegin_OneKeyMissing_DoesNotEvictForTheExistingAddressKey`.
+
+**SignInThrottle_TryBegin_TableFullOfExpiredKeys_PrunesExpiredBeforeEvictingLiveOnes**: The table is full, its keys
+have expired, and a live key was added later; the expired keys are removed and the live counter survives. This
+scenario is tested by `SignInThrottle_TryBegin_TableFullOfExpiredKeys_PrunesExpiredBeforeEvictingLiveOnes`.
+
+**SignInThrottle_Succeeded_AfterWindowRolledOver_DoesNotClearNewNameCounter**: A reservation is taken, the window
+passes, a new window of the name is counted, and then the success of the first reservation is reported; the counter of
+the new window is kept. This scenario is tested by
+`SignInThrottle_Succeeded_AfterWindowRolledOver_DoesNotClearNewNameCounter`.
+
+**SignInThrottle_Succeeded_AfterWindowRolledOver_DoesNotRefundNewAddressCounter**: The same, for the address: the
+success of the old reservation gives no slot back to the new window of the address. This scenario is tested by
+`SignInThrottle_Succeeded_AfterWindowRolledOver_DoesNotRefundNewAddressCounter`.
+
+**SignInThrottle_Succeeded_AfterEviction_DoesNotTouchRecreatedWindows**: The counters of a reservation are evicted and
+created again; the success of the old reservation leaves the new windows as they are. This scenario is tested by
+`SignInThrottle_Succeeded_AfterEviction_DoesNotTouchRecreatedWindows`.
+
+**SignInThrottle_Succeeded_CalledTwiceWithOneReservation_RefundsOnce**: A success is reported twice for one
+reservation; the address slot is given back only once. This scenario is tested by
+`SignInThrottle_Succeeded_CalledTwiceWithOneReservation_RefundsOnce`.
+
+**SignInThrottle_Succeeded_NullReservation_Throws**: A null reservation is refused with an `ArgumentNullException`.
+This scenario is tested by `SignInThrottle_Succeeded_NullReservation_Throws`.
+
+**SignInThrottle_Reset_DoesNotReuseGenerations**: A reservation is taken, `Reset` is called, and the same keys are
+counted again; the success of the old reservation does not touch the new counters. This scenario is tested by
+`SignInThrottle_Reset_DoesNotReuseGenerations`.
 
 **SignInThrottle_Reset_ClearsAllCounters**: After the limit is reached, `Reset` is called; the next attempt is
 allowed and only its two keys are held. This scenario is tested by `SignInThrottle_Reset_ClearsAllCounters`.

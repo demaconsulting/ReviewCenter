@@ -144,8 +144,18 @@ a password does not end the other sessions of the user. Behind a proxy that ends
 trust the forwarded headers so that the cookie is issued as `Secure`; the same setting decides which client address the
 throttle sees. Without it the throttle sees the address of the proxy for every user. With
 `ASPNETCORE_FORWARDEDHEADERS_ENABLED=true` it sees the address in `X-Forwarded-For`, which the framework then accepts
-from any sender, so the proxy must set or overwrite that header and the server must be reachable only through the
-proxy.
+from any sender; the server does not restrict which proxies it trusts. Keeping the header trustworthy is the
+responsibility of the deployment: the proxy must overwrite the header and be the only route to the server. Otherwise
+a client can choose its own address and avoid the per-address and per-name limits (the lockout of the user name
+still applies). This is not mitigated in the code.
+
+Further known limitations, all deliberate and not mitigated: the lockout is per user name, so someone who knows a
+user name can keep that account locked for 5 minutes at a time, also from an address that the throttle allows (the
+throttle limits how often one address can try and does not prevent this); and the response time of a failed sign-in
+can differ slightly between a known and an unknown user (a failure on a known account also stores the failure counter
+and an audit entry), so timing can in principle reveal which user names exist (see the `UserService` design). The
+throttle holds at most 10,000 counters and evicts the oldest ones when it is full, so a distributed flood can push
+out older counters (see the `SignInThrottle` design).
 
 **Sign-in throttle**: Before the password is checked the login endpoint asks `SignInThrottle` whether the client
 address has attempts left, once per name and once over all names. A refused attempt is not authenticated at all and
@@ -159,7 +169,8 @@ cookie is removed, with the actor taken from the server-side principal of the re
 login endpoint also records the refusal by the throttle, as `auth.sign-in-throttled` through
 `AuditService.TryRecordCoalescedAsync`, at most once per minute and typed name. The
 recording is awaited but best-effort: a failure is logged and never changes the response, so a broken audit trail
-cannot lock everybody out. Failed sign-ins, attempts on locked accounts, and lockouts are recorded by `UserService`
+cannot lock everybody out. Failed sign-ins (a wrong password every time; disabled-account failures at most once per
+minute, account and reason), attempts on locked accounts, and lockouts are recorded by `UserService`
 (see its design), because the endpoint cannot tell the reasons apart and must not either. The client address is not
 part of any audit entry: the entry has no place for it, and adding one would change the hash chain format. The
 best-effort rule is a deliberate trade-off: an

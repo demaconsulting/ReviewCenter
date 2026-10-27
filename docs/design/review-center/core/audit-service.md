@@ -44,13 +44,18 @@ entry in its own transaction.
 
 The service is thread-safe. It relies on the store for the trail, and it keeps one small piece of state of its own for
 coalescing (see `TryRecordCoalescedAsync`): a dictionary from a key to the start of the current one-minute window and
-the number of events counted but not recorded in it, behind one lock that is never held across an await. The state is
+the number of events counted but not recorded in it, behind one lock that is never held across an await. A second
+piece of state tracks the current overflow window (when it started and how many events it suppressed) for the case
+that the table is full. The state is
 in memory of one process and is lost on restart. The service takes an optional `TimeProvider` (the system clock when
 none is given) so tests can move time.
 
 **PageSize**: `int` (constant) — 50 entries on a page.
 
 **MaxCoalescedKeys**: `int` (constant) — 500; the most keys the coalescing table holds.
+
+**OverflowAction**: `string` (constant) — `audit.events-suppressed`; the action of the entry that tells events of new
+keys were suppressed because the table was full.
 
 **AuditEntryPage**: the entries of one page, newest first, `HasOlder` and `HasNewer` (whether more entries lie beyond
 either end), and the cursors `OlderBefore` (the sequence of the last entry of the page) and `NewerAfter` (the sequence of
@@ -92,11 +97,18 @@ the short hash (8 hexadecimal characters) of the trimmed text (see `AuditChain`)
 | `auth.sign-in-throttled` | `too many attempts, name '<typed>'` (the sign-in throttle refused the attempt) |
 | `signature.reauth-failed` | as for sign-in: `wrong password`, `account disabled`, `account locked`, or unknown user |
 | `auth.locked-out` | `locked for 5 minutes after 5 failed attempts` |
+| `audit.events-suppressed` | `tracking table full, events of new keys are not recorded` (see below) |
+
+An overflow entry (`audit.events-suppressed`) has the actor text `audit service`. It is written at most once per
+minute, when the coalescing table is full; the second form of its detail,
+`N events suppressed in the previous window, tracking table full`, carries the number of events of the previous
+overflow window.
 
 An event that is recorded through `TryRecordCoalescedAsync` can have the suffix `; N more in the minute after the
 previous entry` on its detail, where N is the number of events of the same key that were counted and not recorded.
-`auth.sign-in-locked`, `auth.sign-in-throttled`, and the unknown-user entries of `auth.sign-in-failed` and
-`signature.reauth-failed` are recorded this way; the other failures are not (they are bounded by the lockout).
+`auth.sign-in-locked`, `auth.sign-in-throttled`, and the unknown-user and disabled-account entries of
+`auth.sign-in-failed` and `signature.reauth-failed` (and the locked-account entries of the latter) are recorded this
+way; the wrong-password failures are not (they are bounded by the lockout).
 
 The anchor of `thread.started` is `line N`, `lines S-E`, or `(whole file)`; a line anchor on the baseline side has the
 suffix `(baseline)`, for example `line 3 (baseline)` and `lines 2-4 (baseline)`.
@@ -139,18 +151,27 @@ own transaction.
 
 - *Parameters*: `AuditDraft draft`; `string key` — identifies the repeating event (the callers use the action, the
   kind of refusal, and the lower-cased typed name); a cancellation token.
-- *Returns*: `true` when an entry was stored; `false` when the event was only counted, dropped, or storing failed.
+- *Returns*: `true` when an entry was stored; `false` when the event was only counted, suppressed, or storing failed.
 - *Preconditions*: `draft` and `key` are not null.
-- *Postconditions*: The first event of a key is stored (as by `TryRecordAsync`) and starts a window of one minute.
+- *Postconditions*: When cancellation is already requested the call throws `OperationCanceledException` before it
+  looks at the table, so a cancelled request neither counts a repeat nor starts a window. The first event of a key is
+  stored (as by `TryRecordAsync`) and starts a window of one minute.
   Repeats of the key inside the window are counted and not stored. The first event of the key after the window is
   stored with the number of counted repeats appended to its detail (`; N more in the minute after the previous
   entry`), because entries are immutable and a count can only ride on a later entry. At most `MaxCoalescedKeys` keys
-  are tracked: when the table is full, keys whose window has passed are removed, and when it is still full an event of
-  a new key is dropped (neither stored nor counted). The rows written for these events are therefore bounded by one
-  per key and minute and at most `MaxCoalescedKeys` keys per minute.
+  are tracked: when the table is full, keys whose window has passed are removed, and when it is still full the event
+  of a new key is not stored but counted in the overflow window. The first suppressed event of an overflow window
+  (one minute long) stores one `audit.events-suppressed` entry through `TryRecordAsync` and reports the saturation
+  once to the error hook (the host logs it as a warning); the entry carries the number of events suppressed in the
+  previous overflow window (it is written at the start of a window so that the saturation is visible at once, and
+  entries are immutable). Further suppressed events of the window are only counted. Keys that are already tracked keep
+  coalescing normally. The rows written for these events are therefore bounded by one per key and minute, at most
+  `MaxCoalescedKeys` keys per minute, plus one overflow entry per minute.
 
-Known and accepted losses: the count of the last window is never written when its key does not occur again; and the
-window and the counts are lost on restart. A failure of the store is handled as in `TryRecordAsync`. The check and
+Known and accepted losses: the count of the last window (of a key, and of the overflow) is never written when it does
+not occur again; the window and the counts are lost on restart; and a cancellation that arrives while the first event
+of a window is being stored loses that event for the window, as a store failure does. A failure of the store is
+handled as in `TryRecordAsync`. The check and
 the update of the table happen under the lock; the store is called after the lock is released.
 
 **ListAsync**: Reads one page of the trail, newest first.
@@ -179,11 +200,12 @@ sign-in event can be missing from the trail when the write fails. Null arguments
 
 #### Known Limitations
 
-- Events that are recorded coalesced (attempts on a locked account, refusals by the throttle, failures for unknown
-  user names) are written once per key and minute, so the trail shows that an attack happened and roughly how long it
-  went on, not every attempt. The count of the last window can be lost (see `TryRecordCoalescedAsync`). The wrong
-  password and disabled-account failures of existing accounts are recorded every time; they are bounded by the
-  lockout.
+- Events that are recorded coalesced (attempts on a locked or disabled account, refusals by the throttle, failures for
+  unknown user names) are written once per key and minute, so the trail shows that an attack happened and roughly how
+  long it went on, not every attempt. The count of the last window can be lost (see `TryRecordCoalescedAsync`). The
+  wrong password failures of existing accounts are recorded every time; they are bounded by the lockout.
+- When an attacker fills the coalescing table with live keys, events of new keys are not recorded; the trail shows one
+  `audit.events-suppressed` entry per minute and the host log shows a warning, but not which events were lost.
 - A wrong *current* password typed on the account page appears as `auth.sign-in-failed` and its refusals on a locked
   account are not recorded: that path (`ChangeOwnPasswordAsync`) was not changed. A wrong password typed on the signing
   dialog is recorded as `signature.reauth-failed`.

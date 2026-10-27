@@ -272,8 +272,11 @@ Rules:
 address, counted before the password is checked. By default an address may try one user name 5 times and all user
 names 20 times in 5 minutes; after that the login page says "Too many sign-in attempts. Try again in a few minutes."
 and refuses even the right password until the window has passed. The message is the same whether or not the user name
-exists. A successful sign-in gives its attempts back. The attempts are counted in memory in one server process, so the
-counters start again at a restart and are not shared between several server processes.
+exists. A successful sign-in gives its attempts back, but only to the window that was counted. The attempts are
+counted in memory in one server process, so the
+counters start again at a restart and are not shared between several server processes. The table holds at most
+10,000 counters; when it is full, expired counters are removed first and then the oldest ones are evicted, so a flood
+from very many addresses can push out older counters.
 
 | Setting                                   | Environment variable                        |
 | ----------------------------------------- | ------------------------------------------- |
@@ -291,9 +294,10 @@ The sign-in cookie is marked Secure when the request arrives over HTTPS. Behind 
 `ASPNETCORE_FORWARDEDHEADERS_ENABLED=true` so that the server sees the original HTTPS scheme and marks the cookie
 Secure. The throttle uses the client address. Without that setting, behind a proxy, every user appears with the
 address of the proxy and so shares one set of limits. With the setting, the server takes the address from the
-`X-Forwarded-For` header from any sender, so the proxy must set or overwrite that header and the server must be
-reachable only through the proxy; otherwise a client can choose its own address and avoid the per-address limits (the
-lockout of the user name still applies).
+`X-Forwarded-For` header from any sender and does not restrict which proxies it trusts. Keeping that header
+trustworthy is the responsibility of the deployment: the proxy must overwrite the header and be the only route to the
+server. Otherwise a client can choose its own address and avoid the per-address and per-name limits (the lockout of
+the user name still applies).
 
 ## Reviewers and Signatures
 
@@ -361,6 +365,7 @@ The recorded actions are:
 | Passwords | `user.password-set-by-admin`, `user.password-changed`                                         |
 | Sign-in   | `auth.sign-in`, `auth.sign-out`, `auth.sign-in-failed`, `auth.locked-out`                     |
 | Sign-in   | `auth.sign-in-locked`, `auth.sign-in-throttled`                                               |
+| Auditing  | `audit.events-suppressed`                                                                     |
 | Signing   | `signature.reauth-failed`                                                                     |
 | Evidence  | `attestation.generated`                                                                       |
 
@@ -385,7 +390,10 @@ line and cut to 50 characters; a password is never recorded), for attempts on a 
 for attempts refused by the sign-in throttle (`auth.sign-in-throttled`), and for a wrong password at a signature
 (`signature.reauth-failed`). So that a flood of attempts cannot flood the trail, repeats of the same kind for the same
 name are recorded once per minute; the next entry after that says how many were left out ("; N more in the minute after
-the previous entry"). The last count of a name that does not come back is not recorded, and this state is kept in
+the previous entry"). Attempts on a disabled account are recorded the same way (once per minute, account, and
+reason). At most 500 keys are tracked at once; while that table is full of live keys, events of new keys are not
+recorded, and the trail shows one `audit.events-suppressed` entry per minute (and the server log one warning) instead.
+The last count of a name that does not come back is not recorded, and this state is kept in
 memory, so it starts again at a restart. The trail does not hold the address of the client.
 
 ## Signed Attestation
@@ -640,12 +648,24 @@ non-zero exit code.
 - **Basic local accounts only**: there is no password reset, no email, no multi-factor sign-in, and no external
   identity provider. An administrator sets a new password for a user who forgot it. Serve over HTTPS (for example
   behind a reverse proxy) when the server is reachable from other machines.
-- **Lockout is per user name**: repeated failed sign-ins lock the user name, so someone who guesses wrongly on
-  purpose can keep a user locked out for 5 minutes at a time. The sign-in throttle (see
-  [Users and Sign-in](#users-and-sign-in)) limits attempts per client address, but it does not stop this.
+- **Lockout is per user name**: repeated failed sign-ins lock the user name, so anyone who knows a user name and
+  guesses wrongly on purpose can keep that user locked out for 5 minutes at a time, also from an address that the
+  throttle allows. The sign-in throttle (see
+  [Users and Sign-in](#users-and-sign-in)) limits how often one address can try, but it does not stop this. This is an
+  accepted trade-off of locking by user name.
+- **Sign-in timing**: every failed sign-in gives the same answer and an unknown user costs one password verification,
+  but the response time can still differ slightly between a known and an unknown user (a failure on a known account
+  also stores the failure counter and an audit entry), so timing can in principle reveal which user names exist. This
+  is not mitigated further.
+- **Forwarded headers are the deployment's responsibility**: with `ASPNETCORE_FORWARDEDHEADERS_ENABLED=true` the server
+  trusts `X-Forwarded-For` from any sender and does not restrict which proxies it trusts. The proxy must overwrite the
+  header and be the only route to the server; otherwise a client can choose its own address and avoid the per-address
+  and per-name limits (the lockout of the user name still applies).
 - **Sign-in throttle limits**: the throttle is kept in memory in one server process; it starts again at a restart,
-  and with several server processes each has its own counters. Users behind one shared address share its limit.
-  The address is only as reliable as the proxy setup (see the note on forwarded headers below), and signature
+  and with several server processes each has its own counters. It holds at most 10,000 counters and evicts the oldest
+  when it is full, so a flood from very many addresses can push out older counters. Users behind one shared address
+  share its limit.
+  The address is only as reliable as the proxy setup (see the note on forwarded headers above), and signature
   re-authentication is limited only by the lockout of the account.
 - **Sessions are not cut short at once**: a user who is disabled, removed, or changed is signed out of an open page
   only at its next check, so for up to the interval (30 seconds by default; `Auth:RevalidationSeconds`) the open
@@ -668,7 +688,9 @@ non-zero exit code.
   or archiving of the trail. A wrong current
   password on the account page is recorded as `auth.sign-in-failed`, and an attempt there on a locked account is not
   recorded. The address of the client is not recorded in the trail (only the web server log has it). Repeated
-  failures are coalesced and the typed name of an unknown user is recorded (see [Audit Trail](#audit-trail)).
+  failures are coalesced and the typed name of an unknown user is recorded (see [Audit Trail](#audit-trail)); when
+  the table that coalesces them (500 keys) is full of live keys, events of new keys are not recorded and the trail
+  shows one `audit.events-suppressed` entry per minute.
   Sign-in events are recorded on a best-effort basis.
 - **Approval is computed**: the Approved or In review status is calculated from the record and its signatures each
   time it is shown; it is not a stored review state, and the review state is still Draft.

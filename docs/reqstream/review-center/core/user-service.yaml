@@ -160,20 +160,23 @@ sections:
           The UserService class shall record a failed sign-in (wrong password, disabled account, unknown user), an
           attempt on a locked account, and the lockout of an account in the audit trail on a best-effort basis, with
           the typed user name of an unknown user cleaned and capped to the length of a user name, without recording
-          a password, with attempts on a locked account and failures for an unknown user recorded at most once per
-          minute and name, and without ever letting a failure of the trail change the result of the sign-in.
+          a password, with attempts on a locked account, failures of a disabled account, and failures for an unknown
+          user recorded at most once per minute, name and reason, and without ever letting a failure of the trail
+          change the result of the sign-in.
         justification: |
           Failed sign-ins show attempts to break in, but the trail must not let an unauthenticated caller fill it
           with text of their choice or with an unlimited number of rows, and a failing trail must not lock
           everybody out. The typed name of an unknown user shows what an attacker tried; it is cleaned to one line
-          and capped, so it cannot forge entries. Wrong passwords and disabled accounts are bounded by the lockout
-          and are recorded every time.
+          and capped, so it cannot forge entries. Wrong passwords are bounded by the lockout and are recorded every
+          time. A right password on a disabled account is not counted by the lockout, so those failures are
+          coalesced like those of locked and unknown accounts.
         tests:
           - UserService_AuthenticateAsync_WrongPassword_CounterUpdateCarriesNoDraft
           - UserService_AuthenticateAsync_UnknownUser_RecordsCleanedCappedTypedNameWithoutPassword
           - UserService_AuthenticateAsync_UnknownUserRepeated_RecordsOneEntryPerWindow
           - UserService_AuthenticateAsync_WrongPassword_RecordsExistingUserWithoutPassword
           - UserService_AuthenticateAsync_DisabledAccount_RecordsAccountDisabled
+          - UserService_AuthenticateAsync_DisabledAccountRepeated_RecordsOneEntryPerWindow
           - UserService_AuthenticateAsync_FifthFailure_RecordsLockoutOnce
           - UserService_AuthenticateAsync_LockedAccount_RecordsSignInLockedOncePerWindow
           - UserService_AuthenticateAsync_AuditStoreFails_StillRefusesAndDoesNotThrow
@@ -184,9 +187,13 @@ sections:
           The UserService class shall offer a re-authentication check that works like a sign-in check, including the
           lockout, and shall record its failures (wrong password, disabled account, locked account, unknown user)
           under a re-authentication action that is different from the sign-in action, without recording a
-          password.
+          password, and with failures of a disabled or locked account recorded at most once per minute, account and
+          reason.
         justification: |
           A signature asks for the password again, and guessing it there is as dangerous as at sign-in. The trail
-          must show where the failed attempt happened, which the sign-in action alone cannot tell.
+          must show where the failed attempt happened, which the sign-in action alone cannot tell. The reason is
+          part of the once-per-minute key, so a disabled account and a locked account of one name both show.
         tests:
           - UserService_ReauthenticateAsync_WrongPasswordAndLockedAccount_RecordSignatureReauthFailed
+          - UserService_ReauthenticateAsync_DisabledAccountRepeated_RecordsOneSignatureReauthFailedPerWindow
+          - UserService_ReauthenticateAsync_DisabledThenLockedInOneMinute_RecordsBothReasons

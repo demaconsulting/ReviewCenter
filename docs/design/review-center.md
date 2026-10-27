@@ -309,8 +309,13 @@ verification show, was recorded somewhere else. There is no external anchoring i
 
 Author signatures, rejecting or withdrawing a signature, and a second
 factor are deferred to later slices; a signed slot cannot be reassigned.
-The limitations of the identity slice are deliberate: lockout after failed sign-ins is per user name, so anyone can
-lock a known user name for a few minutes; a user who is disabled, removed, or changed can keep a page that is already
+The limitations of the identity slice are deliberate: lockout after failed sign-ins is per user name, so anyone who
+knows a user name can lock that account for a few minutes at a time, also from an address that the sign-in throttle
+allows; the response time of a failed sign-in can differ slightly between a known and an unknown user, so timing can
+in principle reveal which user names exist; the client address that the throttle sees comes from `X-Forwarded-For`
+when the forwarded headers are enabled, and the server does not restrict which proxies it trusts, so keeping that
+header trustworthy is the responsibility of the deployment; a user who is disabled, removed, or changed can keep a
+page that is already
 open for up to the revalidation interval (`Auth:RevalidationSeconds`, 30 seconds by default), after which the page is
 replaced by a "Session ended" message, while the page header keeps the old name until the next navigation or reload; a
 password change does not end other sessions of the user; and a database that was created
@@ -320,7 +325,9 @@ from a repository (its reviews have no source columns) must be
 deleted and created again, because there are no migrations.
 The limitations of the audit trail are also deliberate: the throttle and the coalescing of repeated failure entries
 (one entry per key and minute, with a count of the suppressed repeats) are kept in memory, so they are per process and
-start again at a restart, and the count of the last window of a key is lost when the key does not recur; the typed
+start again at a restart, and the count of the last window of a key is lost when the key does not recur; when the
+coalescing table (500 keys) is full of live keys, events of new keys are not recorded and the trail shows one
+`audit.events-suppressed` entry per minute instead; the typed
 name of an unknown user is recorded, cleaned and cut to 50 characters, but the address of the client is not recorded
 in the trail (only the web server log has it); a wrong current password on the account page appears as
 `auth.sign-in-failed`, and an attempt there on a locked account is not recorded; recording of
@@ -391,8 +398,9 @@ is running.
   `Auth:SessionHours` hours (default 8). The cookie is marked secure when the request is HTTPS, so behind a proxy that
   terminates TLS the forwarded headers must be enabled (the environment variable
   `ASPNETCORE_FORWARDEDHEADERS_ENABLED` set to `true`). That setting makes the application take the client address
-  from `X-Forwarded-For` of any sender, so the proxy must set or overwrite that header and the server must be reachable
-  only through the proxy. The sign-in throttle uses the client address: without the setting behind a proxy, every user
+  from `X-Forwarded-For` of any sender; the server does not restrict which proxies it trusts, so keeping the header
+  trustworthy is the responsibility of the deployment: the proxy must overwrite that header and be the only route to
+  the server. The sign-in throttle uses the client address: without the setting behind a proxy, every user
   shares the address of the proxy, and with it but without a proxy that overwrites the header, a client can choose its
   own address and avoid the per-address and per-name limits (the lockout of the account still applies). The throttle
   is set with `Identity:Throttle:MaxFailuresPerName` (default 5), `Identity:Throttle:MaxFailuresPerAddress` (default 20),

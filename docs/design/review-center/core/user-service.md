@@ -145,10 +145,13 @@ and the command line supply it): with it, a failed sign-in records `auth.sign-in
 unknown user the actor text is `unknown user` and the typed name is cleaned (one line, control characters replaced by
 spaces) and cut to the length of a user name; it is attacker-chosen text, so this and the cap are what protect the
 trail; a password is never recorded. An attempt on an account that is already locked is recorded as
-`auth.sign-in-locked` (detail `account locked`). Attempts on locked accounts and failures for unknown names are not
-limited by the lockout, so they are recorded through `AuditService.TryRecordCoalescedAsync`: one entry per minute
-and key, the key being the action, the kind, and the lower-cased typed or account name, with the number of suppressed
-repeats carried on the next entry of the key. Wrong passwords and disabled-account failures of existing accounts
+`auth.sign-in-locked` (detail `account locked`). Attempts on locked or disabled accounts and failures for unknown names
+are not
+limited by the lockout (a right password on a disabled account is not counted either), so they are recorded through
+`AuditService.TryRecordCoalescedAsync`: one entry per minute and key, the key being the action, the kind (for an
+existing account the kind includes the reason, `account disabled` or `account locked`, so one reason cannot hide
+another), and the lower-cased typed or account name, with the number of suppressed
+repeats carried on the next entry of the key. Wrong passwords of existing accounts
 are bounded by the lockout and are recorded every time. The failures of `ReauthenticateAsync` use the action
 `signature.reauth-failed` with the same details instead of `auth.sign-in-failed` and `auth.sign-in-locked`; the
 lockout entry stays `auth.locked-out`. These events change no data of their own and are recorded best-effort,
@@ -164,6 +167,16 @@ Rule violations raise `DomainRuleException` with the matching `DomainRule`. A nu
 construction raises `ArgumentNullException`, and so does a null user name where one is required. A role that is not a
 defined value raises `ArgumentOutOfRangeException`. A failed sign-in is not an error: `AuthenticateAsync` returns
 `null`. Store failures propagate unchanged. The messages never contain a password or a hash.
+
+#### Known Limitations
+
+- Every failed sign-in gives the same answer, and an unknown user costs one password verification (a dummy hash), so
+  the main cost is equal. The response time can still differ slightly between a known and an unknown user: a failure
+  on a known account also stores the failure counter and an audit entry. Timing can therefore in principle reveal
+  which user names exist. This is not mitigated further.
+- The lockout is per user name, so anyone who knows a user name can keep that account locked for 5 minutes at a time,
+  also from an address that the sign-in throttle allows. The throttle limits how often one address can try; it does
+  not prevent this. This is an accepted trade-off of locking by user name.
 
 #### Dependencies
 
