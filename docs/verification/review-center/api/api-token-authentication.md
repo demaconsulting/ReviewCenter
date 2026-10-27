@@ -70,7 +70,7 @@ days, and the same token is answered with 401. This scenario is tested by
 
 **ApiTokenAuthentication_Request_SessionCookie_IsNotAccepted**: A browser that is signed in requests the API with its
 cookie only, and with its cookie and Basic credentials that are not a token. Each answer is 401 with the bearer
-challenge. This scenario is tested by
+and the Basic challenge. This scenario is tested by
 `ApiTokenAuthentication_Request_SessionCookie_IsNotAccepted`.
 
 **ApiTokenAuthentication_Request_TokenOnWebPage_IsNotSignedIn**: The account page and the attestation page route are

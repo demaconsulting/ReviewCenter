@@ -421,9 +421,11 @@ public class ApiEndpointsTests
         var token = await CreateTokenAsync(app);
         using var client = ClientFor(app, token.Value, basic);
 
-        // Act: read the index
+        // Act: read the index, and the recorded signature time of the review it stands for
         var response = await client.GetAsync($"/api/projects/{projectId}/evidence/index.json", TestContext.Current.CancellationToken);
         using var json = await JsonAsync(response);
+        var approval = await app.Services.GetRequiredService<SigningService>().GetApprovalAsync(projectId, "REV-2", TestContext.Current.CancellationToken);
+        var signedDay = approval!.Slots.Max(slot => slot.SignedAt!.Value).UtcDateTime.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture);
 
         // Assert: JSON, not cached, and the root object has the one review that has a set id
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -433,7 +435,7 @@ public class ApiEndpointsTests
         var entry = Assert.Single(reviews.EnumerateArray());
         Assert.Equal("Core-Logic", entry.GetProperty("id").GetString());
         Assert.Matches("^[0-9a-f]{64}$", entry.GetProperty("fingerprint").GetString()!);
-        Assert.Equal(DateTimeOffset.UtcNow.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture), entry.GetProperty("date").GetString());
+        Assert.Equal(signedDay, entry.GetProperty("date").GetString());
         Assert.Equal("pass", entry.GetProperty("result").GetString());
         Assert.Equal($"http://localhost/api/projects/{projectId}/reviews/REV-2/attestation.pdf", entry.GetProperty("file").GetString());
     }

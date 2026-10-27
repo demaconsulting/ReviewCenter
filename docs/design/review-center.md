@@ -477,9 +477,10 @@ is running.
   review
   (200 with `application/pdf`). `GET /api/openapi.json` returns the OpenAPI description of these endpoints and needs no
   token. Errors are `application/problem+json` documents: 400 for a rejected request (with the field that is wrong), 401
-  for a missing or refused token (always the same answer, with `WWW-Authenticate: Bearer`), 403 for an action that is
-  not allowed, 404 for an unknown project, review, or address, 409 for a conflict or an attestation of a review that is
-  not complete, 429 when too many tokens were refused from one address, and 5xx for repository or key failures.
+  for a missing or refused token (always the same answer, with `WWW-Authenticate` headers for `Bearer` and `Basic`),
+  403 for an action that is not allowed, 404 for an unknown project, review, or address, 409 for a conflict or an
+  attestation of a review that is not complete, 429 when too many tokens were refused from one address, and 5xx for
+  repository or key failures.
 - *Constraints*: A token acts with the current role of its owner and stops working when it expires, is revoked, or its
   owner is disabled or locked out. A token cannot sign, change reviewer slots, or reach any page, and a session cookie
   cannot reach the API. The token is only a bearer secret: the server must not be exposed to untrusted networks
