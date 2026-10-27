@@ -71,24 +71,23 @@ internal sealed class EvidenceIndexService
         int projectId,
         CancellationToken cancellationToken = default)
     {
-        // One approval read per review is acceptable at this scale; a batch read is the way to speed it up
+        // Only reviews planned from a review set can be listed; their approvals are read in one batch so the users
+        // are loaded once, not once per review
+        var planned = (await _reviews.ListAsync(projectId, cancellationToken))
+            .Where(review => !string.IsNullOrEmpty(review.ReviewSetId))
+            .ToList();
+        var approvals = await _signing.GetApprovalsAsync(projectId, planned.Select(review => review.Id), cancellationToken);
         var best = new Dictionary<(string Id, string Fingerprint), (DateTimeOffset At, string ReviewId)>();
-        foreach (var review in await _reviews.ListAsync(projectId, cancellationToken))
+        foreach (var review in planned)
         {
-            if (string.IsNullOrEmpty(review.ReviewSetId))
-            {
-                continue;
-            }
-
-            var approval = await _signing.GetApprovalAsync(projectId, review.Id, cancellationToken);
-            if (approval is null || !approval.IsApproved)
+            if (!approvals.TryGetValue(review.Id, out var approval) || !approval.IsApproved)
             {
                 continue;
             }
 
             // The day of the last signature of the current record
             var completed = approval.Slots.Max(s => s.SignedAt!.Value);
-            var key = (review.ReviewSetId, review.ContentFingerprint);
+            var key = (review.ReviewSetId!, review.ContentFingerprint);
             if (!best.TryGetValue(key, out var kept)
                 || completed > kept.At
                 || (completed == kept.At && string.CompareOrdinal(review.Id, kept.ReviewId) < 0))

@@ -99,10 +99,56 @@ public sealed class SigningService
     ///     <see cref="SlotSignatureState.NotSigned"/> otherwise. The review is approved when it has at least one slot
     ///     and every slot is signed.
     /// </remarks>
-    public async Task<ReviewApproval?> GetApprovalAsync(
+    public Task<ReviewApproval?> GetApprovalAsync(
         int projectId,
         string reviewId,
         CancellationToken cancellationToken = default)
+    {
+        return ReadApprovalAsync(projectId, reviewId, null, cancellationToken);
+    }
+
+    /// <summary>
+    ///     Reads the approval status of several reviews of a project, loading the users once for all of them.
+    /// </summary>
+    /// <param name="projectId">The project identity.</param>
+    /// <param name="reviewIds">The review identifiers.</param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <returns>
+    ///     The status of each review that exists, by review identifier; a review that does not exist is absent.
+    ///     Each status equals what <see cref="GetApprovalAsync"/> returns for the same review.
+    /// </returns>
+    public async Task<IReadOnlyDictionary<string, ReviewApproval>> GetApprovalsAsync(
+        int projectId,
+        IEnumerable<string> reviewIds,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(reviewIds);
+        var members = (await _users.ListAsync(cancellationToken)).ToDictionary(user => user.Id);
+        var approvals = new Dictionary<string, ReviewApproval>();
+        foreach (var reviewId in reviewIds)
+        {
+            if (await ReadApprovalAsync(projectId, reviewId, members, cancellationToken) is { } approval)
+            {
+                approvals[reviewId] = approval;
+            }
+        }
+
+        return approvals;
+    }
+
+    /// <summary>
+    ///     Reads the approval status of a review.
+    /// </summary>
+    /// <param name="projectId">The project identity.</param>
+    /// <param name="reviewId">The review identifier.</param>
+    /// <param name="preloaded">The users by identity when the caller already loaded them; <c>null</c> loads them.</param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <returns>The status, or <c>null</c> when the review does not exist.</returns>
+    private async Task<ReviewApproval?> ReadApprovalAsync(
+        int projectId,
+        string reviewId,
+        IReadOnlyDictionary<int, User>? preloaded,
+        CancellationToken cancellationToken)
     {
         // One snapshot, so the digest, the slots and the signatures compared with it describe the same state
         var snapshot = await _store.GetSnapshotAsync(projectId, reviewId, cancellationToken);
@@ -112,7 +158,7 @@ public sealed class SigningService
         }
 
         var (record, slots, signatures) = snapshot;
-        var members = (await _users.ListAsync(cancellationToken)).ToDictionary(user => user.Id);
+        var members = preloaded ?? (await _users.ListAsync(cancellationToken)).ToDictionary(user => user.Id);
         var digest = RecordDigest.Compute(record);
 
         // One status per slot, numbered in creation order

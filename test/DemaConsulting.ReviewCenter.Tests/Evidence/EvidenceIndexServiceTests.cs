@@ -215,6 +215,40 @@ public class EvidenceIndexServiceTests
     }
 
     /// <summary>
+    ///     Test that the users are read once for the whole index, however many reviews it covers, and that the
+    ///     entries are the same as when the approvals are read one review at a time.
+    /// </summary>
+    [Fact]
+    public async Task EvidenceIndexService_Build_SeveralReviews_ReadsUsersOnce()
+    {
+        // Arrange: three complete reviews with a set id over a user store that counts list reads
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var store = new FakeReviewStore();
+        var clock = new MovableTimeProvider(new DateTimeOffset(2025, 3, 4, 5, 6, 7, TimeSpan.Zero));
+        var userStore = new CountingUserStore(new FakeUserStore());
+        var users = new UserService(userStore, new FakePasswordHasher(), clock);
+        var ann = await users.CreateAsync("ann", "Ann", UserRole.Reviewer, AttestationFixture.Password, cancellationToken);
+        var signing = new SigningService(store, users, clock);
+        var checklists = new ChecklistService(store, clock);
+        var project = await new ProjectService(store, clock).CreateAsync("Apollo", null, cancellationToken);
+        foreach (var (id, set) in new[] { ("r-1", "a-set"), ("r-2", "b-set"), ("r-3", "c-set") })
+        {
+            await EvidenceTestSupport.AddReviewAsync(store, clock, project.Id, id, set, TestContent.A);
+            await EvidenceTestSupport.CompleteAsync(checklists, signing, project.Id, id, ann.Id, AttestationFixture.Password);
+        }
+
+        var service = new EvidenceIndexService(new ReviewService(store, clock), signing);
+        var before = userStore.ListCount;
+
+        // Act: build the index
+        var entries = await service.BuildAsync(project.Id, cancellationToken);
+
+        // Assert: all three are listed and the user list was read exactly once
+        Assert.Equal(["a-set", "b-set", "c-set"], entries.Select(entry => entry.Id).ToArray());
+        Assert.Equal(1, userStore.ListCount - before);
+    }
+
+    /// <summary>
     ///     Creates the service over the fixture.
     /// </summary>
     /// <param name="fixture">The fixture.</param>

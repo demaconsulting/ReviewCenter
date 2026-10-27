@@ -24,7 +24,8 @@ attestation. Nothing is stored: the index is built for each request.
 - *Parameters*: `int projectId` and a cancellation token.
 - *Returns*: the entries, one for each review-set id and fingerprint, ordered by id and then by fingerprint (ordinal);
   an empty list when no review qualifies.
-- *Postconditions*: A review is considered only when it has a review-set id. Its approval is read from `SigningService`;
+- *Postconditions*: A review is considered only when it has a review-set id. Its approval is read from `SigningService`
+  (all in one batch, see Cost);
   a review that has no approval, or whose approval is not complete (no slot, an unsigned slot, or a signature of an
   older record), is not listed. The completion time of a review is the latest `SignedAt` of its slots. Of the reviews
   with the same id and fingerprint the one with the latest completion time is kept and, for the same time, the one with
@@ -44,8 +45,9 @@ configuration. Only a review that was planned from a review-set (see `ReviewPlan
 upload, by choosing a repository by hand, or through the API has none, and a made-up id could wrongly satisfy a
 review-set that nobody reviewed.
 
-**Cost**: One approval is read for each review that has a review-set id, one after the other. That is acceptable for the
-size of a project of this tool; a batch read of the approvals is the way to speed it up if a project grows large.
+**Cost**: The approvals of all reviews that have a review-set id are read with one call of
+`SigningService.GetApprovalsAsync`, which loads the user list once for the whole index and not once for each review. The
+snapshot of each review is still one read per review.
 
 #### Dependencies
 

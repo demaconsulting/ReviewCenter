@@ -139,6 +139,11 @@ hexadecimal characters. This scenario is tested by `SigningService_GetApprovalAs
 **SigningService_GetApprovalAsync_MissingReview_ReturnsNull**: The status of a review that does not exist is `null`.
 This scenario is tested by `SigningService_GetApprovalAsync_MissingReview_ReturnsNull`.
 
+**SigningService_GetApprovalsAsync_SeveralReviews_EqualsSingleReadsAndLoadsUsersOnce**: Two reviews and a review that
+does not exist are read in one batch over a user store that counts list reads. The batch has the two existing reviews,
+the status of a review equals the single read, and the user list was read once. This scenario is tested by
+`SigningService_GetApprovalsAsync_SeveralReviews_EqualsSingleReadsAndLoadsUsersOnce`.
+
 **SigningService_ListCandidatesAsync_ReturnsEnabledUsersOnly**: With one user disabled, the candidates are the other
 enabled users. This scenario is tested by `SigningService_ListCandidatesAsync_ReturnsEnabledUsersOnly`.
 

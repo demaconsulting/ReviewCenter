@@ -141,6 +141,7 @@ sections:
           - SigningService_SignAsync_RecordChangedAfterSigning_OutOfDateThenResignable
           - SigningService_GetApprovalAsync_NoSlots_NotApprovedAndAsksForSlot
           - SigningService_GetApprovalAsync_MissingReview_ReturnsNull
+          - SigningService_GetApprovalsAsync_SeveralReviews_EqualsSingleReadsAndLoadsUsersOnce
 
       - id: ReviewCenter-SigningService-Audit
         title: >-

@@ -20,6 +20,7 @@ sections:
           - EvidenceIndexService_Build_IncompleteReview_IsNotListed
           - EvidenceIndexService_Build_ReviewChangedAfterSignature_IsNotListed
           - EvidenceIndexService_Build_OtherProject_IsNotListed
+          - EvidenceIndexService_Build_SeveralReviews_ReadsUsersOnce
 
       - id: ReviewCenter-EvidenceIndex-Identity
         title: >-

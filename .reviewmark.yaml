@@ -744,6 +744,7 @@ reviews:
       - "src/DemaConsulting.ReviewCenter.Core/SlotRole.cs"
       - "src/DemaConsulting.ReviewCenter.Core/ReviewApproval.cs"
       - "test/**/Core/SigningServiceTests.cs"
+      - "test/**/Core/CountingUserStore.cs"
       - "test/**/Core/AuditEventTests.cs"
 
   # ReviewCenter - Core audit trail

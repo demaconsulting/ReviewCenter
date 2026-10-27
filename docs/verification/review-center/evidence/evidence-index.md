@@ -68,6 +68,10 @@ last one close to midnight UTC. The date is the UTC day of the last signature. T
 **EvidenceIndexService_Build_OtherProject_IsNotListed**: A complete review belongs to another project. The index of the
 project is empty. This scenario is tested by `EvidenceIndexService_Build_OtherProject_IsNotListed`.
 
+**EvidenceIndexService_Build_SeveralReviews_ReadsUsersOnce**: Three complete reviews with a review-set id are built over
+a user store that counts how often the user list is read. All three are listed, and the list was read exactly once. This
+scenario is tested by `EvidenceIndexService_Build_SeveralReviews_ReadsUsersOnce`.
+
 **ReviewMarkContract_GoldenIndex_MatchesCommittedFile**: The index of the fixed project is read over HTTP. After the
 line
 endings are normalized it is the golden file: three entries, one of them for a review set that has two reviews with
