@@ -29,8 +29,8 @@ sections:
           - ReviewCenterPuppet-BrowserDaemon-Lifecycle
           - ReviewCenterPuppet-PlaywrightBrowser-LaunchFailure
         tests:
-          - windows@PuppetEndToEnd_StartDriveStop_HelloAndCounter_WorksAgainstRealServer
-          - ubuntu@PuppetEndToEnd_StartDriveStop_HelloAndCounter_WorksAgainstRealServer
+          - windows@PuppetEndToEnd_StartDriveStop_SignInProjectAndTheme_WorksAgainstRealServer
+          - ubuntu@PuppetEndToEnd_StartDriveStop_SignInProjectAndTheme_WorksAgainstRealServer
 
       - id: ReviewCenterPuppet-System-Interact
         title: >-
@@ -49,8 +49,8 @@ sections:
           - ReviewCenterPuppet-SelectorResolver-Resolve
           - ReviewCenterPuppet-PlaywrightBrowser-Navigation
         tests:
-          - windows@PuppetEndToEnd_StartDriveStop_HelloAndCounter_WorksAgainstRealServer
-          - ubuntu@PuppetEndToEnd_StartDriveStop_HelloAndCounter_WorksAgainstRealServer
+          - windows@PuppetEndToEnd_StartDriveStop_SignInProjectAndTheme_WorksAgainstRealServer
+          - ubuntu@PuppetEndToEnd_StartDriveStop_SignInProjectAndTheme_WorksAgainstRealServer
 
       - id: ReviewCenterPuppet-System-VisualCheck
         title: >-
@@ -63,5 +63,5 @@ sections:
         children:
           - ReviewCenterPuppet-OTS-Playwright-Chromium
         tests:
-          - windows@PuppetEndToEnd_StartDriveStop_HelloAndCounter_WorksAgainstRealServer
-          - ubuntu@PuppetEndToEnd_StartDriveStop_HelloAndCounter_WorksAgainstRealServer
+          - windows@PuppetEndToEnd_StartDriveStop_SignInProjectAndTheme_WorksAgainstRealServer
+          - ubuntu@PuppetEndToEnd_StartDriveStop_SignInProjectAndTheme_WorksAgainstRealServer

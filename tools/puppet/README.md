@@ -34,8 +34,8 @@ define a function or alias for it in your shell if you like.
 
 2. Start Puppet: `puppet start --url http://127.0.0.1:5199`. It prints one line and returns; the browser keeps
    running in the background.
-3. Run commands one at a time, for example `puppet goto /`, `puppet snapshot`, `puppet click hello-button`,
-   `puppet wait "text=Count: 2"`, `puppet screenshot shot.png`. Look at each result, then decide the next command.
+3. Run commands one at a time, for example `puppet goto /login`, `puppet snapshot`, `puppet click login-button`,
+`puppet wait current-user`, `puppet screenshot shot.png`. Look at each result, then decide the next command.
 4. Stop it when done: `puppet stop`.
 
 `puppet start` options: `--url <base>` (paths given to `goto` are relative to it), `--viewport <WxH>` (default
@@ -97,7 +97,7 @@ Actions fail after about 5 seconds so a wrong selector costs little.
     (c) Does the UI help me work out what I can or need to do next?
 4. Check other sizes and themes: `puppet viewport 390x800`, `puppet theme dark`, then screenshot again.
 5. Confirm details numerically with `puppet eval`, for example
-   `puppet eval "getComputedStyle(document.querySelector('[data-testid=hello-button]')).color"` or
+   `puppet eval "getComputedStyle(document.querySelector('[data-testid=projects-link]')).color"` or
    `puppet eval "document.documentElement.scrollWidth > innerWidth"` for horizontal overflow.
 
 ## Known limitation

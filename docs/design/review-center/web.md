@@ -5,15 +5,21 @@
 ### Overview
 
 The `Web` subsystem is the Blazor Server user interface of ReviewCenter. It owns what a browser
-shows and how it responds to user actions. It contains thirteen units: `App`, the HTML shell, the URL router, the
-page frame with the sign-in header, and the `SessionGate` that replaces an open page when its user is no longer
-signed in; `HomePage`, the interactive landing page served at the root URL; `ProjectsPage`,
+shows and how it responds to user actions. It contains fifteen units: `App`, the HTML shell with the stored-theme
+script, the URL router, the page frame (the menu bar with the product name, the primary navigation, the Help link
+and the sign-in controls, and the footer with the version and the link to the About page), and the `SessionGate`
+that replaces an open page when its user is no longer signed in; `HomePage`, the landing page served at the root URL,
+with a Get started section for signed-in users; `AboutPage` and `HelpPage`, the pages that describe the product and
+explain how to use it (`HelpPage` includes the index, a page for each topic, and the topic list `HelpTopics`);
+`ProjectsPage`,
 `ProjectPage`, `PlanPage`, `ReviewPage`, and `ChecklistPage`, the pages for projects, the planning of reviews from
-the review-sets of a repository, reviews, and review checklists;
-`LoginPage`, `AccountPage`, and `UsersPage`, the pages for signing in, changing one's own password, and managing
-users; `HistoryPage` and `AuditPage`, the pages that show the history of a review and let an administrator
+the review-sets of a repository, reviews, and review checklists, where `ProjectsPage` includes `NewProjectPage` and
+`ProjectPage` includes `NewReviewPage`, the pages that hold the creation forms;
+`LoginPage`, `AccountPage`, and `UsersPage`, the pages for signing in, changing one's own password and choosing the
+appearance, and managing users (`UsersPage` includes `NewUserPage`); `HistoryPage` and `AuditPage`, the pages that
+show the history of a review and let an administrator
 verify the audit trail; and `RepositoriesPage`, the page where an administrator registers the git repositories that
-reviews can be created from. The subsystem
+reviews can be created from (it includes `NewRepositoryPage`). The subsystem
 does not start or configure the server; the `Hosting` subsystem maps `App` as the root
 component of the server and supplies the endpoints around it, and the `Identity` subsystem supplies the sign-in and
 the authorization the pages rely on. The pages use the `Core` subsystem for
@@ -23,14 +29,24 @@ all domain behavior and never access the database.
 
 **Root route** (`GET /`): The home page.
 
-- *Type*: HTTP `GET`, followed by a live Blazor connection for interactivity.
+- *Type*: HTTP `GET`; there is no live connection, because the page is plain server-rendered markup.
 - *Role*: Provider.
-- *Contract*: Returns an HTML document titled "ReviewCenter" containing the home page with a
-  Hello button, a counter button, and a count. After the client script has connected, button
-  clicks are handled on the server and the page updates without reloading.
-- *Constraints*: The document carries a `data-interactive` marker that is `false` in the
-  server-rendered response and `true` once the live connection is established. The page is open to anonymous
-  visitors.
+- *Contract*: Returns an HTML document titled "ReviewCenter" containing the home page: the product name and the
+  tagline, and for a signed-in user a Get started section with a link card to the projects page and, for an
+  administrator, to the repositories, audit, and users pages.
+- *Constraints*: The page is open to anonymous visitors, who see only the tagline.
+
+**About and Help routes** (`GET /about`, `GET /help`, `GET /help/{topic}`): The pages that describe the product.
+
+- *Type*: HTTP `GET`; there is no live connection, because the pages are static server-rendered markup.
+- *Role*: Provider.
+- *Contract*: `/about` shows the product name, the tagline, the full version, the copyright holder, a link to the
+  project on GitHub, and a short description of what the product does. `/help` is the index of the help topics, a card
+  for each with its title and a one-line description. `/help/{topic}` is the page of one topic, with its text and
+  screenshots and, at the bottom, links to the previous topic, the next topic, and the index. An unknown topic shows a
+  friendly message with a link to the index.
+- *Constraints*: Open to anonymous visitors. No link on these pages is an in-page anchor, because the base address of
+  the HTML document would resolve it to the home page.
 
 **Login route** (`GET /login`): The sign-in page.
 
@@ -40,39 +56,47 @@ all domain behavior and never access the database.
   `Identity` subsystem, and a generic failure message when the query value `error` is present.
 - *Constraints*: Open to anonymous visitors.
 
-**Project routes** (`GET /projects`, `GET /projects/{id}`, `GET /projects/{id}/plan`,
-`GET /projects/{id}/reviews/{reviewId}`,
+**Project routes** (`GET /projects`, `GET /projects/new`, `GET /projects/{id}`, `GET /projects/{id}/plan`,
+`GET /projects/{id}/reviews/new`, `GET /projects/{id}/reviews/{reviewId}`,
 `GET /projects/{id}/reviews/{reviewId}/checklist`): The
 pages for projects, planning, reviews, and review checklists.
 
 - *Type*: HTTP `GET`, followed by a live Blazor connection for interactivity.
 - *Role*: Provider.
-- *Contract*: `/projects` lists the projects and has a form to create one; `/projects/{id}` shows a
-  project with its reviews and a form that creates a review from selected files; `/projects/{id}/plan` plans the
+- *Contract*: `/projects` lists the projects as rows that link to them and has a New project button; `/projects/new`
+  holds the form that creates a project and opens it; `/projects/{id}` shows a
+  project with its reviews as a list of rows and a New review button and a Plan reviews button;
+  `/projects/{id}/reviews/new` holds the form that creates a review from selected files or from a git repository (the
+  review identifier `new` is refused, because it would collide with this route);
+  `/projects/{id}/plan` plans the
   reviews that a head revision of a registered repository needs from the review-sets of its `.reviewmark.yaml`
-  and creates the ticked ones; the review route shows
-  the review, its fingerprint, its files, the content of a selected file, the progress of its checklist, its
-  reviewer slots with their signature status, and an Approved or In review badge, and lets a reviewer sign;
+  and creates the ticked ones; the review route shows a summary of the checklist progress, the reviewers, and the
+  threads, then
+  the review, its fingerprint, its files, the content of a selected file, its reviewer
+  slots with their signature status, and an Approved or In review badge, and lets a reviewer sign;
   the checklist route shows the checklist, where each check is answered. A project or review that
   does not exist is reported on the page itself.
-- *Constraints*: Every page carries the same `data-interactive` marker as the home page. Every page requires a
-  signed-in user: an anonymous request is redirected to the login page.
+- *Constraints*: Every interactive page carries the `data-interactive` marker. Every page requires a
+  signed-in user: an anonymous request is redirected to the login page. List and detail pages use a wide container
+  and form pages a narrow one.
 
-**Account route** (`GET /account`): The page where the signed-in user changes their own password.
+**Account route** (`GET /account`): The page where the signed-in user changes their own password and chooses the
+appearance.
 
 - *Type*: HTTP `GET`, followed by a live Blazor connection for interactivity.
 - *Role*: Provider.
 - *Contract*: A form with the current password and the new password twice; it reports success or the reason of a
-  rejection.
+  rejection. An Appearance card offers System, Light, and Dark, which applies at once and is remembered by the
+  browser.
 - *Constraints*: Requires a signed-in user.
 
-**Users route** (`GET /users`): The page where an administrator manages users.
+**Users routes** (`GET /users`, `GET /users/new`): The pages where an administrator manages users.
 
 - *Type*: HTTP `GET`, followed by a live Blazor connection for interactivity.
 - *Role*: Provider.
-- *Contract*: Lists the users and offers to create a user, disable or enable a user, set a role, and set a
-  password.
-- *Constraints*: Requires the role `Admin`; a signed-in user with another role gets HTTP status 403.
+- *Contract*: `/users` lists the users and offers to disable or enable a user, set a role, and set a
+  password, and has a New user button; `/users/new` holds the form that creates a user.
+- *Constraints*: Require the role `Admin`; a signed-in user with another role gets HTTP status 403.
 
 **History route** (`GET /projects/{id}/reviews/{reviewId}/history`): The history of one review.
 
@@ -88,27 +112,33 @@ pages for projects, planning, reviews, and review checklists.
 - *Type*: HTTP `GET`, followed by a live Blazor connection for interactivity.
 - *Role*: Provider.
 - *Contract*: Lists the entries of the whole system newest first in pages of 50, with Older and Newer links (the
-  position is carried in the query values `before` and `after`), and a Verify chain button that checks the whole hash
+  position is carried in the query values `before` and `after`), shows long hashes shortened to twelve characters
+  with the full value in a tooltip, and a Verify chain button that checks the whole hash
   chain and shows either "Chain intact" with the number of entries and the head hash, or the first broken entry and the
   head hash.
 - *Constraints*: Requires the role `Admin`, which is re-checked against the stored user on load and on every
   verification. It is reached from the Audit link of the page frame, which only an administrator sees.
 
-**Repositories route** (`GET /repositories`): The page where an administrator manages the registered git repositories.
+**Repositories routes** (`GET /repositories`, `GET /repositories/new`): The pages where an administrator manages the
+registered git repositories.
 
 - *Type*: HTTP `GET`, followed by a live Blazor connection for interactivity.
 - *Role*: Provider.
-- *Contract*: Lists the registered repositories with their location, user name, whether a token is set, and whether
-  they are enabled; offers to add a repository, to edit one (name, location, user name, and keeping, replacing, or
-  clearing the token), and to disable or enable one. A token is never shown. There is no delete.
-- *Constraints*: Requires the role `Admin`, which is re-checked against the stored user before every action. It is
+- *Contract*: `/repositories` lists the registered repositories with their location, badges for a user name and a
+  token when set, and whether they are enabled; offers to edit one (name, location, user name, and keeping,
+  replacing, or clearing the token), and to disable or enable one, and has an Add repository button.
+  `/repositories/new` holds the form that registers a repository. A token is never shown. There is no delete.
+- *Constraints*: Require the role `Admin`, which is re-checked against the stored user before every action. They are
   reached from the Repositories link of the page frame, which only an administrator sees.
 
 **Unknown routes**: Any other URL.
 
 - *Type*: HTTP `GET`.
 - *Role*: Provider.
-- *Contract*: The shell is returned with a "Page not found." message in place of a page.
+- *Contract*: The shell is returned with status 404 and a "Page not found" page, inside the header and footer of the
+  page frame, in place of a page (`/not-found` is re-executed for the request, see `UseNotFoundPage` of `ServerHost`).
+  A request that is not a page request (a method other than GET or HEAD, a path under `/api`, `/_framework`,
+  `/_blazor`, or `/_content`, or a path that ends in a file extension) keeps a plain, empty 404.
 - *Constraints*: None.
 
 **Client script** (`/_framework/blazor.web.js`): Referenced by the shell.
@@ -129,18 +159,28 @@ pages for projects, planning, reviews, and review checklists.
 ### Design
 
 The subsystem uses the standard Blazor Server hosting model. `App` is rendered as static
-server-side markup: it emits the HTML document, the page head outlet, the router, and the
-client script reference. `Routes` (part of the `App` unit) matches the requested URL to a page
-component, with `HomePage` registered at the root route, and renders a plain not-found
-message for unmatched URLs. `HomePage` opts in to interactive server rendering, so only the
-page, not the shell, holds a live connection.
+server-side markup: it emits the HTML document, the page head outlet, a small inline script that applies the stored
+appearance before the first paint, the router, and the client script reference. `Routes` (part of the `App` unit)
+matches the requested URL to a page component, with `HomePage` registered at the root route, and renders the not-found
+page (`NotFoundPage`, registered at `/not-found`) inside `MainLayout` for unmatched URLs. The routes that end in `new`
+(`/projects/new`, `/projects/{id}/reviews/new`,
+`/repositories/new`, `/users/new`) are matched before the parameterized routes of the same shape. Each interactive
+page opts in to interactive server rendering, so only the
+page, not the shell, holds a live connection. `HomePage`, `AboutPage`, `LoginPage`, and the help pages are static
+markup with no live connection.
 
-The first response to a browser is a server-rendered snapshot of `HomePage` with the
+The first response to a browser is a server-rendered snapshot of an interactive page with the
 `data-interactive` marker set to `false`. When the client script connects, the page is
 rendered again on a live connection, its first render completes, and the marker becomes
 `true`. Drivers such as tests and tooling wait for the marker instead of using fixed delays.
 Each connection has its own page instance, so the page state is per user and needs no
 synchronization.
+
+All pages share one look: a style sheet with color variables for a light and a dark palette. The `data-theme`
+attribute of the `html` element, set by the inline script of `App` from the value that the `AccountPage` stores in
+the browser, selects the palette; without a stored choice the palette follows the preference of the browser. List and
+detail pages use a wide container and form pages a narrow one; a breadcrumb above the heading shows where a page is
+below its parents.
 
 The subsystem has no dependency on `Context`. It depends on the `Core` subsystem (the services, the
 domain types, and the limits), on the `Identity` subsystem (the signed-in user, the roles, and the safe return
@@ -149,15 +189,17 @@ address), and on the ASP.NET Core Blazor components framework.
 #### Pages and domain access
 
 `ProjectsPage`, `ProjectPage`, `PlanPage`, `ReviewPage`, `ChecklistPage`, `AccountPage`, `UsersPage`, `HistoryPage`,
-`AuditPage`, and `RepositoriesPage` follow the pattern of
-`HomePage`: a Razor
+`AuditPage`, and `RepositoriesPage`, and the creation pages they include (`NewProjectPage`, `NewReviewPage`,
+`NewRepositoryPage`, and `NewUserPage`), follow the pattern of
+the interactive pages: a Razor
 presentation file and a code-behind file, interactive server rendering, and the `data-interactive`
 marker. They obtain `ProjectService`, `ReviewService`, and the other Core services they need (`ReviewPage`:
 `ThreadService`, `ChecklistService`, and `SigningService`; `ProjectPage`: also `SigningService`; `PlanPage`:
 `ProjectService`, `RepositoryService`, and `ReviewPlanner`; `ChecklistPage`:
 `ChecklistService`; `AccountPage` and `UsersPage`:
 `UserService`; `HistoryPage` and `AuditPage`: `AuditService`, and `AuditPage` also the user store through
-`UserService`; `RepositoriesPage`: `RepositoryService` and `UserService`) from the service container and call them
+`UserService`; `RepositoriesPage`: `RepositoryService` and `UserService`; each creation page the service of its
+parent page) from the service container and call them
 from their handlers. Each page loads its data when it is created, so a connection that is
 established after the server-rendered snapshot shows current data. A rule violation reported by
 Core as a `DomainRuleException` is shown as an error message next to the form, with the entered
@@ -167,14 +209,18 @@ by `@onsubmit`, so Enter submits them and tests can submit them without a button
 
 #### Authorization and the signed-in user
 
-Every page except the home page and the login page requires a signed-in user, declared on the page with an
-authorization attribute; `UsersPage`, `AuditPage`, and `RepositoriesPage` require the role `Admin`. The checks are made
+Every page except the home page, the login page, the About page, and the help pages requires a signed-in user,
+declared on the page with an
+authorization attribute; `UsersPage`, `AuditPage`, and `RepositoriesPage`, and their creation pages, require the role
+`Admin`. The checks are made
 by the
 authorization of the `Identity` subsystem before the page is rendered, so a page never shows data to an anonymous
-visitor. The page frame (`MainLayout` in the `App` unit) shows the display name of the signed-in user with links to
-the account page and, for an administrator, the users page, the repositories page, and the audit page, and a logout
-button, or a link to the
-login page when nobody is signed in. The pages that record something on behalf of a person (`ReviewPage` and
+visitor. The page frame (`MainLayout` in the `App` unit) is a menu bar with the product name, which links to the home
+page, then a tab for the projects page and, for an administrator, the repositories page, the audit page, and the users
+page, and at the right the Help link, the display name of the signed-in user, a link to the account page, and a logout
+button, or the Help link and a link to the login page when nobody is signed in. The tab of the section that is open
+is marked as current. A footer shows the product name, the version, the copyright holder, and a link to the About
+page. The pages that record something on behalf of a person (`ReviewPage` and
 `ChecklistPage`) get the signed-in user
 from the authentication state and pass it to Core as an `Actor`; there is no field in which a person could type
 another name. A page that is already open makes no request, so the cookie check does not reach it; the
@@ -195,12 +241,14 @@ so an action that meets an authentication state that has already ended is refuse
 Each protected page opts in to interactive rendering on its own, so each page is a root component of its own live
 connection, while `App`, `Routes`, and `MainLayout` are served as static markup once. Neither the router nor the
 header can react when the authentication state of an open page ends; only a component inside the page can. The
-`SessionGate` component of the `App` unit therefore wraps the content of each of the ten protected pages
-(`ProjectsPage`, `ProjectPage`, `PlanPage`, `ReviewPage`, `ChecklistPage`, `AccountPage`, `UsersPage`, `HistoryPage`,
-`AuditPage`, `RepositoriesPage`). While a user is signed in it
+`SessionGate` component of the `App` unit therefore wraps the content of each of the fourteen protected pages
+(`ProjectsPage`, `NewProjectPage`, `ProjectPage`, `NewReviewPage`, `PlanPage`, `ReviewPage`, `ChecklistPage`,
+`AccountPage`, `UsersPage`, `NewUserPage`, `HistoryPage`,
+`AuditPage`, `RepositoriesPage`, `NewRepositoryPage`). While a user is signed in it
 adds no element, so the markup and the `data-interactive` marker of the page do not change. When the state becomes
 anonymous, it removes the page content, and with it every handler, and shows a "Session ended" message with a link to
-the login page that returns to the same page. `HomePage` and `LoginPage` are open to anonymous visitors, have no
+the login page that returns to the same page. `HomePage`, `AboutPage`, the help pages, and `LoginPage` are open to
+anonymous visitors, have no
 protected actions, and are not wrapped. A test renders every protected page signed out and fails for a page that
 lacks the gate.
 
@@ -209,18 +257,19 @@ reads the state once. This is documented behavior, not a defect: the page body, 
 is what ends.
 
 The pages enforce nothing that Core does not also enforce, with one exception: the file input of
-`ProjectPage` checks the upload limits (file count, size of each file, total size) from the
+`NewReviewPage` checks the upload limits (file count, size of each file, total size) from the
 sizes the browser reports, before reading any file, so that an oversized selection is rejected
 without being read into memory. The limits themselves are defined once in Core.
 
 Upload paths are the file name only. A browser file input does not expose folder paths, so
-`ProjectPage` records each selected file under its browser file name; two selected files with
+`NewReviewPage` records each selected file under its browser file name; two selected files with
 the same name are therefore refused by Core as a duplicate path. Directory-structured uploads are
 a later feature.
 
 #### Reviews from a repository
 
-`ProjectPage` offers two sources for a new review: "Upload files" (the default) and "From a repository". The second
+`NewReviewPage`, which the New review button of `ProjectPage` opens, offers two sources for a new review, shown as
+two selectable option cards: "Upload files" (the default) and "From a repository". The second
 shows a drop-down of the enabled repositories (by name only; `RepositoryService.ListEnabledAsync` returns a summary
 that has no location and no token), a head revision, an optional baseline revision, and the selection (one pattern
 per line, default `**/*`). The page passes the values to `ReviewService.CreateFromRepositoryAsync` and shows every
@@ -268,7 +317,10 @@ to do next; the text git printed, a location, a credential and exception text ar
 the plan page when an enabled repository exists, and `ReviewPage` shows the review-set of a planned review in the
 details.
 
-The review page shows the reviewer slots of a review and lets a reviewer sign. The page contains no signing rules:
+The review page shows the reviewer slots of a review and lets a reviewer sign. A summary strip at its top (the
+state, the checklist progress with the link to the checklist, the reviewer slots with their signatures, and the open
+thread count) comes before the files and the viewer, because reading them is the main work; the form that adds a slot
+is collapsed until asked for. The page contains no signing rules:
 the approval status, the blockers, the record digest, and every refusal come from `SigningService` in Core. The
 page's part is to ask for the approval and display it (the Approved or In review badge next to the title, the status
 of each slot, and the digest in the Details section), to offer the controls that fit the signed-in user (slot

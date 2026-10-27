@@ -19,8 +19,8 @@ N/A - standard test environment.
 
 ### Test Scenarios
 
-**SelectorResolver_Resolve_AllForms_ReturnsPlaywrightSelector**: `hello-button` and `testid:hello-button` resolve to
-`[data-testid="hello-button"]`, a quote in a test id is escaped, and `css=.button`, `text=Count: 2`,
+**SelectorResolver_Resolve_AllForms_ReturnsPlaywrightSelector**: `projects-link` and `testid:projects-link` resolve to
+`[data-testid="projects-link"]`, a quote in a test id is escaped, and `css=.button`, `text=Saved`,
 `role=button[name="Save"]`, and `#main` are returned exactly as given. Tested by
 `SelectorResolver_Resolve_AllForms_ReturnsPlaywrightSelector`.
 

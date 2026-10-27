@@ -15,9 +15,10 @@ tests confirm the framework is functioning correctly in the way ReviewCenter use
 
 ASP.NET Core is verified by integration evidence from the project's own test suite; the framework has no
 self-validation mode. Each scenario names a specific test method. Some scenarios run the application in memory
-through the test host, some render a component, and the system-level scenarios start a real server process with the
-`serve` verb and call it over HTTP, which exercises Kestrel. A passing pipeline run for all scenarios constitutes
-evidence that all four requirements are satisfied.
+through the test host, some render a component, the system-level scenarios start a real server process with the
+`serve` verb and call it over HTTP, which exercises Kestrel, and one scenario drives the live Blazor connection from a
+real browser. A passing pipeline run for all scenarios constitutes evidence that all four requirements are
+satisfied.
 
 ### Test Scenarios
 
@@ -37,28 +38,50 @@ evidence that all four requirements are satisfied.
 
 **Requirement coverage**: `ReviewCenter-OTS-AspNetCore-Host`.
 
-#### ReviewCenter_ServeVerb_Started_HomePageContainsTitleAndControls
+#### ReviewCenter_ServeVerb_Started_HomePageContainsTitleAndTagline
 
-**Scenario**: The `serve` verb starts a real server process and the home page `/` is requested over HTTP.
+**Scenario**: The `serve` verb starts a real server process and the home page `/` is requested over HTTP, as is the
+Blazor client script.
 
-**Expected**: The response contains the page title and the hello and counter controls rendered by the Razor
-components.
+**Expected**: The response contains the page title and the tagline rendered by the Razor components, and the client
+script is served.
 
 **Requirement coverage**: `ReviewCenter-OTS-AspNetCore-Host`, `ReviewCenter-OTS-AspNetCore-Components`.
 
-#### WebSubsystem_HomeRoute_Requested_RendersTitleAndControls
+#### WebSubsystem_HomeRoute_Requested_RendersTitleAndTagline
 
 **Scenario**: The home route is requested from the in-memory test host.
 
-**Expected**: The framework renders the routed Razor component to HTML containing the title and the controls.
+**Expected**: The framework renders the routed Razor component to HTML containing the title and the tagline.
 
 **Requirement coverage**: `ReviewCenter-OTS-AspNetCore-Components`.
 
-#### HomePage_HelloButton_Clicked_ShowsGreeting
+#### WebSubsystem_ProjectsRoute_InitialResponse_IsNotYetInteractive
 
-**Scenario**: The home page component is rendered and the hello button is clicked.
+**Scenario**: A signed-in client requests the projects route from the in-memory test host; no live connection exists
+for a plain HTTP request.
 
-**Expected**: The component model handles the event and re-renders with the greeting displayed.
+**Expected**: The server-rendered page is marked `data-interactive="false"`, which shows that the framework renders
+the page first and opens the live connection afterwards.
+
+**Requirement coverage**: `ReviewCenter-OTS-AspNetCore-Components`.
+
+#### NewProjectPage_CreateForm_ValidInput_CreatesProjectAndOpensIt
+
+**Scenario**: The new project page component is rendered, a name is entered, and the form is submitted.
+
+**Expected**: The component model handles the event, the project is created, and the browser is sent to the project.
+
+**Requirement coverage**: `ReviewCenter-OTS-AspNetCore-Components`.
+
+#### PuppetEndToEnd_StartDriveStop_SignInProjectAndTheme_WorksAgainstRealServer
+
+**Scenario**: The Puppet end-to-end test of the ReviewCenterPuppet system drives a real browser against a real
+server: it signs in, waits until the page is marked interactive, clicks the new project button, fills in the form,
+and submits it. The test runs on Windows and Linux in CI.
+
+**Expected**: The click and the form submission are handled by the live Blazor connection, so the project page
+appears, which proves the round trip between the browser and the component model.
 
 **Requirement coverage**: `ReviewCenter-OTS-AspNetCore-Components`.
 

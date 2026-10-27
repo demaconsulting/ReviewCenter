@@ -35,8 +35,8 @@ public class PuppetProgramTests
         var go = PuppetProgram.ParseCommand(["goto", "/about"]);
         var press = PuppetProgram.ParseCommand(["press", "Enter", "testid:name"]);
         var pressKey = PuppetProgram.ParseCommand(["press", "Escape"]);
-        var wait = PuppetProgram.ParseCommand(["wait", "text=Count: 2", "--timeout", "1500"]);
-        var shot = PuppetProgram.ParseCommand(["screenshot", "shot.png", "--full", "--selector", "hello-button"]);
+        var wait = PuppetProgram.ParseCommand(["wait", "text=Saved", "--timeout", "1500"]);
+        var shot = PuppetProgram.ParseCommand(["screenshot", "shot.png", "--full", "--selector", "projects-link"]);
         var theme = PuppetProgram.ParseCommand(["theme", "dark"]);
         var start = PuppetProgram.ParseCommand(["start", "--url", "http://127.0.0.1:5199/", "--viewport", "390x800", "--headed"]);
 
@@ -47,7 +47,7 @@ public class PuppetProgramTests
         Assert.Equal(["Escape"], pressKey.Args);
         Assert.Equal(("wait", "1500"), (wait.Command, wait.Options["timeout"]));
         Assert.Equal(Path.GetFullPath("shot.png"), shot.Args[0]);
-        Assert.Equal(("true", "hello-button"), (shot.Options["full"], shot.Options["selector"]));
+        Assert.Equal(("true", "projects-link"), (shot.Options["full"], shot.Options["selector"]));
         Assert.Equal(["dark"], theme.Args);
         Assert.Equal("http://127.0.0.1:5199", start.Options["url"]);
         Assert.Equal(("390x800", "true"), (start.Options["viewport"], start.Options["headed"]));

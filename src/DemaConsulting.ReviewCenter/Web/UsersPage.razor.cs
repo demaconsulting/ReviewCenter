@@ -76,26 +76,6 @@ public partial class UsersPage : ComponentBase
     private Dictionary<int, string> Passwords { get; } = [];
 
     /// <summary>
-    ///     Gets or sets the user name typed into the new-user form.
-    /// </summary>
-    private string NewUsername { get; set; } = string.Empty;
-
-    /// <summary>
-    ///     Gets or sets the display name typed into the new-user form.
-    /// </summary>
-    private string NewDisplayName { get; set; } = string.Empty;
-
-    /// <summary>
-    ///     Gets or sets the role chosen in the new-user form.
-    /// </summary>
-    private UserRole NewRole { get; set; } = UserRole.Reviewer;
-
-    /// <summary>
-    ///     Gets or sets the initial password typed into the new-user form.
-    /// </summary>
-    private string NewPassword { get; set; } = string.Empty;
-
-    /// <summary>
     ///     Gets the message of the last rejected action, or <c>null</c> when there is none.
     /// </summary>
     private string? ErrorMessage { get; set; }
@@ -170,27 +150,6 @@ public partial class UsersPage : ComponentBase
     private void SetPasswordChoice(int userId, string? value)
     {
         Passwords[userId] = value ?? string.Empty;
-    }
-
-    /// <summary>
-    ///     Creates a user from the form values and refreshes the list.
-    /// </summary>
-    /// <returns>A task that completes when the submission has been handled.</returns>
-    /// <remarks>
-    ///     On success the form is cleared. On a rule violation the form keeps what was typed, except the
-    ///     password, so that the operator can correct it.
-    /// </remarks>
-    private async Task CreateUserAsync()
-    {
-        var username = NewUsername.Trim();
-        await RunAsync(null, $"Created user '{username}'.", async actor =>
-        {
-            await UserService.CreateAsync(NewUsername, NewDisplayName, NewRole, NewPassword, actor);
-            NewUsername = string.Empty;
-            NewDisplayName = string.Empty;
-            NewRole = UserRole.Reviewer;
-        });
-        NewPassword = string.Empty;
     }
 
     /// <summary>

@@ -1,6 +1,6 @@
 package ReviewCenter {
     part def AccountPage {
-        doc /* Page where a signed-in user changes the own password by giving the current password and the new password twice. */
+        doc /* Page where a signed-in user chooses the appearance of the interface (system, light, or dark, kept in the browser only) and changes the own password by giving the current password and the new password twice. */
 
         comment sourceRef /* Source: src/DemaConsulting.ReviewCenter/Web/AccountPage.razor and AccountPage.razor.cs */
         comment testRef /* Test: test/DemaConsulting.ReviewCenter.Tests/Web/AccountPageTests.cs */

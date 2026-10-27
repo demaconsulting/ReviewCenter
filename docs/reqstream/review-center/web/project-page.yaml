@@ -1,8 +1,8 @@
 ---
 # Software Unit Requirements for the ProjectPage Unit
 #
-# The ProjectPage unit is the page at /projects/{project} that shows one project with its reviews and offers a
-# form to create a review from uploaded files.
+# The ProjectPage unit is the page at /projects/{project} that shows one project with its reviews, and the page at
+# /projects/{project}/reviews/new that holds the form to create a review from uploaded files or from a repository.
 
 sections:
   - title: ProjectPage Unit Requirements
@@ -19,12 +19,22 @@ sections:
 
       - id: ReviewCenter-ProjectPage-Reviews
         title: >-
-          The ProjectPage unit shall list the reviews of the project with a link to each review, its title, and
-          its state.
+          The ProjectPage unit shall list the reviews of the project as rows with a link to each review, its
+          title, and its state.
         justification: |
           The project page is how users reach their reviews and see where each one stands.
         tests:
           - ProjectPage_Render_ProjectWithReview_ListsReviewWithLinkTitleAndState
+
+      - id: ReviewCenter-ProjectPage-NewReview
+        title: >-
+          The ProjectPage unit shall offer a New review button that opens the page holding the review creation form
+          for that project, so the project page itself shows only the reviews.
+        justification: |
+          Users mostly come to the project page to pick a review; the creation form is reached on purpose, from a
+          button, instead of crowding the list.
+        tests:
+          - ProjectPage_Render_ProjectWithoutReviews_ShowsNameAndEmptyMessage
 
       - id: ReviewCenter-ProjectPage-Approval
         title: >-
@@ -47,31 +57,43 @@ sections:
           Users must see exactly which files they are about to submit before they submit them, and must be able
           to correct a wrong selection. Files chosen for one project must never be submitted into another.
         tests:
-          - ProjectPage_FileInput_FilesSelected_ListsNamesAndSizes
-          - ProjectPage_FileInput_SecondSelection_ReplacesFirst
-          - ProjectPage_ParametersChange_OtherProject_ClearsFormAndSelection
+          - NewReviewPage_FileInput_FilesSelected_ListsNamesAndSizes
+          - NewReviewPage_FileInput_SecondSelection_ReplacesFirst
+          - NewReviewPage_ParametersChange_OtherProject_ClearsFormAndSelection
 
       - id: ReviewCenter-ProjectPage-Create
         title: >-
-          The ProjectPage unit shall offer a form with a review identifier, a title, and selected files that
-          creates a review from the file names and contents, and then shows the review page.
+          The ProjectPage unit shall offer, on its page for a new review, a form with a review identifier, a
+          title, and selected files that creates a review from the file names and contents, and then shows the
+          review page.
         justification: |
           Creating a review from files is the central action of the product. Only the file name is used as the
           path, because a browser does not reveal the folder a file came from.
         tests:
-          - ProjectPage_CreateForm_ValidInput_CreatesReviewAndNavigatesToIt
+          - NewReviewPage_CreateForm_ValidInput_CreatesReviewAndNavigatesToIt
 
       - id: ReviewCenter-ProjectPage-Error
         title: >-
           The ProjectPage unit shall show the reason when a review cannot be created, naming the identifier for
-          a duplicate identifier, and shall create nothing, including when no files are selected or two selected
-          files have the same name.
+          a duplicate identifier, and shall create nothing, including when no files are selected, two selected
+          files have the same name, or the sign-in state of the user has ended.
         justification: |
           A rejected form must tell users what to correct, and must not leave a partial review.
         tests:
-          - ProjectPage_CreateForm_NoFiles_ShowsErrorAndCreatesNothing
-          - ProjectPage_CreateForm_DuplicateReviewId_ShowsErrorNamingTheId
-          - ProjectPage_CreateForm_DuplicateFileNames_ShowsDuplicatePathError
+          - NewReviewPage_CreateForm_NoFiles_ShowsErrorAndCreatesNothing
+          - NewReviewPage_CreateForm_DuplicateReviewId_ShowsErrorNamingTheId
+          - NewReviewPage_CreateForm_DuplicateFileNames_ShowsDuplicatePathError
+          - NewReviewPage_CreateForm_SessionEndedBeforePageKnows_ShowsClearErrorAndCreatesNothing
+
+      - id: ReviewCenter-ProjectPage-ReservedId
+        title: >-
+          The ProjectPage unit shall refuse the review identifier "new", in any letter case, with a message that
+          it is reserved, and shall create nothing.
+        justification: |
+          The address of the page for a new review ends in "new", so a review with that identifier could never
+          be opened. Users are told to choose another identifier instead of creating an unreachable review.
+        tests:
+          - NewReviewPage_CreateForm_ReservedReviewId_ShowsErrorAndCreatesNothing
 
       - id: ReviewCenter-ProjectPage-Limits
         title: >-
@@ -84,10 +106,10 @@ sections:
           count and sizes protects the server before any content is transferred, and refusing it as a whole
           ensures a partly read file set is never submitted.
         tests:
-          - ProjectPage_FileInput_FileTooLarge_ShowsErrorAndKeepsNothing
-          - ProjectPage_FileInput_TooManyFiles_ShowsErrorAndKeepsNothing
-          - ProjectPage_FileInput_TotalSizeTooLarge_ShowsErrorAndKeepsNothing
-          - ProjectPage_FileInput_DeclaredSizesUnderstated_RejectsOnReceivedBytes
+          - NewReviewPage_FileInput_FileTooLarge_ShowsErrorAndKeepsNothing
+          - NewReviewPage_FileInput_TooManyFiles_ShowsErrorAndKeepsNothing
+          - NewReviewPage_FileInput_TotalSizeTooLarge_ShowsErrorAndKeepsNothing
+          - NewReviewPage_FileInput_DeclaredSizesUnderstated_RejectsOnReceivedBytes
 
       - id: ReviewCenter-ProjectPage-SourceChoice
         title: >-
@@ -98,8 +120,8 @@ sections:
           One form serves both sources without clutter. A repository cannot be chosen when none is registered,
           and the user is told whom to ask.
         tests:
-          - ProjectPage_SourceChoice_RepositoryChosen_ShowsRepositoryFieldsInsteadOfUpload
-          - ProjectPage_SourceChoice_NoEnabledRepository_DisablesRepositorySourceWithHint
+          - NewReviewPage_SourceChoice_RepositoryChosen_ShowsRepositoryFieldsInsteadOfUpload
+          - NewReviewPage_SourceChoice_NoEnabledRepository_DisablesRepositorySourceWithHint
 
       - id: ReviewCenter-ProjectPage-RepositoryForm
         title: >-
@@ -111,10 +133,10 @@ sections:
           Ordinary users choose from the registry the administrator maintains and must not see how it reaches
           the repository. The creator is told once which entries were left out.
         tests:
-          - ProjectPage_RepositorySelect_OffersOnlyEnabledRepositoriesWithoutLocationOrToken
-          - ProjectPage_CreateForm_FromRepository_CreatesReviewWithSourceAndNavigates
-          - ProjectPage_CreateForm_FromRepositoryWithoutBaseline_ReviewsAllFilesAtHead
-          - ProjectPage_CreateForm_SkippedEntries_AreShownBeforeOpeningTheReview
+          - NewReviewPage_RepositorySelect_OffersOnlyEnabledRepositoriesWithoutLocationOrToken
+          - NewReviewPage_CreateForm_FromRepository_CreatesReviewWithSourceAndNavigates
+          - NewReviewPage_CreateForm_FromRepositoryWithoutBaseline_ReviewsAllFilesAtHead
+          - NewReviewPage_CreateForm_SkippedEntries_AreShownBeforeOpeningTheReview
 
       - id: ReviewCenter-ProjectPage-RepositoryError
         title: >-
@@ -124,10 +146,10 @@ sections:
         justification: |
           The user can fix a wrong revision or selection only when told which one is wrong.
         tests:
-          - ProjectPage_CreateForm_EmptySelection_ShowsNothingToReviewAndCreatesNothing
-          - ProjectPage_CreateForm_BadRevision_ShowsErrorAndCreatesNothing
-          - ProjectPage_CreateForm_NoRepositoryChosen_AsksForOne
-          - ProjectPage_CreateForm_RepositoryDisabledMeanwhile_ShowsErrorAndCreatesNothing
+          - NewReviewPage_CreateForm_EmptySelection_ShowsNothingToReviewAndCreatesNothing
+          - NewReviewPage_CreateForm_BadRevision_ShowsErrorAndCreatesNothing
+          - NewReviewPage_CreateForm_NoRepositoryChosen_AsksForOne
+          - NewReviewPage_CreateForm_RepositoryDisabledMeanwhile_ShowsErrorAndCreatesNothing
 
       - id: ReviewCenter-ProjectPage-Interactive
         title: >-

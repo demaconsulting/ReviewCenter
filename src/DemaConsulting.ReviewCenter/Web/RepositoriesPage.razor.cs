@@ -72,26 +72,6 @@ public partial class RepositoriesPage : ComponentBase
     private IReadOnlyList<SourceRepository> Repositories { get; set; } = [];
 
     /// <summary>
-    ///     Gets or sets the name typed into the add form.
-    /// </summary>
-    private string NewName { get; set; } = string.Empty;
-
-    /// <summary>
-    ///     Gets or sets the location typed into the add form.
-    /// </summary>
-    private string NewLocation { get; set; } = string.Empty;
-
-    /// <summary>
-    ///     Gets or sets the user name typed into the add form.
-    /// </summary>
-    private string NewUsername { get; set; } = string.Empty;
-
-    /// <summary>
-    ///     Gets or sets the token typed into the add form; emptied after every submission.
-    /// </summary>
-    private string NewToken { get; set; } = string.Empty;
-
-    /// <summary>
     ///     Gets the identity of the repository being edited, or <c>null</c> when no edit form is open.
     /// </summary>
     private int? EditingId { get; set; }
@@ -176,28 +156,6 @@ public partial class RepositoriesPage : ComponentBase
             _interactive = true;
             StateHasChanged();
         }
-    }
-
-    /// <summary>
-    ///     Adds a repository from the form values and refreshes the list.
-    /// </summary>
-    /// <returns>A task that completes when the submission has been handled.</returns>
-    /// <remarks>
-    ///     On success the form is cleared. On a rule violation the form keeps what was typed, except the token,
-    ///     so that the operator can correct it.
-    /// </remarks>
-    private async Task CreateRepositoryAsync()
-    {
-        var name = NewName.Trim();
-        var token = NewToken;
-        NewToken = string.Empty;
-        await RunAsync(null, $"Added repository '{name}'.", async actor =>
-        {
-            await RepositoryService.CreateAsync(NewName, NewLocation, NewUsername, token, actor);
-            NewName = string.Empty;
-            NewLocation = string.Empty;
-            NewUsername = string.Empty;
-        });
     }
 
     /// <summary>

@@ -1,8 +1,8 @@
 ---
 # Software Unit Requirements for the AccountPage Unit
 #
-# The AccountPage unit is the Account.razor page at /account where a signed-in user sees the account and changes the
-# own password.
+# The AccountPage unit is the Account.razor page at /account where a signed-in user sees the account, chooses the
+# appearance of the interface, and changes the own password.
 
 sections:
   - title: AccountPage Unit Requirements
@@ -26,3 +26,17 @@ sections:
         tests:
           - AccountPage_ChangePassword_ValidInput_ChangesOwnPasswordAndClearsFields
           - AccountPage_ChangePassword_InvalidInput_ShowsErrorAndChangesNothing
+
+      - id: ReviewCenter-AccountPage-Appearance
+        title: >-
+          The AccountPage unit shall let the signed-in user choose between a system, a light, and a dark appearance,
+          with the system appearance selected until a choice was made, apply a chosen appearance at once, and keep the
+          choice in the browser only, showing the stored choice as selected when the page is opened.
+        justification: |
+          Reviewers read code for long periods and have different needs for contrast and glare. The choice is a
+          property of the device and its surroundings, so it is kept in the browser rather than on the server, and
+          following the device setting is the default so that nobody has to configure anything.
+        tests:
+          - AccountPage_Render_AppearanceCard_ShowsThreeOptionsWithSystemSelected
+          - AccountPage_ChooseDark_AppliesThemeAndSelectsOption
+          - AccountPage_Render_StoredLightChoice_IsSelected

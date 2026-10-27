@@ -8,7 +8,8 @@ verb. The current release lets you sign in, create projects and draft reviews ma
 content fingerprint of each review, lets you discuss the files in threaded comments, gives each review a
 checklist, and lets reviewers sign a review with their password, with every action recorded under the signed-in
 user. Every change is also recorded in a hash-chained audit trail that can be read and verified. The remaining review
-feature (review states beyond Draft) is still under development. The command-line
+feature (review states beyond Draft) is still under development. The web interface has a built-in Help with short
+guides to the main tasks. The command-line
 interface is documented in
 this guide. A separate development tool,
 Puppet, is described near the end of this guide.
@@ -121,20 +122,63 @@ reviewcenter serve --urls http://localhost:8080
 
 The server provides these routes:
 
-- `/` - the ReviewCenter home page. It shows the title `ReviewCenter`, a Hello button that displays a greeting
-  when pressed, a counter button that increments a displayed count, and a link to the projects page. It is open to
-  everyone.
+- `/` - the ReviewCenter home page. It shows the title `ReviewCenter` and its tagline and is open to everyone. Once
+  you are signed in it also shows a **Get started** list of links to the main pages; see
+  [The Page Frame](#the-page-frame).
 - `/login` - the sign-in page (open to everyone).
-- `/account` - your account, with a form to change your password.
+- `/help` and `/help/{topic}` - the built-in help (open to everyone); see [Built-in Help](#built-in-help).
+- `/about` - the version and a link to the project (open to everyone).
+- `/account` - your account, with the appearance (theme) setting and a form to change your password.
 - `/users` - the user administration page (administrators only).
-- `/projects` - the list of projects, with a form to create a new project.
-- `/projects/{id}` - one project, with its reviews and a form to create a review.
+- `/users/new` - the form that creates a user (administrators only).
+- `/repositories` - the registered git repositories (administrators only).
+- `/repositories/new` - the form that registers a repository (administrators only).
+- `/audit` - the audit trail (administrators only).
+- `/projects` - the list of projects.
+- `/projects/new` - the form that creates a project.
+- `/projects/{id}` - one project, with its reviews.
+- `/projects/{id}/reviews/new` - the form that creates a review.
+- `/projects/{id}/plan` - the page that plans reviews from the review-sets of a repository.
 - `/projects/{id}/reviews/{reviewId}` - one review, with its files, their content, and comment threads.
 - `/projects/{id}/reviews/{reviewId}/checklist` - the checklist of a review.
+- `/projects/{id}/reviews/{reviewId}/history` - the history of a review.
 - `/health` - a health check that answers with status 200 and the text `Healthy` while the server is running (open
   to everyone).
 
-Every page except `/`, `/login`, and `/health` needs a signed-in user; see [Users and Sign-in](#users-and-sign-in).
+Every page except `/`, `/login`, `/help`, `/about`, and `/health` needs a signed-in user; see
+[Users and Sign-in](#users-and-sign-in).
+
+### The Page Frame
+
+Every page has the same header and footer.
+
+- The header shows the **ReviewCenter** brand, which is a link to the home page. When you are signed in, it is
+  followed by **Projects** and, for administrators, **Repositories**, **Audit**, and **Users**. On the right it shows
+  **Help**, and then either a **Sign in** link (nobody is signed in) or your display name, an **Account** link, and a
+  **Logout** button.
+- The footer shows the version of ReviewCenter, the copyright, and a link to the **About** page, which has the full
+  version and a link to the project.
+- The home page shows the title and the tagline. When you are signed in it also shows a **Get started** card with links
+  to **Projects** and, for administrators, **Repositories**, **Audit**, and **Users**, each with a one-line
+  description.
+
+### Built-in Help
+
+The **Help** link of the header opens `/help`, an index of short guides, open to everyone, even without signing in.
+Each topic is a page of its own with links to the previous and the next topic:
+
+- **Getting started** (`/help/getting-started`): sign in, find your project, and open a review.
+- **Creating a review** (`/help/creating-a-review`): choose the files from a git repository or by uploading them.
+- **Reading a review** (`/help/reading-a-review`): the Diff, Head, and Baseline views and the change kinds.
+- **Comments and threads** (`/help/comments-and-threads`): comment on a line or a file, reply, resolve, and share a
+  link.
+- **Checklist** (`/help/checklist`): answer each check Pass, Fail, or N/A.
+- **Reviewers and signing** (`/help/reviewers-and-signing`): reviewer slots, signing with your password, and approval.
+- **Audit trail** (`/help/audit-trail`): every action is recorded in a tamper-evident chain.
+- **Planning reviews** (`/help/planning-reviews`): create the reviews of the review-sets of a repository in one go.
+
+The topics are summaries; this guide has the details. An address below `/help` that is not a topic shows a short
+message that the topic does not exist, with a link back to the index.
 
 The `--urls` option is only valid together with `serve`; using it without `serve` is reported as an error.
 The `--silent` option suppresses the server's console log output.
@@ -184,8 +228,8 @@ used) it prints an error and exits with a non-zero exit code.
 Open any page, or `/login`, enter your user name and password, and press Sign in. After signing in you are taken to
 the page you asked for. A failed sign-in always shows the same message, whatever the reason (unknown user name, wrong
 password, disabled account, or locked account), so the message does not reveal which user names exist. The page header
-shows your display name, an Account link, and a Logout button; when nobody is signed in it shows a Sign in link
-instead.
+shows your display name, an Account link, and a Logout button (see [The Page Frame](#the-page-frame)); when nobody is
+signed in it shows a Sign in link instead.
 
 The sign-in is kept in a session cookie that lasts 8 hours of activity by default and is gone when the browser is
 closed. Change the length with the `Auth:SessionHours` setting (environment variable `Auth__SessionHours`), a number
@@ -228,17 +272,25 @@ Some things to know:
 
 ### Account
 
-Open `/account` (the Account link in the header) to change your password: enter the current password and the new
+Open `/account` (the Account link in the header) to choose how ReviewCenter looks and to change your password.
+
+The **Appearance** card offers **System**, **Light**, and **Dark**. **System** is the default and follows the light or
+dark setting of your device; **Light** and **Dark** always use that theme. The choice applies as soon as you select
+it and is remembered in this browser only: it is not an account setting, so another browser or device starts with
+**System** again.
+
+To change your password, enter the current password and the new
 password, and press the change button. A wrong current password counts as a failed sign-in for the lockout. The
 fields are cleared afterwards.
 
 ### Manage Users (Administrators)
 
-Open `/users`; a user who is not an administrator is refused with an "Access denied" page that links back to the
-projects. The page lists the users with their user name, display
+Open `/users` (the Users link in the header); a user who is not an administrator is refused with an "Access denied"
+page that links back to the projects. The page lists the users with their user name, display
 name, role, and state. An administrator can:
 
-1. Create a user with a user name, display name, role, and password.
+1. Create a user: press **+ New user**, which opens the form at `/users/new`, enter a user name, display name, role,
+   and password, and create the user. **Cancel** goes back to the list, and so does a successful creation.
 2. Disable a user, which stops the user from signing in without deleting the record of what the user did, and enable
    the user again.
 3. Change the role of a user.
@@ -259,11 +311,15 @@ server can be reached from other machines.
 A project groups the reviews of one body of work. A review is a named set of files whose content is stored
 unchanged, together with a fingerprint of that content.
 
-1. Open `/projects`, enter a project name (up to 100 characters) and an optional description (up to 1000
-   characters), and press the create button. The project appears in the list; select it to open its page.
-2. On the project page, enter a review identifier (1 to 100 letters, digits, `.`, `_`, or `-`, starting with a
-   letter or digit; unique within the project) and a title (up to 200 characters), choose the files to review, and
-   press the create button. The chosen files are listed with their sizes before you submit.
+1. Open `/projects` (the Projects link in the header) and press **+ New project**. On the form at `/projects/new`, enter
+   a project name (up to 100 characters) and an optional description (up to 1000 characters), and press the create
+   button. The new project opens. **Cancel** goes back to the list; the list of projects shows each project, and you
+   select one to open its page.
+2. On the project page, press **+ New review**. On the form at `/projects/{id}/reviews/new`, enter a review
+   identifier (1 to 100 letters, digits, `.`, `_`, or `-`, starting with a letter or digit; unique within the
+   project; the identifier `new` is reserved and is refused) and a title (up to 200 characters), choose the files to
+   review, and press the create button. The chosen files are listed with their sizes before you submit. **Cancel**
+   goes back to the project.
 3. The review page opens. From the top it shows the title, a line that says what to do next, the files with their
    size and open comment threads, and the thread index. Select a file to read
    its content as numbered lines (see [Review Comments](#review-comments)); the page scrolls to the code. Binary
@@ -288,7 +344,8 @@ on the page, and nothing is created.
 ### Reviews from a Repository
 
 Instead of uploading files you can review what changed in a git repository that an administrator registered (see
-[Repositories and Credentials](#repositories-and-credentials)). On the project page, under **Source**, choose
+[Repositories and Credentials](#repositories-and-credentials)). On the new review form (**+ New review** on the project
+page), under **Files come from**, choose
 **From a repository** and enter:
 
 - **Repository**: one of the enabled repositories, by name. If there is none, the page says so and offers only the
@@ -369,7 +426,7 @@ start from the last signed one.
 ## Planning Reviews
 
 If the repository has a `.reviewmark.yaml` with review-sets, you do not have to create each review by hand. On the
-project page choose **Plan reviews from a repository** (it is shown when an administrator has enabled a repository;
+project page choose **Plan reviews** (it is shown when an administrator has enabled a repository;
 otherwise the page says to ask one). The plan page at `/projects/{id}/plan` finds the review-sets that need a review and
 creates the reviews you tick.
 
@@ -416,7 +473,7 @@ When the plan cannot be made, the page says why in plain English and what to do:
 - No repository is registered, or it was disabled: ask an administrator.
 - The revision is not known: check the spelling, and push the branch or tag if it is new.
 - The head revision has no `.reviewmark.yaml`: add it, or choose another revision; you can still create a review by hand
-  on the project page.
+  on the project page with **+ New review**.
 - The configuration is not valid or too large: the message names the problem and the position; fix the file.
 - The repository could not be read: try again later, or ask an administrator.
 
@@ -710,7 +767,8 @@ so; the rest of the server works.
 An administrator sees a **Repositories** link in the page header, next to **Users** and **Audit**. It opens
 `/repositories`. Other users do not get the page.
 
-- **Add repository**: enter a name (letters, digits, dot, underscore, and hyphen, up to 40 characters, unique without
+- **Add repository**: press **+ Add repository** on `/repositories`, which opens the form at `/repositories/new`, and
+  enter a name (letters, digits, dot, underscore, and hyphen, up to 40 characters, unique without
   regard to case), a location, and for a private repository a user name and an access token. The token must not be
   contained in (a part of, compared with case) the repository name, the user name, or the location (or its URL-escaped
   form), because those appear

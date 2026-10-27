@@ -1,0 +1,68 @@
+@* NewRepositoryPage: the form that registers a git repository, at "/repositories/new". The page holds only the form (a
+   narrow column); Cancel goes back to the registry and a successful registration returns to it. Access is limited to
+   the Admin role by the attribute below.
+
+   Presentation only; state and event handling live in NewRepositoryPage.razor.cs. The token is write-only: it is typed
+   into a password field, sent once and never shown again. The data-interactive marker on the root flips to "true"
+   once the live circuit is connected.
+
+   The page body is inside SessionGate, which replaces it with a "Session ended" message when the user is no longer
+   valid while the page is open. *@
+@page "/repositories/new"
+@using DemaConsulting.ReviewCenter.Identity
+@rendermode InteractiveServer
+@attribute [Authorize(Roles = SignIn.AdminRole)]
+
+<PageTitle>Add repository - ReviewCenter</PageTitle>
+
+<SessionGate>
+<main class="page narrow" data-testid="new-repository-page" data-interactive="@InteractiveMarker">
+    <nav class="breadcrumb">
+        <a href="/repositories" data-testid="repositories-link">Repositories</a>
+        <span aria-hidden="true">/</span>
+        <span aria-current="page">Add repository</span>
+    </nav>
+
+    <h1>Add repository</h1>
+    <p class="page-lead">Register a git repository that reviews can be created from.</p>
+
+    <section class="card">
+        @if (ErrorMessage is not null)
+        {
+            <p class="error" role="alert" data-testid="repositories-error">@ErrorMessage</p>
+        }
+        <form data-testid="new-repository-form" @onsubmit="CreateRepositoryAsync">
+            <div class="field">
+                <label for="new-repository-name">Name</label>
+                <input id="new-repository-name" type="text" maxlength="@RepositoryService.MaxNameLength"
+                       autocomplete="off"
+                       data-testid="new-repository-name-input" @bind="NewName" @bind:event="oninput" />
+            </div>
+            <div class="field">
+                <label for="new-repository-location">Location</label>
+                <input id="new-repository-location" type="text" maxlength="@RepositoryService.MaxLocationLength"
+                       autocomplete="off"
+                       data-testid="new-repository-location-input" @bind="NewLocation" @bind:event="oninput" />
+                <p class="muted hint">An https:// or file:// URL, an http:// URL for localhost only, or an absolute path on the server. Do not put a password in the location.</p>
+            </div>
+            <div class="field">
+                <label for="new-repository-username">User name (private repositories only)</label>
+                <input id="new-repository-username" type="text" maxlength="@RepositoryService.MaxUsernameLength"
+                       autocomplete="off"
+                       data-testid="new-repository-username-input" @bind="NewUsername" @bind:event="oninput" />
+            </div>
+            <div class="field">
+                <label for="new-repository-token">Token (private repositories only)</label>
+                <input id="new-repository-token" type="password" autocomplete="new-password"
+                       maxlength="@RepositoryService.MaxTokenLength"
+                       data-testid="new-repository-token-input" @bind="NewToken" @bind:event="oninput" />
+                <p class="muted hint">The token is stored encrypted and can never be shown again; you can only replace or clear it.</p>
+            </div>
+            <div class="plan-actions">
+                <button type="submit" data-testid="create-repository-button">Add repository</button>
+                <a class="action outline" href="/repositories" data-testid="cancel-new-repository-link">Cancel</a>
+            </div>
+        </form>
+    </section>
+</main>
+</SessionGate>

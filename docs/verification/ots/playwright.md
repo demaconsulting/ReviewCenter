@@ -25,12 +25,14 @@ skipping when the browser cannot be launched. Locally the test skips with a reas
 
 ### Test Scenarios
 
-#### PuppetEndToEnd_StartDriveStop_HelloAndCounter_WorksAgainstRealServer
+#### PuppetEndToEnd_StartDriveStop_SignInProjectAndTheme_WorksAgainstRealServer
 
-**Scenario**: Puppet is started, navigates to the home page, hovers and clicks the buttons, reads the texts, changes
-the viewport and color scheme, takes a screenshot, and is stopped.
+**Scenario**: Puppet is started, navigates to the home page, hovers the sign-in link, fails and then succeeds at
+signing in on the login page, clicks through to the projects page, creates a project, opens the account page and
+switches the theme, reads texts, changes the viewport and color scheme, takes a screenshot, and is stopped.
 
-**Expected**: Every command succeeds, the hover persists, the counter text is "2", and the screenshot is a PNG.
+**Expected**: Every command succeeds, the hover persists, the project page appears after the project is created,
+the theme attribute of the page is `dark` after the theme button is clicked, and the screenshot is a PNG.
 
 **Requirement coverage**: `ReviewCenterPuppet-OTS-Playwright-Chromium`.
 

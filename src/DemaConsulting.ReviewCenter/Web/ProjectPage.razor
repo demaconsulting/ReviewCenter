@@ -1,8 +1,10 @@
-@* ProjectPage: one project with its reviews and the form that creates a new review, at "/projects/{id}".
+@* ProjectPage: one project with its reviews, at "/projects/{id}". The reviews are the whole page: a list of rows (id,
+   title, state and approval badges, creation date), each row a link to the review, with a "+ New review" button
+   that leads to the separate creation page at "/projects/{id}/reviews/new" and a "Plan reviews" button.
 
-   Presentation only; state and event handling live in ProjectPage.razor.cs. Every interactive element and
-   every key value carries a stable kebab-case data-testid (row-level ids carry the review id or the list
-   index), and the data-interactive marker on the root flips to "true" once the live circuit is connected.
+   Presentation only; state lives in ProjectPage.razor.cs. Every interactive element and every key value carries a
+   stable kebab-case data-testid (row-level ids carry the review id), and the data-interactive marker on the root
+   flips to "true" once the live circuit is connected.
 
    The page body is inside SessionGate, which replaces it with a "Session ended" message when the user is no longer
    valid while the page is open. *@
@@ -15,9 +17,12 @@
 <SessionGate>
 <main class="page" data-testid="project-page" data-interactive="@InteractiveMarker">
     <nav class="breadcrumb">
-        <a href="/" data-testid="home-link">ReviewCenter</a>
-        <span aria-hidden="true">/</span>
         <a href="/projects" data-testid="projects-link">Projects</a>
+        @if (Project is not null)
+        {
+            <span aria-hidden="true">/</span>
+            <span aria-current="page">@Project.Name</span>
+        }
     </nav>
 
     @if (!Loaded)
@@ -30,148 +35,49 @@
     }
     else
     {
-        <h1 data-testid="project-name">@Project.Name</h1>
+        <div class="page-heading">
+            <h1 data-testid="project-name">@Project.Name</h1>
+            <div class="heading-actions">
+                @if (Repositories.Count > 0)
+                {
+                    <a class="action outline" href="/projects/@ProjectId/plan" data-testid="plan-reviews-link">Plan reviews</a>
+                }
+                <a class="action" href="/projects/@ProjectId/reviews/new" data-testid="new-review-button">+ New review</a>
+            </div>
+        </div>
         @if (Project.Description.Length > 0)
         {
-            <p class="muted" data-testid="project-description">@Project.Description</p>
+            <p class="page-lead" data-testid="project-description">@Project.Description</p>
+        }
+        @if (Repositories.Count == 0)
+        {
+            <p class="muted hint" data-testid="plan-reviews-unavailable">Planning reviews needs a registered repository; ask an administrator.</p>
         }
 
-        <section class="card">
-            <h2>Reviews</h2>
-            @if (Repositories.Count > 0)
-            {
-                <p><a class="action" href="/projects/@ProjectId/plan" data-testid="plan-reviews-link">Plan reviews from a repository</a></p>
-            }
-            else
-            {
-                <p class="muted" data-testid="plan-reviews-unavailable">Planning reviews needs a registered repository; ask an administrator.</p>
-            }
-            @if (Reviews.Count == 0)
-            {
-                <p class="muted" data-testid="reviews-empty">This project has no reviews yet.</p>
-            }
-            else
-            {
-                <ul class="item-list" data-testid="reviews-list">
-                    @foreach (var review in Reviews)
-                    {
-                        <li data-testid="review-row-@review.Id">
-                            <a href="/projects/@ProjectId/reviews/@review.Id" data-testid="review-link-@review.Id">@review.Id</a>
-                            <span data-testid="review-title-@review.Id">@review.Title</span>
+        <h2 class="section-title">Reviews</h2>
+        @if (Reviews.Count == 0)
+        {
+            <p class="muted" data-testid="reviews-empty">This project has no reviews yet. Use + New review to add the first one.</p>
+        }
+        else
+        {
+            <ul class="row-list" data-testid="reviews-list">
+                @foreach (var review in Reviews)
+                {
+                    <li class="row-card review-row" data-testid="review-row-@review.Id">
+                        <div class="row-main">
+                            <a class="row-title" href="/projects/@ProjectId/reviews/@review.Id" data-testid="review-link-@review.Id">@review.Id</a>
+                            <p class="muted" data-testid="review-title-@review.Id">@review.Title</p>
+                        </div>
+                        <div class="row-meta">
                             <span class="badge" data-testid="review-state-@review.Id">@review.State</span>
                             <span class="badge @(IsApproved(review.Id) ? "approved" : null)" data-testid="review-approval-@review.Id">@(IsApproved(review.Id) ? "Approved" : "In review")</span>
-                        </li>
-                    }
-                </ul>
-            }
-        </section>
-
-        <section class="card">
-            <h2>New review</h2>
-            <form data-testid="new-review-form" @onsubmit="CreateReviewAsync">
-                <div class="field">
-                    <label for="review-id">Review id</label>
-                    <input id="review-id" type="text" maxlength="@ReviewLimits.MaxReviewIdLength"
-                           data-testid="review-id-input" @bind="ReviewId" @bind:event="oninput" />
-                </div>
-                <div class="field">
-                    <label for="review-title">Title</label>
-                    <input id="review-title" type="text" maxlength="@ReviewLimits.MaxReviewTitleLength"
-                           data-testid="review-title-input" @bind="ReviewTitle" @bind:event="oninput" />
-                </div>
-                <fieldset class="field source-choice" data-testid="review-source">
-                    <legend>Files come from</legend>
-                    <label>
-                        <input type="radio" name="review-source" checked="@(!FromRepository)"
-                               data-testid="source-upload-radio" @onchange="() => ChooseSource(false)" />
-                        Upload files
-                    </label>
-                    <label>
-                        <input type="radio" name="review-source" checked="@FromRepository"
-                               disabled="@(Repositories.Count == 0)"
-                               data-testid="source-repository-radio" @onchange="() => ChooseSource(true)" />
-                        From a repository
-                    </label>
-                    @if (Repositories.Count == 0)
-                    {
-                        <p class="muted" data-testid="no-repository-hint">No repository is registered; ask an administrator.</p>
-                    }
-                </fieldset>
-                @if (FromRepository)
-                {
-                    <div class="field">
-                        <label for="review-repository">Repository</label>
-                        <select id="review-repository" data-testid="repository-select" @bind="RepositoryIdText">
-                            <option value="">Choose a repository</option>
-                            @foreach (var repository in Repositories)
-                            {
-                                <option value="@repository.Id">@repository.Name</option>
-                            }
-                        </select>
-                    </div>
-                    <div class="field">
-                        <label for="review-head-revision">Head revision</label>
-                        <input id="review-head-revision" type="text" maxlength="@RevisionValidator.MaxLength"
-                               autocomplete="off" data-testid="head-revision-input"
-                               @bind="HeadRevision" @bind:event="oninput" />
-                        <span class="muted">A branch, tag or commit.</span>
-                    </div>
-                    <div class="field">
-                        <label for="review-baseline-revision">Baseline revision (optional)</label>
-                        <input id="review-baseline-revision" type="text" maxlength="@RevisionValidator.MaxLength"
-                               autocomplete="off" data-testid="baseline-revision-input"
-                               @bind="BaselineRevision" @bind:event="oninput" />
-                        <span class="muted">Leave empty to review all files at the head.</span>
-                    </div>
-                    <div class="field">
-                        <label for="review-selection">File selection</label>
-                        <textarea id="review-selection" rows="3" maxlength="@ReviewLimits.MaxSelectionLength"
-                                  data-testid="selection-input" @bind="Selection" @bind:event="oninput"></textarea>
-                        <span class="muted">One pattern per line; start a line with ! to exclude.</span>
-                    </div>
+                            <time class="muted" datetime="@review.Created.UtcDateTime.ToString("O")" data-testid="review-created-@review.Id">@review.Created.UtcDateTime.ToString("yyyy-MM-dd")</time>
+                        </div>
+                    </li>
                 }
-                else
-                {
-                    <div class="field">
-                        <label for="review-files">Files</label>
-                        <InputFile id="review-files" multiple OnChange="OnFilesSelectedAsync" data-testid="review-files-input" />
-                    </div>
-                    @if (SelectedFiles.Count > 0)
-                    {
-                        <ul class="item-list" data-testid="selected-files-list">
-                            @for (var index = 0; index < SelectedFiles.Count; index++)
-                            {
-                                <li data-testid="selected-file-@index">
-                                    <span class="path" data-testid="selected-file-path-@index">@SelectedFiles[index].Path</span>
-                                    <span class="muted" data-testid="selected-file-size-@index">@SelectedFiles[index].Content.Length bytes</span>
-                                </li>
-                            }
-                        </ul>
-                    }
-                }
-                @if (ErrorMessage is not null)
-                {
-                    <p class="error" role="alert" data-testid="review-error">@ErrorMessage</p>
-                }
-                <button type="submit" disabled="@Busy" data-testid="create-review-button">@(Busy ? "Creating review..." : "Create review")</button>
-            </form>
-            @if (CreatedReview is not null)
-            {
-                <div role="status" data-testid="review-created">
-                    <p>Review <strong>@CreatedReview.Id</strong> was created. These entries were left out because only regular files are reviewed:</p>
-                    <ul class="item-list" data-testid="skipped-entries-list">
-                        @for (var index = 0; index < SkippedEntries.Count; index++)
-                        {
-                            <li data-testid="skipped-entry-@index">
-                                <span class="path">@SkippedEntries[index].Path</span>
-                                <span class="muted">@SkippedEntries[index].Reason</span>
-                            </li>
-                        }
-                    </ul>
-                    <a href="/projects/@ProjectId/reviews/@CreatedReview.Id" data-testid="open-created-review-link">Open the review</a>
-                </div>
-            }
-        </section>
+            </ul>
+        }
     }
 </main>
 </SessionGate>

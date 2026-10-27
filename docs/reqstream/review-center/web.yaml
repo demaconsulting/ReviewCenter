@@ -3,9 +3,9 @@
 #
 # PURPOSE:
 # - Define requirements for the ReviewCenter Web subsystem
-# - The Web subsystem spans the App (App.razor, Routes.razor, MainLayout.razor), HomePage, ProjectsPage, ProjectPage,
-#   PlanPage, ReviewPage, ChecklistPage, LoginPage, AccountPage, UsersPage, AuditPage, and RepositoriesPage units; the
-#   App unit includes the SessionGate
+# - The Web subsystem spans the App (App.razor, Routes.razor, MainLayout.razor), HomePage, AboutPage, HelpPage,
+#   ProjectsPage, ProjectPage, PlanPage, ReviewPage, ChecklistPage, LoginPage, AccountPage, UsersPage, AuditPage, and
+#   RepositoriesPage units; the App unit includes the SessionGate
 #   component that replaces an open protected page when the sign-in state of its user ends
 # - Subsystem requirements describe the externally visible behavior of the web user interface
 # - The subsystem tests run over plain HTTP, so they verify what the server renders: the pages, the read path from
@@ -18,59 +18,92 @@ sections:
       - id: ReviewCenter-Web-HomePage
         title: >-
           The Web subsystem shall serve a home page at the root URL, inside an HTML document
-          titled ReviewCenter, offering a Hello button and a counter button with a visible count.
+          titled ReviewCenter, with the product name and the tagline.
         justification: |
           The home page is the entry point of the web user interface. Delivering it in a
           complete HTML document through a routing layer proves that the shell, the router,
-          and the page work together to put the page's controls in front of the user.
+          and the page work together to put the page in front of the user.
         children:
           - ReviewCenter-App-Shell
           - ReviewCenter-App-Routing
+          - ReviewCenter-App-NotFoundPage
           - ReviewCenter-HomePage-Title
-          - ReviewCenter-HomePage-Hello
-          - ReviewCenter-HomePage-Counter
+          - ReviewCenter-HomePage-Anonymous
+          - ReviewCenter-HomePage-GetStarted
+          - ReviewCenter-HomePage-AdminLinks
+          - ReviewCenter-App-HomeLink
+          - ReviewCenter-App-Footer
+          - ReviewCenter-App-Theme
+          - ReviewCenter-AccountPage-Appearance
         tests:
-          - WebSubsystem_HomeRoute_Requested_RendersTitleAndControls
+          - WebSubsystem_HomeRoute_Requested_RendersTitleAndTagline
+
+      - id: ReviewCenter-Web-Help
+        title: >-
+          The Web subsystem shall serve an About page at /about, and a built-in Help at /help with an index of
+          topics and one page per topic at /help/{topic}, each with links to the previous topic, the next topic,
+          and the index, and a friendly message for an unknown topic.
+        justification: |
+          Users need to learn what the product does, which version they run, and how to work with it without
+          leaving the application. One page per topic keeps every link a plain address that can be shared and
+          avoids in-page anchors, which the base address of the HTML document would break.
+        children:
+          - ReviewCenter-AboutPage-Version
+          - ReviewCenter-AboutPage-Description
+          - ReviewCenter-HelpPage-Index
+          - ReviewCenter-HelpPage-Topics
+          - ReviewCenter-HelpPage-Navigation
+          - ReviewCenter-HelpPage-NotFound
+          - ReviewCenter-App-HelpLink
+        tests:
+          - HelpPage_Render_ListsEveryTopicWithItsPageLink
+          - HelpTopicPages_Render_EveryTopicHasAPageWithValidNavigation
+          - AboutPage_Render_Anonymous_ShowsVersionCopyrightAndProjectLink
 
       - id: ReviewCenter-Web-Interactive
         title: >-
-          The Web subsystem shall mark the home page as not yet interactive in its initial
-          server-rendered response, and as interactive once the live connection is established.
+          The Web subsystem shall mark an interactive page, such as the projects page, as not yet interactive in
+          its initial server-rendered response, and as interactive once the live connection is established.
         justification: |
           Clicks made before the live server connection exists are lost. A marker on the page
           lets users, automated tests, and tooling wait until the page can respond instead of
           guessing with fixed delays. The subsystem test covers the initial server-rendered marker; the switch
           to interactive needs a live connection and is verified by the component tests of the page units.
         children:
-          - ReviewCenter-HomePage-Interactive
+          - ReviewCenter-ProjectsPage-Interactive
         tests:
-          - WebSubsystem_HomeRoute_InitialResponse_IsNotYetInteractive
+          - WebSubsystem_ProjectsRoute_InitialResponse_IsNotYetInteractive
 
       - id: ReviewCenter-Web-Projects
         title: >-
-          The Web subsystem shall serve a projects page at /projects that lists the projects and offers a form
-          to create one, a page for each project at /projects/{project} that shows its reviews, and a link from
-          the home page to the projects page.
+          The Web subsystem shall serve a projects page at /projects that lists the projects, each linking to its
+          page, and offers a New project button that opens a page at /projects/new holding the creation form; a
+          page for each project at /projects/{project} that shows its reviews; and a link to the projects page in
+          the header of every page for a signed-in user.
         justification: |
           Projects are the entry point to the review features. Pages reached through plain addresses can be
-          bookmarked and shared, and the home page must lead to them.
+          bookmarked and shared, and the header must lead to them.
         children:
-          - ReviewCenter-HomePage-ProjectsLink
           - ReviewCenter-ProjectsPage-List
           - ReviewCenter-ProjectsPage-Create
+          - ReviewCenter-ProjectsPage-NewForm
           - ReviewCenter-ProjectsPage-Error
           - ReviewCenter-ProjectsPage-Interactive
           - ReviewCenter-ProjectPage-Show
           - ReviewCenter-ProjectPage-Reviews
+          - ReviewCenter-ProjectPage-NewReview
+          - ReviewCenter-App-Navigation
+          - ReviewCenter-App-FormRoutes
         tests:
           - WebSubsystem_CreatedProjectAndReview_ArePresentedByThePages
 
       - id: ReviewCenter-Web-Reviews
         title: >-
-          The Web subsystem shall let a user create a review of selected files on the project page, within the
-          upload limits, and shall serve a page for each review at /projects/{project}/reviews/{review} that
-          shows its files and the content of a selected file ahead of its fingerprint and file hashes, which are in
-          a collapsed Details section.
+          The Web subsystem shall let a user create a review of selected files on a page of its own, reached from
+          the project page and within the upload limits, and shall serve a page for each review at
+          /projects/{project}/reviews/{review} that opens with a summary of the checklist progress, reviewers and
+          threads, and shows its files and the content of a selected file ahead of its fingerprint and file hashes,
+          which are in a collapsed Details section.
         justification: |
           Creating a review from files, and seeing the fingerprint and the exact content again, is the first
           review capability of the product. Showing the user the reason for every refusal makes the upload
@@ -80,9 +113,11 @@ sections:
           - ReviewCenter-ProjectPage-Selection
           - ReviewCenter-ProjectPage-Create
           - ReviewCenter-ProjectPage-Error
+          - ReviewCenter-ProjectPage-ReservedId
           - ReviewCenter-ProjectPage-Limits
           - ReviewCenter-ProjectPage-Interactive
           - ReviewCenter-ReviewPage-Show
+          - ReviewCenter-ReviewPage-Summary
           - ReviewCenter-ReviewPage-Layout
           - ReviewCenter-ReviewPage-Files
           - ReviewCenter-ReviewPage-Content
@@ -156,9 +191,9 @@ sections:
           The Web subsystem shall show in the page header the name of the signed-in user with a link to the
           account page and a logout button, or a sign-in link when nobody is signed in, serve a login page at
           /login with a user name and a password field that shows a failed sign-in without revealing its reason,
-          serve an account page at /account where a signed-in user changes the own password, and serve a users
-          page at /users where an administrator creates users, enables and disables them, changes roles, and sets
-          passwords.
+          serve an account page at /account where a signed-in user changes the own password and chooses the
+          appearance, and serve a users page at /users where an administrator enables and disables users, changes
+          roles, and sets passwords, and reaches the page at /users/new that creates users.
         justification: |
           Users must be able to sign in, see who they are signed in as, and sign out from every page. Account and
           user management are done in the web interface so that no command line is needed after the first
@@ -166,6 +201,7 @@ sections:
           connection and are verified by the component tests of the page units.
         children:
           - ReviewCenter-App-Header
+          - ReviewCenter-App-UsersLink
           - ReviewCenter-App-RouteAuthorization
           - ReviewCenter-LoginPage-Form
           - ReviewCenter-LoginPage-Error
@@ -173,6 +209,7 @@ sections:
           - ReviewCenter-AccountPage-ChangePassword
           - ReviewCenter-UsersPage-List
           - ReviewCenter-UsersPage-Create
+          - ReviewCenter-UsersPage-NewPage
           - ReviewCenter-UsersPage-Update
           - ReviewCenter-UsersPage-LastAdmin
           - ReviewCenter-UsersPage-AdminCheck
@@ -203,8 +240,8 @@ sections:
           - ReviewPage_Revalidation_UserDisabled_PageStopsShowingAndAcceptingActions
           - UsersPage_Revalidation_AdminDemoted_PageShowsSessionEndedAndNoActions
           - SessionGate_Render_EveryProtectedPageSignedOut_ShowsSessionEndedAndNoPage
-          - ProjectsPage_CreateForm_SessionEndedBeforePageKnows_ShowsClearErrorAndCreatesNothing
-          - ProjectPage_CreateForm_SessionEndedBeforePageKnows_ShowsClearErrorAndCreatesNothing
+          - NewProjectPage_CreateForm_SessionEndedBeforePageKnows_ShowsClearErrorAndCreatesNothing
+          - NewReviewPage_CreateForm_SessionEndedBeforePageKnows_ShowsClearErrorAndCreatesNothing
           - ReviewPage_ResolveAndReopen_SessionEndedBeforePageKnows_ShowsClearErrorAndChangesNothing
 
       - id: ReviewCenter-Web-TestIds
@@ -246,6 +283,7 @@ sections:
           database to detect the later removal of the newest entries.
         children:
           - ReviewCenter-AuditPage-Display
+          - ReviewCenter-AuditPage-ShortHash
           - ReviewCenter-AuditPage-Verify
           - ReviewCenter-AuditPage-Admin
           - ReviewCenter-App-AuditLink
@@ -264,13 +302,14 @@ sections:
         children:
           - ReviewCenter-RepositoriesPage-Display
           - ReviewCenter-RepositoriesPage-Create
+          - ReviewCenter-RepositoriesPage-AddPage
           - ReviewCenter-RepositoriesPage-Edit
           - ReviewCenter-RepositoriesPage-Enable
           - ReviewCenter-RepositoriesPage-Admin
           - ReviewCenter-App-RepositoriesLink
         tests:
           - SignIn_RepositoriesPage_ReviewerAndAdmin_OnlyAdminIsAllowed
-          - RepositoriesPage_CreateForm_WithToken_StoresItWriteOnlyAndClearsFields
+          - NewRepositoryPage_CreateForm_WithToken_StoresItWriteOnlyAndClearsFields
 
       - id: ReviewCenter-Web-RepositoryReviews
         title: >-
@@ -289,7 +328,7 @@ sections:
           - ReviewCenter-ReviewPage-Source
           - ReviewCenter-ReviewPage-Versions
         tests:
-          - ProjectPage_CreateForm_FromRepository_CreatesReviewWithSourceAndNavigates
+          - NewReviewPage_CreateForm_FromRepository_CreatesReviewWithSourceAndNavigates
           - ReviewPage_FileSelect_ModifiedFile_TogglesBetweenDiffHeadAndReadOnlyBaseline
 
       - id: ReviewCenter-Web-DiffReview

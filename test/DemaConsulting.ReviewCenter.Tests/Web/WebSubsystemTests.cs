@@ -33,10 +33,10 @@ namespace DemaConsulting.ReviewCenter.Tests.Web;
 public partial class WebSubsystemTests
 {
     /// <summary>
-    ///     Test that requesting the home route renders the title and all interactive controls.
+    ///     Test that requesting the home route renders the title and the tagline.
     /// </summary>
     [Fact]
-    public async Task WebSubsystem_HomeRoute_Requested_RendersTitleAndControls()
+    public async Task WebSubsystem_HomeRoute_Requested_RendersTitleAndTagline()
     {
         // Arrange: start the real pipeline in memory
         var logs = new CapturingLoggerProvider();
@@ -47,28 +47,25 @@ public partial class WebSubsystemTests
         var response = await client.GetAsync("/", TestContext.Current.CancellationToken);
         var html = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
 
-        // Assert: 200, the document title, and every control the UI tests drive
+        // Assert: 200, the document title, and the tagline
         Assert.Equal(System.Net.HttpStatusCode.OK, response.StatusCode);
         Assert.Contains("<title>ReviewCenter</title>", html);
-        Assert.Contains("data-testid=\"hello-button\"", html);
-        Assert.Contains("data-testid=\"counter-button\"", html);
-        Assert.Contains("data-testid=\"counter-value\"", html);
-        Assert.DoesNotContain("data-testid=\"hello-message\"", html);
+        Assert.Contains("Web-based code review for regulated projects.", html);
     }
 
     /// <summary>
-    ///     Test that the first server-rendered response is not yet marked interactive.
+    ///     Test that the first server-rendered response of an interactive page is not yet marked interactive.
     /// </summary>
     [Fact]
-    public async Task WebSubsystem_HomeRoute_InitialResponse_IsNotYetInteractive()
+    public async Task WebSubsystem_ProjectsRoute_InitialResponse_IsNotYetInteractive()
     {
-        // Arrange: start the real pipeline in memory
+        // Arrange: start the real pipeline in memory and sign in
         var logs = new CapturingLoggerProvider();
         await using var app = await TestWebApp.StartAsync(logs, "serve", "--silent");
-        using var client = app.GetTestClient();
+        using var browser = await TestBrowser.SignedInAsync(app, "ann");
 
-        // Act: request the home route (no circuit exists for a plain HTTP request)
-        var html = await client.GetStringAsync("/", TestContext.Current.CancellationToken);
+        // Act: request the projects route (no circuit exists for a plain HTTP request)
+        var html = await browser.Client.GetStringAsync("/projects", TestContext.Current.CancellationToken);
 
         // Assert: drivers must wait for the marker to flip before clicking
         Assert.Contains("data-interactive=\"false\"", html);
@@ -281,10 +278,19 @@ public partial class WebSubsystemTests
         [
             "/",
             "/login",
+            "/about",
+            "/help",
+            "/help/getting-started",
+            "/help/no-such-topic",
             "/account",
             "/users",
+            "/users/new",
             "/repositories",
+            "/repositories/new",
+            "/projects",
+            "/projects/new",
             $"/projects/{project.Id}",
+            $"/projects/{project.Id}/reviews/new",
             $"/projects/{project.Id}/plan",
             "/projects/9999/plan",
             "/projects/9999",

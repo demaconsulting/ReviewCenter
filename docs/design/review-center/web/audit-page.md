@@ -24,7 +24,14 @@ user is refused).
 message of the last refusal, or `null`. **InteractiveMarker**: as for the other pages.
 
 The table shows, for each entry, the sequence number, the time in UTC, the actor, the action code, the review (as
-`{project}/{review}`, `project {id}`, or a dash), and the detail, all as plain text.
+`{project}/{review}`, `project {id}`, or a dash), and the detail, all as plain text. The time, actor, action, and review
+do not wrap. A run of 24 or more hexadecimal characters in the detail (a hash or a fingerprint) is shown in a monospace
+font, shortened to its first 12 characters and an ellipsis, with the full value as the `title` tooltip of that part of
+the detail; the rest of the detail is unchanged, and the full value is still part of the stored entry. The head hash of
+a verification result is not shortened.
+
+The page uses the wide page container, so the table has room, and a heading with a short lead line. The table scrolls
+sideways inside its container on a narrow screen instead of widening the page.
 
 The result text is `Chain intact: N entries, head hash <64 hex>` for an intact chain and
 `Chain broken at entry N. Head hash <hash>` for a broken one, where the head hash of a broken chain is the hash of the
@@ -37,7 +44,7 @@ the count and the head hash with a value that was recorded somewhere else earlie
 protection records the head hash externally (for example in a ticket or a signed document) at agreed times; this slice
 does not do that automatically and has no external anchoring.
 
-Every interactive element and key value has a stable `data-testid`: `audit-page` (root), `home-link`, `audit-error`,
+Every interactive element and key value has a stable `data-testid`: `audit-page` (root), `audit-error`,
 `audit-verify`, `audit-result`, `audit-head-hash`, `audit-empty` ("Nothing has been recorded yet."), `audit-table`,
 and per row `audit-row`, `audit-sequence`, `audit-time`, `audit-actor`, `audit-action`, `audit-review`, and
 `audit-detail`, then `audit-newer` and `audit-older`.
@@ -62,6 +69,11 @@ the action is refused. The check is kept on load and on every verification altho
 administrators and the page is replaced when the sign-in state ends (see `SessionGate`), because an open page can keep
 its state for up to one revalidation interval after the user was demoted or disabled. A state that has already ended is
 shown with the message of the refusal.
+
+**DetailContent** (private): Builds the content of the detail cell from `SplitDetail`, which splits the detail into plain
+text parts and runs of 24 or more hexadecimal characters. A run is written as a `span` with the class `audit-hash`, the
+full value as its `title`, and `ShortHash` of it as the content; text parts are added as content, so Razor encodes them.
+The concatenated text of the parts is the original detail.
 
 **OnAfterRender**: Marks the page interactive after the first render on a live connection.
 

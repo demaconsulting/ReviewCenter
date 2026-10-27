@@ -2,20 +2,34 @@
 # Software Unit Requirements for the RepositoriesPage Component
 #
 # The RepositoriesPage component lets administrators register, change, disable, and enable the git repositories that
-# reviews can be created from. The token is write-only on this page.
+# reviews can be created from. The token is write-only on this page. The unit includes the NewRepositoryPage
+# component, the separate page that holds the form that registers a repository.
 
 sections:
   - title: RepositoriesPage Unit Requirements
     requirements:
       - id: ReviewCenter-RepositoriesPage-Display
         title: >-
-          The RepositoriesPage component shall list every repository with its name, location, user name, enabled
-          state, and whether it has a token, never showing a token, and shall offer no way to delete a repository.
+          The RepositoriesPage component shall list every repository with its name, location, and enabled state, with
+          the user name and a token indicator only where they are set, never showing a token, and shall offer no way
+          to delete a repository.
         justification: |
           Administrators need to see what is registered and whether a token is set, but a token shown on a page can
           be copied, shoulder-surfed, and logged. A repository is retired by disabling it.
         tests:
           - RepositoriesPage_Render_Repositories_ShowsTokenStateOnlyAndNoDelete
+
+      - id: ReviewCenter-RepositoriesPage-AddPage
+        title: >-
+          The RepositoriesPage component shall offer an add button that leads to a separate page that holds only the
+          form that registers a repository, and that page shall offer a way back to the list without registering
+          anything and return to the list after a repository was registered.
+        justification: |
+          A form between the rows of a list pushes the list down and invites a half-typed token to stay on a page
+          that is meant for reading. A page of its own keeps the list clean and makes cancelling obvious.
+        tests:
+          - RepositoriesPage_Render_Repositories_ShowsTokenStateOnlyAndNoDelete
+          - NewRepositoryPage_CreateForm_WithToken_StoresItWriteOnlyAndClearsFields
 
       - id: ReviewCenter-RepositoriesPage-Create
         title: >-
@@ -26,8 +40,8 @@ sections:
           Registering a repository is how an administrator makes a source reachable. A token must not stay in the form
           after it is saved.
         tests:
-          - RepositoriesPage_CreateForm_WithToken_StoresItWriteOnlyAndClearsFields
-          - RepositoriesPage_CreateForm_InvalidLocation_ShowsErrorAndCreatesNothing
+          - NewRepositoryPage_CreateForm_WithToken_StoresItWriteOnlyAndClearsFields
+          - NewRepositoryPage_CreateForm_InvalidLocation_ShowsErrorAndCreatesNothing
 
       - id: ReviewCenter-RepositoriesPage-Edit
         title: >-

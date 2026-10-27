@@ -98,6 +98,29 @@ public class AuditPageTests : PageTestBase
     }
 
     /// <summary>
+    ///     Test that a long hexadecimal value in an entry detail is shown shortened, with the full value in the tooltip.
+    /// </summary>
+    [Fact]
+    public async Task AuditPage_Render_DetailWithLongHash_ShowsShortenedValueWithFullValueInTooltip()
+    {
+        // Arrange: an entry whose detail carries a 64-character hash between plain words
+        await SignInAsAdminAsync();
+        var hash = new string('a', 32) + new string('b', 32);
+        await Audit.RecordAsync(AuditDraft.By(TestActors.Ann, "review.created", $"fingerprint {hash} recorded", 1, null), TestContext.Current.CancellationToken);
+
+        // Act: render the page
+        var cut = Render<AuditPage>();
+
+        // Assert: the cell shows 12 characters and an ellipsis, keeps the words, and the full value stays available
+        var detail = cut.Find("[data-testid='audit-detail']");
+        var shortened = detail.QuerySelector(".audit-hash")!;
+        Assert.Equal(new string('a', 12) + "…", shortened.TextContent);
+        Assert.Equal(hash, shortened.GetAttribute("title"));
+        Assert.Contains("fingerprint", detail.TextContent, StringComparison.Ordinal);
+        Assert.DoesNotContain(hash, detail.TextContent, StringComparison.Ordinal);
+    }
+
+    /// <summary>
     ///     Test that an empty trail says so.
     /// </summary>
     [Fact]

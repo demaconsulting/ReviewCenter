@@ -1,0 +1,39 @@
+@* NewProjectPage: the form that creates a project, at "/projects/new". The page holds only the form; Cancel
+   goes back to the project list and a successful creation opens the new project.
+
+   Presentation only; state and event handling live in NewProjectPage.razor.cs. The data-interactive marker on the
+   root flips to "true" once the live circuit is connected. *@
+@page "/projects/new"
+@rendermode InteractiveServer
+@attribute [Authorize]
+
+<PageTitle>New project - ReviewCenter</PageTitle>
+
+<SessionGate>
+<main class="page narrow" data-testid="new-project-page" data-interactive="@InteractiveMarker">
+    <h1>New project</h1>
+
+    <section class="card">
+        <form data-testid="new-project-form" @onsubmit="CreateProjectAsync">
+            <div class="field">
+                <label for="project-name">Name</label>
+                <input id="project-name" type="text" maxlength="@ReviewLimits.MaxProjectNameLength"
+                       data-testid="project-name-input" @bind="NewName" @bind:event="oninput" />
+            </div>
+            <div class="field">
+                <label for="project-description">Description</label>
+                <textarea id="project-description" rows="3" maxlength="@ReviewLimits.MaxProjectDescriptionLength"
+                          data-testid="project-description-input" @bind="NewDescription" @bind:event="oninput"></textarea>
+            </div>
+            @if (ErrorMessage is not null)
+            {
+                <p class="error" role="alert" data-testid="project-error">@ErrorMessage</p>
+            }
+            <div class="plan-actions">
+                <button type="submit" data-testid="create-project-button">Create project</button>
+                <a class="action outline" href="/projects" data-testid="cancel-new-project-link">Cancel</a>
+            </div>
+        </form>
+    </section>
+</main>
+</SessionGate>

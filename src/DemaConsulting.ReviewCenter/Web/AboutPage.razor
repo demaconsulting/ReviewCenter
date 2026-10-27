@@ -1,0 +1,29 @@
+@* AboutPage: what ReviewCenter is and which version runs, at "/about".
+
+   Static server-side rendered and open to everyone: plain text with the full informational version (the same
+   string the command line prints), the copyright and a link to the project. *@
+@page "/about"
+
+<PageTitle>About - ReviewCenter</PageTitle>
+
+<main class="page reading" data-testid="about-page">
+    <h1>About ReviewCenter</h1>
+    <p class="muted" data-testid="about-tagline">Web-based code review for regulated projects.</p>
+
+    <section class="card">
+        <h2>What ReviewCenter does</h2>
+        <p>
+            ReviewCenter reviews a set of files against an earlier revision. Reviewers discuss the changes in
+            threaded comments, work through a checklist, and are assigned to reviewer slots with alternates. Each
+            reviewer signs off with a re-authenticated signature, and every action is kept in a hash-chained
+            audit trail that can be verified.
+        </p>
+    </section>
+
+    <section class="card">
+        <h2>Version</h2>
+        <p>Version: <span data-testid="about-version">@Program.Version</span></p>
+        <p>Copyright © DEMA Consulting</p>
+        <p><a href="https://github.com/demaconsulting/ReviewCenter" data-testid="about-github-link">github.com/demaconsulting/ReviewCenter</a></p>
+    </section>
+</main>

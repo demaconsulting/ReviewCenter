@@ -47,11 +47,20 @@ components; registers the persistence and the Core services with `AddServices`; 
 the revalidating authentication state provider of open pages, with `SignIn.AddSignIn` (after the Razor components, so
 that its provider replaces the framework default); applies the options callback; loads static web assets
 when enabled; builds the application; calls `InitializeDatabase`, `ValidateAuthOptions`, and
-`ValidateDataProtection`; adds authentication,
+`ValidateDataProtection`; adds `UseNotFoundPage` (the not-found middleware, below) and routing; adds authentication,
 authorization, and request forgery protection, in that order, ahead of the endpoints they protect; maps static assets
 when enabled; maps `/health` to a plain-text 200 response; maps the login and logout endpoints with
 `SignIn.MapSignIn`; maps `App` with the interactive
 server render mode; and registers the start-up log callback.
+
+**UseNotFoundPage**: Answers a page request that no page handles with the framed "Page not found" page. A URL that
+matches no endpoint never reaches the router, so without this the response is an empty 404. The middleware sits before
+routing. When a GET or HEAD request outside the reserved prefixes (`/api`, `/_framework`, `/_blazor`, `/_content`) and
+without a file extension ends in an empty 404, the request is re-executed against `/not-found` in a new service scope,
+with the original status code kept and the original request published as `IStatusCodeReExecuteFeature`. Any other
+status (a 400 or a 405, for example), any other method, a reserved prefix, and an address that ends in a file
+extension keep the plain response. The built-in re-execution is not used because it answers every empty 4xx or 5xx
+response.
 
 **AddServices**: Registers the persistence and the Core services.
 

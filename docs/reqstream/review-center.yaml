@@ -205,17 +205,29 @@ sections:
       - id: ReviewCenter-System-HomePage
         title: >-
           The tool shall serve a home page titled ReviewCenter at the root URL of the web server,
-          offering a Hello button and a counter button.
+          showing the product name and tagline.
         tags: [system]
         justification: |
           The home page is the entry point of the web user interface. It proves that pages are
-          delivered to a browser and that the interactive server-side user interface needed by
-          later review features works end to end, including the client script it depends on.
+          delivered to a browser, including the client script the interactive pages depend on.
         children:
           - ReviewCenter-Web-HomePage
           - ReviewCenter-Web-Interactive
         tests:
-          - ReviewCenter_ServeVerb_Started_HomePageContainsTitleAndControls
+          - ReviewCenter_ServeVerb_Started_HomePageContainsTitleAndTagline
+
+      - id: ReviewCenter-System-HelpPages
+        title: >-
+          The tool shall serve an About page and its built-in Help pages to every visitor of the web server,
+          including one who is not signed in.
+        tags: [system]
+        justification: |
+          Users must be able to learn what the product does, which version runs, and how to use it before they can
+          sign in, and without an administrator handing out documents.
+        children:
+          - ReviewCenter-Web-Help
+        tests:
+          - ReviewCenter_ServeVerb_Started_ServesHelpAndAboutPagesWithoutSignIn
 
       - id: ReviewCenter-System-Health
         title: >-
@@ -461,7 +473,7 @@ sections:
         children:
           - ReviewCenter-Web-TestIds
         tests:
-          - ReviewCenter_ServeVerb_Started_HomePageContainsTitleAndControls
+          - ReviewCenter_ServeVerb_Started_HomePageContainsTitleAndTagline
           - WebSubsystem_AllPages_EveryInteractiveElementHasTestId
 
       - id: ReviewCenter-System-AuditTrail
@@ -535,7 +547,7 @@ sections:
           - ReviewCenter-Web-Repositories
           - ReviewCenter-Hosting-RepositoryServices
         tests:
-          - RepositoriesPage_CreateForm_WithToken_StoresItWriteOnlyAndClearsFields
+          - NewRepositoryPage_CreateForm_WithToken_StoresItWriteOnlyAndClearsFields
           - StorageSubsystem_Repositories_PersistAcrossReopen
 
       - id: ReviewCenter-System-GitContent
@@ -597,7 +609,7 @@ sections:
           - ReviewCenter-Web-RepositoryReviews
         tests:
           - ReviewService_CreateFromRepositoryAsync_RealGit_FreezesChangesAgainstLaterCommits
-          - ProjectPage_CreateForm_EmptySelection_ShowsNothingToReviewAndCreatesNothing
+          - NewReviewPage_CreateForm_EmptySelection_ShowsNothingToReviewAndCreatesNothing
 
       - id: ReviewCenter-System-PlanReviews
         title: >-

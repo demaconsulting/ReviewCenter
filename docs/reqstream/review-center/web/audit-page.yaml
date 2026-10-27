@@ -19,6 +19,17 @@ sections:
           - AuditPage_Render_LongTrail_PagesByFifty
           - AuditPage_Render_MarkupInEntries_IsEscaped
 
+      - id: ReviewCenter-AuditPage-ShortHash
+        title: >-
+          The AuditPage component shall show a long hexadecimal value (a hash or fingerprint) in the detail of an entry
+          shortened to its first 12 characters, with the full value available as the tooltip of the shortened value.
+        justification: |
+          Hashes and fingerprints make the table too wide to read, yet an administrator who needs the exact value must
+          still be able to get it. The head hash of a verification is not shortened, because it is what is recorded
+          outside the database.
+        tests:
+          - AuditPage_Render_DetailWithLongHash_ShowsShortenedValueWithFullValueInTooltip
+
       - id: ReviewCenter-AuditPage-Verify
         title: >-
           The AuditPage component shall let an administrator verify the hash chain and shall show the entry count

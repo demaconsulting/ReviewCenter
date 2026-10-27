@@ -1,31 +1,56 @@
 @* MainLayout: the frame around every page (part of the App unit).
 
-   It is static server-side rendered markup, so it never needs a live connection. The header shows who is
-   signed in (display name, an Account link, Users, Repositories and Audit links for administrators and a Logout button) or a Sign in
-   link when nobody is. Logout is a form that posts to /auth/logout with an antiforgery token, because signing
-   out changes state and must not be triggered by a plain link. *@
+   It is static server-side rendered markup, so it never needs a live connection. The header spans the full width of
+   the window. On the left it shows the logo and product name (the link home) followed by the main navigation
+   (Projects, and for administrators Repositories, Audit and Users); on the right it shows who is signed in (display
+   name, an Account link and a Logout button) or a Sign in link when nobody is. Logout is a form that posts to
+   /auth/logout with an antiforgery token, because signing out changes state and must not be triggered by a plain
+   link. The footer on every page shows the version, the copyright and a link to the About page. *@
 @inherits LayoutComponentBase
+@using Microsoft.AspNetCore.Components.Routing
 
 <header class="app-header">
-    @if (Actor is null)
-    {
-        <a href="/login" data-testid="signin-link">Sign in</a>
-    }
-    else
-    {
-        <span data-testid="current-user">@Actor.DisplayName</span>
-        <a href="/account" data-testid="account-link">Account</a>
-        @if (IsAdmin)
+    <div class="app-header-group">
+        <a href="/" class="brand" data-testid="home-link">
+            <svg class="brand-logo" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true" focusable="false"
+                 fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M6 2h9l5 5v15H6z" />
+                <path d="M9 14l2.5 2.5L16 11.5" />
+            </svg>
+            <span>ReviewCenter</span>
+        </a>
+        @if (Actor is not null)
         {
-            <a href="/users" data-testid="users-link">Users</a>
-            <a href="/repositories" data-testid="repositories-link">Repositories</a>
-            <a href="/audit" data-testid="audit-link">Audit</a>
+            <NavLink href="/projects" Match="NavLinkMatch.Prefix" class="nav-tab" data-testid="projects-link">Projects</NavLink>
+            @if (IsAdmin)
+            {
+                <NavLink href="/repositories" Match="NavLinkMatch.Prefix" class="nav-tab" data-testid="repositories-link">Repositories</NavLink>
+                <NavLink href="/audit" Match="NavLinkMatch.Prefix" class="nav-tab" data-testid="audit-link">Audit</NavLink>
+                <NavLink href="/users" Match="NavLinkMatch.Prefix" class="nav-tab" data-testid="users-link">Users</NavLink>
+            }
         }
-        <form method="post" action="/auth/logout">
-            <AntiforgeryToken />
-            <button type="submit" data-testid="logout-button">Logout</button>
-        </form>
-    }
+    </div>
+    <div class="app-header-group">
+        <NavLink href="/help" Match="NavLinkMatch.Prefix" class="nav-tab" data-testid="help-link">Help</NavLink>
+        @if (Actor is null)
+        {
+            <a href="/login" class="nav-tab" data-testid="signin-link">Sign in</a>
+        }
+        else
+        {
+            <span data-testid="current-user" class="current-user">@Actor.DisplayName</span>
+            <NavLink href="/account" Match="NavLinkMatch.Prefix" class="nav-tab" data-testid="account-link">Account</NavLink>
+            <form method="post" action="/auth/logout">
+                <AntiforgeryToken />
+                <button type="submit" class="outline" data-testid="logout-button">Logout</button>
+            </form>
+        }
+    </div>
 </header>
 
 @Body
+
+<footer class="app-footer muted" data-testid="footer">
+    <span>ReviewCenter <span data-testid="version-text">@ShortVersion</span> · © DEMA Consulting · Web-based code review for regulated projects</span>
+    <a href="/about" data-testid="about-link">About</a>
+</footer>

@@ -20,6 +20,8 @@ N/A - standard test environment.
 - An administrator sees the whole trail newest first, with the sequence, time, actor, action, review, and detail of each
   entry; an empty trail shows the empty message; a trail over 50 entries is shown in pages of 50 with links.
 - Markup in the trail is shown as text and not interpreted.
+- A long hexadecimal value in the detail of an entry is shown as its first 12 characters and an ellipsis, with the full
+  value as the tooltip, and the surrounding words are kept.
 - Verifying an intact trail shows the entry count and the full head hash; verifying a tampered trail shows the first
   broken entry; verifying an empty trail reports it as intact with zero entries.
 - A user who is not an administrator, and a user whose claims say administrator while the user store says otherwise, are
@@ -32,6 +34,11 @@ N/A - standard test environment.
 
 **AuditPage_Render_Admin_ShowsEntriesNewestFirst**: An administrator opens the page; the entries are listed newest
 first with their columns. This scenario is tested by `AuditPage_Render_Admin_ShowsEntriesNewestFirst`.
+
+**AuditPage_Render_DetailWithLongHash_ShowsShortenedValueWithFullValueInTooltip**: An entry whose detail holds a 64
+character hash between plain words is shown with the hash cut to its first 12 characters and an ellipsis, the words are
+kept, the full hash is the tooltip of the shortened value, and the full hash is not in the text of the cell. This
+scenario is tested by `AuditPage_Render_DetailWithLongHash_ShowsShortenedValueWithFullValueInTooltip`.
 
 **AuditPage_Render_EmptyTrail_ShowsEmptyMessage**: An empty trail shows the empty message and no table. This scenario is
 tested by `AuditPage_Render_EmptyTrail_ShowsEmptyMessage`.

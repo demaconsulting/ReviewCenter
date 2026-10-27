@@ -29,19 +29,19 @@
         }
         @if (ErrorKind == nameof(DomainRule.ReviewSetConfigMissing))
         {
-            <p><a href="/projects/@ProjectId" data-testid="plan-error-project-link">Go to the project page</a></p>
+            <p><a class="action outline" href="/projects/@ProjectId" data-testid="plan-error-project-link">Go to the project page</a></p>
         }
     </div>;
 }
-<main class="page" data-testid="plan-page" data-interactive="@InteractiveMarker">
+<main class="page reading" data-testid="plan-page" data-interactive="@InteractiveMarker">
     <nav class="breadcrumb">
-        <a href="/" data-testid="home-link">ReviewCenter</a>
-        <span aria-hidden="true">/</span>
         <a href="/projects" data-testid="projects-link">Projects</a>
         @if (Project is not null)
         {
             <span aria-hidden="true">/</span>
             <a href="/projects/@ProjectId" data-testid="plan-breadcrumb-project">@Project.Name</a>
+            <span aria-hidden="true">/</span>
+            <span aria-current="page">Plan reviews</span>
         }
     </nav>
 
@@ -152,7 +152,7 @@
                         }
                     </ul>
                     <div class="plan-actions">
-                        <a class="action" href="/projects/@ProjectId" data-testid="plan-back-link">Back to the project</a>
+                        <a class="action outline" href="/projects/@ProjectId" data-testid="plan-back-link">Back to the project</a>
                         <button type="button" class="secondary" disabled="@Busy" data-testid="plan-again-button" @onclick="LoadPlanAsync">Plan again</button>
                     </div>
                 </section>

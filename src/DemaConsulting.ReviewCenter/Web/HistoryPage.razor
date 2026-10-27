@@ -18,13 +18,13 @@
 <SessionGate>
 <main class="page" data-testid="history-page" data-interactive="@InteractiveMarker">
     <nav class="breadcrumb">
-        <a href="/" data-testid="home-link">ReviewCenter</a>
-        <span aria-hidden="true">/</span>
         <a href="/projects" data-testid="projects-link">Projects</a>
         <span aria-hidden="true">/</span>
         <a href="/projects/@ProjectId" data-testid="project-link">@(ProjectName ?? $"Project {ProjectId}")</a>
         <span aria-hidden="true">/</span>
         <a href="/projects/@ProjectId/reviews/@ReviewId" data-testid="review-link">@ReviewId</a>
+        <span aria-hidden="true">/</span>
+        <span aria-current="page">History</span>
     </nav>
 
     @if (!Loaded)
@@ -76,16 +76,16 @@
             <p class="audit-paging">
                 @if (Page.HasNewer)
                 {
-                    <a href="@PageLink("after", Page.NewerAfter)" data-testid="history-newer">Newer</a>
+                    <a class="action outline" href="@PageLink("after", Page.NewerAfter)" data-testid="history-newer">Newer</a>
                 }
                 @if (Page.HasOlder)
                 {
-                    <a href="@PageLink("before", Page.OlderBefore)" data-testid="history-older">Older</a>
+                    <a class="action outline" href="@PageLink("before", Page.OlderBefore)" data-testid="history-older">Older</a>
                 }
             </p>
         }
 
-        <p><a href="/projects/@ProjectId/reviews/@ReviewId" data-testid="history-back">Back to the review</a></p>
+        <p><a class="action outline" href="/projects/@ProjectId/reviews/@ReviewId" data-testid="history-back">Back to the review</a></p>
     }
 </main>
 </SessionGate>

@@ -326,6 +326,7 @@ reviews:
       - "docs/verification/review-center/web/app.md"
       - "src/**/Web/App.razor"
       - "src/**/Web/Routes.razor"
+      - "src/**/Web/NotFoundPage.razor"
       - "src/**/Web/_Imports.razor"
       - "src/**/Web/MainLayout.razor"
       - "src/**/Web/MainLayout.razor.cs"
@@ -344,9 +345,37 @@ reviews:
       - "docs/design/review-center/web/home-page.md"
       - "docs/verification/review-center/web/home-page.md"
       - "src/**/Web/HomePage.razor"
-      - "src/**/Web/HomePage.razor.cs"
       - "test/**/Web/HomePageTests.cs"
       - "test/**/Web/PageTestBase.cs"
+
+  - id: ReviewCenter-Web-AboutPage
+    title: Review of ReviewCenter AboutPage unit implementation
+    context:
+      - docs/design/review-center.md
+      - docs/reqstream/review-center.yaml
+      - docs/design/review-center/web.md
+      - docs/reqstream/review-center/web.yaml
+    paths:
+      - "docs/reqstream/review-center/web/about-page.yaml"
+      - "docs/design/review-center/web/about-page.md"
+      - "docs/verification/review-center/web/about-page.md"
+      - "src/**/Web/AboutPage.razor"
+      - "test/**/Web/AboutPageTests.cs"
+
+  - id: ReviewCenter-Web-HelpPage
+    title: Review of ReviewCenter HelpPage unit implementation
+    context:
+      - docs/design/review-center.md
+      - docs/reqstream/review-center.yaml
+      - docs/design/review-center/web.md
+      - docs/reqstream/review-center/web.yaml
+    paths:
+      - "docs/reqstream/review-center/web/help-page.yaml"
+      - "docs/design/review-center/web/help-page.md"
+      - "docs/verification/review-center/web/help-page.md"
+      - "src/**/Web/Help*.razor"
+      - "src/**/Web/HelpTopics.cs"
+      - "test/**/Web/HelpPageTests.cs"
 
   - id: ReviewCenter-Web-ProjectsPage
     title: Review of ReviewCenter ProjectsPage unit implementation
@@ -361,7 +390,10 @@ reviews:
       - "docs/verification/review-center/web/projects-page.md"
       - "src/**/Web/ProjectsPage.razor"
       - "src/**/Web/ProjectsPage.razor.cs"
+      - "src/**/Web/NewProjectPage.razor"
+      - "src/**/Web/NewProjectPage.razor.cs"
       - "test/**/Web/ProjectsPageTests.cs"
+      - "test/**/Web/NewProjectPageTests.cs"
 
   - id: ReviewCenter-Web-ProjectPage
     title: Review of ReviewCenter ProjectPage unit implementation
@@ -376,8 +408,10 @@ reviews:
       - "docs/verification/review-center/web/project-page.md"
       - "src/**/Web/ProjectPage.razor"
       - "src/**/Web/ProjectPage.razor.cs"
+      - "src/**/Web/NewReviewPage.razor"
+      - "src/**/Web/NewReviewPage.razor.cs"
       - "test/**/Web/ProjectPageTests.cs"
-      - "test/**/Web/ProjectPageRepositoryTests.cs"
+      - "test/**/Web/NewReviewPageRepositoryTests.cs"
 
   - id: ReviewCenter-Web-PlanPage
     title: Review of ReviewCenter PlanPage unit implementation
@@ -473,6 +507,8 @@ reviews:
       - "docs/verification/review-center/web/users-page.md"
       - "src/**/Web/UsersPage.razor"
       - "src/**/Web/UsersPage.razor.cs"
+      - "src/**/Web/NewUserPage.razor"
+      - "src/**/Web/NewUserPage.razor.cs"
       - "test/**/Web/UsersPageTests.cs"
 
   - id: ReviewCenter-Web-HistoryPage
@@ -519,6 +555,8 @@ reviews:
       - "docs/sysml2/model/review-center/web/repositories-page.sysml"
       - "src/**/Web/RepositoriesPage.razor"
       - "src/**/Web/RepositoriesPage.razor.cs"
+      - "src/**/Web/NewRepositoryPage.razor"
+      - "src/**/Web/NewRepositoryPage.razor.cs"
       - "test/**/Web/RepositoriesPageTests.cs"
 
   # ReviewCenter - Core

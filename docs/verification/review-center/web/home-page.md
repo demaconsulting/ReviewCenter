@@ -2,11 +2,10 @@
 
 #### Verification Approach
 
-`HomePage` is verified with component tests defined in `HomePageTests.cs`, which use the bUnit
-test context to render the real component and drive its buttons. bUnit runs the component
-life-cycle, including `OnAfterRender`, in the same way a live connection does. Tests locate
-elements by their `data-testid` attributes and assert on the rendered markup. No mocking is
-applied.
+`HomePage` is verified with component tests defined in `HomePageTests.cs`, which use the bUnit test context to render
+the real component. The signed-in user is set through the test authentication state of `PageTestBase`, so each test
+chooses between an anonymous visitor, a reviewer, and an administrator. Tests locate elements by their `data-testid`
+attributes and by the links of the rendered markup. No mocking is applied.
 
 #### Test Environment
 
@@ -15,38 +14,24 @@ N/A - standard test environment.
 #### Acceptance Criteria
 
 - All component tests pass with zero failures.
-- The page shows the product title and no greeting before any interaction.
-- Clicking Hello shows the greeting, and clicking it again still shows a single greeting.
-- The counter starts at 0 and increases by 1 per click of the counter button.
-- The interactive marker is `true` after the page has rendered on a live connection.
-- The page links to the projects page.
+- The page shows the product title.
+- A visitor who is not signed in sees the tagline, no link, and no "Get started" section.
+- A signed-in reviewer sees the "Get started" section with exactly one link, to the projects page.
+- A signed-in administrator sees four links, to the projects, repositories, audit, and users pages.
 
 #### Test Scenarios
 
-**HomePage_Render_Default_ShowsTitle**: The page is rendered; the heading text "ReviewCenter"
-is present. This scenario is tested by `HomePage_Render_Default_ShowsTitle`.
+**HomePage_Render_Default_ShowsTitle**: The page is rendered; the heading text "ReviewCenter" is present. This
+scenario is tested by `HomePage_Render_Default_ShowsTitle`.
 
-**HomePage_Render_Default_ShowsNoGreeting**: The page is rendered; the greeting element does not
-exist yet. This scenario is tested by `HomePage_Render_Default_ShowsNoGreeting`.
+**HomePage_Render_Anonymous_ShowsTaglineAndNoLinks**: Nobody is signed in and the page is rendered; the tagline
+"Web-based code review for regulated projects." is shown, and there is no link and no "Get started" section. This
+scenario is tested by `HomePage_Render_Anonymous_ShowsTaglineAndNoLinks`.
 
-**HomePage_HelloButton_Clicked_ShowsGreeting**: The page is rendered and the Hello button is
-clicked; the greeting "Hello from ReviewCenter!" appears. This scenario is tested by
-`HomePage_HelloButton_Clicked_ShowsGreeting`.
+**HomePage_Render_Reviewer_ShowsGetStartedWithProjectsOnly**: A reviewer is signed in and the page is rendered; the
+projects link points to `/projects` and it is the only link on the page. This scenario is tested by
+`HomePage_Render_Reviewer_ShowsGetStartedWithProjectsOnly`.
 
-**HomePage_HelloButton_ClickedTwice_ShowsSingleGreeting**: The page is rendered and the Hello
-button is clicked twice; exactly one greeting is shown. This scenario is tested by
-`HomePage_HelloButton_ClickedTwice_ShowsSingleGreeting`.
-
-**HomePage_Render_Default_CounterStartsAtZero**: The page is rendered; the counter shows 0. This
-scenario is tested by `HomePage_Render_Default_CounterStartsAtZero`.
-
-**HomePage_CounterButton_ClickedThreeTimes_ShowsCountThree**: The page is rendered and the
-counter button is clicked three times; the counter shows 3. This scenario is tested by
-`HomePage_CounterButton_ClickedThreeTimes_ShowsCountThree`.
-
-**HomePage_AfterRender_Interactive_SetsMarker**: The page is rendered with the life-cycle that
-a live connection uses; the `data-interactive` attribute of the root element is `true`. This
-scenario is tested by `HomePage_AfterRender_Interactive_SetsMarker`.
-
-**HomePage_Render_Default_LinksToProjects**: The page is rendered; the link with the test identifier
-`projects-link` points to `/projects`. This scenario is tested by `HomePage_Render_Default_LinksToProjects`.
+**HomePage_Render_Admin_ShowsGetStartedWithAdministrationLinks**: An administrator is signed in and the page is
+rendered; there are four links, and those to the repositories, audit, and users pages point to `/repositories`,
+`/audit`, and `/users`. This scenario is tested by `HomePage_Render_Admin_ShowsGetStartedWithAdministrationLinks`.

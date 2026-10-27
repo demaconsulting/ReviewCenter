@@ -20,11 +20,8 @@
 
 <SessionGate>
 <main class="page" data-testid="audit-page" data-interactive="@InteractiveMarker">
-    <nav class="breadcrumb">
-        <a href="/" data-testid="home-link">ReviewCenter</a>
-    </nav>
-
     <h1>Audit trail</h1>
+    <p class="page-lead">A tamper-evident record of every action, newest first.</p>
 
     @if (ErrorMessage is not null)
     {
@@ -75,10 +72,10 @@
                             <tr data-testid="audit-row">
                                 <td data-testid="audit-sequence">@entry.Sequence</td>
                                 <td class="audit-time" data-testid="audit-time">@FormatTime(entry)</td>
-                                <td data-testid="audit-actor">@entry.ActorName</td>
-                                <td data-testid="audit-action">@entry.Action</td>
-                                <td data-testid="audit-review">@ReviewLabel(entry)</td>
-                                <td class="audit-detail" data-testid="audit-detail">@entry.Detail</td>
+                                <td class="nowrap" data-testid="audit-actor">@entry.ActorName</td>
+                                <td class="nowrap" data-testid="audit-action">@entry.Action</td>
+                                <td class="nowrap" data-testid="audit-review">@ReviewLabel(entry)</td>
+                                <td class="audit-detail" data-testid="audit-detail">@DetailContent(entry.Detail)</td>
                             </tr>
                         }
                     </tbody>
@@ -91,11 +88,11 @@
             <p class="audit-paging">
                 @if (Page.HasNewer)
                 {
-                    <a href="@PageLink("after", Page.NewerAfter)" data-testid="audit-newer">Newer</a>
+                    <a class="action outline" href="@PageLink("after", Page.NewerAfter)" data-testid="audit-newer">Newer</a>
                 }
                 @if (Page.HasOlder)
                 {
-                    <a href="@PageLink("before", Page.OlderBefore)" data-testid="audit-older">Older</a>
+                    <a class="action outline" href="@PageLink("before", Page.OlderBefore)" data-testid="audit-older">Older</a>
                 }
             </p>
         }

@@ -33,11 +33,14 @@
 <SessionGate>
 <main class="page review-page" data-testid="review-page" data-interactive="@InteractiveMarker">
     <nav class="breadcrumb">
-        <a href="/" data-testid="home-link">ReviewCenter</a>
-        <span aria-hidden="true">/</span>
         <a href="/projects" data-testid="projects-link">Projects</a>
         <span aria-hidden="true">/</span>
         <a href="/projects/@ProjectId" data-testid="project-link">@(ProjectName ?? $"Project {ProjectId}")</a>
+        @if (Review is not null)
+        {
+            <span aria-hidden="true">/</span>
+            <span aria-current="page">@Review.Id</span>
+        }
     </nav>
 
     @if (!Loaded)
@@ -56,29 +59,47 @@
             {
                 <span class="badge @(Approval.IsApproved ? "approved" : null)" data-testid="review-approval">@(Approval.IsApproved ? "Approved" : "In review")</span>
             }
-            <a class="action" href="/projects/@ProjectId/reviews/@ReviewId/history" data-testid="history-link">History</a>
+            <a class="action outline" href="/projects/@ProjectId/reviews/@ReviewId/history" data-testid="history-link">History</a>
         </div>
 
-        <p class="status" data-testid="next-step">@Approval?.NextStep</p>
+        <p class="status"><strong>Next step:</strong> <span data-testid="next-step">@Approval?.NextStep</span></p>
 
-        @if (Checklist is not null)
-        {
-            <section class="card" data-testid="checklist-card">
-                <h2>Checklist</h2>
-                <p data-testid="checklist-progress-summary">@ChecklistSummary()</p>
-                <a class="action" href="/projects/@ProjectId/reviews/@ReviewId/checklist" data-testid="checklist-link">Open checklist</a>
-            </section>
-        }
+        <section class="summary-strip" data-testid="review-summary" aria-label="Review summary">
+            @if (Checklist is not null)
+            {
+                <div class="summary-cell" data-testid="checklist-card">
+                    <span class="summary-label">Checklist</span>
+                    <span class="summary-value" data-testid="checklist-progress-summary">@ChecklistSummary()</span>
+                    <progress class="summary-progress" max="@Checklist.Overall.Total" value="@Checklist.Overall.Answered"
+                              aria-label="Checklist progress"></progress>
+                    <a class="action outline small" href="/projects/@ProjectId/reviews/@ReviewId/checklist" data-testid="checklist-link">Open checklist</a>
+                </div>
+            }
+            @if (Approval is not null)
+            {
+                <div class="summary-cell" data-testid="summary-reviewers">
+                    <span class="summary-label">Reviewers</span>
+                    <span class="summary-value">@(Approval.Slots.Count == 0 ? "No reviewer slots yet" : $"{Approval.Slots.Count(s => s.State == SlotSignatureState.Signed)} of {Approval.Slots.Count} signed")</span>
+                </div>
+            }
+            <div class="summary-cell" data-testid="summary-threads">
+                <span class="summary-label">Threads</span>
+                <span class="summary-value">@Threads.Count(t => t.State == ReviewThreadState.Open) open &middot; @Threads.Count(t => t.State == ReviewThreadState.Resolved) resolved</span>
+            </div>
+        </section>
 
-        @if (Approval is not null)
+        // The reviewers card is declared here and drawn after the files and threads, because reading comes first
+        var approval = Approval;
+        RenderFragment? reviewersCard = null;
+        if (approval is not null)
         {
-            <section class="card" data-testid="reviewers-card">
-                <h2>Reviewers</h2>
-                @if (Approval.Slots.Count == 0)
+            reviewersCard = @<section class="card" data-testid="reviewers-card">
+                <h2>Reviewers and signing</h2>
+                @if (approval.Slots.Count == 0)
                 {
                     <p class="muted" data-testid="slots-empty">No reviewer slots yet.</p>
                 }
-                @foreach (var slot in Approval.Slots)
+                @foreach (var slot in approval.Slots)
                 {
                     var slotId = slot.SlotId;
                     var occupant = IsOccupant(slot);
@@ -121,12 +142,12 @@
 
                         @if (occupant && slot.State != SlotSignatureState.Signed)
                         {
-                            @if (Approval.Blockers.Count > 0)
+                            @if (approval.Blockers.Count > 0)
                             {
                                 <div data-testid="sign-blockers-@slotId">
                                     <p>This review cannot be signed yet:</p>
                                     <ul>
-                                        @foreach (var blocker in Approval.Blockers)
+                                        @foreach (var blocker in approval.Blockers)
                                         {
                                             <li>@blocker</li>
                                         }
@@ -155,7 +176,7 @@
                 }
 
                 <form class="slot-add" data-testid="slot-add-form" novalidate @onsubmit="AddSlotAsync">
-                    <details open="@(Approval.Slots.Count == 0 || NewSlotError is not null)">
+                    <details open="@(approval.Slots.Count == 0 || NewSlotError is not null)">
                     <summary>Add a slot</summary>
                     <select aria-label="Primary reviewer of the new slot" data-testid="new-slot-primary-select"
                             value="@NewSlotPrimary" @onchange="e => NewSlotPrimary = e.Value?.ToString() ?? string.Empty">
@@ -177,10 +198,10 @@
                     {
                         <p class="error" role="alert" data-testid="new-slot-error">@NewSlotError</p>
                     }
-                    <button type="submit" data-testid="new-slot-add-button">Add slot</button>
+                    <button type="submit" class="@(approval.Slots.Count == 0 ? null : "secondary")" data-testid="new-slot-add-button">Add slot</button>
                     </details>
                 </form>
-            </section>
+            </section>;
         }
 
         <section class="card">
@@ -188,7 +209,7 @@
             @if (DeepLinkMessage is not null)
             {
                 <p class="notice" role="alert" data-testid="deep-link-message">@DeepLinkMessage
-                    <a href="@ReviewLinks.ForReview(ProjectId, ReviewId)" data-testid="deep-link-back">Back to the file list of this review</a></p>
+                    <a class="action outline" href="@ReviewLinks.ForReview(ProjectId, ReviewId)" data-testid="deep-link-back">Back to the file list of this review</a></p>
             }
             <ul class="item-list" data-testid="files-list">
                 @for (var index = 0; index < Review.Files.Count; index++)
@@ -540,6 +561,11 @@
                     }
                 </section>
             }
+        }
+
+        @if (reviewersCard is not null)
+        {
+            @reviewersCard
         }
 
         <details class="review-details" data-testid="review-details">

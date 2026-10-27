@@ -21,7 +21,8 @@
 using Bunit;
 using DemaConsulting.ReviewCenter.Core;
 using DemaConsulting.ReviewCenter.Web;
-
+using Microsoft.AspNetCore.Components;
+using Microsoft.Extensions.DependencyInjection;
 using TestContext = Xunit.TestContext;
 
 namespace DemaConsulting.ReviewCenter.Tests.Web;
@@ -69,26 +70,28 @@ public class RepositoriesPageTests : PageTestBase
         // Assert: details and state are shown, the token is not, and there is no delete control
         Assert.Equal("private", cut.Find($"[data-testid='repository-name-{priv.Id}']").TextContent);
         Assert.Equal(Location, cut.Find($"[data-testid='repository-location-{priv.Id}']").TextContent);
-        Assert.Equal("svc", cut.Find($"[data-testid='repository-username-{priv.Id}']").TextContent);
+        Assert.Equal("user svc", cut.Find($"[data-testid='repository-username-{priv.Id}']").TextContent);
         Assert.Equal("token set", cut.Find($"[data-testid='repository-token-state-{priv.Id}']").TextContent);
-        Assert.Equal("no token", cut.Find($"[data-testid='repository-token-state-{pub.Id}']").TextContent);
+        Assert.Empty(cut.FindAll($"[data-testid='repository-token-state-{pub.Id}']"));
+        Assert.Empty(cut.FindAll($"[data-testid='repository-username-{pub.Id}']"));
         Assert.Equal("Enabled", cut.Find($"[data-testid='repository-enabled-{priv.Id}']").TextContent);
         Assert.DoesNotContain(Secret, cut.Markup, StringComparison.Ordinal);
         Assert.DoesNotContain("protected:", cut.Markup, StringComparison.Ordinal);
         Assert.DoesNotContain("delete", cut.Markup, StringComparison.OrdinalIgnoreCase);
-        Assert.NotNull(cut.Find("[data-testid='create-repository-button']"));
+        Assert.Equal("/repositories/new", cut.Find("[data-testid='new-repository-button']").GetAttribute("href"));
+        Assert.Empty(cut.FindAll("[data-testid='new-repository-form']"));
     }
 
     /// <summary>
-    ///     Test that the add form registers the repository with a write-only token, empties the token field and
-    ///     never puts the token into the markup.
+    ///     Test that the add form registers the repository with a write-only token, never puts the token into the
+    ///     markup and returns to the registry.
     /// </summary>
     [Fact]
-    public async Task RepositoriesPage_CreateForm_WithToken_StoresItWriteOnlyAndClearsFields()
+    public async Task NewRepositoryPage_CreateForm_WithToken_StoresItWriteOnlyAndClearsFields()
     {
         // Arrange: a signed-in administrator and the form filled in
         await SignInAsNewAdminAsync();
-        var cut = Render<RepositoriesPage>();
+        var cut = Render<NewRepositoryPage>();
         await cut.Find("[data-testid='new-repository-name-input']").InputAsync("alpha");
         await cut.Find("[data-testid='new-repository-location-input']").InputAsync(Location);
         await cut.Find("[data-testid='new-repository-username-input']").InputAsync("svc");
@@ -98,26 +101,25 @@ public class RepositoriesPageTests : PageTestBase
         // Act: submit
         await cut.Find("[data-testid='new-repository-form']").SubmitAsync();
 
-        // Assert: registered with a token, shown as "token set", the token and the fields gone from the page
+        // Assert: registered with a token, the token is gone from the page and the browser returned to the registry
         var created = Assert.Single(await Repositories.ListAsync(_admin, TestContext.Current.CancellationToken));
         Assert.True(created.HasToken);
-        Assert.Equal("token set", cut.Find($"[data-testid='repository-token-state-{created.Id}']").TextContent);
         Assert.Empty(cut.FindAll("[data-testid='repositories-error']"));
-        Assert.Contains("alpha", cut.Find("[data-testid='repositories-status']").TextContent, StringComparison.Ordinal);
         Assert.DoesNotContain(Secret, cut.Markup, StringComparison.Ordinal);
         Assert.Equal(string.Empty, cut.Find("[data-testid='new-repository-token-input']").GetAttribute("value") ?? string.Empty);
-        Assert.Equal(string.Empty, cut.Find("[data-testid='new-repository-name-input']").GetAttribute("value") ?? string.Empty);
+        Assert.EndsWith("/repositories", Services.GetRequiredService<NavigationManager>().Uri, StringComparison.Ordinal);
+        Assert.Equal("/repositories", cut.Find("[data-testid='cancel-new-repository-link']").GetAttribute("href"));
     }
 
     /// <summary>
     ///     Test that a rule violation on creation is shown, keeps the typed name and creates nothing.
     /// </summary>
     [Fact]
-    public async Task RepositoriesPage_CreateForm_InvalidLocation_ShowsErrorAndCreatesNothing()
+    public async Task NewRepositoryPage_CreateForm_InvalidLocation_ShowsErrorAndCreatesNothing()
     {
         // Arrange: a signed-in administrator and a location with credentials of its own
         await SignInAsNewAdminAsync();
-        var cut = Render<RepositoriesPage>();
+        var cut = Render<NewRepositoryPage>();
         await cut.Find("[data-testid='new-repository-name-input']").InputAsync("alpha");
         await cut.Find("[data-testid='new-repository-location-input']").InputAsync("https://user:pw@example.com/r.git");
 
@@ -150,7 +152,7 @@ public class RepositoriesPageTests : PageTestBase
         await cut.Find("[data-testid='edit-repository-save-button']").ClickAsync();
 
         // Assert: the user name changed and the token is the same stored value
-        Assert.Equal("other", cut.Find($"[data-testid='repository-username-{repo.Id}']").TextContent);
+        Assert.Equal("user other", cut.Find($"[data-testid='repository-username-{repo.Id}']").TextContent);
         Assert.Equal("token set", cut.Find($"[data-testid='repository-token-state-{repo.Id}']").TextContent);
         Assert.Equal(before, RepositoryStore.StoredToken(repo.Id));
         Assert.Empty(cut.FindAll($"[data-testid='repository-edit-form-{repo.Id}']"));
@@ -200,7 +202,7 @@ public class RepositoriesPageTests : PageTestBase
 
         // Assert: no token is stored
         Assert.Null(RepositoryStore.StoredToken(repo.Id));
-        Assert.Equal("no token", cut.Find($"[data-testid='repository-token-state-{repo.Id}']").TextContent);
+        Assert.Empty(cut.FindAll($"[data-testid='repository-token-state-{repo.Id}']"));
     }
 
     /// <summary>

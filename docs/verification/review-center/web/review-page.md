@@ -43,8 +43,10 @@ N/A - standard test environment.
 - Resolve and reopen change the thread state and the summary; the next-step line follows the threads and the
   unanswered checks of the checklist, asks for a reviewer slot when only that is missing, and says that the review is
   approved once every slot is signed.
-- A review with a checklist shows a card with its progress and a link to the checklist page; a review without one
-  shows no card.
+- A review with a checklist shows its progress, a progress bar and a link to the checklist page in the summary strip; a
+  review without one shows no checklist cell.
+- The summary strip at the top of the page shows, besides the checklist, the reviewer state ("No reviewer slots yet"
+  or how many slots are signed) and the number of open and of resolved threads.
 - The Reviewers card is shown for every review. Without slots it says so and offers the add form, and the review is
   In review. A slot is added with its primary and alternate and listed as "Slot 1" with "Not signed"; a missing
   primary or the same user twice shows a message and adds nothing; an unsigned slot can be changed and removed. A
@@ -303,12 +305,17 @@ thread is resolved, no reviewer slot exists and the line is "Add a reviewer slot
 `ReviewPage_Render_NextStep_IncludesChecklistProgress`.
 
 **ReviewPage_Render_NewReview_ShowsChecklistProgressAndLink**: A review with two answered checks is rendered; the
-checklist card shows "2 of 58 checks answered" and a link to the checklist page of the review. This scenario is
-tested by `ReviewPage_Render_NewReview_ShowsChecklistProgressAndLink`.
+checklist cell of the summary strip shows "2 of 58 checks answered" and a link to the checklist page of the review.
+This scenario is tested by `ReviewPage_Render_NewReview_ShowsChecklistProgressAndLink`.
 
 **ReviewPage_Render_ReviewWithoutChecklist_HidesChecklistCard**: A review stored without a checklist is rendered;
-there is no checklist card, and the next-step line does not mention the checklist. This scenario is tested by
-`ReviewPage_Render_ReviewWithoutChecklist_HidesChecklistCard`.
+there is no checklist cell in the summary strip, and the next-step line does not mention the checklist. This scenario
+is tested by `ReviewPage_Render_ReviewWithoutChecklist_HidesChecklistCard`.
+
+**ReviewPage_Render_ExistingReview_ShowsSummaryStripWithChecklistReviewersAndThreads**: A review without answers,
+slots or threads is rendered; the summary strip contains the checklist progress and a link to the checklist page of
+the review, the text "No reviewer slots yet", and the thread counts "0 open" and "0 resolved". This scenario is
+tested by `ReviewPage_Render_ExistingReview_ShowsSummaryStripWithChecklistReviewersAndThreads`.
 
 **ReviewPage_ThreadIndex_Filters_ShowRowsWithFileAnchorStateCountAuthorAndActivity**: With no threads the index
 says there are no open threads; with an open thread (with a reply) and a resolved thread, the default shows only

@@ -12,7 +12,7 @@ ReviewCenterPuppet, called Puppet in this chapter, is a development tool that le
 drive the real ReviewCenter web application in a browser. A coding agent works at a shell, one command per call,
 and loops: act, look at a screenshot or at the page text, decide, act again. Puppet therefore keeps ONE persistent
 headless Chromium open between commands. `puppet start` spawns a detached daemon process that owns the browser; every
-other command, such as `puppet click hello-button`, is a thin client that sends one request to the daemon, prints the
+other command, such as `puppet click projects-link`, is a thin client that sends one request to the daemon, prints the
 answer, and exits. The ReviewCenter server is started separately by the caller (for example with `dotnet watch`).
 The tool is a single console application on net10.0 built from `tools/puppet`; the same executable is the client and,
 through the hidden verb `daemon`, the daemon.

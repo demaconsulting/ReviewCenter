@@ -19,18 +19,15 @@
 // SOFTWARE.
 
 using DemaConsulting.ReviewCenter.Core;
-using DemaConsulting.ReviewCenter.Identity;
 using Microsoft.AspNetCore.Components;
-using Microsoft.AspNetCore.Components.Authorization;
 
 namespace DemaConsulting.ReviewCenter.Web;
 
 /// <summary>
-///     Code-behind for the projects page (<c>ProjectsPage.razor</c>): lists the projects and creates new ones.
+///     Code-behind for the projects page (<c>ProjectsPage.razor</c>): lists the projects.
 /// </summary>
 /// <remarks>
-///     The page talks to the domain only through <see cref="ProjectService"/>, which owns the rules; a rule
-///     violation is shown to the operator next to the form instead of being thrown. Each browser connection
+///     The page talks to the domain only through <see cref="ProjectService"/>. Each browser connection
 ///     (circuit) gets its own page instance, so the state here is per-user and needs no synchronization.
 ///     The page requires a signed-in user.
 /// </remarks>
@@ -49,30 +46,9 @@ public partial class ProjectsPage : ComponentBase
     private ProjectService ProjectService { get; set; } = null!;
 
     /// <summary>
-    ///     Gets or sets the authentication state of the current user, supplied by dependency injection.
-    /// </summary>
-    [Inject]
-    private AuthenticationStateProvider AuthenticationState { get; set; } = null!;
-
-    /// <summary>
     ///     Gets the projects shown in the list.
     /// </summary>
     private IReadOnlyList<Project> Projects { get; set; } = [];
-
-    /// <summary>
-    ///     Gets or sets the name typed into the new-project form.
-    /// </summary>
-    private string NewName { get; set; } = string.Empty;
-
-    /// <summary>
-    ///     Gets or sets the description typed into the new-project form.
-    /// </summary>
-    private string NewDescription { get; set; } = string.Empty;
-
-    /// <summary>
-    ///     Gets the message of the last rejected submission, or <c>null</c> when there is none.
-    /// </summary>
-    private string? ErrorMessage { get; set; }
 
     /// <summary>
     ///     Gets the value rendered into the <c>data-interactive</c> attribute.
@@ -108,35 +84,5 @@ public partial class ProjectsPage : ComponentBase
             _interactive = true;
             StateHasChanged();
         }
-    }
-
-    /// <summary>
-    ///     Creates a project from the form values and refreshes the list.
-    /// </summary>
-    /// <returns>A task that completes when the submission has been handled.</returns>
-    /// <remarks>
-    ///     On success the form is cleared and any earlier error is removed. On a rule violation the form
-    ///     keeps what was typed so that the operator can correct it, and the message is shown. The submission
-    ///     is refused, with a message, when the sign-in state of the page has already ended.
-    /// </remarks>
-    private async Task CreateProjectAsync()
-    {
-        try
-        {
-            // The actor is audited; asking for it also refuses an ended sign-in state
-            var actor = await AuthenticationState.GetActorAsync();
-            await ProjectService.CreateAsync(NewName, NewDescription, actor);
-        }
-        catch (DomainRuleException ex)
-        {
-            ErrorMessage = ex.Message;
-            return;
-        }
-
-        // Success: reset the form and show the new project in the list
-        ErrorMessage = null;
-        NewName = string.Empty;
-        NewDescription = string.Empty;
-        Projects = await ProjectService.ListAsync();
     }
 }

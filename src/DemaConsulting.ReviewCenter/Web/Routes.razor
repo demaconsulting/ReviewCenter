@@ -1,7 +1,9 @@
 @* Routes: maps the requested URL to a page component (part of the App unit).
 
-   Unknown URLs fall through to a plain "not found" message so that a mistyped address gives the
-   user a clear answer instead of a blank page.
+   Unknown URLs fall through to NotFoundPage ("Page not found"), shown inside MainLayout so that it has the same
+   header and footer as every other page, and so that a mistyped address gives the user a clear answer and a way
+   back instead of a blank page. For a request to the server the same page is served by re-executing the 404
+   (see ServerHost), because a URL that no page handles never reaches this router.
 
    AuthorizeRouteView applies the [Authorize] rules of a page also when the user navigates inside an open
    interactive circuit, where the endpoint check does not run (RouteView would ignore them). A signed-out
@@ -12,32 +14,29 @@
    An open page whose user is disabled, removed or changed is handled by SessionGate inside the page. *@
 @using Microsoft.AspNetCore.Components.Authorization
 @inject NavigationManager Navigation
-<Router AppAssembly="typeof(Routes).Assembly">
+<Router AppAssembly="typeof(Routes).Assembly" NotFoundPage="typeof(NotFoundPage)">
     <Found Context="routeData">
         <AuthorizeRouteView RouteData="routeData" DefaultLayout="typeof(MainLayout)">
             <NotAuthorized Context="state">
-                <main class="page" data-testid="access-denied">
+                <main class="page narrow" data-testid="access-denied">
                     @if (state.User.Identity?.IsAuthenticated == true)
                     {
                         <h1>Access denied</h1>
                         <p>Your account does not have permission to open this page.</p>
-                        <p><a href="/projects" data-testid="access-denied-projects-link">Back to projects</a></p>
+                        <p><a class="action outline" href="/projects" data-testid="access-denied-projects-link">Back to projects</a></p>
                     }
                     else
                     {
                         <h1>Sign in required</h1>
                         <p>Please sign in to open this page.</p>
                         <p>
-                            <a href="@LoginLink" data-testid="access-denied-login-link">Go to the login page</a>
+                            <a class="action" href="@LoginLink" data-testid="access-denied-login-link">Go to the login page</a>
                         </p>
                     }
                 </main>
             </NotAuthorized>
         </AuthorizeRouteView>
     </Found>
-    <NotFound>
-        <p>Page not found.</p>
-    </NotFound>
 </Router>
 
 @code {

@@ -71,6 +71,91 @@ public class AppTests : PageTestBase
     }
 
     /// <summary>
+    ///     Test that a request to the running server for an address that no page handles is answered with status 404
+    ///     and the framed not-found page, with the header brand link and the footer.
+    /// </summary>
+    [Fact]
+    public async Task App_Request_UnknownPath_Returns404WithFramedNotFoundPage()
+    {
+        // Arrange: start the real pipeline in memory
+        var logs = new CapturingLoggerProvider();
+        await using var app = await TestWebApp.StartAsync(logs, "serve", "--silent");
+        using var client = app.GetTestClient();
+
+        // Act: request an address that no page handles
+        var response = await client.GetAsync("/no-such-page?x=1", TestContext.Current.CancellationToken);
+        var html = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
+
+        // Assert: 404 with the not-found page inside the page frame
+        Assert.Equal(System.Net.HttpStatusCode.NotFound, response.StatusCode);
+        Assert.Contains("data-testid=\"not-found\"", html, StringComparison.Ordinal);
+        Assert.Contains("Page not found", html, StringComparison.Ordinal);
+        Assert.Contains("data-testid=\"home-link\"", html, StringComparison.Ordinal);
+        Assert.Contains("data-testid=\"footer\"", html, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    ///     Test that an unknown address under the reserved <c>/api</c> prefix keeps a plain 404 without the page frame.
+    /// </summary>
+    [Fact]
+    public async Task App_Request_UnknownApiPath_Returns404WithoutPageFrame()
+    {
+        // Arrange: start the real pipeline in memory
+        var logs = new CapturingLoggerProvider();
+        await using var app = await TestWebApp.StartAsync(logs, "serve", "--silent");
+        using var client = app.GetTestClient();
+
+        // Act: request an unknown machine-client address
+        var response = await client.GetAsync("/api/anything", TestContext.Current.CancellationToken);
+        var body = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
+
+        // Assert: 404 and no HTML page
+        Assert.Equal(System.Net.HttpStatusCode.NotFound, response.StatusCode);
+        Assert.DoesNotContain("data-testid=\"footer\"", body, StringComparison.Ordinal);
+        Assert.DoesNotContain("Page not found", body, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    ///     Test that an unknown address that ends in a file extension keeps a plain 404 without the page frame.
+    /// </summary>
+    [Fact]
+    public async Task App_Request_UnknownFilePath_Returns404WithoutPageFrame()
+    {
+        // Arrange: start the real pipeline in memory
+        var logs = new CapturingLoggerProvider();
+        await using var app = await TestWebApp.StartAsync(logs, "serve", "--silent");
+        using var client = app.GetTestClient();
+
+        // Act: request a missing style sheet
+        var response = await client.GetAsync("/missing.css", TestContext.Current.CancellationToken);
+        var body = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
+
+        // Assert: 404 and no HTML page
+        Assert.Equal(System.Net.HttpStatusCode.NotFound, response.StatusCode);
+        Assert.DoesNotContain("Page not found", body, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    ///     Test that a non-page request (a POST) to an unknown address keeps a plain 404 without the page frame.
+    /// </summary>
+    [Fact]
+    public async Task App_Request_PostToUnknownPath_Returns404WithoutPageFrame()
+    {
+        // Arrange: start the real pipeline in memory
+        var logs = new CapturingLoggerProvider();
+        await using var app = await TestWebApp.StartAsync(logs, "serve", "--silent");
+        using var client = app.GetTestClient();
+
+        // Act: post to an unknown address
+        var response = await client.PostAsync("/no-such-page", new StringContent(string.Empty), TestContext.Current.CancellationToken);
+        var body = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
+
+        // Assert: the 404 is not turned into the not-found page
+        Assert.Equal(System.Net.HttpStatusCode.NotFound, response.StatusCode);
+        Assert.DoesNotContain("Page not found", body, StringComparison.Ordinal);
+    }
+
+    /// <summary>
     ///     Test that the router shows a not-found message for an unknown URL.
     /// </summary>
     [Fact]
@@ -83,7 +168,29 @@ public class AppTests : PageTestBase
         var cut = Render<Routes>();
 
         // Assert: the not-found message is shown
-        Assert.Contains("Page not found.", cut.Markup);
+        Assert.Contains("Page not found", cut.Find("[data-testid='not-found'] h1").TextContent, StringComparison.Ordinal);
+        Assert.Equal("/projects", cut.Find("[data-testid='not-found-projects-link']").GetAttribute("href"));
+    }
+
+    /// <summary>
+    ///     Test that the not-found page of an unknown URL is shown inside the page frame, so it has the header
+    ///     with the product link and the footer like every other page.
+    /// </summary>
+    [Fact]
+    public void Routes_Render_UnknownUrl_ShowsNotFoundInsidePageFrameWithHeaderAndFooter()
+    {
+        // Arrange: nobody is signed in and the address matches no page
+        SignOut();
+        Services.GetRequiredService<NavigationManager>().NavigateTo("/does-not-exist");
+
+        // Act: render the router
+        var cut = Render<Routes>();
+
+        // Assert: the not-found page, the header brand link, and the footer are all present
+        Assert.NotEmpty(cut.FindAll("[data-testid='not-found']"));
+        Assert.Equal("/", Assert.Single(cut.FindAll("[data-testid='home-link']")).GetAttribute("href"));
+        Assert.Contains("DEMA Consulting", cut.Find("[data-testid='footer']").TextContent, StringComparison.Ordinal);
+        Assert.Equal("/about", cut.Find("[data-testid='about-link']").GetAttribute("href"));
     }
 
     /// <summary>
@@ -103,6 +210,7 @@ public class AppTests : PageTestBase
 
         // Assert: the name, the account link and the logout button are shown, but the Users link only to the administrator
         Assert.Equal("Bea", reviewer.Find("[data-testid='current-user']").TextContent);
+        Assert.Equal("/projects", reviewer.Find("[data-testid='projects-link']").GetAttribute("href"));
         Assert.NotNull(reviewer.Find("[data-testid='account-link']"));
         Assert.NotNull(reviewer.Find("[data-testid='logout-button']"));
         Assert.Empty(reviewer.FindAll("[data-testid='users-link']"));
@@ -112,6 +220,71 @@ public class AppTests : PageTestBase
         Assert.NotNull(admin.Find("[data-testid='users-link']"));
         Assert.Equal("/repositories", admin.Find("[data-testid='repositories-link']").GetAttribute("href"));
         Assert.Equal("/audit", admin.Find("[data-testid='audit-link']").GetAttribute("href"));
+    }
+
+    /// <summary>
+    ///     Test that every page has a footer with the version and a link to the About page, even when nobody is
+    ///     signed in, and that the header has exactly one link to the home page.
+    /// </summary>
+    [Fact]
+    public void MainLayout_Render_NobodySignedIn_ShowsFooterWithVersionAndAboutLink()
+    {
+        // Arrange: nobody is signed in
+        SignOut();
+
+        // Act: render the layout
+        var layout = Render<MainLayout>();
+
+        // Assert: the footer names the product, the version and the copyright and links to /about
+        Assert.Contains("ReviewCenter", layout.Find("[data-testid='footer']").TextContent);
+        Assert.Contains("DEMA Consulting", layout.Find("[data-testid='footer']").TextContent);
+        Assert.False(string.IsNullOrWhiteSpace(layout.Find("[data-testid='version-text']").TextContent));
+        Assert.Contains(Program.Version.Split('+')[0], layout.Find("[data-testid='version-text']").TextContent, StringComparison.Ordinal);
+        Assert.True(layout.Find("[data-testid='version-text']").TextContent.Length <= Program.Version.Length);
+        Assert.Equal("/about", layout.Find("[data-testid='about-link']").GetAttribute("href"));
+        Assert.Equal("/", Assert.Single(layout.FindAll("[data-testid='home-link']")).GetAttribute("href"));
+    }
+
+    /// <summary>
+    ///     Test that the document head applies the stored theme choice before the style sheet is requested, so
+    ///     the page never flashes the wrong theme.
+    /// </summary>
+    [Fact]
+    public async Task App_Render_ServedAtRoot_AppliesStoredThemeBeforeStyleSheet()
+    {
+        // Arrange: start the real pipeline in memory
+        var logs = new CapturingLoggerProvider();
+        await using var app = await TestWebApp.StartAsync(logs, "serve", "--silent");
+        using var client = app.GetTestClient();
+
+        // Act: request the root document
+        var html = await client.GetStringAsync("/", Xunit.TestContext.Current.CancellationToken);
+
+        // Assert: the inline script that reads the stored choice comes before the style sheet link
+        var script = html.IndexOf("reviewcenter-theme", StringComparison.Ordinal);
+        var styleSheet = html.IndexOf("rel=\"stylesheet\"", StringComparison.Ordinal);
+        Assert.True(script >= 0, "The theme script is missing.");
+        Assert.True(styleSheet > script, "The theme script must come before the style sheet.");
+        Assert.Contains("data-theme", html, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    ///     Test that the address of the new-review form is handled by the form, not by a review called "new".
+    /// </summary>
+    [Fact]
+    public async Task Routes_Render_NewReviewRoute_ShowsFormNotReview()
+    {
+        // Arrange: a signed-in user, a project, and the router at the new-review address
+        SignInAs("ann", "Ann");
+        var project = await Projects.CreateAsync("Apollo", null, TestContext.Current.CancellationToken);
+        Services.GetRequiredService<NavigationManager>().NavigateTo($"/projects/{project.Id}/reviews/new");
+
+        // Act: render the router
+        var cut = Render<Routes>();
+
+        // Assert: the creation form is shown and no review page is
+        Assert.NotEmpty(cut.FindAll("[data-testid='new-review-form']"));
+        Assert.Empty(cut.FindAll("[data-testid='review-page']"));
     }
 
     /// <summary>
@@ -127,6 +300,7 @@ public class AppTests : PageTestBase
         var cut = Render<MainLayout>();
 
         // Assert: only the sign-in link is shown
+        Assert.Empty(cut.FindAll("[data-testid='projects-link']"));
         Assert.Equal("/login", cut.Find("[data-testid='signin-link']").GetAttribute("href"));
         Assert.Empty(cut.FindAll("[data-testid='current-user']"));
         Assert.Empty(cut.FindAll("[data-testid='logout-button']"));
@@ -166,8 +340,8 @@ public class AppTests : PageTestBase
         // Act: render the router
         var cut = Render<Routes>();
 
-        // Assert: the creation form is shown and there is no access denied message
-        Assert.NotNull(cut.Find("[data-testid='create-user-button']"));
+        // Assert: the user list page is shown (with its New user button) and there is no access denied message
+        Assert.NotNull(cut.Find("[data-testid='new-user-button']"));
         Assert.Empty(cut.FindAll("[data-testid='access-denied']"));
     }
 

@@ -1,8 +1,8 @@
 ---
 # Software Unit Requirements for the ReviewPage Unit
 #
-# The ReviewPage unit is the page at /projects/{project}/reviews/{review} that shows one review with its
-# fingerprint and files, and displays the content of a selected file.
+# The ReviewPage unit is the page at /projects/{project}/reviews/{review} that shows one review with a summary strip,
+# its fingerprint and files, and displays the content of a selected file.
 
 sections:
   - title: ReviewPage Unit Requirements
@@ -58,6 +58,18 @@ sections:
         tests:
           - ReviewPage_Render_NewReview_ShowsChecklistProgressAndLink
           - ReviewPage_Render_ReviewWithoutChecklist_HidesChecklistCard
+
+      - id: ReviewCenter-ReviewPage-Summary
+        title: >-
+          The ReviewPage unit shall show, in one compact strip at the top of the page below the next-step line, the
+          checklist progress with a link to the checklist, the state of the reviewers ("No reviewer slots yet" or
+          how many of the slots are signed), and the number of open and of resolved threads.
+        justification: |
+          A reviewer decides what to do from the state of the whole review: how far the checklist is, who still has
+          to sign, and how much discussion is open. Showing the three together in one place avoids scrolling
+          through the page to collect them.
+        tests:
+          - ReviewPage_Render_ExistingReview_ShowsSummaryStripWithChecklistReviewersAndThreads
 
       - id: ReviewCenter-ReviewPage-Files
         title: >-

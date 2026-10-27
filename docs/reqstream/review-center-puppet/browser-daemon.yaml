@@ -20,5 +20,5 @@ sections:
               The control file is how the commands find the daemon, so it must exist only while the daemon
               can answer; a stop must leave neither a browser nor a control file behind.
             tests:
-              - windows@PuppetEndToEnd_StartDriveStop_HelloAndCounter_WorksAgainstRealServer
-              - ubuntu@PuppetEndToEnd_StartDriveStop_HelloAndCounter_WorksAgainstRealServer
+              - windows@PuppetEndToEnd_StartDriveStop_SignInProjectAndTheme_WorksAgainstRealServer
+              - ubuntu@PuppetEndToEnd_StartDriveStop_SignInProjectAndTheme_WorksAgainstRealServer

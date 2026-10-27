@@ -1,0 +1,97 @@
+### HelpPage
+
+![Web Structure](WebView.svg)
+
+#### Purpose
+
+`HelpPage` is the built-in help of the web user interface. Its responsibilities are to list the help topics at
+`/help`, to serve one page for each topic at `/help/{topic}`, to give those pages a common frame with links to the
+neighboring topics, and to answer an unknown address under `/help/` with a friendly page. The help is static text and
+screenshots rendered on the server as plain markup, with no live connection, and it is open to anonymous visitors. The
+link to the help in the header of every page belongs to `App`. The unit consists of these Razor components and one
+source file:
+
+- `HelpPage` (`HelpPage.razor`): the index.
+- `HelpTopicFrame` (`HelpTopicFrame.razor`): the common frame of a topic page.
+- The topic pages `HelpGettingStartedPage`, `HelpCreatingReviewPage`, `HelpReadingReviewPage`, `HelpCommentsPage`,
+  `HelpChecklistPage`, `HelpSigningPage`, `HelpAuditPage`, and `HelpPlanningPage`: the text of one topic each.
+- `HelpNotFoundPage` (`HelpNotFoundPage.razor`): the catch-all for an unknown address.
+- `HelpTopics` (`HelpTopics.cs`): the list of topics.
+
+#### Data Model
+
+**HelpTopic**: a record of one topic with three values, **Slug** (the last part of the address, for example
+`checklist`), **Title** (the text of the index link and the heading of the topic page), and **Summary** (one line that
+says what the topic explains), and a derived **Href**, the address `/help/{Slug}`. The slugs are unique.
+
+**HelpTopics.All**: the read-only list of topics in reading order. It feeds the index and the neighbor links of the
+topic pages. Adding a topic is one page component with its route `/help/{slug}` and one entry in this list; the
+index, the navigation links, and the tests then include it without further change. A topic that has a page but no
+entry would be missing from the index, and an entry without a page would lead to the not-found page; the test of the
+topic pages compares the routes of the pages with the list, so either mistake is caught.
+
+**HelpTopicFrame component**: It has two parameters, **Slug**, the topic the page is about, and **ChildContent**, the
+text of the topic. It finds the topic in the list, and renders a `main` element with the title of the topic as
+heading, the content, and a navigation area at the bottom with outline-style links: Previous (the title of the
+previous topic), All help topics, and Next (the title of the next topic). The first topic has no Previous link and the
+last has no Next link.
+The browser title is the title of the topic followed by "Help - ReviewCenter".
+
+**Topic pages**: Each is a component that routes `/help/{slug}` and places its text inside a `HelpTopicFrame` with its
+slug. The text is in cards (`card`), with figures for the screenshots. The screenshots are image files under
+`wwwroot/help/`, requested with a path that begins `/help/`, loaded lazily, and each has alternative text that describes
+what the picture shows and a caption.
+
+**HelpNotFoundPage component**: It routes `/help/{*Slug}`, a catch-all with a parameter. The router prefers the fixed
+routes of the topic pages, so only an address that is not a topic reaches it. It shows a message that there is no help
+topic at the address, and a link to the index.
+
+The links of the help are always whole addresses, never `#section` anchors: the document has a base address (see `App`),
+so a link that begins `#` would lead to the home page and not to a place in the page.
+
+Every interactive element and key value has a stable `data-testid` (see the test identifier rule of the Web
+subsystem): `help-page` (index root), `help-topics` (the list), `help-topic-{slug}` (a card), `help-topic-link-{slug}`
+(its link), `help-about-link`, `help-topic-page` (root of a topic page), `help-previous-link`, `help-index-link`,
+`help-next-link`, and `help-not-found`. There is no `data-interactive` marker, because the pages have no live
+connection.
+
+#### Key Methods
+
+**HelpTopics.Find**: Finds a topic by its slug.
+
+- *Parameters*: `string slug`.
+- *Returns*: The topic, or `null` when there is none with that slug.
+- *Preconditions*: None.
+- *Postconditions*: The slug is compared exactly, with ordinal comparison.
+
+**HelpTopics.Previous** and **HelpTopics.Next**: Find the neighbors of a topic in reading order.
+
+- *Parameters*: `string slug`.
+- *Returns*: The topic before, or after, the given one; `null` for the first topic (Previous), the last topic (Next), or
+  an unknown slug.
+- *Preconditions*: None.
+- *Postconditions*: The result is never the topic itself.
+
+**Render (HelpPage)**: Produces the index: the heading "Help", a line of introduction, one card for each topic in the
+list (a heading that is the link to the page of the topic, and the summary), and a line with a link to the About page.
+
+**Render (HelpTopicFrame)**: Produces the frame described above for the topic named by `Slug`; for a slug that is not in
+the list, the heading is "Help" and there are no neighbor links, only the index link.
+
+**Render (HelpNotFoundPage)**: Produces the not-found message with the link to the index.
+
+#### Error Handling
+
+An address under `/help/` that is not a topic is not an error: `HelpNotFoundPage` shows the friendly message. A topic
+page always passes a slug that is in the list, which the tests check. Otherwise the unit contains no error-producing
+logic.
+
+#### Dependencies
+
+- **About page** (`AboutPage`) — the index links to it.
+- **ASP.NET Core Blazor components** — page routing, page title support, and the base component types.
+
+#### Callers
+
+- **App** — the router in the `App` unit renders the pages of the help for their routes, and the header of `MainLayout`
+  has a link to `/help` on every page.

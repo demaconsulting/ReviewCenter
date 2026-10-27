@@ -1,0 +1,68 @@
+@* NewUserPage: the form that creates a user, at "/users/new". The page holds only the form (a narrow column); Cancel
+   goes back to the user list and a successful creation returns to it. Access is limited to the Admin role by the
+   attribute below.
+
+   Presentation only; state and event handling live in NewUserPage.razor.cs. The data-interactive marker on the root
+   flips to "true" once the live circuit is connected.
+
+   The page body is inside SessionGate, which replaces it with a "Session ended" message when the user is no longer
+   valid while the page is open. *@
+@page "/users/new"
+@using DemaConsulting.ReviewCenter.Identity
+@rendermode InteractiveServer
+@attribute [Authorize(Roles = SignIn.AdminRole)]
+
+<PageTitle>New user - ReviewCenter</PageTitle>
+
+<SessionGate>
+<main class="page narrow" data-testid="new-user-page" data-interactive="@InteractiveMarker">
+    <nav class="breadcrumb">
+        <a href="/users" data-testid="users-link">Users</a>
+        <span aria-hidden="true">/</span>
+        <span aria-current="page">New user</span>
+    </nav>
+
+    <h1>New user</h1>
+    <p class="page-lead">Create an account. The user can change the password after signing in.</p>
+
+    <section class="card">
+        @if (ErrorMessage is not null)
+        {
+            <p class="error" role="alert" data-testid="users-error">@ErrorMessage</p>
+        }
+        <form data-testid="new-user-form" @onsubmit="CreateUserAsync">
+            <div class="field">
+                <label for="new-user-username">User name</label>
+                <input id="new-user-username" type="text" maxlength="@ReviewLimits.MaxUsernameLength"
+                       autocomplete="off"
+                       data-testid="new-user-username-input" @bind="NewUsername" @bind:event="oninput" />
+            </div>
+            <div class="field">
+                <label for="new-user-display-name">Display name</label>
+                <input id="new-user-display-name" type="text" maxlength="@ReviewLimits.MaxDisplayNameLength"
+                       data-testid="new-user-display-name-input" @bind="NewDisplayName" @bind:event="oninput" />
+            </div>
+            <div class="field">
+                <label for="new-user-role">Role</label>
+                <select id="new-user-role" data-testid="new-user-role-select" @bind="NewRole">
+                    @foreach (var role in Enum.GetValues<UserRole>())
+                    {
+                        <option value="@role">@role</option>
+                    }
+                </select>
+            </div>
+            <div class="field">
+                <label for="new-user-password">Initial password</label>
+                <input id="new-user-password" type="password" autocomplete="new-password"
+                       maxlength="@ReviewLimits.MaxPasswordLength"
+                       data-testid="new-user-password-input" @bind="NewPassword" @bind:event="oninput" />
+                <p class="muted hint">At least @ReviewLimits.MinPasswordLength characters.</p>
+            </div>
+            <div class="plan-actions">
+                <button type="submit" data-testid="create-user-button">Create user</button>
+                <a class="action outline" href="/users" data-testid="cancel-new-user-link">Cancel</a>
+            </div>
+        </form>
+    </section>
+</main>
+</SessionGate>

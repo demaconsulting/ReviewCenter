@@ -19,6 +19,7 @@
 // SOFTWARE.
 
 using Bunit;
+using DemaConsulting.ReviewCenter.Core;
 using DemaConsulting.ReviewCenter.Web;
 
 namespace DemaConsulting.ReviewCenter.Tests.Web;
@@ -26,7 +27,7 @@ namespace DemaConsulting.ReviewCenter.Tests.Web;
 /// <summary>
 ///     Unit tests for the <see cref="HomePage"/> component, rendered in memory with bUnit.
 /// </summary>
-public class HomePageTests : BunitContext
+public class HomePageTests : PageTestBase
 {
     /// <summary>
     ///     Test that the page shows the product title heading and sets the document title.
@@ -44,115 +45,56 @@ public class HomePageTests : BunitContext
     }
 
     /// <summary>
-    ///     Test that no greeting is shown before the Hello button is clicked.
+    ///     Test that an anonymous visitor sees the tagline and no links.
     /// </summary>
     [Fact]
-    public void HomePage_Render_Default_ShowsNoGreeting()
+    public void HomePage_Render_Anonymous_ShowsTaglineAndNoLinks()
     {
-        // Arrange: no setup required; the component renders with default parameters
+        // Arrange: nobody is signed in
+        SignOut();
 
         // Act: render the page
         var cut = Render<HomePage>();
 
-        // Assert: the greeting element does not exist yet
-        Assert.Empty(cut.FindAll("[data-testid='hello-message']"));
+        // Assert: the tagline is shown and nothing to follow
+        Assert.Equal("Web-based code review for regulated projects.", cut.Find("p").TextContent);
+        Assert.Empty(cut.FindAll("a"));
+        Assert.Empty(cut.FindAll("[data-testid='home-get-started']"));
     }
 
     /// <summary>
-    ///     Test that clicking Hello shows the greeting.
+    ///     Test that a signed-in reviewer sees the Get started section with only the Projects link.
     /// </summary>
     [Fact]
-    public void HomePage_HelloButton_Clicked_ShowsGreeting()
+    public void HomePage_Render_Reviewer_ShowsGetStartedWithProjectsOnly()
     {
-        // Arrange: render the page
-        var cut = Render<HomePage>();
-
-        // Act: click Hello
-        cut.Find("[data-testid='hello-button']").Click();
-
-        // Assert: the greeting appears
-        Assert.Equal("Hello from ReviewCenter!", cut.Find("[data-testid='hello-message']").TextContent);
-    }
-
-    /// <summary>
-    ///     Test that clicking Hello twice leaves the same single greeting.
-    /// </summary>
-    [Fact]
-    public void HomePage_HelloButton_ClickedTwice_ShowsSingleGreeting()
-    {
-        // Arrange: render the page
-        var cut = Render<HomePage>();
-
-        // Act: click Hello twice
-        var button = cut.Find("[data-testid='hello-button']");
-        button.Click();
-        button.Click();
-
-        // Assert: exactly one greeting is shown
-        Assert.Single(cut.FindAll("[data-testid='hello-message']"));
-    }
-
-    /// <summary>
-    ///     Test that the counter starts at zero.
-    /// </summary>
-    [Fact]
-    public void HomePage_Render_Default_CounterStartsAtZero()
-    {
-        // Arrange: no setup required; the component renders with default parameters
+        // Arrange: a reviewer is signed in
+        SignInAs("bea", "Bea");
 
         // Act: render the page
         var cut = Render<HomePage>();
 
-        // Assert: counter shows 0
-        Assert.Equal("0", cut.Find("[data-testid='counter-value']").TextContent);
+        // Assert: one link, to the projects page
+        Assert.Equal("/projects", cut.Find("[data-testid='home-card-projects']").GetAttribute("href"));
+        Assert.Single(cut.FindAll("a"));
     }
 
     /// <summary>
-    ///     Test that each counter click adds one.
+    ///     Test that a signed-in administrator also sees the repositories, audit and users links.
     /// </summary>
     [Fact]
-    public void HomePage_CounterButton_ClickedThreeTimes_ShowsCountThree()
+    public void HomePage_Render_Admin_ShowsGetStartedWithAdministrationLinks()
     {
-        // Arrange: render the page
-        var cut = Render<HomePage>();
-
-        // Act: click the counter button three times
-        var button = cut.Find("[data-testid='counter-button']");
-        button.Click();
-        button.Click();
-        button.Click();
-
-        // Assert: counter shows 3
-        Assert.Equal("3", cut.Find("[data-testid='counter-value']").TextContent);
-    }
-
-    /// <summary>
-    ///     Test that the page links to the projects page.
-    /// </summary>
-    [Fact]
-    public void HomePage_Render_Default_LinksToProjects()
-    {
-        // Arrange: no setup required; the component renders with default parameters
+        // Arrange: an administrator is signed in
+        SignInAs("root", "Root", UserRole.Admin);
 
         // Act: render the page
         var cut = Render<HomePage>();
 
-        // Assert: the projects link points at the projects page
-        Assert.Equal("/projects", cut.Find("[data-testid='projects-link']").GetAttribute("href"));
-    }
-
-    /// <summary>
-    ///     Test that the interactive marker is set once the component has rendered on a live circuit.
-    /// </summary>
-    [Fact]
-    public void HomePage_AfterRender_Interactive_SetsMarker()
-    {
-        // Arrange: no setup required; the component renders with default parameters
-
-        // Act: render the page (bUnit runs OnAfterRender like a live circuit does)
-        var cut = Render<HomePage>();
-
-        // Assert: the root element reports interactivity
-        Assert.Equal("true", cut.Find("[data-testid='home-page']").GetAttribute("data-interactive"));
+        // Assert: all four links, each to its page
+        Assert.Equal(4, cut.FindAll("a").Count);
+        Assert.Equal("/repositories", cut.Find("[data-testid='home-card-repositories']").GetAttribute("href"));
+        Assert.Equal("/audit", cut.Find("[data-testid='home-card-audit']").GetAttribute("href"));
+        Assert.Equal("/users", cut.Find("[data-testid='home-card-users']").GetAttribute("href"));
     }
 }

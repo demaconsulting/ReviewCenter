@@ -12,7 +12,7 @@ protocol over loopback TCP.
 **Control file**: `reviewcenter-puppet.json` in the temporary folder: `{"port":N,"baseUrl":"..."}` written by the
 daemon when it is ready, or `{"error":"..."}` when the daemon could not start.
 
-**Request**: one JSON line `{"command":"click","args":["hello-button"],"options":{}}`.
+**Request**: one JSON line `{"command":"click","args":["login-button"],"options":{}}`.
 
 **Response**: one JSON line `{"ok":true,"output":"...","url":"...","title":"...","events":["..."]}`. The special
 request `ping` is answered with the output `pong`.

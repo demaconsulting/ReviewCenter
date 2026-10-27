@@ -14,14 +14,14 @@
         @ChildContent
     </Authorized>
     <NotAuthorized>
-        <main class="page" data-testid="session-ended">
+        <main class="page narrow" data-testid="session-ended">
             <h1>Session ended</h1>
             <p>
                 You are no longer signed in: your account was disabled, removed, or changed.
                 Nothing you do on this page is saved. Sign in again to continue.
             </p>
             <p>
-                <a href="@LoginLink" data-testid="session-ended-login-link">Go to the login page</a>
+                <a class="action" href="@LoginLink" data-testid="session-ended-login-link">Go to the login page</a>
             </p>
         </main>
     </NotAuthorized>

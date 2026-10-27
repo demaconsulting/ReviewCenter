@@ -4,72 +4,46 @@
 
 #### Purpose
 
-`HomePage` is the landing page served at the root URL. Its responsibilities are to show the product name,
-a link to the projects page, and two small interactions, a Hello button that reveals a greeting
-and a counter button that counts clicks, and to report when the page is interactive. The unit
-is a Razor component split into presentation (`HomePage.razor`) and behavior
-(`HomePage.razor.cs`).
+`HomePage` is the landing page served at the root URL. Its responsibilities are to show the product name and
+tagline and, for a signed-in user, to offer a short "Get started" list of links to the pages the user can use. It is
+rendered on the server as plain markup and uses no live connection. It is a Razor component with presentation only
+(`HomePage.razor`, no code-behind), and it is open to anonymous visitors, who see only the name and the tagline.
 
 #### Data Model
 
-The page instance is created per browser connection, so its state is per user.
+The page holds no state. It is built from two nested authorize views of the Blazor authorization components. The outer
+one shows the "Get started" section to any signed-in user; the inner one, restricted to the administrator role named
+by `SignIn.AdminRole`, adds the links that only an administrator can use. The section is a `card` and its entries are
+an `item-list`, each entry being a link followed by a one-line description in the `muted` style; the tagline uses the
+`muted` style too.
 
-**GreetingText**: `string` (constant) — `Hello from ReviewCenter!`; the greeting text.
+The entries are:
 
-**Greeting**: `string?` — `null` until the Hello button is clicked, then `GreetingText`.
-Invariant: the greeting is shown if and only if the value is not null.
+- **Projects**: for every signed-in user; links to `/projects`.
+- **Repositories**: for an administrator; links to `/repositories`.
+- **Audit**: for an administrator; links to `/audit`.
+- **Users**: for an administrator; links to `/users`.
 
-**Count**: `int` — number of counter button clicks on this connection; starts at 0 and only
-increases by 1 per click.
-
-**_interactive**: `bool` — `false` until the first render on a live connection has completed.
-Once `true` it never returns to `false`.
-
-**InteractiveMarker**: `string` (derived) — `"true"` or `"false"` according to `_interactive`;
-rendered as the `data-interactive` attribute of the root element.
-
-The markup gives each element a stable `data-testid` so that tests and tooling can find it:
-`home-page` (root element), `hello-button`, `hello-message`, `counter-button`, `counter-value`, and
-`projects-link`, the link to the projects page at `/projects`.
+The markup gives each element a stable `data-testid` so that tests and tooling can find it: `home-page` (root
+element), `home-get-started` (the section), and `home-card-projects`, `home-card-repositories`, `home-card-audit`,
+and `home-card-users` (the links). There is no `data-interactive` marker, because the page has no live connection. The
+page has no link to the home page itself; the brand link in the header of every page (see `App`) serves that purpose.
 
 #### Key Methods
 
-**SayHello**: Handles a click of the Hello button.
-
-- *Parameters*: None.
-- *Returns*: `void`.
-- *Preconditions*: None.
-- *Postconditions*: `Greeting` equals `GreetingText`. Idempotent: further clicks leave a single
-  greeting displayed.
-
-**IncrementCounter**: Handles a click of the counter button.
-
-- *Parameters*: None.
-- *Returns*: `void`.
-- *Preconditions*: None.
-- *Postconditions*: `Count` has increased by 1.
-
-**OnAfterRender**: Marks the page interactive after it has rendered.
-
-- *Parameters*: `bool firstRender` — true for the first render of this page instance.
-- *Returns*: `void`.
-- *Preconditions*: None.
-- *Postconditions*: After the first render, `_interactive` is true and a further render has
-  been requested so that the marker reaches the browser.
-
-The framework does not call `OnAfterRender` during static server-side rendering, so reaching
-it proves that the live connection exists. Only the first render changes the marker, which
-prevents render loops.
+N/A - the unit has no handlers; the links are followed by the browser.
 
 #### Error Handling
 
-N/A - the unit contains no error-producing logic; the handlers only assign or increment page
-state and cannot fail. Exceptions in the framework are handled outside this unit.
+N/A - the unit contains no error-producing logic. The administrator links are a convenience that mirrors the header; the
+access rules are enforced by the target pages and the authorization of the `Identity` subsystem, so a hidden link is
+not a protection.
 
 #### Dependencies
 
-- **ASP.NET Core Blazor components** — the component base class, event handling, page title
-  support, and the interactive server render mode.
+- **SignIn** — `SignIn.AdminRole` names the role that sees the administration links.
+- **ASP.NET Core Blazor components** — page routing, page title support, and the authorize view that reads the
+  authentication state.
 
 #### Callers
 

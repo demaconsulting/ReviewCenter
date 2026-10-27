@@ -1,0 +1,27 @@
+@* HelpCreatingReviewPage: help topic "Creating a review" at "/help/creating-a-review". Static text and screenshots. *@
+@page "/help/creating-a-review"
+
+<HelpTopicFrame Slug="creating-a-review">
+    <section class="card">
+        <p>On the project page, under <strong>Source</strong>, there are two ways to choose the files.</p>
+        <p><strong>From a git repository.</strong> An administrator first registers the repository on the
+            <strong>Repositories</strong> page. Then choose the repository and enter:</p>
+        <ul>
+            <li><strong>Head revision</strong>: a branch, a tag or a commit, for example <code>main</code>. Forms such
+                as <code>HEAD~1</code> are not accepted.</li>
+            <li><strong>Baseline revision</strong> (optional): the earlier revision to compare with. Without it every
+                matching file counts as Added.</li>
+            <li><strong>Selection</strong>: the files to review, one pattern per line, for example
+                <code>src/**</code>. Start a pattern with <code>!</code> to leave files out, for example
+                <code>!**/*.md</code>. The patterns apply to the files that changed between the two revisions.</li>
+        </ul>
+        <p>The review keeps its own copy of the content, so later commits do not change it.</p>
+        <figure class="help-figure">
+            <img class="help-shot" src="/help/creating-a-review-1.png" loading="lazy"
+                 alt="The new review form on a project page with the From a repository source chosen, showing the repository, head revision, baseline revision and file selection fields." />
+            <figcaption>Creating a review from a repository.</figcaption>
+        </figure>
+        <p><strong>By uploading files.</strong> Choose <strong>Upload files</strong> and pick the files from your
+            computer (at most 200 files, 2 MiB each, 20 MiB in all).</p>
+    </section>
+</HelpTopicFrame>
