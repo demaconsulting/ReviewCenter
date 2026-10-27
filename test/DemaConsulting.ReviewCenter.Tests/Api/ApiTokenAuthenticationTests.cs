@@ -242,7 +242,10 @@ public class ApiTokenAuthenticationTests
         // Assert: refused like a request without credentials
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
         Assert.Contains("Bearer", response.Headers.WwwAuthenticate.Select(h => h.Scheme));
+        Assert.Contains("Basic", response.Headers.WwwAuthenticate.Select(h => h.Scheme));
         Assert.Equal(HttpStatusCode.Unauthorized, basicResponse.StatusCode);
+        Assert.Contains("Bearer", basicResponse.Headers.WwwAuthenticate.Select(h => h.Scheme));
+        Assert.Contains("Basic", basicResponse.Headers.WwwAuthenticate.Select(h => h.Scheme));
     }
 
     /// <summary>
