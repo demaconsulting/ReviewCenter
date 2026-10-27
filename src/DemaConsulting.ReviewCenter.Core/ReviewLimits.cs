@@ -146,4 +146,29 @@ public static class ReviewLimits
     ///     The longest accepted password, in characters; the limit keeps hashing time bounded.
     /// </summary>
     public const int MaxPasswordLength = 128;
+
+    /// <summary>
+    ///     The largest number of active (not revoked, not expired) personal access tokens of one user.
+    /// </summary>
+    public const int MaxActiveTokensPerUser = 20;
+
+    /// <summary>
+    ///     The longest accepted personal access token name, in characters.
+    /// </summary>
+    public const int MaxTokenNameLength = 100;
+
+    /// <summary>
+    ///     The lifetimes, in days, a personal access token can be created with; a token never lasts forever.
+    /// </summary>
+    public static readonly IReadOnlyList<int> TokenExpiryChoicesInDays = [30, 90, 365];
+
+    /// <summary>
+    ///     The lifetime, in days, that is preselected when a token is created.
+    /// </summary>
+    public const int DefaultTokenExpiryDays = 90;
+
+    /// <summary>
+    ///     How often the "last used" moment of a token is written at most, so busy automation does not write on every request.
+    /// </summary>
+    public static readonly TimeSpan TokenLastUsedGranularity = TimeSpan.FromMinutes(5);
 }

@@ -54,6 +54,7 @@ internal static class HelpTopics
         new("signed-attestation", "Signed attestation", "Download a digitally signed PDF of a completed review."),
         new("audit-trail", "Audit trail", "Every action is recorded in a tamper-evident chain."),
         new("planning-reviews", "Planning reviews", "Create the reviews of a repository's review-sets in one go."),
+        new("api-tokens", "Automation and API tokens", "Use a personal access token to read reviews and create drafts from a script."),
     ];
 
     /// <summary>

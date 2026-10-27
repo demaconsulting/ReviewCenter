@@ -20,6 +20,7 @@
 
 using System.Data.Common;
 using System.Security.Cryptography;
+using DemaConsulting.ReviewCenter.Api;
 using DemaConsulting.ReviewCenter.Cli;
 using DemaConsulting.ReviewCenter.ContentSources;
 using DemaConsulting.ReviewCenter.Core;
@@ -45,7 +46,8 @@ namespace DemaConsulting.ReviewCenter.Hosting;
 /// <remarks>
 ///     A single composition root keeps service registration, logging, and endpoint mapping in one
 ///     reviewable place, and the <see cref="CreateApplication"/> seam lets tests exercise exactly
-///     the pipeline that ships. The class is stateless and therefore thread-safe; every call builds
+///     the pipeline that ships. It also registers the personal access token service and the token-only
+///     <c>/api</c> surface with its OpenAPI document. The class is stateless and therefore thread-safe; every call builds
 ///     an independent application instance.
 /// </remarks>
 internal static class ServerHost
@@ -129,6 +131,10 @@ internal static class ServerHost
         // Cookie sign-in and authorization (web only)
         builder.Services.AddSignIn(builder.Configuration);
 
+        // Bearer-token authentication of the API (the "Api" policy only) and its OpenAPI document
+        builder.Services.AddApiTokenAuthentication();
+        builder.Services.AddApiDocument();
+
         // Allow the caller (tests) to replace the server or add logger providers
         options.ConfigureBuilder?.Invoke(builder);
 
@@ -178,6 +184,10 @@ internal static class ServerHost
         // The signed PDF attestation of a completed review
         app.MapAttestation();
 
+        // The JSON API under /api (personal access tokens only) and its OpenAPI document; mapped before the UI so
+        // an unknown /api address is answered by the API's own JSON 404
+        app.MapApi();
+        app.MapApiDocument();
         // The UI: every page lives under the App root component
         app.MapRazorComponents<App>().AddInteractiveServerRenderMode();
 
@@ -219,12 +229,14 @@ internal static class ServerHost
             provider.GetRequiredService<TimeProvider>()));
         services.AddSingleton<IReviewStore, ReviewStore>();
         services.AddSingleton<IUserStore, UserStore>();
+        services.AddSingleton<IPersonalAccessTokenStore, PersonalAccessTokenStore>();
         services.AddSingleton<IPasswordHasher, PasswordHasher>();
         services.AddSingleton<ProjectService>();
         services.AddSingleton<ReviewService>();
         services.AddSingleton<ThreadService>();
         services.AddSingleton<ChecklistService>();
         services.AddSingleton<UserService>();
+        services.AddSingleton<PersonalAccessTokenService>();
         services.AddSingleton<SigningService>();
 
         // The repository registry and the git content source. Tokens are encrypted with Data Protection, whose key

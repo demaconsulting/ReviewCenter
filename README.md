@@ -94,6 +94,7 @@ The current release provides:
   hashes; a History page for each review is open to every signed-in user, and administrators see the whole trail at
   `/audit` and can verify the chain there or with `reviewcenter audit verify` (see
   [Audit Trail](#audit-trail))
+- **API Tokens**: personal access tokens (Account page) for the JSON API under `/api`; a token never signs
 - **Repositories and Credentials**: an administrator registers git repositories at `/repositories` (an https, http, or
   file location or a local path, with an optional user name and access token for private repositories); the token is
   encrypted before it is stored, is write-only in the page (only "token set" or "no token" is shown), and reaches git

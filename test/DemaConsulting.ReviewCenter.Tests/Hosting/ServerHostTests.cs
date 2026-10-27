@@ -646,6 +646,32 @@ public class ServerHostTests
     }
 
     /// <summary>
+    ///     Test that the host registers the token service and maps the API: the routes, the OpenAPI document and the
+    ///     JSON 404 for other addresses under the API prefix, which does not fall through to the web pages.
+    /// </summary>
+    [Fact]
+    public async Task ServerHost_CreateApplication_ApiRoutes_AreMapped()
+    {
+        // Arrange: start the real pipeline on an in-memory server
+        var logs = new CapturingLoggerProvider();
+        await using var app = await TestWebApp.StartAsync(logs, "serve", "--silent");
+        using var client = app.GetTestClient();
+
+        // Act: resolve the token service and request a protected route, the document and an unknown route
+        var service = app.Services.GetRequiredService<PersonalAccessTokenService>();
+        var protectedRoute = await client.GetAsync("/api/projects", TestContext.Current.CancellationToken);
+        var document = await client.GetAsync("/api/openapi.json", TestContext.Current.CancellationToken);
+        var unknown = await client.GetAsync("/api/nothing", TestContext.Current.CancellationToken);
+
+        // Assert: a singleton service, 401 for the route, 200 for the document and a JSON 404 for the rest
+        Assert.Same(service, app.Services.GetRequiredService<PersonalAccessTokenService>());
+        Assert.Equal(System.Net.HttpStatusCode.Unauthorized, protectedRoute.StatusCode);
+        Assert.Equal(System.Net.HttpStatusCode.OK, document.StatusCode);
+        Assert.Equal(System.Net.HttpStatusCode.NotFound, unknown.StatusCode);
+        Assert.Equal("application/problem+json", unknown.Content.Headers.ContentType?.MediaType);
+    }
+
+    /// <summary>
     ///     Test that a token encrypted before a restart is readable after it, because the key ring is persisted.
     /// </summary>
     [Fact]

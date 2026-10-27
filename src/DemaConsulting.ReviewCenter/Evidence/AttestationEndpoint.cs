@@ -58,27 +58,45 @@ internal static class AttestationEndpoint
                     http.User.Identity?.Name ?? string.Empty,
                     http.User.FindFirstValue(SignIn.DisplayNameClaimType) ?? http.User.Identity?.Name ?? string.Empty);
                 var result = await attestations.GenerateAsync(projectId, reviewId, actor, http.RequestAborted);
-
-                // A signed attestation is evidence of the moment it was made, so it is never cached
-                http.Response.Headers.CacheControl = "no-store";
-                return result.Status switch
-                {
-                    AttestationStatus.Ok => Results.File(result.Content!, "application/pdf", result.FileName),
-                    AttestationStatus.NotFound => Results.NotFound(),
-                    AttestationStatus.NotApproved => Results.Problem(
-                        title: "The review is not complete",
-                        detail: result.Message,
-                        statusCode: StatusCodes.Status409Conflict),
-                    AttestationStatus.Changed => Results.Problem(
-                        title: "The review changed during generation",
-                        detail: result.Message,
-                        statusCode: StatusCodes.Status409Conflict),
-                    _ => Results.Problem(
-                        title: "Attestation signing key unavailable",
-                        detail: result.Message,
-                        statusCode: StatusCodes.Status500InternalServerError)
-                };
+                return ToResult(result, http, () => Results.NotFound());
             }).RequireAuthorization();
         return endpoints;
+    }
+
+    /// <summary>
+    ///     Turns the outcome of generating an attestation into the HTTP answer.
+    /// </summary>
+    /// <param name="result">The outcome of <see cref="AttestationService.GenerateAsync"/>.</param>
+    /// <param name="http">The request context; the response gets <c>Cache-Control: no-store</c>.</param>
+    /// <param name="notFound">
+    ///     Creates the answer for a missing project or review, so the page route can answer an empty 404 and the API a
+    ///     JSON problem document while every other status is answered identically.
+    /// </param>
+    /// <returns>The file for <see cref="AttestationStatus.Ok"/>; a 409 problem when the review is not complete or
+    ///     changed; a 500 problem when the signing key is not usable.</returns>
+    /// <remarks>
+    ///     Shared by the page route and the API route so the two cannot drift apart. A signed attestation is evidence
+    ///     of the moment it was made, so the response is never cached.
+    /// </remarks>
+    internal static IResult ToResult(AttestationResult result, HttpContext http, Func<IResult> notFound)
+    {
+        http.Response.Headers.CacheControl = "no-store";
+        return result.Status switch
+        {
+            AttestationStatus.Ok => Results.File(result.Content!, "application/pdf", result.FileName),
+            AttestationStatus.NotFound => notFound(),
+            AttestationStatus.NotApproved => Results.Problem(
+                title: "The review is not complete",
+                detail: result.Message,
+                statusCode: StatusCodes.Status409Conflict),
+            AttestationStatus.Changed => Results.Problem(
+                title: "The review changed during generation",
+                detail: result.Message,
+                statusCode: StatusCodes.Status409Conflict),
+            _ => Results.Problem(
+                title: "Attestation signing key unavailable",
+                detail: result.Message,
+                statusCode: StatusCodes.Status500InternalServerError)
+        };
     }
 }

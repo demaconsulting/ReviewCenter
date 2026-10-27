@@ -33,6 +33,22 @@ namespace DemaConsulting.ReviewCenter.Core;
 public sealed record Actor(string Username, string DisplayName)
 {
     /// <summary>
+    ///     Gets the non-secret display id of the personal access token the request was authenticated with, or
+    ///     <c>null</c> when the user is signed in with a password (the web pages and the command line).
+    /// </summary>
+    /// <remarks>
+    ///     Set only by the API, never by the web pages. It marks work done by automation: the audit trail names the
+    ///     token, and <see cref="SigningService"/> refuses every signing action of such an actor, because a signature
+    ///     must be a person's fresh act and a token is a stored credential.
+    /// </remarks>
+    public string? ApiTokenId { get; init; }
+
+    /// <summary>
+    ///     Gets a value indicating whether the actor was authenticated with a personal access token.
+    /// </summary>
+    public bool ViaApiToken => ApiTokenId is not null;
+
+    /// <summary>
     ///     Gets the actor used for changes made from the command line (for example <c>user add</c>), where no
     ///     person is signed in.
     /// </summary>

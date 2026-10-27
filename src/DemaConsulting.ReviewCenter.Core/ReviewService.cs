@@ -141,6 +141,8 @@ public sealed class ReviewService
             Title = trimmedTitle,
             State = ReviewState.Draft,
             Created = _timeProvider.GetUtcNow(),
+            CreatedBy = actor.Username,
+            CreatedViaApi = actor.ViaApiToken,
             ContentFingerprint = Fingerprint.Compute(reviewFiles.Select(file => file.Sha256)),
             Files = reviewFiles,
 
@@ -148,12 +150,13 @@ public sealed class ReviewService
             Checklist = NewChecklist(projectId, id!)
         };
 
+        // An API-created review says so in the trail (at the end: the upload detail is short enough to always fit)
         await _store.AddReviewAsync(
             review,
             AuditDraft.By(
                 actor,
                 "review.created",
-                $"review '{trimmedTitle}', fingerprint {review.ContentFingerprint}, {reviewFiles.Count} file{(reviewFiles.Count == 1 ? string.Empty : "s")}",
+                $"review '{trimmedTitle}', fingerprint {review.ContentFingerprint}, {reviewFiles.Count} file{(reviewFiles.Count == 1 ? string.Empty : "s")}{CreatedViaText(actor)}",
                 projectId,
                 id),
             cancellationToken);
@@ -334,6 +337,8 @@ public sealed class ReviewService
             Title = trimmedTitle,
             State = ReviewState.Draft,
             Created = _timeProvider.GetUtcNow(),
+            CreatedBy = actor.Username,
+            CreatedViaApi = actor.ViaApiToken,
             ContentFingerprint = Fingerprint.Compute(files.Where(f => f.ChangeKind != ChangeKind.Deleted).Select(f => f.Sha256)),
             RepositoryId = access.RepositoryId,
             RepositoryName = access.Name,
@@ -345,23 +350,39 @@ public sealed class ReviewService
             Checklist = NewChecklist(projectId, id)
         };
 
-        // The title is shortened so the SHAs and the fingerprint always fit in the audit detail
+        // The title is shortened so the SHAs and the fingerprint always fit in the audit detail; an API-created review
+        // names its token right after the title (a shorter title) so the statement can never be cut off at the end
         var added = files.Count(f => f.ChangeKind == ChangeKind.Added);
         var modified = files.Count(f => f.ChangeKind == ChangeKind.Modified);
         var deleted = files.Count(f => f.ChangeKind == ChangeKind.Deleted);
         var setText = reviewSetId is null ? string.Empty : $", set '{AuditText.Clean(reviewSetId, 60)}'";
+        var viaText = CreatedViaText(actor);
+        var titleText = AuditText.Clean(trimmedTitle, viaText.Length == 0 ? 60 : 40);
         await _store.AddReviewAsync(
             review,
             AuditDraft.By(
                 actor,
                 "review.created",
-                $"review '{AuditText.Clean(trimmedTitle, 60)}' from repository '{access.Name}', baseline {baselineSha ?? "none"}, head {headSha}, " +
+                $"review '{titleText}'{viaText} from repository '{access.Name}', baseline {baselineSha ?? "none"}, head {headSha}, " +
                 $"{files.Count} file{(files.Count == 1 ? string.Empty : "s")}: {added} added, {modified} modified, {deleted} deleted, " +
                 $"{skipped.Count} skipped, fingerprint {review.ContentFingerprint}{setText}",
                 projectId,
                 id),
             cancellationToken);
         return new RepositoryReviewResult(review, skipped);
+    }
+
+    /// <summary>
+    ///     Builds the audit text that names the API token a review was created with.
+    /// </summary>
+    /// <param name="actor">The actor creating the review.</param>
+    /// <returns>
+    ///     <c>, created via API token 'ID'</c> for an actor that authenticated with a token; otherwise an empty
+    ///     string, so a review created in the web pages reads exactly as before.
+    /// </returns>
+    private static string CreatedViaText(Actor actor)
+    {
+        return actor.ViaApiToken ? $", created via API token '{AuditText.Clean(actor.ApiTokenId, 20)}'" : string.Empty;
     }
 
     /// <summary>

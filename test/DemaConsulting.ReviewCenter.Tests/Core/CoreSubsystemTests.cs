@@ -153,6 +153,17 @@ public class CoreSubsystemTests
     ];
 
     /// <summary>
+    ///     The rules that the personal access token service reports.
+    /// </summary>
+    private static readonly DomainRule[] TokenRules =
+    [
+        DomainRule.TokenNameInvalid,
+        DomainRule.TokenExpiryInvalid,
+        DomainRule.TokenLimitReached,
+        DomainRule.TokenNotFound
+    ];
+
+    /// <summary>
     ///     Test that each domain rule is reported through the services as a domain rule exception that names
     ///     the rule, and that nothing is stored for the violation.
     /// </summary>
@@ -225,7 +236,47 @@ public class CoreSubsystemTests
             return ViolateRepositoryAsync(rule, users);
         }
 
+        if (TokenRules.Contains(rule))
+        {
+            return ViolateTokenAsync(rule);
+        }
+
         return ViolateAsync(rule, projects, reviews, threads, checklists, users, projectId);
+    }
+
+    /// <summary>
+    ///     Makes a request that breaks one rule of the personal access token service.
+    /// </summary>
+    /// <param name="rule">The rule to break; one of <see cref="TokenRules"/>.</param>
+    /// <returns>A task that fails with the rule violation.</returns>
+    private static async Task ViolateTokenAsync(DomainRule rule)
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var clock = new FixedTimeProvider(_now);
+        var userStore = new FakeUserStore();
+        var users = new UserService(userStore, new FakePasswordHasher(), clock);
+        await users.CreateAsync("tok", "Tok", UserRole.Reviewer, ValidPassword, cancellationToken);
+        var service = new PersonalAccessTokenService(new FakePersonalAccessTokenStore(userStore), userStore, clock);
+        var actor = new Actor("tok", "Tok");
+        switch (rule)
+        {
+            case DomainRule.TokenNameInvalid:
+                await service.CreateAsync(actor, " ", 30, cancellationToken);
+                return;
+            case DomainRule.TokenExpiryInvalid:
+                await service.CreateAsync(actor, "name", 7, cancellationToken);
+                return;
+            case DomainRule.TokenLimitReached:
+                for (var i = 0; i <= ReviewLimits.MaxActiveTokensPerUser; i++)
+                {
+                    await service.CreateAsync(actor, $"token {i}", 30, cancellationToken);
+                }
+
+                return;
+            default:
+                await service.RevokeAsync(actor, 999, cancellationToken);
+                return;
+        }
     }
 
     /// <summary>

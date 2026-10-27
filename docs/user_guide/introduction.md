@@ -179,7 +179,8 @@ Each topic is a page of its own with links to the previous and the next topic:
 - **Signed attestation** (`/help/signed-attestation`): download a digitally signed PDF of an approved review.
 - **Audit trail** (`/help/audit-trail`): every action is recorded in a tamper-evident chain.
 - **Planning reviews** (`/help/planning-reviews`): create the reviews of the review-sets of a repository in one go.
-
+- **Automation and API tokens** (`/help/api-tokens`): use a personal access token to read reviews and create drafts
+  from a script.
 The topics are summaries; this guide has the details. An address below `/help` that is not a topic shows a short
 message that the topic does not exist, with a link back to the index.
 
@@ -293,7 +294,8 @@ Some things to know:
 
 ### Account
 
-Open `/account` (the Account link in the header) to choose how ReviewCenter looks and to change your password.
+Open `/account` (the Account link in the header) to choose how ReviewCenter looks, to change your password, and to
+manage your API tokens.
 
 The **Appearance** card offers **System**, **Light**, and **Dark**. **System** is the default and follows the light or
 dark setting of your device; **Light** and **Dark** always use that theme. The choice applies as soon as you select
@@ -303,6 +305,21 @@ it and is remembered in this browser only: it is not an account setting, so anot
 To change your password, enter the current password and the new
 password, and press the change button. A wrong current password counts as a failed sign-in for the lockout. The
 fields are cleared afterwards.
+
+The **API tokens** card creates and revokes the personal access tokens that let a script or tool use the API as you
+(see [Automation and API Tokens](#automation-and-api-tokens)):
+
+1. Type what the token is for (1 to 100 characters), choose the expiry (**30 days**, **90 days**, or **365 days**;
+   90 is selected at first), and press **Create token**.
+2. The value of the token, which starts with `rcpat_`, is shown **once**, in a box with **Copy** and **Done**
+   buttons. Copy it before you press **Done** or leave the page: it cannot be shown again.
+3. The list shows each token with its name, a short identifier, its state (**Active**, **Expired**, or **Revoked**),
+   when it was created and expires, and when it was last used (to within five minutes; **never** until it is used).
+   The value is never listed.
+4. **Revoke** stops a token at once. An expired or revoked token has no button.
+
+A user has at most 20 active tokens; expired and revoked tokens do not count. The card has an **About API tokens**
+button that opens the Help topic.
 
 ### Manage Users (Administrators)
 
@@ -775,6 +792,95 @@ signing key unavailable"). A signed-out request to the address is sent to the si
 - The server does not check the trust chain or the revocation of the certificate; the reader does.
 - The PDF uses the standard PDF fonts (Windows-1252 characters), so any other character is shown as a question mark.
 
+## Automation and API Tokens
+
+ReviewCenter has a JSON API under `/api` for scripts and tools, for example a build job that reads the state of
+reviews or creates a draft review for a release. The API is authenticated with a **personal access token**, which
+acts as the user who created it, with that user's role. A token is for the API only: it does not sign in to the web
+pages, and the session cookie of the web pages is not accepted by the API.
+
+A token **never signs**. Signing a review, and adding, changing, or removing a reviewer slot, are not available in the
+API: there is no route for them, and the service refuses a token even if one existed. A signature always needs a
+person who enters the password again in the browser.
+
+### Create and Revoke a Token
+
+Tokens are created on the **Account** page (see [Account](#account)): a name, an expiry of 30, 90 (the default), or
+365 days, and **Create token**. The value is shown once. A token looks like `rcpat_` followed by 43 characters of a
+random value (256 bits). Only the SHA-256 hash of the value is stored, so a lost token cannot be recovered; create a
+new one and revoke the old one. A user may have 20 active tokens; creating a 21st is refused until one is revoked or
+expires. Revoke a token on the same page. A token also stops working when its owner is disabled or locked.
+
+Keep a token like a password: put it in the secret store of the tool that uses it, never in a repository or a command
+line that is kept in a history. Revoke a token that may have been exposed.
+
+### Call the API
+
+Send the token as a bearer token in the `Authorization` header. This lists the projects:
+
+```bash
+curl -H "Authorization: Bearer rcpat_YOUR_TOKEN" https://reviews.example.com/api/projects
+```
+
+Answers are JSON (the attestation is a PDF). Errors are problem documents (`application/problem+json`) with a title and
+status, and for a request that is not valid a list of the fields at fault.
+
+| Method | Address                                         | Purpose                                          |
+| ------ | ----------------------------------------------- | ------------------------------------------------ |
+| GET    | `/api/projects`                                 | List the projects                                |
+| GET    | `/api/projects/{p}/reviews`                     | List the reviews of project `{p}`                |
+| GET    | `/api/projects/{p}/reviews/{r}`                 | One review: slots, approval, progress, next step |
+| POST   | `/api/projects/{p}/reviews`                     | Create a draft review (201 with the review)      |
+| GET    | `/api/projects/{p}/reviews/{r}/attestation.pdf` | The signed attestation PDF of an approved review |
+| GET    | `/api/openapi.json`                             | The OpenAPI document; open, no token needed      |
+
+In the addresses `{p}` is the project number and `{r}` the review identifier.
+
+The OpenAPI document describes every endpoint, the request and answer shapes, and the bearer scheme, so a client can be
+generated from it. A snapshot of it is kept in the repository as `docs/api/openapi.json`.
+
+### Create a Review with the API
+
+`POST /api/projects/{projectId}/reviews` takes a JSON body with a review `id`, a `title`, and **exactly one** of
+`files` (uploaded files, each with a `path` and its `contentBase64`) or `repository` (a `repositoryId` of an enabled
+registered repository, a `headRevision`, and optionally a `baselineRevision` and a `selection`, one pattern per line).
+The same rules as on the web pages apply: the identifier and title rules, the upload limits, and the repository rules
+(see [Projects and Reviews](#projects-and-reviews) and [Reviews from a Repository](#reviews-from-a-repository)).
+
+```bash
+curl -X POST -H "Authorization: Bearer rcpat_YOUR_TOKEN" -H "Content-Type: application/json" \
+  -d '{"id":"R-1","title":"Release 1.2","files":[{"path":"src/a.txt","contentBase64":"aGVsbG8K"}]}' \
+  https://reviews.example.com/api/projects/1/reviews
+```
+
+The review starts as a **Draft**, like a review created on the web pages. It is flagged
+**created via API**: the review data of the API has `createdViaApi: true`, and its `review.created` audit entry names
+the token (by its short identifier, never its value). A person assigns the reviewers and the reviewers sign in the
+browser.
+
+### Errors, Refusals, and the Throttle
+
+- A request without a token, or with a token that is wrong, malformed, expired, or revoked, or whose owner is disabled or
+  locked, always gets the same **401 Unauthorized** problem document with `WWW-Authenticate: Bearer`. The answer never
+  says which of these it was, so it does not reveal which tokens exist. The reason is recorded in the audit trail.
+- Refused attempts are counted per client address with the same throttle as the sign-in (see Sign In and Out and its
+  `Identity:Throttle:*` settings), separately from the web sign-in. An address that has used up its attempts is
+  answered **429 Too many requests** for the rest of the window, even with a good token. A good token does not use up
+  attempts.
+- A request that is not valid is answered **400** with the fields at fault; a project, review, or repository that does
+  not exist **404**; a review identifier that is already used, a disabled repository, or an attestation of a review
+  that is not complete **409**; and a git repository that is not reachable **502**, **503**, or **504**.
+- Any other address under `/api` is answered with a JSON **404**, with or without a token.
+- The server behind a reverse proxy needs the setting described in Secure Cookie Behind a Reverse Proxy, or all clients
+  share one address and one throttle.
+
+The audit trail records `token.created` (with the name, the short identifier, and the expiry of the token) and
+`token.revoked` (with the name and the short identifier), never the value, and `token.use-failed` and
+`token.use-throttled` for refused uses (see Recorded Actions). A token cannot create or revoke tokens; that is done on
+the Account page only. Refusals are
+recorded at most once a minute for an address, so a flood cannot fill the trail. The last-used time of a token is
+updated at most once every 5 minutes.
+
 ## Audit Trail
 
 ReviewCenter records every change that the application makes to projects, reviews, comments, checklists, reviewer
@@ -844,6 +950,8 @@ head hash is a manual step, and it is most useful after important events such as
 | Auditing  | `audit.events-suppressed` (events of new keys were not recorded; the table was full) |
 | Signing   | `signature.reauth-failed` (a wrong password when a signature was entered)            |
 | Evidence  | `attestation.generated` (a signed attestation PDF was downloaded)                    |
+| Tokens    | `token.created`, `token.revoked`                                                     |
+| Tokens    | `token.use-failed`, `token.use-throttled` (a refused or throttled use of a token)    |
 
 ### Limitations of the Audit Trail
 
@@ -904,7 +1012,9 @@ needed, and the pages cannot work with it: delete the file (or point `Database:C
 start again, then create the first administrator.** Do this only with development data. The repository registry and
 the reviews from a repository add tables and columns, and the record digest of a review from a repository is calculated
 in a new format (version 4) that includes the review-set and the side of every line comment, so a development
-database created before them must be recreated in the same way.
+database created before them must be recreated in the same way. The personal access tokens add a table, and every
+review has new columns that tell who created it and whether it was created with an API token, so a development database
+created before them must be recreated as well.
 
 ## Repositories and Credentials
 

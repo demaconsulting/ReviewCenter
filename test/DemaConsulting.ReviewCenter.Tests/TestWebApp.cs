@@ -25,6 +25,7 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
 namespace DemaConsulting.ReviewCenter.Tests;
@@ -154,12 +155,14 @@ internal static class TestWebApp
     /// </param>
     /// <param name="arguments">Command-line arguments used to create the context.</param>
     /// <param name="settings">Extra configuration values (for example <c>Identity:Throttle:MaxFailuresPerName</c>); <c>null</c> for none.</param>
+    /// <param name="configureServices">Changes to the services, applied after the application registered its own; <c>null</c> for none.</param>
     /// <returns>The started application; the caller disposes it.</returns>
     public static async Task<WebApplication> StartAsync(
         CapturingLoggerProvider logs,
         string? connectionString,
         string[] arguments,
-        IReadOnlyDictionary<string, string?>? settings = null)
+        IReadOnlyDictionary<string, string?>? settings = null,
+        Action<IServiceCollection>? configureServices = null)
     {
         using var context = Context.Create(arguments);
         var app = ServerHost.CreateApplication(context, new ServerHostOptions
@@ -179,6 +182,8 @@ internal static class TestWebApp
                 {
                     builder.Configuration.AddInMemoryCollection(settings);
                 }
+
+                configureServices?.Invoke(builder.Services);
             }
         });
         await app.StartAsync();

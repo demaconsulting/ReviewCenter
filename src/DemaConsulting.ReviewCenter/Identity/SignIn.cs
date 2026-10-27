@@ -286,7 +286,7 @@ internal static class SignIn
     ///     The address of the connection, or <c>null</c> when there is none. Behind a proxy this is the
     ///     forwarded address only when the forwarded headers are enabled for the server.
     /// </returns>
-    private static string? ClientAddress(HttpContext http)
+    internal static string? ClientAddress(HttpContext http)
     {
         var address = http.Connection.RemoteIpAddress;
         if (address is null)

@@ -190,6 +190,7 @@ public sealed class SigningService
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(actor);
+        RejectApiToken(actor);
         await _gate.WaitAsync(cancellationToken);
         try
         {
@@ -243,6 +244,7 @@ public sealed class SigningService
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(actor);
+        RejectApiToken(actor);
         await _gate.WaitAsync(cancellationToken);
         try
         {
@@ -285,6 +287,7 @@ public sealed class SigningService
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(actor);
+        RejectApiToken(actor);
         await _gate.WaitAsync(cancellationToken);
         try
         {
@@ -346,6 +349,7 @@ public sealed class SigningService
     {
         ArgumentNullException.ThrowIfNull(actor);
         ArgumentNullException.ThrowIfNull(expectedDigest);
+        RejectApiToken(actor);
         await _gate.WaitAsync(cancellationToken);
         try
         {
@@ -524,6 +528,29 @@ public sealed class SigningService
         }
 
         return slotCount == 0 ? "Add a reviewer slot." : "Ready for signatures.";
+    }
+
+    /// <summary>
+    ///     Refuses an actor that authenticated with a personal access token.
+    /// </summary>
+    /// <param name="actor">The actor of the signing action.</param>
+    /// <exception cref="DomainRuleException">
+    ///     Thrown with <see cref="DomainRule.ActorNotAllowed"/> when the actor is an API token.
+    /// </exception>
+    /// <remarks>
+    ///     A signature is a person's fresh, password-confirmed act, and the slots decide who may sign, so neither can
+    ///     be done by a stored credential. The check is the first statement of every slot and signing method, before
+    ///     the gate, any password check or any store access, so a future API route that forgets to leave signing out
+    ///     still cannot sign.
+    /// </remarks>
+    private static void RejectApiToken(Actor actor)
+    {
+        if (actor.ViaApiToken)
+        {
+            throw new DomainRuleException(
+                DomainRule.ActorNotAllowed,
+                "Reviewer slots and signatures cannot be changed with an API token; sign in to the web pages.");
+        }
     }
 
     /// <summary>

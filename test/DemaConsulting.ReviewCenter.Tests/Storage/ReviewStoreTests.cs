@@ -53,7 +53,19 @@ internal sealed class TestStore : IDisposable
         Store = new ReviewStore(factory, appender);
         Audit = new AuditStore(factory, appender);
         Users = new UserStore(factory, appender);
+        Tokens = new PersonalAccessTokenStore(factory, appender);
+        Factory = factory;
     }
+
+    /// <summary>
+    ///     Gets the personal access token store over the same database.
+    /// </summary>
+    public PersonalAccessTokenStore Tokens { get; }
+
+    /// <summary>
+    ///     Gets the context factory of the database, for tests that look at the tables themselves.
+    /// </summary>
+    public IDbContextFactory<ReviewCenterDbContext> Factory { get; }
 
     /// <summary>
     ///     Gets the audit store over the same database.
