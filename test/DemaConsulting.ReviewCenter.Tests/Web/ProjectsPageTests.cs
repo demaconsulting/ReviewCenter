@@ -31,22 +31,21 @@ namespace DemaConsulting.ReviewCenter.Tests.Web;
 public class ProjectsPageTests : PageTestBase
 {
     /// <summary>
-    ///     Test that with no projects the page says so and shows the form.
+    ///     Test that with no projects the page says so and offers the New project button, but no form.
     /// </summary>
     [Fact]
-    public void ProjectsPage_Render_NoProjects_ShowsEmptyMessageAndForm()
+    public void ProjectsPage_Render_NoProjects_ShowsEmptyMessageAndNewProjectButton()
     {
         // Arrange: no projects exist
 
         // Act: render the page
         var cut = Render<ProjectsPage>();
 
-        // Assert: the empty message and the form controls are present, the list is not
+        // Assert: the empty message and the button are present; the list and the creation form are not
         Assert.NotEmpty(cut.FindAll("[data-testid='projects-empty']"));
         Assert.Empty(cut.FindAll("[data-testid='projects-list']"));
-        Assert.NotNull(cut.Find("[data-testid='project-name-input']"));
-        Assert.NotNull(cut.Find("[data-testid='project-description-input']"));
-        Assert.NotNull(cut.Find("[data-testid='create-project-button']"));
+        Assert.Equal("/projects/new", cut.Find("[data-testid='new-project-button']").GetAttribute("href"));
+        Assert.Empty(cut.FindAll("[data-testid='new-project-form']"));
     }
 
     /// <summary>
@@ -69,64 +68,6 @@ public class ProjectsPageTests : PageTestBase
         Assert.Equal("Gemini", cut.Find($"[data-testid='project-link-{gemini.Id}']").TextContent);
         Assert.Empty(cut.FindAll($"[data-testid='project-description-{gemini.Id}']"));
         Assert.Empty(cut.FindAll("[data-testid='projects-empty']"));
-    }
-
-    /// <summary>
-    ///     Test that submitting the form creates the project and lists it without an error.
-    /// </summary>
-    [Fact]
-    public async Task ProjectsPage_CreateForm_ValidInput_AddsProjectToList()
-    {
-        // Arrange: the rendered page with the form filled in
-        var cut = Render<ProjectsPage>();
-        await cut.Find("[data-testid='project-name-input']").InputAsync("Apollo");
-        await cut.Find("[data-testid='project-description-input']").InputAsync("Moon landing");
-
-        // Act: submit the form
-        await cut.Find("[data-testid='new-project-form']").SubmitAsync();
-
-        // Assert: the project is stored and shown, and no error is displayed
-        var projects = await Projects.ListAsync(TestContext.Current.CancellationToken);
-        Assert.Equal("Apollo", Assert.Single(projects).Name);
-        Assert.Equal("Apollo", cut.Find("[data-testid^='project-link-']").TextContent);
-        Assert.Empty(cut.FindAll("[data-testid='project-error']"));
-    }
-
-    /// <summary>
-    ///     Test that a project submitted after the session ended, but before the page learned of it, shows a clear
-    ///     message and creates nothing.
-    /// </summary>
-    [Fact]
-    public async Task ProjectsPage_CreateForm_SessionEndedBeforePageKnows_ShowsClearErrorAndCreatesNothing()
-    {
-        // Arrange: a filled-in form, and then the session ends without the page being told
-        var cut = Render<ProjectsPage>();
-        await cut.Find("[data-testid='project-name-input']").InputAsync("Apollo");
-        SignOutQuietly();
-
-        // Act: submit the form
-        await cut.Find("[data-testid='new-project-form']").SubmitAsync();
-
-        // Assert: the page says why nothing was saved, and no project exists
-        Assert.Contains("no longer signed in", cut.Find("[data-testid='project-error']").TextContent, StringComparison.Ordinal);
-        Assert.Empty(await Projects.ListAsync(TestContext.Current.CancellationToken));
-    }
-
-    /// <summary>
-    ///     Test that submitting a blank name shows the validation message and creates nothing.
-    /// </summary>
-    [Fact]
-    public async Task ProjectsPage_CreateForm_BlankName_ShowsErrorAndCreatesNothing()
-    {
-        // Arrange: the rendered page with an empty form
-        var cut = Render<ProjectsPage>();
-
-        // Act: submit the form
-        await cut.Find("[data-testid='new-project-form']").SubmitAsync();
-
-        // Assert: the error is shown and nothing was stored
-        Assert.Contains("name", cut.Find("[data-testid='project-error']").TextContent, StringComparison.OrdinalIgnoreCase);
-        Assert.Empty(await Projects.ListAsync(TestContext.Current.CancellationToken));
     }
 
     /// <summary>

@@ -30,7 +30,7 @@ namespace DemaConsulting.ReviewCenter.Tests.Web;
 /// <summary>
 ///     Unit tests for the repository source of the new-review form of <see cref="ProjectPage"/>.
 /// </summary>
-public class ProjectPageRepositoryTests : PageTestBase
+public class NewReviewPageRepositoryTests : PageTestBase
 {
     /// <summary>
     ///     The location of the registered repository, which must never reach the page.
@@ -81,9 +81,9 @@ public class ProjectPageRepositoryTests : PageTestBase
     /// </summary>
     /// <param name="projectId">The project identity.</param>
     /// <returns>The rendered component.</returns>
-    private IRenderedComponent<ProjectPage> RenderPage(int projectId)
+    private IRenderedComponent<NewReviewPage> RenderPage(int projectId)
     {
-        return Render<ProjectPage>(parameters => parameters.Add(page => page.ProjectId, projectId));
+        return Render<NewReviewPage>(parameters => parameters.Add(page => page.ProjectId, projectId));
     }
 
     /// <summary>
@@ -95,7 +95,7 @@ public class ProjectPageRepositoryTests : PageTestBase
     /// <param name="baseline">The baseline revision.</param>
     /// <param name="selection">The selection, or <c>null</c> to keep the default.</param>
     private static async Task FillAsync(
-        IRenderedComponent<ProjectPage> cut,
+        IRenderedComponent<NewReviewPage> cut,
         int repositoryId,
         string head,
         string baseline,
@@ -118,7 +118,7 @@ public class ProjectPageRepositoryTests : PageTestBase
     ///     repository source is chosen, with the default selection.
     /// </summary>
     [Fact]
-    public async Task ProjectPage_SourceChoice_RepositoryChosen_ShowsRepositoryFieldsInsteadOfUpload()
+    public async Task NewReviewPage_SourceChoice_RepositoryChosen_ShowsRepositoryFieldsInsteadOfUpload()
     {
         // Arrange: a project and an enabled repository
         var (projectId, _) = await ArrangeAsync();
@@ -153,7 +153,7 @@ public class ProjectPageRepositoryTests : PageTestBase
     ///     name nor the token appears anywhere in the page.
     /// </summary>
     [Fact]
-    public async Task ProjectPage_RepositorySelect_OffersOnlyEnabledRepositoriesWithoutLocationOrToken()
+    public async Task NewReviewPage_RepositorySelect_OffersOnlyEnabledRepositoriesWithoutLocationOrToken()
     {
         // Arrange: an enabled and a disabled repository
         var (projectId, _) = await ArrangeAsync();
@@ -178,7 +178,7 @@ public class ProjectPageRepositoryTests : PageTestBase
     ///     Test that without an enabled repository the repository source cannot be chosen and a hint says why.
     /// </summary>
     [Fact]
-    public async Task ProjectPage_SourceChoice_NoEnabledRepository_DisablesRepositorySourceWithHint()
+    public async Task NewReviewPage_SourceChoice_NoEnabledRepository_DisablesRepositorySourceWithHint()
     {
         // Arrange: a project and one repository that is disabled
         var (projectId, repositoryId) = await ArrangeAsync();
@@ -199,7 +199,7 @@ public class ProjectPageRepositoryTests : PageTestBase
     ///     Test that a valid repository form creates the review with its source and navigates to it.
     /// </summary>
     [Fact]
-    public async Task ProjectPage_CreateForm_FromRepository_CreatesReviewWithSourceAndNavigates()
+    public async Task NewReviewPage_CreateForm_FromRepository_CreatesReviewWithSourceAndNavigates()
     {
         // Arrange: the repository form filled in with a selection that leaves out the deleted file
         var (projectId, repositoryId) = await ArrangeAsync();
@@ -225,7 +225,7 @@ public class ProjectPageRepositoryTests : PageTestBase
     ///     Test that an empty baseline and the default selection review every file at the head.
     /// </summary>
     [Fact]
-    public async Task ProjectPage_CreateForm_FromRepositoryWithoutBaseline_ReviewsAllFilesAtHead()
+    public async Task NewReviewPage_CreateForm_FromRepositoryWithoutBaseline_ReviewsAllFilesAtHead()
     {
         // Arrange: no baseline scripted, the default selection kept
         var (projectId, repositoryId) = await ArrangeAsync();
@@ -247,7 +247,7 @@ public class ProjectPageRepositoryTests : PageTestBase
     ///     Test that a selection with no changed files shows the nothing-to-review message and creates nothing.
     /// </summary>
     [Fact]
-    public async Task ProjectPage_CreateForm_EmptySelection_ShowsNothingToReviewAndCreatesNothing()
+    public async Task NewReviewPage_CreateForm_EmptySelection_ShowsNothingToReviewAndCreatesNothing()
     {
         // Arrange: a selection that matches none of the changed files
         var (projectId, repositoryId) = await ArrangeAsync();
@@ -269,7 +269,7 @@ public class ProjectPageRepositoryTests : PageTestBase
     ///     Test that a revision that does not exist shows the git error and creates nothing.
     /// </summary>
     [Fact]
-    public async Task ProjectPage_CreateForm_BadRevision_ShowsErrorAndCreatesNothing()
+    public async Task NewReviewPage_CreateForm_BadRevision_ShowsErrorAndCreatesNothing()
     {
         // Arrange: a head revision the repository does not know
         var (projectId, repositoryId) = await ArrangeAsync();
@@ -288,7 +288,7 @@ public class ProjectPageRepositoryTests : PageTestBase
     ///     Test that submitting without choosing a repository asks for one.
     /// </summary>
     [Fact]
-    public async Task ProjectPage_CreateForm_NoRepositoryChosen_AsksForOne()
+    public async Task NewReviewPage_CreateForm_NoRepositoryChosen_AsksForOne()
     {
         // Arrange: the repository source with everything but the repository filled in
         var (projectId, _) = await ArrangeAsync();
@@ -309,7 +309,7 @@ public class ProjectPageRepositoryTests : PageTestBase
     ///     Test that a repository disabled after the page was opened is refused when the form is submitted.
     /// </summary>
     [Fact]
-    public async Task ProjectPage_CreateForm_RepositoryDisabledMeanwhile_ShowsErrorAndCreatesNothing()
+    public async Task NewReviewPage_CreateForm_RepositoryDisabledMeanwhile_ShowsErrorAndCreatesNothing()
     {
         // Arrange: the filled-in form, then an administrator disables the repository
         var (projectId, repositoryId) = await ArrangeAsync();
@@ -329,7 +329,7 @@ public class ProjectPageRepositoryTests : PageTestBase
     ///     Test that skipped links and submodules are shown to the creator before the review is opened.
     /// </summary>
     [Fact]
-    public async Task ProjectPage_CreateForm_SkippedEntries_AreShownBeforeOpeningTheReview()
+    public async Task NewReviewPage_CreateForm_SkippedEntries_AreShownBeforeOpeningTheReview()
     {
         // Arrange: a change set that reports a link and a submodule as skipped
         var (projectId, repositoryId) = await ArrangeAsync();

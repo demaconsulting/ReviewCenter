@@ -26,10 +26,12 @@ using System.Reflection;
 namespace DemaConsulting.ReviewCenter.Puppet.Tests;
 
 /// <summary>
-///     End-to-end test: start the real server, start Puppet, drive the hello page, and stop Puppet.
+///     End-to-end test: start the real server, start Puppet, drive the real pages (sign in, open Projects through
+///     the header, create a project, switch the theme), and stop Puppet.
 /// </summary>
 /// <remarks>
-///     This test is requirement-linked evidence for the Puppet system and daemon requirements. Locally it is
+///     This test is requirement-linked evidence for the Puppet system and daemon requirements, and for the live
+///     (interactive) connection of the web user interface. Locally it is
 ///     skipped with a clear reason when Chromium is not installed. CI installs Chromium and sets
 ///     <c>REVIEWCENTER_REQUIRE_CHROMIUM=true</c>, which turns a missing or broken browser into a failure so
 ///     the evidence can never be skipped silently.
@@ -43,18 +45,29 @@ public class PuppetEndToEndTests
     private const string RequireChromiumVariable = "REVIEWCENTER_REQUIRE_CHROMIUM";
 
     /// <summary>
-    ///     Test that Puppet can be started, driven one command at a time, and stopped again.
+    ///     The user name of the administrator that the test server is given.
+    /// </summary>
+    private const string UserName = "puppet";
+
+    /// <summary>
+    ///     The password of the administrator that the test server is given.
+    /// </summary>
+    private const string UserPassword = "correct horse battery";
+
+    /// <summary>
+    ///     Test that Puppet can be started, driven one command at a time, and stopped again, while it signs in,
+    ///     follows the header to the projects page, creates a project over the live connection, and switches the theme.
     /// </summary>
     /// <returns>A task that completes when the test has finished.</returns>
     [Fact]
-    public async Task PuppetEndToEnd_StartDriveStop_HelloAndCounter_WorksAgainstRealServer()
+    public async Task PuppetEndToEnd_StartDriveStop_SignInProjectAndTheme_WorksAgainstRealServer()
     {
-        // Arrange: the real server, and a private control file and screenshot folder
+        // Arrange: the real server with one administrator, and a private control file and screenshot folder
         var cancellation = TestContext.Current.CancellationToken;
         var directory = Directory.CreateTempSubdirectory("puppet-tests-");
         var controlFile = Path.Combine(directory.FullName, "control.json");
         var shot = Path.Combine(directory.FullName, "home.png");
-        using var server = await TestServer.StartAsync(cancellation);
+        using var server = await TestServer.StartAsync(cancellation, seedUser: true);
 
         async Task<(int Code, string Output, string Error)> Run(params string[] args)
         {
@@ -78,28 +91,53 @@ public class PuppetEndToEndTests
             Assert.True(start.Code == 0, start.Error);
             Assert.Equal(1, (await Run("start")).Code);
 
-            // Act and assert: the page shows the hello button
+            // Act and assert: the page shows the sign-in link of the header (nobody is signed in)
             var go = await Run("goto", "/");
             Assert.Equal(0, go.Code);
             Assert.StartsWith("HTTP 200", go.Output, StringComparison.Ordinal);
             Assert.Equal("{\"a\":1}", (await Run("eval", "({a: 1})")).Output.Split('\n')[0].Trim());
             var snapshot = await Run("snapshot");
-            Assert.Contains("testid=hello-button", snapshot.Output, StringComparison.Ordinal);
+            Assert.Contains("testid=signin-link", snapshot.Output, StringComparison.Ordinal);
             Assert.Contains(server.Url, snapshot.Output, StringComparison.Ordinal);
 
             // Act and assert: a hover persists across separate commands, including a screenshot, until the mouse moves
-            const string isHovered = "document.querySelector('[data-testid=hello-button]').matches(':hover')";
-            Assert.Equal(0, (await Run("hover", "hello-button")).Code);
+            const string isHovered = "document.querySelector('[data-testid=signin-link]').matches(':hover')";
+            Assert.Equal(0, (await Run("hover", "signin-link")).Code);
             Assert.Equal(0, (await Run("screenshot", Path.Combine(directory.FullName, "hover.png"))).Code);
             Assert.StartsWith("true", (await Run("eval", isHovered)).Output, StringComparison.Ordinal);
             Assert.Equal(0, (await Run("mouse-move", "0", "0")).Code);
             Assert.StartsWith("false", (await Run("eval", isHovered)).Output, StringComparison.Ordinal);
 
-            // Act and assert: two clicks, then wait for the asynchronous update instead of sleeping
-            Assert.Equal(0, (await Run("click", "counter-button")).Code);
-            Assert.Equal(0, (await Run("click", "counter-button")).Code);
-            Assert.Equal(0, (await Run("wait", "text=Count: 2")).Code);
-            Assert.StartsWith("2", (await Run("text", "counter-value")).Output, StringComparison.Ordinal);
+            // Act and assert: a failed sign-in (a plain form post) shows its message; the right password signs in
+            Assert.Equal(0, (await Run("goto", "/login")).Code);
+            Assert.Equal(0, (await Run("fill", "login-username-input", "nobody")).Code);
+            Assert.Equal(0, (await Run("fill", "login-password-input", "wrong-password")).Code);
+            Assert.Equal(0, (await Run("click", "login-button")).Code);
+            Assert.Equal(0, (await Run("wait", "login-error")).Code);
+            Assert.StartsWith("Invalid user name or password.", (await Run("text", "login-error")).Output, StringComparison.Ordinal);
+            Assert.Equal(0, (await Run("fill", "login-username-input", UserName)).Code);
+            Assert.Equal(0, (await Run("fill", "login-password-input", UserPassword)).Code);
+            Assert.Equal(0, (await Run("click", "login-button")).Code);
+            Assert.Equal(0, (await Run("wait", "current-user")).Code);
+            Assert.StartsWith("Puppet Admin", (await Run("text", "current-user")).Output, StringComparison.Ordinal);
+
+            // Act and assert: the header leads to the projects page; its live connection comes up before the next click
+            Assert.Equal(0, (await Run("click", "projects-link")).Code);
+            Assert.Equal(0, (await Run("wait", "css=[data-testid=projects-page][data-interactive=true]")).Code);
+            Assert.Equal(0, (await Run("click", "new-project-button")).Code);
+            Assert.Equal(0, (await Run("wait", "css=[data-testid=new-project-page][data-interactive=true]")).Code);
+
+            // Act and assert: a form submitted over the live connection creates the project; wait for the result
+            Assert.Equal(0, (await Run("fill", "project-name-input", "Puppet Project")).Code);
+            Assert.Equal(0, (await Run("click", "create-project-button")).Code);
+            Assert.Equal(0, (await Run("wait", "project-name")).Code);
+            Assert.StartsWith("Puppet Project", (await Run("text", "project-name")).Output, StringComparison.Ordinal);
+
+            // Act and assert: choosing the dark theme on the account page applies at once and is remembered
+            Assert.Equal(0, (await Run("goto", "/account")).Code);
+            Assert.Equal(0, (await Run("click", "theme-dark")).Code);
+            Assert.Equal(0, (await Run("wait", "css=html[data-theme=dark]")).Code);
+            Assert.StartsWith("dark", (await Run("eval", "localStorage.getItem('reviewcenter-theme')")).Output.Trim('"'), StringComparison.Ordinal);
 
             // Act and assert: a missing element fails fast with a one-line message and exit code 1
             var missing = await Run("click", "no-such-element");
@@ -154,8 +192,9 @@ public class PuppetEndToEndTests
         ///     Starts the server and waits until <c>/health</c> answers <c>Healthy</c>.
         /// </summary>
         /// <param name="cancellationToken">Cancels the wait.</param>
+        /// <param name="seedUser">Whether to create an administrator (<c>UserName</c>) before the server starts.</param>
         /// <returns>The running server; disposing it kills the process tree.</returns>
-        public static async Task<TestServer> StartAsync(CancellationToken cancellationToken)
+        public static async Task<TestServer> StartAsync(CancellationToken cancellationToken, bool seedUser = false)
         {
             var listener = new TcpListener(IPAddress.Loopback, 0);
             listener.Start();
@@ -172,6 +211,33 @@ public class PuppetEndToEndTests
                 WorkingDirectory = Path.GetDirectoryName(dll)!
             };
             info.Environment["Database__ConnectionString"] = $"Data Source={databaseFile};Pooling=False";
+
+            // A signed-in flow needs a user: the command line creates the first administrator, as an operator would
+            if (seedUser)
+            {
+                var add = new ProcessStartInfo(info.FileName)
+                {
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    WorkingDirectory = info.WorkingDirectory
+                };
+                add.Environment["Database__ConnectionString"] = info.Environment["Database__ConnectionString"];
+                add.Environment["REVIEWCENTER_PASSWORD"] = UserPassword;
+                foreach (var argument in new[] { dll, "user", "add", "--username", UserName, "--display-name", "Puppet Admin", "--role", "Admin" })
+                {
+                    add.ArgumentList.Add(argument);
+                }
+
+                using var adding = Process.Start(add)!;
+                var addError = adding.StandardError.ReadToEndAsync(cancellationToken);
+                _ = await adding.StandardOutput.ReadToEndAsync(cancellationToken);
+                await adding.WaitForExitAsync(cancellationToken);
+                if (adding.ExitCode != 0)
+                {
+                    throw new InvalidOperationException("Creating the test user failed: " + await addError);
+                }
+            }
+
             info.ArgumentList.Add(dll);
             info.ArgumentList.Add("serve");
             info.ArgumentList.Add("--urls");

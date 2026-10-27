@@ -13,12 +13,33 @@
 <PageTitle>Account - ReviewCenter</PageTitle>
 
 <SessionGate>
-<main class="page" data-testid="account-page" data-interactive="@InteractiveMarker">
-    <nav class="breadcrumb">
-        <a href="/" data-testid="home-link">ReviewCenter</a>
-    </nav>
-
+<main class="page narrow" data-testid="account-page" data-interactive="@InteractiveMarker">
     <h1>Account</h1>
+
+    <section class="card" data-testid="appearance-card">
+        <h2 id="appearance-heading">Appearance</h2>
+        <p class="muted hint">Remembered in this browser only. System follows your device setting.</p>
+        <div class="option-cards three" role="radiogroup" aria-labelledby="appearance-heading">
+            <label class="option-card">
+                <input type="radio" name="theme" value="system" data-testid="theme-system"
+                       checked="@(Theme == "system")" @onchange="@(() => SelectThemeAsync("system"))" />
+                <span class="option-title">System</span>
+                <span class="option-text">Match my device.</span>
+            </label>
+            <label class="option-card">
+                <input type="radio" name="theme" value="light" data-testid="theme-light"
+                       checked="@(Theme == "light")" @onchange="@(() => SelectThemeAsync("light"))" />
+                <span class="option-title">Light</span>
+                <span class="option-text">Dark text on a light background.</span>
+            </label>
+            <label class="option-card">
+                <input type="radio" name="theme" value="dark" data-testid="theme-dark"
+                       checked="@(Theme == "dark")" @onchange="@(() => SelectThemeAsync("dark"))" />
+                <span class="option-title">Dark</span>
+                <span class="option-text">Light text on a dark background.</span>
+            </label>
+        </div>
+    </section>
 
     <section class="card">
         <h2>Change password</h2>

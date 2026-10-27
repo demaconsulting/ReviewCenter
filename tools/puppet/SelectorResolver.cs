@@ -25,8 +25,8 @@ namespace DemaConsulting.ReviewCenter.Puppet;
 /// </summary>
 /// <remarks>
 ///     The ReviewCenter UI marks every element a driver needs with a stable <c>data-testid</c>
-///     attribute, so the common case should be as short as possible: <c>testid:hello-button</c> or just
-///     <c>hello-button</c> means "the element whose test id is hello-button". Anything else
+///     attribute, so the common case should be as short as possible: <c>testid:projects-link</c> or just
+///     <c>projects-link</c> means "the element whose test id is projects-link". Anything else
 ///     (<c>css=...</c>, <c>text=...</c>, <c>role=...</c>, <c>#id</c>) is passed through unchanged for the
 ///     occasional case where a test id does not exist. The class is stateless and thread-safe.
 /// </remarks>
@@ -54,7 +54,7 @@ internal static class SelectorResolver
         if (selector.StartsWith(TestIdPrefix, StringComparison.Ordinal))
         {
             var name = selector[TestIdPrefix.Length..];
-            return string.IsNullOrWhiteSpace(name) ? throw new ArgumentException("A testid: selector needs a name, like testid:hello-button.", nameof(selector)) : TestId(name);
+            return string.IsNullOrWhiteSpace(name) ? throw new ArgumentException("A testid: selector needs a name, like testid:projects-link.", nameof(selector)) : TestId(name);
         }
 
         return selector.All(c => char.IsAsciiLetterOrDigit(c) || c == '-' || c == '_') ? TestId(selector) : selector;

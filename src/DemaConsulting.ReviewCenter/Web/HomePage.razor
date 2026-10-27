@@ -1,32 +1,41 @@
-@* HomePage: the hello-world landing page at "/".
+@* HomePage: the landing page at "/".
 
-   Presentation only; state and event handling live in HomePage.razor.cs. Every element a test or
-   the Puppet tool needs to find carries a stable data-testid, and the data-interactive marker on
-   the root element flips to "true" once the live server connection is established so that a
-   driver can wait for the page to be clickable instead of guessing with sleeps. *@
+   Static server-side rendered on purpose: it is plain markup (the product name and tagline), so it needs no live
+   connection and no code-behind. Signed-in users also see a "Get started" list of links to the main pages; the
+   administration pages are listed only for an administrator, as in the layout header. *@
 @page "/"
-@rendermode InteractiveServer
+@using DemaConsulting.ReviewCenter.Identity
+@using Microsoft.AspNetCore.Components.Authorization
 
 <PageTitle>ReviewCenter</PageTitle>
 
-<main data-testid="home-page" data-interactive="@InteractiveMarker">
+<main class="page reading" data-testid="home-page">
     <h1>ReviewCenter</h1>
-    <p>Web-based code review for regulated projects.</p>
+    <p class="muted">Web-based code review for regulated projects.</p>
 
-    <nav>
-        <a href="/projects" data-testid="projects-link">Projects</a>
-    </nav>
-
-    <section>
-        <button type="button" data-testid="hello-button" @onclick="SayHello">Hello</button>
-        @if (Greeting is not null)
-        {
-            <p data-testid="hello-message">@Greeting</p>
-        }
-    </section>
-
-    <section>
-        <button type="button" data-testid="counter-button" @onclick="IncrementCounter">Count</button>
-        <p>Count: <span data-testid="counter-value">@Count</span></p>
-    </section>
+    <AuthorizeView>
+        <section class="card" data-testid="home-get-started">
+            <h2>Get started</h2>
+            <ul class="item-list">
+                <li>
+                    <a href="/projects" data-testid="home-card-projects">Projects</a>
+                    <p class="muted">Create a project, then add reviews from a git repository or by uploading files.</p>
+                </li>
+                <AuthorizeView Roles="@SignIn.AdminRole" Context="adminView">
+                    <li>
+                        <a href="/repositories" data-testid="home-card-repositories">Repositories</a>
+                        <p class="muted">Register git repositories reviews are created from.</p>
+                    </li>
+                    <li>
+                        <a href="/audit" data-testid="home-card-audit">Audit</a>
+                        <p class="muted">Verify the tamper-evident record of every action.</p>
+                    </li>
+                    <li>
+                        <a href="/users" data-testid="home-card-users">Users</a>
+                        <p class="muted">Add people and manage their roles.</p>
+                    </li>
+                </AuthorizeView>
+            </ul>
+        </section>
+    </AuthorizeView>
 </main>

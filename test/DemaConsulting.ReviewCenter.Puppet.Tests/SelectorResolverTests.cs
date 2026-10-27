@@ -34,11 +34,11 @@ public class SelectorResolverTests
         // Arrange: every supported form
         // Act: resolve them
         // Assert: test ids become data-testid selectors (with quotes escaped); the rest is unchanged
-        Assert.Equal("[data-testid=\"hello-button\"]", SelectorResolver.Resolve("hello-button"));
-        Assert.Equal("[data-testid=\"hello-button\"]", SelectorResolver.Resolve("testid:hello-button"));
+        Assert.Equal("[data-testid=\"projects-link\"]", SelectorResolver.Resolve("projects-link"));
+        Assert.Equal("[data-testid=\"projects-link\"]", SelectorResolver.Resolve("testid:projects-link"));
         Assert.Equal("[data-testid=\"a\\\"b\"]", SelectorResolver.Resolve("testid:a\"b"));
         Assert.Equal("css=.button", SelectorResolver.Resolve("css=.button"));
-        Assert.Equal("text=Count: 2", SelectorResolver.Resolve("text=Count: 2"));
+        Assert.Equal("text=Saved", SelectorResolver.Resolve("text=Saved"));
         Assert.Equal("role=button[name=\"Save\"]", SelectorResolver.Resolve("role=button[name=\"Save\"]"));
         Assert.Equal("#main", SelectorResolver.Resolve("#main"));
     }

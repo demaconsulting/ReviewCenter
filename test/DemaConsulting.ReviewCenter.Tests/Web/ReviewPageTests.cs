@@ -95,6 +95,27 @@ public class ReviewPageTests : PageTestBase
     }
 
     /// <summary>
+    ///     Test that the summary strip shows the checklist progress, the reviewer state and the thread counts.
+    /// </summary>
+    [Fact]
+    public async Task ReviewPage_Render_ExistingReview_ShowsSummaryStripWithChecklistReviewersAndThreads()
+    {
+        // Arrange: a review without answers, slots or threads
+        var projectId = await CreateReviewAsync(new UploadedFile("a.txt", TestContent.A));
+
+        // Act: render the page
+        var cut = RenderPage(projectId);
+
+        // Assert: the strip names the checklist link, the empty reviewer state and zero thread counts
+        var strip = cut.Find("[data-testid='review-summary']");
+        Assert.NotNull(strip.QuerySelector("[data-testid='checklist-progress-summary']"));
+        Assert.Equal($"/projects/{projectId}/reviews/REV-1/checklist", strip.QuerySelector("[data-testid='checklist-link']")!.GetAttribute("href"));
+        Assert.Contains("No reviewer slots yet", strip.QuerySelector("[data-testid='summary-reviewers']")!.TextContent, StringComparison.Ordinal);
+        Assert.Contains("0 open", strip.QuerySelector("[data-testid='summary-threads']")!.TextContent, StringComparison.Ordinal);
+        Assert.Contains("0 resolved", strip.QuerySelector("[data-testid='summary-threads']")!.TextContent, StringComparison.Ordinal);
+    }
+
+    /// <summary>
     ///     Test that the review's id, title, state and fingerprint are shown.
     /// </summary>
     [Fact]

@@ -16,19 +16,19 @@
     <Found Context="routeData">
         <AuthorizeRouteView RouteData="routeData" DefaultLayout="typeof(MainLayout)">
             <NotAuthorized Context="state">
-                <main class="page" data-testid="access-denied">
+                <main class="page narrow" data-testid="access-denied">
                     @if (state.User.Identity?.IsAuthenticated == true)
                     {
                         <h1>Access denied</h1>
                         <p>Your account does not have permission to open this page.</p>
-                        <p><a href="/projects" data-testid="access-denied-projects-link">Back to projects</a></p>
+                        <p><a class="action outline" href="/projects" data-testid="access-denied-projects-link">Back to projects</a></p>
                     }
                     else
                     {
                         <h1>Sign in required</h1>
                         <p>Please sign in to open this page.</p>
                         <p>
-                            <a href="@LoginLink" data-testid="access-denied-login-link">Go to the login page</a>
+                            <a class="action" href="@LoginLink" data-testid="access-denied-login-link">Go to the login page</a>
                         </p>
                     }
                 </main>

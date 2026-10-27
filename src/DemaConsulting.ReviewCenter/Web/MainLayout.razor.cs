@@ -51,6 +51,26 @@ public partial class MainLayout : LayoutComponentBase
     /// </summary>
     private bool IsAdmin { get; set; }
 
+    /// <summary>
+    ///     Gets the version shown in the footer: the informational version up to the <c>+</c>, then <c>+</c> and the
+    ///     first 7 characters of the commit that follows it, when there is one.
+    /// </summary>
+    private static string ShortVersion
+    {
+        get
+        {
+            var full = Program.Version;
+            var plus = full.IndexOf('+', StringComparison.Ordinal);
+            if (plus < 0)
+            {
+                return full;
+            }
+
+            var sha = full[(plus + 1)..];
+            return sha.Length == 0 ? full[..plus] : $"{full[..plus]}+{sha[..Math.Min(7, sha.Length)]}";
+        }
+    }
+
     /// <inheritdoc />
     protected override async Task OnInitializedAsync()
     {

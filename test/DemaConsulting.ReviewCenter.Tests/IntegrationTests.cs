@@ -427,10 +427,10 @@ public class IntegrationTests
     }
 
     /// <summary>
-    ///     Test that the home page served over HTTP contains the title and the interactive controls.
+    ///     Test that the home page served over HTTP contains the title and the tagline.
     /// </summary>
     [Fact]
-    public async Task ReviewCenter_ServeVerb_Started_HomePageContainsTitleAndControls()
+    public async Task ReviewCenter_ServeVerb_Started_HomePageContainsTitleAndTagline()
     {
         // Arrange: start the server and wait for it
         using var server = ServerProcess.Start();
@@ -444,10 +444,31 @@ public class IntegrationTests
 
         // Assert: title, test ids, and a non-empty client script (needed for interactivity)
         Assert.Contains("<title>ReviewCenter</title>", html);
-        Assert.Contains("data-testid=\"hello-button\"", html);
-        Assert.Contains("data-testid=\"counter-button\"", html);
-        Assert.Contains("data-testid=\"counter-value\"", html);
+        Assert.Contains("Web-based code review for regulated projects.", html);
         Assert.NotEmpty(script);
+    }
+
+    /// <summary>
+    ///     Test that the running server serves the built-in Help and the About page to a visitor who is not signed in.
+    /// </summary>
+    [Fact]
+    public async Task ReviewCenter_ServeVerb_Started_ServesHelpAndAboutPagesWithoutSignIn()
+    {
+        // Arrange: start the server and wait for it
+        using var server = ServerProcess.Start();
+        var healthy = await server.WaitUntilHealthyAsync(TimeSpan.FromSeconds(30));
+        Assert.True(healthy, "Server did not become healthy in time");
+
+        // Act: request the help index, a help topic, and the about page
+        using var client = new HttpClient();
+        var index = await client.GetStringAsync($"{server.BaseUrl}/help", TestContext.Current.CancellationToken);
+        var topic = await client.GetStringAsync($"{server.BaseUrl}/help/getting-started", TestContext.Current.CancellationToken);
+        var about = await client.GetStringAsync($"{server.BaseUrl}/about", TestContext.Current.CancellationToken);
+
+        // Assert: each page is served with its own marker
+        Assert.Contains("data-testid=\"help-page\"", index);
+        Assert.Contains("data-testid=\"help-topic-page\"", topic);
+        Assert.Contains("data-testid=\"about-page\"", about);
     }
 
     /// <summary>

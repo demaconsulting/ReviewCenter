@@ -21,7 +21,7 @@
 using Bunit;
 using DemaConsulting.ReviewCenter.Core;
 using DemaConsulting.ReviewCenter.Web;
-
+using Microsoft.AspNetCore.Components;
 using TestContext = Xunit.TestContext;
 
 namespace DemaConsulting.ReviewCenter.Tests.Web;
@@ -40,6 +40,15 @@ public class AccountPageTests : PageTestBase
     ///     Another password that satisfies the policy.
     /// </summary>
     private const string NewPassword = "new password 67890";
+
+    /// <summary>
+    ///     Initializes a new instance of the <see cref="AccountPageTests"/> class; the page asks the browser for the
+    ///     stored appearance, which these tests do not script unless they say so.
+    /// </summary>
+    public AccountPageTests()
+    {
+        JSInterop.Mode = JSRuntimeMode.Loose;
+    }
 
     /// <summary>
     ///     Test that the page shows the password form with its controls and no message.
@@ -115,6 +124,61 @@ public class AccountPageTests : PageTestBase
         Assert.Contains(expected, cut.Find("[data-testid='account-error']").TextContent, StringComparison.OrdinalIgnoreCase);
         Assert.Empty(cut.FindAll("[data-testid='account-message']"));
         Assert.NotNull(await Users.AuthenticateAsync("ann", OldPassword, TestContext.Current.CancellationToken));
+    }
+
+    /// <summary>
+    ///     Test that the appearance card offers System, Light and Dark, with System selected by default.
+    /// </summary>
+    [Fact]
+    public void AccountPage_Render_AppearanceCard_ShowsThreeOptionsWithSystemSelected()
+    {
+        // Arrange: no JS answer, as in a browser without a stored choice
+        JSInterop.Mode = JSRuntimeMode.Loose;
+
+        // Act: render the page
+        var cut = Render<AccountPage>();
+
+        // Assert: three radio options, System checked
+        Assert.NotNull(cut.Find("[data-testid='appearance-card']"));
+        Assert.True(cut.Find("[data-testid='theme-system']").HasAttribute("checked"));
+        Assert.False(cut.Find("[data-testid='theme-light']").HasAttribute("checked"));
+        Assert.False(cut.Find("[data-testid='theme-dark']").HasAttribute("checked"));
+        Assert.Equal("radio", cut.Find("[data-testid='theme-dark']").GetAttribute("type"));
+    }
+
+    /// <summary>
+    ///     Test that choosing an appearance is applied to the browser at once and shown as selected.
+    /// </summary>
+    [Fact]
+    public async Task AccountPage_ChooseDark_AppliesThemeAndSelectsOption()
+    {
+        // Arrange: the rendered page
+        JSInterop.Mode = JSRuntimeMode.Loose;
+        var cut = Render<AccountPage>();
+
+        // Act: choose Dark
+        await cut.Find("[data-testid='theme-dark']").ChangeAsync(new ChangeEventArgs { Value = "dark" });
+
+        // Assert: the browser script was told and the option is selected
+        Assert.Equal(["dark"], JSInterop.Invocations["reviewCenter.setTheme"][^1].Arguments);
+        Assert.True(cut.Find("[data-testid='theme-dark']").HasAttribute("checked"));
+        Assert.False(cut.Find("[data-testid='theme-system']").HasAttribute("checked"));
+    }
+
+    /// <summary>
+    ///     Test that the stored browser choice is shown as selected when the page is first rendered.
+    /// </summary>
+    [Fact]
+    public void AccountPage_Render_StoredLightChoice_IsSelected()
+    {
+        // Arrange: the browser reports a stored Light choice
+        JSInterop.Setup<string?>("reviewCenter.getTheme").SetResult("light");
+
+        // Act: render the page
+        var cut = Render<AccountPage>();
+
+        // Assert: Light is selected
+        Assert.True(cut.Find("[data-testid='theme-light']").HasAttribute("checked"));
     }
 
     /// <summary>

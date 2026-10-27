@@ -103,6 +103,7 @@ public class AppTests : PageTestBase
 
         // Assert: the name, the account link and the logout button are shown, but the Users link only to the administrator
         Assert.Equal("Bea", reviewer.Find("[data-testid='current-user']").TextContent);
+        Assert.Equal("/projects", reviewer.Find("[data-testid='projects-link']").GetAttribute("href"));
         Assert.NotNull(reviewer.Find("[data-testid='account-link']"));
         Assert.NotNull(reviewer.Find("[data-testid='logout-button']"));
         Assert.Empty(reviewer.FindAll("[data-testid='users-link']"));
@@ -112,6 +113,71 @@ public class AppTests : PageTestBase
         Assert.NotNull(admin.Find("[data-testid='users-link']"));
         Assert.Equal("/repositories", admin.Find("[data-testid='repositories-link']").GetAttribute("href"));
         Assert.Equal("/audit", admin.Find("[data-testid='audit-link']").GetAttribute("href"));
+    }
+
+    /// <summary>
+    ///     Test that every page has a footer with the version and a link to the About page, even when nobody is
+    ///     signed in, and that the header has exactly one link to the home page.
+    /// </summary>
+    [Fact]
+    public void MainLayout_Render_NobodySignedIn_ShowsFooterWithVersionAndAboutLink()
+    {
+        // Arrange: nobody is signed in
+        SignOut();
+
+        // Act: render the layout
+        var layout = Render<MainLayout>();
+
+        // Assert: the footer names the product, the version and the copyright and links to /about
+        Assert.Contains("ReviewCenter", layout.Find("[data-testid='footer']").TextContent);
+        Assert.Contains("DEMA Consulting", layout.Find("[data-testid='footer']").TextContent);
+        Assert.False(string.IsNullOrWhiteSpace(layout.Find("[data-testid='version-text']").TextContent));
+        Assert.Contains(Program.Version.Split('+')[0], layout.Find("[data-testid='version-text']").TextContent, StringComparison.Ordinal);
+        Assert.True(layout.Find("[data-testid='version-text']").TextContent.Length <= Program.Version.Length);
+        Assert.Equal("/about", layout.Find("[data-testid='about-link']").GetAttribute("href"));
+        Assert.Equal("/", Assert.Single(layout.FindAll("[data-testid='home-link']")).GetAttribute("href"));
+    }
+
+    /// <summary>
+    ///     Test that the document head applies the stored theme choice before the style sheet is requested, so
+    ///     the page never flashes the wrong theme.
+    /// </summary>
+    [Fact]
+    public async Task App_Render_ServedAtRoot_AppliesStoredThemeBeforeStyleSheet()
+    {
+        // Arrange: start the real pipeline in memory
+        var logs = new CapturingLoggerProvider();
+        await using var app = await TestWebApp.StartAsync(logs, "serve", "--silent");
+        using var client = app.GetTestClient();
+
+        // Act: request the root document
+        var html = await client.GetStringAsync("/", Xunit.TestContext.Current.CancellationToken);
+
+        // Assert: the inline script that reads the stored choice comes before the style sheet link
+        var script = html.IndexOf("reviewcenter-theme", StringComparison.Ordinal);
+        var styleSheet = html.IndexOf("rel=\"stylesheet\"", StringComparison.Ordinal);
+        Assert.True(script >= 0, "The theme script is missing.");
+        Assert.True(styleSheet > script, "The theme script must come before the style sheet.");
+        Assert.Contains("data-theme", html, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    ///     Test that the address of the new-review form is handled by the form, not by a review called "new".
+    /// </summary>
+    [Fact]
+    public async Task Routes_Render_NewReviewRoute_ShowsFormNotReview()
+    {
+        // Arrange: a signed-in user, a project, and the router at the new-review address
+        SignInAs("ann", "Ann");
+        var project = await Projects.CreateAsync("Apollo", null, TestContext.Current.CancellationToken);
+        Services.GetRequiredService<NavigationManager>().NavigateTo($"/projects/{project.Id}/reviews/new");
+
+        // Act: render the router
+        var cut = Render<Routes>();
+
+        // Assert: the creation form is shown and no review page is
+        Assert.NotEmpty(cut.FindAll("[data-testid='new-review-form']"));
+        Assert.Empty(cut.FindAll("[data-testid='review-page']"));
     }
 
     /// <summary>
@@ -127,6 +193,7 @@ public class AppTests : PageTestBase
         var cut = Render<MainLayout>();
 
         // Assert: only the sign-in link is shown
+        Assert.Empty(cut.FindAll("[data-testid='projects-link']"));
         Assert.Equal("/login", cut.Find("[data-testid='signin-link']").GetAttribute("href"));
         Assert.Empty(cut.FindAll("[data-testid='current-user']"));
         Assert.Empty(cut.FindAll("[data-testid='logout-button']"));
@@ -166,8 +233,8 @@ public class AppTests : PageTestBase
         // Act: render the router
         var cut = Render<Routes>();
 
-        // Assert: the creation form is shown and there is no access denied message
-        Assert.NotNull(cut.Find("[data-testid='create-user-button']"));
+        // Assert: the user list page is shown (with its New user button) and there is no access denied message
+        Assert.NotNull(cut.Find("[data-testid='new-user-button']"));
         Assert.Empty(cut.FindAll("[data-testid='access-denied']"));
     }
 

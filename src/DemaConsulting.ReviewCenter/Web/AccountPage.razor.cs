@@ -22,6 +22,7 @@ using DemaConsulting.ReviewCenter.Core;
 using DemaConsulting.ReviewCenter.Identity;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Authorization;
+using Microsoft.JSInterop;
 
 namespace DemaConsulting.ReviewCenter.Web;
 
@@ -56,6 +57,17 @@ public partial class AccountPage : ComponentBase
     /// </summary>
     [Inject]
     private AuthenticationStateProvider AuthenticationState { get; set; } = null!;
+
+    /// <summary>
+    ///     Gets or sets the browser script runtime used to apply and read the appearance choice.
+    /// </summary>
+    [Inject]
+    private IJSRuntime Js { get; set; } = null!;
+
+    /// <summary>
+    ///     Gets or sets the selected appearance: <c>system</c> (the default), <c>light</c> or <c>dark</c>.
+    /// </summary>
+    private string Theme { get; set; } = "system";
 
     /// <summary>
     ///     Gets or sets the current password typed into the form.
@@ -95,13 +107,48 @@ public partial class AccountPage : ComponentBase
     ///     Marks the page interactive after it has rendered on a live circuit.
     /// </summary>
     /// <param name="firstRender"><c>true</c> for the first render of this component instance.</param>
-    protected override void OnAfterRender(bool firstRender)
+    protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         // Only the first render transitions the marker; later renders must not loop
-        if (firstRender)
+        if (!firstRender)
         {
-            _interactive = true;
-            StateHasChanged();
+            return;
+        }
+
+        _interactive = true;
+        StateHasChanged();
+
+        // Show the browser's stored appearance choice; the choice lives in the browser, not on the server
+        try
+        {
+            var stored = await Js.InvokeAsync<string?>("reviewCenter.getTheme");
+            if (stored is "system" or "light" or "dark" && stored != Theme)
+            {
+                Theme = stored;
+                StateHasChanged();
+            }
+        }
+        catch (Exception ex) when (ex is JSException or InvalidOperationException or JSDisconnectedException)
+        {
+            // No browser script available (or the circuit is gone): keep the default choice
+        }
+    }
+
+    /// <summary>
+    ///     Applies and remembers the appearance chosen by the user.
+    /// </summary>
+    /// <param name="theme">The choice: <c>system</c>, <c>light</c> or <c>dark</c>.</param>
+    /// <returns>A task that completes when the browser has been told.</returns>
+    private async Task SelectThemeAsync(string theme)
+    {
+        Theme = theme;
+        try
+        {
+            await Js.InvokeVoidAsync("reviewCenter.setTheme", theme);
+        }
+        catch (Exception ex) when (ex is JSException or InvalidOperationException or JSDisconnectedException)
+        {
+            // The choice stays selected for this view even if the browser could not store it
         }
     }
 

@@ -21,7 +21,8 @@
 using Bunit;
 using DemaConsulting.ReviewCenter.Core;
 using DemaConsulting.ReviewCenter.Web;
-
+using Microsoft.AspNetCore.Components;
+using Microsoft.Extensions.DependencyInjection;
 using TestContext = Xunit.TestContext;
 
 namespace DemaConsulting.ReviewCenter.Tests.Web;
@@ -59,20 +60,21 @@ public class UsersPageTests : PageTestBase
         Assert.NotNull(cut.Find($"[data-testid='user-set-role-{ann.Id}']"));
         Assert.NotNull(cut.Find($"[data-testid='user-password-input-{ann.Id}']"));
         Assert.NotNull(cut.Find($"[data-testid='user-set-password-{ann.Id}']"));
-        Assert.NotNull(cut.Find("[data-testid='create-user-button']"));
+        Assert.Equal("/users/new", cut.Find("[data-testid='new-user-button']").GetAttribute("href"));
+        Assert.Empty(cut.FindAll("[data-testid='new-user-form']"));
         Assert.DoesNotContain(Password, cut.Markup, StringComparison.Ordinal);
         Assert.DoesNotContain("hash:", cut.Markup, StringComparison.Ordinal);
     }
 
     /// <summary>
-    ///     Test that the new-user form creates the user with the chosen role and clears the form.
+    ///     Test that the new-user form creates the user with the chosen role and returns to the user list.
     /// </summary>
     [Fact]
-    public async Task UsersPage_CreateForm_ValidInput_CreatesUserAndClearsForm()
+    public async Task NewUserPage_CreateForm_ValidInput_CreatesUserAndClearsForm()
     {
         // Arrange: a signed-in administrator and the rendered page with the form filled in
         await SignInAsNewAdminAsync();
-        var cut = Render<UsersPage>();
+        var cut = Render<NewUserPage>();
         await cut.Find("[data-testid='new-user-username-input']").InputAsync("bea");
         await cut.Find("[data-testid='new-user-display-name-input']").InputAsync("Bea");
         await cut.Find("[data-testid='new-user-role-select']").ChangeAsync("Admin");
@@ -81,26 +83,25 @@ public class UsersPageTests : PageTestBase
         // Act: submit
         await cut.Find("[data-testid='new-user-form']").SubmitAsync();
 
-        // Assert: the user exists with the role, is listed, and the fields are empty
+        // Assert: the user exists with the role, the password field is empty and the browser returned to the list
         var created = await Users.GetAsync("bea", TestContext.Current.CancellationToken);
         Assert.NotNull(created);
         Assert.Equal(UserRole.Admin, created.Role);
-        Assert.Equal("bea", cut.Find($"[data-testid='user-username-{created.Id}']").TextContent);
         Assert.Empty(cut.FindAll("[data-testid='users-error']"));
-        Assert.Contains("bea", cut.Find("[data-testid='users-status']").TextContent, StringComparison.Ordinal);
-        Assert.Equal(string.Empty, cut.Find("[data-testid='new-user-username-input']").GetAttribute("value") ?? string.Empty);
         Assert.Equal(string.Empty, cut.Find("[data-testid='new-user-password-input']").GetAttribute("value") ?? string.Empty);
+        Assert.EndsWith("/users", Services.GetRequiredService<NavigationManager>().Uri, StringComparison.Ordinal);
+        Assert.Equal("/users", cut.Find("[data-testid='cancel-new-user-link']").GetAttribute("href"));
     }
 
     /// <summary>
     ///     Test that a rule violation on creation is shown and keeps the typed name but not the password.
     /// </summary>
     [Fact]
-    public async Task UsersPage_CreateForm_TooShortPassword_ShowsErrorAndCreatesNothing()
+    public async Task NewUserPage_CreateForm_TooShortPassword_ShowsErrorAndCreatesNothing()
     {
         // Arrange: a signed-in administrator and the rendered page with a too short password
         await SignInAsNewAdminAsync();
-        var cut = Render<UsersPage>();
+        var cut = Render<NewUserPage>();
         await cut.Find("[data-testid='new-user-username-input']").InputAsync("bea");
         await cut.Find("[data-testid='new-user-display-name-input']").InputAsync("Bea");
         await cut.Find("[data-testid='new-user-password-input']").InputAsync("short");

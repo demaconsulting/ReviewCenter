@@ -6,12 +6,55 @@
    so everything outside a page stays cheap, static HTML. It also carries one tiny script: the scroll
    helper that the review page calls to bring a thread's lines into view (Blazor cannot scroll by itself) and the
    helper that replaces the address in the address bar by the link of the file or thread shown (history.replaceState:
-   no navigation and no history entry, so the page keeps its state). *@
+   no navigation and no history entry, so the page keeps its state). A second script in the head applies the stored
+   light/dark/system appearance before the first paint. *@
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <script>
+        // Appearance: runs before the first paint so a stored dark choice never flashes light. The choice (system,
+        // light or dark) lives in this browser's localStorage only; "system" follows prefers-color-scheme and the
+        // result is published as data-theme="light|dark" on the html element. Storage may be blocked: always guarded.
+        (function () {
+            var key = 'reviewcenter-theme';
+            function stored() {
+                try {
+                    var value = window.localStorage.getItem(key);
+                    return value === 'light' || value === 'dark' ? value : 'system';
+                } catch (e) { return 'system'; }
+            }
+            function systemDark() {
+                try { return window.matchMedia('(prefers-color-scheme: dark)').matches; } catch (e) { return false; }
+            }
+            function apply(choice) {
+                var dark = choice === 'dark' || (choice === 'system' && systemDark());
+                var root = document.documentElement;
+                root.setAttribute('data-theme', dark ? 'dark' : 'light');
+                root.setAttribute('data-theme-choice', choice);
+                root.style.colorScheme = dark ? 'dark' : 'light';
+            }
+            apply(stored());
+            try {
+                window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function () { apply(stored()); });
+                // Enhanced navigation may rebuild the html element's attributes; put the theme back if it goes missing
+                new MutationObserver(function () {
+                    if (!document.documentElement.hasAttribute('data-theme')) { apply(stored()); }
+                }).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+            } catch (e) { }
+            window.reviewCenter = window.reviewCenter || {};
+            window.reviewCenter.getTheme = function () { return stored(); };
+            window.reviewCenter.setTheme = function (choice) {
+                if (choice !== 'light' && choice !== 'dark') { choice = 'system'; }
+                try {
+                    if (choice === 'system') { window.localStorage.removeItem(key); }
+                    else { window.localStorage.setItem(key, choice); }
+                } catch (e) { }
+                apply(choice);
+            };
+        })();
+    </script>
     <base href="/" />
     <link rel="stylesheet" href="app.css" />
     <HeadOutlet />
@@ -19,7 +62,8 @@
 <body>
     <Routes />
     <script>
-        window.reviewCenter = {
+        window.reviewCenter = window.reviewCenter || {};
+        Object.assign(window.reviewCenter, {
             scrollToTestId: function (id, block) {
                 var element = document.querySelector('[data-testid="' + id + '"]');
                 if (element) { element.scrollIntoView({ block: block }); }
@@ -30,7 +74,7 @@
                     history.replaceState(history.state, '', url);
                 }
             }
-        };
+        });
     </script>
     <script src="_framework/blazor.web.js"></script>
 </body>

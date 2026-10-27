@@ -35,13 +35,23 @@ namespace DemaConsulting.ReviewCenter.Tests.Web;
 public class ProjectPageTests : PageTestBase
 {
     /// <summary>
-    ///     Renders the page for a project.
+    ///     Renders the project page for a project.
     /// </summary>
     /// <param name="projectId">The project identity.</param>
     /// <returns>The rendered component.</returns>
-    private IRenderedComponent<ProjectPage> RenderPage(int projectId)
+    private IRenderedComponent<ProjectPage> RenderProjectPage(int projectId)
     {
         return Render<ProjectPage>(parameters => parameters.Add(page => page.ProjectId, projectId));
+    }
+
+    /// <summary>
+    ///     Renders the new review page (the form that creates a review) for a project.
+    /// </summary>
+    /// <param name="projectId">The project identity.</param>
+    /// <returns>The rendered component.</returns>
+    private IRenderedComponent<NewReviewPage> RenderPage(int projectId)
+    {
+        return Render<NewReviewPage>(parameters => parameters.Add(page => page.ProjectId, projectId));
     }
 
     /// <summary>
@@ -49,7 +59,7 @@ public class ProjectPageTests : PageTestBase
     /// </summary>
     /// <param name="cut">The rendered page.</param>
     /// <param name="files">The files to select as name and bytes pairs.</param>
-    private static void SelectFiles(IRenderedComponent<ProjectPage> cut, params (string Name, byte[] Content)[] files)
+    private static void SelectFiles(IRenderedComponent<NewReviewPage> cut, params (string Name, byte[] Content)[] files)
     {
         cut.FindComponent<InputFile>().UploadFiles(
             files.Select(file => InputFileContent.CreateFromBinary(file.Content, file.Name)).ToArray());
@@ -64,7 +74,7 @@ public class ProjectPageTests : PageTestBase
         // Arrange: no projects exist
 
         // Act: render the page for project 99
-        var cut = RenderPage(99);
+        var cut = RenderProjectPage(99);
 
         // Assert: not-found is shown and there is no review form
         Assert.Contains("99", cut.Find("[data-testid='project-not-found']").TextContent, StringComparison.Ordinal);
@@ -81,7 +91,7 @@ public class ProjectPageTests : PageTestBase
         var project = await Projects.CreateAsync("Apollo", null, TestContext.Current.CancellationToken);
 
         // Act: render the page without a repository
-        var without = RenderPage(project.Id);
+        var without = RenderProjectPage(project.Id);
 
         // Assert: no link, but a hint that explains why
         Assert.Empty(without.FindAll("[data-testid='plan-reviews-link']"));
@@ -94,12 +104,12 @@ public class ProjectPageTests : PageTestBase
             "main-repo", "https://example.com/org/repo.git", null, null, admin, TestContext.Current.CancellationToken);
 
         // Act: render the page again
-        var with = RenderPage(project.Id);
+        var with = RenderProjectPage(project.Id);
 
         // Assert: the link goes to the plan page of the project and the hint is gone
         var link = with.Find("[data-testid='plan-reviews-link']");
         Assert.Equal($"/projects/{project.Id}/plan", link.GetAttribute("href"));
-        Assert.Equal("Plan reviews from a repository", link.TextContent);
+        Assert.Equal("Plan reviews", link.TextContent);
         Assert.Empty(with.FindAll("[data-testid='plan-reviews-unavailable']"));
     }
 
@@ -113,12 +123,13 @@ public class ProjectPageTests : PageTestBase
         var project = await Projects.CreateAsync("Apollo", "Moon landing", TestContext.Current.CancellationToken);
 
         // Act: render the page
-        var cut = RenderPage(project.Id);
+        var cut = RenderProjectPage(project.Id);
 
-        // Assert: name, description and the empty message
+        // Assert: name, description, the empty message and the New review button leading to the form page
         Assert.Equal("Apollo", cut.Find("[data-testid='project-name']").TextContent);
         Assert.Equal("Moon landing", cut.Find("[data-testid='project-description']").TextContent);
         Assert.NotEmpty(cut.FindAll("[data-testid='reviews-empty']"));
+        Assert.Equal($"/projects/{project.Id}/reviews/new", cut.Find("[data-testid='new-review-button']").GetAttribute("href"));
     }
 
     /// <summary>
@@ -132,7 +143,7 @@ public class ProjectPageTests : PageTestBase
         await Reviews.CreateDraftAsync(project.Id, "REV-1", "First review", [new("a.txt", TestContent.A)], TestContext.Current.CancellationToken);
 
         // Act: render the page
-        var cut = RenderPage(project.Id);
+        var cut = RenderProjectPage(project.Id);
 
         // Assert: the review row shows a link to the review, its title and its state
         var link = cut.Find("[data-testid='review-link-REV-1']");
@@ -168,7 +179,7 @@ public class ProjectPageTests : PageTestBase
             TestActors.Ann, project.Id, "REV-1", slot.Id, approval!.Digest, "correct horse battery", TestContext.Current.CancellationToken);
 
         // Act: render the page
-        var cut = RenderPage(project.Id);
+        var cut = RenderProjectPage(project.Id);
 
         // Assert: the badges follow the approval
         Assert.Equal("Approved", cut.Find("[data-testid='review-approval-REV-1']").TextContent);
@@ -179,7 +190,7 @@ public class ProjectPageTests : PageTestBase
     ///     Test that choosing files lists them with their names and sizes.
     /// </summary>
     [Fact]
-    public async Task ProjectPage_FileInput_FilesSelected_ListsNamesAndSizes()
+    public async Task NewReviewPage_FileInput_FilesSelected_ListsNamesAndSizes()
     {
         // Arrange: a project and its rendered page
         var project = await Projects.CreateAsync("Apollo", null, TestContext.Current.CancellationToken);
@@ -199,7 +210,7 @@ public class ProjectPageTests : PageTestBase
     ///     Test that submitting a valid form stores the review with verbatim bytes and opens the review page.
     /// </summary>
     [Fact]
-    public async Task ProjectPage_CreateForm_ValidInput_CreatesReviewAndNavigatesToIt()
+    public async Task NewReviewPage_CreateForm_ValidInput_CreatesReviewAndNavigatesToIt()
     {
         // Arrange: a project, the form filled in, and binary and text files selected
         var project = await Projects.CreateAsync("Apollo", null, TestContext.Current.CancellationToken);
@@ -226,7 +237,7 @@ public class ProjectPageTests : PageTestBase
     ///     message and stores nothing.
     /// </summary>
     [Fact]
-    public async Task ProjectPage_CreateForm_SessionEndedBeforePageKnows_ShowsClearErrorAndCreatesNothing()
+    public async Task NewReviewPage_CreateForm_SessionEndedBeforePageKnows_ShowsClearErrorAndCreatesNothing()
     {
         // Arrange: a filled-in form, and then the session ends without the page being told
         var project = await Projects.CreateAsync("Apollo", null, TestContext.Current.CancellationToken);
@@ -249,7 +260,7 @@ public class ProjectPageTests : PageTestBase
     ///     Test that submitting without files shows the empty-file-set error and creates nothing.
     /// </summary>
     [Fact]
-    public async Task ProjectPage_CreateForm_NoFiles_ShowsErrorAndCreatesNothing()
+    public async Task NewReviewPage_CreateForm_NoFiles_ShowsErrorAndCreatesNothing()
     {
         // Arrange: a project with id and title entered but no files chosen
         var project = await Projects.CreateAsync("Apollo", null, TestContext.Current.CancellationToken);
@@ -269,7 +280,7 @@ public class ProjectPageTests : PageTestBase
     ///     Test that a duplicate review id is shown as an error naming the id, keeping the form values.
     /// </summary>
     [Fact]
-    public async Task ProjectPage_CreateForm_DuplicateReviewId_ShowsErrorNamingTheId()
+    public async Task NewReviewPage_CreateForm_DuplicateReviewId_ShowsErrorNamingTheId()
     {
         // Arrange: a project that already has REV-1, and a form that tries to create it again
         var project = await Projects.CreateAsync("Apollo", null, TestContext.Current.CancellationToken);
@@ -290,10 +301,32 @@ public class ProjectPageTests : PageTestBase
     }
 
     /// <summary>
+    ///     Test that the review id "new" is refused, because the address of the form would hide that review.
+    /// </summary>
+    [Fact]
+    public async Task NewReviewPage_CreateForm_ReservedReviewId_ShowsErrorAndCreatesNothing()
+    {
+        // Arrange: a project and a filled form whose review id is the reserved word, in any letter case
+        var project = await Projects.CreateAsync("Apollo", null, TestContext.Current.CancellationToken);
+        var cut = RenderPage(project.Id);
+        await cut.Find("[data-testid='review-id-input']").InputAsync("New");
+        await cut.Find("[data-testid='review-title-input']").InputAsync("Reserved");
+        SelectFiles(cut, ("a.txt", TestContent.A));
+        await cut.WaitForAssertionAsync(() => Assert.NotEmpty(cut.FindAll("[data-testid='selected-file-0']")));
+
+        // Act: submit the form
+        await cut.Find("[data-testid='new-review-form']").SubmitAsync();
+
+        // Assert: the error says the id is reserved and no review was created
+        Assert.Contains("reserved", cut.Find("[data-testid='review-error']").TextContent, StringComparison.Ordinal);
+        Assert.Empty(await Reviews.ListAsync(project.Id, TestContext.Current.CancellationToken));
+    }
+
+    /// <summary>
     ///     Test that two selected files with the same name are reported as a duplicate path on submit.
     /// </summary>
     [Fact]
-    public async Task ProjectPage_CreateForm_DuplicateFileNames_ShowsDuplicatePathError()
+    public async Task NewReviewPage_CreateForm_DuplicateFileNames_ShowsDuplicatePathError()
     {
         // Arrange: a project and two selected files with the same name
         var project = await Projects.CreateAsync("Apollo", null, TestContext.Current.CancellationToken);
@@ -316,7 +349,7 @@ public class ProjectPageTests : PageTestBase
     ///     submitting afterwards keeps that reason visible instead of replacing it.
     /// </summary>
     [Fact]
-    public async Task ProjectPage_FileInput_FileTooLarge_ShowsErrorAndKeepsNothing()
+    public async Task NewReviewPage_FileInput_FileTooLarge_ShowsErrorAndKeepsNothing()
     {
         // Arrange: a project and a file one byte over the limit
         var project = await Projects.CreateAsync("Apollo", null, TestContext.Current.CancellationToken);
@@ -340,7 +373,7 @@ public class ProjectPageTests : PageTestBase
     ///     error, and that submitting afterwards keeps that reason visible and stores nothing.
     /// </summary>
     [Fact]
-    public async Task ProjectPage_FileInput_TooManyFiles_ShowsErrorAndKeepsNothing()
+    public async Task NewReviewPage_FileInput_TooManyFiles_ShowsErrorAndKeepsNothing()
     {
         // Arrange: a project and one more tiny file than the limit allows
         var project = await Projects.CreateAsync("Apollo", null, TestContext.Current.CancellationToken);
@@ -368,7 +401,7 @@ public class ProjectPageTests : PageTestBase
     ///     is rejected as a whole with a clear error, and that submitting afterwards stores nothing.
     /// </summary>
     [Fact]
-    public async Task ProjectPage_FileInput_TotalSizeTooLarge_ShowsErrorAndKeepsNothing()
+    public async Task NewReviewPage_FileInput_TotalSizeTooLarge_ShowsErrorAndKeepsNothing()
     {
         // Arrange: a project and enough files at the per-file limit (sharing one buffer) to pass the total limit
         var project = await Projects.CreateAsync("Apollo", null, TestContext.Current.CancellationToken);
@@ -397,7 +430,7 @@ public class ProjectPageTests : PageTestBase
     ///     rejected based on the bytes actually received.
     /// </summary>
     [Fact]
-    public async Task ProjectPage_FileInput_DeclaredSizesUnderstated_RejectsOnReceivedBytes()
+    public async Task NewReviewPage_FileInput_DeclaredSizesUnderstated_RejectsOnReceivedBytes()
     {
         // Arrange: files that declare one byte each but stream the per-file maximum, enough to pass the total limit
         var project = await Projects.CreateAsync("Apollo", null, TestContext.Current.CancellationToken);
@@ -446,7 +479,7 @@ public class ProjectPageTests : PageTestBase
     ///     Test that a new selection replaces the previous one.
     /// </summary>
     [Fact]
-    public async Task ProjectPage_FileInput_SecondSelection_ReplacesFirst()
+    public async Task NewReviewPage_FileInput_SecondSelection_ReplacesFirst()
     {
         // Arrange: a project with a first selection
         var project = await Projects.CreateAsync("Apollo", null, TestContext.Current.CancellationToken);
@@ -466,7 +499,7 @@ public class ProjectPageTests : PageTestBase
     ///     Test that navigating to another project clears the form and the selection of the previous one.
     /// </summary>
     [Fact]
-    public async Task ProjectPage_ParametersChange_OtherProject_ClearsFormAndSelection()
+    public async Task NewReviewPage_ParametersChange_OtherProject_ClearsFormAndSelection()
     {
         // Arrange: a page for the first project with a filled form, a selected file and an error
         var first = await Projects.CreateAsync("Apollo", null, TestContext.Current.CancellationToken);
@@ -479,10 +512,10 @@ public class ProjectPageTests : PageTestBase
 
         // Act: the router reuses the component for the other project
         await cut.InvokeAsync(() => cut.Instance.SetParametersAsync(
-            ParameterView.FromDictionary(new Dictionary<string, object?> { [nameof(ProjectPage.ProjectId)] = second.Id })));
+            ParameterView.FromDictionary(new Dictionary<string, object?> { [nameof(NewReviewPage.ProjectId)] = second.Id })));
 
         // Assert: the new project is shown with an empty form and no selected files
-        await cut.WaitForAssertionAsync(() => Assert.Equal("Gemini", cut.Find("[data-testid='project-name']").TextContent));
+        await cut.WaitForAssertionAsync(() => Assert.Equal("Gemini", cut.Find("[data-testid='project-link']").TextContent));
         Assert.Equal(string.Empty, cut.Find("[data-testid='review-id-input']").GetAttribute("value") ?? string.Empty);
         Assert.Equal(string.Empty, cut.Find("[data-testid='review-title-input']").GetAttribute("value") ?? string.Empty);
         Assert.Empty(cut.FindAll("[data-testid='selected-file-0']"));
@@ -497,7 +530,7 @@ public class ProjectPageTests : PageTestBase
         // Arrange: no setup required
 
         // Act: render the page
-        var cut = RenderPage(1);
+        var cut = RenderProjectPage(1);
 
         // Assert: the root element reports interactivity
         Assert.Equal("true", cut.Find("[data-testid='project-page']").GetAttribute("data-interactive"));

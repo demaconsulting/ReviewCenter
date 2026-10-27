@@ -2,7 +2,8 @@
 
    Presentation only; state and event handling live in RepositoriesPage.razor.cs. A list of all repositories with,
    per repository, its location, user name, whether a token is set ("token set" or "no token", never the token),
-   the controls to disable or enable it and to edit it, followed by the form that adds a repository. Access is
+   the controls to disable or enable it and to edit it; a "+ Add repository" button leads to the separate form page
+   at "/repositories/new". Access is
    limited to the Admin role by the attribute below. The token is write-only: it is typed into a password field,
    sent once and never shown again; an edit keeps, replaces or clears the stored token. A repository is never
    deleted, only disabled. Every interactive element and every key value carries a stable kebab-case data-testid
@@ -20,28 +21,56 @@
 
 <SessionGate>
 <main class="page" data-testid="repositories-page" data-interactive="@InteractiveMarker">
-    <nav class="breadcrumb">
-        <a href="/" data-testid="home-link">ReviewCenter</a>
-    </nav>
+    <div class="page-heading">
+        <h1>Repositories</h1>
+        <a class="action" href="/repositories/new" data-testid="new-repository-button">+ Add repository</a>
+    </div>
+    <p class="page-lead">Git repositories that reviews can be created from. A repository can be disabled but not removed.</p>
 
-    <h1>Repositories</h1>
+    @if (MessageRepositoryId is null)
+    {
+        if (ErrorMessage is not null)
+        {
+            <p class="error" role="alert" data-testid="repositories-error">@ErrorMessage</p>
+        }
+        if (StatusMessage is not null)
+        {
+            <p class="notice" role="status" data-testid="repositories-status">@StatusMessage</p>
+        }
+    }
 
-    <section class="card">
-        <h2>All repositories</h2>
-        <ul class="item-list" data-testid="repositories-list">
+    @if (Repositories.Count == 0)
+    {
+        <p class="muted" data-testid="repositories-empty">No repositories are registered yet. Use + Add repository to register the first one.</p>
+    }
+    else
+    {
+        <ul class="row-list" data-testid="repositories-list">
             @foreach (var repository in Repositories)
             {
                 var repositoryId = repository.Id;
-                <li data-testid="repository-row-@repositoryId">
-                    <strong data-testid="repository-name-@repositoryId">@repository.Name</strong>
-                    <span class="muted" data-testid="repository-location-@repositoryId">@repository.Location</span>
-                    <span class="muted" data-testid="repository-username-@repositoryId">@(repository.Username ?? "no user name")</span>
-                    <span class="badge" data-testid="repository-token-state-@repositoryId">@(repository.HasToken ? "token set" : "no token")</span>
-                    <span class="badge" data-testid="repository-enabled-@repositoryId">@(repository.Enabled ? "Enabled" : "Disabled")</span>
-                    <button type="button" class="row-action" data-testid="repository-toggle-enabled-@repositoryId"
-                            @onclick="() => ToggleEnabledAsync(repository)">@(repository.Enabled ? "Disable" : "Enable")</button>
-                    <button type="button" class="row-action" data-testid="repository-edit-@repositoryId"
-                            @onclick="() => StartEdit(repository)">Edit</button>
+                <li class="row-card static-row" data-testid="repository-row-@repositoryId">
+                    <div class="row-main">
+                        <strong class="row-title" data-testid="repository-name-@repositoryId">@repository.Name</strong>
+                        <p class="muted mono" data-testid="repository-location-@repositoryId">@repository.Location</p>
+                        <p class="row-badges">
+                            <span class="badge @(repository.Enabled ? "approved" : null)" data-testid="repository-enabled-@repositoryId">@(repository.Enabled ? "Enabled" : "Disabled")</span>
+                            @if (repository.HasToken)
+                            {
+                                <span class="badge" data-testid="repository-token-state-@repositoryId">token set</span>
+                            }
+                            @if (repository.Username is not null)
+                            {
+                                <span class="badge" data-testid="repository-username-@repositoryId">user @repository.Username</span>
+                            }
+                        </p>
+                    </div>
+                    <div class="row-actions">
+                        <button type="button" class="outline small" data-testid="repository-toggle-enabled-@repositoryId"
+                                @onclick="() => ToggleEnabledAsync(repository)">@(repository.Enabled ? "Disable" : "Enable")</button>
+                        <button type="button" class="outline small" data-testid="repository-edit-@repositoryId"
+                                @onclick="() => StartEdit(repository)">Edit</button>
+                    </div>
                     @if (EditingId == repositoryId)
                     {
                         <form class="inline-form" data-testid="repository-edit-form-@repositoryId" @onsubmit="SaveEditAsync">
@@ -81,8 +110,10 @@
                                            data-testid="edit-repository-token-input" @bind="EditToken" @bind:event="oninput" />
                                 </div>
                             }
-                            <button type="submit" data-testid="edit-repository-save-button">Save</button>
-                            <button type="button" data-testid="edit-repository-cancel-button" @onclick="CancelEdit">Cancel</button>
+                            <div class="plan-actions">
+                                <button type="submit" data-testid="edit-repository-save-button">Save</button>
+                                <button type="button" class="outline" data-testid="edit-repository-cancel-button" @onclick="CancelEdit">Cancel</button>
+                            </div>
                         </form>
                     }
                     @if (MessageRepositoryId == repositoryId)
@@ -99,50 +130,6 @@
                 </li>
             }
         </ul>
-    </section>
-
-    <section class="card">
-        <h2>Add repository</h2>
-        @if (MessageRepositoryId is null)
-        {
-            if (ErrorMessage is not null)
-            {
-                <p class="error" role="alert" data-testid="repositories-error">@ErrorMessage</p>
-            }
-            if (StatusMessage is not null)
-            {
-                <p class="notice" role="status" data-testid="repositories-status">@StatusMessage</p>
-            }
-        }
-        <form data-testid="new-repository-form" @onsubmit="CreateRepositoryAsync">
-            <div class="field">
-                <label for="new-repository-name">Name</label>
-                <input id="new-repository-name" type="text" maxlength="@RepositoryService.MaxNameLength"
-                       autocomplete="off"
-                       data-testid="new-repository-name-input" @bind="NewName" @bind:event="oninput" />
-            </div>
-            <div class="field">
-                <label for="new-repository-location">Location</label>
-                <input id="new-repository-location" type="text" maxlength="@RepositoryService.MaxLocationLength"
-                       autocomplete="off"
-                       data-testid="new-repository-location-input" @bind="NewLocation" @bind:event="oninput" />
-                <p class="muted hint">An https:// or file:// URL, an http:// URL for localhost only, or an absolute path on the server. Do not put a password in the location.</p>
-            </div>
-            <div class="field">
-                <label for="new-repository-username">User name (private repositories only)</label>
-                <input id="new-repository-username" type="text" maxlength="@RepositoryService.MaxUsernameLength"
-                       autocomplete="off"
-                       data-testid="new-repository-username-input" @bind="NewUsername" @bind:event="oninput" />
-            </div>
-            <div class="field">
-                <label for="new-repository-token">Token (private repositories only)</label>
-                <input id="new-repository-token" type="password" autocomplete="new-password"
-                       maxlength="@RepositoryService.MaxTokenLength"
-                       data-testid="new-repository-token-input" @bind="NewToken" @bind:event="oninput" />
-                <p class="muted hint">The token is stored encrypted and can never be shown again; you can only replace or clear it.</p>
-            </div>
-            <button type="submit" data-testid="create-repository-button">Add repository</button>
-        </form>
-    </section>
+    }
 </main>
 </SessionGate>
