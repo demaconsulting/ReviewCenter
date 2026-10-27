@@ -129,7 +129,7 @@ no review-set id is requested. The answer is 200 with an empty list. This scenar
 `ApiEndpoints_GetEvidenceIndex_NoListableReview_ReturnsEmptyList`.
 
 **ApiEndpoints_GetEvidenceIndex_UnknownProject_Answers404Problem**: The index of a project that does not exist is
-requested. The answer is a 404 problem document. This scenario is tested by
+requested. The answer is a 404 problem document with `Cache-Control: no-store`. This scenario is tested by
 `ApiEndpoints_GetEvidenceIndex_UnknownProject_Answers404Problem`.
 
 **ApiEndpoints_GetEvidenceIndex_SchemeHostPathBaseAndId_BuildsAbsoluteUrl**: The attestation address is built for a

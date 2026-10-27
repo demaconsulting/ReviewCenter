@@ -526,9 +526,10 @@ public class ApiEndpointsTests
         // Act: read the index of a project that does not exist
         var response = await client.GetAsync("/api/projects/99/evidence/index.json", TestContext.Current.CancellationToken);
 
-        // Assert: not found as a problem document
+        // Assert: not found as a problem document that is not cached either
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
         Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
+        Assert.True(response.Headers.CacheControl?.NoStore);
     }
 
     /// <summary>

@@ -87,7 +87,8 @@ the absolute address of the attestation of the review that the entry stands for,
 scheme, the host (the `Host` header), and the path base of the request, so the address is the one the client used to
 reach
 the server; the scheme follows the forwarded protocol when the forwarded headers are enabled, and a reverse proxy must
-pass the `Host` header on. The answer has `Cache-Control: no-store`. An empty list is a normal answer.
+pass the `Host` header on. Every answer of the handler, including the 404 of an unknown project, has
+`Cache-Control: no-store`. An empty list is a normal answer.
 
 **ApiProblems.StatusOf**: Maps a rule to a status: the not-found rules (including a missing token) to 404; a duplicate
 review identifier, a disabled repository, and a changed record to 409; an unavailable git to 503, a git access failure

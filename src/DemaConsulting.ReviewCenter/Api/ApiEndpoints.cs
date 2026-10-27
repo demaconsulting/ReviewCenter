@@ -379,15 +379,15 @@ internal static class ApiEndpoints
         ProjectService projects,
         EvidenceIndexService index)
     {
+        // The index holds the addresses of signed documents behind a token: never cache any response of it in a
+        // shared cache, including the not-found problem
+        http.Response.Headers.CacheControl = "no-store";
         if (await projects.GetAsync(projectId, http.RequestAborted) is null)
         {
             return ApiProblems.NotFound("The project does not exist.");
         }
 
         var entries = await index.BuildAsync(projectId, http.RequestAborted);
-
-        // The index holds the addresses of signed documents behind a token: never cache it in a shared cache
-        http.Response.Headers.CacheControl = "no-store";
         return TypedResults.Ok(new EvidenceIndexDto(
             entries.Select(entry => new EvidenceEntryDto(
                 entry.Id,
