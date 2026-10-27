@@ -21,7 +21,9 @@ never shown, logged, or put into a message, and the password itself is never sto
 **UserRole**: a closed enumeration with the values `Reviewer` and `Admin`. It is stored by name, so adding a role
 never renumbers stored rows. Any signed-in user can work on projects and reviews; only `Admin` can manage users.
 
-**Actor**: an immutable record of `Username` and `DisplayName`: the signed-in person on whose behalf a service records
+**Actor**: an immutable record of `Username` and `DisplayName`, and the optional `ApiTokenId` (the display id of the
+personal access token that authenticated the call, null for a call from the web pages or the command line; `ViaApiToken`
+is true when it is set): the signed-in person on whose behalf a service records
 a comment or a checklist answer. `ThreadService` and `ChecklistService` accept an `Actor`, never free text, so the
 author of a record always comes from a signed-in user and cannot be supplied by a form field.
 

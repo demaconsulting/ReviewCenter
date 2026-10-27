@@ -15,8 +15,9 @@ explain how to use it (`HelpPage` includes the index, a page for each topic, and
 `ProjectPage`, `PlanPage`, `ReviewPage`, and `ChecklistPage`, the pages for projects, the planning of reviews from
 the review-sets of a repository, reviews, and review checklists, where `ProjectsPage` includes `NewProjectPage` and
 `ProjectPage` includes `NewReviewPage`, the pages that hold the creation forms;
-`LoginPage`, `AccountPage`, and `UsersPage`, the pages for signing in, changing one's own password and choosing the
-appearance, and managing users (`UsersPage` includes `NewUserPage`); `HistoryPage` and `AuditPage`, the pages that
+`LoginPage`, `AccountPage`, and `UsersPage`, the pages for signing in, changing one's own password, choosing the
+appearance and managing one's personal access tokens, and managing users (`UsersPage` includes `NewUserPage`);
+`HistoryPage` and `AuditPage`, the pages that
 show the history of a review and let an administrator
 verify the audit trail; and `RepositoriesPage`, the page where an administrator registers the git repositories that
 reviews can be created from (it includes `NewRepositoryPage`). The subsystem
@@ -80,14 +81,15 @@ pages for projects, planning, reviews, and review checklists.
   signed-in user: an anonymous request is redirected to the login page. List and detail pages use a wide container
   and form pages a narrow one.
 
-**Account route** (`GET /account`): The page where the signed-in user changes their own password and chooses the
-appearance.
+**Account route** (`GET /account`): The page where the signed-in user changes their own password, chooses the
+appearance, and manages their personal access tokens.
 
 - *Type*: HTTP `GET`, followed by a live Blazor connection for interactivity.
 - *Role*: Provider.
 - *Contract*: A form with the current password and the new password twice; it reports success or the reason of a
   rejection. An Appearance card offers System, Light, and Dark, which applies at once and is remembered by the
-  browser.
+  browser. An API tokens card creates a token from a name and a lifetime of 30, 90, or 365 days and shows its value once
+  with a copy button, lists the tokens with their state, and revokes one.
 - *Constraints*: Requires a signed-in user.
 
 **Users routes** (`GET /users`, `GET /users/new`): The pages where an administrator manages users.
@@ -196,7 +198,7 @@ presentation file and a code-behind file, interactive server rendering, and the 
 marker. They obtain `ProjectService`, `ReviewService`, and the other Core services they need (`ReviewPage`:
 `ThreadService`, `ChecklistService`, and `SigningService`; `ProjectPage`: also `SigningService`; `PlanPage`:
 `ProjectService`, `RepositoryService`, and `ReviewPlanner`; `ChecklistPage`:
-`ChecklistService`; `AccountPage` and `UsersPage`:
+`ChecklistService`; `AccountPage`: `UserService` and `PersonalAccessTokenService`; `UsersPage`:
 `UserService`; `HistoryPage` and `AuditPage`: `AuditService`, and `AuditPage` also the user store through
 `UserService`; `RepositoriesPage`: `RepositoryService` and `UserService`; each creation page the service of its
 parent page) from the service container and call them
@@ -342,6 +344,15 @@ subject and the start of
 its thumbprint), or the reason why the key cannot be used. The link is a plain anchor to the endpoint of the `Evidence`
 subsystem, built by `ReviewLinks.ForAttestation`; the document is made and signed there, never in the page. The Help
 topic `signed-attestation` explains what the signature proves and does not prove.
+
+#### Personal access tokens
+
+The tokens card of `AccountPage` only collects input and shows results; the rules (the name, the choices of lifetime,
+the limit of active tokens, and who may revoke) are in `PersonalAccessTokenService`. The value of a new token is held
+only in the state of the open page, shown once, and never listed again; the card says so, offers a copy button that uses
+a browser script of `App`, and falls back to a hint to copy it by hand. The list never has a value, only the display
+id. The Help topic `api-tokens` explains how to use a token and links back to the card; the card links to the topic. A
+token authenticates only the `Api` subsystem: the pages, including this one, accept the session cookie only.
 
 #### History and audit
 

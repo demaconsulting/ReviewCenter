@@ -185,3 +185,14 @@ sections:
           - ServerHost_CreateApplication_CertificateNotInStore_ThrowsClearError
           - ServerHost_CreateApplication_RequireTrustedKeyWithSelfSignedProvider_ThrowsClearError
           - ServerHost_CreateApplication_SelfSignedFolderIsAFile_ThrowsClearError
+
+      - id: ReviewCenter-ServerHost-ApiRegistration
+        title: >-
+          The ServerHost class shall register the personal access token service as one service for the server,
+          map the API routes under /api, serve the OpenAPI document without a token, and answer an address under /api
+          that does not exist with a JSON problem document instead of a page.
+        justification: |
+          The API can only be used when the server connects the routes and the token service to the pipeline, and a
+          script that mistypes an address must not receive the HTML of the not-found page.
+        tests:
+          - ServerHost_CreateApplication_ApiRoutes_AreMapped

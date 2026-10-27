@@ -5,15 +5,16 @@
 ### Overview
 
 The `Storage` subsystem keeps projects, reviews, review comment threads, review checklists, users, reviewer slots,
-signatures, and the hash-chained audit trail in a relational
+signatures, personal access tokens, and the hash-chained audit trail in a relational
 database through Entity
 Framework Core. It
 implements the store interfaces of the `Core` subsystem and owns everything about the database: the schema, the
-choice of provider, the location of the data, and the creation of the database. It contains six units:
+choice of provider, the location of the data, and the creation of the database. It contains seven units:
 `ReviewCenterDbContext`, the mapping of the domain types to tables; `ReviewStore`, the implementation of the
 review store interface; `UserStore`, the implementation of the user store interface; `AuditStore`, the implementation
 of the audit store interface together with the `AuditAppender` that serializes and chains the entries;
-`RepositoryStore`, the implementation of the repository store interface; and `DatabaseSetup`, the
+`RepositoryStore`, the implementation of the repository store interface; `PersonalAccessTokenStore`, the implementation
+of the personal access token store interface; and `DatabaseSetup`, the
 provider selection, connection string resolution, and database
 creation, together with its options type `DatabaseOptions`. The types of the subsystem are internal to the
 application; the rest of the system sees only the Core store interfaces.
@@ -52,6 +53,16 @@ application; the rest of the system sees only the Core store interfaces.
   `DomainRuleException` for `UserNameTaken`. A new user, and an update that carries an audit draft, are stored together
   with their audit entry in one transaction.
 - *Constraints*: Every operation uses its own short-lived database context, so it is safe for concurrent use.
+
+**PersonalAccessTokenStore (as IPersonalAccessTokenStore)**: The persistence operations for personal access tokens.
+
+- *Type*: In-process .NET class implementing the Core interface.
+- *Role*: Provider.
+- *Contract*: Stores a token, lists the tokens of a user newest first, finds a token with its owner by the hash of its
+  value, revokes a token of a user, and records the moment of a use. A token is stored together with its audit entry,
+  and so is a revocation; a revocation of an unknown or already revoked token stores nothing, and a use is not audited.
+- *Constraints*: Every operation uses its own short-lived database context, so it is safe for concurrent use. The store
+  holds and returns only the hash of a token value; the value itself never reaches it.
 
 **AuditStore (as IAuditStore)**: The persistence operations for the audit trail.
 
@@ -108,16 +119,17 @@ with migrations. This is adequate while there is no released schema to upgrade: 
 tables, and an existing database is left alone. The cost is that a database created by an earlier version is
 never altered, so a change of the schema needs a migration strategy before the first release that must keep
 data. This is a known limitation, recorded as an open decision in `architecture.md` and not yet resolved. It
-already matters seven times: the tables for comment threads were added after the first schema, the tables for review
+already matters eight times: the tables for comment threads were added after the first schema, the tables for review
 checklists after those, the users table and the user name columns of comments, answers, and section decisions
 after those, the tables of reviewer slots and signatures after those, the audit table after those, the
-`Repositories` table after that, and the source and change columns of reviews from a repository after that, so a database
+`Repositories` table after that, the source and change columns of reviews from a repository after that, and the
+`PersonalAccessTokens` table with the creator columns of reviews after that, so a database
 created before them does not
 have them and the pages fail until the
 database file is deleted (or a new one is
 named) and created again. Databases created before the identity slice must be deleted and recreated, and so must
-databases created before the signature slice, before the audit trail, before the repository registry, and before
-reviews from a repository; there is no
+databases created before the signature slice, before the audit trail, before the repository registry, before
+reviews from a repository, and before the personal access tokens; there is no
 migration of their data, and no data of a released version is
 affected. A
 second limitation is that two processes starting at the same moment on a brand-new database file can collide
@@ -136,6 +148,13 @@ only as the encrypted text produced by `ICredentialProtector`; the store never s
 that leaves the store has a flag (`HasToken`) instead of a member for the text. Name uniqueness is enforced by a
 unique index with the case-insensitive collation of SQLite, and a violation is translated to `RepositoryNameTaken`;
 like the other stores, the translation is SQLite specific. Repositories are never deleted.
+
+**Personal access tokens**: The `PersonalAccessTokens` table holds the tokens of the users. Only the lowercase
+hexadecimal SHA-256 hash of a token value is stored, with a unique index that serves the lookup of every request to the
+API; the value is never stored. A token has a separate, random display id for the list of the Account page, so no part of
+the value is stored. The use of a token is recorded with a single-column update that is not audited, because it happens
+on every request and the audit trail records only changes that matter. The `Reviews` table gains the creator columns
+(`CreatedBy` and `CreatedViaApi`).
 
 **Context lifetime and concurrency**: Blazor Server connections are long-lived and concurrent, and a database
 context is not thread-safe. The store therefore obtains a new context from a context factory for every

@@ -84,6 +84,11 @@ loopback TCP ports.
   rewrite by someone with write access to the database, unless the head hash was recorded elsewhere.
 - A database setting that cannot be used stops the server with an error and a non-zero exit code.
 - Every interactive element of the home page carries a `data-testid`, and the same holds for every other page.
+- A user creates a personal access token, sees its value once, and revokes it; a script that sends the token calls the
+  API as that user until the token is revoked or expires, and a refused token is recorded in the audit trail without its
+  value.
+- The API lists the projects and reviews, creates a review draft flagged as created through the API, and downloads the
+  attestation of a signed review; a token never signs, never changes a reviewer slot, and never opens a web page.
 
 ## Test Scenarios
 
@@ -300,6 +305,20 @@ complete is not offered and is refused. These scenarios are tested by
 `EvidenceSubsystem_ReviewNotComplete_IsNotOfferedAndRefused`. The system requirement is also traced to the HTTP test of
 the endpoint, `AttestationEndpoint_Get_CompleteReview_ReturnsSignedPdfDownloadAndRecordsEvent`. The Puppet end-to-end
 test was not extended for this slice (see the verification of the `Evidence` subsystem).
+
+**Personal access tokens**: A user creates a token, a script uses it to call the API, and after the token is revoked the
+same request is refused with 401. This
+scenario is tested by `ApiSubsystem_TokenJourney_CreateUseRevoke_WorksEndToEnd`. The rules of the tokens (the hash, the
+expiry, the limit, and the revocation) are verified in the `Core` subsystem, the table in the `Storage` subsystem, and
+the card on the account page in the `Web` subsystem.
+
+**API under /api**: With a token, a script creates a draft review from files, reads it back (it is flagged as created
+through the API and is not approved), finds that the attestation of a draft is refused with 409, and downloads the
+attestation PDF of a complete review. This scenario is tested by
+`ApiSubsystem_ReviewJourney_CreateDraftReadAndDownloadAttestation_WorksEndToEnd`. A token cannot sign or change a
+reviewer slot, and cannot open a web page; this is tested by
+`ApiSubsystem_TokenPrincipal_SigningAndWebPages_AreNotReachable`. The Puppet end-to-end test was not extended, because
+the API has no page (see the verification of the `Api` subsystem).
 
 **Persistence across restart**: A project is stored, the server is stopped and started again on the same
 database file, and a signed-in user sees the project on the projects page. This scenario is tested by

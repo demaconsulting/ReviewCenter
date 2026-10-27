@@ -199,3 +199,16 @@ sections:
           - ServerHost_CreateApplication_CertificateNotInStore_ThrowsClearError
           - ServerHost_CreateApplication_RequireTrustedKeyWithSelfSignedProvider_ThrowsClearError
           - ServerHost_CreateApplication_SelfSignedFolderIsAFile_ThrowsClearError
+
+      - id: ReviewCenter-Hosting-ApiServices
+        title: >-
+          The Hosting subsystem shall make the API available to clients, registering the personal access token
+          service and mapping the API routes and the OpenAPI document under /api, so that an address under /api that
+          does not exist is answered with a JSON problem document.
+        justification: |
+          The API can only be used when the server connects the Api subsystem to the services it reads, and keeping
+          the prefix to the API keeps a script from receiving a web page.
+        children:
+          - ReviewCenter-ServerHost-ApiRegistration
+        tests:
+          - ServerHost_CreateApplication_ApiRoutes_AreMapped

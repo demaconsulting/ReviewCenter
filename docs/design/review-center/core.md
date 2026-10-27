@@ -11,7 +11,7 @@ that protect them, the content fingerprint that identifies a review's files and 
 hash-chained audit trail of everything that happens. It
 is
 deliberately free of web and database technology so that the rules can be reviewed and tested on their own. It
-contains fifteen units: `Fingerprint`, the content fingerprint algorithm; `RecordDigest`, the digest of a review
+It contains sixteen units: `Fingerprint`, the content fingerprint algorithm; `RecordDigest`, the digest of a review
 record that a signature binds to; `AuditChain`, the audit entry types, their hash, and the verifier of the chain;
 `AuditService`, the recording, reading, and verification of the audit trail; `ProjectService`, the rules
 for projects; `ReviewService`, the rules for reviews; `ThreadService`, the rules for review comments;
@@ -20,7 +20,8 @@ rules for reviewer slots and signatures; `RepositoryService`, the registry of gi
 created from, with their credentials; `SelectionMatcher`, the file pattern language that selects the files of a
 repository; `RevisionValidator`, the check that a revision name cannot be taken for an option or an expression;
 `LineDiff`, the comparison of the lines of two versions of a file and its division into shown and collapsed regions;
-and `ReviewPlanner`, the planning of the reviews that a head revision needs from the review-sets of the repository. The
+`ReviewPlanner`, the planning of the reviews that a head revision needs from the review-sets of the repository; and
+`PersonalAccessTokenService`, the rules for the personal access tokens that let a script use the API as its owner. The
 domain types (`Project`, `Review`, `ReviewFile`, `ReviewState`, `UploadedFile`, `ReviewThread`, `ThreadSide`,
 `ReviewComment`,
 `ReviewThreadState`, the checklist types, `User`, `UserRole`, `Actor`, the signing types `ReviewerSlot`,
@@ -30,18 +31,21 @@ and `AuditVerificationResult`, and the repository types `SourceRepository`, `Rep
 `ChangeKind`, `SkippedEntry`, and `GitChangeSet`, and the review-source types `ReviewSource`, `ChangedFile`, and
 `RepositoryReviewResult`, and the diff types `FileDiff`, `FileDiffStatus`, `DiffLine`, `DiffLineKind`,
 `LineDiffResult`, `DiffSegment`, and `DiffRow`, and the planning types `BaselineMode`, `PlanRowStatus`, `PlanRow`, `ReviewPlan`,
-`PlanCreateRequest`, `PlanCreateOutcome`, `PlanCreateResult`, and `ReviewSetDefinition`), the text and line definition
+`PlanCreateRequest`, `PlanCreateOutcome`, `PlanCreateResult`, and `ReviewSetDefinition`), the personal access token
+types (`PersonalAccessToken`, `CreatedPersonalAccessToken`, `TokenFailure`, `TokenValidation`), the text and line
+definition
 (`FileText`), the limits
 (`ReviewLimits`), the rule failure type
 (`DomainRuleException` with the `DomainRule` enumeration), and the interfaces (`IReviewStore`, `IUserStore`,
-`IAuditStore`, `IRepositoryStore`, `ICredentialProtector`, `IGitRepositoryProvider`, `IGitRepository`,
+`IAuditStore`, `IRepositoryStore`, `IPersonalAccessTokenStore`, `ICredentialProtector`, `IGitRepositoryProvider`, `IGitRepository`,
 `IReviewSetParser`, and `IPasswordHasher`) are
 supporting types, documented with the unit that owns them.
 
 ### Interfaces
 
-**ProjectService, ReviewService, ThreadService, ChecklistService, UserService, and SigningService**: The operations
-used by the `Web` and `Identity` subsystems and by the `Hosting` subsystem.
+**ProjectService, ReviewService, ThreadService, ChecklistService, UserService, SigningService, and
+PersonalAccessTokenService**: The operations
+used by the `Web`, `Identity`, and `Api` subsystems and by the `Hosting` subsystem.
 
 - *Type*: In-process .NET classes.
 - *Role*: Provider.
@@ -61,7 +65,8 @@ used by the `Web` and `Identity` subsystems and by the `Hosting` subsystem.
   approval status of a review (its slots, blockers, record digest, and next step), and list the users that can be
   chosen for a slot. `RecordDigest` calculates the digest of a record. Every operation that changes data takes
   the `Actor` and records the change in the audit trail; `AuditService` lists the trail newest first in pages
-  and verifies its hash chain.
+  and verifies its hash chain. Create a personal access token for the actor (the value is returned once), list the
+  tokens of the actor, revoke one, and authenticate a presented token value into a token and its owner.
   Posted comments are
   immutable: there is no operation to edit or delete one. Rule violations are reported as a
   `DomainRuleException` that carries a `DomainRule` value and a message suitable for display to the user.
@@ -95,6 +100,16 @@ used by the `Web` and `Identity` subsystems and by the `Hosting` subsystem.
   state of a user. Adding a user, and an update that carries a draft, append that audit entry in the same transaction.
 - *Constraints*: An attempt to add a user whose name exists fails with a `DomainRuleException` for `UserNameTaken`.
   Every read returns a new object.
+
+**IPersonalAccessTokenStore**: The store interface the subsystem requires for personal access tokens.
+
+- *Type*: In-process .NET interface.
+- *Role*: Consumer (implemented by `PersonalAccessTokenStore` in the `Storage` subsystem).
+- *Contract*: Add a token with its audit entry; list the tokens of a user newest first; find a token, with its owner, by
+  the hash of its value; revoke a token of a user with its audit entry; and record the moment a token was used.
+- *Constraints*: The store only persists and finds; the rules are in `PersonalAccessTokenService`. Revoking a token that
+  the user does not own, or that is already revoked, returns nothing and changes nothing. Recording a use changes only
+  the last-used moment and writes no audit entry. Every read returns a new object.
 
 **IAuditStore**: The store interface the subsystem requires for the audit trail.
 
@@ -258,7 +273,7 @@ message and keep the entered values, and there is a single, easily tested path f
 | `SlotNotFound` | A slot change or signature names a slot that is not part of the review |
 | `SlotUserInvalid` | A reviewer is not an enabled user, primary and alternate are the same, or a user is in two slots |
 | `SlotSigned` | A slot that has any signature is changed or removed |
-| `ActorNotAllowed` | The acting user is gone or disabled, or signs a slot of which they are not a reviewer |
+| `ActorNotAllowed` | The user is gone or disabled, is not in the slot, or uses an API token to sign or change |
 | `SigningNotAllowed` | The slot is already signed for this record, or a blocker remains (checks, failures, threads) |
 | `ReauthenticationFailed` | The password given with a signature is wrong, or the user is locked out |
 | `RecordChanged` | The record changed after the signer saw it, so the digest differs |
@@ -276,6 +291,9 @@ message and keep the entered values, and there is a single, easily tested path f
 | `GitAccessFailed` | Git cannot read the repository (denied, missing, over a size limit, or another failure) |
 | `GitTimeout` | A git operation did not finish within the configured time and was stopped |
 | `CredentialsUnreadable` | A stored token cannot be decrypted, for example after the key ring changed |
+| `TokenNameInvalid` | The name of a personal access token is empty, too long, or has control characters |
+| `TokenExpiryInvalid` | The lifetime of a personal access token is not one of the choices of 30, 90, or 365 days |
+| `TokenLimitReached` | The user already has 20 active personal access tokens |
 
 The checklist of a review is the copy of the default checklist that the review received when it was created, so
 changing the default never changes an existing review (see `ChecklistService`). The name saved with an answer or
@@ -310,3 +328,11 @@ says only whether a token is set or was replaced or cleared. The reading of the 
 `IGitRepositoryProvider` contract, implemented in the `ContentSources` subsystem, so the rules stay free of processes
 and of the file system. Repositories are never deleted, only disabled, so the name of a repository that reviews were
 created from stays meaningful.
+
+Personal access tokens are a fifth kind of record, owned by a user rather than by a review. The value of a token is
+secret, so `PersonalAccessTokenService` returns it once, when the token is created, and keeps only its SHA-256 hash; a
+presented value is hashed and looked up, never compared with a stored value. A token acts as its owner, and the `Actor`
+that the `Api` subsystem builds from it carries the identity of the token. The services that must not accept a token
+refuse it themselves: `SigningService` rejects an actor that carries a token for every signature and slot operation, so
+the rule "a token can never sign" does not depend on which routes exist. `ReviewService` records that a review was
+created by a token. See the `PersonalAccessTokenService` unit.

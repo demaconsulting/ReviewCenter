@@ -13,7 +13,9 @@ package ReviewCenter {
      * Administrators register git repositories, with access tokens that are stored
      * encrypted, as the sources of review content. A complete review can be
      * downloaded as a digitally signed PDF attestation, signed with a key of the
-     * server.
+     * server. Users create personal access tokens, with which scripts call a JSON
+     * API under /api, described by an OpenAPI document, to read projects and
+     * reviews, create draft reviews, and download attestations; a token never signs.
      */
 
     part def ReviewCenterSystem {
@@ -35,5 +37,6 @@ package ReviewCenter {
         part storage : StorageSubsystem;
         part contentSources : ContentSourcesSubsystem;
         part evidence : EvidenceSubsystem;
+        part api : ApiSubsystem;
     }
 }

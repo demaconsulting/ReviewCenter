@@ -3,10 +3,12 @@
 #### Verification Approach
 
 `AccountPage` is verified with component tests defined in `AccountPageTests.cs`, which use the bUnit test context to
-render the real component over a real `UserService` with an in-memory fake store and a trivial password hasher, and
-drive its form. The signed-in user of the tests is `ann`, set by the test authentication state of the shared helper
+render the real component over a real `UserService` and a real `PersonalAccessTokenService` with in-memory fake stores
+and a trivial password hasher, a clock that the test can move (for the expiry of a token), and drive its forms. The
+signed-in user of the tests is `ann`, set by the test authentication state of the shared helper
 `PageTestBase`. The browser script runtime is the bUnit `JSInterop` in loose mode, so the calls to
-`reviewCenter.getTheme` and `reviewCenter.setTheme` are recorded or scripted instead of run; the application of the
+`reviewCenter.getTheme`, `reviewCenter.setTheme`, and `reviewCenter.copyText` are recorded or scripted instead of
+run; the application of the
 stored appearance before the first paint is verified by the `App` unit. Tests locate elements by their `data-testid`
 attributes. The real database is covered by the `Storage` subsystem and the sign-in by the `Identity` subsystem.
 
@@ -23,6 +25,11 @@ N/A - standard test environment.
 - A valid change changes the password of the signed-in user, shows a confirmation, and empties the fields.
 - A wrong current password, new passwords that do not match, and a new password that breaks the policy are each shown
   as an error and change nothing.
+- The page shows a card of personal access tokens with the name field, the choices of 30, 90 (selected), and 365 days,
+  the list (or a note that it is empty), and a link to the help topic; creating a token shows its value once with a copy
+  button and lists the token without the value; an empty name and the twenty-first active token are each shown as an
+  error and create nothing; the copy button hands the value to the browser and shows a hint when the browser refuses; and
+  an active token is revoked from the list while an expired one has no revoke button.
 
 #### Test Scenarios
 
@@ -50,3 +57,38 @@ shows three radio options, and System is selected while Light and Dark are not. 
 
 **AccountPage_Render_StoredLightChoice_IsSelected**: The browser reports a stored Light choice; after the page is
 rendered Light is selected. This scenario is tested by `AccountPage_Render_StoredLightChoice_IsSelected`.
+
+**AccountPage_Render_TokensCard_ShowsFormEmptyListAndHelpLink**: The page is rendered for a user without tokens. The
+card, the name input, the create button, and the three expiry choices are present, with 90 days selected; the empty-list
+note is shown, no value box is shown, and the only link in the card is the help topic `/help/api-tokens`, styled as a
+button. This scenario is tested by `AccountPage_Render_TokensCard_ShowsFormEmptyListAndHelpLink`.
+
+**AccountPage_CreateToken_ValidInput_ShowsValueOnceAndListsToken**: A name is typed, 30 days is chosen, and the form is
+submitted. The value box shows a value that starts with `rcpat_`, the confirmation "The token was created." is shown,
+and the name field is empty. The list has the token with its name, display id, state Active, the expiry 30 days later,
+and "never" as last use, and the value is not in the list. Dismissing the box removes the value from the page for good.
+This scenario is tested by `AccountPage_CreateToken_ValidInput_ShowsValueOnceAndListsToken`.
+
+**AccountPage_CreateToken_EmptyName_ShowsErrorAndCreatesNothing**: The form is submitted with an empty name; an error is
+shown, no value box is shown, and the store holds no token. This scenario is tested by
+`AccountPage_CreateToken_EmptyName_ShowsErrorAndCreatesNothing`.
+
+**AccountPage_CreateToken_TwentyActive_ShowsLimitError**: The user has twenty active tokens and submits another; the
+error names the limit of 20, no value box is shown, and the store still holds twenty tokens. This scenario is tested by
+`AccountPage_CreateToken_TwentyActive_ShowsLimitError`.
+
+**AccountPage_CopyToken_NewToken_CopiesThroughBrowserScript**: The browser script `reviewCenter.copyText` reports success;
+after a token is created and the copy button is pressed, the script received exactly the value and the page shows
+"Copied.". This scenario is tested by `AccountPage_CopyToken_NewToken_CopiesThroughBrowserScript`.
+
+**AccountPage_CopyToken_BrowserRefuses_ShowsHintAndKeepsToken**: The script reports that the copy failed; the page shows
+the hint to copy the value by hand and the value stays on the page. This scenario is tested by
+`AccountPage_CopyToken_BrowserRefuses_ShowsHintAndKeepsToken`.
+
+**AccountPage_RevokeToken_ActiveToken_MarksRevokedAndRemovesButton**: The user has two tokens and revokes the first; the
+first shows Revoked and has no revoke button, the second stays Active with its button, and the confirmation "The token
+was revoked." is shown. This scenario is tested by `AccountPage_RevokeToken_ActiveToken_MarksRevokedAndRemovesButton`.
+
+**AccountPage_Render_ExpiredToken_ShowsExpiredWithoutRevokeButton**: A 30-day token is created and the clock is moved
+31 days; the page shows the token as Expired without a revoke button. This scenario is tested by
+`AccountPage_Render_ExpiredToken_ShowsExpiredWithoutRevokeButton`.

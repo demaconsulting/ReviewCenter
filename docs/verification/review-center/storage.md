@@ -3,11 +3,12 @@
 ### Verification Approach
 
 The `Storage` subsystem is verified by subsystem tests defined in `StorageSubsystemTests.cs`. The tests build the
-real `DatabaseSetup`, `ReviewCenterDbContext`, `ReviewStore`, `UserStore`, and `RepositoryStore` over a real SQLite
+real `DatabaseSetup`, `ReviewCenterDbContext`, `ReviewStore`, `UserStore`, `RepositoryStore`, and
+`PersonalAccessTokenStore` over a real SQLite
 database file, and
 run the real
-`ProjectService`, `ReviewService`, `ThreadService`, `ChecklistService`, `UserService`, `SigningService`, and
-`RepositoryService` of the `Core`
+`ProjectService`, `ReviewService`, `ThreadService`, `ChecklistService`, `UserService`, `SigningService`,
+`RepositoryService`, and `PersonalAccessTokenService` of the `Core`
 subsystem over
 them, so that
 the subsystem is
@@ -43,6 +44,10 @@ The native SQLite library must be loadable on the test platform (it is supplied 
 - A registered repository with its token flag and its disabled state, written through the service, is still present after
   the database is closed and opened again, and a disabled repository is not offered for selection.
 - An unsupported provider is refused with an error that names it, and no database is created.
+- Personal access tokens written through the service, with one of them revoked, are still present after the database is
+  closed and opened again: the value of the kept token still authenticates its owner, the revoked token is refused,
+  and no
+  row holds a token value.
 - A review from a repository, with its source and the change kind and baseline content of each file, is stored and
   read back without file bytes in the review, and its baseline content is read on request; the scenario is verified
   by the unit tests of `ReviewStore` on the real database (`ReviewStore_GetReviewAsync_RepositoryReview_ReturnsSourceAndKindsWithoutBytes`
@@ -87,6 +92,11 @@ repository with a user name and a token is registered through `RepositoryService
 closed and opened again. The repository is listed with its name, user name, the token flag set, and the disabled
 state, and no repository is offered for selection. This scenario is tested by
 `StorageSubsystem_Repositories_PersistAcrossReopen`.
+
+**StorageSubsystem_AccessTokens_PersistAcrossReopen**: A user and two tokens are created through the services over a new
+database and one token is revoked; the database is closed and opened again. The kept token still authenticates its owner,
+the revoked token is refused, both are listed, the revoked one with its revocation time, and no row holds a token value.
+This scenario is tested by `StorageSubsystem_AccessTokens_PersistAcrossReopen`.
 
 **StorageSubsystem_UnsupportedProvider_Opening_FailsWithClearErrorAndCreatesNothing**: A database is opened with
 the provider name `Oracle` and a new file path; an `InvalidOperationException` that names the provider is thrown

@@ -228,9 +228,15 @@ It is a minimal helper and is kept as small and simple as possible; see
     ReviewMark (basic credentials via env vars). PATs act as their user, are hashed at rest, expire and are
     revocable, and can never sign. Reviews created through the API start as Draft until a human assigns slots and
     opens them in the UI. Reason: automation can start a review, but only people can take part in it.
+    Implementation note (slice 9a): a token is sent as a bearer token and is accepted only on `/api`; a token never
+    opens a page and the cookie is ignored on `/api`. "Can never sign" is enforced in `SigningService` (which also
+    refuses a token for reviewer slots), not only in the routes. A token is looked up by its SHA-256 hash, and its
+    separate, random display id is only a label for the lists and the audit trail.
 16. **Unversioned API**: the API is unversioned. It is protected by a committed OpenAPI snapshot (CI fails on
     unintended diffs) and by ReviewMark contract tests (index.json schema, fingerprint vectors). Reason: there is a
-    single known consumer, and the snapshot and contract tests make breaking changes visible.
+    single known consumer, and the snapshot and contract tests make breaking changes visible. Implementation note
+    (slice 9a): the snapshot is `docs/api/openapi.json`, compared with the generated document by a test; the ReviewMark
+    contract tests come with the `index.json` endpoint.
 17. **Evidence is a web report for now**: the review record is a web report view. Reason: it delivers usable evidence
     sooner than a PDF pipeline. Details:
     - **Report**: evidence is a web report view for now.
@@ -264,7 +270,7 @@ It is a minimal helper and is kept as small and simple as possible; see
 
 ## Implementation Status
 
-The architecture above is the target design. Only the first two slices are implemented so far:
+The architecture above is the target design. Only the first slices are implemented so far:
 
 - **Implemented, slice 1 (platform)**: Hosting (the ASP.NET Core server host and its logging), Web (the Blazor Server
   home page with a health endpoint), the command-line interface (`serve`, `--urls`, and the template options), and
@@ -321,10 +327,21 @@ The architecture above is the target design. Only the first two slices are imple
   makes a signed PDF of an Approved review at `/projects/{id}/reviews/{reviewId}/attestation.pdf`, signed with a
   self-signed key (development and test) or a certificate from a certificate store, and records `attestation.generated`.
   Azure Key Vault and an RFC 3161 time stamp authority are planned, not implemented.
-- **Planned and deferred**: Api, Messaging, the review lifecycle beyond `Draft`, and the rest of Core and
+- **Implemented, slice 9a (personal access tokens and /api)**: any signed-in user creates, lists and revokes personal
+  access tokens on the account page (a name, 30, 90 or 365 days, at most 20 active tokens, the value shown once, only its
+  hash stored; the Core `PersonalAccessTokenService` and the Storage `PersonalAccessTokenStore`). The new Api subsystem
+  (`ApiTokenAuthentication`, `ApiEndpoints`, `ApiDocument`) serves a JSON API under `/api` that accepts a token and
+  nothing else: it lists projects and reviews, reads a review, creates a Draft review from files or from the changes
+  of a registered repository (flagged on the review as created through the API, with its creator), and downloads the
+  attestation of a complete review. The OpenAPI document is served at `/api/openapi.json` and a committed snapshot
+  (`docs/api/openapi.json`) is compared with it in a test. A token never signs and never opens a page; the former is
+  enforced in the Core `SigningService`, not only in the routes. The `index.json` evidence endpoint for ReviewMark is a
+  later slice. Development databases created before this slice must be recreated (no migrations).
+- **Planned and deferred**: Messaging, the `index.json` evidence endpoint of the Api, the review lifecycle beyond
+  `Draft`, and the rest of Core and
   Storage. They have no code, requirements,
-  design documents, or verification documents yet, so the SysML2 model and the design documentation describe the
-  implemented items only and are deliberately partial.
+  design documents, or verification documents yet (the Api subsystem is implemented, apart from that endpoint), so the
+  SysML2 model and the design documentation describe the implemented items only and are deliberately partial.
 - **Pipeline**: the CI/release pipeline builds net10.0 only and publishes the self-contained win-x64 and linux-x64
   executables (see decision 21). The Core assembly is bundled into the single-file executable; the native SQLite
   library (`e_sqlite3.dll` or `libe_sqlite3.so`) stays a separate file beside the executable, next to the web assets,

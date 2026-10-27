@@ -15,6 +15,7 @@ needs-review:
   - "docs/verification/**/*.md"   # Verification documentation files
   - "docs/user_guide/**/*.md"     # User guide documentation
   - "docs/sysml2/**/*.sysml"      # SysML2 architecture model
+  - "docs/api/**/*.json"          # API contract snapshot
   - "!**/obj/**"                  # Exclude build output
   - "!**/bin/**"                  # Exclude build output
   - "!node_modules/**"            # Exclude npm dependencies
@@ -863,6 +864,24 @@ reviews:
       - "src/DemaConsulting.ReviewCenter.Core/IRepositoryStore.cs"
       - "test/**/Core/RepositoryServiceTests.cs"
 
+  - id: ReviewCenter-Core-PersonalAccessTokenService
+    title: Review of ReviewCenter PersonalAccessTokenService unit implementation
+    context:
+      - docs/design/review-center.md
+      - docs/reqstream/review-center.yaml
+      - docs/design/review-center/core.md
+      - docs/reqstream/review-center/core.yaml
+    paths:
+      - "docs/reqstream/review-center/core/personal-access-token-service.yaml"
+      - "docs/design/review-center/core/personal-access-token-service.md"
+      - "docs/verification/review-center/core/personal-access-token-service.md"
+      - "docs/sysml2/model/review-center/core/personal-access-token-service.sysml"
+      - "src/DemaConsulting.ReviewCenter.Core/PersonalAccessTokenService.cs"
+      - "src/DemaConsulting.ReviewCenter.Core/PersonalAccessToken.cs"
+      - "src/DemaConsulting.ReviewCenter.Core/IPersonalAccessTokenStore.cs"
+      - "test/**/Core/PersonalAccessTokenServiceTests.cs"
+      - "test/**/Core/FakePersonalAccessTokenStore.cs"
+
   # ReviewCenter - Storage
   - id: ReviewCenter-Storage
     title: Review of ReviewCenter Storage subsystem architecture and interfaces
@@ -964,6 +983,21 @@ reviews:
       - "src/**/Storage/RepositoryStore.cs"
       - "src/**/Storage/RepositoryRecord.cs"
       - "test/**/Storage/RepositoryStoreTests.cs"
+
+  - id: ReviewCenter-Storage-PersonalAccessTokenStore
+    title: Review of ReviewCenter PersonalAccessTokenStore unit implementation
+    context:
+      - docs/design/review-center.md
+      - docs/reqstream/review-center.yaml
+      - docs/design/review-center/storage.md
+      - docs/reqstream/review-center/storage.yaml
+    paths:
+      - "docs/reqstream/review-center/storage/personal-access-token-store.yaml"
+      - "docs/design/review-center/storage/personal-access-token-store.md"
+      - "docs/verification/review-center/storage/personal-access-token-store.md"
+      - "docs/sysml2/model/review-center/storage/personal-access-token-store.sysml"
+      - "src/**/Storage/PersonalAccessTokenStore.cs"
+      - "test/**/Storage/PersonalAccessTokenStoreTests.cs"
 
   # ReviewCenter - ContentSources
   - id: ReviewCenter-ContentSources
@@ -1166,6 +1200,68 @@ reviews:
       - "src/**/Evidence/AttestationEndpoint.cs"
       - "test/**/Evidence/AttestationEndpointTests.cs"
 
+  # ReviewCenter - Api
+  - id: ReviewCenter-Api
+    title: Review of ReviewCenter Api subsystem architecture and interfaces
+    context:
+      - docs/design/review-center.md
+      - docs/reqstream/review-center.yaml
+    paths:
+      - "docs/reqstream/review-center/api.yaml"
+      - "docs/design/review-center/api.md"
+      - "docs/verification/review-center/api.md"
+      - "docs/sysml2/model/review-center/api.sysml"
+      - "test/**/Api/ApiSubsystemTests.cs"
+      - "test/**/Api/ApiTestSupport.cs"
+
+  - id: ReviewCenter-Api-ApiTokenAuthentication
+    title: Review of ReviewCenter ApiTokenAuthentication unit implementation
+    context:
+      - docs/design/review-center.md
+      - docs/reqstream/review-center.yaml
+      - docs/design/review-center/api.md
+      - docs/reqstream/review-center/api.yaml
+    paths:
+      - "docs/reqstream/review-center/api/api-token-authentication.yaml"
+      - "docs/design/review-center/api/api-token-authentication.md"
+      - "docs/verification/review-center/api/api-token-authentication.md"
+      - "docs/sysml2/model/review-center/api/api-token-authentication.sysml"
+      - "src/**/Api/ApiTokenAuthentication.cs"
+      - "test/**/Api/ApiTokenAuthenticationTests.cs"
+
+  - id: ReviewCenter-Api-ApiEndpoints
+    title: Review of ReviewCenter ApiEndpoints unit implementation
+    context:
+      - docs/design/review-center.md
+      - docs/reqstream/review-center.yaml
+      - docs/design/review-center/api.md
+      - docs/reqstream/review-center/api.yaml
+    paths:
+      - "docs/reqstream/review-center/api/api-endpoints.yaml"
+      - "docs/design/review-center/api/api-endpoints.md"
+      - "docs/verification/review-center/api/api-endpoints.md"
+      - "docs/sysml2/model/review-center/api/api-endpoints.sysml"
+      - "src/**/Api/ApiEndpoints.cs"
+      - "src/**/Api/ApiModels.cs"
+      - "src/**/Api/ApiProblems.cs"
+      - "test/**/Api/ApiEndpointsTests.cs"
+
+  - id: ReviewCenter-Api-ApiDocument
+    title: Review of ReviewCenter ApiDocument unit implementation
+    context:
+      - docs/design/review-center.md
+      - docs/reqstream/review-center.yaml
+      - docs/design/review-center/api.md
+      - docs/reqstream/review-center/api.yaml
+    paths:
+      - "docs/reqstream/review-center/api/api-document.yaml"
+      - "docs/design/review-center/api/api-document.md"
+      - "docs/verification/review-center/api/api-document.md"
+      - "docs/sysml2/model/review-center/api/api-document.sysml"
+      - "docs/api/openapi.json"
+      - "src/**/Api/ApiDocument.cs"
+      - "test/**/Api/ApiDocumentTests.cs"
+
   # ReviewCenterPuppet - Specials (separate software system, development tool)
   - id: ReviewCenterPuppet-Architecture
     title: Review of ReviewCenterPuppet system architecture and end-to-end operation
@@ -1318,6 +1414,13 @@ reviews:
       - "docs/reqstream/ots/git.yaml"
       - "docs/design/ots/git.md"
       - "docs/verification/ots/git.md"
+
+  - id: OTS-OpenApi
+    title: Review of Microsoft.AspNetCore.OpenApi OTS verification evidence
+    paths:
+      - "docs/reqstream/ots/openapi.yaml"
+      - "docs/design/ots/openapi.md"
+      - "docs/verification/ots/openapi.md"
 
   - id: OTS-Pandoc
     title: Review of Pandoc OTS verification evidence

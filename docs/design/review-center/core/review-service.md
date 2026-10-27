@@ -17,7 +17,10 @@ checklist copy of the review, see `ChecklistService`; set when the review is cre
 the review). A review from a repository also has `RepositoryId`, `RepositoryName` (a display copy), `BaselineSha`
 (null when no baseline was given), `HeadSha`, `Selection` (the normalized selection text), and `ReviewSetId` (the
 review-set of `.reviewmark.yaml` the review was planned from, null when it was not planned from a set; at most 100
-characters); all six are null for an uploaded review.
+characters); all six are null for an uploaded review. Every review also records `CreatedBy` (the user name of the actor
+that created it, null for a review stored before this field existed) and `CreatedViaApi` (true when the actor
+authenticated with a personal access token). Both are metadata of the review: they are not part of the record digest,
+so a signature does not depend on them, and the review list and detail of the API show them.
 
 **ReviewFile**: a data class (init-only properties) of `ProjectId`, `ReviewId`, `Path`, `Content` (the bytes), `Size`,
 and `Sha256`, and for a review from a repository `ChangeKind`, `BaselineContent`, `BaselineSize` and
@@ -131,6 +134,10 @@ fingerprint, and the number of files) to the store, which saves it in the same t
 baseline {sha|none}, head {sha}, {n} file(s): {a} added, {m} modified, {d} deleted, {s} skipped, fingerprint {fp}`
 followed, for a review planned from a review-set, by `, set '{id}'`; the title and the set identifier are shortened to
 60 characters so the commits and the fingerprint always fit.
+When the actor authenticated with a personal access token (`Actor.ViaApiToken`), the detail of `review.created` also
+names the display id of the token: `, created via API token '{id}'` is added at the end of the detail of an uploaded
+review, and right after the title in the detail of a review from a repository (where the title is shortened to 40
+characters instead of 60, so the text still fits). A review created in the web pages reads exactly as before.
 A refused creation records nothing. See the `AuditService` unit for the action codes.
 
 #### Error Handling
@@ -153,4 +160,5 @@ store or clock at construction, raise `ArgumentNullException`. Store failures pr
 - **ProjectPage** — creates reviews (uploaded or from a repository) and lists the reviews of a project.
 - **ReviewPlanner** — creates the reviews of a plan through `CreateFromSessionAsync`, one session for the batch.
 - **ReviewPage** — reads a review, the head and baseline content of a file, and (in the diff view) its differences.
+- **ApiEndpoints** — lists and reads reviews, and creates reviews (uploaded or from a repository) for a token actor.
 - **ServerHost** — registers the service for the pages.

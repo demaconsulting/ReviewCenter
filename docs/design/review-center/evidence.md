@@ -133,7 +133,9 @@ every checklist comment in full; the only caps are on the list of resolved threa
 dependency for them. A provider for Azure Key Vault would keep the key in the vault and sign through the Azure SDK; the
 design leaves a place for it, because the key type that the signer uses is an RSA or ECDSA object that need not hold the
 key itself. A timestamp authority (RFC 3161) would add a trusted time to the signature as an unsigned attribute of the
-CMS signature. The attestation is not part of an `index.json` of an API, because the system has no such API yet. The PDF
+CMS signature. The attestation of a review can also be downloaded through the JSON API with a personal access token (see
+the `Api` subsystem); an `index.json` that lists the attestations of a project for pipelines is planned for a later
+slice and does not exist yet. The PDF
 is generated for every request and is not stored; the audit event holds its hash, so a copy can be checked against the
 trail. Tests of the certificate store provider use a temporary certificate in the store of the current user and skip
 themselves when the store is not available; the local machine store and a real hardware module need a manual check.

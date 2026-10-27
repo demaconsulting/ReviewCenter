@@ -44,6 +44,10 @@ package ReviewCenter {
         expose EvidenceSubsystem;
     }
 
+    view ApiView {
+        expose ApiSubsystem;
+    }
+
     view SelfTestView {
         expose SelfTestSubsystem;
     }

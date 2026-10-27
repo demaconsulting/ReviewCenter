@@ -21,7 +21,7 @@ does not restate requirements; it explains how they are realized.
 Local items:
 
 - **ReviewCenter**: the distributed software system. It is divided into the Program unit and the
-  Cli, Hosting, Identity, Web, Core, Storage, ContentSources, Evidence, SelfTest, and Utilities subsystems.
+  Cli, Hosting, Identity, Web, Core, Storage, ContentSources, Evidence, Api, SelfTest, and Utilities subsystems.
 - **ReviewCenterPuppet**: a separate software system, a development tool that is built and reviewed
   in this repository but is not part of the distributed ReviewCenter package. It has no
   subsystems; its units are PuppetProgram, ControlChannel, BrowserDaemon, SelectorResolver, and
@@ -34,6 +34,7 @@ OTS items:
 - **bUnit**: integration and usage design.
 - **Entity Framework Core**: integration and usage design (including its SQLite provider).
 - **FileAssert**: integration and usage design.
+- **Microsoft.AspNetCore.OpenApi**: integration and usage design (used to generate the OpenAPI document of the API).
 - **Pandoc**: integration and usage design.
 - **Playwright**: integration and usage design (used by ReviewCenterPuppet).
 - **System.Security.Cryptography.Pkcs**: integration and usage design (used to sign the PDF attestations).
@@ -50,7 +51,9 @@ OTS items:
 The following topics are out of scope:
 
 - Design documents are not produced for the test projects or build pipeline CI configuration
-- Subsystems of the target architecture that are not implemented yet (Api, Messaging) have no design documents yet
+- Subsystems of the target architecture that are not implemented yet (Messaging) have no design documents yet,
+  and the parts of the Api subsystem that are planned for later slices (the `index.json` evidence endpoint) are not
+  designed here
 - The internal design of OTS software items is excluded; only integration and usage design is documented
 
 ## Software Structure
@@ -80,20 +83,23 @@ The ReviewCenter system is divided as follows:
   units, the LoginPage,
   AccountPage, and UsersPage units, the HistoryPage and AuditPage units, and the RepositoriesPage unit
 - **Core** (subsystem): the domain model and rules for projects, reviews, review comments, review checklists,
-  users, reviewer signatures, the hash-chained audit trail, and the registry of git repositories, free of web and
-  database technology; contains the Fingerprint, RecordDigest, AuditChain, AuditService, ProjectService,
-  ReviewService, ThreadService, ChecklistService, UserService, SigningService, RepositoryService, SelectionMatcher,
-  RevisionValidator, ReviewPlanner, and LineDiff units
-- **Storage** (subsystem): persistence of projects, reviews, comment threads, checklists, users, reviewer slots,
-  signatures, the audit trail, and the registered repositories in a database
+  users, personal access tokens, reviewer signatures, the hash-chained audit trail, and the registry of git
+  repositories, free of web and database technology; contains the Fingerprint, RecordDigest, AuditChain, AuditService,
+  ProjectService, ReviewService, ThreadService, ChecklistService, UserService, PersonalAccessTokenService,
+  SigningService, RepositoryService, SelectionMatcher, RevisionValidator, ReviewPlanner, and LineDiff units
+- **Storage** (subsystem): persistence of projects, reviews, comment threads, checklists, users, personal access
+  tokens, reviewer slots, signatures, the audit trail, and the registered repositories in a database
   through Entity
-  Framework Core; contains the ReviewCenterDbContext, ReviewStore, UserStore, AuditStore, RepositoryStore, and
-  DatabaseSetup units
+  Framework Core; contains the ReviewCenterDbContext, ReviewStore, UserStore, PersonalAccessTokenStore, AuditStore,
+  RepositoryStore, and DatabaseSetup units
 - **ContentSources** (subsystem): reads content from outside the system, currently from git repositories, and protects
   the access tokens of private repositories; contains the GitRunner, GitSource, ReviewSetParser, and CredentialProtector
   units
 - **Evidence** (subsystem): produces the signed PDF attestation of a complete review; contains the PdfDocumentWriter,
   AttestationRenderer, AttestationSigner, AttestationKeyProvider, AttestationService, and AttestationEndpoint units
+- **Api** (subsystem): the JSON API under `/api` for scripts and pipelines, with bearer-token authentication by personal
+  access tokens that is limited to that API, its endpoints, and its OpenAPI document; contains the
+  ApiTokenAuthentication, ApiEndpoints, and ApiDocument units
 - **SelfTest** (subsystem): self-validation; contains the Validation unit
 - **Utilities** (subsystem): shared helpers; contains the PathHelpers unit
 
@@ -101,9 +107,10 @@ The ReviewCenterPuppet system is a flat set of units that drive one persistent h
 invocation, against a ReviewCenter server and write screenshots.
 
 The model is deliberately partial. It covers only the items that are implemented so far: the Program unit, the
-Cli, Hosting, Identity, Web, Core, Storage, ContentSources, Evidence, SelfTest, and Utilities subsystems, and the Puppet
-system. The Api and Messaging subsystems of the target architecture (`architecture.md`) are planned and
-deferred; they will be added to the model, with their requirements and design documents, as they are implemented.
+Cli, Hosting, Identity, Web, Core, Storage, ContentSources, Evidence, Api, SelfTest, and Utilities subsystems, and the
+Puppet system. The Messaging subsystem of the target architecture (`architecture.md`) is planned and deferred, and so
+is the `index.json` evidence endpoint of the Api subsystem; they will be added to the model, with their requirements
+and design documents, as they are implemented.
 
 ## Folder Layout
 
@@ -116,11 +123,13 @@ deferred; they will be added to the model, with their requirements and design do
     - **Storage/** - database persistence subsystem
     - **ContentSources/** - git content source and token protection subsystem
     - **Evidence/** - signed PDF attestation subsystem
+    - **Api/** - token-authenticated JSON API subsystem
     - **SelfTest/** - self-validation subsystem
     - **Utilities/** - shared utilities subsystem
   - **DemaConsulting.ReviewCenter.Core/** - source of the Core subsystem, in a project of its own (see below)
 - **tools/** - development tools that are not distributed
   - **puppet/** - source of the ReviewCenterPuppet system
+- **docs/api/** - the committed snapshot of the OpenAPI document of the API (`openapi.json`), compared by a test
 - **test/** - test projects
   - **DemaConsulting.ReviewCenter.Tests/** - tests of the ReviewCenter system, including the Core subsystem
     (`Core/` folder) and the Storage subsystem (`Storage/` folder)

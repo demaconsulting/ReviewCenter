@@ -41,11 +41,15 @@ This document covers the verification design for the following software items:
     - **ReviewPage** — review, fingerprint, files, file content, comment threads, reviewers, and signatures page
     - **ChecklistPage** — review checklist page
     - **LoginPage** — sign-in page
-    - **AccountPage** — password change page of the signed-in user
+    - **AccountPage** — password change, appearance, and personal access token page of the signed-in user
     - **UsersPage** — user administration page
     - **HistoryPage** — audit history of one review
     - **AuditPage** — whole audit trail and chain verification for administrators
     - **RepositoriesPage** — git repository registry administration page
+  - **Api** subsystem
+    - **ApiTokenAuthentication** — bearer personal access token sign-in of the API
+    - **ApiEndpoints** — JSON routes under /api
+    - **ApiDocument** — OpenAPI document of the API
   - **ContentSources** subsystem
     - **GitRunner** — safe git child-process runner
     - **GitSource** — git implementation of the repository provider
@@ -73,12 +77,14 @@ This document covers the verification design for the following software items:
     - **RevisionValidator** — git revision name validation
     - **RepositoryService** — repository registry rules
     - **ReviewPlanner** — review planning from review-sets, baselines, and fallbacks
+    - **PersonalAccessTokenService** — personal access token rules
   - **Storage** subsystem
     - **ReviewCenterDbContext** — database schema mapping
     - **ReviewStore** — database implementation of the store interface
     - **UserStore** — database implementation of the user store interface
     - **AuditStore** — database implementation of the audit store interface and the shared audit appender
     - **RepositoryStore** — database implementation of the repository store interface
+    - **PersonalAccessTokenStore** — database implementation of the personal access token store interface
     - **DatabaseSetup** — provider selection, connection resolution, and database creation
   - **SelfTest** subsystem
     - **Validation** — self-validation test runner
@@ -98,6 +104,7 @@ This document covers the verification design for the following software items:
 - **bUnit** — Blazor component testing library and in-memory test host
 - **Entity Framework Core** — object-relational mapper and SQLite provider
 - **FileAssert** — document assertion tool
+- **Microsoft.AspNetCore.OpenApi** — OpenAPI document generation for the API
 - **Pandoc** — Markdown-to-HTML conversion tool
 - **Playwright** — browser automation library used by the Puppet developer tool
 - **ReqStream** — requirements traceability tool
@@ -123,7 +130,7 @@ The following topics are out of scope:
 
 The test folder structure mirrors the source subsystem breakdown. The Core subsystem has its own source project
 but its tests are in the main test project, in the `Core/` folder, next to the `Storage/`, `ContentSources/`,
-`Evidence/`, `Identity/`, `Web/`,
+`Evidence/`, `Identity/`, `Web/`, `Api/`,
 and `Hosting/` folders:
 
 ```text
@@ -135,6 +142,7 @@ test/
 │   ├── Evidence/                              — Evidence unit and subsystem tests
 │   ├── Identity/                              — Identity unit and subsystem tests
 │   ├── Web/                                   — Web unit and subsystem tests
+│   ├── Api/                                   — Api unit and subsystem tests
 │   └── Hosting/                               — Hosting unit and subsystem tests
 └── DemaConsulting.ReviewCenter.Puppet.Tests/  — unit, system, and end-to-end tests of ReviewCenterPuppet
 ```

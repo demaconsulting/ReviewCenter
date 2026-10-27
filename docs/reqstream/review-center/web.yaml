@@ -409,3 +409,23 @@ sections:
         tests:
           - ReviewPage_Render_ReviewApprovedWithSelfSignedKey_OffersAttestationDownloadWithKeyNote
           - HelpAttestationPage_Render_ExplainsWhatTheSignatureProvesAndTheKey
+
+      - id: ReviewCenter-Web-AccessTokens
+        title: >-
+          The Web subsystem shall let a signed-in user manage personal access tokens on the account page, creating a
+          token and seeing its value once with a way to copy it, seeing the tokens with their expiry and last use,
+          and revoking a token, and shall explain the tokens and the API in a help topic that the account page links
+          to.
+        justification: |
+          A token is made, read and taken back by its owner, so the page where the user already manages the account is
+          where it belongs, and a help topic next to it tells how a token is used and what it cannot do.
+        children:
+          - ReviewCenter-AccountPage-TokensCard
+          - ReviewCenter-AccountPage-TokenCreate
+          - ReviewCenter-AccountPage-TokenCopy
+          - ReviewCenter-AccountPage-TokenRevoke
+          - ReviewCenter-HelpPage-ApiTokensTopic
+        tests:
+          - AccountPage_CreateToken_ValidInput_ShowsValueOnceAndListsToken
+          - AccountPage_RevokeToken_ActiveToken_MarksRevokedAndRemovesButton
+          - HelpApiTokensPage_Render_ExplainsTokensCurlEndpointsAndErrors

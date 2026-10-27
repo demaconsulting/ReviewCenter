@@ -1,0 +1,83 @@
+---
+# Api Subsystem Requirements
+#
+# PURPOSE:
+# - Define requirements for the ReviewCenter Api subsystem
+# - The Api subsystem spans ApiTokenAuthentication.cs (the bearer token sign-in of API requests),
+#   ApiEndpoints.cs (the JSON routes under /api), and ApiDocument.cs (the OpenAPI document of the API)
+# - Subsystem requirements describe the externally visible behavior of a script that calls the API with a personal
+#   access token: reading projects and reviews, creating review drafts, downloading attestations, the document that
+#   describes the API, and the limits on what a token can do
+
+sections:
+  - title: Api Subsystem Requirements
+    requirements:
+      - id: ReviewCenter-Api-TokenJourney
+        title: >-
+          The Api subsystem shall let a client that sends a valid personal access token as a bearer token call the API
+          as the owner of the token, refuse a missing, unknown, revoked, or expired token with one generic answer,
+          refuse too many refused tokens from one address, and record
+          each use that is refused without recording the token value.
+        justification: |
+          A script cannot sign in through a page, so it needs a credential that is easy to hand out and to take back.
+          Acting as the owner keeps every change attributable to a person. One answer for every refusal does not tell
+          somebody guessing tokens whether a token ever existed, a limit makes guessing slow, and an audit record
+          without the value lets an administrator see failed use without the log becoming a source of tokens.
+        children:
+          - ReviewCenter-ApiTokenAuthentication-Bearer
+          - ReviewCenter-ApiTokenAuthentication-Refusal
+          - ReviewCenter-ApiTokenAuthentication-Throttle
+          - ReviewCenter-ApiTokenAuthentication-FailureAudit
+        tests:
+          - ApiSubsystem_TokenJourney_CreateUseRevoke_WorksEndToEnd
+
+      - id: ReviewCenter-Api-ReviewJourney
+        title: >-
+          The Api subsystem shall let a client with a valid token list the projects and the reviews of a project, read
+          one review, create a review draft from uploaded files or from the changes of a repository, mark a review
+          that was created this way, download the attestation of a signed review, report an invalid request or a
+          refused rule as a problem document that names the cause, and answer an address that does not exist with a
+          JSON problem document.
+        justification: |
+          Creating a draft for every pull request from a pipeline and fetching the attestation after sign-off are
+          the reasons to have an API. The same rules as for the web pages keep the record consistent, a mark on the
+          review keeps a draft created by a script visible to the reviewers, and a machine readable problem document
+          lets a script act on an error without parsing text.
+        children:
+          - ReviewCenter-ApiEndpoints-Read
+          - ReviewCenter-ApiEndpoints-Create
+          - ReviewCenter-ApiEndpoints-Validation
+          - ReviewCenter-ApiEndpoints-Attestation
+          - ReviewCenter-ApiEndpoints-Errors
+        tests:
+          - ApiSubsystem_ReviewJourney_CreateDraftReadAndDownloadAttestation_WorksEndToEnd
+
+      - id: ReviewCenter-Api-Isolation
+        title: >-
+          The Api subsystem shall keep a token to the API: a token shall not sign a review or change the reviewers of
+          a review, shall not sign in to a web page, and a session cookie shall not be accepted by the API.
+        justification: |
+          A signature must prove that the person was present, which a stored secret does not. A token that could
+          sign, or that could open the web pages, would turn a leaked token into the identity of the person, and a
+          cookie accepted by the API would open it to forgery from other sites.
+        children:
+          - ReviewCenter-ApiTokenAuthentication-Cookie
+          - ReviewCenter-ApiEndpoints-NoSigning
+        tests:
+          - ApiSubsystem_TokenPrincipal_SigningAndWebPages_AreNotReachable
+
+      - id: ReviewCenter-Api-Document
+        title: >-
+          The Api subsystem shall describe the API in an OpenAPI document, served without a token, that names the
+          bearer scheme, is the same for every server start, and matches the document that is kept with the
+          documentation.
+        justification: |
+          A client generator and a person reading the documentation both need the contract of the API. A document
+          that is committed and compared with the running server is kept from drifting away from the behavior.
+        children:
+          - ReviewCenter-ApiDocument-Document
+          - ReviewCenter-ApiDocument-Snapshot
+          - ReviewCenter-OTS-OpenApi-Document
+        tests:
+          - ApiDocument_Get_NoToken_DescribesTheApiWithBearerScheme
+          - ApiDocument_Get_MatchesCommittedSnapshot

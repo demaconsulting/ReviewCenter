@@ -24,6 +24,8 @@ N/A - standard test environment.
   same database (to a signed-in user), and an unsupported database provider ends the run with exit code 1.
 - The repository registry and the git source are registered, and a stored token stays readable after a restart because
   the key ring is persisted; the behavior is verified in the unit tests of `ServerHost`.
+- The routes of the `Api` subsystem and the personal access token service are registered, and an unknown address under
+  `/api` is answered with a JSON problem document; the behavior is verified in the unit tests of `ServerHost`.
 
 ### Test Scenarios
 
@@ -73,6 +75,11 @@ cannot work stops the start with a message that names it, which is tested by
 `ServerHost_CreateApplication_SelfSignedFolderIsAFile_ThrowsClearError`. The registration of the certificate store
 provider is verified by `CertificateStoreKeyProvider_GetSigningKey_ConfiguredForTheServer_StartsWithTheCertificate`,
 which skips when the store is unavailable.
+
+**API registration**: The routes of the API under `/api` are mapped, the personal access token service is registered once,
+the OpenAPI document is served without a token, and an unknown address under `/api` is a JSON 404 instead of a page. This
+is verified by the unit test of `ServerHost`, `ServerHost_CreateApplication_ApiRoutes_AreMapped`; the behavior of the
+routes is verified in the `Api` subsystem.
 
 **Audit verify verb**: The `AuditCommand` unit tests run the verb over a real database. An intact trail gives the
 entry count and exit code 0, which is tested by `AuditCommand_Run_IntactTrail_ReportsEntryCountWithExitCodeZero`, and

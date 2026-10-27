@@ -663,3 +663,46 @@ sections:
           - EvidenceSubsystem_CompletedReview_IsOfferedAndDownloadedAsSignedPdf
           - AttestationEndpoint_Get_CompleteReview_ReturnsSignedPdfDownloadAndRecordsEvent
           - EvidenceSubsystem_ReviewNotComplete_IsNotOfferedAndRefused
+
+      - id: ReviewCenter-System-PersonalAccessTokens
+        title: >-
+          The tool shall let a signed-in user create, see, and revoke personal access tokens for their own account,
+          with a name, an expiry of 30, 90, or 365 days, and at most 20 active tokens, showing the value of a token
+          only once and keeping only a hash of it, so that the tokens of a user keep working only while the user is
+          allowed to sign in, and shall record the creation, the revocation, and each refused use of a token in the
+          audit trail without recording a token value.
+        tags: [system]
+        justification: |
+          Pipelines and scripts that file reviews need a credential that is not a password, that is easy to hand
+          out and to take back, and that gives away little if it leaks. A token that expires, can be revoked at once,
+          is audited, and is stored only as a hash limits the harm of a leak and keeps every action attributable.
+        children:
+          - ReviewCenter-Core-AccessTokens
+          - ReviewCenter-Storage-AccessTokens
+          - ReviewCenter-Web-AccessTokens
+          - ReviewCenter-Api-TokenJourney
+        tests:
+          - ApiSubsystem_TokenJourney_CreateUseRevoke_WorksEndToEnd
+          - CoreSubsystem_AccessTokens_CreateAuthenticateAndRevoke_FollowTheOwner
+          - StorageSubsystem_AccessTokens_PersistAcrossReopen
+
+      - id: ReviewCenter-System-ApiAccess
+        title: >-
+          The tool shall offer an HTTP API under /api, described by an OpenAPI document, with which a client that
+          sends a personal access token can list the projects and reviews, read a review, create a review draft from
+          files or from the changes of a repository, and download the attestation of a signed review, with the same
+          rules as the web pages, but shall not let a token sign a review, arrange the reviewers, or open a web page.
+        tags: [system]
+        justification: |
+          Creating a draft for every pull request from a pipeline and filing the attestation of a signed review with
+          the release take the manual work out of the process. The people stay the only ones who sign, so that a
+          signature still proves that a person was there.
+        children:
+          - ReviewCenter-Api-ReviewJourney
+          - ReviewCenter-Api-Isolation
+          - ReviewCenter-Api-Document
+          - ReviewCenter-Hosting-ApiServices
+        tests:
+          - ApiSubsystem_ReviewJourney_CreateDraftReadAndDownloadAttestation_WorksEndToEnd
+          - ApiSubsystem_TokenPrincipal_SigningAndWebPages_AreNotReachable
+          - CoreSubsystem_TokenActor_CreatesFlaggedReviewButCannotSign

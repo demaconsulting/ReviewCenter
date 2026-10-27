@@ -3,7 +3,7 @@
 #### Verification Approach
 
 `ReviewCenterDbContext` is verified with the unit tests of `ReviewStoreTests.cs`, `ReviewStoreSigningTests.cs`,
-`UserStoreTests.cs`, `RepositoryStoreTests.cs`, `ReviewStoreRepositoryTests.cs`, and
+`UserStoreTests.cs`, `RepositoryStoreTests.cs`, `PersonalAccessTokenStoreTests.cs`, `ReviewStoreRepositoryTests.cs`, and
 `DatabaseSetupTests.cs`, which
 exercise the context through the units that use it. The context has no behavior that can be reached without a
 database, and its job is to produce the right schema, so the tests run against real SQLite database files in a
@@ -34,6 +34,8 @@ be loadable on the test platform.
   the name ignores case.
 - The source columns of a review and the change kind and baseline columns of a file are created, stored, and read back
   as written, with the baseline content as binary data and no value for an uploaded review.
+- The table for personal access tokens has a unique index on the hash and no column for the value of a token, and a
+  review keeps its creator and whether it was created through the API.
 
 #### Test Scenarios
 
@@ -119,3 +121,11 @@ on the name ignores case, which is tested by `RepositoryStore_NameOtherCase_Thro
 **Audit entries table**: The `AuditEntries` table is mapped by `ReviewCenterDbContext` and is exercised by the tests
 of `AuditStore`, which write, read, and verify entries through the real schema; all scenarios of this unit run over a
 schema that includes it.
+
+**ReviewCenterDbContext_Model_HasTokenTableAndReviewCreatorColumns**: A review with a creator and the API flag is stored
+and read back, and the model of the token table is read. The review keeps its creator and the flag; the index on the
+token hash is unique; and the table has exactly the columns for the identity, the owner, the name, the display id, the
+hash, the creation, the expiry, the last use, and the revocation, and none for the value of a token. This scenario is
+tested by `ReviewCenterDbContext_Model_HasTokenTableAndReviewCreatorColumns`, defined in
+`PersonalAccessTokenStoreTests.cs`. The display id is not unique at the database (it is only a label that is shown); the
+hash alone identifies a token.

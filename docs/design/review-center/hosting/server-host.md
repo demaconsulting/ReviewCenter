@@ -50,8 +50,12 @@ when enabled; builds the application; calls `InitializeDatabase`, `ValidateAuthO
 `ValidateDataProtection`; adds `UseNotFoundPage` (the not-found middleware, below) and routing; adds authentication,
 authorization, and request forgery protection, in that order, ahead of the endpoints they protect; maps static assets
 when enabled; maps `/health` to a plain-text 200 response; maps the login and logout endpoints with
-`SignIn.MapSignIn`; maps `App` with the interactive
-server render mode; and registers the start-up log callback.
+`SignIn.MapSignIn`; maps the signed attestation download; maps the JSON API with `MapApi` and its OpenAPI document with
+`MapApiDocument` ahead of the user interface, so that an unknown address under `/api` is answered by the API's own JSON
+404; maps `App` with the interactive
+server render mode; and registers the start-up log callback. After the sign-in, it registers the token authentication
+scheme and the `Api` policy with `ApiTokenAuthentication.AddApiTokenAuthentication` and the OpenAPI generator with
+`ApiDocument.AddApiDocument`; the cookie stays the default scheme.
 
 **UseNotFoundPage**: Answers a page request that no page handles with the framed "Page not found" page. A URL that
 matches no endpoint never reaches the router, so without this the response is an empty 404. The middleware sits before
@@ -68,9 +72,11 @@ response.
 - *Returns*: `void`.
 - *Preconditions*: Neither argument is null.
 - *Postconditions*: The `Database` options, a `ReviewCenterDbContext` factory configured by
-  `DatabaseSetup.Configure`, `TimeProvider.System`, one `AuditAppender`, `ReviewStore`, `UserStore`, and `AuditStore` as
+  `DatabaseSetup.Configure`, `TimeProvider.System`, one `AuditAppender`, `ReviewStore`, `UserStore`,
+  `PersonalAccessTokenStore`, and `AuditStore` as
   the Core store interfaces, `PasswordHasher` as the Core hasher interface, and `ProjectService`, `ReviewService`,
-  `ThreadService`, `ChecklistService`, `UserService`, `SigningService`, and `AuditService` as singletons are registered.
+  `ThreadService`, `ChecklistService`, `UserService`, `PersonalAccessTokenService`, `SigningService`, and `AuditService`
+  as singletons are registered.
   `AuditService` gets a hook that logs a warning when an event cannot be recorded, and the registered `TimeProvider`
   (its coalescing of repeated events uses the clock, so tests can move time). The `DataProtection` and `Git`
   settings are bound (an empty `Git:CachePath` becomes a `git-cache` folder beside the database, through
@@ -87,6 +93,8 @@ response.
 
 The method is shared with `UserCommand` and `AuditCommand`, so that the command line works with exactly the services of
 the server. `UserService` must remain a single instance, because it serializes the changes to users in the process;
+`PersonalAccessTokenService` must remain a single instance for the same reason, because it serializes the creation and
+revocation of tokens with one gate, which is what keeps the limit of active tokens exact;
 `SigningService` must remain a single instance for the same reason, because it serializes the changes to reviewer
 slots and signatures with one gate. `RepositoryService` must remain a single instance for the same reason, because it
 serializes the changes to repositories. `AuditAppender` must remain a single instance, because its gate is what
@@ -205,10 +213,13 @@ always disposed.
 
 - **Context** — supplies `Urls` and `Silent`, and receives start-up error reports.
 - **App** — the root component mapped as the user interface.
-- **DatabaseSetup**, **ReviewCenterDbContext**, **ReviewStore**, **UserStore**, **AuditStore**, **AuditAppender**,
+- **DatabaseSetup**, **ReviewCenterDbContext**, **ReviewStore**, **UserStore**, **PersonalAccessTokenStore**,
+  **AuditStore**, **AuditAppender**,
   **RepositoryStore** — the database configuration, context, and stores registered for the pages.
-- **ProjectService**, **ReviewService**, **ThreadService**, **ChecklistService**, **UserService**, **SigningService**,
-  **AuditService**, **RepositoryService** — the Core services registered for the pages.
+- **ProjectService**, **ReviewService**, **ThreadService**, **ChecklistService**, **UserService**,
+  **PersonalAccessTokenService**, **SigningService**,
+  **AuditService**, **RepositoryService** — the Core services registered for the pages and the API.
+- **ApiTokenAuthentication**, **ApiEndpoints**, **ApiDocument** — the `Api` subsystem, which is registered and mapped.
 - **GitOptions**, **GitRunner**, **GitSource**, **CredentialProtector** — the git content source and the token protector.
 - **AttestationOptions**, **AttestationKeyProviderFactory**, **AttestationKeyException**, **AttestationRenderer**,
   **AttestationSigner**, **AttestationService**, **AttestationEndpoint** — the signed attestation of the `Evidence`

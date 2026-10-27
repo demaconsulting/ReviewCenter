@@ -52,3 +52,8 @@ provider of
 the tests that works at the start and fails afterwards, and the key then stops working. The answer is 500 with a problem
 description that carries the reason of the key, no PDF is sent, and no event is recorded. This scenario is tested by
 `AttestationEndpoint_Get_KeyBecomesUnavailable_Answers500AndRecordsNothing`.
+
+**Shared result mapping**: `ToResult`, which turns the outcome of the attestation service into the answer, is shared by
+the page address and by the API address of the attestation. The mapping is exercised through this unit's tests above and
+through the attestation tests of the API (`ApiEndpoints_GetAttestation_*` in `ApiEndpointsTests.cs`), which check the same
+statuses and the same PDF; see the verification of the `ApiEndpoints` unit.

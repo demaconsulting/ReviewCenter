@@ -31,6 +31,9 @@ N/A - standard test environment.
 - The audit entry of a repository review names the repository, the commits, the counts, and the fingerprint.
 - A review created from a plan carries its review-set identifier and names it last in the audit entry; a manual
   review has none.
+- A review records the user who created it; a review created by an actor that came through a personal access token is
+  flagged as created through the API, and the audit entry of the creation names the id of the token, never its value,
+  both for a draft from files and for a review from a repository; a review created from the web pages is not flagged.
 - The diff of a file is computed from the stored content only, never from git; it reports no baseline, a binary
   side, or a file that is too large instead of rows, and flags content that differs only in line endings.
 
@@ -116,6 +119,21 @@ the audit entry `review.created` is recorded with the review title, the file cou
 detail. This scenario is tested by `ReviewService_CreateDraftAsync_Review_RecordsReviewCreatedWithFingerprint`, and
 the plural wording for several files by `ReviewService_CreateDraftAsync_SeveralFiles_RecordsPluralCount`; both are
 defined in `AuditEventTests.cs`.
+
+**ReviewService_CreateDraftAsync_ApiActor_FlagsReviewAndAuditText**: A draft is created by an actor that carries a token
+id. The review records the user name as creator, is flagged as created through the API, and the `review.created` detail
+ends with `, created via API token 'K7M2QX9P'`. This scenario is tested by
+`ReviewService_CreateDraftAsync_ApiActor_FlagsReviewAndAuditText`.
+
+**ReviewService_CreateDraftAsync_UiActor_RecordsCreatorWithoutApiFlag**: A draft is created by a person who signed in
+with a password. The creator is recorded, the review is not flagged, and the audit detail has no token text. This
+scenario is tested by `ReviewService_CreateDraftAsync_UiActor_RecordsCreatorWithoutApiFlag`.
+
+**ReviewService_CreateFromRepositoryAsync_ApiActor_FlagsReviewAndAuditText**: A review is created from a repository by
+an actor that carries a token id. The review is flagged, records the creator, and the one `review.created` detail starts
+with `review 'Title', created via API token 'K7M2QX9P' from repository`. This scenario is tested by
+`ReviewService_CreateFromRepositoryAsync_ApiActor_FlagsReviewAndAuditText`, defined in
+`ReviewServiceRepositoryTests.cs`.
 
 **Reviews from a repository** are verified in `ReviewServiceRepositoryTests.cs` with the real service, a fake store,
 and a fake git provider that serves scripted changes and blobs (`FakeGitRepositoryProvider`); one test uses a real

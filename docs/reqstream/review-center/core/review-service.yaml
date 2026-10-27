@@ -227,3 +227,16 @@ sections:
           - ReviewService_GetDiffAsync_BinarySide_ReportsBinary
           - ReviewService_GetDiffAsync_BeyondLineLimit_ReportsTooLarge
           - ReviewService_GetDiffAsync_OnlyLineEndingsDiffer_IsFlagged
+
+      - id: ReviewCenter-ReviewService-CreatedVia
+        title: >-
+          The ReviewService class shall record the user who created a review, mark a review that an actor created
+          through a personal access token as created through the API, and name the id of the token, never the value,
+          in the audit entry of the creation, both for a draft from files and for a review from a repository.
+        justification: |
+          Reviewers should see that a script, and not a person at the screen, made a draft, and an investigation
+          should be able to tell which token did it.
+        tests:
+          - ReviewService_CreateDraftAsync_ApiActor_FlagsReviewAndAuditText
+          - ReviewService_CreateDraftAsync_UiActor_RecordsCreatorWithoutApiFlag
+          - ReviewService_CreateFromRepositoryAsync_ApiActor_FlagsReviewAndAuditText

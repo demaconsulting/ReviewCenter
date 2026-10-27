@@ -9,7 +9,8 @@ command line, and verifies the audit trail from the command line. It owns
 the composition of the ASP.NET Core application behind the `serve` verb: the listen address,
 the logging configuration, the health endpoint, the sign-in configuration and endpoints of the `Identity`
 subsystem, the mapping of the user interface provided
-by the `Web` subsystem, and the connection of the pages to the database: reading the `Database` settings,
+by the `Web` subsystem, the registration and mapping of the JSON API of the `Api` subsystem, and the connection of
+the pages to the database: reading the `Database` settings,
 creating the database, and registering the `Core` services with the `Storage` stores. It also owns the
 start, run, and stop lifecycle of that application and
 the translation of start-up failures into ordinary error reports. The `user add` and `audit verify` verbs reuse the same
@@ -97,11 +98,18 @@ the server.
 - *Role*: Consumer.
 
 **Storage and Core (consumed)**: `DatabaseSetup`, `ReviewCenterDbContext`, `ReviewStore`, `UserStore`, `AuditStore`,
-`RepositoryStore`, and `AuditAppender` of the
+`RepositoryStore`, `PersonalAccessTokenStore`, and `AuditAppender` of the
 `Storage` subsystem, and `ProjectService`, `ReviewService`, `ThreadService`, `ChecklistService`, `UserService`,
-`SigningService`, `AuditService`, `RepositoryService`, and the store and hasher interfaces of the `Core` subsystem.
+`SigningService`, `AuditService`, `RepositoryService`, `PersonalAccessTokenService`, and the store and hasher interfaces
+of the `Core` subsystem, and `PersonalAccessTokenStore` of the `Storage` subsystem.
 
 - *Type*: In-process .NET types.
+- *Role*: Consumer.
+
+**Api (consumed)**: `AddApiTokenAuthentication`, `AddApiDocument`, `MapApi`, and `MapApiDocument` of the `Api`
+subsystem.
+
+- *Type*: In-process .NET extension methods.
 - *Role*: Consumer.
 
 **ContentSources (consumed)**: `GitOptions`, `GitRunner`, `GitSource`, and `CredentialProtector` of the
@@ -181,6 +189,12 @@ usable: ..." that names the setting. The same reasoning applies as for the datab
 chose a certificate must learn at the start that the choice does not work. The price is that a server whose key is in a
 hardware module that is not present does not start. The endpoint `/projects/{projectId}/reviews/{reviewId}/attestation.pdf`
 is mapped after the sign-in endpoints and requires a signed-in user.
+
+The `Api` subsystem is registered after the sign-in: `AddApiTokenAuthentication` adds the bearer token scheme and the
+`Api` policy, and `AddApiDocument` adds the OpenAPI document generation. `MapApi` and `MapApiDocument` come after
+`MapAttestation` and before the Razor components, so the routes under `/api` are matched before the pages and an
+unknown address under `/api` is a JSON 404 rather than the page of the user interface. The token store and
+`PersonalAccessTokenService` are registered by `AddServices`, so the command-line verbs get the same services.
 
 The database is created right after the application is built, before the first request, so that a
 problem with the settings or the file system stops the start-up with one clear message rather than

@@ -4,17 +4,20 @@
 
 The `Core` subsystem is verified by subsystem tests defined in `CoreSubsystemTests.cs`. The tests use the real
 `ProjectService`, `ReviewService`, `ThreadService`, `ChecklistService`, `UserService`, `SigningService`,
-`RepositoryService`, `SelectionMatcher`, `RevisionValidator`, `Fingerprint`, `RecordDigest`, and `ReviewPlanner`
+`RepositoryService`, `PersonalAccessTokenService`, `SelectionMatcher`, `RevisionValidator`, `Fingerprint`,
+`RecordDigest`, and `ReviewPlanner`
 together, with
-a fixed clock (a clock the test can move for the lockout) and fakes for the stores (`FakeReviewStore`,
-`FakeUserStore`, `FakeRepositoryStore`), a trivial password hasher (`FakePasswordHasher`), and a trivial token protector
+a fixed clock (a clock the test can move for the lockout and the expiry of a token) and fakes for the stores
+(`FakeReviewStore`,
+`FakeUserStore`, `FakeRepositoryStore`, `FakePersonalAccessTokenStore`), a trivial password hasher
+(`FakePasswordHasher`), and a trivial token protector
 (`FakeCredentialProtector`) in place of the database and the real hasher and protector,
 because the subsystem has no dependency on a
 database; the real database is verified in the `Storage` subsystem, the real hasher in the `Identity` subsystem, and the
 real token protector and git in the `ContentSources` subsystem.
 The tests show that the units cooperate as the
 design describes: the services create, store, and read back what the fingerprint algorithm and the rules require.
-The rules and the algorithm themselves are verified in detail by the unit tests of the fourteen units.
+The rules and the algorithm themselves are verified in detail by the unit tests of the sixteen units.
 
 ### Test Environment
 
@@ -27,7 +30,7 @@ N/A - standard test environment.
   the known answer for the files, every file keeps its own size and SHA-256 hash, and file bytes are returned
   exactly.
 - The same file contents give the same fingerprint when submitted in another order or under other names.
-- Every domain rule (all forty-nine values of `DomainRule`) is reported as a domain rule exception that names it, and
+- Every domain rule (all fifty-two values of `DomainRule`) is reported as a domain rule exception that names it, and
   nothing is stored. The four rules that only a real git can raise (`RevisionNotFound`, `GitUnavailable`,
   `GitAccessFailed`, and `GitTimeout`) are exercised in the `ContentSources` subsystem tests instead.
 - A thread started on a file, with replies, resolved and reopened, is read back with its comments in posting order.
@@ -53,6 +56,10 @@ N/A - standard test environment.
   a baseline that cannot be trusted gives a full review with a note, sets already filed or without a change are told
   apart, and the picked reviews are created each in its own transaction, with the review-set recorded in the review
   (see the unit tests of `ReviewPlanner`, and the real-git tests of the planner in the `ContentSources` subsystem tests).
+- A user creates personal access tokens, which are listed without their value; the value authenticates the owner only
+  while the token is active; a revoked token and a wrong value are refused; and an actor that came through a token
+  cannot create a token, name a reviewer, or sign, while it can create a review that is flagged as created through the
+  API (see the unit tests of `PersonalAccessTokenService`, `SigningService`, and `ReviewService`).
 
 ### Test Scenarios
 
@@ -78,7 +85,9 @@ check without a justification; a user with an invalid or taken user name, a blan
 password, a wrong current password, a change of a user that does not exist, or disabling the last enabled
 administrator; a slot for a missing review, a slot with an unknown reviewer or one that does not exist, a change of a
 signed slot, a signing by a user who is not in the slot, a signing that is blocked, a wrong password at a signing, or
-a signing of a record that changed; a repository with an invalid name, location, or credential, a name already used,
+a signing of a record that changed; a token with an invalid name, an invalid lifetime, or beyond the limit of 20 active
+tokens, and an actor that came through a token that signs or names a reviewer; a repository with an invalid name,
+location, or credential, a name already used,
 an unknown or disabled repository, or a token that cannot be decrypted; a revision that is not a safe name; and a
 selection with no valid pattern; and a selection that matches no changed file). Each
 fails with a `DomainRuleException` that names the rule, and the store holds only the project, review, and
@@ -110,6 +119,17 @@ wrong password is refused with `ReauthenticationFailed`; signing with the right 
 then opened and resolved, which changes the record: the slot is out of date, the review is not approved, and the
 digest differs. The alternate signs the new record, and the review is approved again with the alternate as signer.
 This scenario is tested by `CoreSubsystem_Signatures_SignChangeOutOfDateAndResign_FollowsTheRecord`.
+
+**CoreSubsystem_AccessTokens_CreateAuthenticateAndRevoke_FollowTheOwner**: A user is created and a token is made through
+`PersonalAccessTokenService`. The value authenticates the owner and a value with a changed ending does not; the list
+shows the name; an actor that carries the id of the token is refused when it tries to create a token; and after the owner
+revokes the token the value is refused. This scenario is tested by
+`CoreSubsystem_AccessTokens_CreateAuthenticateAndRevoke_FollowTheOwner`.
+
+**CoreSubsystem_TokenActor_CreatesFlaggedReviewButCannotSign**: An actor that came through a token creates a review,
+which is flagged as created through the API; the same actor is refused with `ActorNotAllowed` when it names a reviewer
+or signs, even with the right password and digest, and the slot stays unsigned. This scenario is tested by
+`CoreSubsystem_TokenActor_CreatesFlaggedReviewButCannotSign`.
 
 **Audit trail of the services**: The unit tests of `AuditService` and `UserService` verify the subsystem requirement
 for the audit trail. A draft recorded through `AuditService` is stored and the chain verifies, which is tested by
