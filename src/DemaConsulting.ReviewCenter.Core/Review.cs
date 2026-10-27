@@ -59,6 +59,20 @@ public sealed class Review
     public DateTimeOffset Created { get; init; }
 
     /// <summary>
+    ///     Gets the user name of the user who created the review, or <c>null</c> for a review created before this was recorded.
+    /// </summary>
+    /// <remarks>
+    ///     Provenance metadata only; it is not part of the record digest, because the tamper-evident audit trail
+    ///     carries the same fact.
+    /// </remarks>
+    public string? CreatedBy { get; init; }
+
+    /// <summary>
+    ///     Gets a value indicating whether the review was created through the API with a personal access token.
+    /// </summary>
+    public bool CreatedViaApi { get; init; }
+
+    /// <summary>
     ///     Gets the content fingerprint of the file set, as computed by <see cref="Fingerprint"/>.
     /// </summary>
     public string ContentFingerprint { get; init; } = string.Empty;

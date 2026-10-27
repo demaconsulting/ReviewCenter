@@ -38,6 +38,9 @@ N/A - standard test environment.
   encrypted before a restart is readable after it.
 - A key ring folder that cannot be written stops the start of the server with an error that names the
   `DataProtection:KeysPath` setting and the folder.
+- The personal access token service is one shared instance, the routes under `/api` are mapped, the OpenAPI document is
+  served without a token, a protected route without a token is answered 401, and an unknown address under `/api` is
+  answered with a JSON problem document instead of a page.
 
 #### Test Scenarios
 
@@ -124,6 +127,12 @@ same instance, the git source and the token protector are registered, the git ca
 the database, a key file exists in a `keys` folder beside the database, and a protected value does not contain the
 token and is unprotected to it. This scenario is tested by
 `ServerHost_AddServices_Configured_RegistersRepositoryServicesWithDefaultFolders`.
+
+**ServerHost_CreateApplication_ApiRoutes_AreMapped**: The real pipeline is started on an in-memory server; the
+`PersonalAccessTokenService` is taken from the application services twice and is the same instance. A request for
+`/api/projects` without a token is answered 401, the OpenAPI document at `/api/openapi.json` is answered 200 without a
+token, and an unknown address `/api/nothing` is answered 404 with the media type `application/problem+json`, not with a
+page. This scenario is tested by `ServerHost_CreateApplication_ApiRoutes_AreMapped`.
 
 **ServerHost_Restart_KeyRingPersisted_TokenStaysReadable**: A token is encrypted with the protector of one application
 instance, which is then disposed; a second instance on the same database decrypts it. This scenario is tested by

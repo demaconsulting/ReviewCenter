@@ -153,3 +153,15 @@ sections:
         tests:
           - SigningService_SlotAndSignatureEvents_AreRecordedWithMembersAndDigest
           - SigningService_RemoveSlotAsync_RecordsSlotRemovedWithItsMembers
+
+      - id: ReviewCenter-SigningService-ApiToken
+        title: >-
+          The SigningService class shall refuse to sign, and to add, change, or remove a reviewer slot, for an actor
+          that came through a personal access token, before it checks anything else.
+        justification: |
+          A signature must prove that the person was present and knew their password, which a token held by a script
+          does not. Refusing in the service, not only in the routes, keeps a later route or page from giving a token
+          the power to sign.
+        tests:
+          - SigningService_SignAsync_ApiTokenActor_IsRefusedBeforeAnyCheck
+          - SigningService_AddUpdateRemoveSlot_ApiTokenActor_IsRefused

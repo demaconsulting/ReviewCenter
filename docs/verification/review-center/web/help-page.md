@@ -29,6 +29,9 @@ N/A - standard test environment.
   key, the certificate store settings, and `Attestation:RequireTrustedKey` (refusal to start for a self-signed key or a
   certificate without a signing key usage, and the review page reason for a certificate that stops being valid while
   the server runs).
+- The API tokens topic describes how to create a token on the account page, that the value is shown once, the expiry
+  choices and the limit, a curl example with the bearer header, the endpoints and the OpenAPI document, that a token
+  never signs, that a review made through the API is a Draft marked as created via API, and the 401 and 429 answers.
 
 #### Test Scenarios
 
@@ -55,3 +58,11 @@ refuse to start for a self-signed key or a certificate without a signing key usa
 valid while the server runs is reported on the review page instead of the button, and that the note of a self-signed
 certificate from the store says that the administrator supplied it. This scenario is tested by
 `HelpAttestationPage_Render_ExplainsWhatTheSignatureProvesAndTheKey`.
+
+**HelpApiTokensPage_Render_ExplainsTokensCurlEndpointsAndErrors**: The API tokens page is rendered; the heading is
+"Automation and API tokens", the screenshot is served from `/help/` with alternative text, and the text names the
+Account page, the expiry choices of 30, 90, or 365 days with 90 as the default, that the value is shown once, the limit
+of 20 active tokens, and the revocation. It says that a token can never sign, shows a curl example with the bearer header
+against `/api/projects`, names `POST /api/projects/{id}/reviews` and `/api/openapi.json`, says that a review made through
+the API is a Draft that is marked as created via API, and explains the 401 and 429 answers. No link begins with `#`. This
+scenario is tested by `HelpApiTokensPage_Render_ExplainsTokensCurlEndpointsAndErrors`.

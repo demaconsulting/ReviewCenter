@@ -26,14 +26,15 @@ namespace DemaConsulting.ReviewCenter.Storage;
 /// <summary>
 ///     The Entity Framework Core model of the ReviewCenter database: users, the registry of git repositories, projects, reviews, review files, the
 ///     comment threads of a review with their comments, the review checklist (frozen snapshot, section
-///     applicability and answers), and the reviewer slots with their signatures.
+///     applicability and answers), the reviewer slots with their signatures, and the personal access tokens.
 /// </summary>
 /// <remarks>
 ///     The model maps the Core entities as they are, so Core stays free of any database library.
 ///     The schema is created with <c>EnsureCreated</c> (see <see cref="DatabaseSetup"/>); there are no
 ///     migrations yet, so a database created before users, threads, checklists, slots or signatures existed does
 ///     not gain their tables or columns and must be deleted and recreated (this includes the repository registry and
-///     the repository source columns of reviews and review files). Instances are short-lived and not thread-safe: create one per operation
+///     the repository source columns of reviews and review files, the personal access token table and the creator
+///     columns of reviews). Instances are short-lived and not thread-safe: create one per operation
 ///     through <see cref="IDbContextFactory{TContext}"/>.
 /// </remarks>
 internal sealed class ReviewCenterDbContext : DbContext
@@ -73,6 +74,11 @@ internal sealed class ReviewCenterDbContext : DbContext
     ///     token of the longest allowed length.
     /// </summary>
     private const int EncryptedTokenColumnLength = 4000;
+
+    /// <summary>
+    ///     The width of the column that holds the short display id of a personal access token; wider than the id itself.
+    /// </summary>
+    private const int TokenDisplayIdColumnLength = 16;
 
     /// <summary>
     ///     Initializes a new instance of the <see cref="ReviewCenterDbContext"/> class.
@@ -149,6 +155,11 @@ internal sealed class ReviewCenterDbContext : DbContext
     public DbSet<RepositoryRecord> Repositories => Set<RepositoryRecord>();
 
     /// <summary>
+    ///     Gets the table of personal access tokens.
+    /// </summary>
+    public DbSet<PersonalAccessToken> PersonalAccessTokens => Set<PersonalAccessToken>();
+
+    /// <summary>
     ///     Configures keys, relationships, length limits and conversions.
     /// </summary>
     /// <param name="modelBuilder">The builder used to describe the model.</param>
@@ -178,6 +189,9 @@ internal sealed class ReviewCenterDbContext : DbContext
             review.Property(r => r.State).HasConversion<string>().HasMaxLength(StateColumnLength);
             review.Property(r => r.ContentFingerprint).IsRequired().HasMaxLength(Sha256HexColumnLength);
 
+            // Who created the review and whether through the API (provenance only; null and false for older rows)
+            review.Property(r => r.CreatedBy).HasMaxLength(ReviewLimits.MaxUsernameLength);
+            review.Property(r => r.CreatedViaApi).HasDefaultValue(false);
             // Source of a repository review (all null for an upload): the repository identity is a plain number,
             // not a foreign key, so the review keeps its reference whatever happens to the registration
             review.Property(r => r.RepositoryName).HasMaxLength(RepositoryService.MaxNameLength);
@@ -239,6 +253,20 @@ internal sealed class ReviewCenterDbContext : DbContext
             user.Property(u => u.DisplayName).IsRequired().HasMaxLength(ReviewLimits.MaxDisplayNameLength);
             user.Property(u => u.Role).HasConversion<string>().HasMaxLength(StateColumnLength);
             user.Property(u => u.PasswordHash).IsRequired();
+        });
+
+        // Personal access tokens: only the SHA-256 hash of the value is stored (unique, and the key of the lookup when
+        // a request presents a token); the display id is a random, non-secret label for lists and the audit trail.
+        // A token goes away with its user
+        modelBuilder.Entity<PersonalAccessToken>(token =>
+        {
+            token.HasKey(t => t.Id);
+            token.Property(t => t.Name).IsRequired().HasMaxLength(ReviewLimits.MaxTokenNameLength);
+            token.Property(t => t.DisplayId).IsRequired().HasMaxLength(TokenDisplayIdColumnLength);
+            token.Property(t => t.TokenHash).IsRequired().HasMaxLength(Sha256HexColumnLength);
+            token.HasIndex(t => t.TokenHash).IsUnique();
+            token.HasIndex(t => t.UserId);
+            token.HasOne(t => t.User).WithMany().HasForeignKey(t => t.UserId).OnDelete(DeleteBehavior.Cascade);
         });
 
         // Repositories: identity assigned by the database; the name is unique without regard to case (NOCASE); the

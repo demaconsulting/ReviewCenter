@@ -1,0 +1,78 @@
+---
+# Software Unit Requirements for the ApiTokenAuthentication Unit
+#
+# The ApiTokenAuthentication unit signs in the requests under /api from a personal access token that is sent as a
+# bearer token, and answers a request without a valid token. It never uses the session cookie of the web pages.
+
+sections:
+  - title: ApiTokenAuthentication Unit Requirements
+    requirements:
+      - id: ReviewCenter-ApiTokenAuthentication-Bearer
+        title: >-
+          The ApiTokenAuthentication unit shall sign in a request under /api that sends a valid personal access token
+          as a bearer token as the owner of the token, with the id of the token on the actor, and shall record that
+          the token was used.
+        justification: |
+          Acting as the owner keeps every change attributable to a person, the id of the token tells which of the
+          tokens of that person was used, and the time of last use lets the owner find a token that nobody needs.
+        tests:
+          - ApiTokenAuthentication_Request_ValidToken_AuthenticatesAndRecordsLastUsed
+          - ApiTokenAuthentication_Request_ValidToken_ActsAsTheOwner
+
+      - id: ReviewCenter-ApiTokenAuthentication-Refusal
+        title: >-
+          The ApiTokenAuthentication unit shall answer a request under /api with no token, an unknown or revoked
+          token, or an expired token with status 401 and a Bearer challenge, and shall give the same answer for
+          every reason that a token is refused.
+        justification: |
+          A client must be told to send a token, but a different answer for an expired token and for a token that
+          never existed would help somebody who guesses tokens.
+        tests:
+          - ApiTokenAuthentication_Request_NoBearerToken_Answers401WithChallenge
+          - ApiTokenAuthentication_Request_RefusedTokens_AllGetTheSameGenericAnswer
+          - ApiTokenAuthentication_Request_ExpiredToken_Answers401
+
+      - id: ReviewCenter-ApiTokenAuthentication-Cookie
+        title: >-
+          The ApiTokenAuthentication unit shall not accept the session cookie of the web pages for a request under
+          /api, and shall not sign in a request for a web page, the sign-in and sign-out endpoints or the web socket
+          negotiation of the pages from a bearer token.
+        justification: |
+          A cookie is sent by the browser to a site without the user being asked, so an API that accepted it would
+          be open to forgery from other sites. A token that signed in a web page would give a leaked token the
+          power of the person at the screen, including the actions that need a password.
+        tests:
+          - ApiTokenAuthentication_Request_SessionCookie_IsNotAccepted
+          - ApiTokenAuthentication_Request_TokenOnWebPage_IsNotSignedIn
+          - ApiTokenAuthentication_Request_TokenOnAuthAndBlazorRoutes_IsNotSignedIn
+
+      - id: ReviewCenter-ApiTokenAuthentication-Throttle
+        title: >-
+          The ApiTokenAuthentication unit shall answer a request from a client address that has had too many tokens
+          refused with status 429.
+        justification: |
+          Guessing tokens must be slow for one client, even though a token has high entropy, and a limit by address
+          does not stop other clients.
+        tests:
+          - ApiTokenAuthentication_Request_TooManyRefusals_AnswersTooManyRequests
+
+      - id: ReviewCenter-ApiTokenAuthentication-FailureAudit
+        title: >-
+          The ApiTokenAuthentication unit shall record a refused token in the audit trail, once for each client
+          address and minute, without recording the token value.
+        justification: |
+          An administrator needs to see that tokens are being guessed or that a script uses a revoked token. Once
+          for each address and minute keeps a flood of requests from filling the audit trail, and leaving out the
+          value keeps the audit trail from becoming a source of tokens.
+        tests:
+          - ApiTokenAuthentication_Request_RefusedToken_IsAuditedOnceWithoutTheValue
+
+      - id: ReviewCenter-ApiTokenAuthentication-NoLog
+        title: >-
+          The ApiTokenAuthentication unit shall not write a token value, or any text that starts with the token prefix,
+          to the application log when a token is created, accepted or refused.
+        justification: |
+          A log is read by more people, and kept longer, than the place where a token is shown once. A token in a log
+          would give everybody who can read the log the access of its owner.
+        tests:
+          - ApiTokenAuthentication_Request_AnyOutcome_NeverLogsTheToken

@@ -30,7 +30,13 @@ protected pages are redirected.
 the "too many attempts" message (any other value asks for the generic message).
 
 **Claims**: the principal in the cookie has three claims: the user name (the name claim), the display name, and the
-role (the role claim). It never has the password or its hash.
+role (the role claim). It never has the password or its hash. A principal that the `Api` subsystem builds from a token
+has the same three claims and two more (`rc_auth` and `rc_token_id`), but it is never signed in with the cookie scheme
+and this unit never accepts it.
+
+**ClientAddress**: `internal static` method; the address of the connection of a request as text (an IPv4 address that is
+mapped into IPv6 shown as IPv4), or null when it is not known. It is the one place that decides what the client address
+is, so the web login and the token authentication of the API count attempts by the same address.
 
 **AuthOptions** (supporting type): a settings object bound from the `Auth` configuration section, with two settings.
 `SessionHours` (`int`, default 8, must be greater than 0): how many hours a sign-in lasts without activity.
@@ -183,6 +189,8 @@ address is only in the web server log.
 - **ServerHost** — calls `AddSignIn` while registering the services (after the Razor components) and `MapSignIn`
   while mapping the endpoints, and enables the authentication and authorization middleware.
 - **RevalidatingAuthenticationStateProvider** — calls `IsCurrent`.
+- **ApiTokenAuthentication** — reads the client address of a request with `ClientAddress` (an internal static method of
+  this unit that the web login also uses), so that the attempts of the API count per address in the same way.
 - **LoginPage** — posts its form to `/auth/login`, uses `SafeReturnUrl`, and uses `ThrottledError` to choose its message.
 - **App** (`MainLayout`) — posts its logout form to `/auth/logout`, and reads the signed-in user for the header.
 - **ReviewPage**, **ChecklistPage**, **AccountPage**, and **UsersPage** — call `GetActorAsync` (the account page to know

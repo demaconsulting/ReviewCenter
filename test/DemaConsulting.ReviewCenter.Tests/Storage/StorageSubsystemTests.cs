@@ -216,6 +216,50 @@ public class StorageSubsystemTests
     }
 
     /// <summary>
+    ///     Test that a token created through the service, and the revocation of a second one, are still there after
+    ///     the database is closed and opened again, that the value still authenticates its owner, and that the
+    ///     value itself was never stored.
+    /// </summary>
+    [Fact]
+    public async Task StorageSubsystem_AccessTokens_PersistAcrossReopen()
+    {
+        // Arrange: a new database file
+        var options = new DatabaseOptions { ConnectionString = TestDatabase.NewConnectionString() };
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var ann = new Actor("ann", "Ann");
+        CreatedPersonalAccessToken kept;
+        CreatedPersonalAccessToken revoked;
+
+        // Act: create a user and two tokens, revoke one, then close the database
+        var first = Open(options);
+        using (first.Provider)
+        {
+            await NewUserService(first.Provider).CreateAsync("ann", "Ann", UserRole.Reviewer, "correct horse battery", cancellationToken);
+            var tokens = NewTokenService(first.Provider);
+            kept = await tokens.CreateAsync(ann, "build server", 90, cancellationToken);
+            revoked = await tokens.CreateAsync(ann, "laptop", 30, cancellationToken);
+            await tokens.RevokeAsync(ann, revoked.Token.Id, cancellationToken);
+        }
+
+        // Act: open the same database again and use both tokens
+        var second = Open(options);
+        using (second.Provider)
+        {
+            var tokens = NewTokenService(second.Provider);
+            var accepted = await tokens.AuthenticateAsync(kept.Value, cancellationToken);
+            var refused = await tokens.AuthenticateAsync(revoked.Value, cancellationToken);
+            var listed = await tokens.ListAsync(ann, cancellationToken);
+
+            // Assert: the kept token works, the revoked one does not, and no row holds a value
+            Assert.True(accepted.Succeeded);
+            Assert.False(refused.Succeeded);
+            Assert.Equal(2, listed.Count);
+            Assert.DoesNotContain(listed, t => t.TokenHash == kept.Value || t.Name == kept.Value);
+            Assert.NotNull(Assert.Single(listed, t => t.Name == "laptop").Revoked);
+        }
+    }
+
+    /// <summary>
     ///     Test that a repository registered through the service, with its encrypted token and its disabled state,
     ///     is still there after the database is closed and opened again.
     /// </summary>
@@ -333,6 +377,19 @@ public class StorageSubsystemTests
     {
         var factory = provider.GetRequiredService<IDbContextFactory<ReviewCenterDbContext>>();
         return new UserService(new UserStore(factory, new AuditAppender(TimeProvider.System)), new FakePasswordHasher(), new FixedTimeProvider(_now));
+    }
+
+    /// <summary>
+    ///     Builds the token service over the real stores of an opened database.
+    /// </summary>
+    /// <param name="provider">The provider that owns the database factory.</param>
+    /// <returns>The token service.</returns>
+    private static PersonalAccessTokenService NewTokenService(ServiceProvider provider)
+    {
+        var factory = provider.GetRequiredService<IDbContextFactory<ReviewCenterDbContext>>();
+        var appender = new AuditAppender(TimeProvider.System);
+        return new PersonalAccessTokenService(
+            new PersonalAccessTokenStore(factory, appender), new UserStore(factory, appender), new FixedTimeProvider(_now));
     }
 
     /// <summary>

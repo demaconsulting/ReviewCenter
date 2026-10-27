@@ -5,9 +5,11 @@
 #### Purpose
 
 `AccountPage` is the page at `/account`. Its responsibilities are to let the signed-in user choose the appearance of the
-interface, let the user change their own password, and report when the page is interactive. It requires a signed-in
-user. It is a Razor component split into presentation (`AccountPage.razor`) and behavior (`AccountPage.razor.cs`). The
-page uses the narrow page container, because it holds forms, and its two cards are headed Appearance and Change password.
+interface, let the user change their own password, let the user create, list, and revoke their personal access tokens
+for the API, and report when the page is interactive. It requires a signed-in user. It is a Razor component split into
+presentation (`AccountPage.razor`) and behavior (`AccountPage.razor.cs`). The
+page uses the narrow page container, because it holds forms, and its three cards are headed Appearance, Change password,
+and API tokens.
 
 #### Data Model
 
@@ -32,12 +34,27 @@ password only guards against a typing error, so it is compared on the page; Core
 **InteractiveMarker**: `"true"` or `"false"`, rendered as the `data-interactive` attribute of the root element; it
 becomes `true` after the first render on a live connection.
 
+**Tokens**: the personal access tokens of the signed-in user, newest first, read from `PersonalAccessTokenService` when
+the page is initialized and again after every change. The page never sees a token value, only the name, the display id,
+the creation, expiry, and last-used times, and the state. **TokenName** and **TokenExpiryDays** (30, 90, or 365; 90 is
+selected at first) are the values of the create form. **TokenError** and **TokenMessage** hold the last rejected action
+and the last confirmation. **NewTokenValue** is the value of the token that was just created: it is held only in the
+memory of this page instance (the state of this connection), shown once in a box that says it cannot be shown again, and
+removed by the "Done" button or when the page is left. **CopyStatus** is the answer of the copy button. The state of a
+token is worded by the page: Revoked when it has a revocation time, Expired when the clock of the page is at or past the
+expiry, and otherwise Active.
+
 Whose password changes is decided by the authentication state, never by a field on the page.
 
 Every interactive element and key value has a stable `data-testid` (see the test identifier rule of the Web
 subsystem): `account-page` (root), `appearance-card`, `theme-system`, `theme-light`, `theme-dark`,
 `change-password-form`, `current-password-input`, `new-password-input`, `confirm-password-input`, `account-error`,
-`account-message`, and `change-password-button`.
+`account-message`, `change-password-button`, and for the tokens card `tokens-card`, `tokens-help-link`,
+`create-token-form`, `token-name-input`, `token-expiry-{days}`, `create-token-button`, `token-error`, `token-message`,
+`new-token-box`, `new-token-value`, `copy-token-button`, `dismiss-token-button`, `token-copy-status`,
+`token-list-empty`, `token-list`, and for each token (by its identity) `token-row-{id}`, `token-name-{id}`,
+`token-display-id-{id}`, `token-status-{id}`, `token-created-{id}`, `token-expires-{id}`, `token-last-used-{id}`, and
+`revoke-token-{id}`.
 
 #### Key Methods
 
@@ -61,12 +78,32 @@ The user name comes from `SignIn.GetActorAsync`, and the change is made by `User
 **OnAfterRenderAsync**: Marks the page interactive after the first render on a live connection, as `HomePage` does, and
 then reads the stored appearance with `reviewCenter.getTheme` to show it as selected.
 
+**CreateTokenAsync**: Handles submission of the token form.
+
+- *Postconditions*: On success a token of the chosen name and lifetime exists, its value is shown once in the box, the
+  name field is emptied, the message "The token was created." is shown, and the list is read again. On a rule violation
+  (an empty or too long name, a limit of 20 active tokens, or an account that is not available) the message of the
+  violation is shown and nothing is created.
+
+**CopyTokenAsync**: Copies the new value with the browser script `reviewCenter.copyText` (defined by the head script of
+`App`) and shows "Copied.". When the browser refuses or there is no script, the page shows a hint to select the text and
+copy it by hand, and the value stays in the box.
+
+**DismissToken**: Removes the value of the new token from the page for good.
+
+**RevokeTokenAsync**: Revokes one token of the user by its identity and shows "The token was revoked.". The revoke
+button is offered only for a token that is active; a rule violation is shown as the message of the violation.
+
+The tokens are managed on behalf of the signed-in user: the actor comes from `SignIn.GetActorAsync`, so a token cannot be
+created or revoked for anyone else, and a page can only be reached with the cookie, never with a token.
+
 Other sessions of the user stay signed in after the change. An open page of the user that was disabled, removed, or
 changed ends at the next revalidation of the open page (see the `Identity` design).
 
 #### Error Handling
 
-A `DomainRuleException` from `UserService`, or from `GetActorAsync` when the sign-in state of the open page has already
+A `DomainRuleException` from `UserService` or `PersonalAccessTokenService`, or from `GetActorAsync` when the sign-in
+state of the open page has already
 ended, is caught and its message shown in the page. A failure of the browser script that reads or stores the appearance
 (no script, or a lost connection) is caught and ignored, so the default or the last selected choice stays. No other
 exception is handled by the page. The new password inputs carry the maximum length as a convenience; the service remains
@@ -77,8 +114,11 @@ the authority.
 - **SessionGate** (App) — wraps the whole page content, so the page is replaced by a "Session ended" message when the
   sign-in state of the open page ends.
 - **UserService** — changes the password.
+- **PersonalAccessTokenService** — creates, lists, and revokes the tokens.
+- **TimeProvider** — decides whether a token has expired.
 - **SignIn** — `GetActorAsync` supplies the user name from the authentication state.
-- **App** — its head script defines `reviewCenter.getTheme` and `reviewCenter.setTheme` and applies the stored
+- **App** — its head script defines `reviewCenter.getTheme`, `reviewCenter.setTheme`, and `reviewCenter.copyText`, and
+  applies the stored
   appearance before the first paint.
 - **IJSRuntime** (ASP.NET Core) — calls the browser script functions.
 - **ASP.NET Core Blazor components** — the component base class, events, authorization attribute, and the interactive

@@ -318,6 +318,27 @@ public class ReviewServiceRepositoryTests
     }
 
     /// <summary>
+    ///     Test that a review created by an actor that came through an API token is flagged, names the creator and
+    ///     says so in the audit detail with the non-secret token id.
+    /// </summary>
+    [Fact]
+    public async Task ReviewService_CreateFromRepositoryAsync_ApiActor_FlagsReviewAndAuditText()
+    {
+        // Arrange: the fixture and an actor that authenticated with a token
+        var f = await CreateAsync();
+        var viaApi = _actor with { ApiTokenId = "K7M2QX9P" };
+
+        // Act: create the review as that actor
+        var result = await f.Service.CreateFromRepositoryAsync(
+            f.ProjectId, "rev-1", "Title", f.RepositoryId, "main", "v1", "**/*", viaApi, TestContext.Current.CancellationToken);
+
+        // Assert: the review records the creator and the API flag, and the audit detail names the token
+        Assert.Equal(_actor.Username, result.Review.CreatedBy);
+        Assert.True(result.Review.CreatedViaApi);
+        Assert.StartsWith("review 'Title', created via API token 'K7M2QX9P' from repository", Assert.Single(CreatedAudits(f)).Detail, StringComparison.Ordinal);
+    }
+
+    /// <summary>
     ///     Test that the audit entry names the repository, both commits, the counts and the fingerprint.
     /// </summary>
     [Fact]

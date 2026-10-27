@@ -1,0 +1,100 @@
+---
+# Software Unit Requirements for the PersonalAccessTokenService Unit
+#
+# The PersonalAccessTokenService unit creates, lists, authenticates, and revokes the personal access tokens with
+# which a script calls the API as a user. It keeps only a hash of each token value.
+
+sections:
+  - title: PersonalAccessTokenService Unit Requirements
+    requirements:
+      - id: ReviewCenter-PersonalAccessTokenService-Create
+        title: >-
+          The PersonalAccessTokenService unit shall create a token of a user with a trimmed name of at most the
+          allowed length, that has a recognizable prefix and a high-entropy random value, a short random display id
+          that does not depend on the value, show the value only in the answer of the creation, store only the
+          SHA-256 hash of the value, and refuse an unknown or disabled owner.
+        justification: |
+          A stolen database must not hand out working tokens, so only a hash is kept and the value cannot be read
+          again. A prefix lets secret scanners recognize a leaked token, a random value that cannot be guessed makes
+          guessing hopeless, and a display id that does not depend on the value lets the owner and the audit trail
+          name a token without exposing any part of it.
+        tests:
+          - PersonalAccessTokenService_Create_NewToken_HasPrefixAndHighEntropyValue
+          - PersonalAccessTokenService_Create_NewToken_StoresOnlyTheSha256Hash
+          - PersonalAccessTokenService_Create_DisplayId_IsShortRandomAndIndependentOfTheSecret
+          - PersonalAccessTokenService_List_AfterCreate_NeverReturnsTheValue
+          - PersonalAccessTokenService_Create_Name_IsValidatedAndTrimmed
+          - PersonalAccessTokenService_Create_NameLength_HasInclusiveLimit
+          - PersonalAccessTokenService_CreateAndList_UnknownOrDisabledOwner_IsRefused
+
+      - id: ReviewCenter-PersonalAccessTokenService-Expiry
+        title: >-
+          The PersonalAccessTokenService unit shall give a token an expiry of 30, 90, or 365 days chosen at the
+          creation, refuse any other choice, and refuse an expired token.
+        justification: |
+          A token that never expires is a permanent risk if it leaks. A short list of choices keeps the settings
+          simple, and refusing at the expiry makes the choice real.
+        tests:
+          - PersonalAccessTokenService_Create_ExpiryChoices_SetsExpiryOrRejectsOthers
+          - PersonalAccessTokenService_Authenticate_AfterExpiry_IsRejected
+
+      - id: ReviewCenter-PersonalAccessTokenService-Limit
+        title: >-
+          The PersonalAccessTokenService unit shall refuse to create a token for a user who already has 20 active
+          tokens, where a revoked or an expired token is not active.
+        justification: |
+          A limit keeps a user, or a script that creates tokens in a loop, from filling the table, and revoked and
+          expired tokens must not count so that the user can always make room.
+        tests:
+          - PersonalAccessTokenService_Create_TwentyActive_RejectsTheTwentyFirst
+          - PersonalAccessTokenService_Create_RevokedAndExpiredDoNotCount
+
+      - id: ReviewCenter-PersonalAccessTokenService-Authenticate
+        title: >-
+          The PersonalAccessTokenService unit shall accept a token value only when its hash equals the stored hash,
+          compared in constant time, and shall refuse a malformed value, a revoked token, and a token of a disabled
+          or locked owner.
+        justification: |
+          A token must work for the person who has the value and for nobody else, and must stop working when the
+          person is no longer allowed to act. A comparison that takes the same time for every value does not tell
+          how much of a guess was right.
+        tests:
+          - PersonalAccessTokenService_Authenticate_RightAndWrongValue_OnlyRightSucceeds
+          - PersonalAccessTokenService_Authenticate_StoreReturnsRowWithOtherHash_IsRejected
+          - PersonalAccessTokenService_Authenticate_DisabledOrLockedOwner_IsRejected
+          - PersonalAccessTokenService_Authenticate_Malformed_IsRejected
+
+      - id: ReviewCenter-PersonalAccessTokenService-LastUsed
+        title: >-
+          The PersonalAccessTokenService unit shall record the time of the last use of a token when it is
+          authenticated, at most once in five minutes for one token, also when several requests arrive at once.
+        justification: |
+          The owner can tell a token that is no longer used and revoke it. Writing at most once in five minutes
+          keeps a script that calls the API often from writing to the database on every request.
+        tests:
+          - PersonalAccessTokenService_Authenticate_Touch_AtMostOncePerFiveMinutes
+          - PersonalAccessTokenService_Authenticate_ParallelBurst_TouchesOnce
+
+      - id: ReviewCenter-PersonalAccessTokenService-Revoke
+        title: >-
+          The PersonalAccessTokenService unit shall let a user revoke a token of their own so that it stops working,
+          shall refuse to revoke the token of another user, and shall refuse to create or revoke a token for an
+          actor that came through a token.
+        justification: |
+          A token that leaked or is no longer needed must be possible to take back at once. A user must not take back
+          the tokens of others, and a token must not be able to create more tokens or revoke tokens, as that would let
+          a leaked token outlive its revocation.
+        tests:
+          - PersonalAccessTokenService_Revoke_OwnToken_StopsWorkingAndIsAudited
+          - PersonalAccessTokenService_Revoke_OtherUsersToken_IsRefused
+          - PersonalAccessTokenService_CreateAndRevoke_ApiTokenActor_IsRefused
+
+      - id: ReviewCenter-PersonalAccessTokenService-Audit
+        title: >-
+          The PersonalAccessTokenService unit shall record the creation and the revocation of a token in the audit
+          trail, with the display id and without the value.
+        justification: |
+          Tokens give access, so who made and who took back a token belongs in the audit trail, and the value must
+          not be there, as the audit trail is read by more people than the owner.
+        tests:
+          - PersonalAccessTokenService_CreateAndRevoke_RecordAuditEventsWithoutTheValue

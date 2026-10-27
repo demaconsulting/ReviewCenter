@@ -36,6 +36,9 @@ N/A - standard test environment.
   kept.
 - A review is approved only when it has at least one slot and every slot has a current signature.
 - The candidates for a slot are the enabled users.
+- An actor that came through a personal access token cannot sign, and cannot add, change, or remove a slot; the refusal
+  is `ActorNotAllowed` and comes before every other check, so that a request with everything right and one with
+  everything wrong give the same answer.
 - Null arguments are rejected with an `ArgumentNullException`.
 
 #### Test Scenarios
@@ -138,6 +141,16 @@ This scenario is tested by `SigningService_GetApprovalAsync_MissingReview_Return
 
 **SigningService_ListCandidatesAsync_ReturnsEnabledUsersOnly**: With one user disabled, the candidates are the other
 enabled users. This scenario is tested by `SigningService_ListCandidatesAsync_ReturnsEnabledUsersOnly`.
+
+**SigningService_SignAsync_ApiTokenActor_IsRefusedBeforeAnyCheck**: A review that can be signed is prepared, and the
+primary reviewer's identity arrives through a token. Signing with the right password, slot, and digest, and signing with
+a wrong password, a missing review, an unknown slot, and a stale digest, are both refused with `ActorNotAllowed`, which
+shows that nothing else is checked first, and the slot stays unsigned. This scenario is tested by
+`SigningService_SignAsync_ApiTokenActor_IsRefusedBeforeAnyCheck`.
+
+**SigningService_AddUpdateRemoveSlot_ApiTokenActor_IsRefused**: An actor that came through a token adds, changes, and
+removes a slot; each is refused with `ActorNotAllowed` and the existing slot is unchanged. This scenario is tested by
+`SigningService_AddUpdateRemoveSlot_ApiTokenActor_IsRefused`.
 
 **SigningService_Constructor_NullArguments_Throw**: A null store, user service, or clock is rejected with an
 `ArgumentNullException`. This scenario is tested by `SigningService_Constructor_NullArguments_Throw`.

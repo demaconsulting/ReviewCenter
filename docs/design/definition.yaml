@@ -12,6 +12,7 @@ resource-path:
   - docs/design/review-center/storage
   - docs/design/review-center/content-sources
   - docs/design/review-center/evidence
+  - docs/design/review-center/api
   - docs/design/review-center-puppet
   - docs/design/ots
   - docs/template
@@ -53,6 +54,7 @@ input-files:
   - docs/design/review-center/core/thread-service.md
   - docs/design/review-center/core/checklist-service.md
   - docs/design/review-center/core/user-service.md
+  - docs/design/review-center/core/personal-access-token-service.md
   - docs/design/review-center/core/record-digest.md
   - docs/design/review-center/core/signing-service.md
   - docs/design/review-center/core/selection-matcher.md
@@ -64,6 +66,7 @@ input-files:
   - docs/design/review-center/storage/review-center-db-context.md
   - docs/design/review-center/storage/review-store.md
   - docs/design/review-center/storage/user-store.md
+  - docs/design/review-center/storage/personal-access-token-store.md
   - docs/design/review-center/storage/database-setup.md
   - docs/design/review-center/storage/repository-store.md
   - docs/design/review-center/content-sources.md
@@ -78,6 +81,10 @@ input-files:
   - docs/design/review-center/evidence/attestation-key-provider.md
   - docs/design/review-center/evidence/attestation-service.md
   - docs/design/review-center/evidence/attestation-endpoint.md
+  - docs/design/review-center/api.md
+  - docs/design/review-center/api/api-token-authentication.md
+  - docs/design/review-center/api/api-endpoints.md
+  - docs/design/review-center/api/api-document.md
   - docs/design/review-center-puppet.md
   - docs/design/review-center-puppet/puppet-program.md
   - docs/design/review-center-puppet/control-channel.md
@@ -92,6 +99,7 @@ input-files:
   - docs/design/ots/fileassert.md
   - docs/design/ots/filesystemglobbing.md
   - docs/design/ots/git.md
+  - docs/design/ots/openapi.md
   - docs/design/ots/pandoc.md
   - docs/design/ots/pkcs.md
   - docs/design/ots/playwright.md

@@ -40,3 +40,51 @@ sections:
           - AccountPage_Render_AppearanceCard_ShowsThreeOptionsWithSystemSelected
           - AccountPage_ChooseDark_AppliesThemeAndSelectsOption
           - AccountPage_Render_StoredLightChoice_IsSelected
+
+      - id: ReviewCenter-AccountPage-TokensCard
+        title: >-
+          The AccountPage unit shall show a card of the personal access tokens of the signed-in user, with a form to
+          create a token, the list of the tokens with the name, the display id, the expiry, the last use, and the
+          state of each, without any token value, and a link to the help topic about the API.
+        justification: |
+          The owner of a token must see which tokens exist and which are in use, in order to take back the ones that
+          are not needed, and a link to the help topic puts the explanation where the token is made.
+        tests:
+          - AccountPage_Render_TokensCard_ShowsFormEmptyListAndHelpLink
+          - AccountPage_Render_ExpiredToken_ShowsExpiredWithoutRevokeButton
+
+      - id: ReviewCenter-AccountPage-TokenCreate
+        title: >-
+          The AccountPage unit shall create a token from the name and the expiry that the user entered, show its
+          value once, with a copy button and a note that it cannot be shown again, list the new token, and show an
+          error and create nothing when the name is empty or the user already has 20 active tokens.
+        justification: |
+          The value is only known at the moment of creation, so the page must show it then, and a refusal must say why
+          and must not leave a token that the user did not see.
+        tests:
+          - AccountPage_CreateToken_ValidInput_ShowsValueOnceAndListsToken
+          - AccountPage_CreateToken_EmptyName_ShowsErrorAndCreatesNothing
+          - AccountPage_CreateToken_TwentyActive_ShowsLimitError
+
+      - id: ReviewCenter-AccountPage-TokenCopy
+        title: >-
+          The AccountPage unit shall copy the value of a new token to the clipboard through the browser when the user
+          presses the copy button, and show a hint to copy it by hand, keeping the value on the page, when the
+          browser refuses.
+        justification: |
+          Copying the value avoids a typing error, and the value must not be lost because a browser did not allow the
+          copy, as it cannot be shown again.
+        tests:
+          - AccountPage_CopyToken_NewToken_CopiesThroughBrowserScript
+          - AccountPage_CopyToken_BrowserRefuses_ShowsHintAndKeepsToken
+
+      - id: ReviewCenter-AccountPage-TokenRevoke
+        title: >-
+          The AccountPage unit shall let the user revoke an active token of their own, show the token as revoked
+          without the revoke button afterwards, and offer no revoke button for a token that is expired.
+        justification: |
+          A token that leaked or is no longer used must be possible to take back from the page at once, and a button
+          that does nothing for a token that is already dead would only confuse.
+        tests:
+          - AccountPage_RevokeToken_ActiveToken_MarksRevokedAndRemovesButton
+          - AccountPage_Render_ExpiredToken_ShowsExpiredWithoutRevokeButton

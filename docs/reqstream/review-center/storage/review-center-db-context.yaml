@@ -138,3 +138,14 @@ sections:
         tests:
           - RepositoryStore_AddAsync_Repository_RoundTripsAndAudits
           - RepositoryStore_NameOtherCase_ThrowsRepositoryNameTaken
+
+      - id: ReviewCenter-DbContext-Tokens
+        title: >-
+          The ReviewCenterDbContext class shall map the personal access tokens to a table in which the hash is
+          unique, and shall map the creator and the creation through the API of a review to
+          columns of the review.
+        justification: |
+          The database is the last defense against two tokens with one hash, which would make the owner of a request
+          ambiguous, and the creator of a review must be kept with the review to be shown and audited later.
+        tests:
+          - ReviewCenterDbContext_Model_HasTokenTableAndReviewCreatorColumns

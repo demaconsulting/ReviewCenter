@@ -69,7 +69,11 @@ public abstract class PageTestBase : BunitContext
         Checklists = new ChecklistService(store, clock);
         AuditStore = new FakeAuditStore(clock);
         Audit = new AuditService(AuditStore);
-        Users = new UserService(new FakeUserStore(), new FakePasswordHasher(), clock, Audit);
+        var userStore = new FakeUserStore();
+        Users = new UserService(userStore, new FakePasswordHasher(), clock, Audit);
+        TokenStore = new FakePersonalAccessTokenStore(userStore);
+        Tokens = new PersonalAccessTokenService(TokenStore, userStore, Time);
+        Services.AddSingleton(Tokens);
         RepositoryStore = new FakeRepositoryStore();
         Repositories = new RepositoryService(RepositoryStore, new FakeCredentialProtector(), Users, clock);
         Git = new FakeGitRepositoryProvider();
@@ -120,6 +124,16 @@ public abstract class PageTestBase : BunitContext
     ///     Gets the in-memory store behind the repository service, for arranging and inspecting registrations.
     /// </summary>
     internal FakeRepositoryStore RepositoryStore { get; }
+
+    /// <summary>
+    ///     Gets the in-memory token store behind the token service, for arranging and inspecting tokens.
+    /// </summary>
+    internal FakePersonalAccessTokenStore TokenStore { get; }
+
+    /// <summary>
+    ///     Gets the personal access token service the account page uses.
+    /// </summary>
+    protected PersonalAccessTokenService Tokens { get; }
 
     /// <summary>
     ///     Gets the scripted git provider behind the review service, for arranging repository reviews.

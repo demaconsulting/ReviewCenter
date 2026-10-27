@@ -73,5 +73,89 @@
             <button type="submit" data-testid="change-password-button">Change password</button>
         </form>
     </section>
+
+    <section class="card" data-testid="tokens-card">
+        <h2 id="tokens-heading">API tokens</h2>
+        <p class="muted hint">A token lets a script or tool use the ReviewCenter API as you. It can read projects and reviews and create review drafts; it can never sign. The token is shown once, so copy it right away.</p>
+        <p><a class="action outline small" href="/help/api-tokens" data-testid="tokens-help-link">About API tokens</a></p>
+        <form data-testid="create-token-form" @onsubmit="CreateTokenAsync">
+            <div class="field">
+                <label for="token-name">What is the token for?</label>
+                <input id="token-name" type="text" autocomplete="off"
+                       maxlength="@ReviewLimits.MaxTokenNameLength"
+                       data-testid="token-name-input" @bind="TokenName" @bind:event="oninput" />
+            </div>
+            <p id="token-expiry-heading" class="muted hint">Expires after</p>
+            <div class="option-cards three" role="radiogroup" aria-labelledby="token-expiry-heading">
+                @foreach (var days in ReviewLimits.TokenExpiryChoicesInDays)
+                {
+                    var choice = days;
+                    <label class="option-card">
+                        <input type="radio" name="token-expiry" value="@choice" data-testid="token-expiry-@choice"
+                               checked="@(TokenExpiryDays == choice)" @onchange="@(() => TokenExpiryDays = choice)" />
+                        <span class="option-title">@choice days</span>
+                    </label>
+                }
+            </div>
+            @if (TokenError is not null)
+            {
+                <p class="error" role="alert" data-testid="token-error">@TokenError</p>
+            }
+            @if (TokenMessage is not null)
+            {
+                <p class="notice" role="status" data-testid="token-message">@TokenMessage</p>
+            }
+            <button type="submit" data-testid="create-token-button">Create token</button>
+        </form>
+
+        @if (NewTokenValue is not null)
+        {
+            <div class="notice" role="status" data-testid="new-token-box">
+                <p><strong>Copy this token now. It cannot be shown again.</strong></p>
+                <p><code class="mono" data-testid="new-token-value">@NewTokenValue</code></p>
+                <p>
+                    <button type="button" class="outline small" data-testid="copy-token-button"
+                            @onclick="CopyTokenAsync">Copy</button>
+                    <button type="button" class="outline small" data-testid="dismiss-token-button"
+                            @onclick="DismissToken">Done</button>
+                    <span class="muted" role="status" data-testid="token-copy-status">@CopyStatus</span>
+                </p>
+            </div>
+        }
+
+        @if (Tokens.Count == 0)
+        {
+            <p class="muted" data-testid="token-list-empty">You have no tokens yet.</p>
+        }
+        else
+        {
+            <ul class="row-list" data-testid="token-list">
+                @foreach (var token in Tokens)
+                {
+                    var tokenId = token.Id;
+                    var status = StatusOf(token);
+                    <li class="row-card static-row" data-testid="token-row-@tokenId">
+                        <div class="row-main">
+                            <strong class="row-title" data-testid="token-name-@tokenId">@token.Name</strong>
+                            <p class="muted mono" data-testid="token-display-id-@tokenId">@token.DisplayId</p>
+                            <p class="row-badges">
+                                <span class="badge @(status == "Active" ? "approved" : null)" data-testid="token-status-@tokenId">@status</span>
+                                <span class="muted" data-testid="token-created-@tokenId">Created @FormatDate(token.Created)</span>
+                                <span class="muted" data-testid="token-expires-@tokenId">Expires @FormatDate(token.Expires)</span>
+                                <span class="muted" data-testid="token-last-used-@tokenId">Last used @(token.LastUsed is { } lastUsed ? FormatDate(lastUsed) : "never")</span>
+                            </p>
+                        </div>
+                        @if (status == "Active")
+                        {
+                            <div class="row-actions">
+                                <button type="button" class="outline small" data-testid="revoke-token-@tokenId"
+                                        @onclick="() => RevokeTokenAsync(tokenId)">Revoke</button>
+                            </div>
+                        }
+                    </li>
+                }
+            </ul>
+        }
+    </section>
 </main>
 </SessionGate>

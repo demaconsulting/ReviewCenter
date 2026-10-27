@@ -1,0 +1,67 @@
+@* HelpApiTokensPage: help topic "Automation and API tokens" at "/help/api-tokens". Static text, a curl example and a
+   screenshot of the token card of the Account page. *@
+@page "/help/api-tokens"
+
+<HelpTopicFrame Slug="api-tokens">
+    <section class="card">
+        <p>A <strong>personal access token</strong> lets a script or a tool use the ReviewCenter API as you, without your
+            password. It can read projects and reviews and create review drafts. It can <strong>never sign</strong>: a
+            signature always needs a person who enters the password again, so a token cannot sign a review or change its
+            reviewer slots.</p>
+        <h2>Create a token</h2>
+        <ul>
+            <li>Open the <strong>Account</strong> page and find the <strong>API tokens</strong> card.</li>
+            <li>Type what the token is for (for example the name of the build job), choose when it expires (30, 90 or 365
+                days; 90 is the default), and press <strong>Create token</strong>.</li>
+            <li>The token value (it starts with <code>rcpat_</code>) is shown <strong>once</strong>. Copy it right away
+                and keep it in the secret store of your tool. ReviewCenter keeps only a fingerprint of it, so a lost token
+                cannot be shown again; create a new one.</li>
+            <li>The list shows each token with its name, a short identifier, the state (Active, Expired or Revoked), when
+                it was created, when it expires, and when it was last used. The value is never listed.</li>
+            <li>You can have at most 20 active tokens. Expired and revoked tokens do not count.</li>
+        </ul>
+        <figure class="help-figure">
+            <img class="help-shot" src="/help/api-tokens-1.png" loading="lazy"
+                 alt="The API tokens card of the Account page: a name field, the expiry choices 30, 90 and 365 days, the Create token button, and a list with one active token and its Revoke button." />
+            <figcaption>The API tokens card of the Account page, with one token created.</figcaption>
+        </figure>
+        <h2>Revoke a token</h2>
+        <p>Press <strong>Revoke</strong> next to a token that is no longer needed or that may have leaked. It stops working
+            at once. Disabling your user also stops all of your tokens.</p>
+        <h2>Use a token</h2>
+        <p>Send the token in the <code>Authorization</code> header, as a bearer token, with every request to an address
+            under <code>/api</code>. This lists the projects:</p>
+        <pre><code>curl -H "Authorization: Bearer rcpat_YOUR_TOKEN" https://reviews.example.com/api/projects</code></pre>
+        <p>The answer is JSON. The endpoints are:</p>
+        <ul>
+            <li><code>GET /api/projects</code>: the projects.</li>
+            <li><code>GET /api/projects/{id}/reviews</code>: the reviews of a project.</li>
+            <li><code>GET /api/projects/{id}/reviews/{reviewId}</code>: one review with its reviewer slots, approval
+                status, and progress.</li>
+            <li><code>POST /api/projects/{id}/reviews</code>: create a review from uploaded files (Base64) or from a
+                registered git repository.</li>
+            <li><code>GET /api/projects/{id}/reviews/{reviewId}/attestation.pdf</code>: the signed attestation PDF of an
+                approved review.</li>
+            <li><code>GET /api/openapi.json</code>: the OpenAPI document that describes all of this. It is open to
+                everyone and needs no token.</li>
+        </ul>
+        <h2>A review created through the API</h2>
+        <p>A review created with a token starts as a <strong>Draft</strong>, like one created on the web pages. It is
+            flagged <strong>created via API</strong>: the review data of the API says so (<code>createdViaApi</code>), and
+            the audit trail entry names the token. A person still has to assign the reviewers, and the reviewers still
+            sign in the browser.</p>
+        <h2>When something goes wrong</h2>
+        <ul>
+            <li>A request without a token, or with a token that is wrong, malformed, expired or revoked, or whose owner
+                is disabled or locked, always gets the same plain <strong>401 Unauthorized</strong> answer. It does not say
+                which of these it was, so it tells nobody which tokens exist. The reason is recorded in the audit
+                trail.</li>
+            <li>Too many refused attempts from one address in a short time are answered with <strong>429 Too many
+                requests</strong>, whatever token is sent. Wait a few minutes and try again.</li>
+            <li>A token is for the API only. It does not sign you in to the web pages, and the session cookie of the web
+                pages does not work for the API.</li>
+        </ul>
+        <p class="muted">Creating a token, revoking one, and every refused use of a token are recorded in the audit trail.
+            The user guide has the details.</p>
+    </section>
+</HelpTopicFrame>

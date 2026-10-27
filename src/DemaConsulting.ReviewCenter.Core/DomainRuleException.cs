@@ -183,7 +183,19 @@ public enum DomainRule
     ReviewSetConfigMissing,
 
     /// <summary>The <c>.reviewmark.yaml</c> is not valid YAML, is too large, or does not define usable review-sets.</summary>
-    ReviewSetConfigInvalid
+    ReviewSetConfigInvalid,
+
+    /// <summary>The name of a personal access token is empty, too long or has control characters.</summary>
+    TokenNameInvalid,
+
+    /// <summary>The lifetime of a personal access token is not one of the allowed choices.</summary>
+    TokenExpiryInvalid,
+
+    /// <summary>The user already has <see cref="ReviewLimits.MaxActiveTokensPerUser"/> active personal access tokens.</summary>
+    TokenLimitReached,
+
+    /// <summary>The personal access token does not exist for the user, or it is already revoked.</summary>
+    TokenNotFound
 }
 
 /// <summary>

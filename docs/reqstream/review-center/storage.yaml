@@ -178,3 +178,21 @@ sections:
           - ReviewStore_GetReviewAsync_RepositoryReview_ReturnsSourceAndKindsWithoutBytes
           - ReviewStore_GetBaselineContentAsync_StoredFiles_ReturnsBaselineBytesOrNull
           - ReviewStore_AddReviewAsync_LongestReviewSetId_RoundTrips
+
+      - id: ReviewCenter-Storage-AccessTokens
+        title: >-
+          The Storage subsystem shall keep the personal access tokens of the users (the hash, never the value) in the
+          database file together with the creator of a review and whether it was created through the API, find a
+          token by its hash, list the tokens of a user, mark a token as revoked or used, and write the audit record of
+          a creation or a revocation in the same transaction.
+        justification: |
+          Tokens must survive a restart so that scripts keep working, and a change of a token without its audit record
+          would leave the history untrue.
+        children:
+          - ReviewCenter-PersonalAccessTokenStore-Persist
+          - ReviewCenter-PersonalAccessTokenStore-Find
+          - ReviewCenter-PersonalAccessTokenStore-Revoke
+          - ReviewCenter-PersonalAccessTokenStore-Touch
+          - ReviewCenter-DbContext-Tokens
+        tests:
+          - StorageSubsystem_AccessTokens_PersistAcrossReopen

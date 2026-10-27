@@ -1,0 +1,29 @@
+---
+# Software Unit Requirements for the ApiDocument Unit
+#
+# The ApiDocument unit serves the OpenAPI document that describes the API. The document is generated from the
+# routes, and a copy is kept with the documentation.
+
+sections:
+  - title: ApiDocument Unit Requirements
+    requirements:
+      - id: ReviewCenter-ApiDocument-Document
+        title: >-
+          The ApiDocument unit shall serve, without a token, an OpenAPI document at /api/openapi.json that describes
+          the API and names the bearer scheme that its routes need.
+        justification: |
+          A client generator and a person who starts to write a script need the contract of the API, and they can
+          fetch it before they have a token.
+        tests:
+          - ApiDocument_Get_NoToken_DescribesTheApiWithBearerScheme
+
+      - id: ReviewCenter-ApiDocument-Snapshot
+        title: >-
+          The ApiDocument unit shall produce the same document on every start, and the document shall equal the copy
+          that is kept in the documentation.
+        justification: |
+          A document that changes between starts could not be compared, and a comparison with the kept copy
+          catches a change of the API that was not documented.
+        tests:
+          - ApiDocument_Get_TwoApplications_AreIdentical
+          - ApiDocument_Get_MatchesCommittedSnapshot

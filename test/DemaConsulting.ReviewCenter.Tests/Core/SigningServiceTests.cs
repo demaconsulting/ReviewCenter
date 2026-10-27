@@ -110,6 +110,59 @@ public class SigningServiceTests
     }
 
     /// <summary>
+    ///     Test that an actor that came through an API token cannot sign, even with the right password and digest,
+    ///     because a signature must be a person's fresh act.
+    /// </summary>
+    [Fact]
+    public async Task SigningService_SignAsync_ApiTokenActor_IsRefusedBeforeAnyCheck()
+    {
+        // Arrange: a review that can be signed, and the primary reviewer's identity arriving through a token
+        var (fixture, slot) = await CreateReadyAsync();
+        var digest = (await ApprovalAsync(fixture)).Digest;
+        var viaApi = new Actor("ann", "Ann") { ApiTokenId = "K7M2QX9P" };
+
+        // Act: sign with everything right
+        var right = await Assert.ThrowsAsync<DomainRuleException>(() => fixture.Signing.SignAsync(
+            viaApi, fixture.ProjectId, "rev-1", slot.Id, digest, Password, TestContext.Current.CancellationToken));
+
+        // Act: sign with everything wrong, which must give the same answer because nothing else is checked
+        var wrong = await Assert.ThrowsAsync<DomainRuleException>(() => fixture.Signing.SignAsync(
+            viaApi, fixture.ProjectId, "rev-999", 12345, "stale", "wrong password here", TestContext.Current.CancellationToken));
+
+        // Assert: refused as not allowed both times, and the review is still unsigned
+        Assert.Equal(DomainRule.ActorNotAllowed, right.Rule);
+        Assert.Equal(DomainRule.ActorNotAllowed, wrong.Rule);
+        Assert.All((await ApprovalAsync(fixture)).Slots, s => Assert.Equal(SlotSignatureState.NotSigned, s.State));
+    }
+
+    /// <summary>
+    ///     Test that an actor that came through an API token cannot add, change or remove reviewer slots.
+    /// </summary>
+    [Fact]
+    public async Task SigningService_AddUpdateRemoveSlot_ApiTokenActor_IsRefused()
+    {
+        // Arrange: a review with one slot, and an actor that came through a token
+        var (fixture, slot) = await CreateReadyAsync();
+        var viaApi = new Actor("cyd", "Cyd") { ApiTokenId = "K7M2QX9P" };
+
+        // Act: add, update and remove a slot
+        var add = await Assert.ThrowsAsync<DomainRuleException>(() => fixture.Signing.AddSlotAsync(
+            viaApi, fixture.ProjectId, "rev-1", fixture.Ids["dee"], null, TestContext.Current.CancellationToken));
+        var update = await Assert.ThrowsAsync<DomainRuleException>(() => fixture.Signing.UpdateSlotAsync(
+            viaApi, fixture.ProjectId, "rev-1", slot.Id, fixture.Ids["dee"], null, TestContext.Current.CancellationToken));
+        var remove = await Assert.ThrowsAsync<DomainRuleException>(() => fixture.Signing.RemoveSlotAsync(
+            viaApi, fixture.ProjectId, "rev-1", slot.Id, TestContext.Current.CancellationToken));
+
+        // Assert: all refused, and the slot is unchanged
+        Assert.Equal(DomainRule.ActorNotAllowed, add.Rule);
+        Assert.Equal(DomainRule.ActorNotAllowed, update.Rule);
+        Assert.Equal(DomainRule.ActorNotAllowed, remove.Rule);
+        var approval = await ApprovalAsync(fixture);
+        var unchanged = Assert.Single(approval.Slots);
+        Assert.Equal("Ann", unchanged.Primary.DisplayName);
+    }
+
+    /// <summary>
     ///     Test that a slot can be added, is numbered and lists primary and alternate.
     /// </summary>
     [Fact]

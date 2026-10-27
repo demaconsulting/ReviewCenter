@@ -153,6 +153,17 @@ public class CoreSubsystemTests
     ];
 
     /// <summary>
+    ///     The rules that the personal access token service reports.
+    /// </summary>
+    private static readonly DomainRule[] TokenRules =
+    [
+        DomainRule.TokenNameInvalid,
+        DomainRule.TokenExpiryInvalid,
+        DomainRule.TokenLimitReached,
+        DomainRule.TokenNotFound
+    ];
+
+    /// <summary>
     ///     Test that each domain rule is reported through the services as a domain rule exception that names
     ///     the rule, and that nothing is stored for the violation.
     /// </summary>
@@ -225,7 +236,47 @@ public class CoreSubsystemTests
             return ViolateRepositoryAsync(rule, users);
         }
 
+        if (TokenRules.Contains(rule))
+        {
+            return ViolateTokenAsync(rule);
+        }
+
         return ViolateAsync(rule, projects, reviews, threads, checklists, users, projectId);
+    }
+
+    /// <summary>
+    ///     Makes a request that breaks one rule of the personal access token service.
+    /// </summary>
+    /// <param name="rule">The rule to break; one of <see cref="TokenRules"/>.</param>
+    /// <returns>A task that fails with the rule violation.</returns>
+    private static async Task ViolateTokenAsync(DomainRule rule)
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var clock = new FixedTimeProvider(_now);
+        var userStore = new FakeUserStore();
+        var users = new UserService(userStore, new FakePasswordHasher(), clock);
+        await users.CreateAsync("tok", "Tok", UserRole.Reviewer, ValidPassword, cancellationToken);
+        var service = new PersonalAccessTokenService(new FakePersonalAccessTokenStore(userStore), userStore, clock);
+        var actor = new Actor("tok", "Tok");
+        switch (rule)
+        {
+            case DomainRule.TokenNameInvalid:
+                await service.CreateAsync(actor, " ", 30, cancellationToken);
+                return;
+            case DomainRule.TokenExpiryInvalid:
+                await service.CreateAsync(actor, "name", 7, cancellationToken);
+                return;
+            case DomainRule.TokenLimitReached:
+                for (var i = 0; i <= ReviewLimits.MaxActiveTokensPerUser; i++)
+                {
+                    await service.CreateAsync(actor, $"token {i}", 30, cancellationToken);
+                }
+
+                return;
+            default:
+                await service.RevokeAsync(actor, 999, cancellationToken);
+                return;
+        }
     }
 
     /// <summary>
@@ -608,6 +659,75 @@ public class CoreSubsystemTests
         Assert.NotNull(unlocked);
         Assert.NotNull(changed);
         Assert.Equal(DomainRule.LastAdmin, lastAdmin.Rule);
+    }
+
+    /// <summary>
+    ///     Test the access token workflow: a user creates a token and sees it listed without its value, the value
+    ///     authenticates the owner, a token of an actor that came through a token is refused, and a revoked token
+    ///     no longer authenticates.
+    /// </summary>
+    [Fact]
+    public async Task CoreSubsystem_AccessTokens_CreateAuthenticateAndRevoke_FollowTheOwner()
+    {
+        // Arrange: the token service over fake storage with a user
+        var clock = new MovableTimeProvider(_now);
+        var userStore = new FakeUserStore();
+        var users = new UserService(userStore, new FakePasswordHasher(), clock);
+        var tokens = new PersonalAccessTokenService(new FakePersonalAccessTokenStore(userStore), userStore, clock);
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await users.CreateAsync("ann", "Ann", UserRole.Reviewer, ValidPassword, cancellationToken);
+
+        // Act: create a token, authenticate with it and with a wrong value, list, try as a token actor, and revoke
+        var created = await tokens.CreateAsync(TestActors.Ann, "build server", 30, cancellationToken);
+        var accepted = await tokens.AuthenticateAsync(created.Value, cancellationToken);
+        var wrong = await tokens.AuthenticateAsync(created.Value + "x", cancellationToken);
+        var listed = await tokens.ListAsync(TestActors.Ann, cancellationToken);
+        var viaToken = await Assert.ThrowsAsync<DomainRuleException>(
+            () => tokens.CreateAsync(new Actor("ann", "Ann") { ApiTokenId = created.Token.DisplayId }, "another", 30, cancellationToken));
+        await tokens.RevokeAsync(TestActors.Ann, created.Token.Id, cancellationToken);
+        var revoked = await tokens.AuthenticateAsync(created.Value, cancellationToken);
+
+        // Assert: accepted for the owner, refused when wrong, listed, refused for a token actor, refused once revoked
+        Assert.True(accepted.Succeeded);
+        Assert.Equal("ann", accepted.User?.Username);
+        Assert.False(wrong.Succeeded);
+        Assert.Equal("build server", Assert.Single(listed).Name);
+        Assert.Equal(DomainRule.ActorNotAllowed, viaToken.Rule);
+        Assert.False(revoked.Succeeded);
+    }
+
+    /// <summary>
+    ///     Test that an actor that came through a token can create a review that is flagged as created through the
+    ///     API, but cannot name reviewers or sign, even with the right password and the right digest.
+    /// </summary>
+    [Fact]
+    public async Task CoreSubsystem_TokenActor_CreatesFlaggedReviewButCannotSign()
+    {
+        // Arrange: the services over one store, a user with a slot on a review, and an actor that came through a token
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var store = new FakeReviewStore();
+        var projects = new ProjectService(store, new FixedTimeProvider(_now));
+        var reviews = new ReviewService(store, new FixedTimeProvider(_now));
+        var users = new UserService(new FakeUserStore(), new FakePasswordHasher(), new FixedTimeProvider(_now));
+        var signing = new SigningService(store, users, new FixedTimeProvider(_now));
+        var ann = await users.CreateAsync("ann", "Ann", UserRole.Reviewer, ValidPassword, cancellationToken);
+        var project = await projects.CreateAsync("Apollo", null, cancellationToken);
+        var viaToken = new Actor("ann", "Ann") { ApiTokenId = "K7M2QX9P" };
+
+        // Act: create a review as the token actor, name a reviewer as the person, then try to name and sign as the token actor
+        var review = await reviews.CreateDraftAsync(project.Id, "rev-9", "Via API", [new("a.txt", TestContent.A)], viaToken, cancellationToken);
+        var slot = await signing.AddSlotAsync(new Actor("ann", "Ann"), project.Id, "rev-9", ann.Id, null, cancellationToken);
+        var approval = await signing.GetApprovalAsync(project.Id, "rev-9", cancellationToken);
+        var naming = await Assert.ThrowsAsync<DomainRuleException>(
+            () => signing.AddSlotAsync(viaToken, project.Id, "rev-9", ann.Id, null, cancellationToken));
+        var signed = await Assert.ThrowsAsync<DomainRuleException>(() => signing.SignAsync(
+            viaToken, project.Id, "rev-9", slot.Id, approval!.Digest, ValidPassword, cancellationToken));
+
+        // Assert: the review is flagged, naming and signing are refused for the token actor, and nothing is signed
+        Assert.True(review.CreatedViaApi);
+        Assert.Equal(DomainRule.ActorNotAllowed, naming.Rule);
+        Assert.Equal(DomainRule.ActorNotAllowed, signed.Rule);
+        Assert.Equal(SlotSignatureState.NotSigned, (await signing.GetApprovalAsync(project.Id, "rev-9", cancellationToken))!.Slots.Single().State);
     }
 
     /// <summary>

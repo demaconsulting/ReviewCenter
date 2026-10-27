@@ -64,6 +64,10 @@ N/A - standard test environment (temporary SQLite databases are created by the t
   component tests of `ReviewPage` in `ReviewDeepLinkTests.cs`, which render the real router, and by the tests of
   `SignIn`; the subsystem test renders the router for a signed-out visitor (see the requirement
   `ReviewCenter-Web-DeepLinks` in `web.yaml`).
+- The token card of the account page (the form, the value shown once with the copy button, the list with the state of
+  each token, and the revocation) and the help topic on the API tokens need a live connection for the actions, so they
+  are verified at unit level by the component tests of `AccountPage` and `HelpPage` (see the children of the requirement
+  `ReviewCenter-Web-AccessTokens` in `web.yaml`).
 
 ### Test Scenarios
 
@@ -178,3 +182,10 @@ all three for a review that is not approved are verified by the `ReviewPage` uni
 `ReviewLinks_ForAttestation_ProjectAndReview_BuildsAddress`, and the help topic by
 `HelpAttestationPage_Render_ExplainsWhatTheSignatureProvesAndTheKey`. The download itself, over HTTP, is verified in the
 `Evidence` subsystem.
+
+**Personal access tokens on the account page**: The token card, the creation that shows the value once, and the
+revocation are verified by the `AccountPage` unit tests, which render the page with the component test host and the real
+`PersonalAccessTokenService` over a fake store: `AccountPage_CreateToken_ValidInput_ShowsValueOnceAndListsToken` and
+`AccountPage_RevokeToken_ActiveToken_MarksRevokedAndRemovesButton` trace the subsystem requirement, and the help topic is
+verified by `HelpApiTokensPage_Render_ExplainsTokensCurlEndpointsAndErrors`. The end-to-end journey from the card
+to a call of the API is verified in the `Api` subsystem.

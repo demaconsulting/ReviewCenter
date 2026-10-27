@@ -1,0 +1,97 @@
+---
+# Software Unit Requirements for the ApiEndpoints Unit
+#
+# The ApiEndpoints unit maps the JSON routes under /api: reading projects and reviews, creating review drafts,
+# downloading the attestation, and the answers for an invalid request. The routes call the same services as the
+# web pages.
+
+sections:
+  - title: ApiEndpoints Unit Requirements
+    requirements:
+      - id: ReviewCenter-ApiEndpoints-Read
+        title: >-
+          The ApiEndpoints unit shall return, to a client with a valid token, the list of projects, the review
+          summaries of a project, and the details of one review as JSON, answer 404 for a project or a review that
+          does not exist, and answer 401 to a request without a valid token.
+        justification: |
+          A script that files and follows reviews needs to find them, and an unknown project or review must be told
+          from an empty list.
+        tests:
+          - ApiEndpoints_ListProjects_Token_ReturnsProjects
+          - ApiEndpoints_ListReviews_Project_ReturnsSummariesOrNotFound
+          - ApiEndpoints_GetReview_CompleteReview_ReturnsDetails
+          - ApiEndpoints_Request_NoToken_Answers401
+          - ApiEndpoints_CreateReview_NoTokenOddBody_Answers401
+
+      - id: ReviewCenter-ApiEndpoints-Create
+        title: >-
+          The ApiEndpoints unit shall create a review draft from files that are sent in the request, or from the
+          changes of a repository that is registered with the server, with the same rules as the web pages, mark the
+          review as created through the API, and answer with the review and the files that were skipped.
+        justification: |
+          Creating a draft for every pull request from a pipeline is the main use of the API. The same rules keep
+          the record consistent, and the mark lets the reviewers see that a script made the draft.
+        tests:
+          - ApiEndpoints_CreateReview_Upload_CreatesDraftFlaggedAsApi
+          - ApiEndpoints_CreateReview_Repository_CreatesReviewFromChanges
+
+      - id: ReviewCenter-ApiEndpoints-Validation
+        title: >-
+          The ApiEndpoints unit shall answer a request body that is not valid, including one that is not JSON or not
+          JSON of the right shape, with a status of 400 (415 for a content type that is not JSON) and a problem document
+          that names the field where there is one, and shall answer a domain rule that refuses the request with the
+          status of that rule.
+        justification: |
+          A script cannot read a page, so the cause of a refusal must be in the answer. Naming the field tells the
+          author which part of the request to fix.
+        tests:
+          - ApiEndpoints_CreateReview_BadRequestBody_Answers400NamingTheField
+          - ApiEndpoints_CreateReview_MalformedJson_Answers400Problem
+          - ApiEndpoints_CreateReview_NotJsonContentType_Answers415Problem
+          - ApiEndpoints_CreateReview_ServiceRules_AnswerTheirStatus
+
+      - id: ReviewCenter-ApiEndpoints-Limits
+        title: >-
+          The ApiEndpoints unit shall refuse a request to create a review whose body is larger than the limit of the
+          endpoint with status 413, and a file count, file size or total size beyond the review limits with status 400
+          and a problem document, and shall create no review in either case.
+        justification: |
+          A script can send far more than a person can upload by hand. The body limit, which is derived from the
+          review limits, keeps the server from reading an unbounded body, and the review limits must hold for the API
+          exactly as they do for the web pages.
+        tests:
+          - ApiEndpoints_CreateReview_FileLimits_Answer400Problem
+          - ApiEndpoints_CreateReview_Endpoint_HasDerivedBodySizeLimit
+          - ApiEndpoints_CreateReview_BodyOverLimit_Answers413
+
+      - id: ReviewCenter-ApiEndpoints-Attestation
+        title: >-
+          The ApiEndpoints unit shall return the signed attestation PDF of a review whose reviewer slots have all
+          signed, with the same release rules and audit record as the download from the web pages, and shall answer
+          with a problem document, status 409, for a review that is not signed.
+        justification: |
+          Fetching the attestation after the sign-off lets a pipeline file it with a release. Using the same
+          mapping as the page keeps what is released, and what is recorded, the same.
+        tests:
+          - ApiEndpoints_GetAttestation_Token_ReturnsPdfOrProblem
+          - ApiEndpoints_GetAttestation_ReviewNotSigned_Answers409Problem
+
+      - id: ReviewCenter-ApiEndpoints-Errors
+        title: >-
+          The ApiEndpoints unit shall answer an address under /api that does not exist, with any standard HTTP method
+          (GET, HEAD, POST, PUT, PATCH, DELETE, OPTIONS), with a JSON problem document and status 404, not with a web
+          page.
+        justification: |
+          A script that mistypes an address must get an answer it can read, not the HTML of the not-found page.
+        tests:
+          - ApiEndpoints_Request_UnknownRoute_AnswersJsonNotFound
+
+      - id: ReviewCenter-ApiEndpoints-NoSigning
+        title: >-
+          The ApiEndpoints unit shall offer no route that signs a review or adds, changes, or removes a reviewer
+          slot.
+        justification: |
+          A signature must prove that the person was present, which a stored secret does not, so the API has no
+          way to give one.
+        tests:
+          - ApiEndpoints_Routes_NoSigningOrSlotRoutes

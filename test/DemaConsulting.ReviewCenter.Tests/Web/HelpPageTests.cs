@@ -131,6 +131,47 @@ public sealed class HelpPageTests : PageTestBase
     }
 
     /// <summary>
+    ///     Test that the API tokens topic explains the token, how to create and revoke it, that it never signs, the
+    ///     curl example, the endpoints, the generic 401 and the throttle, and the Draft state of an API-created review.
+    /// </summary>
+    [Fact]
+    public void HelpApiTokensPage_Render_ExplainsTokensCurlEndpointsAndErrors()
+    {
+        // Act: render the topic page
+        var page = Render<HelpApiTokensPage>();
+
+        // Assert: the title and the screenshot with alternative text, served from the help folder
+        var text = page.Markup;
+        Assert.Equal("Automation and API tokens", page.Find("h1").TextContent);
+        Assert.Equal("/help/api-tokens-1.png", page.Find("img.help-shot").GetAttribute("src"));
+        Assert.False(string.IsNullOrWhiteSpace(page.Find("img.help-shot").GetAttribute("alt")));
+
+        // Assert: creating (name, 30/90/365 days, shown once), the limit, and revoking
+        Assert.Contains("<strong>Account</strong>", text, StringComparison.Ordinal);
+        Assert.Contains("30, 90 or 365", text, StringComparison.Ordinal);
+        Assert.Contains("90 is the default", text, StringComparison.Ordinal);
+        Assert.Contains("<strong>once</strong>", text, StringComparison.Ordinal);
+        Assert.Contains("at most 20 active tokens", text, StringComparison.Ordinal);
+        Assert.Contains("<strong>Revoke</strong>", text, StringComparison.Ordinal);
+
+        // Assert: a token never signs
+        Assert.Contains("<strong>never sign</strong>", text, StringComparison.Ordinal);
+
+        // Assert: the curl example, the endpoints and the OpenAPI document
+        Assert.Contains("Authorization: Bearer rcpat_", page.Find("pre").TextContent, StringComparison.Ordinal);
+        Assert.Contains("/api/projects", page.Find("pre").TextContent, StringComparison.Ordinal);
+        Assert.Contains("POST /api/projects/{id}/reviews", text, StringComparison.Ordinal);
+        Assert.Contains("/api/openapi.json", text, StringComparison.Ordinal);
+
+        // Assert: an API-created review is a flagged Draft, and the generic 401 and the throttle are described
+        Assert.Contains("<strong>Draft</strong>", text, StringComparison.Ordinal);
+        Assert.Contains("<strong>created via API</strong>", text, StringComparison.Ordinal);
+        Assert.Contains("401 Unauthorized", text, StringComparison.Ordinal);
+        Assert.Contains("429", text, StringComparison.Ordinal);
+        AssertNoAnchorLinks(page);
+    }
+
+    /// <summary>
     ///     Test that an unknown help address shows a friendly message and a link back to the index.
     /// </summary>
     [Fact]

@@ -53,6 +53,48 @@ public class ReviewServiceTests
     private static List<UploadedFile> One(string path, byte[] content) => [new UploadedFile(path, content)];
 
     /// <summary>
+    ///     Test that a draft created by an actor that came through an API token is flagged and the audit detail
+    ///     names the non-secret token id.
+    /// </summary>
+    [Fact]
+    public async Task ReviewService_CreateDraftAsync_ApiActor_FlagsReviewAndAuditText()
+    {
+        // Arrange: a project and an actor that authenticated with a token
+        var (store, service, projectId) = await CreateWithProjectAsync();
+        var viaApi = new Actor("ann", "Ann") { ApiTokenId = "K7M2QX9P" };
+
+        // Act: create the draft as that actor
+        var review = await service.CreateDraftAsync(
+            projectId, "REV-1", "First", One("a.txt", TestContent.A), viaApi, TestContext.Current.CancellationToken);
+
+        // Assert: the review is flagged, and the audit detail ends with the token id
+        Assert.Equal("ann", review.CreatedBy);
+        Assert.True(review.CreatedViaApi);
+        var audit = Assert.Single(store.Audits, a => a.Action == "review.created");
+        Assert.EndsWith(", created via API token 'K7M2QX9P'", audit.Detail, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    ///     Test that a draft created from the web pages records the creator but is not flagged as created through
+    ///     the API, and the audit detail does not mention a token.
+    /// </summary>
+    [Fact]
+    public async Task ReviewService_CreateDraftAsync_UiActor_RecordsCreatorWithoutApiFlag()
+    {
+        // Arrange: a project
+        var (store, service, projectId) = await CreateWithProjectAsync();
+
+        // Act: create the draft as a person who signed in with a password
+        var review = await service.CreateDraftAsync(projectId, "REV-1", "First", One("a.txt", TestContent.A), TestContext.Current.CancellationToken);
+
+        // Assert: creator recorded, no API flag, no token text
+        Assert.Equal("ann", review.CreatedBy);
+        Assert.False(review.CreatedViaApi);
+        var audit = Assert.Single(store.Audits, a => a.Action == "review.created");
+        Assert.DoesNotContain("API token", audit.Detail, StringComparison.Ordinal);
+    }
+
+    /// <summary>
     ///     Test that a valid draft is stored with its state, time, trimmed title and a known fingerprint.
     /// </summary>
     [Fact]

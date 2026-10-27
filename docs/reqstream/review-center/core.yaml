@@ -314,3 +314,28 @@ sections:
           - ReviewPlanner_PlanAsync_NoBaseline_ClassifiesSetsWithOneSession
           - ReviewPlanner_CreateAsync_PlanRows_CreatesReviewsWithSetIdAndOneSession
           - ReviewPlanner_CreateAsync_RealGit_LastReviewedBaselineThenAlreadyFiled
+
+      - id: ReviewCenter-Core-AccessTokens
+        title: >-
+          The Core subsystem shall let a user create personal access tokens with a name and an expiry, up to a limit,
+          show the value only when it is created, authenticate a request from a token as its owner for as long as the
+          owner is allowed to sign in, let the owner revoke a token, record the creation and the revocation in the
+          audit trail, mark a review created through a token, and refuse that an actor that came through a token signs
+          a review or arranges the reviewers.
+        justification: |
+          Scripts need a credential of their own, and it must give less than a person has. Keeping only a hash, a
+          limit, an expiry, and a revocation that works at once keep a leaked token small in effect, and refusing a
+          signature in the service keeps the rule in force for every route that is ever added.
+        children:
+          - ReviewCenter-PersonalAccessTokenService-Create
+          - ReviewCenter-PersonalAccessTokenService-Expiry
+          - ReviewCenter-PersonalAccessTokenService-Limit
+          - ReviewCenter-PersonalAccessTokenService-Authenticate
+          - ReviewCenter-PersonalAccessTokenService-LastUsed
+          - ReviewCenter-PersonalAccessTokenService-Revoke
+          - ReviewCenter-PersonalAccessTokenService-Audit
+          - ReviewCenter-SigningService-ApiToken
+          - ReviewCenter-ReviewService-CreatedVia
+        tests:
+          - CoreSubsystem_AccessTokens_CreateAuthenticateAndRevoke_FollowTheOwner
+          - CoreSubsystem_TokenActor_CreatesFlaggedReviewButCannotSign

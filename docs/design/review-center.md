@@ -6,8 +6,8 @@
 
 The ReviewCenter is an ASP.NET Core web service with a companion command-line interface,
 built on .NET. It is structured as one system containing one top-level unit (`Program`) and
-ten subsystems (`Cli`, `SelfTest`, `Utilities`, `Hosting`, `Identity`, `Web`, `Core`, `Storage`, `ContentSources`,
-`Evidence`):
+eleven subsystems (`Cli`, `SelfTest`, `Utilities`, `Hosting`, `Identity`, `Web`, `Core`, `Storage`, `ContentSources`,
+`Evidence`, `Api`):
 
 ```mermaid
 flowchart TD
@@ -56,6 +56,7 @@ flowchart TD
         ThreadService
         ChecklistService
         UserService
+        PersonalAccessTokenService
         RecordDigest
         SigningService
         AuditChain
@@ -69,6 +70,7 @@ flowchart TD
         ReviewCenterDbContext
         ReviewStore
         UserStore
+        PersonalAccessTokenStore
         AuditStore
         RepositoryStore
         DatabaseSetup
@@ -85,6 +87,11 @@ flowchart TD
         AttestationKeyProvider
         AttestationService
         AttestationEndpoint
+    end
+    subgraph Api
+        ApiTokenAuthentication
+        ApiEndpoints
+        ApiDocument
     end
     Program --> Context
     Program --> Validation
@@ -115,6 +122,11 @@ flowchart TD
     ServerHost --> CredentialProtector
     ServerHost --> AttestationKeyProvider
     ServerHost --> AttestationEndpoint
+    ServerHost --> PersonalAccessTokenStore
+    ServerHost --> PersonalAccessTokenService
+    ServerHost --> ApiTokenAuthentication
+    ServerHost --> ApiEndpoints
+    ServerHost --> ApiDocument
     UserCommand --> Context
     UserCommand --> ServerHost
     UserCommand --> DatabaseSetup
@@ -147,6 +159,7 @@ flowchart TD
     LoginPage --> SignIn
     AccountPage --> SignIn
     AccountPage --> UserService
+    AccountPage --> PersonalAccessTokenService
     UsersPage --> UserService
     ProjectsPage --> ProjectService
     ProjectPage --> ProjectService
@@ -180,6 +193,8 @@ flowchart TD
     ChecklistService --> ReviewStore
     UserService --> UserStore
     UserService --> AuditService
+    PersonalAccessTokenService --> PersonalAccessTokenStore
+    PersonalAccessTokenService --> UserService
     SigningService --> ReviewStore
     SigningService --> UserService
     SigningService --> RecordDigest
@@ -188,6 +203,7 @@ flowchart TD
     ReviewStore --> RecordDigest
     ReviewStore --> ReviewCenterDbContext
     UserStore --> ReviewCenterDbContext
+    PersonalAccessTokenStore --> ReviewCenterDbContext
     AuditStore --> AuditChain
     AuditStore --> ReviewCenterDbContext
     RepositoryService --> RepositoryStore
@@ -204,6 +220,17 @@ flowchart TD
     AttestationService --> SigningService
     AttestationService --> AuditService
     AttestationRenderer --> PdfDocumentWriter
+    ApiTokenAuthentication --> PersonalAccessTokenService
+    ApiTokenAuthentication --> SignInThrottle
+    ApiTokenAuthentication --> SignIn
+    ApiTokenAuthentication --> AuditService
+    ApiEndpoints --> ProjectService
+    ApiEndpoints --> ReviewService
+    ApiEndpoints --> SigningService
+    ApiEndpoints --> ThreadService
+    ApiEndpoints --> ChecklistService
+    ApiEndpoints --> AttestationService
+    ApiEndpoints --> AttestationEndpoint
     DatabaseSetup --> ReviewCenterDbContext
 ```
 
@@ -226,7 +253,8 @@ The `Web` subsystem is a Blazor Server user interface: `App` is the HTML shell a
 to use it, `ProjectsPage`, `ProjectPage`, `PlanPage`,
 `ReviewPage`, and `ChecklistPage` are the pages for projects, the planning of reviews, reviews, and review
 checklists, `LoginPage`,
-`AccountPage`, and `UsersPage` are the pages for signing in, changing one's own password, and managing users, and
+`AccountPage`, and `UsersPage` are the pages for signing in, changing one's own password and creating personal access
+tokens, and managing users, and
 `HistoryPage` and `AuditPage` show the audit trail of a review and of the whole system, and `RepositoriesPage` lets an
 administrator register git repositories. A browser
 connects to the server,
@@ -271,6 +299,18 @@ of the server by default, or a certificate of a certificate store whose private 
 proves that the document is unchanged and was produced by the holder of the key; it does not prove who the reviewers
 are (the sign-offs of the record do that) and carries no trusted time. Nothing is stored: the document is made when it
 is asked for. `ServerHost` wires it and checks the key at the start, and `ReviewPage` offers the download.
+
+The `Api` subsystem lets scripts and pipelines work with the same data without a browser. Every request under `/api`
+is authenticated by `ApiTokenAuthentication`, an authentication scheme that accepts only
+`Authorization: Bearer <personal access token>`; a session cookie is not accepted there, and a token is not accepted
+anywhere else. `PersonalAccessTokenService` (in `Core`) creates, lists, revokes, and validates the tokens, which
+`PersonalAccessTokenStore` (in `Storage`) keeps as hashes only; a user creates and revokes tokens on `AccountPage`
+and sees the value once. `ApiEndpoints` maps the endpoints, which read projects and reviews, create a draft review
+from uploaded files or from a repository, and download the attestation of a complete review; every one of them calls
+the same Core services as the pages and acts as the owner of the token. Reviewer slots and signatures cannot be
+changed through the API: there is no route for them, and `SigningService` refuses an actor that came in with a token
+as a second line of defense. `ApiDocument` serves the OpenAPI description of the API at `/api/openapi.json`, which
+`Microsoft.AspNetCore.OpenApi` generates and a test compares with the snapshot `docs/api/openapi.json`.
 
 The system is a single process with one database; there is no separate service tier. Users are local accounts
 with a user name, a display name, a role (Reviewer or Admin), and a password that is stored only as a hash. A user
@@ -320,8 +360,9 @@ open for up to the revalidation interval (`Auth:RevalidationSeconds`, 30 seconds
 replaced by a "Session ended" message, while the page header keeps the old name until the next navigation or reload; a
 password change does not end other sessions of the user; and a database that was created
 before the identity slice, before the signature slice (it has no reviewer slot and signature tables), before the
-audit trail (it has no audit table), before the repository registry (it has no `Repositories` table), or before reviews
-from a repository (its reviews have no source columns) must be
+audit trail (it has no audit table), before the repository registry (it has no `Repositories` table), before reviews
+from a repository (its reviews have no source columns), or before personal access tokens (it has no token table and
+its reviews have no creator columns) must be
 deleted and created again, because there are no migrations.
 The limitations of the audit trail are also deliberate: the throttle and the coalescing of repeated failure entries
 (one entry per key and minute, with a count of the suppressed repeats) are kept in memory, so they are per process and
@@ -385,12 +426,13 @@ is running.
   review does not exist, 409 when it is not complete, 500 when the signing key cannot be used; a signed-out request is
   redirected to `/login`).
   Any other page request returns HTTP status 404 with the not-found page of the user interface, an HTML document with the
-  header and the footer; a request under `/api`, a method other than GET, and a path that ends in a file extension get a
-  plain, empty 404. The client
+  header and the footer; a method other than GET and a path that ends in a file extension get a
+  plain, empty 404, and an unknown address under `/api` gets a JSON problem 404. The client
   script for the live connection is served from `/_framework/blazor.web.js`.
 - *Constraints*: The server listens on the URL given with `--urls`, by default
   `http://localhost:5000`, which is reachable only from the local machine. TLS termination is
-  not performed by the server itself. Authentication is by cookie: the routes `/`, `/login`, and `/health` and the
+  not performed by the server itself. Authentication of the pages is by cookie: the routes `/`, `/login`, and `/health`
+  and the
   static assets are open to anonymous visitors, every other page requires a signed-in user (an anonymous request is
   redirected to `/login` with the wanted address), and `/users`, `/repositories`, and `/audit` require the Admin role
   (another user gets HTTP status
@@ -409,6 +451,30 @@ is running.
   without TLS, because the password of a sign-in is sent in the request. An open page re-checks its user every
   `Auth:RevalidationSeconds` seconds (default 30, at least 5; a smaller value stops the start-up with an error).
 
+**Web API**: The JSON interface under `/api` of the running web server, for scripts and pipelines.
+
+- *Type*: HTTP with JSON bodies (and the PDF of an attestation).
+- *Role*: Provider.
+- *Contract*: Every request except the OpenAPI document carries `Authorization: Bearer <token>`, where the token is a
+  personal access token (`rcpat_` and 43 characters) that a user created on the account page. `GET /api/projects`
+  lists the projects, `GET /api/projects/{projectId}/reviews` the reviews of a project, and
+  `GET /api/projects/{projectId}/reviews/{reviewId}` one review with its reviewer slots, counts, and approval state.
+  `POST /api/projects/{projectId}/reviews` creates a draft review from either a list of files (Base64 contents) or a
+  repository (name, revisions, selection) and answers 201 with a `Location` header and the review.
+  `GET /api/projects/{projectId}/reviews/{reviewId}/attestation.pdf` returns the signed PDF attestation of a complete
+  review
+  (200 with `application/pdf`). `GET /api/openapi.json` returns the OpenAPI description of these endpoints and needs no
+  token. Errors are `application/problem+json` documents: 400 for a rejected request (with the field that is wrong), 401
+  for a missing or refused token (always the same answer, with `WWW-Authenticate: Bearer`), 403 for an action that is
+  not allowed, 404 for an unknown project, review, or address, 409 for a conflict or an attestation of a review that is
+  not complete, 429 when too many tokens were refused from one address, and 5xx for repository or key failures.
+- *Constraints*: A token acts with the current role of its owner and stops working when it expires, is revoked, or its
+  owner is disabled or locked out. A token cannot sign, change reviewer slots, or reach any page, and a session cookie
+  cannot reach the API. The token is only a bearer secret: the server must not be exposed to untrusted networks
+  without TLS, because it is sent in every request. A request is counted by the sign-in throttle with the client
+  address (the same limits and the same forwarded-headers caveat as the sign-in). The limit of one request body is
+  30 MiB.
+
 **Database**: The persistent store of projects, reviews, and users.
 
 - *Type*: File (SQLite) or database connection.
@@ -426,8 +492,9 @@ is running.
   schema is created, never migrated; the database file of an older schema is not upgraded. A database that was
   created before the identity slice (it has no users and no user name columns), before the signature slice (it
   has no reviewer slot and signature tables), before the audit trail (it has no audit table), before the repository
-  registry (it has no `Repositories` table), or before reviews from a repository (its reviews and files lack the
-  source and change columns) must be deleted and
+  registry (it has no `Repositories` table), before reviews from a repository (its reviews and files lack the
+  source and change columns), or before personal access tokens (it has no token table and its reviews lack the
+  creator columns) must be deleted and
   created again. The audit table is append-only for the application, but anyone with write access to the database file
   can still change it; the hash chain makes such a change detectable only in the way the design of `AuditChain`
   describes.
@@ -513,6 +580,8 @@ is running.
   of the ASP.NET Core shared framework, so it needs no package reference.
 - **System.Security.Cryptography.Pkcs**: provides the CMS (PKCS #7) detached signature of the PDF attestation in the
   `Evidence` subsystem; see the PKCS integration design in the OTS chapter.
+- **Microsoft.AspNetCore.OpenApi**: generates the OpenAPI document of the `Api` subsystem. It is a package of its own,
+  not part of the ASP.NET Core shared framework; see the OpenAPI integration design in the OTS chapter.
 
 ## Risk Control Measures
 
@@ -567,7 +636,14 @@ calls `SigningService` to show whether each review is Approved. `AccountPage` an
 answered by `AttestationEndpoint` after the same authorization: `AttestationService` checks through `SigningService`
 that the review is approved, reads the record, has `AttestationRenderer` and `PdfDocumentWriter` produce the PDF, has
 `AttestationSigner` sign it with the key from `AttestationKeyProvider`, records the generation through `AuditService`,
-and the endpoint returns the signed bytes. When the server is
+and the endpoint returns the signed bytes. A request under `/api` takes another way: the `ReviewCenterToken`
+scheme of `ApiTokenAuthentication` reads the bearer token, counts the attempt with `SignInThrottle`, asks
+`PersonalAccessTokenService` to validate the token (a hash lookup in `PersonalAccessTokenStore`, then the checks of
+expiry, revocation, and the owner), and on success builds a principal with the owner's name and role and a token
+claim; a refusal is audited through `AuditService` without the value and answered with a generic 401. `ApiEndpoints`
+then calls the same services as the pages (`ProjectService`, `ReviewService`, `SigningService` for the approval,
+`ThreadService` and `ChecklistService` for the counts, and `AttestationService`) and maps the result or the rule that
+was broken to a JSON answer. When the server is
 stopped, `ServerHost.RunAsync` returns 0; if the server cannot start, including because the
 database cannot be used, it reports the reason
 through `Context.WriteError` and returns 1, which makes `Context.ExitCode` 1.
@@ -598,6 +674,9 @@ result or the reason of a failure is reported through `Context`.
   signature count toward the same lockout.
 - Signatures: a signature is bound to the digest of the review record and is never changed or removed; the approval
   of a review is computed from the record and the signatures each time and is never stored.
+- Access tokens: only the SHA-256 hash of a token is stored and the value is shown once, when it is created; a token
+  is accepted only on `/api`, never makes a user signed in on a page, and can never sign or change reviewer slots.
+  A user has at most 20 active tokens, each valid for 30, 90, or 365 days.
 - Upload limits: a review accepts at most 200 files, each at most 2 MiB, and 20 MiB in total, with the limits
   defined once in the Core subsystem; a review from a repository honors the same limits for the files it freezes
   (counting both the baseline and the head content).

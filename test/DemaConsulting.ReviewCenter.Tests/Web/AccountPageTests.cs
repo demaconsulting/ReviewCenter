@@ -182,6 +182,204 @@ public class AccountPageTests : PageTestBase
     }
 
     /// <summary>
+    ///     Test that the token card is there with its controls, an empty list and no value box, and that its only
+    ///     link is the button that opens the Help topic about API tokens.
+    /// </summary>
+    [Fact]
+    public void AccountPage_Render_TokensCard_ShowsFormEmptyListAndHelpLink()
+    {
+        // Arrange: nothing to prepare
+
+        // Act: render the page
+        var cut = Render<AccountPage>();
+
+        // Assert: the form controls and the three expiry choices (90 days selected) are present
+        var card = cut.Find("[data-testid='tokens-card']");
+        Assert.NotNull(cut.Find("[data-testid='token-name-input']"));
+        Assert.NotNull(cut.Find("[data-testid='create-token-button']"));
+        Assert.True(cut.Find("[data-testid='token-expiry-90']").HasAttribute("checked"));
+        Assert.False(cut.Find("[data-testid='token-expiry-30']").HasAttribute("checked"));
+        Assert.False(cut.Find("[data-testid='token-expiry-365']").HasAttribute("checked"));
+
+        // Assert: an empty list, no value box, and the Help topic as the only anchor in the card, shown as a button
+        Assert.NotNull(cut.Find("[data-testid='token-list-empty']"));
+        Assert.Empty(cut.FindAll("[data-testid='new-token-box']"));
+        var link = Assert.Single(card.QuerySelectorAll("a"));
+        Assert.Equal("tokens-help-link", link.GetAttribute("data-testid"));
+        Assert.Equal("/help/api-tokens", link.GetAttribute("href"));
+        Assert.Contains("action", link.ClassList);
+    }
+
+    /// <summary>
+    ///     Test that creating a token shows its value once with the chosen expiry, lists it without the value, and
+    ///     that dismissing the box removes the value for good.
+    /// </summary>
+    [Fact]
+    public async Task AccountPage_CreateToken_ValidInput_ShowsValueOnceAndListsToken()
+    {
+        // Arrange: the signed-in user exists, a name is typed and 30 days is chosen
+        await Users.CreateAsync("ann", "Ann", UserRole.Reviewer, OldPassword, TestContext.Current.CancellationToken);
+        var cut = Render<AccountPage>();
+        await cut.Find("[data-testid='token-name-input']").InputAsync("build server");
+        await cut.Find("[data-testid='token-expiry-30']").ChangeAsync(new ChangeEventArgs { Value = "30" });
+
+        // Act: submit the form
+        await cut.Find("[data-testid='create-token-form']").SubmitAsync();
+
+        // Assert: the value box shows a token once; the confirmation shows; the name field is empty
+        var value = cut.Find("[data-testid='new-token-value']").TextContent;
+        Assert.StartsWith("rcpat_", value, StringComparison.Ordinal);
+        Assert.Equal("The token was created.", cut.Find("[data-testid='token-message']").TextContent);
+        Assert.Equal(string.Empty, cut.Find("[data-testid='token-name-input']").GetAttribute("value") ?? string.Empty);
+
+        // Assert: the list has the token with its name, display id and 30-day expiry, and never the value
+        var token = Assert.Single(await Tokens.ListAsync(new Actor("ann", "Ann"), TestContext.Current.CancellationToken));
+        Assert.Equal("build server", cut.Find($"[data-testid='token-name-{token.Id}']").TextContent);
+        Assert.Equal(token.DisplayId, cut.Find($"[data-testid='token-display-id-{token.Id}']").TextContent);
+        Assert.Equal("Active", cut.Find($"[data-testid='token-status-{token.Id}']").TextContent);
+        Assert.Contains("2025-04-03", cut.Find($"[data-testid='token-expires-{token.Id}']").TextContent, StringComparison.Ordinal);
+        Assert.Contains("never", cut.Find($"[data-testid='token-last-used-{token.Id}']").TextContent, StringComparison.Ordinal);
+        Assert.DoesNotContain(value, cut.Find("[data-testid='token-list']").TextContent, StringComparison.Ordinal);
+
+        // Act: dismiss the box
+        await cut.Find("[data-testid='dismiss-token-button']").ClickAsync();
+
+        // Assert: the value is nowhere on the page any more
+        Assert.Empty(cut.FindAll("[data-testid='new-token-box']"));
+        Assert.DoesNotContain(value, cut.Markup, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    ///     Test that a missing name is shown as an error and no token is created.
+    /// </summary>
+    [Fact]
+    public async Task AccountPage_CreateToken_EmptyName_ShowsErrorAndCreatesNothing()
+    {
+        // Arrange: the signed-in user exists and the name is empty
+        await Users.CreateAsync("ann", "Ann", UserRole.Reviewer, OldPassword, TestContext.Current.CancellationToken);
+        var cut = Render<AccountPage>();
+
+        // Act: submit
+        await cut.Find("[data-testid='create-token-form']").SubmitAsync();
+
+        // Assert: an error, no value box, nothing stored
+        Assert.NotEmpty(cut.Find("[data-testid='token-error']").TextContent);
+        Assert.Empty(cut.FindAll("[data-testid='new-token-box']"));
+        Assert.Empty(TokenStore.Rows);
+    }
+
+    /// <summary>
+    ///     Test that the copy button hands the token to the browser script and shows the result.
+    /// </summary>
+    [Fact]
+    public async Task AccountPage_CopyToken_NewToken_CopiesThroughBrowserScript()
+    {
+        // Arrange: a created token, and a browser that can copy
+        await Users.CreateAsync("ann", "Ann", UserRole.Reviewer, OldPassword, TestContext.Current.CancellationToken);
+        JSInterop.Setup<bool>("reviewCenter.copyText", _ => true).SetResult(true);
+        var cut = Render<AccountPage>();
+        await cut.Find("[data-testid='token-name-input']").InputAsync("build server");
+        await cut.Find("[data-testid='create-token-form']").SubmitAsync();
+        var value = cut.Find("[data-testid='new-token-value']").TextContent;
+
+        // Act: press copy
+        await cut.Find("[data-testid='copy-token-button']").ClickAsync();
+
+        // Assert: the script received exactly the value, and the page says so
+        Assert.Equal([value], JSInterop.Invocations["reviewCenter.copyText"][^1].Arguments);
+        Assert.Equal("Copied.", cut.Find("[data-testid='token-copy-status']").TextContent);
+    }
+
+    /// <summary>
+    ///     Test that a browser that cannot copy gets a hint to copy by hand, and the token stays visible.
+    /// </summary>
+    [Fact]
+    public async Task AccountPage_CopyToken_BrowserRefuses_ShowsHintAndKeepsToken()
+    {
+        // Arrange: a created token, and a browser that refuses
+        await Users.CreateAsync("ann", "Ann", UserRole.Reviewer, OldPassword, TestContext.Current.CancellationToken);
+        JSInterop.Setup<bool>("reviewCenter.copyText", _ => true).SetResult(false);
+        var cut = Render<AccountPage>();
+        await cut.Find("[data-testid='token-name-input']").InputAsync("build server");
+        await cut.Find("[data-testid='create-token-form']").SubmitAsync();
+
+        // Act: press copy
+        await cut.Find("[data-testid='copy-token-button']").ClickAsync();
+
+        // Assert: a hint to copy by hand, and the value is still shown
+        Assert.Contains("copy it by hand", cut.Find("[data-testid='token-copy-status']").TextContent, StringComparison.Ordinal);
+        Assert.NotNull(cut.Find("[data-testid='new-token-value']"));
+    }
+
+    /// <summary>
+    ///     Test that revoking marks the token as revoked, removes its button and does not touch other tokens.
+    /// </summary>
+    [Fact]
+    public async Task AccountPage_RevokeToken_ActiveToken_MarksRevokedAndRemovesButton()
+    {
+        // Arrange: two tokens of the signed-in user
+        await Users.CreateAsync("ann", "Ann", UserRole.Reviewer, OldPassword, TestContext.Current.CancellationToken);
+        var ann = new Actor("ann", "Ann");
+        var first = await Tokens.CreateAsync(ann, "first", 90, TestContext.Current.CancellationToken);
+        var second = await Tokens.CreateAsync(ann, "second", 90, TestContext.Current.CancellationToken);
+        var cut = Render<AccountPage>();
+
+        // Act: revoke the first
+        await cut.Find($"[data-testid='revoke-token-{first.Token.Id}']").ClickAsync();
+
+        // Assert: the first is revoked and has no button; the second is active and keeps its button
+        Assert.Equal("Revoked", cut.Find($"[data-testid='token-status-{first.Token.Id}']").TextContent);
+        Assert.Empty(cut.FindAll($"[data-testid='revoke-token-{first.Token.Id}']"));
+        Assert.Equal("Active", cut.Find($"[data-testid='token-status-{second.Token.Id}']").TextContent);
+        Assert.NotNull(cut.Find($"[data-testid='revoke-token-{second.Token.Id}']"));
+        Assert.Equal("The token was revoked.", cut.Find("[data-testid='token-message']").TextContent);
+    }
+
+    /// <summary>
+    ///     Test that an expired token is listed as expired and cannot be revoked.
+    /// </summary>
+    [Fact]
+    public async Task AccountPage_Render_ExpiredToken_ShowsExpiredWithoutRevokeButton()
+    {
+        // Arrange: a 30-day token and a page rendered after it expired
+        await Users.CreateAsync("ann", "Ann", UserRole.Reviewer, OldPassword, TestContext.Current.CancellationToken);
+        var created = await Tokens.CreateAsync(new Actor("ann", "Ann"), "old", 30, TestContext.Current.CancellationToken);
+        Time.Advance(TimeSpan.FromDays(31));
+
+        // Act: render the page
+        var cut = Render<AccountPage>();
+
+        // Assert: expired, without a revoke button
+        Assert.Equal("Expired", cut.Find($"[data-testid='token-status-{created.Token.Id}']").TextContent);
+        Assert.Empty(cut.FindAll($"[data-testid='revoke-token-{created.Token.Id}']"));
+    }
+
+    /// <summary>
+    ///     Test that the twenty-first active token is refused with the limit shown as an error.
+    /// </summary>
+    [Fact]
+    public async Task AccountPage_CreateToken_TwentyActive_ShowsLimitError()
+    {
+        // Arrange: twenty active tokens and a filled-in form
+        await Users.CreateAsync("ann", "Ann", UserRole.Reviewer, OldPassword, TestContext.Current.CancellationToken);
+        for (var i = 0; i < ReviewLimits.MaxActiveTokensPerUser; i++)
+        {
+            await Tokens.CreateAsync(new Actor("ann", "Ann"), $"token {i}", 90, TestContext.Current.CancellationToken);
+        }
+
+        var cut = Render<AccountPage>();
+        await cut.Find("[data-testid='token-name-input']").InputAsync("one too many");
+
+        // Act: submit
+        await cut.Find("[data-testid='create-token-form']").SubmitAsync();
+
+        // Assert: the limit is explained, no value is shown, and nothing was added
+        Assert.Contains("20", cut.Find("[data-testid='token-error']").TextContent, StringComparison.Ordinal);
+        Assert.Empty(cut.FindAll("[data-testid='new-token-box']"));
+        Assert.Equal(ReviewLimits.MaxActiveTokensPerUser, TokenStore.Rows.Count);
+    }
+
+    /// <summary>
     ///     Fills the three password fields.
     /// </summary>
     /// <param name="cut">The rendered page.</param>

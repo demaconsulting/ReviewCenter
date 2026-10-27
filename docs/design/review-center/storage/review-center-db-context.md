@@ -10,13 +10,15 @@ conversions. It contains no queries; those belong to `ReviewStore`.
 
 #### Data Model
 
-The context exposes thirteen sets and maps the Core types directly, without separate persistence classes (the
+The context exposes fourteen sets and maps the Core types directly, without separate persistence classes (the
 repository registry is the one exception, see `Repositories`).
 
 - **Projects** (`Project`): key `Id`, assigned by the database. `Name` is required, at most 100 characters;
   `Description` is required (may be empty), at most 1000; `Created`.
 - **Reviews** (`Review`): key `ProjectId` plus `Id`. `Title` is required, at most 200; `State` is stored as text, at
-  most 32; `ContentFingerprint` is required, at most 64; `Created`. A review from a repository also has
+  most 32; `ContentFingerprint` is required, at most 64; `Created`; `CreatedBy` (the user name of the creator, at most
+  the user name limit, null for a review stored before the column existed) and `CreatedViaApi` (default false, true
+  for a review created with a personal access token). A review from a repository also has
   `RepositoryId` (a plain number, not a foreign key, so the review keeps its reference whatever happens to the
   registration), `RepositoryName` (a display copy, at most the repository name limit), `BaselineSha` and `HeadSha` (at
   most 64 characters), `Selection` (at most `ReviewLimits.MaxSelectionLength`), and `ReviewSetId` (the review-set
@@ -53,6 +55,12 @@ repository registry is the one exception, see `Repositories`).
   lookup by user name
   ignores case; `DisplayName` is required, at most 100; `Role` is stored as text, at most 32; `Enabled`;
   `PasswordHash` is required; `FailedLoginCount`; `LockoutUntil` (null when the user is not locked out); `Created`.
+- **PersonalAccessTokens** (`PersonalAccessToken`): key `Id`, assigned by the database. `UserId` relates the token to its
+  owner, and a token is deleted with its user (an index on `UserId` serves the list of a user). `Name` is required, at
+  most 100; `DisplayId` is required, at most 16 (the stored text has 8 characters; the column is wider); `TokenHash` is
+  required, at most 64 (a SHA-256 value written in hexadecimal), with a unique index, which is what makes a hash unique
+  in the database and what the lookup of a presented token uses; `Created`, `Expires`, `LastUsed` and `Revoked` (the
+  last two are null until they happen). The value of a token is never a column.
 - **ReviewerSlots** (`ReviewerSlot`): key `Id`, assigned by the database. `ProjectId` and `ReviewId` relate the slot
   to its review, so the database refuses a slot for a review that does not exist, and a slot is deleted with its
   review. `PrimaryUserId` and `AlternateUserId` (null when there is no alternate) hold user identities only; they are
@@ -109,7 +117,9 @@ trail does not have it and must be deleted and created again (there are no migra
 `Repositories` table: a database created before the repository registry does not have it and must be deleted and
 created again. The same holds for the review columns of a repository review (source columns on a review, change kind
 and baseline columns on a file): a database created before the review-from-git slice does not have them and must be
-deleted and created again (there are no migrations; the development database is simply recreated). The
+deleted and created again (there are no migrations; the development database is simply recreated). The same holds for
+the `PersonalAccessTokens` table and the creator columns of a review (`CreatedBy`, `CreatedViaApi`): a database created
+before the personal-access-token slice does not have them and must be deleted and created again. The
 checklist keys are what makes "one answer per check" a rule of the database. The section and
 check identifiers are not related to a table of their own: they name entries inside the snapshot, and the service
 checks them.
@@ -132,11 +142,13 @@ mapped constraints surface as database update exceptions to `ReviewStore`.
 
 - **Core domain types** — `Project`, `Review`, `ReviewFile`, `ReviewState`, `ReviewThread`, `ReviewComment`,
   `ReviewThreadState`, `ReviewChecklist`, `ChecklistSectionState`, `ChecklistAnswer`, `ChecklistOutcome`, `User`,
-  `UserRole`, `ReviewerSlot`, `ReviewSignature`, `SlotRole`, `AuditEntry`, `AuditText` (the column limits), and
+  `UserRole`, `ReviewerSlot`, `ReviewSignature`, `SlotRole`, `AuditEntry`, `PersonalAccessToken`, `AuditText` (the column
+  limits), and
   `ReviewLimits`, and `RepositoryService` (the length limits of the repository columns).
 - **Entity Framework Core** — the context base class and the model configuration API.
 
 #### Callers
 
-- **ReviewStore**, **UserStore**, **AuditStore**, and **RepositoryStore** — open a context for each operation.
+- **ReviewStore**, **UserStore**, **PersonalAccessTokenStore**, **AuditStore**, and **RepositoryStore** — open a context
+  for each operation.
 - **DatabaseSetup** — configures the context options and creates the schema.

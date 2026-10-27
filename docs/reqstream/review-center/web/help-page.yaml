@@ -68,3 +68,14 @@ sections:
           say plainly what the document proves and how to make it carry weight.
         tests:
           - HelpAttestationPage_Render_ExplainsWhatTheSignatureProvesAndTheKey
+
+      - id: ReviewCenter-HelpPage-ApiTokensTopic
+        title: >-
+          The HelpPage unit shall serve a topic, API tokens, that explains how to create a token on the account page
+          and that its value is shown once, how to send it as a bearer token with a curl example, which endpoints
+          the API offers, that a token never signs or opens a page, and what the errors of the API mean.
+        justification: |
+          A script author needs one place that tells how to get a token and use it, and the limits of a token must
+          be said plainly so that nobody expects a pipeline to sign a review.
+        tests:
+          - HelpApiTokensPage_Render_ExplainsTokensCurlEndpointsAndErrors

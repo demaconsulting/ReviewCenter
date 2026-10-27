@@ -139,6 +139,14 @@ changes or deletes a signature. `UpdateSlotAsync` and `RemoveSlotAsync` return `
 - *Preconditions*: The actor and the expected digest are not null.
 - *Postconditions*: Nothing is stored when a rule fails.
 
+**API tokens cannot sign**: The first statement of `SignAsync`, `AddSlotAsync`, `UpdateSlotAsync`, and
+`RemoveSlotAsync` refuses an actor that came in with a personal access token (`Actor.ViaApiToken`) with
+`ActorNotAllowed` and the message that reviewer slots and signatures cannot be changed with an API token. The check comes
+before the gate, the password check, and any read of the store, so a refused call has no effect and costs nothing. A
+signature records that a named person confirmed the review with the password, which a script holding a token cannot do.
+The API has no route for these operations, so this check is the second, independent line of defense: it protects against
+a route that is added later without the rule. Reading the approval is not restricted.
+
 **Audit**: Adding, updating, and removing a slot record `slot.added`, `slot.updated`, and `slot.removed`, and signing
 records `signature.added` with the slot, the role, and the record digest the reviewer signed. Each draft is passed to
 the store and saved in the same transaction as the change, so a signature and its entry exist together or not at all.
@@ -167,4 +175,5 @@ never contain a password or a hash. An infrastructure failure of the store passe
 
 - **ReviewPage** and **ProjectPage** (`Web` subsystem) — show the approval, the slots, and the blockers, and make the
   changes of the signed-in user.
+- **ApiEndpoints** (`Api` subsystem) — reads the approval of a review; it cannot change slots or signatures.
 - **ServerHost** (`Hosting` subsystem) — registers the service as a singleton.

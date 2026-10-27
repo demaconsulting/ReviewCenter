@@ -14,6 +14,10 @@ includes:
   - docs/reqstream/review-center/identity/sign-in.yaml
   - docs/reqstream/review-center/identity/sign-in-throttle.yaml
   - docs/reqstream/review-center/identity/revalidating-authentication-state-provider.yaml
+  - docs/reqstream/review-center/api.yaml
+  - docs/reqstream/review-center/api/api-token-authentication.yaml
+  - docs/reqstream/review-center/api/api-endpoints.yaml
+  - docs/reqstream/review-center/api/api-document.yaml
   - docs/reqstream/review-center/program.yaml
   - docs/reqstream/review-center/cli.yaml
   - docs/reqstream/review-center/cli/context.yaml
@@ -69,6 +73,7 @@ includes:
   - docs/reqstream/review-center/core/repository-service.yaml
   - docs/reqstream/review-center/core/review-planner.yaml
   - docs/reqstream/review-center/core/line-diff.yaml
+  - docs/reqstream/review-center/core/personal-access-token-service.yaml
   - docs/reqstream/review-center/storage.yaml
   - docs/reqstream/review-center/storage/review-center-db-context.yaml
   - docs/reqstream/review-center/storage/review-store.yaml
@@ -76,6 +81,7 @@ includes:
   - docs/reqstream/review-center/storage/audit-store.yaml
   - docs/reqstream/review-center/storage/repository-store.yaml
   - docs/reqstream/review-center/storage/database-setup.yaml
+  - docs/reqstream/review-center/storage/personal-access-token-store.yaml
   - docs/reqstream/review-center/platform-requirements.yaml
   - docs/reqstream/review-center-puppet.yaml
   - docs/reqstream/review-center-puppet/puppet-program.yaml
@@ -102,3 +108,4 @@ includes:
   - docs/reqstream/ots/filesystemglobbing.yaml
   - docs/reqstream/ots/yamldotnet.yaml
   - docs/reqstream/ots/pkcs.yaml
+  - docs/reqstream/ots/openapi.yaml
