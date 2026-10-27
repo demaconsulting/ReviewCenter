@@ -144,6 +144,10 @@ does not exist are read in one batch over a user store that counts list reads. T
 the status of a review equals the single read, and the user list was read once. This scenario is tested by
 `SigningService_GetApprovalsAsync_SeveralReviews_EqualsSingleReadsAndLoadsUsersOnce`.
 
+**SigningService_GetApprovalsAsync_NoReviews_ReturnsEmptyWithoutReadingUsers**: An empty sequence of review
+identifiers is read in one batch over a user store that counts list reads. The result is empty and the user list was
+never read. This scenario is tested by `SigningService_GetApprovalsAsync_NoReviews_ReturnsEmptyWithoutReadingUsers`.
+
 **SigningService_ListCandidatesAsync_ReturnsEnabledUsersOnly**: With one user disabled, the candidates are the other
 enabled users. This scenario is tested by `SigningService_ListCandidatesAsync_ReturnsEnabledUsersOnly`.
 

@@ -113,8 +113,8 @@ changes or deletes a signature. `UpdateSlotAsync` and `RemoveSlotAsync` return `
 - *Parameters*: project identity, the review identifiers, and a cancellation token.
 - *Returns*: `Task<IReadOnlyDictionary<string, ReviewApproval>>` — the status of each review that exists, by review
   identifier; a review that does not exist is absent. Each status equals the one `GetApprovalAsync` gives.
-- *Postconditions*: The user list is loaded once for the whole batch, not once for each review; each review has its own
-  snapshot read.
+- *Postconditions*: The user list is loaded once for the whole batch, not once for each review, and not at all when
+  there are no review identifiers; each review has its own snapshot read.
 
 **ListCandidatesAsync**: Lists the users that can be chosen for a slot.
 

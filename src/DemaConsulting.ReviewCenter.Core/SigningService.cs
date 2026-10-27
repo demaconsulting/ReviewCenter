@@ -108,7 +108,8 @@ public sealed class SigningService
     }
 
     /// <summary>
-    ///     Reads the approval status of several reviews of a project, loading the users once for all of them.
+    ///     Reads the approval status of several reviews of a project, loading the users once for all of them, and not
+    ///     at all when there are no reviews.
     /// </summary>
     /// <param name="projectId">The project identity.</param>
     /// <param name="reviewIds">The review identifiers.</param>
@@ -123,9 +124,17 @@ public sealed class SigningService
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(reviewIds);
-        var members = (await _users.ListAsync(cancellationToken)).ToDictionary(user => user.Id);
+        var ids = reviewIds.ToList();
         var approvals = new Dictionary<string, ReviewApproval>();
-        foreach (var reviewId in reviewIds)
+
+        // Nothing to read, so do not load the whole user list
+        if (ids.Count == 0)
+        {
+            return approvals;
+        }
+
+        var members = (await _users.ListAsync(cancellationToken)).ToDictionary(user => user.Id);
+        foreach (var reviewId in ids)
         {
             if (await ReadApprovalAsync(projectId, reviewId, members, cancellationToken) is { } approval)
             {

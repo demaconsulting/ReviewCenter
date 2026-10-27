@@ -763,6 +763,29 @@ public class SigningServiceTests
     }
 
     /// <summary>
+    ///     Test that the batch read of no reviews gives an empty result without reading the user list.
+    /// </summary>
+    [Fact]
+    public async Task SigningService_GetApprovalsAsync_NoReviews_ReturnsEmptyWithoutReadingUsers()
+    {
+        // Arrange: a user store that counts list reads
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var store = new FakeReviewStore();
+        var clock = new MovableTimeProvider(_now);
+        var userStore = new CountingUserStore(new FakeUserStore());
+        var users = new UserService(userStore, new FakePasswordHasher(), clock);
+        var project = await new ProjectService(store, clock).CreateAsync("Apollo", null, cancellationToken);
+        var signing = new SigningService(store, users, clock);
+
+        // Act: read an empty sequence of reviews
+        var batch = await signing.GetApprovalsAsync(project.Id, [], cancellationToken);
+
+        // Assert: nothing returned and the user list was never read
+        Assert.Empty(batch);
+        Assert.Equal(0, userStore.ListCount);
+    }
+
+    /// <summary>
     ///     Test that only enabled users are offered for a slot, and without anything secret.
     /// </summary>
     [Fact]
