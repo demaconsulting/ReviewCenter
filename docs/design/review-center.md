@@ -429,7 +429,7 @@ is running.
 - *Type*: Git command-line tool, file system, and configuration.
 - *Role*: Consumer (the server runs git and reads and writes the folders).
 - *Contract*: The server runs the installed `git` tool to read registered repositories into a local mirror folder
-  (`Git:CachePath`, by default `git-cache` beside the database; `Git:TimeoutSeconds`, 120 by default). The access
+  (`Git:CachePath`, by default `git-cache` beside the database; `Git:TimeoutSeconds`, 120 by default, 1 to 3600). The access
   token of a private repository is stored encrypted with the Data Protection system, whose key ring is kept in a folder
   (`DataProtection:KeysPath`, by default `keys` beside the database).
 - *Constraints*: A usable git must be installed, or reading a repository fails with an error that says so. The key ring

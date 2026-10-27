@@ -468,19 +468,6 @@ a.action:active {
     transform: translateY(1px);
 }
 
-/* A quiet reference link inside a thread header, so it does not compete with Resolve and Reply */
-a.thread-link {
-    font-size: 0.85rem;
-    color: var(--muted);
-    text-decoration: underline;
-    background: none;
-    padding: 0;
-}
-
-a.thread-link:hover {
-    color: var(--accent);
-}
-
 .hint {
     margin: 0.25rem 0 0.75rem;
     font-size: 0.85rem;
@@ -582,9 +569,15 @@ a.thread-link:hover {
     margin: 0 0 0.5rem;
 }
 
-.thread-head button {
+/* The Link anchor and the thread buttons share one compact size */
+.thread-head button,
+.thread-head a.action {
     margin: 0;
     padding: 0.25rem 0.75rem;
+    box-sizing: border-box;
+    font-size: 0.9rem;
+    font-weight: 600;
+    line-height: 1.25rem;
 }
 
 .thread-head .badge + .muted {
@@ -759,6 +752,26 @@ a.thread-link:hover {
 .diff-row .gutter {
     position: static;
     background: inherit;
+}
+
+/* The + control appears on row hover or keyboard focus. Opacity (not display or visibility) keeps it
+   in the tab order and in the layout, so the gutter never shifts. Touch screens always show it. */
+.diff-row .line-comment {
+    opacity: 0;
+    transition: opacity var(--transition);
+}
+
+.diff-row:hover .line-comment,
+.diff-row:focus-within .line-comment,
+.diff-row.selected .line-comment,
+.diff-row .line-comment:focus-visible {
+    opacity: 1;
+}
+
+@media (hover: none) {
+    .diff-row .line-comment {
+        opacity: 1;
+    }
 }
 
 .diff-row .line-text {

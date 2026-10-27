@@ -46,7 +46,7 @@ Every interactive element and key value has a stable `data-testid` (see the test
 subsystem): `users-page` (root), `new-user-button`, `users-error`, `users-status`, `users-list`, and per user (by user
 identity) `user-row-{id}`, `user-username-{id}`, `user-display-name-{id}`, `user-role-{id}`, `user-enabled-{id}`,
 `user-toggle-enabled-{id}`, `user-role-select-{id}`, `user-set-role-{id}`, `user-password-input-{id}`, and
-`user-set-password-{id}`. The page of the form has `new-user-page` (root), `users-link` (breadcrumb), `users-error`,
+`user-set-password-{id}`. The page of the form has `new-user-page` (root), `breadcrumb-users-link`, `users-error`,
 `new-user-form`, `new-user-username-input`, `new-user-display-name-input`, `new-user-role-select`,
 `new-user-password-input`, `create-user-button`, and `cancel-new-user-link`.
 

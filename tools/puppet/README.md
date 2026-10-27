@@ -72,7 +72,13 @@ the page, use `wait` (for example `puppet wait "text=Saved"`) before you read `t
 
 The mouse position persists between commands, so `puppet hover save-button` followed by a separate
 `puppet screenshot hover.png` shows the hover state. It lasts until the mouse moves again (`hover`, `click`,
-`mouse-move`) or `reset` runs.
+`mouse-move`) or `reset` runs. A control that only appears on hover, such as the **+** of a diff line, is reached
+with `puppet hover diff-row-11` (it is visible in the next screenshot) and then `puppet click diff-comment-11`;
+`click` also moves the mouse onto the element first.
+
+Test ids are unique within a page. The header tabs are `projects-link`, `repositories-link`, and `users-link`; the
+breadcrumb links of the pages below them are `breadcrumb-projects-link`, `breadcrumb-repositories-link`, and
+`breadcrumb-users-link`.
 
 ## Output and exit codes
 

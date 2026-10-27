@@ -57,7 +57,7 @@ Every interactive element and key value has a stable `data-testid`:
 - *Edit form*: `repository-edit-form-{id}`, `edit-repository-name-input`, `edit-repository-location-input`,
   `edit-repository-username-input`, `edit-repository-token-action-select`, `edit-repository-token-input`,
   `edit-repository-save-button`, and `edit-repository-cancel-button`.
-- *Add page*: `new-repository-page` (root), `repositories-link` (breadcrumb), `repositories-error`,
+- *Add page*: `new-repository-page` (root), `breadcrumb-repositories-link`, `repositories-error`,
   `new-repository-form`, `new-repository-name-input`, `new-repository-location-input`,
   `new-repository-username-input`, `new-repository-token-input`, `create-repository-button`, and
   `cancel-new-repository-link`.

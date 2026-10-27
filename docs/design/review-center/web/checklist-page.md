@@ -37,7 +37,7 @@ justification typed, and the message of a violated rule. **PendingNotApplicable*
 **SectionErrors**: the same per section for a "does not apply" decision. All of these are cleared when the route
 parameters change. The page also keeps the test id to scroll to after the next render, and the interactive marker.
 
-Test identifiers: `checklist-page` (root), `home-link`, `projects-link`, `project-link`, `review-link`,
+Test identifiers: `checklist-page` (root), `breadcrumb-projects-link`, `project-link`, `review-link`,
 `checklist-loading`, `checklist-not-found`, `checklist-missing`, `checklist-review-title`, `checklist-status`,
 `checklist-progress`, `next-unanswered-button`, `back-to-review-link`, and, per section,
 `section-{id}`, `section-{id}-toggle`, `section-{id}-progress`, `section-{id}-applicable`, `section-{id}-reason`,

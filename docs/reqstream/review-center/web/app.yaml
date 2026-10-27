@@ -12,13 +12,16 @@ sections:
       - id: ReviewCenter-App-Shell
         title: >-
           The App unit shall render every page inside an HTML document that sets the base
-          address, receives the page title, and loads the interactive client script.
+          address, receives the page title, loads the interactive client script, and defines the
+          browser helper that copies text to the clipboard for the Copy link button.
         justification: |
           Pages need a common document around them so that relative links resolve, so that each
           page can set the browser title, and so that the client script that makes a page
-          interactive is loaded exactly once.
+          interactive is loaded exactly once. Copying needs browser code, which falls back to a
+          hidden text area where the clipboard API is not available (a page that is not a secure context).
         tests:
           - App_Render_ServedAtRoot_ContainsShellElements
+          - App_Render_ServedAtRoot_DefinesCopyTextHelper
 
       - id: ReviewCenter-App-Routing
         title: >-

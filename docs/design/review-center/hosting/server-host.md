@@ -46,7 +46,7 @@ and adds the console provider only when the context is not silent; registers Bla
 components; registers the persistence and the Core services with `AddServices`; registers cookie sign-in, and with it
 the revalidating authentication state provider of open pages, with `SignIn.AddSignIn` (after the Razor components, so
 that its provider replaces the framework default); applies the options callback; loads static web assets
-when enabled; builds the application; calls `InitializeDatabase`, `ValidateAuthOptions`, and
+when enabled; builds the application; calls `InitializeDatabase`, `ValidateAuthOptions`, `ValidateGitOptions`, and
 `ValidateDataProtection`; adds `UseNotFoundPage` (the not-found middleware, below) and routing; adds authentication,
 authorization, and request forgery protection, in that order, ahead of the endpoints they protect; maps static assets
 when enabled; maps `/health` to a plain-text 200 response; maps the login and logout endpoints with
@@ -120,6 +120,18 @@ session length that is not positive, an interval for the re-check of open pages 
 limit that is not positive or a window outside 1 to 86400 seconds) into one clear
 start-up message, which names the setting, rather than a failure at the first sign-in.
 
+**ValidateGitOptions**: Reads the git options of a built application once.
+
+- *Parameters*: `WebApplication app` — supplies the options.
+- *Returns*: `void`.
+- *Postconditions*: The `Git` settings are valid, or the application is disposed and an
+  `InvalidOperationException` beginning "Invalid git settings:" is thrown with the validation failure as its inner
+  exception.
+
+`Git:TimeoutSeconds` must be from 1 to 3600 (`GitOptions.MinimumTimeoutSeconds` and `MaximumTimeoutSeconds`); the
+message "Git:TimeoutSeconds must be between 1 and 3600 seconds." names the setting. A value that is not a number
+fails earlier, while the configuration is bound, with a message that names the key as well.
+
 **ResolveKeysPath**: Chooses the folder of the Data Protection key ring.
 
 - *Parameters*: `DataProtectionSettings settings` — holds `KeysPath`; `DatabaseOptions database` — locates the
@@ -179,11 +191,11 @@ This is the mechanism behind the requirement that the listen URL be exposed as a
 `CreateApplication` and `RunAsync` throw `ArgumentNullException` for a null context. `RunAsync`
 handles three environmental conditions locally: an `OperationCanceledException` raised while the
 caller has requested cancellation is treated as a normal stop and returns 0; an
-`InvalidOperationException` from building, which is how a database that cannot be prepared and invalid sign-in
+`InvalidOperationException` from building, which is how a database that cannot be prepared and invalid sign-in or git
 settings are reported, is
-written through `Context.WriteError` as is ("Failed to prepare the database: {detail}" or "Invalid sign-in
-settings: {detail}", or "The Data Protection key ring folder '{path}' is not writable: ...", or "The attestation signing
-key is not usable: {detail}") and returns 1; and an
+written through `Context.WriteError` as is ("Failed to prepare the database: {detail}", "Invalid sign-in
+settings: {detail}", "Invalid git settings: {detail}", "The Data Protection key ring folder '{path}' is not
+writable: ...", or "The attestation signing key is not usable: {detail}") and returns 1; and an
 `IOException`, which Kestrel uses to report an address that is in use or not bindable, is
 reported as "Failed to start the server on {url}: {detail}" through `Context.WriteError` and
 returns 1. Any other exception propagates to the caller (`Program.Main`). The application is

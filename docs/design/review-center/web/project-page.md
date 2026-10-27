@@ -50,7 +50,7 @@ repository and the entries that were skipped, shown before the review is opened.
 
 **InteractiveMarker**: as for the other pages; each page has its own.
 
-Test identifiers of `ProjectPage`: `project-page` (root), `projects-link`, `project-loading`, `project-not-found`,
+Test identifiers of `ProjectPage`: `project-page` (root), `breadcrumb-projects-link`, `project-loading`, `project-not-found`,
 `project-name`, `project-description`, `new-review-button` (the link that leads to the form page), `reviews-list`,
 `reviews-empty`, `review-row-{id}`, `review-link-{id}`, `review-title-{id}`, `review-state-{id}`,
 `review-approval-{id}`, `review-created-{id}`, `plan-reviews-link` (the link to the plan page, shown when at least
@@ -58,7 +58,7 @@ one repository is enabled), and `plan-reviews-unavailable` (the note shown when 
 `reviews-list`: the identifier is the link, followed by the title, the state and approval badges, and the creation
 date.
 
-Test identifiers of `NewReviewPage`: `new-review-page` (root), `projects-link`, `project-link`, `project-loading`,
+Test identifiers of `NewReviewPage`: `new-review-page` (root), `breadcrumb-projects-link`, `project-link`, `project-loading`,
 `project-not-found`, `new-review-form`, `review-id-input`, `review-title-input`, `review-source` (the source choice),
 `source-upload-radio`, `source-repository-radio`, `no-repository-hint`, `repository-select`, `head-revision-input`,
 `baseline-revision-input`, `selection-input`, `review-files-input`, `selected-files-list`, `selected-file-{index}`,

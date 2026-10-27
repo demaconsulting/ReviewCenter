@@ -84,7 +84,8 @@ internal static class ServerHost
     /// <returns>A configured, not yet started <see cref="WebApplication"/>. The caller owns and must dispose it.</returns>
     /// <exception cref="ArgumentNullException">Thrown when <paramref name="context"/> is null.</exception>
     /// <exception cref="InvalidOperationException">
-    ///     Thrown when the configured database cannot be prepared (see <see cref="InitializeDatabase"/>).
+    ///     Thrown when the configured database cannot be prepared (see <see cref="InitializeDatabase"/>) or when the
+    ///     <c>Auth</c> or <c>Git</c> settings are invalid.
     /// </exception>
     /// <remarks>
     ///     Building is separated from running so tests can start the application against an
@@ -145,6 +146,7 @@ internal static class ServerHost
         // start-up with a clear message instead of failing on the first page request
         InitializeDatabase(app);
         ValidateAuthOptions(app);
+        ValidateGitOptions(app);
         ValidateDataProtection(app);
         ValidateAttestation(app);
 
@@ -230,6 +232,9 @@ internal static class ServerHost
         services.AddOptions<DataProtectionSettings>().Bind(configuration.GetSection(DataProtectionSettings.SectionName));
         services.AddOptions<GitOptions>()
             .Bind(configuration.GetSection(GitOptions.SectionName))
+            .Validate(
+                git => git.TimeoutSeconds is >= GitOptions.MinimumTimeoutSeconds and <= GitOptions.MaximumTimeoutSeconds,
+                $"Git:TimeoutSeconds must be between {GitOptions.MinimumTimeoutSeconds} and {GitOptions.MaximumTimeoutSeconds} seconds.")
             .PostConfigure<IOptions<DatabaseOptions>>((git, database) =>
             {
                 if (string.IsNullOrWhiteSpace(git.CachePath))
@@ -497,6 +502,26 @@ internal static class ServerHost
         {
             ((IDisposable)app).Dispose();
             throw new InvalidOperationException($"Invalid sign-in settings: {ex.Message}", ex);
+        }
+    }
+
+    /// <summary>
+    ///     Reads the git options once so an invalid value stops the start-up with a clear message.
+    /// </summary>
+    /// <param name="app">The built application whose services provide the options.</param>
+    /// <exception cref="InvalidOperationException">
+    ///     Thrown when the <c>Git</c> settings are invalid; the application is disposed before the exception is thrown.
+    /// </exception>
+    private static void ValidateGitOptions(WebApplication app)
+    {
+        try
+        {
+            _ = app.Services.GetRequiredService<IOptions<GitOptions>>().Value;
+        }
+        catch (OptionsValidationException ex)
+        {
+            ((IDisposable)app).Dispose();
+            throw new InvalidOperationException($"Invalid git settings: {ex.Message}", ex);
         }
     }
 

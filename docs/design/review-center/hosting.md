@@ -133,7 +133,7 @@ the `Evidence` design.
 - *Role*: Consumer.
 - *Contract*: `KeysPath` is the folder of the key ring that protects the stored repository tokens (empty for a `keys`
   folder beside the database). The `Git` section sets `CachePath` (empty for a `git-cache` folder beside the database)
-  and `TimeoutSeconds` (120 by default) of the git content source.
+  and `TimeoutSeconds` (120 by default, 1 to 3600) of the git content source.
 - *Constraints*: The server refuses to start when the key ring folder cannot be written.
 
 ### Design
@@ -187,7 +187,9 @@ problem with the settings or the file system stops the start-up with one clear m
 failing on the first page request. The sign-in settings (`Auth:SessionHours` and `Auth:RevalidationSeconds`) are
 validated at the same point, for the
 same reason: an invalid value stops the start-up with the message "Invalid sign-in settings: ...", instead of
-failing at the first sign-in.
+failing at the first sign-in. The git setting `Git:TimeoutSeconds` is checked the same way and must be from 1 to 3600:
+any other number stops the start-up with "Invalid git settings: Git:TimeoutSeconds must be between 1 and 3600
+seconds."
 
 The key ring of the Data Protection system is persisted in a folder, because the stored repository tokens are
 encrypted with it: with the default in-memory or profile-bound key ring, a restart or a move to another account could
