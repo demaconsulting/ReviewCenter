@@ -24,6 +24,7 @@ using DemaConsulting.ReviewCenter.Core;
 using DemaConsulting.ReviewCenter.Tests.Core;
 using DemaConsulting.ReviewCenter.Tests.Evidence;
 using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.Metadata;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
@@ -146,6 +147,7 @@ public class ApiEndpointsTests
     [InlineData("GET", "/api/projects/1/reviews/REV-1")]
     [InlineData("POST", "/api/projects/1/reviews")]
     [InlineData("GET", "/api/projects/1/reviews/REV-1/attestation.pdf")]
+    [InlineData("GET", "/api/projects/1/evidence/index.json")]
     public async Task ApiEndpoints_Request_NoToken_Answers401(string method, string route)
     {
         // Arrange: an application with a project and a review
@@ -403,6 +405,133 @@ public class ApiEndpointsTests
     }
 
     /// <summary>
+    ///     Test that the evidence index lists the complete review of a plan with its review-set id, the fingerprint
+    ///     of the review, the day of completion and an absolute link to the attestation, over bearer and Basic
+    ///     credentials, and that the answer is not cached.
+    /// </summary>
+    /// <param name="basic">Whether the token is sent as the password of HTTP Basic credentials.</param>
+    [Theory(Timeout = 60000)]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ApiEndpoints_GetEvidenceIndex_CompleteReviewWithSetId_ReturnsEntryWithAbsoluteFileUrl(bool basic)
+    {
+        // Arrange: one complete review that has a review-set id, one without, and a token
+        await using var app = await StartAsync();
+        var projectId = await ArrangeSignedReviewWithSetIdAsync(app);
+        var token = await CreateTokenAsync(app);
+        using var client = ClientFor(app, token.Value, basic);
+
+        // Act: read the index
+        var response = await client.GetAsync($"/api/projects/{projectId}/evidence/index.json", TestContext.Current.CancellationToken);
+        using var json = await JsonAsync(response);
+
+        // Assert: JSON, not cached, and the root object has the one review that has a set id
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal("application/json", response.Content.Headers.ContentType?.MediaType);
+        Assert.True(response.Headers.CacheControl?.NoStore);
+        var reviews = json.RootElement.GetProperty("reviews");
+        var entry = Assert.Single(reviews.EnumerateArray());
+        Assert.Equal("Core-Logic", entry.GetProperty("id").GetString());
+        Assert.Matches("^[0-9a-f]{64}$", entry.GetProperty("fingerprint").GetString()!);
+        Assert.Equal(DateTimeOffset.UtcNow.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture), entry.GetProperty("date").GetString());
+        Assert.Equal("pass", entry.GetProperty("result").GetString());
+        Assert.Equal($"http://localhost/api/projects/{projectId}/reviews/REV-2/attestation.pdf", entry.GetProperty("file").GetString());
+    }
+
+    /// <summary>
+    ///     Test that the evidence index builds the attestation address from the scheme, the host and the path base of
+    ///     the request, and escapes the review identifier.
+    /// </summary>
+    /// <param name="scheme">The scheme of the request.</param>
+    /// <param name="host">The host header of the request.</param>
+    /// <param name="pathBase">The path base of the request.</param>
+    /// <param name="reviewId">The review identifier.</param>
+    /// <param name="expected">The expected address.</param>
+    [Theory]
+    [InlineData("https", "reviews.example.com:8443", "/center", "REV-2", "https://reviews.example.com:8443/center/api/projects/7/reviews/REV-2/attestation.pdf")]
+    [InlineData("http", "localhost", "", "REV-2", "http://localhost/api/projects/7/reviews/REV-2/attestation.pdf")]
+    [InlineData("http", "localhost", "", "A B/c?d", "http://localhost/api/projects/7/reviews/A%20B%2Fc%3Fd/attestation.pdf")]
+    public void ApiEndpoints_GetEvidenceIndex_SchemeHostPathBaseAndId_BuildsAbsoluteUrl(
+        string scheme, string host, string pathBase, string reviewId, string expected)
+    {
+        // Arrange: a request with the scheme, the host and the path base
+        var context = new DefaultHttpContext();
+        context.Request.Scheme = scheme;
+        context.Request.Host = new HostString(host);
+        context.Request.PathBase = pathBase;
+
+        // Act: build the address
+        var url = ApiEndpoints.AttestationUrl(context.Request, 7, reviewId);
+
+        // Assert: absolute, from the request, with the identifier escaped
+        Assert.Equal(expected, url);
+    }
+
+    /// <summary>
+    ///     Test that the evidence index builds the attestation address from the host header of the request.
+    /// </summary>
+    [Fact(Timeout = 60000)]
+    public async Task ApiEndpoints_GetEvidenceIndex_OtherHost_BuildsUrlFromRequestHost()
+    {
+        // Arrange: one complete review that has a review-set id, a token, and a request for another host
+        await using var app = await StartAsync();
+        var projectId = await ArrangeSignedReviewWithSetIdAsync(app);
+        var token = await CreateTokenAsync(app);
+        using var client = ClientFor(app, token.Value);
+        client.DefaultRequestHeaders.Host = "reviews.example.com";
+
+        // Act: read the index
+        var response = await client.GetAsync($"/api/projects/{projectId}/evidence/index.json", TestContext.Current.CancellationToken);
+        using var json = await JsonAsync(response);
+
+        // Assert: the address names the host of the request
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var entry = Assert.Single(json.RootElement.GetProperty("reviews").EnumerateArray());
+        Assert.Equal($"http://reviews.example.com/api/projects/{projectId}/reviews/REV-2/attestation.pdf", entry.GetProperty("file").GetString());
+    }
+
+    /// <summary>
+    ///     Test that the evidence index of a project without a complete review that has a review-set id is an empty
+    ///     list, not an error.
+    /// </summary>
+    [Fact(Timeout = 60000)]
+    public async Task ApiEndpoints_GetEvidenceIndex_NoListableReview_ReturnsEmptyList()
+    {
+        // Arrange: a complete review without a review-set id, and a token
+        await using var app = await StartAsync();
+        var projectId = await AttestationEndpointTests.CreateReviewAsync(app, signed: true);
+        var token = await CreateTokenAsync(app);
+        using var client = ClientFor(app, token.Value);
+
+        // Act: read the index
+        var response = await client.GetAsync($"/api/projects/{projectId}/evidence/index.json", TestContext.Current.CancellationToken);
+        using var json = await JsonAsync(response);
+
+        // Assert: OK with an empty list
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal(0, json.RootElement.GetProperty("reviews").GetArrayLength());
+    }
+
+    /// <summary>
+    ///     Test that the evidence index of a project that does not exist is a 404 problem document.
+    /// </summary>
+    [Fact(Timeout = 60000)]
+    public async Task ApiEndpoints_GetEvidenceIndex_UnknownProject_Answers404Problem()
+    {
+        // Arrange: an application without projects, and a token
+        await using var app = await StartAsync();
+        var token = await CreateTokenAsync(app);
+        using var client = ClientFor(app, token.Value);
+
+        // Act: read the index of a project that does not exist
+        var response = await client.GetAsync("/api/projects/99/evidence/index.json", TestContext.Current.CancellationToken);
+
+        // Assert: not found as a problem document
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
+    }
+
+    /// <summary>
     ///     Test that an address under <c>/api</c> that does not exist answers a JSON 404 for any method, with or
     ///     without a token, and never the web application.
     /// </summary>
@@ -624,6 +753,25 @@ public class ApiEndpointsTests
         Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
         Assert.Empty(await app.Services.GetRequiredService<ReviewService>().ListAsync(project.Id, TestContext.Current.CancellationToken));
         Assert.Equal(auditBefore, (await AuditAsync(app)).Count);
+    }
+
+    /// <summary>
+    ///     Arranges one complete review of a project, signed by its one reviewer, that was planned from the review-set
+    ///     <c>Core-Logic</c>, next to a complete review without a review-set id.
+    /// </summary>
+    /// <param name="app">The running application.</param>
+    /// <returns>The project number.</returns>
+    private static async Task<int> ArrangeSignedReviewWithSetIdAsync(WebApplication app)
+    {
+        var projectId = await AttestationEndpointTests.CreateReviewAsync(app, signed: true);
+        var store = app.Services.GetRequiredService<IReviewStore>();
+        await EvidenceTestSupport.AddReviewAsync(store, TimeProvider.System, projectId, "REV-2", "Core-Logic", "one\ntwo\n"u8.ToArray());
+        await EvidenceTestSupport.AnswerAllPassAsync(app.Services.GetRequiredService<ChecklistService>(), projectId, "REV-2");
+        var annId = (await app.Services.GetRequiredService<UserService>().GetAsync("ann", TestContext.Current.CancellationToken))!.Id;
+        var signing = app.Services.GetRequiredService<SigningService>();
+        var slotId = await EvidenceTestSupport.AddSlotAsync(signing, projectId, "REV-2", annId);
+        await EvidenceTestSupport.SignAsync(signing, projectId, "REV-2", slotId, EvidenceTestSupport.Ann, TestBrowser.Password);
+        return projectId;
     }
 
     /// <summary>

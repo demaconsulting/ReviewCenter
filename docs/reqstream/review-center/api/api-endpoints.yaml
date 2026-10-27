@@ -76,6 +76,25 @@ sections:
           - ApiEndpoints_GetAttestation_Token_ReturnsPdfOrProblem
           - ApiEndpoints_GetAttestation_ReviewNotSigned_Answers409Problem
 
+      - id: ReviewCenter-ApiEndpoints-EvidenceIndex
+        title: >-
+          The ApiEndpoints unit shall return, to a client with a valid token, the evidence index of a project at
+          GET /projects/{projectId}/evidence/index.json as a JSON object with a reviews list in the format that
+          ReviewMark reads, with the absolute address of the attestation of each entry built from the scheme, host and
+          path base of the request, with a response that no cache keeps, answer 404 with a problem document for a
+          project that does not exist, and answer 401 to a request without a valid token.
+        justification: |
+          ReviewMark takes the evidence of a review from an index. The file address in it must be one that the client
+          can open, whatever address it used to reach the server, a cached index would show a review that has since
+          changed, and an unknown project must be told from a project without evidence.
+        tests:
+          - ApiEndpoints_GetEvidenceIndex_CompleteReviewWithSetId_ReturnsEntryWithAbsoluteFileUrl
+          - ApiEndpoints_GetEvidenceIndex_NoListableReview_ReturnsEmptyList
+          - ApiEndpoints_GetEvidenceIndex_UnknownProject_Answers404Problem
+          - ApiEndpoints_GetEvidenceIndex_SchemeHostPathBaseAndId_BuildsAbsoluteUrl
+          - ApiEndpoints_GetEvidenceIndex_OtherHost_BuildsUrlFromRequestHost
+          - ApiEndpoints_Request_NoToken_Answers401
+
       - id: ReviewCenter-ApiEndpoints-Errors
         title: >-
           The ApiEndpoints unit shall answer an address under /api that does not exist, with any standard HTTP method

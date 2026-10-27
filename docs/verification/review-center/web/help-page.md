@@ -62,7 +62,10 @@ certificate from the store says that the administrator supplied it. This scenari
 **HelpApiTokensPage_Render_ExplainsTokensCurlEndpointsAndErrors**: The API tokens page is rendered; the heading is
 "Automation and API tokens", the screenshot is served from `/help/` with alternative text, and the text names the
 Account page, the expiry choices of 30, 90, or 365 days with 90 as the default, that the value is shown once, the limit
-of 20 active tokens, and the revocation. It says that a token can never sign, shows a curl example with the bearer header
-against `/api/projects`, names `POST /api/projects/{id}/reviews` and `/api/openapi.json`, says that a review made through
-the API is a Draft that is marked as created via API, and explains the 401 and 429 answers. No link begins with `#`. This
+of 20 active tokens, and the revocation. It says that a token can never sign, shows a curl example with the bearer
+header
+against `/api/projects`, names `POST /api/projects/{id}/reviews`, the evidence index, and `/api/openapi.json`, explains
+the use with ReviewMark (HTTP Basic, the token as the password), says that a review made through
+the API is a Draft that is marked as created via API, and explains the 401 and 429 answers. No link begins with `#`.
+This
 scenario is tested by `HelpApiTokensPage_Render_ExplainsTokensCurlEndpointsAndErrors`.

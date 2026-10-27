@@ -2,7 +2,8 @@
 # Software Unit Requirements for the ApiTokenAuthentication Unit
 #
 # The ApiTokenAuthentication unit signs in the requests under /api from a personal access token that is sent as a
-# bearer token, and answers a request without a valid token. It never uses the session cookie of the web pages.
+# bearer token or as the password of HTTP Basic credentials (the way ReviewMark sends it), and answers a request
+# without a valid token. It never uses the session cookie of the web pages.
 
 sections:
   - title: ApiTokenAuthentication Unit Requirements
@@ -10,33 +11,36 @@ sections:
       - id: ReviewCenter-ApiTokenAuthentication-Bearer
         title: >-
           The ApiTokenAuthentication unit shall sign in a request under /api that sends a valid personal access token
-          as a bearer token as the owner of the token, with the id of the token on the actor, and shall record that
-          the token was used.
+          as a bearer token, or as the password of HTTP Basic credentials whatever the user name is, as the owner of the
+          token, with the id of the token on the actor, and shall record that the token was used.
         justification: |
           Acting as the owner keeps every change attributable to a person, the id of the token tells which of the
           tokens of that person was used, and the time of last use lets the owner find a token that nobody needs.
         tests:
           - ApiTokenAuthentication_Request_ValidToken_AuthenticatesAndRecordsLastUsed
           - ApiTokenAuthentication_Request_ValidToken_ActsAsTheOwner
+          - ApiTokenAuthentication_Request_BasicWithTokenAsPassword_AuthenticatesAsOwner
 
       - id: ReviewCenter-ApiTokenAuthentication-Refusal
         title: >-
           The ApiTokenAuthentication unit shall answer a request under /api with no token, an unknown or revoked
           token, or an expired token with status 401 and a Bearer challenge, and shall give the same answer for
-          every reason that a token is refused.
+          every reason that a token is refused, a wrong Basic password included. The challenge shall name the bearer and
+          the Basic scheme.
         justification: |
           A client must be told to send a token, but a different answer for an expired token and for a token that
           never existed would help somebody who guesses tokens.
         tests:
-          - ApiTokenAuthentication_Request_NoBearerToken_Answers401WithChallenge
+          - ApiTokenAuthentication_Request_NoUsableToken_Answers401WithChallenge
           - ApiTokenAuthentication_Request_RefusedTokens_AllGetTheSameGenericAnswer
           - ApiTokenAuthentication_Request_ExpiredToken_Answers401
+          - ApiTokenAuthentication_Request_BasicWithWrongPassword_GetsTheSameGeneric401AndIsThrottledAndAudited
 
       - id: ReviewCenter-ApiTokenAuthentication-Cookie
         title: >-
           The ApiTokenAuthentication unit shall not accept the session cookie of the web pages for a request under
           /api, and shall not sign in a request for a web page, the sign-in and sign-out endpoints or the web socket
-          negotiation of the pages from a bearer token.
+          negotiation of the pages from a bearer token or from HTTP Basic credentials.
         justification: |
           A cookie is sent by the browser to a site without the user being asked, so an API that accepted it would
           be open to forgery from other sites. A token that signed in a web page would give a leaked token the
@@ -49,7 +53,7 @@ sections:
       - id: ReviewCenter-ApiTokenAuthentication-Throttle
         title: >-
           The ApiTokenAuthentication unit shall answer a request from a client address that has had too many tokens
-          refused with status 429.
+          refused with status 429, whether the token was sent as a bearer token or as a Basic password.
         justification: |
           Guessing tokens must be slow for one client, even though a token has high entropy, and a limit by address
           does not stop other clients.

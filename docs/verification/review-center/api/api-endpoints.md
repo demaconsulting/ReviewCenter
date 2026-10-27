@@ -6,7 +6,8 @@
 (`TestWebApp`) over a temporary database, with the git provider replaced by a scripted fake for the repository case,
 create projects and reviews (a complete one with `AttestationEndpointTests.CreateReviewAsync`) and a token through the
 real `PersonalAccessTokenService` (`ApiTestSupport`), and call the routes with an HTTP client that sends the token. The
-responses are examined for the status, the content type, the headers, and the JSON; the data and the audit trail are read
+responses are examined for the status, the content type, the headers, and the JSON; the data and the audit trail are
+read
 through the services, and the routes are read from the endpoint data source of the application.
 
 #### Test Environment
@@ -26,6 +27,10 @@ N/A - standard test environment (a temporary database and key folder are created
 - A file count, file size or total size beyond the review limits is a 400 problem, a body over the limit of the endpoint
   is a 413, and no review is created in these cases.
 - The attestation of a complete review is a PDF, of a review that is not complete a 409 problem.
+- The evidence index of a project is a JSON document with the complete reviews that have a review-set id, each with an
+  absolute attestation address built from the request; it is empty when no review can be listed, and a 404 problem for
+  an
+  unknown project.
 - An unknown address under `/api` is a JSON 404 for every standard HTTP method (`GET`, `HEAD`, `POST`, `PUT`, `PATCH`,
   `DELETE`, `OPTIONS`), and there is no route that signs or changes a slot.
 
@@ -45,14 +50,16 @@ requested. The details show the identity, that it is approved, the approval dige
 slot with its reviewers and who signed; the other is 404. This scenario is tested by
 `ApiEndpoints_GetReview_CompleteReview_ReturnsDetails`.
 
-**ApiEndpoints_Request_NoToken_Answers401**: Each route (the three reads, the creation, and the attestation) is requested
+**ApiEndpoints_Request_NoToken_Answers401**: Each route (the three reads, the creation, and the attestation) is
+requested
 without a token. Each answer is 401. This scenario is tested by `ApiEndpoints_Request_NoToken_Answers401`.
 
 **ApiEndpoints_CreateReview_NoTokenOddBody_Answers401**: A creation request without a token and with a body that is
 not JSON (plain text, or malformed JSON) is refused with 401, never with 415 or 400, because authentication comes
 before the body is read. This scenario is tested by `ApiEndpoints_CreateReview_NoTokenOddBody_Answers401`.
 
-**ApiEndpoints_CreateReview_Upload_CreatesDraftFlaggedAsApi**: A review is created from two uploaded files. The answer is
+**ApiEndpoints_CreateReview_Upload_CreatesDraftFlaggedAsApi**: A review is created from two uploaded files. The answer
+is
 201 with the address of the review, the details, and no skipped files; the review is flagged as created through the API,
 and the audit entry names the display id of the token. This scenario is tested by
 `ApiEndpoints_CreateReview_Upload_CreatesDraftFlaggedAsApi`.
@@ -97,13 +104,43 @@ and an
 unknown project are sent. The answers are 409, 400, 400, and 404, each a problem document with the status and a detail.
 This scenario is tested by `ApiEndpoints_CreateReview_ServiceRules_AnswerTheirStatus`.
 
-**ApiEndpoints_GetAttestation_Token_ReturnsPdfOrProblem**: The attestation of a complete review and of a review that does
+**ApiEndpoints_GetAttestation_Token_ReturnsPdfOrProblem**: The attestation of a complete review and of a review that
+does
 not exist are requested. The first is 200 `application/pdf` with the PDF header; the second is a 404 problem document.
 This scenario is tested by `ApiEndpoints_GetAttestation_Token_ReturnsPdfOrProblem`.
 
-**ApiEndpoints_GetAttestation_ReviewNotSigned_Answers409Problem**: The attestation of a review nobody signed is requested.
+**ApiEndpoints_GetAttestation_ReviewNotSigned_Answers409Problem**: The attestation of a review nobody signed is
+requested.
 The answer is a 409 problem document. This scenario is tested by
 `ApiEndpoints_GetAttestation_ReviewNotSigned_Answers409Problem`.
+
+**ApiEndpoints_GetEvidenceIndex_CompleteReviewWithSetId_ReturnsEntryWithAbsoluteFileUrl**: A project has a complete
+review
+without a review-set id and one with a review-set id. The index is requested with a bearer token and with Basic
+credentials. Each answer is 200 JSON with `Cache-Control: no-store`, a `reviews` list with the one entry of the review
+that has
+a set id (its id, a 64-character fingerprint, the date of the day, the result `pass`), and the absolute address of its
+attestation built from the request. This scenario is tested by
+`ApiEndpoints_GetEvidenceIndex_CompleteReviewWithSetId_ReturnsEntryWithAbsoluteFileUrl`.
+
+**ApiEndpoints_GetEvidenceIndex_NoListableReview_ReturnsEmptyList**: The index of a project whose only complete review
+has
+no review-set id is requested. The answer is 200 with an empty list. This scenario is tested by
+`ApiEndpoints_GetEvidenceIndex_NoListableReview_ReturnsEmptyList`.
+
+**ApiEndpoints_GetEvidenceIndex_UnknownProject_Answers404Problem**: The index of a project that does not exist is
+requested. The answer is a 404 problem document. This scenario is tested by
+`ApiEndpoints_GetEvidenceIndex_UnknownProject_Answers404Problem`.
+
+**ApiEndpoints_GetEvidenceIndex_SchemeHostPathBaseAndId_BuildsAbsoluteUrl**: The attestation address is built for a
+request with the scheme `https`, the host `reviews.example.com:8443` and the path base `/center`, for a request with
+the default scheme, host and an empty path base, and for a review identifier with special characters. The address is
+absolute, follows the request, and has the identifier escaped (`A%20B%2Fc%3Fd`). This scenario is tested by
+`ApiEndpoints_GetEvidenceIndex_SchemeHostPathBaseAndId_BuildsAbsoluteUrl`.
+
+**ApiEndpoints_GetEvidenceIndex_OtherHost_BuildsUrlFromRequestHost**: The index is requested with another `Host`
+header. The attestation address of the entry names that host. This scenario is tested by
+`ApiEndpoints_GetEvidenceIndex_OtherHost_BuildsUrlFromRequestHost`.
 
 **ApiEndpoints_Request_UnknownRoute_AnswersJsonNotFound**: An address under `/api` that does not exist is requested with
 `GET`, `POST`, and `DELETE`, with and without a token. Each answer is a 404 problem document, not a page. This scenario

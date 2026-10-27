@@ -5,12 +5,18 @@
 ### Overview
 
 The `Evidence` subsystem turns the approval of a review into a document that can leave the tool: a PDF attestation of a
-completed review that the server signs digitally. It holds no domain rule. Whether a review is complete is decided by
-`SigningService` of `Core`, and the subsystem only asks. It contains six units: `PdfDocumentWriter`, a small writer of
+completed review that the server signs digitally, and a list of the completed reviews of a project in the form that
+ReviewMark
+reads. It holds no domain rule. Whether a review is complete is decided by `SigningService` of `Core`, and the subsystem
+only
+asks. It contains seven units: `PdfDocumentWriter`, a small writer of
 plain PDF files; `AttestationRenderer`, which lays out the record of a review in that writer; `AttestationSigner`, which
 adds a detached CMS signature to the result; `AttestationKeyProvider`, which finds the key that signs (a self-signed key
-that the server creates or a certificate of a certificate store); `AttestationService`, which checks the review, gets the
-key, renders, signs, and records the release in the audit trail; and `AttestationEndpoint`, the download address. The
+that the server creates or a certificate of a certificate store); `AttestationService`, which checks the review, gets
+the
+key, renders, signs, and records the release in the audit trail; `AttestationEndpoint`, the download address; and
+`EvidenceIndexService`, which lists the completed reviews that have a
+review-set id as the evidence index. The
 units are internal to the application, except `AttestationKeyException`, which `Hosting` and the pages see. The
 subsystem uses one OTS item, `System.Security.Cryptography.Pkcs`, for the CMS signature, and no other library.
 
@@ -29,6 +35,18 @@ subsystem uses one OTS item, `System.Security.Cryptography.Pkcs`, for the CMS si
 - *Constraints*: The attestation is made for every request and is stored nowhere; every successful request adds an
   `attestation.generated` event to the audit trail. The route includes the project number because reviews are
   addressed by project everywhere else in the system.
+
+**EvidenceIndexService**: The evidence index of a project.
+
+- *Type*: In-process .NET class.
+- *Role*: Provider, to `ApiEndpoints` of the `Api` subsystem, which serves it as `GET
+  /api/projects/{projectId}/evidence/index.json`.
+- *Contract*: `BuildAsync` returns one entry (the review-set id, the content fingerprint, the UTC day of the latest
+  signature,
+  and the review it stands for) for each review-set id and fingerprint of the complete reviews of the project that have
+  a
+  review-set id, ordered by id and then by fingerprint. See the design of `EvidenceIndexService`.
+- *Constraints*: Nothing is stored and no audit event is written: the index is made for each request.
 
 **IAttestationKeyProvider (as AttestationKeyProvider)**: The supplier of the signing key.
 
@@ -62,7 +80,8 @@ subsystem uses one OTS item, `System.Security.Cryptography.Pkcs`, for the CMS si
 
 **What the attestation is for**: Approval inside the tool is of little use to someone who has no access to it. The
 attestation is a portable record of the approval: it states what was reviewed (the content fingerprint, the revisions,
-the files), what the reviewers answered and discussed, who signed which slot and when, and the head of the audit chain at
+the files), what the reviewers answered and discussed, who signed which slot and when, and the head of the audit chain
+at
 the time. The server then signs the document, so that a change made after the signing shows in a PDF reader or any CMS
 tool.
 
@@ -75,18 +94,21 @@ time in the signature is the clock of the server; **there is no timestamp author
 timestamp and proves nothing about when the document really existed. A reader who needs a trusted time must get it
 elsewhere until a timestamp authority is supported.
 
-**Writing and signing a PDF**: `PdfDocumentWriter` writes a plain PDF 1.4 file with a classic cross-reference table, with
+**Writing and signing a PDF**: `PdfDocumentWriter` writes a plain PDF 1.4 file with a classic cross-reference table,
+with
 standard fonts, no compression, and no embedded font, so it has no dependency, always gives the same bytes for the
 same input, and has a layout that `AttestationSigner` can rely on. The price is that characters outside the WinAnsi
 encoding are shown as question marks. `AttestationSigner` leaves those bytes unchanged and adds an incremental update
-with a signature field, a form, and a signature dictionary (`adbe.pkcs7.detached`) whose value is a detached CMS signature
+with a signature field, a form, and a signature dictionary (`adbe.pkcs7.detached`) whose value is a detached CMS
+signature
 with SHA-256 over the whole file except the hexadecimal value of the signature. The space for the signature is reserved
 before the signature is known, so a certificate chain that does not fit is reported and no broken document is produced.
 The signer works only with a document that has the layout of its own writer.
 
 **The keys**: Two providers exist. The **self-signed provider** is the default, so that a new installation works without
 configuration. It creates an RSA key and a self-signed certificate on first use, in a file in a folder beside the Data
-Protection keys (`attestation-selfsigned` under the folder of `DataProtection:KeysPath`, or `Attestation:SelfSignedFolder`),
+Protection keys (`attestation-selfsigned` under the folder of `DataProtection:KeysPath`, or
+`Attestation:SelfSignedFolder`),
 and loads the same file afterwards, so that the key persists across restarts. The file is a PFX without a password,
 so anyone who can read the folder can use the key; it is only as safe as the folder, which is restricted to its owner
 on systems that support it, and it is **for development and test only**. The key says so in its certificate subject, in
@@ -98,7 +120,8 @@ the memory of the server in a form that could be copied. The server account need
 supports RSA and ECDSA keys, and keeps the intermediate certificates of the chain (without revocation checks) so that
 the signature carries them. It does not sign a test value at start-up, so a smart card is not asked for its PIN just
 because the server
-started. A certificate that is meant for code signing only is not suited to signing a PDF: many readers do not accept it.
+started. A certificate that is meant for code signing only is not suited to signing a PDF: many readers do not accept
+it.
 Use a document-signing certificate (an internal certification authority is fine, if its root is distributed to
 the readers). The provider logs a warning for a certificate whose extended key usage allows code signing only; it does
 not refuse it.
@@ -129,13 +152,30 @@ tiny and the event states the digest that was attested. The user interface offer
 for an approved review, but the endpoint decides again, so the rule does not depend on the page. The document prints
 every checklist comment in full; the only caps are on the list of resolved threads (see `AttestationRenderer`).
 
+**The evidence index**: ReviewMark checks in a pipeline that every review-set has a current review, and it can read that
+evidence from a URL as an `index.json` file. `EvidenceIndexService` makes that file from the approvals of ReviewCenter,
+so the
+evidence is not kept twice. The completion rule is the one of the attestation: a review is listed only while every slot
+has
+signed the record that the review has now. Only a review that has a review-set id is listed, because ReviewMark matches
+by
+that id and a made-up id could satisfy a review-set that nobody reviewed. The result is always `pass`, because a review
+with a
+failed answer cannot be completed. ReviewMark keeps one entry for an id and fingerprint, so the index has one: the
+review
+that was completed last. The `file` of an entry is the address of the attestation, which the endpoint builds from the
+request.
+The fingerprint is the content fingerprint of the review, which is the algorithm of ReviewMark (SHA-256 of the sorted
+SHA-256 hashes of the files); a contract test checks it against an independent implementation. A review that was made
+from the changes since a baseline holds only the changed files, so its fingerprint differs from the one that ReviewMark
+computes for the whole review-set, and ReviewMark shows it as stale.
+
 **Known limitations and planned follow-ups**: These are not implemented, and the subsystem has no requirement and no
 dependency for them. A provider for Azure Key Vault would keep the key in the vault and sign through the Azure SDK; the
 design leaves a place for it, because the key type that the signer uses is an RSA or ECDSA object that need not hold the
 key itself. A timestamp authority (RFC 3161) would add a trusted time to the signature as an unsigned attribute of the
 CMS signature. The attestation of a review can also be downloaded through the JSON API with a personal access token (see
-the `Api` subsystem); an `index.json` that lists the attestations of a project for pipelines is planned for a later
-slice and does not exist yet. The PDF
+the `Api` subsystem). The PDF
 is generated for every request and is not stored; the audit event holds its hash, so a copy can be checked against the
 trail. Tests of the certificate store provider use a temporary certificate in the store of the current user and skip
 themselves when the store is not available; the local machine store and a real hardware module need a manual check.

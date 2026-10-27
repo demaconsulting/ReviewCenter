@@ -193,7 +193,7 @@ Each topic is a page of its own with links to the previous and the next topic:
 - **Audit trail** (`/help/audit-trail`): every action is recorded in a tamper-evident chain.
 - **Planning reviews** (`/help/planning-reviews`): create the reviews of the review-sets of a repository in one go.
 - **Automation and API tokens** (`/help/api-tokens`): use a personal access token to read reviews and create drafts
-  from a script.
+  from a script, or to feed ReviewMark with the evidence index.
 
 The topics are summaries; this guide has the details. An address below `/help` that is not a topic shows a short
 message that the topic does not exist, with a link back to the index.
@@ -838,6 +838,16 @@ Send the token as a bearer token in the `Authorization` header. This lists the p
 curl -H "Authorization: Bearer rcpat_YOUR_TOKEN" https://reviews.example.com/api/projects
 ```
 
+A client that can only send HTTP Basic credentials (ReviewMark is one) may send the token as the **password**; the user
+name is ignored and may be anything, for example `reviewmark`:
+
+```bash
+curl -u reviewmark:rcpat_... https://reviews.example.com/api/projects
+```
+
+Basic credentials are accepted only under `/api`, are checked, throttled, and audited like a bearer token, and are never
+logged. They do not sign in to the web pages, and the password of a person is not accepted there.
+
 Answers are JSON (the attestation is a PDF). Errors are problem documents (`application/problem+json`) with a title and
 status, and for a request that is not valid a list of the fields at fault.
 
@@ -848,12 +858,64 @@ status, and for a request that is not valid a list of the fields at fault.
 | GET    | `/api/projects/{p}/reviews/{r}`                 | One review: slots, approval, progress, next step |
 | POST   | `/api/projects/{p}/reviews`                     | Create a draft review (201 with the review)      |
 | GET    | `/api/projects/{p}/reviews/{r}/attestation.pdf` | The signed attestation PDF of an approved review |
+| GET    | `/api/projects/{p}/evidence/index.json`         | The evidence index of project `{p}` (ReviewMark) |
 | GET    | `/api/openapi.json`                             | The OpenAPI document; open, no token needed      |
 
 In the addresses `{p}` is the project number and `{r}` the review identifier.
 
-The OpenAPI document describes every endpoint, the request and answer shapes, and the bearer scheme, so a client can be
-generated from it. A snapshot of it is kept in the repository as `docs/api/openapi.json`.
+The OpenAPI document describes every endpoint, the request and answer shapes, and the bearer and Basic schemes, so a
+client can be generated from it. A snapshot of it is kept in the repository as `docs/api/openapi.json`.
+
+### Use the Evidence Index with ReviewMark
+
+ReviewMark can read the evidence of reviews from a URL instead of a file. ReviewCenter serves that evidence for a
+project at `/api/projects/{p}/evidence/index.json`. A pipeline that runs `reviewmark` can then enforce that every
+review-set has a current review in ReviewCenter, without keeping the evidence twice.
+
+An example of the `evidence-source` in the `.reviewmark.yaml` file of the repository:
+
+```yaml
+evidence-source:
+  type: url
+  location: https://reviews.example.com/api/projects/1/evidence/index.json
+  credentials:
+    username-env: REVIEWCENTER_USER
+    password-env: REVIEWCENTER_TOKEN
+```
+
+Put a personal access token in the secret store of the pipeline and expose it as `REVIEWCENTER_TOKEN`. ReviewMark sends
+the two variables as HTTP Basic credentials, and only when both are set and not empty, so set `REVIEWCENTER_USER` to any
+text (it is ignored) and keep the token in the password. Use a token of a user who can read the project; it is read-only
+in this use.
+
+The answer is a JSON object with a `reviews` list. Each entry has:
+
+- `id`: the identifier of the review-set that the review was planned from;
+- `fingerprint`: the content fingerprint of the review, which is the one ReviewMark computes for the files of the
+  review-set (SHA-256 of the sorted SHA-256 hashes of the files);
+- `date`: the UTC day (`yyyy-MM-dd`) of the last signature that completed the review;
+- `result`: always `pass`;
+- `file`: the absolute address of the attestation PDF of the review.
+
+What is listed:
+
+- Only **complete** reviews: every reviewer slot has signed the record that the review has now. A review that is not
+  complete, or that was changed after the signatures, is not listed, so it never satisfies a review-set.
+- Only reviews that were **planned from a review-set**. A review that was created by uploading files, by choosing a
+  repository by hand, or through the API has no review-set identifier and is not listed.
+- One entry for each identifier and fingerprint: the review that was completed last. The list is ordered by identifier
+  and then by fingerprint, so the same state gives the same answer.
+
+Limits to know about:
+
+- There are no `fail` entries. A review with a failed answer cannot be completed, so it is simply missing.
+- A review made from the **changes since a baseline** holds only the changed files, so its fingerprint is not the one
+  ReviewMark computes for the whole review-set, and ReviewMark reports it as stale.
+- ReviewMark only prints the `file` address. Following it needs a token (it is an API address) and records an
+  `attestation.generated` event in the audit trail.
+- The host of `file` is the `Host` of the request. Behind a reverse proxy, the proxy must keep the `Host` header,
+  and `ASPNETCORE_FORWARDEDHEADERS_ENABLED=true` must be set so that the scheme is `https` (see Secure Cookie Behind a
+  Reverse Proxy).
 
 ### Create a Review with the API
 
@@ -877,8 +939,9 @@ browser.
 ### Errors, Refusals, and the Throttle
 
 - A request without a token, or with a token that is wrong, malformed, expired, or revoked, or whose owner is disabled or
-  locked, always gets the same **401 Unauthorized** problem document with `WWW-Authenticate: Bearer`. The answer never
-  says which of these it was, so it does not reveal which tokens exist. The reason is recorded in the audit trail.
+  locked, always gets the same **401 Unauthorized** problem document with `WWW-Authenticate` headers for `Bearer` and
+  `Basic`. The answer never says which of these it was, so it does not reveal which tokens exist. The reason is
+  recorded in the audit trail.
 - Refused attempts are counted per client address with the same throttle as the sign-in (see Sign In and Out and its
   `Identity:Throttle:*` settings), separately from the web sign-in. An address that has used up its attempts is
   answered **429 Too many requests** for the rest of the window, even with a good token. A good token does not use up

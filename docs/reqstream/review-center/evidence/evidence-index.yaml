@@ -1,0 +1,63 @@
+---
+# Software Unit Requirements for the EvidenceIndexService Class
+#
+# The EvidenceIndexService class builds the evidence index of a project: one entry for each review-set id and
+# fingerprint of the completed reviews, in the format that ReviewMark reads as the index.json of an evidence source.
+
+sections:
+  - title: EvidenceIndexService Unit Requirements
+    requirements:
+      - id: ReviewCenter-EvidenceIndex-Completed
+        title: >-
+          The EvidenceIndexService class shall list a review of the project only when every reviewer slot of the
+          review has signed the record that the review has now, and shall not list a review that is not complete, a
+          review that changed after it was signed, or a review of another project.
+        justification: |
+          An entry in the index tells ReviewMark that the files with that fingerprint were reviewed and approved. A
+          review that is still open, or whose record changed after the signatures, has no such approval.
+        tests:
+          - EvidenceIndexService_Build_CompleteReviewWithSetId_ListsEntry
+          - EvidenceIndexService_Build_IncompleteReview_IsNotListed
+          - EvidenceIndexService_Build_ReviewChangedAfterSignature_IsNotListed
+          - EvidenceIndexService_Build_OtherProject_IsNotListed
+
+      - id: ReviewCenter-EvidenceIndex-Identity
+        title: >-
+          The EvidenceIndexService class shall use the review-set id of a review as the id of its entry, and shall skip
+          a review that has no review-set id.
+        justification: |
+          ReviewMark matches an entry with the review-set of its configuration by id. A review that was not planned
+          from a review-set has no id that ReviewMark could match, and inventing one would claim evidence for a set
+          that nobody reviewed.
+        tests:
+          - EvidenceIndexService_Build_CompleteReviewWithSetId_ListsEntry
+          - EvidenceIndexService_Build_NoSetId_IsSkipped
+          - ReviewMarkContract_Index_FollowsReviewMarkSemantics
+
+      - id: ReviewCenter-EvidenceIndex-Fields
+        title: >-
+          The EvidenceIndexService class shall give each entry the content fingerprint of the review as the
+          fingerprint that ReviewMark computes for the same files, the UTC day of the latest signature of the review as
+          the date in the form yyyy-MM-dd, and the result pass.
+        justification: |
+          ReviewMark compares the fingerprint with the one it computes from the files in the repository, so the two
+          must be the same algorithm. It picks the newest entry by comparing the dates as text, and it can only be told
+          about approvals, because a review with a failed check cannot be completed.
+        tests:
+          - EvidenceIndexService_Build_Date_IsLatestSignatureAsUtcDay
+          - ReviewMarkContract_IndexFingerprint_EqualsReviewMarkAlgorithm
+          - ReviewMarkContract_Index_HasTheSchemaReviewMarkReads
+
+      - id: ReviewCenter-EvidenceIndex-Order
+        title: >-
+          The EvidenceIndexService class shall list one entry for each review-set id and fingerprint, the one with the
+          latest completion and, for the same completion time, the lowest review id, and shall order the entries by id
+          and then by fingerprint, in ordinal order, so that the same reviews give the same index.
+        justification: |
+          ReviewMark keeps the last of two entries with the same id and fingerprint, so a duplicate would make the
+          result depend on the order. A fixed order makes the index comparable and testable byte for byte.
+        tests:
+          - EvidenceIndexService_Build_Order_IsByIdThenFingerprint
+          - EvidenceIndexService_Build_SameIdAndFingerprint_KeepsLatestCompletion
+          - EvidenceIndexService_Build_SameCompletionTime_KeepsLowestReviewId
+          - ReviewMarkContract_GoldenIndex_MatchesCommittedFile

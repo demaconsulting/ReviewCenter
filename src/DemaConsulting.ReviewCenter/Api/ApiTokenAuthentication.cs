@@ -20,6 +20,7 @@
 
 using System.Net.Http.Headers;
 using System.Security.Claims;
+using System.Text;
 using System.Text.Encodings.Web;
 using DemaConsulting.ReviewCenter.Core;
 using DemaConsulting.ReviewCenter.Identity;
@@ -29,7 +30,8 @@ using Microsoft.Extensions.Options;
 namespace DemaConsulting.ReviewCenter.Api;
 
 /// <summary>
-///     Bearer-token authentication of the API: the authentication scheme, the <c>Api</c> authorization policy and the
+///     Token authentication of the API (bearer token, or Basic with the token as the password): the authentication
+///     scheme, the <c>Api</c> authorization policy and the
 ///     handler that turns a personal access token into the signed-in principal of its owner.
 /// </summary>
 /// <remarks>
@@ -38,8 +40,8 @@ namespace DemaConsulting.ReviewCenter.Api;
 ///     cookie never authenticates an API call (which also closes cross-site request forgery for the API) and a token
 ///     never authenticates a web page, the sign-in endpoints or the page route of the attestation. Every refusal
 ///     (no header, wrong, malformed, expired, revoked token, disabled or locked owner) answers the same generic
-///     <c>401</c> problem document with <c>WWW-Authenticate: Bearer</c>, so a caller learns nothing about which tokens
-///     exist; the audit trail records the reason (never the token). Attempts are counted per client address with
+///     <c>401</c> problem document advertising <c>Bearer</c> and <c>Basic</c>, so a caller learns nothing about which
+///     tokens exist; the audit trail records the reason (never the token). Attempts are counted per client address with
 ///     <see cref="SignInThrottle"/>; an address over its limit is answered <c>429</c>. The static members are
 ///     stateless and thread-safe; see <see cref="ApiTokenHandler"/> for the per-request work.
 /// </remarks>
@@ -96,7 +98,8 @@ internal static class ApiTokenAuthentication
 ///     The authentication handler of the <c>ReviewCenterToken</c> scheme.
 /// </summary>
 /// <remarks>
-///     A new instance serves each request. The handler reads the bearer token, counts the attempt in the throttle,
+///     A new instance serves each request. The handler reads the bearer token (or the password of a Basic credential),
+///     counts the attempt in the throttle,
 ///     asks <see cref="PersonalAccessTokenService"/> to check it and builds the principal from the current data of the
 ///     owner, so a changed role applies at once. Nothing about the header is logged; a refusal is written to the audit
 ///     trail on a best-effort basis, coalesced per address so a flood cannot fill it.
@@ -161,18 +164,17 @@ internal sealed class ApiTokenHandler : AuthenticationHandler<AuthenticationSche
     }
 
     /// <summary>
-    ///     Authenticates the request from its bearer token.
+    ///     Authenticates the request from its bearer token or Basic password.
     /// </summary>
     /// <returns>
-    ///     No result when the request carries no bearer token (the challenge answers 401); a failure when the
+    ///     No result when the request carries no usable token (the challenge answers 401); a failure when the
     ///     attempt is throttled or the token is refused; otherwise success with the principal of the token's owner.
     /// </returns>
     protected override async Task<AuthenticateResult> HandleAuthenticateAsync()
     {
-        // Only "Authorization: Bearer <token>" is an attempt; anything else is a request without credentials
-        if (!AuthenticationHeaderValue.TryParse(Request.Headers.Authorization.ToString(), out var header)
-            || !string.Equals(header.Scheme, "Bearer", StringComparison.OrdinalIgnoreCase)
-            || string.IsNullOrWhiteSpace(header.Parameter))
+        // A bearer token or the password of a Basic credential is an attempt; anything else is no credentials
+        var presented = ExtractToken(Request.Headers.Authorization.ToString());
+        if (presented is null)
         {
             return AuthenticateResult.NoResult();
         }
@@ -197,7 +199,7 @@ internal sealed class ApiTokenHandler : AuthenticationHandler<AuthenticationSche
             return AuthenticateResult.Fail("throttled");
         }
 
-        var validation = await _tokens.AuthenticateAsync(header.Parameter, Context.RequestAborted);
+        var validation = await _tokens.AuthenticateAsync(presented, Context.RequestAborted);
         if (!validation.Succeeded)
         {
             // The failure stays counted; the reason goes to the trail (with the token's display id only when a stored
@@ -222,12 +224,54 @@ internal sealed class ApiTokenHandler : AuthenticationHandler<AuthenticationSche
     }
 
     /// <summary>
+    ///     Extracts the token text from an <c>Authorization</c> header.
+    /// </summary>
+    /// <param name="authorization">The header value; may be empty.</param>
+    /// <returns>
+    ///     The bearer token, or the password of a Basic credential (the user name is ignored, so tools that can send
+    ///     only Basic, such as ReviewMark, can present the token); null when the header holds neither or is
+    ///     malformed.
+    /// </returns>
+    private static string? ExtractToken(string authorization)
+    {
+        if (!AuthenticationHeaderValue.TryParse(authorization, out var header)
+            || string.IsNullOrWhiteSpace(header.Parameter))
+        {
+            return null;
+        }
+
+        if (string.Equals(header.Scheme, "Bearer", StringComparison.OrdinalIgnoreCase))
+        {
+            return header.Parameter;
+        }
+
+        if (!string.Equals(header.Scheme, "Basic", StringComparison.OrdinalIgnoreCase))
+        {
+            return null;
+        }
+
+        // "user:password": split at the first colon, so the password may contain colons
+        try
+        {
+            var decoded = new UTF8Encoding(false, true).GetString(Convert.FromBase64String(header.Parameter));
+            var colon = decoded.IndexOf(':');
+            var password = colon < 0 ? string.Empty : decoded[(colon + 1)..];
+            return string.IsNullOrWhiteSpace(password) ? null : password;
+        }
+        catch (Exception ex) when (ex is FormatException or ArgumentException)
+        {
+            return null;
+        }
+    }
+
+    /// <summary>
     ///     Answers a request that needs a token and has none that was accepted.
     /// </summary>
     /// <param name="properties">The challenge properties; not used.</param>
     /// <returns>A task that completes when the answer is written.</returns>
     /// <remarks>
-    ///     One generic <c>401</c> problem document for every reason, with <c>WWW-Authenticate: Bearer</c>; <c>429</c>
+    ///     One generic <c>401</c> problem document for every reason, advertising <c>Bearer</c> and <c>Basic</c>;
+    ///     <c>429</c>
     ///     when the address is throttled.
     /// </remarks>
     protected override Task HandleChallengeAsync(AuthenticationProperties properties)
@@ -240,7 +284,7 @@ internal sealed class ApiTokenHandler : AuthenticationHandler<AuthenticationSche
                 statusCode: StatusCodes.Status429TooManyRequests).ExecuteAsync(Context);
         }
 
-        Response.Headers.WWWAuthenticate = "Bearer";
+        Response.Headers.WWWAuthenticate = new[] { "Bearer", "Basic realm=\"ReviewCenter\", charset=\"UTF-8\"" };
         return Results.Problem(
             title: "Unauthorized",
             statusCode: StatusCodes.Status401Unauthorized).ExecuteAsync(Context);

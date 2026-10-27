@@ -3,10 +3,11 @@
 #
 # PURPOSE:
 # - Define requirements for the ReviewCenter Api subsystem
-# - The Api subsystem spans ApiTokenAuthentication.cs (the bearer token sign-in of API requests),
+# - The Api subsystem spans ApiTokenAuthentication.cs (the token sign-in of API requests),
 #   ApiEndpoints.cs (the JSON routes under /api), and ApiDocument.cs (the OpenAPI document of the API)
 # - Subsystem requirements describe the externally visible behavior of a script that calls the API with a personal
-#   access token: reading projects and reviews, creating review drafts, downloading attestations, the document that
+#   access token: reading projects and reviews, creating review drafts, downloading attestations, the evidence index
+#   for ReviewMark, the document that
 #   describes the API, and the limits on what a token can do
 
 sections:
@@ -14,7 +15,8 @@ sections:
     requirements:
       - id: ReviewCenter-Api-TokenJourney
         title: >-
-          The Api subsystem shall let a client that sends a valid personal access token as a bearer token call the API
+          The Api subsystem shall let a client that sends a valid personal access token as a bearer token or as an HTTP
+          Basic password call the API
           as the owner of the token, refuse a missing, unknown, revoked, or expired token with one generic answer,
           refuse too many refused tokens from one address, and record
           each use that is refused without recording the token value, in the audit trail or in the log.
@@ -54,6 +56,20 @@ sections:
           - ReviewCenter-ApiEndpoints-Errors
         tests:
           - ApiSubsystem_ReviewJourney_CreateDraftReadAndDownloadAttestation_WorksEndToEnd
+
+      - id: ReviewCenter-Api-EvidenceJourney
+        title: >-
+          The Api subsystem shall let ReviewMark read the evidence index of a project and follow the file address of an
+          entry with a personal access token that it sends as the password of HTTP Basic credentials, and shall refuse
+          the token once it is revoked.
+        justification: |
+          ReviewMark can send only HTTP Basic credentials. Accepting the token that way, with the same checks and the
+          same refusal as a bearer token, lets a pipeline verify the reviews against ReviewCenter without a second
+          kind of credential.
+        children:
+          - ReviewCenter-ApiEndpoints-EvidenceIndex
+        tests:
+          - ApiSubsystem_EvidenceJourney_BasicCredentials_ReadIndexAndFollowLink_WorksEndToEnd
 
       - id: ReviewCenter-Api-Isolation
         title: >-

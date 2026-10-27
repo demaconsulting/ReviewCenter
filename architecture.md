@@ -232,16 +232,23 @@ It is a minimal helper and is kept as small and simple as possible; see
     opens a page and the cookie is ignored on `/api`. "Can never sign" is enforced in `SigningService` (which also
     refuses a token for reviewer slots), not only in the routes. A token is looked up by its SHA-256 hash, and its
     separate, random display id is only a label for the lists and the audit trail.
+    Implementation note (slice 9b): ReviewMark can send only HTTP Basic credentials, so `/api` also accepts a token as
+    the password of HTTP Basic credentials (the user name is ignored). It is the same token with the same checks,
+    throttle and audit record, a refusal is the same generic 401 (which now offers both schemes), and Basic is still
+    never valid for signing or for a page.
 16. **Unversioned API**: the API is unversioned. It is protected by a committed OpenAPI snapshot (CI fails on
     unintended diffs) and by ReviewMark contract tests (index.json schema, fingerprint vectors). Reason: there is a
     single known consumer, and the snapshot and contract tests make breaking changes visible. Implementation note
     (slice 9a): the snapshot is `docs/api/openapi.json`, compared with the generated document by a test; the ReviewMark
-    contract tests come with the `index.json` endpoint.
+    contract tests (slice 9b) check the `index.json` against a committed golden file and the fingerprint against an
+    independent implementation of the ReviewMark algorithm.
 17. **Evidence is a web report for now**: the review record is a web report view. Reason: it delivers usable evidence
     sooner than a PDF pipeline. Details:
     - **Report**: evidence is a web report view for now.
-    - **index.json**: entries have `id`, `fingerprint`, `date`, `result` (pass|fail) and `file`, where `file` points
-      to the report.
+    - **index.json**: entries have `id`, `fingerprint`, `date`, `result` (pass|fail) and `file`. Implementation note
+      (slice 9b): `file` points to the signed attestation PDF (the API address, built from the request), not to the
+      report; only `pass` entries exist, because a review with a failed answer cannot be completed; and only completed
+      reviews that were planned from a review-set are listed, one entry for each id and fingerprint.
     - **PDF**: PDF/A export is deferred, and the library choice is open (PDFsharp went commercial).
 18. **Database migrations deferred**: no EF migrations for now; the schema is created directly. There will be an
     explicit `migrate` CLI verb later. Tests run on SQLite only. Reason: the product is pre-release, so there is no
@@ -335,12 +342,20 @@ The architecture above is the target design. Only the first slices are implement
   of a registered repository (flagged on the review as created through the API, with its creator), and downloads the
   attestation of a complete review. The OpenAPI document is served at `/api/openapi.json` and a committed snapshot
   (`docs/api/openapi.json`) is compared with it in a test. A token never signs and never opens a page; the former is
-  enforced in the Core `SigningService`, not only in the routes. The `index.json` evidence endpoint for ReviewMark is a
-  later slice. Development databases created before this slice must be recreated (no migrations).
-- **Planned and deferred**: Messaging, the `index.json` evidence endpoint of the Api, the review lifecycle beyond
+  enforced in the Core `SigningService`, not only in the routes. Development databases created before this slice must be
+  recreated (no migrations).
+- **Implemented, slice 9b (evidence index for ReviewMark)**: `GET /api/projects/{projectId}/evidence/index.json` serves
+  the completed reviews of a project as the ReviewMark evidence index (the new Evidence unit `EvidenceIndexService`):
+  only `pass` entries, only reviews planned from a review-set, one entry for each id and fingerprint, in a fixed order,
+  with the absolute address of the attestation as `file`. The `/api` routes also accept HTTP Basic credentials with the
+  token as the password, so ReviewMark can read the index with its `evidence-source` credentials. ReviewMark contract
+  tests (a golden file and an independent fingerprint check) and a user guide section cover it. Reviews created by
+  upload, by a manual repository choice or through the API have no review-set id and are not listed; an optional
+  review-set id in the API is a possible follow-up.
+- **Planned and deferred**: Messaging, the review lifecycle beyond
   `Draft`, and the rest of Core and
   Storage. They have no code, requirements,
-  design documents, or verification documents yet (the Api subsystem is implemented, apart from that endpoint), so the
+  design documents, or verification documents yet (the Api subsystem is implemented), so the
   SysML2 model and the design documentation describe the implemented items only and are deliberately partial.
 - **Pipeline**: the CI/release pipeline builds net10.0 only and publishes the self-contained win-x64 and linux-x64
   executables (see decision 21). The Core assembly is bundled into the single-file executable; the native SQLite
@@ -357,7 +372,7 @@ The architecture above is the target design. Only the first slices are implement
    database at the same time; run a single instance (decision 20).
 3. 🟡 **MEDIUM** GitSource fidelity: verify early that the git CLI filter approach reproduces the CI checkout bytes,
    including LFS and binary files.
-4. 🟢 **LOW** ReviewMark `file` field: confirm ReviewMark's url evidence source accepts a non-PDF report URL in
-   `file`. Covered by the contract tests.
+4. ✅ **RESOLVED** ReviewMark `file` field: ReviewMark 1.4.0 only prints `file`, and the index points it at the PDF
+   attestation. The contract tests cover the schema and the matching rules.
 5. 🟢 **LOW** Provider coverage: testing on SQLite only leaves PostgreSQL/SQL Server provider differences unverified.
 6. 🟢 **LOW** AI-assisted review: deferred, with identity and role details to be designed.

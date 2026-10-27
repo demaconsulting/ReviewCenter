@@ -4,7 +4,8 @@
 # PURPOSE:
 # - Define requirements for the ReviewCenter Evidence subsystem
 # - The Evidence subsystem spans the PdfDocumentWriter, AttestationRenderer, AttestationSigner, AttestationKeyProvider,
-#   AttestationService, and AttestationEndpoint units: it produces the signed PDF attestation of a completed review
+#   AttestationService, AttestationEndpoint, and EvidenceIndexService units: it produces the signed PDF attestation of a
+#   completed review and the evidence index of the completed reviews of a project
 # - Subsystem requirements describe the externally visible behavior of the download; the subsystem tests run the real
 #   server in process against a review that was signed by two users
 
@@ -106,3 +107,21 @@ sections:
         tests:
           - EvidenceSubsystem_CompletedReview_IsOfferedAndDownloadedAsSignedPdf
           - EvidenceSubsystem_ReviewNotComplete_IsNotOfferedAndRefused
+
+      - id: ReviewCenter-Evidence-Index
+        title: >-
+          The Evidence subsystem shall list the completed reviews of a project that were planned from a review-set in an
+          index in the format that ReviewMark reads, with the review-set id, the fingerprint of the files, the date of
+          the latest signature, the result pass and the address of the attestation, but not a review that is incomplete,
+          changed since it was signed, or has no review-set id, and in the same order for the same reviews.
+        justification: |
+          ReviewMark verifies in a pipeline that every review-set has a current review. Reading the evidence from the
+          tool that holds the reviews, in the format it already knows, closes that loop without a second record of the
+          same approvals.
+        children:
+          - ReviewCenter-EvidenceIndex-Completed
+          - ReviewCenter-EvidenceIndex-Identity
+          - ReviewCenter-EvidenceIndex-Fields
+          - ReviewCenter-EvidenceIndex-Order
+        tests:
+          - ReviewMarkContract_GoldenIndex_MatchesCommittedFile

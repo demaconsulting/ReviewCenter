@@ -30,7 +30,8 @@ a project checklist, and sign the review with their password. Every action is re
 - 🔗 **Tamper-Evident Audit Trail** - Every change is chained by SHA-256 hashes and can be verified at any time
 - 📄 **Signed PDF Attestation** - Approved reviews download as a digitally signed PDF that any reader can verify
 - 🔐 **Local Accounts** - Admin and Reviewer roles, sign-in lockout and throttling, and password changes
-- 🔑 **API Tokens** - Personal access tokens for automation, with a REST API and an OpenAPI document
+- 🔑 **API Tokens** - Personal access tokens for automation, with a REST API, an OpenAPI document, and an evidence index
+  for ReviewMark
 - 🌗 **Light and Dark Theme** - Follows the system setting, or choose a theme in your account
 - 🤖 **Puppet UI Automation** - A developer tool that lets AI agents drive the web interface and take screenshots
 - 📦 **Self-Contained Executable** - A single executable for Windows (win-x64) and Linux (linux-x64), no runtime needed

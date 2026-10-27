@@ -163,6 +163,12 @@ public sealed class HelpPageTests : PageTestBase
         Assert.Contains("POST /api/projects/{id}/reviews", text, StringComparison.Ordinal);
         Assert.Contains("/api/openapi.json", text, StringComparison.Ordinal);
 
+        // Assert: the evidence index for ReviewMark, and HTTP Basic with the token as the password
+        Assert.Contains("/api/projects/{id}/evidence/index.json", text, StringComparison.Ordinal);
+        Assert.Contains("evidence-source", text, StringComparison.Ordinal);
+        Assert.Contains("HTTP Basic", text, StringComparison.Ordinal);
+        Assert.Contains("<strong>password</strong>", text, StringComparison.Ordinal);
+
         // Assert: an API-created review is a flagged Draft, and the generic 401 and the throttle are described
         Assert.Contains("<strong>Draft</strong>", text, StringComparison.Ordinal);
         Assert.Contains("<strong>created via API</strong>", text, StringComparison.Ordinal);

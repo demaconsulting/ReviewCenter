@@ -110,20 +110,38 @@ internal static class ApiTestSupport
     }
 
     /// <summary>
-    ///     Creates a client that calls the application with a bearer token; it keeps no cookies and follows no redirects.
+    ///     Creates a client that calls the application with a token; it keeps no cookies and follows no redirects.
     /// </summary>
     /// <param name="app">The application.</param>
     /// <param name="token">The token value, or <c>null</c> to send no <c>Authorization</c> header.</param>
+    /// <param name="basic">
+    ///     <c>true</c> to send the token as the password of HTTP Basic credentials, the way ReviewMark does, instead of
+    ///     as a bearer token.
+    /// </param>
     /// <returns>The client; the caller disposes it.</returns>
-    public static HttpClient ClientFor(WebApplication app, string? token)
+    public static HttpClient ClientFor(WebApplication app, string? token, bool basic = false)
     {
         var client = app.GetTestServer().CreateClient();
         if (token is not null)
         {
-            client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            client.DefaultRequestHeaders.Authorization = basic
+                ? BasicHeader("reviewmark", token)
+                : new AuthenticationHeaderValue("Bearer", token);
         }
 
         return client;
+    }
+
+    /// <summary>
+    ///     Builds HTTP Basic credentials.
+    /// </summary>
+    /// <param name="username">The user name.</param>
+    /// <param name="password">The password.</param>
+    /// <returns>The header value.</returns>
+    public static AuthenticationHeaderValue BasicHeader(string username, string password)
+    {
+        return new AuthenticationHeaderValue(
+            "Basic", Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes($"{username}:{password}")));
     }
 
     /// <summary>
