@@ -153,11 +153,13 @@ internal static class TestWebApp
     ///     Database connection string, or <c>null</c> to use a new temporary database for this application.
     /// </param>
     /// <param name="arguments">Command-line arguments used to create the context.</param>
+    /// <param name="settings">Extra configuration values (for example <c>Identity:Throttle:MaxFailuresPerName</c>); <c>null</c> for none.</param>
     /// <returns>The started application; the caller disposes it.</returns>
     public static async Task<WebApplication> StartAsync(
         CapturingLoggerProvider logs,
         string? connectionString,
-        string[] arguments)
+        string[] arguments,
+        IReadOnlyDictionary<string, string?>? settings = null)
     {
         using var context = Context.Create(arguments);
         var app = ServerHost.CreateApplication(context, new ServerHostOptions
@@ -173,6 +175,10 @@ internal static class TestWebApp
                     // Every in-memory application gets its own database so parallel tests never share a file
                     ["Database:ConnectionString"] = connectionString ?? TestDatabase.NewConnectionString()
                 });
+                if (settings is not null)
+                {
+                    builder.Configuration.AddInMemoryCollection(settings);
+                }
             }
         });
         await app.StartAsync();

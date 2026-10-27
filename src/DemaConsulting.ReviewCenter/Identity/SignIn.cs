@@ -37,11 +37,15 @@ namespace DemaConsulting.ReviewCenter.Identity;
 /// <remarks>
 ///     Signing in is plain HTTP, not a Blazor circuit event: the login page posts a normal form to
 ///     <see cref="LoginEndpoint"/>, which checks the password with <see cref="UserService"/> and issues the
-///     authentication cookie. Both endpoints require the antiforgery token. One generic failure redirect covers
-///     an unknown user, a wrong password, a disabled account and a lockout, so the response does not reveal
-///     which accounts exist. On every request the cookie is checked against the user store, so a disabled or
-///     changed account has to sign in again; an open page is checked by the same rule, <see cref="IsCurrent"/>,
-///     every <see cref="AuthOptions.RevalidationSeconds"/>. The class is stateless and therefore thread-safe.
+///     authentication cookie. Both endpoints require the antiforgery token. Before the password is checked,
+///     <see cref="SignInThrottle"/> counts the attempt per client address and user name; a client over its limit
+///     is sent back with a "too many attempts" message and nothing is checked, whatever the name or the
+///     password. Otherwise one generic failure redirect covers an unknown user, a wrong password, a disabled
+///     account and a lockout, so the response does not reveal which accounts exist. On every request the cookie
+///     is checked against the user store, so a disabled or changed account has to sign in again; an open page is
+///     checked by the same rule, <see cref="IsCurrent"/>, every <see cref="AuthOptions.RevalidationSeconds"/>.
+///     The class is stateless and therefore thread-safe (the throttle state lives in the
+///     <see cref="SignInThrottle"/> singleton).
 /// </remarks>
 internal static class SignIn
 {
@@ -66,6 +70,11 @@ internal static class SignIn
     public const string LogoutEndpoint = "/auth/logout";
 
     /// <summary>
+    ///     The value of the <c>error</c> query of the login page that asks for the "too many attempts" message.
+    /// </summary>
+    public const string ThrottledError = "throttled";
+
+    /// <summary>
     ///     The claim type that carries the display name.
     /// </summary>
     public const string DisplayNameClaimType = "display_name";
@@ -79,7 +88,7 @@ internal static class SignIn
     ///     Registers cookie authentication and authorization.
     /// </summary>
     /// <param name="services">The service collection. Must not be null.</param>
-    /// <param name="configuration">The configuration that holds the <c>Auth</c> section. Must not be null.</param>
+    /// <param name="configuration">The configuration that holds the <c>Auth</c> and <c>Identity:Throttle</c> sections. Must not be null.</param>
     /// <returns>The same service collection.</returns>
     /// <remarks>
     ///     The cookie is HttpOnly, SameSite=Lax and Secure when the request is https (<c>SameAsRequest</c>, so
@@ -90,6 +99,10 @@ internal static class SignIn
     ///     therefore has to be made after the Razor components are added. The settings are checked when they are first
     ///     used (at start-up): <see cref="AuthOptions.SessionHours"/> must be above 0 and
     ///     <see cref="AuthOptions.RevalidationSeconds"/> at least <see cref="AuthOptions.MinimumRevalidationSeconds"/>.
+    ///     The throttle settings are checked the same way: each limit above 0, <see cref="SignInThrottleOptions.WindowSeconds"/>
+    ///     at most <see cref="SignInThrottleOptions.MaximumWindowSeconds"/>, and
+    ///     <see cref="SignInThrottleOptions.MaxFailuresPerAddress"/> not below <see cref="SignInThrottleOptions.MaxFailuresPerName"/>.
+    ///     The throttle needs a <see cref="TimeProvider"/> in the service collection.
     /// </remarks>
     public static IServiceCollection AddSignIn(this IServiceCollection services, IConfiguration configuration)
     {
@@ -102,6 +115,22 @@ internal static class SignIn
             .Validate(
                 options => options.RevalidationSeconds >= AuthOptions.MinimumRevalidationSeconds,
                 $"Auth:RevalidationSeconds must be at least {AuthOptions.MinimumRevalidationSeconds}.");
+
+        services.AddOptions<SignInThrottleOptions>()
+            .Bind(configuration.GetSection(SignInThrottleOptions.SectionName))
+            .Validate(
+                options => options.MaxFailuresPerName > 0,
+                $"{SignInThrottleOptions.SectionName}:MaxFailuresPerName must be greater than 0.")
+            .Validate(
+                options => options.MaxFailuresPerAddress > 0,
+                $"{SignInThrottleOptions.SectionName}:MaxFailuresPerAddress must be greater than 0.")
+            .Validate(
+                options => options.MaxFailuresPerAddress >= options.MaxFailuresPerName,
+                $"{SignInThrottleOptions.SectionName}:MaxFailuresPerAddress must not be less than MaxFailuresPerName.")
+            .Validate(
+                options => options.WindowSeconds > 0 && options.WindowSeconds <= SignInThrottleOptions.MaximumWindowSeconds,
+                $"{SignInThrottleOptions.SectionName}:WindowSeconds must be between 1 and {SignInThrottleOptions.MaximumWindowSeconds}.");
+        services.AddSingleton<SignInThrottle>();
 
         // An open page (circuit) re-checks its user through this provider. A plain AddScoped is needed, not
         // TryAddScoped: AddRazorComponents().AddInteractiveServerComponents() registers the framework default with
@@ -174,17 +203,36 @@ internal static class SignIn
                 [FromForm] string? returnUrl,
                 HttpContext http,
                 UserService users,
-                AuditService audit) =>
+                AuditService audit,
+                SignInThrottle throttle) =>
             {
                 var target = SafeReturnUrl(returnUrl);
+                var retry = target == "/" ? string.Empty : $"&ReturnUrl={Uri.EscapeDataString(target)}";
+
+                // Over the limit: nothing is checked (even a right password is refused), so the answer is the same
+                // for every name; the refusal is recorded once per minute and name
+                var address = ClientAddress(http);
+                var reservation = throttle.TryBegin(address, username);
+                if (reservation is null)
+                {
+                    var typed = AuditText.Clean(username, ReviewLimits.MaxUsernameLength);
+                    await audit.TryRecordCoalescedAsync(
+                        new AuditDraft("auth.sign-in-throttled", null, "not signed in", null, null, $"too many attempts, name '{typed}'"),
+                        $"auth.sign-in-throttled|{typed.ToLowerInvariant()}",
+                        http.RequestAborted);
+                    return Results.Redirect($"{LoginPath}?error={ThrottledError}{retry}");
+                }
+
                 var user = await users.AuthenticateAsync(username, password, http.RequestAborted);
 
                 // One generic answer for every failure; the query keeps the (safe) place the user wanted to go to
                 if (user is null)
                 {
-                    var retry = target == "/" ? string.Empty : $"&ReturnUrl={Uri.EscapeDataString(target)}";
                     return Results.Redirect($"{LoginPath}?error=1{retry}");
                 }
+
+                // The attempt does not count against the client any more
+                throttle.Succeeded(reservation);
 
                 await http.SignInAsync(
                     CookieAuthenticationDefaults.AuthenticationScheme,
@@ -228,6 +276,25 @@ internal static class SignIn
             });
 
         return endpoints;
+    }
+
+    /// <summary>
+    ///     Gets the address of the client of a request as text.
+    /// </summary>
+    /// <param name="http">The request context.</param>
+    /// <returns>
+    ///     The address of the connection, or <c>null</c> when there is none. Behind a proxy this is the
+    ///     forwarded address only when the forwarded headers are enabled for the server.
+    /// </returns>
+    private static string? ClientAddress(HttpContext http)
+    {
+        var address = http.Connection.RemoteIpAddress;
+        if (address is null)
+        {
+            return null;
+        }
+
+        return (address.IsIPv4MappedToIPv6 ? address.MapToIPv4() : address).ToString();
     }
 
     /// <summary>

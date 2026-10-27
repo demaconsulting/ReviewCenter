@@ -147,3 +147,11 @@ entries `slot.added`, `slot.updated`, and `signature.added` carry the members an
 password. This scenario is tested by `SigningService_SlotAndSignatureEvents_AreRecordedWithMembersAndDigest`. The
 removal of a slot records `slot.removed` with its members, which is tested by
 `SigningService_RemoveSlotAsync_RecordsSlotRemovedWithItsMembers`. Both tests are defined in `AuditEventTests.cs`.
+
+**SigningService_SignAsync_WrongPasswordThenLocked_RecordsReauthFailedEntriesWithoutPassword**: After four wrong
+passwords through `ReauthenticateAsync`, signing with a wrong password (the fifth failure, which locks the account)
+and then with the right password (met by the lock) are both refused with `ReauthenticationFailed`; the trail holds five
+`signature.reauth-failed` entries with the detail `wrong password` and one with `account locked`, and no entry
+contains the typed password. This
+scenario is tested by `SigningService_SignAsync_WrongPasswordThenLocked_RecordsReauthFailedEntriesWithoutPassword`,
+defined in `AuditEventTests.cs`.

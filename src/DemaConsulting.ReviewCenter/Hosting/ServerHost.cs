@@ -215,7 +215,8 @@ internal static class ServerHost
         services.AddSingleton<IAuditStore, AuditStore>();
         services.AddSingleton(provider => new AuditService(
             provider.GetRequiredService<IAuditStore>(),
-            exception => LogAuditFailure(provider.GetRequiredService<ILoggerFactory>(), exception)));
+            exception => LogAuditFailure(provider.GetRequiredService<ILoggerFactory>(), exception),
+            provider.GetRequiredService<TimeProvider>()));
         services.AddSingleton<IReviewStore, ReviewStore>();
         services.AddSingleton<IUserStore, UserStore>();
         services.AddSingleton<IPasswordHasher, PasswordHasher>();
@@ -487,13 +488,15 @@ internal static class ServerHost
     /// </summary>
     /// <param name="app">The built application whose services provide the options.</param>
     /// <exception cref="InvalidOperationException">
-    ///     Thrown when the <c>Auth</c> settings are invalid; the application is disposed before the exception is thrown.
+    ///     Thrown when the <c>Auth</c> or <c>Identity:Throttle</c> settings are invalid; the application is disposed
+    ///     before the exception is thrown.
     /// </exception>
     private static void ValidateAuthOptions(WebApplication app)
     {
         try
         {
             _ = app.Services.GetRequiredService<IOptions<AuthOptions>>().Value;
+            _ = app.Services.GetRequiredService<IOptions<SignInThrottleOptions>>().Value;
         }
         catch (OptionsValidationException ex)
         {

@@ -33,6 +33,11 @@ N/A - standard test environment (temporary SQLite databases are created by the t
 - The cookie check and the re-check of open pages share one rule, and the interval of the re-check has a default of
   30 seconds and a minimum of 5.
 - The login page shows the error only after a failed sign-in, and carries only a safe return URL.
+- When the throttle refuses an attempt (even with the right password), the answer is the same for known and unknown
+  user names, sets no cookie, and the login page shows a "too many attempts" message; a success gives the attempts
+  back.
+- Failed sign-ins of unknown users and locked accounts, and the refused attempts, are audited with the cleaned typed
+  name, never the password, and at most one entry per key per minute.
 
 #### Test Scenarios
 
@@ -120,11 +125,33 @@ local path, or `/` for the hostile URL. This scenario is tested by
 pipeline and read the audit trail. A valid sign-in records `auth.sign-in`, which is tested by
 `SignIn_Login_ValidCredentials_RecordsSignInEntry`; a sign-out records `auth.sign-out`, which is tested by
 `SignIn_Logout_SignedInUser_RecordsSignOutEntry`. A failed sign-in of an unknown user records the actor
-`unknown user` without echoing the input, which is tested by
-`SignIn_Login_UnknownUser_RecordsUnknownUserWithoutEchoingInput`, and a wrong password records the failure for the
+`unknown user` and the typed name, cleaned and cut, without the password, which is tested by
+`SignIn_Login_UnknownUser_RecordsCleanedTypedNameWithoutPassword`, and a wrong password records the failure for the
 user without the password, which is tested by `SignIn_Login_WrongPassword_RecordsFailureForTheUserWithoutPassword`.
-Repeated failures record the lockout once, which is tested by `SignIn_Login_RepeatedFailures_RecordsLockoutOnce`,
-and a complete flow forms an intact chain, which is tested by `SignIn_Flow_LoginFailureAndLogout_FormAnIntactChain`.
+Repeated failures record the lockout once, which is tested by `SignIn_Login_RepeatedFailures_RecordsLockoutOnce`;
+an attempt on a locked account records `auth.sign-in-locked` once per minute, which is tested by
+`SignIn_Login_LockedAccount_RecordsOneSignInLockedEntry`; refused attempts record `auth.sign-in-throttled` once per
+minute, which is tested by `SignIn_Login_Throttled_RecordsOneThrottledEntryPerWindow`; and a complete flow forms an
+intact chain, which is tested by `SignIn_Flow_LoginFailureAndLogout_FormAnIntactChain`.
+
+**SignIn_Login_TooManyAttempts_RedirectsToThrottledAnswerIdenticalForKnownAndUnknownNames**: With the per-name limit
+lowered to 2, a known and an unknown user name are each tried three times with a wrong password; for both names the
+first two answers are the generic failure redirect and the third is the same redirect to `/login?error=throttled`,
+with the return URL kept. This scenario is tested by
+`SignIn_Login_TooManyAttempts_RedirectsToThrottledAnswerIdenticalForKnownAndUnknownNames`.
+
+**SignIn_Login_Throttled_RefusesEvenTheRightPasswordAndSetsNoCookie**: After the limit is reached, the right password
+is refused with the throttled answer and no cookie is set. This scenario is tested by
+`SignIn_Login_Throttled_RefusesEvenTheRightPasswordAndSetsNoCookie`.
+
+**SignIn_Login_SuccessAfterFailures_ResetsTheNameCounter**: With the limit lowered to 3, two wrong attempts and then the
+right password are answered normally; then three wrong attempts get the generic answer and the fourth the throttled
+answer, so the count started again after the success. This scenario is tested by
+`SignIn_Login_SuccessAfterFailures_ResetsTheNameCounter`.
+
+**SignIn_LoginPage_ThrottledError_ShowsTooManyAttemptsMessage**: The login page requested with `error=throttled`
+shows the "Too many sign-in attempts" message and not the generic error. This scenario is tested by
+`SignIn_LoginPage_ThrottledError_ShowsTooManyAttemptsMessage`.
 
 **SignIn_DeepLink_SignedOut_ReturnsToTheSameLinkAfterLogin**: A theory over file paths with nested directories, a
 space, `#`, `?`, a literal `%`, a literal `%2F` and non-ASCII letters. An anonymous request for the line link of the

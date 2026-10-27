@@ -123,13 +123,28 @@ with the actor `(command line)`, which is tested by `UserService_CreateAsync_Com
 wrong password leaves the counter update without an audit draft, which is tested by
 `UserService_AuthenticateAsync_WrongPassword_CounterUpdateCarriesNoDraft`, and records `auth.sign-in-failed` for the
 existing user without the password, which is tested by
-`UserService_AuthenticateAsync_WrongPassword_RecordsExistingUserWithoutPassword`. An unknown user is recorded as
-`unknown user` without echoing the input, which is tested by
-`UserService_AuthenticateAsync_UnknownUser_RecordsUnknownUserWithoutEchoingInput`. A disabled account is recorded,
-which is tested by `UserService_AuthenticateAsync_DisabledAccount_RecordsAccountDisabled`. The fifth failure records
-`auth.locked-out` once, and attempts on the locked account are not recorded, which is tested by
-`UserService_AuthenticateAsync_FifthFailure_RecordsLockoutOnceAndLockedAttemptsAreNotRecorded`. A failing audit store
+`UserService_AuthenticateAsync_WrongPassword_RecordsExistingUserWithoutPassword`. An unknown user is recorded with
+the actor `unknown user` and the typed name cleaned and cut to 50 characters, never the password, which is tested by
+`UserService_AuthenticateAsync_UnknownUser_RecordsCleanedCappedTypedNameWithoutPassword`, and repeated failures of the
+same name in one minute produce one entry, with the suppressed count on the next entry of the next minute, which is
+tested by `UserService_AuthenticateAsync_UnknownUserRepeated_RecordsOneEntryPerWindow`. A disabled account is
+recorded, which is tested by `UserService_AuthenticateAsync_DisabledAccount_RecordsAccountDisabled`, and repeated
+attempts on it in one minute produce one entry, with the suppressed count on the next entry of the next minute, which
+is tested by `UserService_AuthenticateAsync_DisabledAccountRepeated_RecordsOneEntryPerWindow`. The fifth failure
+records `auth.locked-out` once, which is tested by `UserService_AuthenticateAsync_FifthFailure_RecordsLockoutOnce`,
+and attempts on the locked account record `auth.sign-in-locked` once per minute, which is tested by
+`UserService_AuthenticateAsync_LockedAccount_RecordsSignInLockedOncePerWindow`. A failing audit store
 does not change the refusal and throws nothing, which is tested by
 `UserService_AuthenticateAsync_AuditStoreFails_StillRefusesAndDoesNotThrow`, and a service without an audit service
-still works, which is tested by `UserService_AuthenticateAsync_NoAuditService_Works`. These tests are defined in
-`AuditEventTests.cs`.
+still works, which is tested by `UserService_AuthenticateAsync_NoAuditService_Works`.
+
+**UserService_ReauthenticateAsync audit scenario**: Wrong passwords, an attempt on the locked account, and an unknown
+user through `ReauthenticateAsync` record `signature.reauth-failed` (details `wrong password`, `account locked`, and
+`unknown user, name 'zed'`) and never `auth.sign-in-failed` or `auth.sign-in-locked`; the password is in no entry, and
+the fifth failure still records `auth.locked-out` once. This scenario is tested by
+`UserService_ReauthenticateAsync_WrongPasswordAndLockedAccount_RecordSignatureReauthFailed`. Repeated attempts on a
+disabled account record one `signature.reauth-failed` per minute, which is tested by
+`UserService_ReauthenticateAsync_DisabledAccountRepeated_RecordsOneSignatureReauthFailedPerWindow`, and a disabled
+and a locked attempt on the same account within one minute are both recorded, because the reason is part of the
+coalescing key, which is tested by `UserService_ReauthenticateAsync_DisabledThenLockedInOneMinute_RecordsBothReasons`.
+These tests are defined in `AuditEventTests.cs`.

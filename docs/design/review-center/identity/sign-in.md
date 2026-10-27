@@ -7,7 +7,8 @@
 `SignIn` is the cookie sign-in of the web server. Its single responsibility is to establish who the user of a request
 is: it configures cookie authentication and authorization, handles the login and logout requests, makes sure a return
 address stays on this site, validates the authentication cookie on every request, and converts between the signed-in
-principal and the `Actor` that the Core services record. It also owns the small options type `AuthOptions`.
+principal and the `Actor` that the Core services record. It also owns the small options type `AuthOptions`, and it
+asks `SignInThrottle` before it checks a password.
 
 #### Data Model
 
@@ -24,6 +25,9 @@ protected pages are redirected.
 **DisplayNameClaimType**: `string` (constant) — `display_name`; the claim that carries the display name.
 
 **AdminRole**: `string` (constant) — `Admin`; the role name that the user administration page requires.
+
+**ThrottledError**: `string` (constant) — `throttled`; the value of the `error` query of the login page that asks for
+the "too many attempts" message (any other value asks for the generic message).
 
 **Claims**: the principal in the cookie has three claims: the user name (the name claim), the display name, and the
 role (the role claim). It never has the password or its hash.
@@ -47,8 +51,9 @@ request and also works on plain http during development; a session cookie (not p
 - *Returns*: `IServiceCollection` — the same collection.
 - *Preconditions*: Neither argument is null.
 - *Postconditions*: The cookie scheme is the default scheme, the cookie has the settings above, the `Auth` options are
-  bound and validated, authorization is registered, and `RevalidatingAuthenticationStateProvider` is registered as the
-  scoped authentication state provider.
+  bound and validated, the `Identity:Throttle` options (see `SignInThrottle`) are bound and validated, the
+  `SignInThrottle` is registered as a singleton, authorization is registered, and
+  `RevalidatingAuthenticationStateProvider` is registered as the scoped authentication state provider.
 
 The provider is registered with a plain `AddScoped`, not `TryAddScoped`: the Razor components registration of the
 framework registers its own default provider with `TryAdd`, and the host calls `AddSignIn` after it, so the last
@@ -64,7 +69,10 @@ redirect is replaced by HTTP status 403 with a short "Access denied" page that l
 fallback authorization policy is set, so static assets, `/health`,
 `/`, and `/login` stay anonymous and each protected page declares its own requirement. The session length and the
 revalidation interval are taken from the options when they are first needed, and an invalid value (a session length
-that is not above 0, or a revalidation interval below 5 seconds) is reported when the server starts.
+that is not above 0, or a revalidation interval below 5 seconds) is reported when the server starts. The throttle
+settings are validated the same way: each limit must be above 0, the limit per address must not be lower than the
+limit per name, and the window must be between 1 second and one day; the error names the setting
+(`Identity:Throttle:...`).
 
 **MapSignIn**: Maps the two endpoints.
 
@@ -72,13 +80,34 @@ that is not above 0, or a revalidation interval below 5 seconds) is reported whe
 - *Returns*: `IEndpointRouteBuilder` — the same builder.
 
 **POST /auth/login**: Takes the form fields `username`, `password`, and `returnUrl`; the framework binds them as form
-parameters, which makes it require the antiforgery token. The return URL is reduced with `SafeReturnUrl`. The user
-name and password are checked with `UserService.AuthenticateAsync`. On success the principal (see Claims) is signed in
-with the cookie scheme as a session cookie and the response redirects to the safe return URL. On failure the response
-redirects to `/login?error=1`, adding `&ReturnUrl=` with the escaped safe return URL when it is not `/`, so a second
-attempt still leads to the place the user wanted. The failure is the same for an unknown user, a wrong password, a
-disabled account, and a locked account, so the response does not reveal which user names exist or that an account is
-locked.
+parameters, which makes it require the antiforgery token. The return URL is reduced with `SafeReturnUrl`. The client
+address is the address of the connection (see the limitations in the `SignInThrottle` design), with an IPv4 address
+that is mapped into IPv6 shown as IPv4. First the endpoint asks `SignInThrottle.TryBegin` with the client address
+and the typed name, which returns a reservation or, when the throttle refuses, `null`. When the throttle refuses,
+nothing else is checked, even a right password is not looked at, no
+cookie is set, a `auth.sign-in-throttled` entry is recorded (see below), and the response redirects to
+`/login?error=throttled`, with `&ReturnUrl=` as for a failure. The answer is the same for every user name, so it does
+not reveal which names exist. Otherwise the user name and password are checked with
+`UserService.AuthenticateAsync`. On success `SignInThrottle.Succeeded` gives the attempts back (it is given the
+reservation that `TryBegin` returned, so it only touches the windows that attempt was counted in), the principal (see
+Claims) is signed in with the cookie scheme as a session cookie and the response redirects to the safe return URL. On
+failure the response redirects to `/login?error=1`, adding `&ReturnUrl=` with the escaped safe return URL when it is
+not `/`, so a second attempt still leads to the place the user wanted. The failure is the same for an unknown user, a
+wrong password, a disabled account, and a locked account, so the response does not reveal which user names exist or
+that an account is locked. The throttled answer is the only different one, and it depends on the client address and
+the typed name, not on the account.
+
+Known limitations of the login (see also the `SignInThrottle` and `UserService` designs):
+
+- The client address comes from the connection or, with `ASPNETCORE_FORWARDEDHEADERS_ENABLED=true`, from
+  `X-Forwarded-For`, which the framework trusts from any sender. The server does not restrict which proxies it
+  trusts; keeping the header trustworthy (the proxy overwrites it and is the only route to the server) is the
+  responsibility of the deployment. Otherwise a client can choose its own address and avoid the per-address and
+  per-name limits; the lockout of the user name still applies.
+- The lockout is per user name, so anyone who knows a name can keep that account locked for 5 minutes at a time, also
+  from an address that the throttle allows. This is an accepted trade-off.
+- The response time can differ slightly between a known and an unknown user (see the `UserService` design). This is
+  not mitigated further.
 After the cookie has been issued, the sign-in is recorded as `auth.sign-in` through `AuditService.TryRecordAsync`
 (awaited, best-effort: a failure is logged and never changes the response).
 
@@ -129,14 +158,20 @@ again." when the state has no authenticated user or lacks a claim. That is a rul
 because an open page can lose its user between two clicks (the state ends when the user is disabled, removed, or
 changed), and the pages already show a rule violation as a message next to the control that was used instead of failing.
 Rule failures of the login are not errors: they are the generic failure redirect.
-An invalid `SessionHours` or `RevalidationSeconds` value makes the options validation fail, which `ServerHost` reports
-when the server starts. The login and logout endpoints do not log the password or the hash. A failure to record an
-audit event is logged as a warning and swallowed (see the `AuditService` unit for why).
+An invalid `SessionHours` or `RevalidationSeconds` value, or an invalid `Identity:Throttle` value, makes the options
+validation fail, which `ServerHost` reports when the server starts. The login and logout endpoints do not log the
+password or the hash. A failure to record an audit event is logged as a warning and swallowed (see the `AuditService`
+unit for why). The throttled refusal is recorded as `auth.sign-in-throttled` through
+`AuditService.TryRecordCoalescedAsync` (actor text `not signed in`, detail `too many attempts, name '<typed>'`, the typed
+name cleaned and cut to the length of a user name, at most one entry per minute and lower-cased name); the client
+address is not recorded, because the audit entry has no place for it (adding one would change the hash chain), so the
+address is only in the web server log.
 
 #### Dependencies
 
 - **UserService** (Core) — checks the password and reads the user for the per-request validation.
-- **AuditService** (Core) — records the sign-in and the sign-out.
+- **AuditService** (Core) — records the sign-in, the sign-out, and the throttled refusals.
+- **SignInThrottle** (Identity) — decides whether an attempt may go on, and takes attempts back after a success.
 - **Actor**, **User**, **UserRole**, and **DomainRuleException** (Core) — the type produced for the pages, the user
   that `IsCurrent` compares with, the role names of the claims, and the refusal of `GetActorAsync`.
 - **RevalidatingAuthenticationStateProvider** (Identity) — registered by `AddSignIn`; it calls `IsCurrent`.
@@ -148,7 +183,7 @@ audit event is logged as a warning and swallowed (see the `AuditService` unit fo
 - **ServerHost** — calls `AddSignIn` while registering the services (after the Razor components) and `MapSignIn`
   while mapping the endpoints, and enables the authentication and authorization middleware.
 - **RevalidatingAuthenticationStateProvider** — calls `IsCurrent`.
-- **LoginPage** — posts its form to `/auth/login` and uses `SafeReturnUrl`.
+- **LoginPage** — posts its form to `/auth/login`, uses `SafeReturnUrl`, and uses `ThrottledError` to choose its message.
 - **App** (`MainLayout`) — posts its logout form to `/auth/logout`, and reads the signed-in user for the header.
 - **ReviewPage**, **ChecklistPage**, **AccountPage**, and **UsersPage** — call `GetActorAsync` (the account page to know
   whose password to change). **ProjectsPage**, **ProjectPage**, **ReviewPage**, **ChecklistPage**, and **AccountPage**

@@ -71,7 +71,8 @@ response.
   `DatabaseSetup.Configure`, `TimeProvider.System`, one `AuditAppender`, `ReviewStore`, `UserStore`, and `AuditStore` as
   the Core store interfaces, `PasswordHasher` as the Core hasher interface, and `ProjectService`, `ReviewService`,
   `ThreadService`, `ChecklistService`, `UserService`, `SigningService`, and `AuditService` as singletons are registered.
-  `AuditService` gets a hook that logs a warning when an event cannot be recorded. The `DataProtection` and `Git`
+  `AuditService` gets a hook that logs a warning when an event cannot be recorded, and the registered `TimeProvider`
+  (its coalescing of repeated events uses the clock, so tests can move time). The `DataProtection` and `Git`
   settings are bound (an empty `Git:CachePath` becomes a `git-cache` folder beside the database, through
   `DatabaseSetup.ResolveDataDirectory`), the Data Protection system is registered with the application name
   `DemaConsulting.ReviewCenter` and a file system key ring in the folder from `ResolveKeysPath`, and `RepositoryStore`,
@@ -110,12 +111,13 @@ build with the native library removed (exit code 1 and the message above); no au
 
 - *Parameters*: `WebApplication app` — supplies the options.
 - *Returns*: `void`.
-- *Postconditions*: The `Auth` settings are valid, or the application is disposed and an
+- *Postconditions*: The `Auth` and `Identity:Throttle` settings are valid, or the application is disposed and an
   `InvalidOperationException` beginning "Invalid sign-in settings:" is thrown with the validation failure as its
   inner exception.
 
 The options are validated when they are first read, so reading them at start-up turns an invalid value (such as a
-session length that is not positive, or an interval for the re-check of open pages below 5 seconds) into one clear
+session length that is not positive, an interval for the re-check of open pages below 5 seconds, a sign-in throttle
+limit that is not positive or a window outside 1 to 86400 seconds) into one clear
 start-up message, which names the setting, rather than a failure at the first sign-in.
 
 **ValidateGitOptions**: Reads the git options of a built application once.

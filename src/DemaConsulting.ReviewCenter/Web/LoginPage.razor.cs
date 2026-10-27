@@ -25,7 +25,7 @@ namespace DemaConsulting.ReviewCenter.Web;
 
 /// <summary>
 ///     Code-behind for the sign-in page (<c>LoginPage.razor</c>): reads the return address and the failure
-///     flag from the query string.
+///     flag (a generic failure or "too many attempts") from the query string.
 /// </summary>
 /// <remarks>
 ///     The page is static, so it holds no state of its own and needs no synchronization. The return address is
@@ -54,4 +54,9 @@ public partial class LoginPage : ComponentBase
     ///     Gets a value indicating whether the previous attempt failed.
     /// </summary>
     private bool Failed => !string.IsNullOrEmpty(Error);
+
+    /// <summary>
+    ///     Gets a value indicating whether the previous attempt was refused because there were too many.
+    /// </summary>
+    private bool Throttled => Error == SignIn.ThrottledError;
 }

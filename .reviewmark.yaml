@@ -286,6 +286,21 @@ reviews:
       - "test/**/Identity/SignInTests.cs"
       - "test/**/Identity/SignInAuditTests.cs"
 
+  - id: ReviewCenter-Identity-SignInThrottle
+    title: Review of ReviewCenter SignInThrottle unit implementation
+    context:
+      - docs/design/review-center.md
+      - docs/reqstream/review-center.yaml
+      - docs/design/review-center/identity.md
+      - docs/reqstream/review-center/identity.yaml
+    paths:
+      - "docs/reqstream/review-center/identity/sign-in-throttle.yaml"
+      - "docs/design/review-center/identity/sign-in-throttle.md"
+      - "docs/verification/review-center/identity/sign-in-throttle.md"
+      - "src/**/Identity/SignInThrottle.cs"
+      - "src/**/Identity/SignInThrottleOptions.cs"
+      - "test/**/Identity/SignInThrottleTests.cs"
+
   - id: ReviewCenter-Identity-RevalidatingAuthenticationStateProvider
     title: Review of ReviewCenter RevalidatingAuthenticationStateProvider unit implementation
     context:

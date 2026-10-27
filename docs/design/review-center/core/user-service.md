@@ -98,6 +98,14 @@ result is `null`), not locked out (otherwise the dummy hash is verified and the 
 (otherwise the failure is counted), and enabled. A disabled user with a wrong password is therefore counted like any
 other wrong password, and a disabled user with the right password is refused without counting.
 
+**ReauthenticateAsync**: Checks a user name and password for the re-authentication of a signature.
+
+- *Parameters*, *Returns*, *Postconditions*: as for `AuthenticateAsync`.
+
+It is the same check, including the failure counter, the lockout, and the dummy hash, so guessing the password at
+signing time is as limited as at sign-in. It is a separate method only so that its failures are recorded under their
+own action code, `signature.reauth-failed`, and not as `auth.sign-in-failed`. Both methods share one private routine.
+
 **ListAsync**: Lists all users ordered by user name. **GetAsync**: Reads a user by user name, without regard to case;
 `null` when there is none.
 
@@ -133,12 +141,25 @@ user are cleared, so it also ends a lockout. Other sessions of the user are not 
 `user.password-changed` with that user as the actor. These drafts are saved by the store in the same transaction as the
 change. The command line passes `Actor.CommandLine`. The constructor takes an optional `AuditService` (the web server
 and the command line supply it): with it, a failed sign-in records `auth.sign-in-failed` (detail `wrong password`,
-`account disabled`, or `unknown user`, the last as the actor text `unknown user`) and the fifth failure also records
-`auth.locked-out`. These events change no data of their own and are recorded best-effort through `TryRecordAsync`,
+`account disabled`, or `unknown user, name '<typed>'`) and the fifth failure also records `auth.locked-out`. For an
+unknown user the actor text is `unknown user` and the typed name is cleaned (one line, control characters replaced by
+spaces) and cut to the length of a user name; it is attacker-chosen text, so this and the cap are what protect the
+trail; a password is never recorded. An attempt on an account that is already locked is recorded as
+`auth.sign-in-locked` (detail `account locked`). Attempts on locked or disabled accounts and failures for unknown names
+are not
+limited by the lockout (a right password on a disabled account is not counted either), so they are recorded through
+`AuditService.TryRecordCoalescedAsync`: one entry per minute and key, the key being the action, the kind (for an
+existing account the kind includes the reason, `account disabled` or `account locked`, so one reason cannot hide
+another), and the lower-cased typed or account name, with the number of suppressed
+repeats carried on the next entry of the key. Wrong passwords of existing accounts
+are bounded by the lockout and are recorded every time. The failures of `ReauthenticateAsync` use the action
+`signature.reauth-failed` with the same details instead of `auth.sign-in-failed` and `auth.sign-in-locked`; the
+lockout entry stays `auth.locked-out`. These events change no data of their own and are recorded best-effort,
 awaited and logged on failure, so a broken trail can never block a sign-in. The update of the failure counter and the
-lockout state is itself not audited (no draft). Two limits are known and deliberate: an attempt on an account that is
-already locked is refused before the password is checked and is not recorded, and a wrong current password at signing
-or on the account page is reported by the same code path and appears as `auth.sign-in-failed`.
+lockout state is itself not audited (no draft). One limit is known and deliberate: `ChangeOwnPasswordAsync` was not
+changed, so a wrong current password on the account page is recorded as `auth.sign-in-failed`, and a refusal there
+because the account is locked is not recorded. The address of the client is not known to this unit and is not
+recorded.
 
 #### Error Handling
 
@@ -147,15 +168,27 @@ construction raises `ArgumentNullException`, and so does a null user name where 
 defined value raises `ArgumentOutOfRangeException`. A failed sign-in is not an error: `AuthenticateAsync` returns
 `null`. Store failures propagate unchanged. The messages never contain a password or a hash.
 
+#### Known Limitations
+
+- Every failed sign-in gives the same answer, and an unknown user costs one password verification (a dummy hash), so
+  the main cost is equal. The response time can still differ slightly between a known and an unknown user: a failure
+  on a known account also stores the failure counter and an audit entry. Timing can therefore in principle reveal
+  which user names exist. This is not mitigated further.
+- The lockout is per user name, so anyone who knows a user name can keep that account locked for 5 minutes at a time,
+  also from an address that the sign-in throttle allows. The throttle limits how often one address can try; it does
+  not prevent this. This is an accepted trade-off of locking by user name.
+
 #### Dependencies
 
 - **IUserStore** — reads and stores users (injected).
 - **IPasswordHasher** — hashes and verifies passwords (injected).
 - **TimeProvider** — supplies the creation and lockout times (injected).
+- **AuditService** — records failed sign-ins and re-authentications (optional, injected).
 
 #### Callers
 
 - **SignIn** — checks the password at sign-in and reads the user to validate the cookie of each request.
+- **SigningService** — checks the password again at signing time through `ReauthenticateAsync`.
 - **AccountPage** — changes the password of the signed-in user.
 - **UsersPage** — lists, creates, enables, disables, and changes users.
 - **UserCommand** — creates the first administrator and other users from the command line.

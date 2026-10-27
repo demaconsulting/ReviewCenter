@@ -360,17 +360,20 @@ sections:
           The tool shall let a user sign in at /login with the user name and password of a local account that is
           enabled, keep the user signed in with a session cookie for the configured number of hours, let the
           user sign out, answer every failed sign-in with the same message, so that it does not reveal whether
-          the account exists, and end the session, including every page that is open, when the account is
+          the account exists, slow down repeated attempts from one client address with a limit that gives the same
+          message for every user name, and end the session, including every page that is open, when the account is
           disabled, removed, or changed, within the configured number of seconds for an open page.
         tags: [system]
         justification: |
           Review actions are only trustworthy when they are attributable, which needs a verified identity. A
           local account with a password needs no external service, and one answer for every failure does not
-          help someone who is guessing user names. Disabling a user or changing a role must also stop a page that
+          help someone who is guessing user names. A limit per client address makes guessing slow without
+          depending on whether the account exists. Disabling a user or changing a role must also stop a page that
           the user already has open, not only the next request, so open pages re-check the user at a configurable
           interval.
         children:
           - ReviewCenter-Identity-Login
+          - ReviewCenter-Identity-Throttle
           - ReviewCenter-Identity-Session
           - ReviewCenter-Identity-CircuitSession
           - ReviewCenter-Web-SignIn
@@ -479,9 +482,11 @@ sections:
       - id: ReviewCenter-System-AuditTrail
         title: >-
           The tool shall record every change of projects, reviews, comments, checklists, reviewer slots,
-          signatures, and users, and every sign-in, sign-out, failed sign-in, and lockout, in an audit trail in the
+          signatures, and users, and every sign-in, sign-out, failed sign-in, attempt on a locked account, refusal
+          by the sign-in throttle, failed re-authentication for a signature, and lockout, in an audit trail in the
           database, naming the time, the person, the action, and a short detail, without ever recording a password
-          or the text of a comment or a justification, and chaining the entries by hashes so that an edit, a
+          or the text of a comment or a justification, recording repeated sign-in failures of one kind at most once
+          per minute, and chaining the entries by hashes so that an edit, a
           deletion, an insertion, or a reordering in the middle of the history can be detected.
         tags: [system]
         justification: |

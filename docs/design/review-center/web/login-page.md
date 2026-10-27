@@ -16,7 +16,9 @@ The page holds no state of its own. It reads two values from the query string of
 
 **ReturnUrl**: the address the visitor wanted before being sent to sign in (the standard `ReturnUrl` query value).
 
-**Error**: the failure flag (`error`); the page shows the failure message when it has any value.
+**Error**: the failure flag (`error`); the page shows the "too many attempts" message when it is `throttled` (the
+constant `SignIn.ThrottledError`), the generic failure message when it has any other value, and no message when it is
+absent.
 
 **SafeReturnUrl**: derived; the return address reduced to a path of this site with `SignIn.SafeReturnUrl`, otherwise
 `/`. It is written into a hidden field of the form, and the endpoint checks it again.
@@ -26,14 +28,17 @@ field, and the fields `username` and `password` (the password field is masked). 
 because the page has no live connection.
 
 Every interactive element and key value has a stable `data-testid` (see the test identifier rule of the Web
-subsystem): `login-page` (root), `login-form`, `login-username-input`, `login-password-input`, `login-error`, and
-`login-button`.
+subsystem): `login-page` (root), `login-form`, `login-username-input`, `login-password-input`, `login-error`,
+`login-throttled`, and `login-button`.
 
 #### Key Methods
 
 N/A - the unit has no handlers. The form is posted by the browser, and the sign-in is performed by the `Identity`
 subsystem. The failure message is "Invalid user name or password." and is the same whatever went wrong (unknown user,
-wrong password, disabled account, or locked account), so the page does not reveal which user names exist.
+wrong password, disabled account, or locked account), so the page does not reveal which user names exist. The one other
+message, "Too many sign-in attempts. Try again in a few minutes.", is shown when the sign-in throttle of the `Identity`
+subsystem refused the attempt. The throttle counts by client address and typed name whether or not the account exists,
+so this message tells nothing about an account.
 
 #### Error Handling
 
@@ -42,7 +47,8 @@ an unknown query value is ignored.
 
 #### Dependencies
 
-- **SignIn** — `SafeReturnUrl` reduces the return address to one on this site.
+- **SignIn** — `SafeReturnUrl` reduces the return address to one on this site, and `ThrottledError` is the value of
+  the `error` query that asks for the "too many attempts" message.
 - **ASP.NET Core Blazor components** — the component base class, query parameters, and the antiforgery token
   component.
 

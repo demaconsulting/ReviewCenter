@@ -26,6 +26,9 @@ N/A - standard test environment.
 - A session length that is not positive is reported with an error that names the `Auth:SessionHours` setting.
 - A re-check interval of open pages below 5 seconds is reported with an error that names the
   `Auth:RevalidationSeconds` setting.
+- A sign-in throttle setting that is not positive, a window outside 1 to 86400 seconds, or a per-address limit below
+  the per-name limit is reported with an error that names the `Identity:Throttle` setting; the defaults and a valid
+  custom set are accepted.
 - A git timeout (`Git:TimeoutSeconds`) outside 1 to 3600 seconds is reported with an error that names the setting;
   1 and 3600 are accepted.
 - An unsupported database provider and an unusable database location are reported as the error "Failed to prepare
@@ -90,6 +93,16 @@ is tested by `ServerHost_CreateApplication_NonPositiveSessionHours_ThrowsClearEr
 setting `Auth:RevalidationSeconds` set to 4, below the minimum of 5; an `InvalidOperationException` whose message names
 the setting is thrown. This scenario is tested by
 `ServerHost_CreateApplication_RevalidationSecondsBelowMinimum_ThrowsClearError`.
+
+**ServerHost_CreateApplication_InvalidThrottleSettings_ThrowsClearError**: A theory; the pipeline is built with one
+invalid `Identity:Throttle` value (a per-name limit of 0 or -1, a per-address limit of 0, a per-address limit of 4 with
+a per-name limit of 5, and a window of 0 or 86401 seconds); an `InvalidOperationException` that says "Invalid sign-in
+settings" and names the setting is thrown. This scenario is tested by
+`ServerHost_CreateApplication_InvalidThrottleSettings_ThrowsClearError`.
+
+**ServerHost_CreateApplication_ValidThrottleSettings_BuildsTheApplication**: The pipeline is built with the default
+throttle settings and with explicit valid ones (3, 3, and 86400 seconds); both are built. This scenario is tested by
+`ServerHost_CreateApplication_ValidThrottleSettings_BuildsTheApplication`.
 
 **ServerHost_CreateApplication_GitTimeoutOutOfRange_ThrowsClearError**: A theory over 0, -5, and 3601: the pipeline is built
 with the setting `Git:TimeoutSeconds` set to that value; an `InvalidOperationException` whose message names the setting

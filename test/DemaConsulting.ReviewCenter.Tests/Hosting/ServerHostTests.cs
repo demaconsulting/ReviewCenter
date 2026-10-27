@@ -260,6 +260,83 @@ public class ServerHostTests
     }
 
     /// <summary>
+    ///     Test that an invalid sign-in throttle setting stops the build with an error naming the setting.
+    /// </summary>
+    /// <param name="name">The setting under <c>Identity:Throttle</c>.</param>
+    /// <param name="value">The invalid value.</param>
+    /// <param name="alsoSet">An extra setting made at the same time, as <c>name=value</c>, or <c>null</c>.</param>
+    [Theory]
+    [InlineData("MaxFailuresPerName", "0", null)]
+    [InlineData("MaxFailuresPerName", "-1", null)]
+    [InlineData("MaxFailuresPerAddress", "0", null)]
+    [InlineData("MaxFailuresPerAddress", "4", "MaxFailuresPerName=5")]
+    [InlineData("WindowSeconds", "0", null)]
+    [InlineData("WindowSeconds", "86401", null)]
+    public void ServerHost_CreateApplication_InvalidThrottleSettings_ThrowsClearError(string name, string value, string? alsoSet)
+    {
+        // Arrange: configuration with one invalid throttle value
+        using var context = Context.Create(["serve", "--silent"]);
+        var options = new ServerHostOptions
+        {
+            MapStaticAssets = false,
+            ConfigureBuilder = builder =>
+            {
+                builder.WebHost.UseTestServer();
+                var values = new Dictionary<string, string?>
+                {
+                    ["Database:ConnectionString"] = TestDatabase.NewConnectionString(),
+                    [$"Identity:Throttle:{name}"] = value
+                };
+                if (alsoSet is not null)
+                {
+                    var parts = alsoSet.Split('=');
+                    values[$"Identity:Throttle:{parts[0]}"] = parts[1];
+                }
+
+                builder.Configuration.AddInMemoryCollection(values);
+            }
+        };
+
+        // Act: create the application
+        var exception = Assert.Throws<InvalidOperationException>(() => ServerHost.CreateApplication(context, options));
+
+        // Assert: the message is the sign-in settings error and names the setting
+        Assert.Contains("Invalid sign-in settings", exception.Message, StringComparison.Ordinal);
+        Assert.Contains($"Identity:Throttle:{name}", exception.Message, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    ///     Test that the default and a customized set of throttle settings are accepted.
+    /// </summary>
+    [Fact]
+    public void ServerHost_CreateApplication_ValidThrottleSettings_BuildsTheApplication()
+    {
+        // Arrange: the defaults, and values that are explicit but valid
+        using var context = Context.Create(["serve", "--silent"]);
+        ServerHostOptions Options(Dictionary<string, string?> extra) => new()
+        {
+            MapStaticAssets = false,
+            ConfigureBuilder = builder =>
+            {
+                builder.WebHost.UseTestServer();
+                extra["Database:ConnectionString"] = TestDatabase.NewConnectionString();
+                builder.Configuration.AddInMemoryCollection(extra);
+            }
+        };
+
+        // Act / Assert: both build
+        using var defaults = ServerHost.CreateApplication(context, Options([]));
+        using var custom = ServerHost.CreateApplication(context, Options(new Dictionary<string, string?>
+        {
+            ["Identity:Throttle:MaxFailuresPerName"] = "3",
+            ["Identity:Throttle:MaxFailuresPerAddress"] = "3",
+            ["Identity:Throttle:WindowSeconds"] = "86400"
+        }));
+        Assert.NotNull(defaults);
+        Assert.NotNull(custom);
+    }
+
+    /// <summary>
     ///     Test that an attestation provider that does not exist stops the build with an error naming the setting.
     /// </summary>
     [Fact]

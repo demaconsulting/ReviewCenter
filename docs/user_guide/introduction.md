@@ -230,7 +230,8 @@ used) it prints an error and exits with a non-zero exit code.
 
 Open any page, or `/login`, enter your user name and password, and press Sign in. After signing in you are taken to
 the page you asked for. A failed sign-in always shows the same message, whatever the reason (unknown user name, wrong
-password, disabled account, or locked account), so the message does not reveal which user names exist. The page header
+password, disabled account, or locked account), so the message does not reveal which user names exist. After several
+failed attempts you are asked to wait a few minutes (see Password Rules and Lockout). The page header
 shows your display name, an Account link, and a Logout button (see [The Page Frame](#the-page-frame)); when nobody is
 signed in it shows a Sign in link instead.
 
@@ -244,6 +245,19 @@ Session Ended on an Open Page).
 | -------------------------- | --------------------------- | --------------------------------------------- |
 | `Auth:SessionHours`        | `Auth__SessionHours`        | Hours of sign-in session (default 8; > 0)     |
 | `Auth:RevalidationSeconds` | `Auth__RevalidationSeconds` | Seconds between open-page checks (default 30) |
+
+The sign-in throttle (see Password Rules and Lockout) is set with the following settings; the server does not start
+when a value is not valid.
+
+| Setting                                   | Environment variable                        |
+| ----------------------------------------- | ------------------------------------------- |
+| `Identity:Throttle:MaxFailuresPerName`    | `Identity__Throttle__MaxFailuresPerName`    |
+| `Identity:Throttle:MaxFailuresPerAddress` | `Identity__Throttle__MaxFailuresPerAddress` |
+| `Identity:Throttle:WindowSeconds`         | `Identity__Throttle__WindowSeconds`         |
+
+`MaxFailuresPerName` is the attempts per address and user name (default 5; above 0), `MaxFailuresPerAddress` the
+attempts per address over all names (default 20; not below the per-name value), and `WindowSeconds` the length of the
+window (default 300; 1 to 86400).
 
 ### Session Ended on an Open Page
 
@@ -272,6 +286,10 @@ Some things to know:
   Spaces are part of the password.
 - After 5 failed sign-ins in a row for a user name, that user name is locked for 5 minutes, even for the right
   password. A successful sign-in before that resets the count.
+- The server also limits the sign-in attempts of one client address, whatever the user name. By default an address
+  may try one user name 5 times and all user names 20 times in 5 minutes; after that the login page says "Too many
+  sign-in attempts. Try again in a few minutes." and refuses even the right password until the time has passed. The
+  message is the same whether or not the user name exists. A successful sign-in gives its attempts back.
 
 ### Account
 
@@ -308,6 +326,13 @@ The sign-in cookie is marked Secure when the request reaches the server over HTT
 forwards plain HTTP to ReviewCenter, set the environment variable `ASPNETCORE_FORWARDEDHEADERS_ENABLED=true` for the
 server, so that it trusts the forwarded scheme of the proxy and still marks the cookie Secure. Use HTTPS whenever the
 server can be reached from other machines.
+
+The sign-in throttle (see Sign In and Out) uses the client address, and the same setting makes the server take that
+address from the `X-Forwarded-For` header. The server then accepts that header from any sender and does not restrict
+which proxies it trusts. Keeping the header trustworthy is the responsibility of the deployment: the proxy must
+overwrite it and be the only route to the server. If the server can be reached directly, a client can
+choose its own address and avoid the per-address and per-name limits (the lockout of the user name still applies).
+Without the setting, behind a proxy, every user appears with the address of the proxy and shares one set of limits.
 
 ## Projects and Reviews
 
@@ -487,8 +512,23 @@ The page never shows text printed by git, the location of the repository, or a c
 
 - There is no password reset, no email, no multi-factor sign-in, and no external identity provider. An administrator
   sets a new password for a user who forgot it.
-- The lockout counts failures per user name, not per source address, so someone can keep a user name locked by
-  guessing wrongly on purpose.
+- The lockout counts failures per user name, so anyone who knows a user name can keep that account locked for 5
+  minutes at a time by guessing wrongly on purpose, also from an address that the throttle allows. The sign-in
+  throttle (see Sign In and Out) limits how often one address can try, but it does not prevent this. This is an
+  accepted trade-off of locking by user name.
+- Every failed sign-in gives the same answer, and an unknown user costs one password verification. The response time
+  can still differ slightly between a known and an unknown user (a failure on a known account also stores the failure
+  counter and an audit entry), so timing can in principle reveal which user names exist. This is not mitigated further.
+- With `ASPNETCORE_FORWARDEDHEADERS_ENABLED=true` the server trusts `X-Forwarded-For` from any sender and does not
+  restrict which proxies it trusts. The proxy must overwrite that header and be the only route to the server;
+  otherwise a client can choose its own address and avoid the per-address and per-name limits (the lockout of the user
+  name still applies).
+- The sign-in throttle is kept in memory in one server process: it starts again when the server restarts, and with
+  several server processes each has its own counters. It holds at most 10,000 counters and evicts the oldest when it
+  is full, so a flood from very many addresses can push out older counters. Users behind one shared address (an office
+  network or a proxy)
+  share the limit of that address, and the address is only as reliable as the proxy setup (see Secure Cookie Behind a
+  Reverse Proxy). A wrong password at a signature is limited by the lockout of the user name only.
 - The sign-in state of an open page is re-checked only every `Auth:RevalidationSeconds` seconds (30 by default), so a
   disabled or changed user can still use some actions of an open page for up to that long; see Session Ended on an
   Open Page. Changing a password does not end the user's other sessions. Opening a page that needs a role from an
@@ -800,16 +840,29 @@ head hash is a manual step, and it is most useful after important events such as
 | Users     | `user.created`, `user.enabled`, `user.disabled`, `user.role-changed`                 |
 | Passwords | `user.password-set-by-admin`, `user.password-changed`                                |
 | Sign-in   | `auth.sign-in`, `auth.sign-out`, `auth.sign-in-failed`, `auth.locked-out`            |
+| Sign-in   | `auth.sign-in-locked`, `auth.sign-in-throttled`                                      |
+| Auditing  | `audit.events-suppressed` (events of new keys were not recorded; the table was full) |
+| Signing   | `signature.reauth-failed` (a wrong password when a signature was entered)            |
 | Evidence  | `attestation.generated` (a signed attestation PDF was downloaded)                    |
 
 ### Limitations of the Audit Trail
 
 - Sign-in, sign-out, failed sign-in, and lockout entries are recorded on a best-effort basis, in their own
   transaction. If an entry cannot be stored, the sign-in is still decided as usual and the failure is logged.
-- Failed attempts on an account that is already locked are not recorded. Failed attempts for unknown user names are
-  recorded without throttling, so the trail can grow quickly if someone guesses user names.
-- A wrong current password at a signature or on the account page is recorded as `auth.sign-in-failed`, because it is
-  checked in the same way as a sign-in and counts toward the same lockout.
+- Failed sign-ins for unknown user names are recorded with the actor `unknown user` and the typed name, made one line
+  and cut to 50 characters; a password is never recorded. Attempts on a locked or disabled account
+  (`auth.sign-in-locked`, and `auth.sign-in-failed` with the detail `account disabled`) and
+  attempts refused by the sign-in throttle (`auth.sign-in-throttled`) are recorded too. So that guessing cannot flood
+  the trail, repeats of the same kind for the same name are recorded once per minute, and the next entry says how many
+  were left out ("; N more in the minute after the previous entry"). The count of the last minute of a name that does
+  not come back is not recorded, and this state is kept in memory, so it starts again at a restart. At most 500 keys
+  are tracked at once; while that table is full of keys from the last minute, an event for a new key is not recorded.
+  The trail then shows one `audit.events-suppressed` entry per minute (and the server log one warning). The first
+  entry only says that events were left out; each next one says how many were left out in the minute before it.
+- The trail does not hold the address of the client; only the log of the web server has it.
+- A wrong current password on the account page is recorded as `auth.sign-in-failed`, because it is checked in the same
+  way as a sign-in and counts toward the same lockout; an attempt there on a locked account is not recorded. A wrong
+  password at a signature is recorded as `signature.reauth-failed`.
 - Comments, justifications, and the reason for marking a checklist section not applicable are recorded only as a short
   digest, never as text.
 - There is no export and no retention or archiving of the trail, and no external anchoring.

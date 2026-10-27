@@ -4,7 +4,8 @@
 # PURPOSE:
 # - Define requirements for the ReviewCenter Identity subsystem
 # - The Identity subsystem spans PasswordHasher.cs (the password hash adapter), the sign-in code (cookie
-#   sign-in, the login and logout endpoints, the authorization policy, and the actor of the signed-in user), and
+#   sign-in, the login and logout endpoints, the authorization policy, and the actor of the signed-in user),
+#   SignInThrottle.cs (the in-memory limit on sign-in attempts), and
 #   RevalidatingAuthenticationStateProvider.cs (the periodic re-check of the user of an open page)
 # - Subsystem requirements describe the externally visible behavior of signing in, authorization, the end of
 #   open pages of a user who is no longer valid, and the identity of the person who acts
@@ -33,6 +34,27 @@ sections:
           - ReviewCenter-PasswordHasher-HashVerify
         tests:
           - IdentitySubsystem_SignInJourney_LoginUseAndLogout_WorksEndToEnd
+
+      - id: ReviewCenter-Identity-Throttle
+        title: >-
+          The Identity subsystem shall refuse sign-in attempts from a client address that has made too many
+          attempts for one user name, or too many attempts overall, within a window, with the same answer whether
+          or not the user name exists, without checking the password, and shall read the limits from settings that
+          are validated when the server starts.
+        justification: |
+          The account lockout only protects accounts that exist and makes a lockout possible for any attacker who
+          knows a name. A limit per client address and name slows guessing for every name alike and does not lock
+          the real user out from other addresses. The answer must not depend on the account, so it does not help
+          somebody collecting user names.
+        children:
+          - ReviewCenter-SignIn-Throttle
+          - ReviewCenter-SignIn-ThrottleSettings
+          - ReviewCenter-SignInThrottle-Limits
+          - ReviewCenter-SignInThrottle-Options
+          - ReviewCenter-SignInThrottle-Bounded
+          - ReviewCenter-SignInThrottle-Reservation
+        tests:
+          - IdentitySubsystem_Throttle_RepeatedFailures_AreRefusedAndAuditedOncePerWindow
 
       - id: ReviewCenter-Identity-Authorization
         title: >-
@@ -95,13 +117,15 @@ sections:
 
       - id: ReviewCenter-Identity-AuditTrail
         title: >-
-          The Identity subsystem shall record successful sign-ins, sign-outs, failed sign-ins, and lockouts in the
-          audit trail on a best-effort basis, taking the actor from the server-side sign-in state, never echoing
-          a user name that does not exist or a password, and never letting a failure of the trail change the
-          result of a sign-in or sign-out.
+          The Identity subsystem shall record successful sign-ins, sign-outs, failed sign-ins, attempts on locked
+          accounts, refusals by the sign-in throttle, and lockouts in the audit trail on a best-effort basis, taking
+          the actor from the server-side sign-in state, cleaning and capping any typed user name that does not
+          exist, never recording a password, recording repeated events of one kind at most once per minute, and
+          never letting a failure of the trail change the result of a sign-in or sign-out.
         justification: |
           Attempts to break in and the use of accounts belong to the history, but an unauthenticated caller must
-          not be able to fill the trail with text of their choice, and a failing trail must not lock anybody out.
+          not be able to fill the trail with text of their choice or with an unlimited number of rows, and a
+          failing trail must not lock anybody out.
         children:
           - ReviewCenter-SignIn-Audit
         tests:

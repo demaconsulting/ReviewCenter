@@ -1,6 +1,6 @@
 package ReviewCenter {
     part def AuditService {
-        doc /* Records the events that change no data (sign-in, sign-out, failed sign-in, lockout) on a best-effort basis, reads the audit trail one page at a time, and verifies the hash chain by streaming. Also defines the audit store contract and the page type. */
+        doc /* Records the events that change no data (sign-in, sign-out, failed sign-in, lockout) on a best-effort basis, coalesces repeated failure events to one entry per key and minute with a suppressed count (cancellation-aware, and one suppressed-events entry per minute when the key table is full), reads the audit trail one page at a time, and verifies the hash chain by streaming. Also defines the audit store contract and the page type. */
 
         comment sourceRef /* Source: src/DemaConsulting.ReviewCenter.Core/AuditService.cs and IAuditStore.cs */
         comment testRef /* Test: test/DemaConsulting.ReviewCenter.Tests/Core/AuditServiceTests.cs */

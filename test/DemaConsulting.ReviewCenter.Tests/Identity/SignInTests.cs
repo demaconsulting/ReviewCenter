@@ -119,6 +119,84 @@ public class SignInTests
     }
 
     /// <summary>
+    ///     Test that a client over the per-name limit gets the same "too many attempts" answer for a known and for an
+    ///     unknown user name, so the answer does not reveal which accounts exist.
+    /// </summary>
+    [Fact]
+    public async Task SignIn_Login_TooManyAttempts_RedirectsToThrottledAnswerIdenticalForKnownAndUnknownNames()
+    {
+        // Arrange: a limit of two attempts per name, and one known user
+        await using var app = await StartAsync(perName: 2);
+        await CreateUserAsync(app, "ann");
+        using var browser = new TestBrowser(app);
+        var locations = new Dictionary<string, List<string?>> { ["ann"] = [], ["nobody"] = [] };
+
+        // Act: three wrong attempts for the known and for the unknown name
+        foreach (var name in locations.Keys)
+        {
+            for (var i = 0; i < 3; i++)
+            {
+                var response = await browser.LoginAsync(name, "wrong password here", "/account");
+                locations[name].Add(response.Headers.Location?.OriginalString);
+            }
+        }
+
+        // Assert: both names get the generic answer twice, then the same throttled answer
+        var generic = $"/login?error=1&ReturnUrl={Uri.EscapeDataString("/account")}";
+        var expected = new[] { generic, generic, $"/login?error=throttled&ReturnUrl={Uri.EscapeDataString("/account")}" };
+        Assert.Equal(expected, locations["ann"]);
+        Assert.Equal(expected, locations["nobody"]);
+    }
+
+    /// <summary>
+    ///     Test that a throttled client is refused even with the right password and gets no session cookie.
+    /// </summary>
+    [Fact]
+    public async Task SignIn_Login_Throttled_RefusesEvenTheRightPasswordAndSetsNoCookie()
+    {
+        // Arrange: a limit of two attempts per name, both used up
+        await using var app = await StartAsync(perName: 2);
+        await CreateUserAsync(app, "ann");
+        using var browser = new TestBrowser(app);
+        await browser.LoginAsync("ann", "wrong password here");
+        await browser.LoginAsync("ann", "wrong password here");
+
+        // Act: the right password
+        var response = await browser.LoginAsync("ann", TestBrowser.Password);
+
+        // Assert: refused as throttled, nobody is signed in
+        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+        Assert.Equal("/login?error=throttled", response.Headers.Location?.OriginalString);
+        Assert.Empty(AuthCookies(browser));
+    }
+
+    /// <summary>
+    ///     Test that a successful sign-in gives the attempts of the name back.
+    /// </summary>
+    [Fact]
+    public async Task SignIn_Login_SuccessAfterFailures_ResetsTheNameCounter()
+    {
+        // Arrange: a limit of three attempts per name; two wrong attempts, then the right password
+        await using var app = await StartAsync(perName: 3);
+        await CreateUserAsync(app, "ann");
+        using var browser = new TestBrowser(app);
+        await browser.LoginAsync("ann", "wrong password here");
+        await browser.LoginAsync("ann", "wrong password here");
+        var success = await browser.LoginAsync("ann", TestBrowser.Password);
+
+        // Act: three more wrong attempts, then one more
+        var locations = new List<string?>();
+        for (var i = 0; i < 4; i++)
+        {
+            locations.Add((await browser.LoginAsync("ann", "wrong password here")).Headers.Location?.OriginalString);
+        }
+
+        // Assert: the success was not throttled, and the count started again after it
+        Assert.Equal("/", success.Headers.Location?.OriginalString);
+        Assert.Equal(["/login?error=1", "/login?error=1", "/login?error=1", "/login?error=throttled"], locations);
+    }
+
+    /// <summary>
     ///     Test that a failed login keeps a safe return URL for the next attempt.
     /// </summary>
     [Fact]
@@ -488,6 +566,25 @@ public class SignInTests
     }
 
     /// <summary>
+    ///     Test that the login page shows the "too many attempts" message, instead of the generic one, only for the
+    ///     throttled error.
+    /// </summary>
+    [Fact]
+    public async Task SignIn_LoginPage_ThrottledError_ShowsTooManyAttemptsMessage()
+    {
+        // Arrange: an application and a visitor who is not signed in
+        await using var app = await StartAsync();
+        using var browser = new TestBrowser(app);
+
+        // Act: request the login page after a throttled attempt
+        var throttled = await browser.GetPageAsync("/login?error=throttled");
+
+        // Assert: the throttle message replaces the generic one
+        Assert.Equal("Too many sign-in attempts. Try again in a few minutes.", throttled.QuerySelector("[data-testid='login-throttled']")?.TextContent);
+        Assert.Null(throttled.QuerySelector("[data-testid='login-error']"));
+    }
+
+    /// <summary>
     ///     Builds a principal with the claims the application issues, for the given role and display name.
     /// </summary>
     /// <param name="role">The role claim value.</param>
@@ -507,10 +604,18 @@ public class SignInTests
     /// <summary>
     ///     Starts an in-memory application with its own temporary database.
     /// </summary>
+    /// <param name="perName">The throttle limit per name; <c>null</c> for the default.</param>
     /// <returns>The started application; the caller disposes it.</returns>
-    private static async Task<WebApplication> StartAsync()
+    private static async Task<WebApplication> StartAsync(int? perName = null)
     {
-        return await TestWebApp.StartAsync(new CapturingLoggerProvider(), "serve", "--silent");
+        var settings = perName is null
+            ? null
+            : new Dictionary<string, string?>
+            {
+                ["Identity:Throttle:MaxFailuresPerName"] = perName.Value.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                ["Identity:Throttle:MaxFailuresPerAddress"] = "1000"
+            };
+        return await TestWebApp.StartAsync(new CapturingLoggerProvider(), null, ["serve", "--silent"], settings);
     }
 
     /// <summary>

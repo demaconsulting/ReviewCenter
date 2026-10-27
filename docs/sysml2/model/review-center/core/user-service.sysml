@@ -1,6 +1,6 @@
 package ReviewCenter {
     part def UserService {
-        doc /* Creates users and checks their sign-in: enforces the user name, display name, and password rules, keeps only a password hash, authenticates with a lockout after repeated failures, enables and disables users, sets roles, changes passwords, and protects the last enabled administrator. Also defines the user, role, actor, hasher, and user store types of the Core subsystem. */
+        doc /* Creates users and checks their sign-in: enforces the user name, display name, and password rules, keeps only a password hash, authenticates with a lockout after repeated failures (also for the re-authentication of a signature, under its own audit action), records failed attempts including those on unknown and locked accounts, enables and disables users, sets roles, changes passwords, and protects the last enabled administrator. Also defines the user, role, actor, hasher, and user store types of the Core subsystem. */
 
         comment sourceRef /* Source: src/DemaConsulting.ReviewCenter.Core/UserService.cs, User.cs, UserRole.cs, Actor.cs, IPasswordHasher.cs, and IUserStore.cs */
         comment testRef /* Test: test/DemaConsulting.ReviewCenter.Tests/Core/UserServiceTests.cs */

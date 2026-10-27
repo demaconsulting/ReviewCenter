@@ -22,6 +22,7 @@ N/A - standard test environment (temporary SQLite databases are created by the t
   display name there.
 - After signing out, the protected page is refused again.
 - The stored password hash does not contain the password.
+- Repeated failed sign-ins of one name are refused by the throttle with the same message, and audited once per window.
 - The state provider that a new scope (a circuit) gets from the real pipeline is the revalidating provider, and it
   reports a user as valid while enabled and as no longer valid after the user is disabled.
 
@@ -42,3 +43,10 @@ This scenario is tested by `IdentitySubsystem_Revalidation_UserDisabledAfterSign
 **Sign-in audit**: On the real pipeline a user signs in with a wrong password, then with the right one, and signs
 out; the audit trail holds the failed sign-in, the sign-in, and the sign-out in this order, and its chain is intact.
 This scenario is tested by `SignIn_Flow_LoginFailureAndLogout_FormAnIntactChain`.
+
+**IdentitySubsystem_Throttle_RepeatedFailures_AreRefusedAndAuditedOncePerWindow**: On the real pipeline with a limit of
+three attempts per name, a user is tried three times with a wrong password and then twice with the right one. The
+first three answers are the generic failure; the next attempts are refused with the throttled answer even with the
+right password; the login page then shows the throttle message; and the audit trail holds three `auth.sign-in-failed`
+entries and one `auth.sign-in-throttled` entry, none with a password. This scenario is tested by
+`IdentitySubsystem_Throttle_RepeatedFailures_AreRefusedAndAuditedOncePerWindow`.

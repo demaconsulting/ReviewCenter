@@ -102,6 +102,17 @@ sections:
           - SigningService_SignAsync_WrongPassword_ThrowsReauthenticationFailed
           - SigningService_SignAsync_RepeatedWrongPassword_LocksOutLikeLogin
 
+      - id: ReviewCenter-SigningService-ReauthAudit
+        title: >-
+          The SigningService class shall have the failures of the password check of a signature (wrong password,
+          locked account) recorded in the audit trail as failed re-authentications, without the password, using the
+          re-authentication check of the UserService.
+        justification: |
+          Guessing the password at signing time must be visible in the history, apart from failed sign-ins, so that
+          the history shows where the attempt was made.
+        tests:
+          - SigningService_SignAsync_WrongPasswordThenLocked_RecordsReauthFailedEntriesWithoutPassword
+
       - id: ReviewCenter-SigningService-Current
         title: >-
           The SigningService class shall store a signature only for the digest of the record that the signer

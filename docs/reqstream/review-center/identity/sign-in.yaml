@@ -24,10 +24,42 @@ sections:
           cookie.
         justification: |
           A different answer per reason would tell an attacker which user names exist and which accounts are
-          disabled.
+          disabled. The one allowed difference is the refusal by the sign-in throttle, which does not depend on
+          the account (see ReviewCenter-SignIn-Throttle).
         tests:
           - SignIn_Login_EveryKindOfFailure_GivesTheSameAnswerAndNoCookie
           - SignIn_Login_WrongPasswordWithReturnUrl_KeepsReturnUrlOnLoginPage
+
+      - id: ReviewCenter-SignIn-Throttle
+        title: >-
+          The SignIn unit shall, before it checks a password, ask the sign-in throttle for permission and, when the
+          throttle refuses, check no password, set no cookie, give the same throttled answer whether or not the
+          user name exists, keep the safe return address, and record the refusal in the audit trail, at most once
+          per minute and typed name, with the typed name cleaned and without the password; and shall give the
+          attempts of a name back when its sign-in succeeds.
+        justification: |
+          Guessing passwords must be slow even where the account lockout does not apply, for example for names that
+          do not exist. Refusing without checking the password, and with an answer that does not depend on the
+          account, keeps the throttle from revealing which accounts exist or whether a guess was right. Recording
+          the refusals once per minute shows an attack without letting it flood the trail.
+        tests:
+          - SignIn_Login_TooManyAttempts_RedirectsToThrottledAnswerIdenticalForKnownAndUnknownNames
+          - SignIn_Login_Throttled_RefusesEvenTheRightPasswordAndSetsNoCookie
+          - SignIn_Login_SuccessAfterFailures_ResetsTheNameCounter
+          - SignIn_Login_Throttled_RecordsOneThrottledEntryPerWindow
+
+      - id: ReviewCenter-SignIn-ThrottleSettings
+        title: >-
+          The SignIn unit shall read the limits of the sign-in throttle from the Identity:Throttle settings
+          (failures per name, failures per client address, and the window in seconds), and shall stop the server
+          from starting, naming the setting, when a value is not above 0, when the window is longer than one day,
+          or when the limit per address is lower than the limit per name.
+        justification: |
+          An operator must be able to tune the throttle, and a wrong value, such as a limit of 0 that would lock
+          everybody out, must be found when the server starts and not when the first user cannot sign in.
+        tests:
+          - ServerHost_CreateApplication_InvalidThrottleSettings_ThrowsClearError
+          - ServerHost_CreateApplication_ValidThrottleSettings_BuildsTheApplication
 
       - id: ReviewCenter-SignIn-ReturnUrl
         title: >-
@@ -144,14 +176,18 @@ sections:
         title: >-
           The SignIn unit shall record a successful sign-in and a sign-out in the audit trail on a best-effort basis,
           after the cookie was set or before it is cleared, taking the actor from the server-side sign-in state, and
-          shall record a failed sign-in and a lockout without echoing the typed user name or password.
+          shall record a failed sign-in, an attempt on a locked account and a lockout, with the typed user name of an
+          unknown user cleaned and capped, and never with the typed password.
         justification: |
           Who was signed in when something happened is part of the history. The actor must come from the server
-          and not from form input, and a failing trail must not stop anybody from signing in or out.
+          and not from form input, and a failing trail must not stop anybody from signing in or out. The typed name
+          of an unknown user shows what an attacker tried, and is cleaned and capped so that it cannot forge or
+          flood the trail.
         tests:
           - SignIn_Login_ValidCredentials_RecordsSignInEntry
           - SignIn_Logout_SignedInUser_RecordsSignOutEntry
-          - SignIn_Login_UnknownUser_RecordsUnknownUserWithoutEchoingInput
+          - SignIn_Login_UnknownUser_RecordsCleanedTypedNameWithoutPassword
           - SignIn_Login_WrongPassword_RecordsFailureForTheUserWithoutPassword
           - SignIn_Login_RepeatedFailures_RecordsLockoutOnce
+          - SignIn_Login_LockedAccount_RecordsOneSignInLockedEntry
           - SignIn_Flow_LoginFailureAndLogout_FormAnIntactChain
