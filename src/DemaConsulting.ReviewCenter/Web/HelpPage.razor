@@ -1,0 +1,25 @@
+@* HelpPage: the index of the help, at "/help": one card per topic with its title and a one-line description, each
+   linking to the page of that topic (/help/{slug}).
+
+   Static server-side rendered markup, open to everyone like the About page. The list of topics is HelpTopics; to add
+   a topic, add a page for it and one entry there. *@
+@page "/help"
+
+<PageTitle>Help - ReviewCenter</PageTitle>
+
+<main class="page reading" data-testid="help-page">
+    <h1>Help</h1>
+    <p class="muted">Short guides to working with ReviewCenter. Choose a topic.</p>
+
+    <ul class="help-index" data-testid="help-topics">
+        @foreach (var topic in HelpTopics.All)
+        {
+            <li class="card" data-testid="help-topic-@topic.Slug">
+                <h2><a href="@topic.Href" data-testid="help-topic-link-@topic.Slug">@topic.Title</a></h2>
+                <p class="muted">@topic.Summary</p>
+            </li>
+        }
+    </ul>
+
+    <p class="muted">The version and the project page are on the <a href="/about" data-testid="help-about-link">About</a> page.</p>
+</main>

@@ -1,0 +1,19 @@
+@* HelpNotFoundPage: the friendly answer for an address under "/help/" that is not a help topic. The topic pages have
+   their own, more specific routes, so this catch-all only receives the rest. *@
+@page "/help/{*Slug}"
+
+<PageTitle>Help topic not found - ReviewCenter</PageTitle>
+
+<main class="page narrow" data-testid="help-not-found">
+    <h1>Help topic not found</h1>
+    <p>There is no help topic at this address. It may have been renamed or never existed.</p>
+    <p><a class="action outline" href="/help" data-testid="help-index-link">All help topics</a></p>
+</main>
+
+@code {
+    /// <summary>
+    ///     Gets or sets the part of the address after <c>/help/</c>.
+    /// </summary>
+    [Parameter]
+    public string? Slug { get; set; }
+}

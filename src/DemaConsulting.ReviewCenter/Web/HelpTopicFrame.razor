@@ -1,0 +1,46 @@
+@* HelpTopicFrame: the common frame of a help topic page (a page of the help, not a unit of its own).
+
+   It shows the topic's title as the h1, then the content the page gives it, then the outline-button links at the
+   bottom: Previous, All help topics, Next. The title and the neighbours come from the HelpTopics list, so a page only
+   has to say which topic it is. There are no in-page anchors: the page has a base address, so a "#section" link
+   would not stay on the page. *@
+
+@{
+    var topic = HelpTopics.Find(Slug);
+    var previous = HelpTopics.Previous(Slug);
+    var next = HelpTopics.Next(Slug);
+}
+
+<PageTitle>@(topic?.Title ?? "Help") - Help - ReviewCenter</PageTitle>
+
+<main class="page reading help-topic" data-testid="help-topic-page">
+    <h1>@(topic?.Title ?? "Help")</h1>
+
+    @ChildContent
+
+    <nav class="plan-actions help-nav" aria-label="Help navigation">
+        @if (previous is not null)
+        {
+            <a class="action outline" href="@previous.Href" data-testid="help-previous-link">&larr; @previous.Title</a>
+        }
+        <a class="action outline" href="/help" data-testid="help-index-link">All help topics</a>
+        @if (next is not null)
+        {
+            <a class="action outline" href="@next.Href" data-testid="help-next-link">@next.Title &rarr;</a>
+        }
+    </nav>
+</main>
+
+@code {
+    /// <summary>
+    ///     Gets or sets the slug of the topic this page is about.
+    /// </summary>
+    [Parameter, EditorRequired]
+    public string Slug { get; set; } = string.Empty;
+
+    /// <summary>
+    ///     Gets or sets the content of the topic.
+    /// </summary>
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+}
