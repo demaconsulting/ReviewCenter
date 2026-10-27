@@ -78,6 +78,11 @@ response.
   `CredentialProtector`, `RepositoryService`, `GitRunner`, and `GitSource` are registered as singletons, the first
   two and the last as the Core interfaces `IRepositoryStore`, `ICredentialProtector`, and `IGitRepositoryProvider`.
   `ReviewMarkConfigParser` is registered as the Core interface `IReviewSetParser`, and `ReviewPlanner` as a singleton.
+  The `Attestation` settings are bound, with an empty `SelfSignedFolder` becoming an `attestation-selfsigned` folder
+  inside the folder from `ResolveKeysPath`, the key provider is registered through
+  `AttestationKeyProviderFactory.Create`, and `AttestationRenderer`, `AttestationSigner`, and `AttestationService` are
+  registered as singletons (the first two as the interfaces `IAttestationRenderer` and `IAttestationSigner`;
+  `AttestationService` as the concrete class).
 
 The method is shared with `UserCommand` and `AuditCommand`, so that the command line works with exactly the services of
 the server. `UserService` must remain a single instance, because it serializes the changes to users in the process;
@@ -135,6 +140,19 @@ round trip failures (I/O, access, cryptographic, domain rule, argument, and not-
 message, so an administrator gets a clear start-up error instead of failing at the first token. The keys in the folder
 are not encrypted at rest.
 
+**ValidateAttestation**: Obtains the attestation signing key of a built application once.
+
+- *Parameters*: `WebApplication app` — supplies the key provider.
+- *Returns*: `void`.
+- *Postconditions*: The signing key can be obtained and meets the `RequireTrustedKey` rule; otherwise the application is
+  disposed and an `InvalidOperationException` "The attestation signing key is not usable: {reason}" is thrown, whose
+  reason names the `Attestation` setting at fault. With the default self-signed provider the key file is created here on
+  the first start.
+
+Runs after `ValidateDataProtection` in `CreateApplication`, so it applies to the `serve` verb only. It does not sign a
+test value, so a smart card is not asked for its PIN at the start. The consequence of failing fast is that a server
+whose key is in a hardware module that is not present does not start.
+
 **RunAsync**: Builds and runs the web server until it is stopped.
 
 - *Parameters*: `Context context` — parsed context; `CancellationToken cancellationToken` —
@@ -162,7 +180,8 @@ caller has requested cancellation is treated as a normal stop and returns 0; an
 `InvalidOperationException` from building, which is how a database that cannot be prepared and invalid sign-in
 settings are reported, is
 written through `Context.WriteError` as is ("Failed to prepare the database: {detail}" or "Invalid sign-in
-settings: {detail}", or "The Data Protection key ring folder '{path}' is not writable: ...") and returns 1; and an
+settings: {detail}", or "The Data Protection key ring folder '{path}' is not writable: ...", or "The attestation signing
+key is not usable: {detail}") and returns 1; and an
 `IOException`, which Kestrel uses to report an address that is in use or not bindable, is
 reported as "Failed to start the server on {url}: {detail}" through `Context.WriteError` and
 returns 1. Any other exception propagates to the caller (`Program.Main`). The application is
@@ -177,6 +196,9 @@ always disposed.
 - **ProjectService**, **ReviewService**, **ThreadService**, **ChecklistService**, **UserService**, **SigningService**,
   **AuditService**, **RepositoryService** — the Core services registered for the pages.
 - **GitOptions**, **GitRunner**, **GitSource**, **CredentialProtector** — the git content source and the token protector.
+- **AttestationOptions**, **AttestationKeyProviderFactory**, **AttestationKeyException**, **AttestationRenderer**,
+  **AttestationSigner**, **AttestationService**, **AttestationEndpoint** — the signed attestation of the `Evidence`
+  subsystem, which is registered, validated at the start, and mapped.
 - **ASP.NET Core Data Protection** — the key ring and the protection of tokens.
 - **PasswordHasher**, **SignIn** — the password hasher registered for the Core, and the cookie sign-in, authorization,
   and login and logout endpoints.

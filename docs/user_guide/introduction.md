@@ -142,6 +142,8 @@ The server provides these routes:
 - `/projects/{id}/reviews/{reviewId}` - one review, with its files, their content, and comment threads.
 - `/projects/{id}/reviews/{reviewId}/checklist` - the checklist of a review.
 - `/projects/{id}/reviews/{reviewId}/history` - the history of a review.
+- `/projects/{id}/reviews/{reviewId}/attestation.pdf` - the signed PDF attestation of an approved review; see
+  [Signed Attestation](#signed-attestation).
 - `/health` - a health check that answers with status 200 and the text `Healthy` while the server is running (open
   to everyone).
 
@@ -174,6 +176,7 @@ Each topic is a page of its own with links to the previous and the next topic:
   link.
 - **Checklist** (`/help/checklist`): answer each check Pass, Fail, or N/A.
 - **Reviewers and signing** (`/help/reviewers-and-signing`): reviewer slots, signing with your password, and approval.
+- **Signed attestation** (`/help/signed-attestation`): download a digitally signed PDF of an approved review.
 - **Audit trail** (`/help/audit-trail`): every action is recorded in a tamper-evident chain.
 - **Planning reviews** (`/help/planning-reviews`): create the reviews of the review-sets of a repository in one go.
 
@@ -632,7 +635,103 @@ not re-checked, such as answering checks and adding comments and threads. Signin
 the account again on every action and are refused for a disabled user at once.
 
 Approved is computed each time from the record and the signatures; it is not a stored state of the review. Every
-signature is also recorded in the audit trail, which is described in the next section.
+signature is also recorded in the audit trail, which is described in the section after the next one. An Approved
+review can be downloaded as a digitally signed PDF; see the next section.
+
+## Signed Attestation
+
+When a review is **Approved**, its page shows **Download attestation (PDF)** on a line of its own below the title, with
+a note about the key that signs the file. The PDF is made when you press the button and is not stored. It contains the
+review (project, review, repository and commits, the content fingerprint and the hash of every file), the checklist
+with every answer and justification in full (a comment is never shortened), the comment threads, the sign-off of every
+reviewer slot with the record digest it was bound to, and the state of the audit trail (the number of entries, whether
+the chain is intact, and the head hash). The counts of open and resolved threads are exact. The first 100 resolved
+threads are listed, each with the start of its first comment (at most 300 characters), and a line says how many more
+there are; the full threads are in the review record. The last section describes the signing key and what the
+signature proves. A review that is not Approved has no button; a direct request to its `attestation.pdf` address is
+refused with the message "The review is not complete" (status 409). If the review changes while the PDF is being
+prepared (for example a reviewer changes an answer), nothing is signed or recorded and the request is also refused
+with status 409 ("The review changed while the attestation was being prepared; try again."); press the button again.
+Every download is recorded in the audit trail as `attestation.generated`.
+
+### What a Verifier Sees
+
+Open the PDF in a PDF reader that checks signatures, for example Adobe Acrobat. The signature panel shows the
+certificate (subject, issuer, and thumbprint, which are also printed on the last page of the PDF) and whether the file
+has changed since it was signed.
+
+- **Proves**: the PDF has not been changed since it was signed, and it was signed with the key of the certificate that
+  is named in it.
+- **Does not prove who the reviewers are.** The reviewers are identified by the signatures in the review record, which
+  ReviewCenter made after asking each reviewer for the password again. The PDF lists them, and the signature vouches
+  for that list only as far as the key of the server is trusted.
+- **Does not prove when it was signed.** The signing time is the clock of the server. This release uses no time stamp
+  authority, so a reader can only say that the time is the one the signer claims.
+- **Does not make the review correct.** It shows what the record said at the moment the PDF was made.
+
+A reader reports the signer as **not trusted** unless it trusts the certificate. For a self-signed key it always does;
+for an organization certificate it does once the root certificate of the issuing authority is installed on the reader's
+machine.
+
+### The Signing Key
+
+The server signs with one key, which an administrator chooses in the `Attestation` section of `appsettings.json` or
+with environment variables (a double underscore stands for the colon, for example `Attestation__Provider`):
+
+`Provider` is `SelfSigned` or `CertificateStore`; the settings marked "Store" apply to `CertificateStore` only.
+
+| Setting                             | Environment variable                 | Meaning                               |
+| ----------------------------------- | ------------------------------------ | ------------------------------------- |
+| `Attestation:Provider`              | `Attestation__Provider`              | Key source; default `SelfSigned`      |
+| `Attestation:RequireTrustedKey`     | `Attestation__RequireTrustedKey`     | Refuse unsuitable keys; default false |
+| `Attestation:CertificateThumbprint` | `Attestation__CertificateThumbprint` | Store: certificate thumbprint         |
+| `Attestation:StoreLocation`         | `Attestation__StoreLocation`         | Store: `CurrentUser` or `LocalMachine`|
+| `Attestation:StoreName`             | `Attestation__StoreName`             | Store: store name; default `My`       |
+| `Attestation:SelfSignedFolder`      | `Attestation__SelfSignedFolder`      | Folder of the self-signed key file    |
+
+**The self-signed key (default) is for development and test only.** On first use the server creates a key and a
+self-signed certificate named "ReviewCenter self-signed attestation key (not an organization key)", and keeps them in
+`attestation-selfsigned/attestation-selfsigned.pfx` in the folder of the Data Protection keys (beside the database, see
+[Repositories and Credentials](#repositories-and-credentials)), unless `Attestation:SelfSignedFolder` names another
+folder. The file has no password, so protect the folder and back it up together with the keys; whoever can read the file
+can sign as the server. The review page and the PDF say that the key is self-signed and not an organization key. If an
+administrator supplies a self-signed certificate through the certificate store, the review page says that it is a
+self-signed certificate supplied by the administrator from the certificate store, not an organization key and not
+issued by a certificate authority; it says "generated by this server" only for the key that the server creates itself.
+
+**Choose the certificate store for real use.** Set `Attestation:Provider` to `CertificateStore` and
+`Attestation:CertificateThumbprint` to the thumbprint of the certificate.
+
+- *Choose a document-signing certificate.* Its key usage must allow digital signatures or non-repudiation. A
+  certificate that allows code signing only is not suited to signing a PDF; the server logs a warning when it finds
+  one. A certificate from an internal certificate authority is fine, provided the readers of the PDF trust that
+  authority: give them its root certificate.
+- *Find the thumbprint.* In PowerShell run `Get-ChildItem Cert:\CurrentUser\My` (or `Cert:\LocalMachine\My`) and copy
+  the thumbprint of the certificate, or open the certificate (`certmgr.msc` for the current user, `certlm.msc` for the
+  machine) and copy the **Thumbprint** from the **Details** tab. Spaces are ignored.
+- *Give the server access to the private key.* The key is used where it is and is never exported. The account that runs
+  the server must be allowed to use it: for a certificate in `LocalMachine\My`, grant that account read access to the
+  private key (Manage Private Keys in `certlm.msc`); for `CurrentUser\My`, the server must run as the user who owns the
+  certificate. A key on a smart card or in a hardware module can be used when it is present.
+- *Set `RequireTrustedKey` to `true`* to make the server refuse a self-signed key, a certificate whose key usage does
+  not allow digital signatures or non-repudiation, and a certificate that is not valid now. This is all it checks: it
+  does **not** check that the
+  certificate chains to a trusted root and does **not** check revocation.
+
+The server checks the key when it starts. A setting that cannot work (an unknown provider, a missing thumbprint, a
+certificate that is not in the store, or `RequireTrustedKey` with a self-signed key or a certificate without a signing
+key usage) stops the start with a message
+that names the setting. If the key later becomes unusable (for example the certificate expires while the server runs),
+the page shows the problem instead of the button, and a direct request is answered with status 500 ("Attestation
+signing key unavailable"). A signed-out request to the address is sent to the sign-in page.
+
+### Limitations of the Attestation
+
+- The default key is self-signed and is not an organization key.
+- There is no time stamp authority; the signing time is the server clock.
+- Signing with a key in Azure Key Vault and with an RFC 3161 time stamp authority are planned, not implemented.
+- The server does not check the trust chain or the revocation of the certificate; the reader does.
+- The PDF uses the standard PDF fonts (Windows-1252 characters), so any other character is shown as a question mark.
 
 ## Audit Trail
 
@@ -699,6 +798,7 @@ head hash is a manual step, and it is most useful after important events such as
 | Users     | `user.created`, `user.enabled`, `user.disabled`, `user.role-changed`                 |
 | Passwords | `user.password-set-by-admin`, `user.password-changed`                                |
 | Sign-in   | `auth.sign-in`, `auth.sign-out`, `auth.sign-in-failed`, `auth.locked-out`            |
+| Evidence  | `attestation.generated` (a signed attestation PDF was downloaded)                    |
 
 ### Limitations of the Audit Trail
 

@@ -121,6 +121,37 @@ path is thrown. This scenario is tested by `ServerHost_CreateApplication_KeyRing
 missing or blank setting gives a `keys` folder beside the database. This scenario is tested by
 `ServerHost_ResolveKeysPath_ConfiguredOrDefault_ChoosesTheFolder`.
 
+**ServerHost_CreateApplication_NoAttestationSettings_CreatesSelfSignedKeyBesideTheDataProtectionKeys**: The pipeline
+is started twice on the same database folder with no attestation setting. The key file exists in the
+`attestation-selfsigned` folder inside the `keys` folder, and the key (its thumbprint) is the same after the restart.
+This scenario is tested by
+`ServerHost_CreateApplication_NoAttestationSettings_CreatesSelfSignedKeyBesideTheDataProtectionKeys`.
+
+**ServerHost_CreateApplication_SelfSignedFolderConfigured_KeepsTheKeyThere**: `Attestation:SelfSignedFolder` names a
+folder; the key file is created there and the provider reports an available key. This scenario is tested by
+`ServerHost_CreateApplication_SelfSignedFolderConfigured_KeepsTheKeyThere`.
+
+**ServerHost_CreateApplication_UnknownAttestationProvider_ThrowsClearError**: The provider setting names a provider that
+does not exist; an `InvalidOperationException` "The attestation signing key is not usable" that names
+`Attestation:Provider` is thrown. This scenario is tested by
+`ServerHost_CreateApplication_UnknownAttestationProvider_ThrowsClearError`.
+
+**ServerHost_CreateApplication_CertificateStoreWithoutThumbprint_ThrowsClearError**: The certificate store is chosen
+and no thumbprint is set; the message names `Attestation:CertificateThumbprint`. This scenario is tested by
+`ServerHost_CreateApplication_CertificateStoreWithoutThumbprint_ThrowsClearError`.
+
+**ServerHost_CreateApplication_CertificateNotInStore_ThrowsClearError**: The thumbprint names a certificate that is not
+in the store; the message holds the thumbprint and "was not found". This scenario is tested by
+`ServerHost_CreateApplication_CertificateNotInStore_ThrowsClearError`.
+
+**ServerHost_CreateApplication_RequireTrustedKeyWithSelfSignedProvider_ThrowsClearError**: `RequireTrustedKey` is set
+and the provider stays self-signed; the message names `Attestation:RequireTrustedKey` and the self-signed key. This
+scenario is tested by `ServerHost_CreateApplication_RequireTrustedKeyWithSelfSignedProvider_ThrowsClearError`.
+
+**ServerHost_CreateApplication_SelfSignedFolderIsAFile_ThrowsClearError**: A file stands where the folder of the key
+should be; the message names `Attestation:SelfSignedFolder`. This scenario is tested by
+`ServerHost_CreateApplication_SelfSignedFolderIsAFile_ThrowsClearError`.
+
 **Audit services**: The registration of the audit store, the shared audit appender, and the audit service in
 `AddServices` is exercised by the sign-in audit tests and the `AuditCommand` tests, which resolve them from the real
 pipeline; there is no separate test of the registration.

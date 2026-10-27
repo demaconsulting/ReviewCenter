@@ -40,6 +40,9 @@
     <!-- Entity Framework Core with the SQLite provider stores projects and reviews. The native SQLite library
          (e_sqlite3 / libe_sqlite3.so) is published as a side file next to the single-file executable. -->
     <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="10.0.14" />
+    <!-- System.Security.Cryptography.Pkcs builds the detached CMS signature (adbe.pkcs7.detached) of the PDF
+         attestation. It has no reference assembly in the shared framework, so the package is needed to compile. -->
+    <PackageReference Include="System.Security.Cryptography.Pkcs" Version="10.0.14" />
     <!-- YamlDotNet reads the review-sets of a repository's .reviewmark.yaml (the same library ReviewMark uses). -->
     <PackageReference Include="YamlDotNet" Version="18.1.0" />
   </ItemGroup>

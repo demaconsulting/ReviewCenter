@@ -50,6 +50,13 @@ This document covers the verification design for the following software items:
     - **GitSource** — git implementation of the repository provider
     - **ReviewSetParser** — reading of the review-sets of a ReviewMark configuration file
     - **CredentialProtector** — token encryption through Data Protection
+  - **Evidence** subsystem
+    - **PdfDocumentWriter** — PDF document writer with embedded standard fonts and text layout
+    - **AttestationRenderer** — layout of the attestation document of a review
+    - **AttestationSigner** — detached CMS signature of a PDF with the attestation key
+    - **AttestationKeyProvider** — selection, loading, and description of the attestation signing key
+    - **AttestationService** — approval check, rendering, signing, and audit of an attestation
+    - **AttestationEndpoint** — authorized download endpoint of the attestation
   - **Core** subsystem
     - **Fingerprint** — ReviewMark-compatible content fingerprint
     - **RecordDigest** — digest of a review record that a signature binds to
@@ -97,6 +104,7 @@ This document covers the verification design for the following software items:
 - **SarifMark** — SARIF report conversion tool
 - **SonarMark** — SonarCloud quality report tool
 - **SysML2Tools** — architecture model validation and diagram rendering tool
+- **System.Security.Cryptography.Pkcs** — CMS signing library used to sign the PDF attestations
 - **VersionMark** — tool-version documentation tool
 - **WeasyPrint** — HTML-to-PDF conversion tool
 - **xUnit** — unit-testing framework
@@ -114,7 +122,7 @@ The following topics are out of scope:
 
 The test folder structure mirrors the source subsystem breakdown. The Core subsystem has its own source project
 but its tests are in the main test project, in the `Core/` folder, next to the `Storage/`, `ContentSources/`,
-`Identity/`, `Web/`,
+`Evidence/`, `Identity/`, `Web/`,
 and `Hosting/` folders:
 
 ```text
@@ -123,6 +131,7 @@ test/
 │   ├── Core/                                  — Core unit and subsystem tests
 │   ├── Storage/                               — Storage unit and subsystem tests
 │   ├── ContentSources/                        — ContentSources unit and subsystem tests
+│   ├── Evidence/                              — Evidence unit and subsystem tests
 │   ├── Identity/                              — Identity unit and subsystem tests
 │   ├── Web/                                   — Web unit and subsystem tests
 │   └── Hosting/                               — Hosting unit and subsystem tests

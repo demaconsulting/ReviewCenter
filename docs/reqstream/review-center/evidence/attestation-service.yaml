@@ -1,0 +1,78 @@
+---
+# Software Unit Requirements for the AttestationService Class
+#
+# The AttestationService class releases the signed attestation of an approved review: it checks that the record is
+# approved, gets the signing key, renders and signs the document, and records the release in the audit trail.
+
+sections:
+  - title: AttestationService Unit Requirements
+    requirements:
+      - id: ReviewCenter-AttestationService-Approved
+        title: >-
+          The AttestationService class shall release an attestation only for a review that exists and has a current
+          signature in every reviewer slot for the current record, and shall report an unknown review as not found and
+          any other review as not approved, without asking for the signing key.
+        justification: |
+          The attestation is evidence that a review is complete. It must never be produced for a review that is not,
+          and a record that changed after the signatures must not be attested as approved.
+        tests:
+          - AttestationService_GenerateAsync_UnknownReview_ReturnsNotFound
+          - AttestationService_GenerateAsync_SlotNotSigned_ReturnsNotApprovedWithoutAskingForTheKey
+          - AttestationService_GenerateAsync_RecordChangedAfterSigning_ReturnsNotApproved
+
+      - id: ReviewCenter-AttestationService-Revalidation
+        title: >-
+          The AttestationService class shall read the review again after the document is rendered and before it is
+          signed, and when the review is no longer complete, or its record digest, its slots, its signers, or the
+          digests they signed differ from what was rendered, shall report that the review changed, and shall sign
+          nothing, return no document, and record nothing in the audit trail.
+        justification: |
+          The approval and the content are read in separate steps and rendering takes time. Without the second check a
+          slot added or a record changed in between would yield a signed document that attests a review that was no
+          longer complete when it was signed.
+        tests:
+          - AttestationService_GenerateAsync_RecordChangesWhileRendering_ReturnsChangedAndRecordsNothing
+          - AttestationService_GenerateAsync_SlotAddedWhileRendering_ReturnsChangedAndRecordsNothing
+          - AttestationService_GenerateAsync_SlotsChangeWhileRenderingButStillComplete_ReturnsChangedAndRecordsNothing
+          - AttestationService_GenerateAsync_ReviewUnchangedWhileRendering_PassesRevalidationAndIsAttested
+
+      - id: ReviewCenter-AttestationService-Document
+        title: >-
+          The AttestationService class shall return a signed PDF of the review, with its content, checklist, threads,
+          sign-offs, audit head, and key, and a file name that keeps only safe characters.
+        justification: |
+          The caller needs the finished document and a name that is safe to put in a download header.
+        tests:
+          - AttestationService_GenerateAsync_CompleteReview_ReturnsSignedPdfOfTheReview
+          - AttestationService_FileNameFor_ReviewId_KeepsOnlySafeCharacters
+
+      - id: ReviewCenter-AttestationService-KeyUnavailable
+        title: >-
+          The AttestationService class shall report that the key is unavailable, and record nothing in the audit trail,
+          when the signing key cannot be obtained or the signing fails.
+        justification: |
+          The user must be told that the key is the problem and not the review, and an event for a document that was
+          never released would be false.
+        tests:
+          - AttestationService_GenerateAsync_KeyProblem_ReturnsKeyUnavailableAndRecordsNothing
+          - AttestationService_GenerateAsync_SignerFails_ReturnsKeyUnavailableAndRecordsNothing
+
+      - id: ReviewCenter-AttestationService-Audit
+        title: >-
+          The AttestationService class shall record an attestation.generated event in the audit trail for every
+          attestation it releases, with the record digest, the head of the audit chain, the SHA-256 hash of the PDF,
+          and the key, and shall release nothing when that record cannot be written.
+        justification: |
+          A document that leaves the server is an action that someone must be able to find later. If the trail cannot
+          be written, releasing the document would leave an action without a trace.
+        tests:
+          - AttestationService_GenerateAsync_CompleteReview_RecordsAuditEventWithDigestAndPdfHash
+          - AttestationService_GenerateAsync_AskedTwice_RecordsTwoEvents
+
+      - id: ReviewCenter-AttestationService-Arguments
+        title: >-
+          The AttestationService class shall reject a missing collaborator when it is created.
+        justification: |
+          A missing collaborator is a mistake in the composition root that must show at once.
+        tests:
+          - AttestationService_Constructor_NullCollaborator_Throws

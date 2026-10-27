@@ -11,6 +11,7 @@ resource-path:
   - docs/design/review-center/core
   - docs/design/review-center/storage
   - docs/design/review-center/content-sources
+  - docs/design/review-center/evidence
   - docs/design/review-center-puppet
   - docs/design/ots
   - docs/template
@@ -69,6 +70,13 @@ input-files:
   - docs/design/review-center/content-sources/git-source.md
   - docs/design/review-center/content-sources/credential-protector.md
   - docs/design/review-center/content-sources/review-set-parser.md
+  - docs/design/review-center/evidence.md
+  - docs/design/review-center/evidence/pdf-document-writer.md
+  - docs/design/review-center/evidence/attestation-renderer.md
+  - docs/design/review-center/evidence/attestation-signer.md
+  - docs/design/review-center/evidence/attestation-key-provider.md
+  - docs/design/review-center/evidence/attestation-service.md
+  - docs/design/review-center/evidence/attestation-endpoint.md
   - docs/design/review-center-puppet.md
   - docs/design/review-center-puppet/puppet-program.md
   - docs/design/review-center-puppet/control-channel.md
@@ -84,6 +92,7 @@ input-files:
   - docs/design/ots/filesystemglobbing.md
   - docs/design/ots/git.md
   - docs/design/ots/pandoc.md
+  - docs/design/ots/pkcs.md
   - docs/design/ots/playwright.md
   - docs/design/ots/reqstream.md
   - docs/design/ots/reviewmark.md

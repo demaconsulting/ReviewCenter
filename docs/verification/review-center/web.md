@@ -151,3 +151,14 @@ shows the entry count and the full head hash of an intact chain, which is tested
 denied message and no entries, which is tested by `Routes_Render_ReviewerOpensAuditRoute_ShowsAccessDeniedNotTrail`.
 The subsystem test of all pages does not include the two new routes; their `data-testid` attributes are checked in
 the unit tests.
+
+**Attestation download and help**: The download button, its note, the problem shown instead of it, and the absence of
+all three for a review that is not approved are verified by the `ReviewPage` unit tests
+(`ReviewPage_Render_ReviewNotApproved_OffersNoAttestation`,
+`ReviewPage_Render_ReviewApprovedWithSelfSignedKey_OffersAttestationDownloadWithKeyNote`,
+`ReviewPage_Render_ReviewApprovedWithOrganizationKey_NoteNamesTheCertificate`,
+`ReviewPage_Render_ReviewApprovedWithKeyProblem_ShowsProblemInsteadOfDownload`, and
+`ReviewPage_Sign_CorrectPassword_OffersAttestationDownload`), the address by
+`ReviewLinks_ForAttestation_ProjectAndReview_BuildsAddress`, and the help topic by
+`HelpAttestationPage_Render_ExplainsWhatTheSignatureProvesAndTheKey`. The download itself, over HTTP, is verified in the
+`Evidence` subsystem.
