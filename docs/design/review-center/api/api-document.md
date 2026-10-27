@@ -17,6 +17,27 @@ The committed snapshot `docs/api/openapi.json` is a file of the repository and n
 compares the generated document with it, and that can write it when the environment variable
 `REVIEWCENTER_UPDATE_OPENAPI` is set to 1, is in `ApiDocumentTests`.
 
+**Regenerating the snapshot.** When the API changes on purpose, the snapshot is rewritten by running only the snapshot
+test with the variable set (`--project` and `--filter-method` are the options of the test runner of this repository).
+PowerShell:
+
+```powershell
+$env:REVIEWCENTER_UPDATE_OPENAPI = "1"
+dotnet test --project test/DemaConsulting.ReviewCenter.Tests `
+  --filter-method "*ApiDocument_Get_MatchesCommittedSnapshot"
+Remove-Item Env:REVIEWCENTER_UPDATE_OPENAPI
+```
+
+Bash:
+
+```bash
+REVIEWCENTER_UPDATE_OPENAPI=1 dotnet test --project test/DemaConsulting.ReviewCenter.Tests \
+  --filter-method "*ApiDocument_Get_MatchesCommittedSnapshot"
+```
+
+The change of `docs/api/openapi.json` is then reviewed and committed. The failure message of the test repeats the
+command.
+
 #### Key Methods
 
 **AddApiDocument**: Registers the generator.

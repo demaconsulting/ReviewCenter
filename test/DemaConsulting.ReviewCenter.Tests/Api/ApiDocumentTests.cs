@@ -36,6 +36,16 @@ public class ApiDocumentTests
     private const string UpdateVariable = "REVIEWCENTER_UPDATE_OPENAPI";
 
     /// <summary>
+    ///     The complete command that regenerates the snapshot, for the PowerShell and the bash shell. It runs only the
+    ///     snapshot test with the update variable set, and is repeated in the failure messages of that test.
+    /// </summary>
+    private const string RegenerateCommand =
+        "PowerShell: $env:REVIEWCENTER_UPDATE_OPENAPI = \"1\"; dotnet test --project test/DemaConsulting.ReviewCenter.Tests "
+        + "--filter-method \"*ApiDocument_Get_MatchesCommittedSnapshot\"; Remove-Item Env:REVIEWCENTER_UPDATE_OPENAPI"
+        + "  |  bash: REVIEWCENTER_UPDATE_OPENAPI=1 dotnet test --project test/DemaConsulting.ReviewCenter.Tests "
+        + "--filter-method \"*ApiDocument_Get_MatchesCommittedSnapshot\"";
+
+    /// <summary>
     ///     Test that the document is served without a token, describes the API operations with a fixed version,
     ///     no server address and the bearer scheme, and requires the scheme for every operation.
     /// </summary>
@@ -87,8 +97,11 @@ public class ApiDocumentTests
 
     /// <summary>
     ///     Test that the generated document is the one committed in <c>docs/api/openapi.json</c>. When the API
-    ///     changes on purpose, run the test once with the environment variable <c>REVIEWCENTER_UPDATE_OPENAPI</c>
-    ///     set to <c>1</c> to write the new snapshot, and review the change.
+    ///     changes on purpose, run only this test with the environment variable <c>REVIEWCENTER_UPDATE_OPENAPI</c>
+    ///     set to <c>1</c> to write the new snapshot, and review the change. In PowerShell:
+    ///     <c>$env:REVIEWCENTER_UPDATE_OPENAPI = "1"; dotnet test --project test/DemaConsulting.ReviewCenter.Tests
+    ///     --filter-method "*ApiDocument_Get_MatchesCommittedSnapshot"</c>; in bash the same command is prefixed with
+    ///     <c>REVIEWCENTER_UPDATE_OPENAPI=1</c>.
     /// </summary>
     [Fact(Timeout = 60000)]
     public async Task ApiDocument_Get_MatchesCommittedSnapshot()
@@ -105,12 +118,12 @@ public class ApiDocumentTests
             return;
         }
 
-        Assert.True(File.Exists(path), $"The snapshot '{path}' is missing. Run this test once with {UpdateVariable}=1 to create it.");
+        Assert.True(File.Exists(path), $"The snapshot '{path}' is missing. Create it with: {RegenerateCommand}");
         var committed = Normalize(await File.ReadAllTextAsync(path, TestContext.Current.CancellationToken));
         Assert.True(
             committed == generated,
-            $"The OpenAPI document differs from docs/api/openapi.json. If the change of the API is intended, run this test once "
-            + $"with {UpdateVariable}=1 to write the new snapshot, and commit it.");
+            "The OpenAPI document differs from docs/api/openapi.json. If the change of the API is intended, write the new "
+            + $"snapshot with: {RegenerateCommand}  Then review the change and commit it.");
     }
 
     /// <summary>

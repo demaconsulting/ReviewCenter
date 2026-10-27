@@ -17,7 +17,7 @@ sections:
           The Api subsystem shall let a client that sends a valid personal access token as a bearer token call the API
           as the owner of the token, refuse a missing, unknown, revoked, or expired token with one generic answer,
           refuse too many refused tokens from one address, and record
-          each use that is refused without recording the token value.
+          each use that is refused without recording the token value, in the audit trail or in the log.
         justification: |
           A script cannot sign in through a page, so it needs a credential that is easy to hand out and to take back.
           Acting as the owner keeps every change attributable to a person. One answer for every refusal does not tell
@@ -28,6 +28,7 @@ sections:
           - ReviewCenter-ApiTokenAuthentication-Refusal
           - ReviewCenter-ApiTokenAuthentication-Throttle
           - ReviewCenter-ApiTokenAuthentication-FailureAudit
+          - ReviewCenter-ApiTokenAuthentication-NoLog
         tests:
           - ApiSubsystem_TokenJourney_CreateUseRevoke_WorksEndToEnd
 
@@ -36,7 +37,8 @@ sections:
           The Api subsystem shall let a client with a valid token list the projects and the reviews of a project, read
           one review, create a review draft from uploaded files or from the changes of a repository, mark a review
           that was created this way, download the attestation of a signed review, report an invalid request or a
-          refused rule as a problem document that names the cause, and answer an address that does not exist with a
+          refused rule as a problem document that names the cause, refuse a body that is too large or beyond the
+          review limits, and answer an address that does not exist with a
           JSON problem document.
         justification: |
           Creating a draft for every pull request from a pipeline and fetching the attestation after sign-off are
@@ -47,6 +49,7 @@ sections:
           - ReviewCenter-ApiEndpoints-Read
           - ReviewCenter-ApiEndpoints-Create
           - ReviewCenter-ApiEndpoints-Validation
+          - ReviewCenter-ApiEndpoints-Limits
           - ReviewCenter-ApiEndpoints-Attestation
           - ReviewCenter-ApiEndpoints-Errors
         tests:
@@ -55,7 +58,8 @@ sections:
       - id: ReviewCenter-Api-Isolation
         title: >-
           The Api subsystem shall keep a token to the API: a token shall not sign a review or change the reviewers of
-          a review, shall not sign in to a web page, and a session cookie shall not be accepted by the API.
+          a review, shall not sign in to a web page or to the sign-in endpoints, and a session cookie shall not be
+          accepted by the API.
         justification: |
           A signature must prove that the person was present, which a stored secret does not. A token that could
           sign, or that could open the web pages, would turn a leaked token into the identity of the person, and a

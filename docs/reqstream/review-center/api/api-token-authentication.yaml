@@ -35,7 +35,8 @@ sections:
       - id: ReviewCenter-ApiTokenAuthentication-Cookie
         title: >-
           The ApiTokenAuthentication unit shall not accept the session cookie of the web pages for a request under
-          /api, and shall not sign in a request for a web page from a bearer token.
+          /api, and shall not sign in a request for a web page, the sign-in and sign-out endpoints or the web socket
+          negotiation of the pages from a bearer token.
         justification: |
           A cookie is sent by the browser to a site without the user being asked, so an API that accepted it would
           be open to forgery from other sites. A token that signed in a web page would give a leaked token the
@@ -43,6 +44,7 @@ sections:
         tests:
           - ApiTokenAuthentication_Request_SessionCookie_IsNotAccepted
           - ApiTokenAuthentication_Request_TokenOnWebPage_IsNotSignedIn
+          - ApiTokenAuthentication_Request_TokenOnAuthAndBlazorRoutes_IsNotSignedIn
 
       - id: ReviewCenter-ApiTokenAuthentication-Throttle
         title: >-
@@ -64,3 +66,13 @@ sections:
           value keeps the audit trail from becoming a source of tokens.
         tests:
           - ApiTokenAuthentication_Request_RefusedToken_IsAuditedOnceWithoutTheValue
+
+      - id: ReviewCenter-ApiTokenAuthentication-NoLog
+        title: >-
+          The ApiTokenAuthentication unit shall not write a token value, or any text that starts with the token prefix,
+          to the application log when a token is created, accepted or refused.
+        justification: |
+          A log is read by more people, and kept longer, than the place where a token is shown once. A token in a log
+          would give everybody who can read the log the access of its owner.
+        tests:
+          - ApiTokenAuthentication_Request_AnyOutcome_NeverLogsTheToken

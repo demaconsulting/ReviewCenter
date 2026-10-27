@@ -171,6 +171,31 @@ dotnet run --project src/DemaConsulting.ReviewCenter \
   --configuration Release --framework net10.0 --no-build -- --validate
 ```
 
+### Regenerating the API snapshot
+
+The OpenAPI description of the API is kept in `docs/api/openapi.json`, and a test fails when the generated description
+differs from it. When you change the API on purpose, rewrite the snapshot by running only that test with the environment
+variable `REVIEWCENTER_UPDATE_OPENAPI` set to `1`.
+
+PowerShell:
+
+```powershell
+$env:REVIEWCENTER_UPDATE_OPENAPI = "1"
+dotnet test --project test/DemaConsulting.ReviewCenter.Tests `
+  --filter-method "*ApiDocument_Get_MatchesCommittedSnapshot"
+Remove-Item Env:REVIEWCENTER_UPDATE_OPENAPI
+```
+
+Bash:
+
+```bash
+REVIEWCENTER_UPDATE_OPENAPI=1 dotnet test --project test/DemaConsulting.ReviewCenter.Tests \
+  --filter-method "*ApiDocument_Get_MatchesCommittedSnapshot"
+```
+
+Clear the variable afterwards (the PowerShell example does), because the test only writes while it is set. Then review
+`git diff docs/api/openapi.json` and commit the file together with the API change; CI fails on a stale snapshot.
+
 ## Documentation
 
 ### Markdown Guidelines

@@ -19,10 +19,12 @@
 // SOFTWARE.
 
 using System.Net;
+using DemaConsulting.ReviewCenter.Api;
 using DemaConsulting.ReviewCenter.Core;
 using DemaConsulting.ReviewCenter.Tests.Core;
 using DemaConsulting.ReviewCenter.Tests.Evidence;
 using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Http.Metadata;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
 using static DemaConsulting.ReviewCenter.Tests.Api.ApiTestSupport;
@@ -429,5 +431,209 @@ public class ApiEndpointsTests
             || p.Contains("approval", StringComparison.OrdinalIgnoreCase));
         Assert.Equal(HttpStatusCode.NotFound, slot.StatusCode);
         Assert.Equal(HttpStatusCode.NotFound, sign.StatusCode);
+    }
+
+    /// <summary>
+    ///     Test that a file set that is beyond the review limits (the number of files, the size of one file, the total
+    ///     size) is refused with 400 and a problem document that names the limit, and that no review is created.
+    /// </summary>
+    /// <param name="limit">The limit to exceed: <c>count</c>, <c>file</c> or <c>total</c>.</param>
+    /// <param name="expectedDetail">Text that the problem detail must contain.</param>
+    [Theory(Timeout = 120000)]
+    [InlineData("count", "at most 200 files")]
+    [InlineData("file", "limit of 2 MiB")]
+    [InlineData("total", "limit of 20 MiB")]
+    public async Task ApiEndpoints_CreateReview_FileLimits_Answer400Problem(string limit, string expectedDetail)
+    {
+        // Arrange: a project, a token and a file set that is one step over the limit
+        await using var app = await StartAsync();
+        var token = await CreateTokenAsync(app);
+        var project = await app.Services.GetRequiredService<ProjectService>().CreateAsync("Apollo", null, TestContext.Current.CancellationToken);
+        using var client = ClientFor(app, token.Value);
+        var oneFileLimit = (int)(ReviewLimits.MaxTotalSizeBytes / ReviewLimits.MaxFileSizeBytes);
+        var files = limit switch
+        {
+            "count" => Enumerable.Range(0, ReviewLimits.MaxFileCount + 1).Select(i => UploadOf($"f{i}.txt", 1)).ToList(),
+            "file" => [UploadOf("big.bin", ReviewLimits.MaxFileSizeBytes + 1)],
+
+            // The largest files that are allowed one by one, then one byte more than the total allows
+            _ => Enumerable.Range(0, oneFileLimit + 1)
+                .Select(i => UploadOf($"f{i}.bin", i == oneFileLimit ? 1 : ReviewLimits.MaxFileSizeBytes)).ToList()
+        };
+
+        // Act: send the review
+        var response = await client.PostAsync(
+            $"/api/projects/{project.Id}/reviews", Json(new { id = "REV-L", title = "Limits", files }), TestContext.Current.CancellationToken);
+        using var problem = await JsonAsync(response);
+
+        // Assert: 400 as a problem document that names the limit, and nothing is created
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
+        Assert.Contains(expectedDetail, problem.RootElement.GetProperty("detail").GetString(), StringComparison.Ordinal);
+        Assert.Empty(await app.Services.GetRequiredService<ReviewService>().ListAsync(project.Id, TestContext.Current.CancellationToken));
+    }
+
+    /// <summary>
+    ///     Test that the endpoint that creates a review carries a request size limit that is derived from the review
+    ///     limits: large enough for the Base64 text of the largest upload, and far below an unbounded body.
+    /// </summary>
+    [Fact(Timeout = 60000)]
+    public async Task ApiEndpoints_CreateReview_Endpoint_HasDerivedBodySizeLimit()
+    {
+        // Arrange: an application and its endpoints
+        TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
+        await using var app = await StartAsync();
+
+        // Act: find the endpoint that creates a review and read its size limit
+        var endpoint = app.Services.GetRequiredService<EndpointDataSource>().Endpoints
+            .Single(e => e.Metadata.GetMetadata<IEndpointNameMetadata>()?.EndpointName == "CreateReview");
+        var limit = endpoint.Metadata.GetMetadata<IRequestSizeLimitMetadata>()?.MaxRequestBodySize;
+
+        // Assert: the derived limit, between the Base64 size of the largest upload and twice the largest upload
+        Assert.Equal(ApiEndpoints.MaxCreateBodyBytes, limit);
+        Assert.True(limit > ReviewLimits.MaxTotalSizeBytes / 3 * 4);
+        Assert.True(limit < ReviewLimits.MaxTotalSizeBytes * 2);
+    }
+
+    /// <summary>
+    ///     Test that a request body larger than the limit of the endpoint is refused with 413 by a real server, and
+    ///     that no review is created. The in-memory test server does not enforce the limit, so Kestrel is used.
+    /// </summary>
+    [Fact(Timeout = 120000)]
+    public async Task ApiEndpoints_CreateReview_BodyOverLimit_Answers413()
+    {
+        // Arrange: a real server with a project and a token, and a body one byte over the limit of the endpoint
+        var (app, address) = await StartKestrelAsync();
+        await using (app)
+        {
+            var token = await CreateTokenAsync(app);
+            var project = await app.Services.GetRequiredService<ProjectService>().CreateAsync("Apollo", null, TestContext.Current.CancellationToken);
+            using var client = new HttpClient { BaseAddress = address, Timeout = TimeSpan.FromSeconds(100) };
+            client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token.Value);
+            using var content = new ZeroBodyContent(ApiEndpoints.MaxCreateBodyBytes + 1);
+            using var request = new HttpRequestMessage(HttpMethod.Post, $"/api/projects/{project.Id}/reviews") { Content = content };
+
+            // The server answers before it reads the body, so the client waits for that answer before it sends 30 MB
+            request.Headers.ExpectContinue = true;
+
+            // Act: post the body
+            var response = await client.SendAsync(request, TestContext.Current.CancellationToken);
+
+            // Assert: refused as too large, and nothing is created
+            Assert.Equal(HttpStatusCode.RequestEntityTooLarge, response.StatusCode);
+            Assert.Empty(await app.Services.GetRequiredService<ReviewService>().ListAsync(project.Id, TestContext.Current.CancellationToken));
+        }
+    }
+
+    /// <summary>
+    ///     Test that a request body that is not JSON of the right shape is refused with 400 and a problem document
+    ///     that does not leak details of the server, and that nothing is created.
+    /// </summary>
+    /// <param name="json">The request body.</param>
+    [Theory(Timeout = 60000)]
+    [InlineData("""{"id":""")]
+    [InlineData("not json")]
+    [InlineData("""{"files": 5}""")]
+    public async Task ApiEndpoints_CreateReview_MalformedJson_Answers400Problem(string json)
+    {
+        // Arrange: a project and a token
+        await using var app = await StartAsync();
+        var token = await CreateTokenAsync(app);
+        var project = await app.Services.GetRequiredService<ProjectService>().CreateAsync("Apollo", null, TestContext.Current.CancellationToken);
+        using var client = ClientFor(app, token.Value);
+        using var content = new StringContent(json, System.Text.Encoding.UTF8, "application/json");
+
+        // Act: send the body
+        var response = await client.PostAsync($"/api/projects/{project.Id}/reviews", content, TestContext.Current.CancellationToken);
+        var text = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
+
+        // Assert: 400 as a problem document, with no exception text or stack trace, and no review
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
+        using var problem = System.Text.Json.JsonDocument.Parse(text);
+        Assert.Equal(400, problem.RootElement.GetProperty("status").GetInt32());
+        Assert.DoesNotContain("System.", text, StringComparison.Ordinal);
+        Assert.DoesNotContain("Exception", text, StringComparison.Ordinal);
+        Assert.DoesNotContain(" at ", text, StringComparison.Ordinal);
+        Assert.Empty(await app.Services.GetRequiredService<ReviewService>().ListAsync(project.Id, TestContext.Current.CancellationToken));
+    }
+
+    /// <summary>
+    ///     Test that a request body that does not say it is JSON is refused with 415 and a problem document, with a
+    ///     content type of another kind or with none, and that nothing is created.
+    /// </summary>
+    /// <param name="contentType">The content type of the body; <c>null</c> for none.</param>
+    [Theory(Timeout = 60000)]
+    [InlineData(null)]
+    [InlineData("text/plain")]
+    public async Task ApiEndpoints_CreateReview_NotJsonContentType_Answers415Problem(string? contentType)
+    {
+        // Arrange: a project and a token
+        await using var app = await StartAsync();
+        var token = await CreateTokenAsync(app);
+        var project = await app.Services.GetRequiredService<ProjectService>().CreateAsync("Apollo", null, TestContext.Current.CancellationToken);
+        using var client = ClientFor(app, token.Value);
+        using var content = new ByteArrayContent("""{"id":"X-1","title":"T","files":[]}"""u8.ToArray());
+        if (contentType is not null)
+        {
+            content.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue(contentType);
+        }
+
+        // Act: send the body without the JSON content type
+        var response = await client.PostAsync($"/api/projects/{project.Id}/reviews", content, TestContext.Current.CancellationToken);
+
+        // Assert: 415 as a problem document, and no review
+        Assert.Equal(HttpStatusCode.UnsupportedMediaType, response.StatusCode);
+        Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
+        Assert.Empty(await app.Services.GetRequiredService<ReviewService>().ListAsync(project.Id, TestContext.Current.CancellationToken));
+    }
+
+    /// <summary>
+    ///     Builds the JSON of one uploaded file of zero bytes.
+    /// </summary>
+    /// <param name="path">The path of the file.</param>
+    /// <param name="size">The number of bytes.</param>
+    /// <returns>The file as the API takes it.</returns>
+    private static Dictionary<string, string> UploadOf(string path, long size)
+    {
+        return new Dictionary<string, string> { ["path"] = path, ["contentBase64"] = Convert.ToBase64String(new byte[size]) };
+    }
+
+    /// <summary>
+    ///     A request body of zero bytes that is written in blocks, so a body of tens of megabytes is never held in memory.
+    /// </summary>
+    private sealed class ZeroBodyContent : HttpContent
+    {
+        /// <summary>
+        ///     The number of bytes of the body.
+        /// </summary>
+        private readonly long _length;
+
+        /// <summary>
+        ///     Initializes a new instance of the <see cref="ZeroBodyContent"/> class.
+        /// </summary>
+        /// <param name="length">The number of bytes of the body.</param>
+        public ZeroBodyContent(long length)
+        {
+            _length = length;
+            Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("application/json");
+        }
+
+        /// <inheritdoc />
+        protected override async Task SerializeToStreamAsync(Stream stream, TransportContext? context)
+        {
+            var block = new byte[64 * 1024];
+            for (var written = 0L; written < _length; written += block.Length)
+            {
+                await stream.WriteAsync(block.AsMemory(0, (int)Math.Min(block.Length, _length - written)));
+            }
+        }
+
+        /// <inheritdoc />
+        protected override bool TryComputeLength(out long length)
+        {
+            length = _length;
+            return true;
+        }
     }
 }

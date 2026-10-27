@@ -193,6 +193,83 @@ public class ApiTokenAuthenticationTests
     }
 
     /// <summary>
+    ///     Test that a token does not change any answer of the sign-in and sign-out endpoints and of the web socket
+    ///     negotiation of the pages: they answer the same with and without a token, and record nothing for the owner.
+    /// </summary>
+    /// <param name="route">The address to post to.</param>
+    [Theory(Timeout = 60000)]
+    [InlineData("/_blazor/negotiate?negotiateVersion=1")]
+    [InlineData("/auth/logout")]
+    [InlineData("/auth/login")]
+    public async Task ApiTokenAuthentication_Request_TokenOnAuthAndBlazorRoutes_IsNotSignedIn(string route)
+    {
+        // Arrange: an application with a token, the audit trail so far, and a client with and one without the token
+        await using var app = await StartAsync();
+        var created = await CreateTokenAsync(app, "ann");
+        var before = (await AuditAsync(app)).Count;
+        using var withToken = ClientFor(app, created.Value);
+        using var withoutToken = ClientFor(app, null);
+
+        // Act: post to the route with and without the token
+        var answerWith = await withToken.PostAsync(route, new FormUrlEncodedContent([]), TestContext.Current.CancellationToken);
+        var answerWithout = await withoutToken.PostAsync(route, new FormUrlEncodedContent([]), TestContext.Current.CancellationToken);
+
+        // Assert: the token changes nothing about the answer
+        Assert.Equal(answerWithout.StatusCode, answerWith.StatusCode);
+        Assert.Equal(answerWithout.Headers.Location?.OriginalString, answerWith.Headers.Location?.OriginalString);
+        Assert.Empty(answerWith.Headers.WwwAuthenticate);
+
+        // Assert: nothing was recorded as done by the owner of the token or by the token
+        var entries = await AuditAsync(app);
+        Assert.Equal(before, entries.Count);
+        Assert.DoesNotContain(entries, e => e.Action.StartsWith("token.use", StringComparison.Ordinal));
+    }
+
+    /// <summary>
+    ///     Test that no outcome of token authentication (accepted, refused as unknown, refused as revoked) writes the
+    ///     token, its secret part, or any text with the token prefix to the application log.
+    /// </summary>
+    [Fact(Timeout = 60000)]
+    public async Task ApiTokenAuthentication_Request_AnyOutcome_NeverLogsTheToken()
+    {
+        // Arrange: an application that keeps its log, one token that is used and one that is revoked
+        var logs = new CapturingLoggerProvider();
+        await using var app = await StartAsync(logs: logs);
+        var used = await CreateTokenAsync(app, "ann");
+        var revoked = await CreateTokenAsync(app, "ann");
+        var unknown = "rcpat_" + new string('B', 43);
+        await app.Services.GetRequiredService<PersonalAccessTokenService>()
+            .RevokeAsync(TestActors.Ann, revoked.Token.Id, TestContext.Current.CancellationToken);
+
+        // Act: present each of them, one is accepted and two are refused
+        var statuses = new List<HttpStatusCode>();
+        foreach (var value in new[] { used.Value, unknown, revoked.Value })
+        {
+            using var client = ClientFor(app, value);
+            statuses.Add((await client.GetAsync("/api/projects", TestContext.Current.CancellationToken)).StatusCode);
+        }
+
+        // Assert: the three outcomes happened
+        Assert.Equal([HttpStatusCode.OK, HttpStatusCode.Unauthorized, HttpStatusCode.Unauthorized], statuses);
+
+        // Assert: the log is not empty (so the check is not vacuous) and nothing in it has a token or the prefix
+        var entries = logs.Entries;
+        Assert.NotEmpty(entries);
+        var forbidden = new[] { used.Value, revoked.Value, unknown }
+            .SelectMany(v => new[] { v, v["rcpat_".Length..] })
+            .Append("rcpat_")
+            .ToList();
+        foreach (var entry in entries)
+        {
+            var texts = new[] { entry.Message }.Concat(entry.Properties.Select(p => $"{p.Key}={p.Value}"));
+            foreach (var text in texts)
+            {
+                Assert.All(forbidden, f => Assert.DoesNotContain(f, text, StringComparison.Ordinal));
+            }
+        }
+    }
+
+    /// <summary>
     ///     Test that too many refused tokens from one address are throttled with 429, even for a good token, and
     ///     that the throttle does not stop people signing in with a password.
     /// </summary>

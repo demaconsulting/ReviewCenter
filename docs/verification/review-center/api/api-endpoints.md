@@ -21,7 +21,10 @@ N/A - standard test environment (a temporary database and key folder are created
 - Every route refuses a request without a token with 401.
 - A review is created from uploaded files or from the changes of a repository, answered with 201, flagged as created
   through the API, and the audit entry names the token.
-- An invalid body is a 400 problem that names the field, and the rules of the services answer with their status.
+- An invalid body is a 400 problem that names the field, a body that is not JSON of the right shape is a 400 problem, a
+  body that is not declared as JSON is a 415 problem, and the rules of the services answer with their status.
+- A file count, file size or total size beyond the review limits is a 400 problem, a body over the limit of the endpoint
+  is a 413, and no review is created in these cases.
 - The attestation of a complete review is a PDF, of a review that is not complete a 409 problem.
 - An unknown address under `/api` is a JSON 404 for every method, and there is no route that signs or changes a slot.
 
@@ -59,6 +62,30 @@ the two changed files, and the audit entry names the token. This scenario is tes
 file that is not Base64, and with no body are sent. Each answer is a 400 problem document that names the field
 (`source`, `files[0].contentBase64`, or `body`), and no review is created. This scenario is tested by
 `ApiEndpoints_CreateReview_BadRequestBody_Answers400NamingTheField`.
+
+**ApiEndpoints_CreateReview_MalformedJson_Answers400Problem**: Bodies that are cut off (`{"id":`), that are not JSON
+(`not json`), and that are JSON of the wrong shape (`{"files": 5}`) are sent. Each answer is a 400 problem document with
+the status in it, with no exception name, namespace, or stack trace in the text, and no review is created. This scenario
+is tested by `ApiEndpoints_CreateReview_MalformedJson_Answers400Problem`.
+
+**ApiEndpoints_CreateReview_NotJsonContentType_Answers415Problem**: A body is sent with the content type `text/plain`
+and with no content type. Each answer is a 415 problem document, and no review is created. This scenario is tested by
+`ApiEndpoints_CreateReview_NotJsonContentType_Answers415Problem`.
+
+**ApiEndpoints_CreateReview_FileLimits_Answer400Problem**: A review with one file more than the limit, a review with one
+file one byte over the size limit of a file, and a review of files that together are one byte over the total limit are
+sent; the sizes are built from `ReviewLimits`. Each answer is a 400 problem document whose detail names the limit, and
+no review is created. This scenario is tested by `ApiEndpoints_CreateReview_FileLimits_Answer400Problem`.
+
+**ApiEndpoints_CreateReview_Endpoint_HasDerivedBodySizeLimit**: The endpoint that creates a review is found in the
+endpoint data source. Its request size limit is the derived limit of `ApiEndpoints`, above the Base64 size of the
+largest upload and below twice the largest upload. This scenario is tested by
+`ApiEndpoints_CreateReview_Endpoint_HasDerivedBodySizeLimit`.
+
+**ApiEndpoints_CreateReview_BodyOverLimit_Answers413**: The application is started on a real Kestrel server (the
+in-memory test server does not enforce the limit), and a body one byte over the limit of the endpoint is announced with
+`Expect: 100-continue`. The answer is 413, and no review is created. This scenario is tested by
+`ApiEndpoints_CreateReview_BodyOverLimit_Answers413`.
 
 **ApiEndpoints_CreateReview_ServiceRules_AnswerTheirStatus**: A duplicate review id, an invalid id, an empty title,
 and an

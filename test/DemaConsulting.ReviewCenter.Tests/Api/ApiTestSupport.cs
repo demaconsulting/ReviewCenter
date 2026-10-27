@@ -20,9 +20,13 @@
 
 using System.Net.Http.Headers;
 using System.Text.Json;
+using DemaConsulting.ReviewCenter.Cli;
 using DemaConsulting.ReviewCenter.Core;
+using DemaConsulting.ReviewCenter.Hosting;
 using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.TestHost;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace DemaConsulting.ReviewCenter.Tests.Api;
@@ -38,12 +42,38 @@ internal static class ApiTestSupport
     /// </summary>
     /// <param name="settings">Extra configuration values; <c>null</c> for none.</param>
     /// <param name="configureServices">Changes to the services; <c>null</c> for none.</param>
+    /// <param name="logs">Receives the log entries of the application; <c>null</c> to capture them in a provider nobody reads.</param>
     /// <returns>The started application; the caller disposes it.</returns>
     public static Task<WebApplication> StartAsync(
         IReadOnlyDictionary<string, string?>? settings = null,
-        Action<IServiceCollection>? configureServices = null)
+        Action<IServiceCollection>? configureServices = null,
+        CapturingLoggerProvider? logs = null)
     {
-        return TestWebApp.StartAsync(new CapturingLoggerProvider(), null, ["serve", "--silent"], settings, configureServices);
+        return TestWebApp.StartAsync(logs ?? new CapturingLoggerProvider(), null, ["serve", "--silent"], settings, configureServices);
+    }
+
+    /// <summary>
+    ///     Starts the real pipeline on a real Kestrel server that listens on a free loopback port, with a new database.
+    ///     The in-memory server does not enforce the request size limit of an endpoint, Kestrel does.
+    /// </summary>
+    /// <returns>The started application and the address it listens on; the caller disposes the application.</returns>
+    public static async Task<(WebApplication App, Uri Address)> StartKestrelAsync()
+    {
+        using var context = Context.Create(["serve", "--silent"]);
+        var app = ServerHost.CreateApplication(context, new ServerHostOptions
+        {
+            MapStaticAssets = false,
+            ConfigureBuilder = builder =>
+            {
+                builder.WebHost.UseUrls("http://127.0.0.1:0");
+                builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
+                {
+                    ["Database:ConnectionString"] = TestDatabase.NewConnectionString()
+                });
+            }
+        });
+        await app.StartAsync(TestContext.Current.CancellationToken);
+        return (app, new Uri(app.Urls.First()));
     }
 
     /// <summary>

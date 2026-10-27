@@ -20,9 +20,11 @@ N/A - standard test environment (a temporary database is created by each test).
 - A request with no token, another kind of credential, or an incomplete bearer header is answered with 401, the bearer
   challenge, and a problem document.
 - An unknown, malformed, revoked, expired, or disabled-owner token is answered with the same 401 body.
-- The session cookie does not authenticate the API, and a token does not sign in a web page.
+- The session cookie does not authenticate the API, and a token does not sign in a web page, the sign-in and sign-out
+  endpoints or the web socket negotiation.
 - Refused tokens are throttled per address with 429, without stopping people signing in with a password.
 - A refused token is audited once for each address and minute and the value is never recorded.
+- No token value, and no text with the token prefix, is written to the application log for any outcome.
 
 #### Test Scenarios
 
@@ -64,3 +66,15 @@ can still sign in with a password. This scenario is tested by
 **ApiTokenAuthentication_Request_RefusedToken_IsAuditedOnceWithoutTheValue**: A revoked token is presented three times.
 The audit trail has one `token.use-failed` entry that names the reason and the display id, and no entry holds the token
 value. This scenario is tested by `ApiTokenAuthentication_Request_RefusedToken_IsAuditedOnceWithoutTheValue`.
+
+**ApiTokenAuthentication_Request_TokenOnAuthAndBlazorRoutes_IsNotSignedIn**: The web socket negotiation of the pages
+(`/_blazor/negotiate`) and the sign-out and sign-in endpoints (`/auth/logout`, `/auth/login`) are posted to once with a
+valid token and once without. The status and the redirect address are the same in both, no challenge is sent, and the
+audit trail has no new entry, so the token changed nothing and did not act as its owner. This scenario is tested by
+`ApiTokenAuthentication_Request_TokenOnAuthAndBlazorRoutes_IsNotSignedIn`.
+
+**ApiTokenAuthentication_Request_AnyOutcome_NeverLogsTheToken**: The application keeps its log in a capturing provider.
+A token is created, then presented while valid (200), a well-formed unknown value is presented, and a revoked token is
+presented (both 401). The log is not empty, and no message or structured property of any entry contains a token value,
+its secret part, or the token prefix. This scenario is tested by
+`ApiTokenAuthentication_Request_AnyOutcome_NeverLogsTheToken`.

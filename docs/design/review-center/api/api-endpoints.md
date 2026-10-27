@@ -34,18 +34,24 @@ step.
   - `GET /api/projects`,
   - `GET /api/projects/{projectId}/reviews` (the project number must be an integer),
   - `GET /api/projects/{projectId}/reviews/{reviewId}`,
-  - `POST /api/projects/{projectId}/reviews`, which accepts a body of up to 30 MiB (the largest upload as Base64 text
-    with the JSON around it) and answers 201 with a `Location` header, and
+  - `POST /api/projects/{projectId}/reviews`, which accepts a JSON body (the content type must be JSON; a request with
+    another content type or none is answered by a second `POST` route of lower priority with a 415 problem) up to a
+    limit that is derived from `ReviewLimits` (the Base64 text of the largest upload, the path and JSON framing of
+    every file at the largest number of files, and 64 KiB for the other fields; the services stay authoritative for the
+    limits themselves), enforced by the server as a 413, and answers 201 with a `Location` header, and
   - `GET /api/projects/{projectId}/reviews/{reviewId}/attestation.pdf`.
 
   A catch-all route for every method under `/api` is outside the group and open, so that an unknown address answers a JSON
-  404 with or without a token and never falls through to the pages. It is excluded from the OpenAPI description. A more
-  specific route wins over it.
+  404 with or without a token and never falls through to the pages. It is excluded from the OpenAPI description and has
+  the lowest priority, so every other route, including the 415 route, wins over it.
 
 **Create a review**: The handler of the `POST` route.
 
 - *Preconditions*: The request is authenticated as a token.
 - *Postconditions*:
+  - The handler reads the body itself instead of letting the framework bind it, so that a body that is not JSON, is cut
+    off, or has the wrong shape (for example `files` as a number) is a 400 problem that names the field `body`, with
+    no text of the parser in it. A body over the size limit is not read and is answered 413 by the server.
   - A request with no body, or with both or neither of `files` and `repository`, is a 400 problem that names the
     field (`body` or `source`). A file whose content is not valid Base64 is a 400 that names the position
     (`files[i].contentBase64`) and never echoes the content.

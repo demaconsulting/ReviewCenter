@@ -18,6 +18,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
+using System.Text.Json;
 using DemaConsulting.ReviewCenter.Core;
 using DemaConsulting.ReviewCenter.Evidence;
 using Microsoft.AspNetCore.Http.HttpResults;
@@ -46,10 +47,15 @@ internal static class ApiEndpoints
     public const string Prefix = "/api";
 
     /// <summary>
-    ///     The largest request body accepted by the endpoint that creates a review: the largest upload
-    ///     (20 MiB) as Base64 text plus the JSON around it.
+    ///     The largest request body accepted by the endpoint that creates a review, derived from the review limits: the
+    ///     Base64 text of the largest upload (four characters for every three bytes, rounded up), a path (worst case
+    ///     six characters per character for <c>\uXXXX</c> escaping) and the JSON framing for every file, and 64 KiB for
+    ///     the identifier, the title and the selection. The services stay authoritative for the limits themselves.
     /// </summary>
-    private const long MaxCreateBodyBytes = 30L * 1024 * 1024;
+    internal const long MaxCreateBodyBytes =
+        (4 * ((ReviewLimits.MaxTotalSizeBytes + 2) / 3))
+        + (ReviewLimits.MaxFileCount * ((ReviewLimits.MaxPathLength * 6L) + 128))
+        + (64 * 1024);
 
     /// <summary>
     ///     The HTTP methods the catch-all route answers with a 404.
@@ -111,14 +117,23 @@ internal static class ApiEndpoints
                 + "of 'files' and 'repository'. The review is recorded as created with an API token. Reviewer slots and "
                 + "signatures cannot be changed with an API token.")
             .WithMetadata(new BodySizeLimit())
+            .Accepts<CreateReviewRequest>(isOptional: true, "application/json")
             .Produces<CreatedReviewDto>(StatusCodes.Status201Created)
             .ProducesValidationProblem()
             .ProducesProblem(StatusCodes.Status401Unauthorized)
             .ProducesProblem(StatusCodes.Status404NotFound)
             .ProducesProblem(StatusCodes.Status409Conflict)
+            .ProducesProblem(StatusCodes.Status415UnsupportedMediaType)
             .ProducesProblem(StatusCodes.Status502BadGateway)
             .ProducesProblem(StatusCodes.Status503ServiceUnavailable)
             .ProducesProblem(StatusCodes.Status504GatewayTimeout);
+
+        // A body that is not declared as JSON does not match the route above, which accepts JSON only; this route
+        // (with a lower priority than that one, and a higher one than the catch-all below) answers it with 415
+        // instead of letting the catch-all answer 404
+        group.MapPost("/projects/{projectId:int}/reviews", () => ApiProblems.UnsupportedMediaType())
+            .WithOrder(1)
+            .ExcludeFromDescription();
 
         group.MapGet("/projects/{projectId:int}/reviews/{reviewId}/attestation.pdf", GetAttestationAsync)
             .WithName("GetAttestation")
@@ -133,6 +148,7 @@ internal static class ApiEndpoints
         // Every other address under /api answers a JSON 404, with or without a token. A more specific route above wins
         // over this catch-all, so it only sees what nothing else handles
         endpoints.MapMethods(Prefix + "/{**rest}", AllMethods, () => ApiProblems.NotFound("The address does not exist."))
+            .WithOrder(2)
             .AllowAnonymous()
             .ExcludeFromDescription();
         return endpoints;
@@ -229,18 +245,19 @@ internal static class ApiEndpoints
     ///     Creates a review from uploaded files or from a repository.
     /// </summary>
     /// <param name="projectId">The project number.</param>
-    /// <param name="request">The request body; <c>null</c> when it is empty.</param>
-    /// <param name="http">The request context; supplies the token actor.</param>
+    /// <param name="http">The request context; supplies the body and the token actor.</param>
     /// <param name="projects">The project service.</param>
     /// <param name="reviews">The review service.</param>
     /// <param name="signing">The signing service.</param>
     /// <param name="threads">The thread service.</param>
     /// <param name="checklists">The checklist service.</param>
     /// <param name="cancellationToken">Cancels the request.</param>
-    /// <returns>201 with the review and its address; a problem document when the request is not valid.</returns>
+    /// <returns>
+    ///     201 with the review and its address; a problem document when the body is not JSON (415), is not JSON of the
+    ///     right shape (400), or is not valid. A body over the size limit of the endpoint is answered 413 by the server.
+    /// </returns>
     private static async Task<IResult> CreateReviewAsync(
         int projectId,
-        CreateReviewRequest? request,
         HttpContext http,
         ProjectService projects,
         ReviewService reviews,
@@ -249,6 +266,24 @@ internal static class ApiEndpoints
         ChecklistService checklists,
         CancellationToken cancellationToken)
     {
+        // The body is read here, not bound by the framework, so that a body that is not JSON of the right shape
+        // answers a problem document like every other refusal. The route only matches a JSON content type
+        CreateReviewRequest? request;
+        try
+        {
+            request = http.Request.ContentLength is 0
+                ? null
+                : await http.Request.ReadFromJsonAsync<CreateReviewRequest>(cancellationToken);
+        }
+        catch (JsonException)
+        {
+            // The text of the parser is not echoed: it names positions and types of the caller's own body only
+            return Results.ValidationProblem(new Dictionary<string, string[]>
+            {
+                ["body"] = ["The request body is not valid JSON for a review."]
+            });
+        }
+
         // Exactly one source: the request itself is checked here; every other rule belongs to the services
         var errors = CheckSource(request);
         if (errors is not null)

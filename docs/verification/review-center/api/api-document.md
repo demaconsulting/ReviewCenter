@@ -6,7 +6,20 @@
 (`TestWebApp`) over a temporary database, fetch `/api/openapi.json` with an HTTP client that sends no token, and parse or
 compare the JSON. The snapshot test compares the document with `docs/api/openapi.json` after the line endings are
 normalized; when the API changes on purpose, the test is run once with the environment variable
-`REVIEWCENTER_UPDATE_OPENAPI` set to `1` to write the new snapshot, which is then reviewed and kept.
+`REVIEWCENTER_UPDATE_OPENAPI` set to `1` to write the new snapshot, which is then reviewed and kept. The command is
+(PowerShell, then bash):
+
+```powershell
+$env:REVIEWCENTER_UPDATE_OPENAPI = "1"
+dotnet test --project test/DemaConsulting.ReviewCenter.Tests `
+  --filter-method "*ApiDocument_Get_MatchesCommittedSnapshot"
+Remove-Item Env:REVIEWCENTER_UPDATE_OPENAPI
+```
+
+```bash
+REVIEWCENTER_UPDATE_OPENAPI=1 dotnet test --project test/DemaConsulting.ReviewCenter.Tests \
+  --filter-method "*ApiDocument_Get_MatchesCommittedSnapshot"
+```
 
 #### Test Environment
 
@@ -34,5 +47,6 @@ two texts are the same, so the snapshot does not depend on the machine, the host
 tested by `ApiDocument_Get_TwoApplications_AreIdentical`.
 
 **ApiDocument_Get_MatchesCommittedSnapshot**: The generated document is compared with `docs/api/openapi.json`. The two
-are the same, so a change of the API that was not documented fails the test. This scenario is tested by
+are the same, so a change of the API that was not documented fails the test. When the files differ, or the snapshot is
+missing, the failure message contains the complete regeneration command above. This scenario is tested by
 `ApiDocument_Get_MatchesCommittedSnapshot`.

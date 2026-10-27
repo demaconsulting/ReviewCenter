@@ -96,6 +96,18 @@ internal static class ApiProblems
     }
 
     /// <summary>
+    ///     Builds the 415 problem document of a request body that is not JSON.
+    /// </summary>
+    /// <returns>A problem result with status 415.</returns>
+    public static IResult UnsupportedMediaType()
+    {
+        return Results.Problem(
+            title: TitleOf(StatusCodes.Status415UnsupportedMediaType),
+            detail: "The request body must be JSON (content type application/json).",
+            statusCode: StatusCodes.Status415UnsupportedMediaType);
+    }
+
+    /// <summary>
     ///     Builds the actor of an API call from the principal of its token.
     /// </summary>
     /// <param name="principal">The authenticated principal. Must not be null.</param>
@@ -127,6 +139,7 @@ internal static class ApiProblems
             StatusCodes.Status403Forbidden => "Forbidden",
             StatusCodes.Status404NotFound => "Not Found",
             StatusCodes.Status409Conflict => "Conflict",
+            StatusCodes.Status415UnsupportedMediaType => "Unsupported Media Type",
             StatusCodes.Status500InternalServerError => "Internal Server Error",
             StatusCodes.Status502BadGateway => "Bad Gateway",
             StatusCodes.Status503ServiceUnavailable => "Service Unavailable",

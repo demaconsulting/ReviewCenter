@@ -188,6 +188,7 @@ internal static class ServerHost
         // an unknown /api address is answered by the API's own JSON 404
         app.MapApi();
         app.MapApiDocument();
+
         // The UI: every page lives under the App root component
         app.MapRazorComponents<App>().AddInteractiveServerRenderMode();
 
