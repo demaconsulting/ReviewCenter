@@ -45,7 +45,8 @@ matching `.sha256` file, and extract it:
 - `reviewcenter-<version>-linux-x64.tar.gz` (Linux)
 
 Keep the extracted files together: the executable serves the web assets that sit beside it, and the native SQLite
-library is a separate file that must stay in the same folder. No release has been published yet; until one is, build from source with the .NET 10 SDK:
+library is a separate file that must stay in the same folder. No release has been published yet; until one is,
+build from source with the .NET 10 SDK:
 
 ```bash
 dotnet build
