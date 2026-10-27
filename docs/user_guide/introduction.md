@@ -26,6 +26,19 @@ This user guide covers:
 - The Puppet development tool
 - Practical examples for various scenarios
 
+## Planned Work
+
+These items are planned but not yet implemented:
+
+- The remaining review features of the ReviewCenter web service: review states beyond Draft
+- External anchoring, export, and retention of the audit trail
+- Password reset, multi-factor sign-in, and external identity providers
+- EF Core database migrations with an explicit `migrate` command, and further database providers (PostgreSQL,
+  SQL Server)
+- PDF/A evidence export of review records
+- Signing attestations with a key in Azure Key Vault (the key stays in the vault), and RFC 3161 time stamps for them
+- AI-assisted review (planned to use an Azure OpenAI Service account)
+
 # Continuous Compliance
 
 ReviewCenter follows the
@@ -289,7 +302,8 @@ Some things to know:
 - The server also limits the sign-in attempts of one client address, whatever the user name. By default an address
   may try one user name 5 times and all user names 20 times in 5 minutes; after that the login page says "Too many
   sign-in attempts. Try again in a few minutes." and refuses even the right password until the time has passed. The
-  message is the same whether or not the user name exists. A successful sign-in gives its attempts back.
+  message is the same whether or not the user name exists. A successful sign-in gives its attempts back, but only to
+  the window that was counted.
 
 ### Account
 
@@ -626,7 +640,8 @@ The checklist is complete when every check of every applicable section is answer
 counts as answered, and its justification records the finding.
 
 The checklist of a review is fixed when the review is created: a later release with a different default checklist
-does not change reviews that already exist. Checklist answers are not linked to comment threads. The checklist
+does not change reviews that already exist, and there is no project-level checklist editor or import yet. Checklist
+answers are not linked to comment threads. The checklist
 page is made for narrow screens too.
 
 ## Review Signatures
@@ -1000,6 +1015,13 @@ These patterns work like the file lists of the ReviewMark tool with a few delibe
 matching is case-sensitive, `?` is a wildcard, `\` is not accepted, and an empty selection is an error instead of
 meaning all files.
 
+### Limitations of Repositories
+
+- A review from a repository has the same limits as an upload, counted over the baseline and head content of the
+  changed files.
+- There is no Linux or Windows secret store for the key ring, no credential helper or SSH key support, and no
+  repository deletion.
+
 ## Self-Validation
 
 Self-validation produces a report demonstrating that ReviewCenter is functioning
@@ -1023,6 +1045,8 @@ The `--result` option is an accepted alias for `--results`.
 
 The results file format is determined by the file extension: `.trx` for TRX (MSTest) format,
 or `.xml` for JUnit format.
+
+When a validation test fails, the tool exits with a non-zero exit code.
 
 ### Heading Depth
 
