@@ -33,7 +33,7 @@ a project checklist, and sign the review with their password. Every action is re
 - 🌗 **Light and Dark Theme** - Follows the system setting, or choose a theme in your account
 - 🤖 **Puppet UI Automation** - A developer tool that lets AI agents drive the web interface and take screenshots
 - 📦 **Self-Contained Executable** - A single executable for Windows (win-x64) and Linux (linux-x64), no runtime needed
-- 🗄️ **SQLite Storage** - All data in one database file that is created on first start
+- 🗄️ **SQLite Storage** - Reviews, users, and the audit trail in one database file created on first start
 - 🧪 **Self-Validation** - Built-in validation tests with TRX and JUnit output
 
 ## Installation
@@ -44,8 +44,8 @@ matching `.sha256` file, and extract it:
 - `reviewcenter-<version>-win-x64.zip` (Windows)
 - `reviewcenter-<version>-linux-x64.tar.gz` (Linux)
 
-Keep the extracted files together: the executable serves the web assets, and the native SQLite library, that sit
-beside it. No release has been published yet; until one is, build from source with the .NET 10 SDK:
+Keep the extracted files together: the executable serves the web assets that sit beside it, and the native SQLite
+library is a separate file that must stay in the same folder. No release has been published yet; until one is, build from source with the .NET 10 SDK:
 
 ```bash
 dotnet build
