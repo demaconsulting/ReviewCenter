@@ -1,8 +1,9 @@
 ---
 # Software Unit Requirements for the HomePage Unit
 #
-# The HomePage unit is the landing page served at the root URL, with a greeting button, a counter, and a link
-# to the projects page.
+# The HomePage unit is the landing page served at the root URL, with the product name and tagline. It is static
+# markup with no interactive behavior. A signed-in user also sees a "Get started" list of links to the pages the
+# user can use; the administration pages are listed only for an administrator.
 
 sections:
   - title: HomePage Unit Requirements
@@ -14,44 +15,34 @@ sections:
         tests:
           - HomePage_Render_Default_ShowsTitle
 
-      - id: ReviewCenter-HomePage-Hello
+      - id: ReviewCenter-HomePage-Anonymous
         title: >-
-          The HomePage unit shall show no greeting until the Hello button is clicked, and shall
-          then show a single greeting, Hello from ReviewCenter!, however often it is clicked.
+          The HomePage unit shall show a visitor who is not signed in the tagline of the product and no link to any
+          other page.
         justification: |
-          The Hello button demonstrates that user actions are handled by the server-side user
-          interface and change what the page shows. Showing the greeting once keeps the page
-          stable under repeated clicks.
+          The home page is open to everyone, but the pages it would lead to need a sign-in. A visitor should learn what
+          the product is and be left to the sign-in link in the header, not be offered links that only lead to a
+          refusal.
         tests:
-          - HomePage_Render_Default_ShowsNoGreeting
-          - HomePage_HelloButton_Clicked_ShowsGreeting
-          - HomePage_HelloButton_ClickedTwice_ShowsSingleGreeting
+          - HomePage_Render_Anonymous_ShowsTaglineAndNoLinks
 
-      - id: ReviewCenter-HomePage-Counter
+      - id: ReviewCenter-HomePage-GetStarted
         title: >-
-          The HomePage unit shall show a count that starts at zero and increases by one each
-          time the counter button is clicked.
+          The HomePage unit shall show a signed-in user a Get started section with a link, and a one-line
+          description, for the projects page.
         justification: |
-          The counter demonstrates that the page keeps per-user state between interactions
-          without reloading, which later review features rely on.
+          A new user needs a clear first step after signing in. The projects page is where every review starts, so
+          the home page points to it directly.
         tests:
-          - HomePage_Render_Default_CounterStartsAtZero
-          - HomePage_CounterButton_ClickedThreeTimes_ShowsCountThree
+          - HomePage_Render_Reviewer_ShowsGetStartedWithProjectsOnly
 
-      - id: ReviewCenter-HomePage-ProjectsLink
-        title: The HomePage unit shall offer a link to the projects page.
-        justification: |
-          The home page is the entry point of the web interface, and the review features start at the projects
-          page, so users need a way to get there.
-        tests:
-          - HomePage_Render_Default_LinksToProjects
-
-      - id: ReviewCenter-HomePage-Interactive
+      - id: ReviewCenter-HomePage-AdminLinks
         title: >-
-          The HomePage unit shall report that it is interactive, through a marker on its root
-          element, once it has rendered on a live connection.
+          The HomePage unit shall add to the Get started section, each with a one-line description, links to the
+          repositories, audit, and users pages only while an enabled administrator is signed in.
         justification: |
-          Users, automated tests, and tooling need a reliable signal that the page now responds
-          to clicks, so that they do not act before the live connection exists.
+          The links must not invite other users to pages they cannot open, and an administrator needs the same
+          first steps for the pages that administration involves.
         tests:
-          - HomePage_AfterRender_Interactive_SetsMarker
+          - HomePage_Render_Admin_ShowsGetStartedWithAdministrationLinks
+          - HomePage_Render_Reviewer_ShowsGetStartedWithProjectsOnly

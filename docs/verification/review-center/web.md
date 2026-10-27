@@ -10,8 +10,8 @@ the Core services and the Storage database exactly as they do in production. Tes
 HTML. Behavior that needs a live browser connection (typing, selecting files, submitting forms, and the switch of
 the `data-interactive` marker from `false` to `true`) is outside what plain HTTP requests can exercise. It is
 verified at unit level by the component tests of the page units (see the children of the requirements in
-`web.yaml`), not by these subsystem tests; the Puppet end-to-end test drives a real browser against a real server,
-but it only relies on the marker (its navigation waits for it) and does not assert it.
+`web.yaml`), not by these subsystem tests; the Puppet end-to-end test drives a real browser against a real server
+over the live connection (sign in, open Projects from the header, create a project, switch the theme).
 
 ### Test Environment
 
@@ -20,10 +20,13 @@ N/A - standard test environment (temporary SQLite databases are created by the t
 ### Acceptance Criteria
 
 - All integration tests pass with zero failures.
-- The home route answers HTTP status 200 with a document titled "ReviewCenter" that contains
-  every control the user interface tests drive.
-- The server-rendered response is marked as not yet interactive, so that drivers wait for the
-  live connection. (The marker's switch to interactive is verified by the page units' component tests.)
+- The home route answers HTTP status 200 with a document titled "ReviewCenter" that contains the product name and the
+  tagline.
+- The Help index, the help topic pages, and the About page are served to a signed-in user over HTTP (their content is
+  verified by the component tests of `AboutPage` and `HelpPage`, and their service to an anonymous visitor by the
+  system test `ReviewCenter_ServeVerb_Started_ServesHelpAndAboutPagesWithoutSignIn`).
+- The projects route, which is the interactive page that the subsystem tests use for the marker, is served with the
+  `data-interactive` marker set to `false`.
 - A project and a review created through the services are presented by the pages with the correct fingerprint.
   (The creation forms and uploads are verified by the page units' component tests.)
 - Threads created through the Core service are presented by the review page: the next-step line, the thread index,
@@ -62,15 +65,15 @@ N/A - standard test environment (temporary SQLite databases are created by the t
 
 ### Test Scenarios
 
-**WebSubsystem_HomeRoute_Requested_RendersTitleAndControls**: The pipeline is started in memory
-and the home route is requested; the response is 200 and contains the document title, the Hello
-button, the counter button, and the counter value. This scenario is tested by
-`WebSubsystem_HomeRoute_Requested_RendersTitleAndControls`.
+**WebSubsystem_HomeRoute_Requested_RendersTitleAndTagline**: The pipeline is started in memory
+and the home route is requested; the response is 200 and contains the document title and the tagline. This
+scenario is tested by
+`WebSubsystem_HomeRoute_Requested_RendersTitleAndTagline`.
 
-**WebSubsystem_HomeRoute_InitialResponse_IsNotYetInteractive**: The home route is requested
-over plain HTTP, where no live connection exists; the `data-interactive` marker in the response
+**WebSubsystem_ProjectsRoute_InitialResponse_IsNotYetInteractive**: The projects route is requested
+over plain HTTP by a signed-in user, where no live connection exists; the `data-interactive` marker in the response
 is `false`. This scenario is tested by
-`WebSubsystem_HomeRoute_InitialResponse_IsNotYetInteractive`.
+`WebSubsystem_ProjectsRoute_InitialResponse_IsNotYetInteractive`.
 
 **WebSubsystem_CreatedProjectAndReview_ArePresentedByThePages**: The pipeline is started in memory on a temporary
 database, a project with a review of three files (one of them binary) is created through the Core services, and
@@ -124,7 +127,9 @@ and the review page shows "Signature out of date". This scenario is tested by
 `WebSubsystem_SignedReview_ApprovalIsPresentedAndGoesOutOfDateWhenRecordChanges`.
 
 **WebSubsystem_AllPages_EveryInteractiveElementHasTestId**: A user with the Admin role is signed in, and every route
-(home, login, account, users, repositories, a project, the plan page of a project that has a registered repository, the
+(home, login, about, the help index, a help topic, an unknown help topic, account, users, the new user page,
+repositories, the new repository page, projects, the new project page, a project, the new review page of a project,
+the plan page of a project that has a registered repository, the
 plan page and the project page of a missing project, a review, a missing review, a checklist) is
 requested over the in-memory server; every link, button, visible input, select, and text area in each response has a
 `data-testid` in kebab-case. This scenario is tested by
@@ -133,7 +138,7 @@ requested over the in-memory server; every link, button, visible input, select, 
 **Repositories page**: The page of the repository registry is verified by its unit tests, which render it with the
 component test host. It lists repositories with the token state only and no delete control, which is tested by
 `RepositoriesPage_Render_Repositories_ShowsTokenStateOnlyAndNoDelete`, and it stores a token without ever showing it,
-which is tested by `RepositoriesPage_CreateForm_WithToken_StoresItWriteOnlyAndClearsFields`. A reviewer who requests the
+which is tested by `NewRepositoryPage_CreateForm_WithToken_StoresItWriteOnlyAndClearsFields`. A reviewer who requests the
 route is refused and an administrator receives the page, which is tested by
 `SignIn_RepositoriesPage_ReviewerAndAdmin_OnlyAdminIsAllowed` in the `Identity` subsystem tests.
 

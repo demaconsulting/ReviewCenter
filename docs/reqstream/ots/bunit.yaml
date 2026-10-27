@@ -19,12 +19,10 @@ sections:
               functions correctly.
             tags: [ots]
             tests:
-              - HomePage_HelloButton_Clicked_ShowsGreeting
-              - HomePage_CounterButton_ClickedThreeTimes_ShowsCountThree
               - Routes_Render_RootUrl_RendersHomePage
-              - ProjectsPage_CreateForm_ValidInput_AddsProjectToList
-              - ProjectPage_FileInput_FilesSelected_ListsNamesAndSizes
-              - ProjectPage_CreateForm_ValidInput_CreatesReviewAndNavigatesToIt
+              - NewProjectPage_CreateForm_ValidInput_CreatesProjectAndOpensIt
+              - NewReviewPage_FileInput_FilesSelected_ListsNamesAndSizes
+              - NewReviewPage_CreateForm_ValidInput_CreatesReviewAndNavigatesToIt
           - id: ReviewCenter-OTS-bUnit-TestHost
             title: The ASP.NET Core test host shall serve the application in memory for request tests.
             justification: |
@@ -35,5 +33,5 @@ sections:
             tags: [ots]
             tests:
               - ServerHost_CreateApplication_HealthRoute_Returns200Healthy
-              - WebSubsystem_HomeRoute_Requested_RendersTitleAndControls
+              - WebSubsystem_HomeRoute_Requested_RendersTitleAndTagline
               - WebSubsystem_CreatedProjectAndReview_ArePresentedByThePages

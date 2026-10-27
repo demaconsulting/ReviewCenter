@@ -175,11 +175,16 @@ the tool is started with `serve --urls` naming that port; the tool exits with a 
 its output contains "Failed to start the server". This scenario is tested by
 `ReviewCenter_ServeVerb_PortInUse_ReturnsError`.
 
-**ReviewCenter_ServeVerb_Started_HomePageContainsTitleAndControls**: The tool is started with
+**ReviewCenter_ServeVerb_Started_HomePageContainsTitleAndTagline**: The tool is started with
 the `serve` verb; a request to `/` returns an HTML document titled "ReviewCenter" that contains
-the Hello button and the counter button, and the Blazor client script is served at
+the tagline, and the Blazor client script is served at
 `/_framework/blazor.web.js`. This scenario is tested by
-`ReviewCenter_ServeVerb_Started_HomePageContainsTitleAndControls`.
+`ReviewCenter_ServeVerb_Started_HomePageContainsTitleAndTagline`.
+
+**ReviewCenter_ServeVerb_Started_ServesHelpAndAboutPagesWithoutSignIn**: The tool is started with the `serve` verb as
+a real process; requests without signing in to `/help`, `/help/getting-started`, and `/about` each return the page
+(the Help index, a help topic page, and the About page, each recognized by its test id). This scenario is tested by
+`ReviewCenter_ServeVerb_Started_ServesHelpAndAboutPagesWithoutSignIn`.
 
 **ReviewCenter_ServeVerb_Started_RedirectsAnonymousProjectsRequestToLoginAndCreatesDatabase**: The tool is started
 with the `serve` verb as a real process; the test process points its `Database` settings at a temporary file that
@@ -284,7 +289,7 @@ and the frozen head and baseline content; a further commit is then made in the r
 content, and its record digest are unchanged, while a review created afterwards sees the new commit. This scenario is
 tested by `ReviewService_CreateFromRepositoryAsync_RealGit_FreezesChangesAgainstLaterCommits`. A selection that
 matches no changed file is refused with the nothing-to-review message and nothing is created, which is tested by
-`ProjectPage_CreateForm_EmptySelection_ShowsNothingToReviewAndCreatesNothing`. The digest that binds to the source,
+`NewReviewPage_CreateForm_EmptySelection_ShowsNothingToReviewAndCreatesNothing`. The digest that binds to the source,
 the selection, and each change is tested by `RecordDigest_Compute_SourceChange_ChangesDigest`.
 
 **Persistence across restart**: A project is stored, the server is stopped and started again on the same

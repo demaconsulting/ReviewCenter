@@ -2,8 +2,9 @@
 
 #### Verification Approach
 
-`RepositoriesPage` is verified with component tests defined in `RepositoriesPageTests.cs`, which use the bUnit test
-context to render the real component over a real `RepositoryService` with the in-memory fake repository store
+`RepositoriesPage` and `NewRepositoryPage` are verified with component tests defined in `RepositoriesPageTests.cs`, which
+use the bUnit test context to render the real components over a real `RepositoryService` with the in-memory fake
+repository store
 (`FakeRepositoryStore`), a fake token protector (`FakeCredentialProtector`), and a real `UserService` with an in-memory
 fake user store. The signed-in user of the tests is set by the test authentication state of the shared helper
 `PageTestBase`; the tests sign in as an administrator stored in the fake user store, because the page re-checks the stored
@@ -19,10 +20,11 @@ N/A - standard test environment.
 #### Acceptance Criteria
 
 - All component tests pass with zero failures.
-- The list shows the name, location, user name, token state, and enabled state of each repository; it never shows a token
-  and has no delete control.
-- The add form registers a repository, stores the token only through the service, empties the token field, and the token
-  is never in the markup; an invalid location is shown as an error, keeps the typed name, and creates nothing.
+- The list shows the name, location, and enabled state of each repository, and the user name and token state where they
+  are set; it never shows a token and has no delete control, and it has no form but a button that leads to the add page.
+- The add page holds the form and a Cancel link back to the list. The form registers a repository, stores the token only
+  through the service, empties the token field, returns to the list, and the token is never in the markup; an invalid
+  location is shown as an error, keeps the typed name, and creates nothing.
 - Editing keeps, replaces, or clears the token as chosen, and cancelling closes the form and changes nothing.
 - A repository can be disabled and enabled again.
 - An administrator who was demoted after the page was opened is refused with an error when acting, and the page of such
@@ -31,17 +33,19 @@ N/A - standard test environment.
 
 #### Test Scenarios
 
-**RepositoriesPage_Render_Repositories_ShowsTokenStateOnlyAndNoDelete**: Repositories are listed with location, user name,
-and the token state; neither a token nor a delete control is shown. This scenario is tested by
+**RepositoriesPage_Render_Repositories_ShowsTokenStateOnlyAndNoDelete**: A private and a public repository are listed
+with location; the user name and token badges appear only for the private one; neither a token nor a delete control is
+shown; the add button links to the add page and the form is not on the list page. This scenario is tested by
 `RepositoriesPage_Render_Repositories_ShowsTokenStateOnlyAndNoDelete`.
 
-**RepositoriesPage_CreateForm_WithToken_StoresItWriteOnlyAndClearsFields**: The add form registers the repository, the
-token is stored through the service, the token field is emptied, and the token is not in the markup. This scenario is
-tested by `RepositoriesPage_CreateForm_WithToken_StoresItWriteOnlyAndClearsFields`.
+**NewRepositoryPage_CreateForm_WithToken_StoresItWriteOnlyAndClearsFields**: The add page registers the repository, the
+token is stored through the service, the token field is emptied, the token is not in the markup, the browser returns to
+the list, and the Cancel link leads to the list. This scenario is tested by
+`NewRepositoryPage_CreateForm_WithToken_StoresItWriteOnlyAndClearsFields`.
 
-**RepositoriesPage_CreateForm_InvalidLocation_ShowsErrorAndCreatesNothing**: An invalid location is shown as an error, the
-typed name is kept, and nothing is created. This scenario is tested by
-`RepositoriesPage_CreateForm_InvalidLocation_ShowsErrorAndCreatesNothing`.
+**NewRepositoryPage_CreateForm_InvalidLocation_ShowsErrorAndCreatesNothing**: An invalid location is shown as an error,
+the typed name is kept, and nothing is created. This scenario is tested by
+`NewRepositoryPage_CreateForm_InvalidLocation_ShowsErrorAndCreatesNothing`.
 
 **RepositoriesPage_Edit_KeepToken_ChangesFieldsAndKeepsToken**: Editing with the default action changes the fields and
 keeps the stored token. This scenario is tested by `RepositoriesPage_Edit_KeepToken_ChangesFieldsAndKeepsToken`.

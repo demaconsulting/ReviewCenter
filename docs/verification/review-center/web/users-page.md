@@ -2,9 +2,10 @@
 
 #### Verification Approach
 
-`UsersPage` is verified with component tests defined in `UsersPageTests.cs`, which use the bUnit test context to
-render the real component over a real `UserService` with an in-memory fake store and a trivial password hasher, and
-drive its forms and buttons. The signed-in user of the tests is set by the test authentication state of the shared
+`UsersPage` and `NewUserPage` are verified with component tests defined in `UsersPageTests.cs`, which use the bUnit test
+context to render the real components over a real `UserService` with an in-memory fake store and a trivial password
+hasher, and drive its forms and buttons. The signed-in user of the tests is set by the test authentication state of
+the shared
 helper `PageTestBase`; the action tests sign in as an administrator stored in the fake store, because every action
 re-checks the stored user. The restriction of the page to administrators is verified by the `SignIn` unit. Tests
 locate elements by their `data-testid` attributes. The real database is covered by the `Storage` subsystem.
@@ -17,9 +18,11 @@ N/A - standard test environment.
 
 - All component tests pass with zero failures.
 - Every user is listed with the user name, display name, role, and enabled state, and with the controls to disable or
-  enable, change the role, and set a password; the creation form is present; no password or hash is shown.
-- A valid new user is created with the chosen role and the form is emptied; a rule violation is shown as an error,
-  creates nothing, keeps the typed user name, and drops the typed password.
+  enable, change the role, and set a password; the list page has a button that leads to the page of the creation form
+  but not the form itself; no password or hash is shown.
+- On the creation page, a valid new user is created with the chosen role, the password field is emptied, and the
+  browser returns to the list; the page has a Cancel link to the list; a rule violation is shown as an error, creates
+  nothing, keeps the typed user name, and drops the typed password.
 - A user is disabled and enabled again, and the chosen role is stored.
 - A new password set for a user works, the old one does not, and the field is emptied.
 - Disabling or demoting the last enabled administrator is refused with an error.
@@ -32,19 +35,19 @@ N/A - standard test environment.
 #### Test Scenarios
 
 **UsersPage_Render_ExistingUsers_ListsThemWithControls**: An administrator and a reviewer exist; the page lists their
-user names, display names, roles, and enabled states with the row controls and the create button, and the markup
-contains neither the password nor the hash. This scenario is tested by
-`UsersPage_Render_ExistingUsers_ListsThemWithControls`.
+user names, display names, roles, and enabled states with the row controls and the button that leads to the creation
+page, the creation form is not on the page, and the markup contains neither the password nor the hash. This scenario is
+tested by `UsersPage_Render_ExistingUsers_ListsThemWithControls`.
 
-**UsersPage_CreateForm_ValidInput_CreatesUserAndClearsForm**: The creation form is filled in with a user name,
-display name, the Admin role, and a password and submitted; the user is stored with the role and listed, there is
-no error, and the user name and password fields are empty. This scenario is tested by
-`UsersPage_CreateForm_ValidInput_CreatesUserAndClearsForm`.
+**NewUserPage_CreateForm_ValidInput_CreatesUserAndClearsForm**: The creation page is filled in with a user name,
+display name, the Admin role, and a password and submitted; the user is stored with the role, there is no error, the
+password field is empty, the browser returns to the list, and the Cancel link leads to the list. This scenario is
+tested by `NewUserPage_CreateForm_ValidInput_CreatesUserAndClearsForm`.
 
-**UsersPage_CreateForm_TooShortPassword_ShowsErrorAndCreatesNothing**: The creation form is submitted with a too
+**NewUserPage_CreateForm_TooShortPassword_ShowsErrorAndCreatesNothing**: The creation page is submitted with a too
 short password; an error that mentions the characters is shown, no user is stored, the user name stays in its field,
 and the password field is empty. This scenario is tested by
-`UsersPage_CreateForm_TooShortPassword_ShowsErrorAndCreatesNothing`.
+`NewUserPage_CreateForm_TooShortPassword_ShowsErrorAndCreatesNothing`.
 
 **UsersPage_ToggleEnabled_User_DisablesAndEnablesAgain**: The toggle button of a reviewer is used twice; the user is
 stored as disabled and shown as "Disabled", and then stored as enabled and shown as "Enabled". This scenario is

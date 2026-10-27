@@ -1,9 +1,10 @@
 ---
 # Software Unit Requirements for the App Unit
 #
-# The App unit is the HTML shell (App.razor), the router (Routes.razor), the header layout (MainLayout.razor), and the
-# SessionGate component that selects the page for a requested URL and keeps an open protected page from showing
-# data after the sign-in state of its user has ended.
+# The App unit is the HTML shell (App.razor), the router (Routes.razor), the page frame (MainLayout.razor) with the
+# menu bar header and the footer, and the SessionGate component. It selects the page for a requested URL, puts the
+# same header and footer around every page, applies the stored appearance before the first paint, and keeps an open
+# protected page from showing data after the sign-in state of its user has ended.
 
 sections:
   - title: App Unit Requirements
@@ -32,14 +33,77 @@ sections:
 
       - id: ReviewCenter-App-Header
         title: >-
-          The App unit shall show in the header of every page the display name of the signed-in user, a link
-          to the account page, and a logout button, or a sign-in link when nobody is signed in.
+          The App unit shall show in a header on every page the display name of the signed-in user, a link to the
+          account page, and a logout button, or a sign-in link when nobody is signed in.
         justification: |
-          Users need to see who they are signed in as, and to sign in or out from wherever they are, without
-          searching for a page.
+          Users need to see who they are signed in as, and to sign in or out from wherever they are, without searching
+          for a page.
         tests:
           - MainLayout_Render_SignedInUser_ShowsNameAccountAndLogout
           - MainLayout_Render_NobodySignedIn_ShowsSignInLink
+
+      - id: ReviewCenter-App-HomeLink
+        title: >-
+          The App unit shall show in the header of every page exactly one link to the home page, labeled with the
+          product name.
+        justification: |
+          Users need one familiar way back to the start from any page. Because the header always provides it, the
+          pages do not repeat it, and a second link to the same place would only confuse.
+        tests:
+          - MainLayout_Render_NobodySignedIn_ShowsFooterWithVersionAndAboutLink
+
+      - id: ReviewCenter-App-Navigation
+        title: >-
+          The App unit shall show in the header a link to the projects page while a user is signed in, and no
+          such link while nobody is.
+        justification: |
+          Users need to reach the review features from wherever they are, and a link to a page that needs a sign-in
+          must not be offered to a visitor who is not signed in.
+        tests:
+          - MainLayout_Render_SignedInUser_ShowsNameAccountAndLogout
+          - MainLayout_Render_NobodySignedIn_ShowsSignInLink
+
+      - id: ReviewCenter-App-HelpLink
+        title: >-
+          The App unit shall show in the header of every page, to a visitor who is signed in or not, a link to the
+          help, placed before the sign-in link when nobody is signed in.
+        justification: |
+          Help is most needed by a new user who may not have signed in yet, so it is offered to everyone and stays in
+          the same place on every page.
+        tests:
+          - MainLayout_Render_NobodySignedIn_ShowsHelpLinkBeforeSignIn
+
+      - id: ReviewCenter-App-Footer
+        title: >-
+          The App unit shall show in a footer on every page the product name, its version, the copyright
+          holder, and a link to the About page.
+        justification: |
+          Users and auditors need to see which version of the product they are using wherever they are, and
+          to find the full version and the project page from there. The footer shows the version number and the
+          start of the commit identifier, enough to tell builds apart.
+        tests:
+          - MainLayout_Render_NobodySignedIn_ShowsFooterWithVersionAndAboutLink
+
+      - id: ReviewCenter-App-Theme
+        title: >-
+          The App unit shall apply the light, dark, or system appearance stored in the browser before the first
+          paint of every page.
+        justification: |
+          A page that first appears in the wrong appearance and then changes flashes at the user, which is
+          unpleasant and, for a reader who chose the dark appearance, glaring. The choice is applied before the
+          style sheet is used so that it never shows.
+        tests:
+          - App_Render_ServedAtRoot_AppliesStoredThemeBeforeStyleSheet
+
+      - id: ReviewCenter-App-FormRoutes
+        title: >-
+          The App unit shall show the new-review form, and not a review, for the address of the new-review form of a
+          project.
+        justification: |
+          The address of the form lies in the same place as the addresses of the reviews of a project. If it were read
+          as the address of a review called "new", a user who asked for the form would be shown a missing review.
+        tests:
+          - Routes_Render_NewReviewRoute_ShowsFormNotReview
 
       - id: ReviewCenter-App-RouteAuthorization
         title: >-
@@ -84,6 +148,15 @@ sections:
       - id: ReviewCenter-App-RepositoriesLink
         title: >-
           The App unit shall show a link to the repositories page in the header only while an enabled administrator is
+          signed in.
+        justification: |
+          The link must not invite other users to a page they cannot open.
+        tests:
+          - MainLayout_Render_SignedInUser_ShowsNameAccountAndLogout
+
+      - id: ReviewCenter-App-UsersLink
+        title: >-
+          The App unit shall show a link to the users page in the header only while an enabled administrator is
           signed in.
         justification: |
           The link must not invite other users to a page they cannot open.

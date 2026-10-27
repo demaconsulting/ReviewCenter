@@ -19,7 +19,7 @@ Chromium installed with the Playwright installation script; CI installs it and f
 
 ### Test Scenarios
 
-**PuppetEndToEnd_StartDriveStop_HelloAndCounter_WorksAgainstRealServer**: See the system verification. The start,
-the commands, and the stop of that scenario exercise the daemon. Tested by
-`windows@PuppetEndToEnd_StartDriveStop_HelloAndCounter_WorksAgainstRealServer` and
-`ubuntu@PuppetEndToEnd_StartDriveStop_HelloAndCounter_WorksAgainstRealServer`.
+**PuppetEndToEnd_StartDriveStop_SignInProjectAndTheme_WorksAgainstRealServer**: See the system verification. The
+start, the commands, and the stop of that scenario exercise the daemon. Tested by
+`windows@PuppetEndToEnd_StartDriveStop_SignInProjectAndTheme_WorksAgainstRealServer` and
+`ubuntu@PuppetEndToEnd_StartDriveStop_SignInProjectAndTheme_WorksAgainstRealServer`.

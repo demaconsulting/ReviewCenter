@@ -19,19 +19,22 @@ sections:
             tests:
               - ServerHost_CreateApplication_HealthRoute_Returns200Healthy
               - ReviewCenter_ServeVerb_Started_HealthEndpointReturnsHealthy
-              - ReviewCenter_ServeVerb_Started_HomePageContainsTitleAndControls
+              - ReviewCenter_ServeVerb_Started_HomePageContainsTitleAndTagline
           - id: ReviewCenter-OTS-AspNetCore-Components
             title: ASP.NET Core shall render Razor components and handle their interactive events.
             justification: |
               The ReviewCenter user interface is built from Razor components rendered by Blazor Server.
-              The service depends on the framework to render the routed page to HTML and to handle user
-              events such as button clicks. Passing tests confirm components render and respond
-              correctly.
+              The service depends on the framework to render the routed page to HTML, to open the live
+              connection of a page, and to handle user events such as button clicks and form submissions over it.
+              Passing tests confirm components render and respond correctly, including in a real browser.
             tags: [ots]
             tests:
-              - ReviewCenter_ServeVerb_Started_HomePageContainsTitleAndControls
-              - WebSubsystem_HomeRoute_Requested_RendersTitleAndControls
-              - HomePage_HelloButton_Clicked_ShowsGreeting
+              - ReviewCenter_ServeVerb_Started_HomePageContainsTitleAndTagline
+              - WebSubsystem_HomeRoute_Requested_RendersTitleAndTagline
+              - WebSubsystem_ProjectsRoute_InitialResponse_IsNotYetInteractive
+              - NewProjectPage_CreateForm_ValidInput_CreatesProjectAndOpensIt
+              - windows@PuppetEndToEnd_StartDriveStop_SignInProjectAndTheme_WorksAgainstRealServer
+              - ubuntu@PuppetEndToEnd_StartDriveStop_SignInProjectAndTheme_WorksAgainstRealServer
           - id: ReviewCenter-OTS-AspNetCore-Authentication
             title: >-
               ASP.NET Core shall provide cookie sign-in and sign-out with a redirect for requests without a signed-in

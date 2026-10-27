@@ -635,8 +635,10 @@ jobs:
 
           curl --silent --fail --output home.html "${URL}/" \
             || { echo "✗ Home page request failed"; cat serve.log; exit 1; }
-          grep -q "hello-button" home.html \
-            || { echo "✗ Home page does not contain the hello button"; cat serve.log; exit 1; }
+          grep -q 'data-testid="home-link"' home.html \
+            || { echo "✗ Home page does not contain the ReviewCenter brand link"; cat serve.log; exit 1; }
+          grep -q "Web-based code review for regulated projects." home.html \
+            || { echo "✗ Home page does not contain the tagline"; cat serve.log; exit 1; }
           echo "✓ Home page served"
 
           STATUS=$(curl --silent --output /dev/null --write-out '%{http_code}' "${URL}/_framework/blazor.web.js")

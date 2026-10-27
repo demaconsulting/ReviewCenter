@@ -18,22 +18,6 @@ scenarios constitutes evidence that both requirements are satisfied.
 
 ### Test Scenarios
 
-#### HomePage_HelloButton_Clicked_ShowsGreeting
-
-**Scenario**: bUnit renders the home page component and clicks the hello button.
-
-**Expected**: The component re-renders and the greeting appears in the markup.
-
-**Requirement coverage**: `ReviewCenter-OTS-bUnit-Component`.
-
-#### HomePage_CounterButton_ClickedThreeTimes_ShowsCountThree
-
-**Scenario**: bUnit renders the home page component and clicks the counter button three times.
-
-**Expected**: The rendered counter value is 3.
-
-**Requirement coverage**: `ReviewCenter-OTS-bUnit-Component`.
-
 #### Routes_Render_RootUrl_RendersHomePage
 
 **Scenario**: bUnit renders the router component after navigating to the root URL.
@@ -42,25 +26,27 @@ scenarios constitutes evidence that both requirements are satisfied.
 
 **Requirement coverage**: `ReviewCenter-OTS-bUnit-Component`.
 
-#### ProjectsPage_CreateForm_ValidInput_AddsProjectToList
+#### NewProjectPage_CreateForm_ValidInput_CreatesProjectAndOpensIt
 
-**Scenario**: bUnit renders the projects page, enters a name in the input, and submits the form.
+**Scenario**: bUnit renders the new project page, enters a name and a description in the inputs, and submits the
+form.
 
-**Expected**: The form submission is processed and the new project appears in the rendered list.
+**Expected**: The form submission is processed, the project is created, and the navigation manager of the test
+context is sent to the project page.
 
 **Requirement coverage**: `ReviewCenter-OTS-bUnit-Component`.
 
-#### ProjectPage_FileInput_FilesSelected_ListsNamesAndSizes
+#### NewReviewPage_FileInput_FilesSelected_ListsNamesAndSizes
 
-**Scenario**: bUnit renders the project page and selects two files in the file input.
+**Scenario**: bUnit renders the new review page and selects two files in the file input.
 
 **Expected**: The file selection is processed and the rendered markup lists the names and sizes of the files.
 
 **Requirement coverage**: `ReviewCenter-OTS-bUnit-Component`.
 
-#### ProjectPage_CreateForm_ValidInput_CreatesReviewAndNavigatesToIt
+#### NewReviewPage_CreateForm_ValidInput_CreatesReviewAndNavigatesToIt
 
-**Scenario**: bUnit renders the project page, selects files, fills in the form, and submits it.
+**Scenario**: bUnit renders the new review page, selects files, fills in the form, and submits it.
 
 **Expected**: The submission is processed and the navigation manager of the test context is sent to the review
 page.
@@ -75,11 +61,11 @@ page.
 
 **Requirement coverage**: `ReviewCenter-OTS-bUnit-TestHost`.
 
-#### WebSubsystem_HomeRoute_Requested_RendersTitleAndControls
+#### WebSubsystem_HomeRoute_Requested_RendersTitleAndTagline
 
 **Scenario**: The test host serves the application in memory and the test client requests `/`.
 
-**Expected**: The response contains the page title and the hello and counter controls.
+**Expected**: The response contains the page title and the tagline.
 
 **Requirement coverage**: `ReviewCenter-OTS-bUnit-TestHost`.
 

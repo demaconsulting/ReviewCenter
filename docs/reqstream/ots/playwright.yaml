@@ -20,5 +20,5 @@ sections:
               The Puppet developer tool depends on Playwright to show a coding agent the web interface.
             tags: [ots]
             tests:
-              - windows@PuppetEndToEnd_StartDriveStop_HelloAndCounter_WorksAgainstRealServer
-              - ubuntu@PuppetEndToEnd_StartDriveStop_HelloAndCounter_WorksAgainstRealServer
+              - windows@PuppetEndToEnd_StartDriveStop_SignInProjectAndTheme_WorksAgainstRealServer
+              - ubuntu@PuppetEndToEnd_StartDriveStop_SignInProjectAndTheme_WorksAgainstRealServer

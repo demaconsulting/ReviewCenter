@@ -1,7 +1,8 @@
 ---
 # Software Unit Requirements for the UsersPage Unit
 #
-# The UsersPage unit is the Users.razor page at /users where an administrator manages the users.
+# The UsersPage unit is the Users.razor page at /users where an administrator manages the users. The unit includes
+# the NewUserPage.razor page at /users/new, which holds the form that creates a user.
 
 sections:
   - title: UsersPage Unit Requirements
@@ -16,16 +17,28 @@ sections:
         tests:
           - UsersPage_Render_ExistingUsers_ListsThemWithControls
 
+      - id: ReviewCenter-UsersPage-NewPage
+        title: >-
+          The UsersPage unit shall offer a button that leads to a separate page that holds only the form that creates
+          a user, and that page shall offer a way back to the list without creating anything and return to the list
+          after a user was created.
+        justification: |
+          A creation form among the rows of a list pushes the users down and keeps a typed password on a page that
+          is meant for reading. A page of its own keeps the list tidy and makes cancelling obvious.
+        tests:
+          - UsersPage_Render_ExistingUsers_ListsThemWithControls
+          - NewUserPage_CreateForm_ValidInput_CreatesUserAndClearsForm
+
       - id: ReviewCenter-UsersPage-Create
         title: >-
           The UsersPage unit shall create a user from a form with a user name, a display name, a role, and a
-          password, clearing the form on success, and shall show a violated rule as a message, creating nothing.
+          password, clearing the password afterwards, and shall show a violated rule as a message, creating nothing.
         justification: |
           After the first administrator exists, users are added in the web interface rather than on the command
-          line. The form is cleared so that no password stays on the page.
+          line. The password is cleared so that it does not stay on the page.
         tests:
-          - UsersPage_CreateForm_ValidInput_CreatesUserAndClearsForm
-          - UsersPage_CreateForm_TooShortPassword_ShowsErrorAndCreatesNothing
+          - NewUserPage_CreateForm_ValidInput_CreatesUserAndClearsForm
+          - NewUserPage_CreateForm_TooShortPassword_ShowsErrorAndCreatesNothing
 
       - id: ReviewCenter-UsersPage-Update
         title: >-

@@ -32,6 +32,8 @@ includes:
   - docs/reqstream/review-center/web.yaml
   - docs/reqstream/review-center/web/app.yaml
   - docs/reqstream/review-center/web/home-page.yaml
+  - docs/reqstream/review-center/web/about-page.yaml
+  - docs/reqstream/review-center/web/help-page.yaml
   - docs/reqstream/review-center/web/projects-page.yaml
   - docs/reqstream/review-center/web/project-page.yaml
   - docs/reqstream/review-center/web/plan-page.yaml

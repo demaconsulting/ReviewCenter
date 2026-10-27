@@ -5,27 +5,30 @@
 #### Purpose
 
 `ReviewPage` is the page at `/projects/{id}/reviews/{reviewId}`, which also answers the file, line and thread addresses
-described under Deep links below. Its responsibility is to show one review, with the
-reader's work first. From the top it shows the title with an approval badge (Approved or In review), a one-sentence
-next step, a checklist card (progress summary
-such as "37 of 58 checks answered" and a link to the checklist page; absent when the review has no checklist), a
-Reviewers card (the reviewer slots with their signature status, the form that adds a slot, and, for a reviewer, the
-form that signs), the
-files with the size and number
-of open threads of each, the thread index of all files, the selected file as a diff against its baseline (or as numbered
-lines), the comment
-threads on that file, which a reader can answer, resolve, and reopen (a resolved thread is a one-line header
-until expanded), and the form that starts a new thread. Last, in a native `<details>` element that is collapsed by
-default, it shows the review's
-identifier, state, content fingerprint, record digest, and the hash of each file; for a review from a repository it
-also shows the repository name, the baseline and head commits, and the selection; for a review that was planned from
-a review-set it also shows the identifier of that set (`review-set-id`, the "Review set" row). It is a Razor component
-split into presentation
-(`ReviewPage.razor`) and behavior (`ReviewPage.razor.cs`). It reads reviews through `ReviewService` and works with
-threads only through `ThreadService`, so every comment rule is applied there. It works with reviewer slots,
-signatures, and the approval status only through `SigningService`, so the page contains no signing rules. It requires
-a signed-in user, and every comment, slot change, and signature is made on behalf of that user. The title row also
-has a link to the history page of the review (`history-link`), where the audit entries of the review are listed.
+described under Deep links below. Its responsibility is to show one review, with the reader's work first. From the top it
+shows a breadcrumb (muted, with "/" separators, leading to the projects list and the owning project, and ending in the
+review identifier as text instead of a link), the title with an approval badge (Approved or In review) and a History
+button, and a one-sentence next step, which is the single hint of the page about what to do next. Below it is a
+compact summary strip (`review-summary`) of up to three cells: the checklist (the progress summary such as "37 of 58
+checks answered", a progress bar of the answered checks over all checks, and a link to the checklist page; absent when
+the review has no checklist), the reviewers ("No reviewer slots yet", or "N of M signed"), and the threads ("N open
+· M resolved"). Then come the files with the size and number of open threads of each, the thread index of all files, the
+selected file as a diff against its baseline (or as numbered lines), the comment threads on that file, which a reader
+can answer, resolve, and reopen (a resolved thread is a one-line header until expanded), and the form that starts a new
+thread. After the reading come the Reviewers and signing card (the reviewer slots with their signature status, the
+form that adds a slot, collapsed until a reviewer asks for it unless the review has no slot yet or the last attempt
+was refused, and, for a reviewer, the form that signs) and, last, in a native `<details>` element that is collapsed by
+default, the review's identifier, state, content fingerprint, record digest, and the hash of each file; for a review
+from a repository it also shows the repository name, the baseline and head commits, and the selection; for a review that
+was planned from a review-set it also shows the identifier of that set (`review-set-id`, the "Review set" row). Each card
+has one primary action; navigation buttons such as History, Open checklist, and the way back after an address that names
+nothing are outline buttons. The page uses the wide page container, because it shows tables and code. It is a Razor
+component split into presentation (`ReviewPage.razor`) and behavior (`ReviewPage.razor.cs`). It reads reviews through
+`ReviewService` and works with threads only through `ThreadService`, so every comment rule is applied there. It works
+with reviewer slots, signatures, and the approval status only through `SigningService`, so the page contains no signing
+rules. It requires a signed-in user, and every comment, slot change, and signature is made on behalf of that user. The
+History button (`history-link`) leads to the history page of the review, where the audit entries of the review are
+listed.
 
 #### Data Model
 
@@ -59,7 +62,7 @@ for a diff that has rows. **NewSide**: the version (`Head` or `Baseline`) the ne
 calculated from this list, and the selected file's threads are the ones with its path.
 
 **Checklist**: the `ChecklistState` of the review, or `null` when it has none. The page only reads it for the summary
-and the checklist card; the answers are made on `ChecklistPage`.
+strip; the answers are made on `ChecklistPage`.
 
 **Approval**: the `ReviewApproval` of the review from `SigningService.GetApprovalAsync`: whether it is approved, the
 record digest, the slots with their signature state, the blockers that prevent signing, and the next-step sentence.
@@ -84,9 +87,10 @@ password field after every signing attempt.
 expanded. **FocusedThreadId**: the thread chosen in the index, whose lines and card are highlighted. The page also
 keeps the test id to scroll to after the next render. All of these are cleared when the route parameters change.
 
-Test identifiers: `review-page` (root), `home-link`, `projects-link`, `project-link`, `review-loading`,
-`review-not-found`, `review-title`, `review-approval`, `next-step`, `checklist-card`, `checklist-progress-summary`,
-`checklist-link`, `reviewers-card`, `slots-empty`, `slot-{id}`, `slot-label-{id}`, `slot-primary-{id}`,
+Test identifiers: `review-page` (root), `projects-link`, `project-link`, `review-loading`,
+`review-not-found`, `review-title`, `review-approval`, `next-step`, `review-summary` (the summary strip),
+`checklist-card` (its checklist cell), `checklist-progress-summary`, `checklist-link`, `summary-reviewers`,
+`summary-threads`, `reviewers-card`, `slots-empty`, `slot-{id}`, `slot-label-{id}`, `slot-primary-{id}`,
 `slot-alternate-{id}`, `slot-status-{id}`, `slot-primary-select-{id}`, `slot-alternate-select-{id}`,
 `slot-save-{id}`, `slot-remove-{id}`, `slot-error-{id}`, `sign-blockers-{id}`, `sign-form-{id}`, `sign-meaning-{id}`,
 `sign-password-{id}`, `sign-error-{id}`, `sign-button-{id}` (all by slot identity), `slot-add-form`,
@@ -243,8 +247,11 @@ Reply. The index rows come from `ThreadService.BuildIndex` and the next-step lin
 `Approval.NextStep` (which `SigningService` builds with `ThreadService.NextStep`, given the checklist progress and the
 number of checks answered Fail, and words itself for missing slots and signatures), so the page holds no ordering or
 wording rules of its own.
-The summary of the checklist card is "{answered} of {total} checks answered", or "Checklist complete" when nothing
-is left to answer.
+The summary of the checklist cell is "{answered} of {total} checks answered", or "Checklist complete" when nothing
+is left to answer, and its progress bar shows the answered checks over all checks. The reviewers cell reads "No reviewer
+slots yet" when the review has no slot, and otherwise "{signed} of {slots} signed", where a slot counts as signed only
+while its signature is current; the threads cell counts the open and the resolved threads from `Threads`. The strip is
+drawn from the data the page already holds, so it changes after every change made on the page.
 
 **AddSlotAsync**, **SaveSlotAsync**, **RemoveSlotAsync**: Add a slot from the add-slot form, save the primary and
 alternate chosen for a slot, and remove a slot, on behalf of the signed-in user through `SigningService`. The select

@@ -1,0 +1,55 @@
+---
+# Software Unit Requirements for the HelpPage Unit
+#
+# The HelpPage unit is the built-in help: the index at /help (HelpPage.razor), one page for each help topic at
+# /help/{topic} with its shared frame (HelpTopicFrame.razor) fed by the list of topics (HelpTopics.cs), and the
+# friendly page for an unknown address under /help/ (HelpNotFoundPage.razor). The link to the help in the header of
+# every page belongs to the App unit.
+
+sections:
+  - title: HelpPage Unit Requirements
+    requirements:
+      - id: ReviewCenter-HelpPage-Index
+        title: >-
+          The HelpPage unit shall serve at /help an index headed Help that lists every help topic with its title and a
+          link to the page of the topic, and a link to the About page.
+        justification: |
+          A user who needs help must be able to see what is covered and to choose a topic without guessing an address.
+          The About page holds the version and the project page, which a user reporting a problem needs, so the help
+          points to it.
+        tests:
+          - HelpPage_Render_ListsEveryTopicWithItsPageLink
+
+      - id: ReviewCenter-HelpPage-Topics
+        title: >-
+          The HelpPage unit shall serve for every help topic, at the address /help/ followed by the name of the topic,
+          a page headed with the title of the topic, in which every image has alternative text.
+        justification: |
+          Each task of a review is explained on a page of its own, so that a user can find it from the index and
+          share its address. A listed topic without a page would lead to an error, and an image without alternative
+          text cannot be read by a user of assistive technology.
+        tests:
+          - HelpTopicPages_Render_EveryTopicHasAPageWithValidNavigation
+
+      - id: ReviewCenter-HelpPage-Navigation
+        title: >-
+          The HelpPage unit shall end every topic page with links to the previous topic, to the index of all help
+          topics, and to the next topic, leaving out the link to the previous topic on the first page and the link to
+          the next topic on the last, and shall not use a link to a place within the same page.
+        justification: |
+          A user who has finished reading a topic should be able to continue, go back, or return to the index without
+          scrolling up or using the browser. The site gives every page a base address, so a link to a place within the
+          page would lead to the home page, and the links must lead to whole pages.
+        tests:
+          - HelpTopicPages_Render_EveryTopicHasAPageWithValidNavigation
+          - HelpPage_Render_ListsEveryTopicWithItsPageLink
+
+      - id: ReviewCenter-HelpPage-NotFound
+        title: >-
+          The HelpPage unit shall show, for an address under /help/ that is not a help topic, a message that there is no
+          such topic and a link to the index of all help topics.
+        justification: |
+          An old or mistyped help address, such as a bookmark of a topic that was renamed, should lead the user back to
+          the index and not to a blank page or the general not-found message.
+        tests:
+          - HelpNotFoundPage_Render_UnknownTopic_ShowsMessageAndIndexLink

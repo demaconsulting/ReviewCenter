@@ -1,0 +1,30 @@
+---
+# Software Unit Requirements for the AboutPage Unit
+#
+# The AboutPage unit is the AboutPage.razor page at /about, open to everyone, that says what ReviewCenter does and which
+# version of it is running.
+
+sections:
+  - title: AboutPage Unit Requirements
+    requirements:
+      - id: ReviewCenter-AboutPage-Version
+        title: >-
+          The AboutPage unit shall serve at /about, to a visitor who is not signed in, the full version of the program,
+          the copyright holder, and a link to the project page on GitHub.
+        justification: |
+          Users and auditors must be able to tell exactly which build they are using, for example when reporting a
+          problem or recording the version used for a review. The footer shows a shortened version; this page gives the
+          full one, the same text that the command line prints. The page must be open to everyone, so that the version
+          can be read before signing in.
+        tests:
+          - AboutPage_Render_Anonymous_ShowsVersionCopyrightAndProjectLink
+
+      - id: ReviewCenter-AboutPage-Description
+        title: >-
+          The AboutPage unit shall describe in plain words what ReviewCenter does, naming the threaded comments, the
+          checklist, and the audit trail.
+        justification: |
+          A visitor who has just arrived at the product needs a short answer to what it is for, in terms of the
+          features that matter for a formal review, without having to read the help first.
+        tests:
+          - AboutPage_Render_Default_DescribesWhatReviewCenterDoes

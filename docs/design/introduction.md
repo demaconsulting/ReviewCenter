@@ -73,9 +73,10 @@ The ReviewCenter system is divided as follows:
   AuditCommand units
 - **Identity** (subsystem): the web side of local accounts, cookie sign-in and authorization, and the periodic re-check
   of the user of an open page; contains the PasswordHasher, SignIn, and RevalidatingAuthenticationStateProvider units
-- **Web** (subsystem): the Blazor Server user interface; contains the App unit (HTML shell, router, page frame, and the
-  SessionGate that replaces an open page when its user is no longer signed in),
-  the HomePage unit, the ProjectsPage, ProjectPage, PlanPage, ReviewPage, and ChecklistPage units, the LoginPage,
+- **Web** (subsystem): the Blazor Server user interface; contains the App unit (HTML shell, router, page frame with
+  the menu bar and the footer, and the SessionGate that replaces an open page when its user is no longer signed in),
+  the HomePage, AboutPage, and HelpPage units, the ProjectsPage, ProjectPage, PlanPage, ReviewPage, and ChecklistPage
+  units, the LoginPage,
   AccountPage, and UsersPage units, the HistoryPage and AuditPage units, and the RepositoriesPage unit
 - **Core** (subsystem): the domain model and rules for projects, reviews, review comments, review checklists,
   users, reviewer signatures, the hash-chained audit trail, and the registry of git repositories, free of web and
