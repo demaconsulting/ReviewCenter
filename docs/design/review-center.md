@@ -114,7 +114,8 @@ flowchart TD
     ServerHost --> PasswordHasher
     ServerHost --> SignIn
     ServerHost --> OidcSignIn
-    ServerHost --> ReauthProofStore    ServerHost --> ProjectService
+    ServerHost --> ReauthProofStore
+    ServerHost --> ProjectService
     ServerHost --> EvidenceSettingsService
     ServerHost --> ReviewService
     ServerHost --> ThreadService
@@ -148,7 +149,8 @@ flowchart TD
     OidcSignIn --> SignInThrottle
     OidcSignIn --> UserService
     OidcSignIn --> SigningService
-    OidcSignIn --> ReauthProofStore    RevalidatingAuthenticationStateProvider --> SignIn
+    OidcSignIn --> ReauthProofStore
+    RevalidatingAuthenticationStateProvider --> SignIn
     RevalidatingAuthenticationStateProvider --> UserService
     PasswordHasher --> UserService
     App --> HomePage
@@ -190,7 +192,8 @@ flowchart TD
     ReviewPage --> SigningService
     ReviewPage --> SignIn
     ReviewPage --> OidcSignIn
-    ReviewPage --> UserService    ReviewPage --> AttestationKeyProvider
+    ReviewPage --> UserService
+    ReviewPage --> AttestationKeyProvider
     ReviewPage --> HistoryPage
     ChecklistPage --> ReviewService
     ChecklistPage --> ChecklistService
@@ -212,7 +215,8 @@ flowchart TD
     SigningService --> ReviewStore
     SigningService --> UserService
     SigningService --> RecordDigest
-    SigningService --> ReauthProofStore    AuditService --> AuditChain
+    SigningService --> ReauthProofStore
+    AuditService --> AuditChain
     AuditService --> AuditStore
     ReviewStore --> RecordDigest
     ReviewStore --> ReviewCenterDbContext
