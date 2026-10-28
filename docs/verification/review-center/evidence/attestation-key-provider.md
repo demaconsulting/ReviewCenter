@@ -27,7 +27,8 @@ certificate store tests need the store of the current user.
 - `RequireTrustedKey` is checked on every call; the rule accepts an organization certificate and refuses a self-signed
   one, one without a signing key usage, and one outside its validity.
 - A certificate for code signing only is classified (not when it has no extended key usage or a document purpose), is
-  warned about once with the defined text, is flagged in the key description, and is not refused.
+  warned about once with the defined text, is flagged in the key description, and is not refused because of its
+  code-signing usage.
 - `Describe` never throws: a known key problem is reported with its message, and an unexpected failure is reported as
   unavailable with a generic message.
 

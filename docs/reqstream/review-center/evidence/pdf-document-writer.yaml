@@ -1,7 +1,7 @@
 ---
 # Software Unit Requirements for the PdfDocumentWriter Class
 #
-# The PdfDocumentWriter class writes a small, plain PDF 1.4 document from headings, paragraphs, and label and value
+# The PdfDocumentWriter class writes a small, plain PDF 1.5 document from headings, paragraphs, and label and value
 # rows, with a header and a footer on every A4 page. It has no dependency and does not compress or embed fonts.
 
 sections:
@@ -9,7 +9,7 @@ sections:
     requirements:
       - id: ReviewCenter-PdfDocumentWriter-Structure
         title: >-
-          The PdfDocumentWriter class shall write a PDF 1.4 document of A4 pages with a classic cross-reference table,
+          The PdfDocumentWriter class shall write a PDF 1.5 document of A4 pages with a classic cross-reference table,
           at least one page, a header and a footer with a page number on every page, new pages as the content grows,
           and the document properties it was given.
         justification: |

@@ -30,7 +30,7 @@ namespace DemaConsulting.ReviewCenter.Evidence;
 ///     The policy checks what can be known locally from the certificate: whether it is self-signed, whether its key
 ///     usage allows signing documents, and whether it is within its validity period. It deliberately does not check
 ///     that the chain is trusted or that the certificate is not revoked; that is the verifier's decision. A
-///     code-signing-only certificate is classified and reported, never refused.
+///     code-signing-only certificate is classified and reported; its code-signing usage is not a reason to refuse it.
 /// </remarks>
 internal static class AttestationKeyPolicy
 {

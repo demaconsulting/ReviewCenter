@@ -20,8 +20,9 @@ reason, the signing time, the byte range, and a `/Reference` entry for the DocMD
 because the attestation has no form fields to fill in and nothing is meant to be added to it. Without the DocMDP entry
 the signature is an approval signature, for which a reader allows later changes. The `/Reference` entry is the
 signature reference dictionary (`/Type /SigRef`, `/TransformMethod /DocMDP`, transform parameters with `/P 1` and
-`/V /1.2`, and `/Data` that points to the catalog); `/Perms` reuses the signature object, so no object is added. The
-byte range is a
+`/V /1.2`, and `/Data` that points to the catalog); `/Perms` reuses the signature object, so no object is added. A
+certifying signature and `/Perms` are PDF 1.5 features, so `PdfDocumentWriter` writes the `%PDF-1.5` header, which the
+signer keeps and the byte range covers. The byte range is a
 placeholder of fixed width that is filled in last, with four numbers that cover the whole file except the hexadecimal
 value of the signature. Both entries are inside the covered bytes, so changing the permission breaks the signature. The
 value has room for 32768 bytes of signature; the signature includes the certificate of the

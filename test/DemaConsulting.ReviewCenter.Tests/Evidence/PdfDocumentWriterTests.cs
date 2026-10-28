@@ -58,8 +58,10 @@ public class PdfDocumentWriterTests
         // Act: build the file
         var pdf = new PdfInspector(writer.Build());
 
-        // Assert: PDF header and end marker, one page, consistent cross-reference table
+        // Assert: PDF header (version 1.5, which certification and /Perms need) and end marker, one page,
+        // consistent cross-reference table
         Assert.True(pdf.HasPdfFraming);
+        Assert.StartsWith("%PDF-1.5\n", pdf.Text, StringComparison.Ordinal);
         Assert.Equal(1, pdf.PageCount);
         Assert.True(pdf.CrossReferenceIsConsistent());
         Assert.Single(pdf.CrossReferenceChain);

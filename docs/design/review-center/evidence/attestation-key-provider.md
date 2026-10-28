@@ -65,8 +65,10 @@ the signature carries what a reader needs to follow the chain, and the root is l
   the extended key usage lists code signing and none of e-mail protection, Microsoft or Adobe document signing, or any
   usage; a certificate without the extension is not code-signing-only). The text is
   `AttestationKeyPolicy.CodeSigningNotice`: "This certificate is a code-signing certificate. Adobe Acrobat will not trust
-  it for document signatures; use a document-signing certificate for production." The key is not refused, also not when
-  `RequireTrustedKey` is set, and `AttestationKeyInfo.IsCodeSigningOnly` carries the classification to the attestation.
+  it for document signatures; use a document-signing certificate for production." The code-signing usage is not a
+  reason to refuse the key, also not when `RequireTrustedKey` is set (a key that fails that policy for another reason,
+  such as a key usage that does not allow signing or a validity period that has ended, is still refused).
+  `AttestationKeyInfo.IsCodeSigningOnly` carries the classification to the attestation.
 
 **Describe**: Returns the status for the page.
 

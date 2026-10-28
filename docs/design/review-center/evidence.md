@@ -94,7 +94,7 @@ time in the signature is the clock of the server; **there is no timestamp author
 timestamp and proves nothing about when the document really existed. A reader who needs a trusted time must get it
 elsewhere until a timestamp authority is supported.
 
-**Writing and signing a PDF**: `PdfDocumentWriter` writes a plain PDF 1.4 file with a classic cross-reference table,
+**Writing and signing a PDF**: `PdfDocumentWriter` writes a plain PDF 1.5 file with a classic cross-reference table,
 with
 standard fonts, no compression, and no embedded font, so it has no dependency, always gives the same bytes for the
 same input, and has a layout that `AttestationSigner` can rely on. The price is that characters outside the WinAnsi

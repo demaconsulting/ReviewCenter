@@ -114,7 +114,8 @@ sections:
 
       - id: ReviewCenter-AttestationKeyProvider-CodeSigningWarning
         title: >-
-          The AttestationKeyProvider unit shall warn, without refusing the certificate, when the extended key usage of
+          The AttestationKeyProvider unit shall warn, without refusing the certificate for that reason, when the
+          extended key usage of
           a certificate allows code signing and none of the document signing purposes (e-mail protection, Microsoft or
           Adobe document signing, any purpose), with the text "This certificate is a code-signing certificate. Adobe
           Acrobat will not trust it for document signatures; use a document-signing certificate for production.", log

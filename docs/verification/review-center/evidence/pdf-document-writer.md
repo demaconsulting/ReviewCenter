@@ -13,7 +13,7 @@ N/A - standard test environment (everything runs in memory).
 #### Acceptance Criteria
 
 - All tests pass with zero failures.
-- An empty document is a valid one-page PDF 1.4 file, and a long body continues onto numbered pages.
+- An empty document is a valid one-page PDF 1.5 file, and a long body continues onto numbered pages.
 - The same input gives the same bytes.
 - Text is wrapped at word boundaries, an over-wide word is broken, line feeds start lines, and the value of a row wraps
   beside its label.

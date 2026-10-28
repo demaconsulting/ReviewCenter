@@ -230,8 +230,8 @@ public class AttestationKeyPolicyTests
     }
 
     /// <summary>
-    ///     Test that a code-signing-only certificate is warned about once, at first load, and never refused, also
-    ///     when a trusted key is required: that policy does not look at the purpose.
+    ///     Test that a code-signing-only certificate is warned about once, at first load, and not refused for its
+    ///     purpose, also when a trusted key is required: that policy does not look at the purpose.
     /// </summary>
     [Fact]
     public void AttestationKeyProviderBase_GetSigningKey_CodeSigningOnlyCertificate_LogsWarningOnceAndDoesNotRefuse()

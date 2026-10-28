@@ -38,7 +38,7 @@
                 (<code>Attestation:Provider</code> set to <code>CertificateStore</code>, with the certificate's
                 thumbprint). The private key stays in the store, smart card or hardware module and is never exported. Use
                 a document-signing certificate (key usage digital signature or non-repudiation).</li>
-            <li>A certificate that is for code signing only is used, not refused: the PDF carries a note that Adobe
+            <li>A certificate that is for code signing only is used, not refused for that reason: the PDF carries a note that Adobe
                 Acrobat will not trust it for document signatures, and the server logs a warning at start-up. The server
                 does not check the certificate chain or revocation; the PDF reader does.</li>
             <li>An administrator can set <code>Attestation:RequireTrustedKey</code> to refuse unsuitable keys. A

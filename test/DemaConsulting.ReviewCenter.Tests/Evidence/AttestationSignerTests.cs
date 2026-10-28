@@ -193,6 +193,8 @@ public class AttestationSignerTests
             StringComparison.Ordinal);
         Assert.Equal(1, signed.DocMdpPermission);
 
+        // Assert: certification and /Perms are PDF 1.5 features, so the signed file declares at least that version
+        Assert.StartsWith("%PDF-1.5\n", signed.Text, StringComparison.Ordinal);
         // Assert: one signature and one DocMDP entry; the catalog and the signature field refer to the same object
         var signature = Assert.Single(signed.SignatureObjectNumbers);
         Assert.Equal(signature, signed.PermsDocMdpObject);
