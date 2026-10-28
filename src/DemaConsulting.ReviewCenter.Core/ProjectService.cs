@@ -53,6 +53,8 @@ public sealed record NewMemberAccount(ProjectMember Member, string TemporaryPass
 ///     <see cref="IProjectAccess"/>. A member is added by the exact user name only and no operation lists users, so
 ///     a project administrator cannot browse the user base; failed adds are counted per actor in memory (at most
 ///     <see cref="MaxFailedAttempts"/> in <see cref="ThrottleWindow"/>, system administrators exempt) and audited.
+///     Each attempt is reserved atomically per actor before the user is looked up and given back only when the
+///     attempt succeeds, so parallel attempts cannot exceed the limit.
 ///     That throttle state is per process and lost on restart. The service is safe for concurrent use as long as
 ///     the injected stores are; the last project administrator is protected by the store, atomically.
 /// </remarks>
@@ -140,9 +142,10 @@ public sealed class ProjectService
     private readonly object _failuresLock = new();
 
     /// <summary>
-    ///     The times of the recent failed attempts of each actor, by user name without regard to case.
+    ///     The reserved attempts of each actor, by user name without regard to case; a reservation that is not
+    ///     released is a failed attempt.
     /// </summary>
-    private readonly Dictionary<string, Queue<DateTimeOffset>> _failures = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, List<AttemptReservation>> _failures = new(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>
     ///     Initializes a new instance of the <see cref="ProjectService"/> class.
@@ -329,22 +332,36 @@ public sealed class ProjectService
         ValidateRole(role);
         await _access.RequireAdministerAsync(actor, projectId, cancellationToken);
         var exempt = await _access.IsSystemAdminAsync(actor, cancellationToken);
-        EnsureNotThrottled(actor, exempt);
 
-        // Resolve the exact name; the one message hides whether the name exists, is disabled or is only misspelled
+        // The attempt is reserved before the lookup and counted from then on, so concurrent attempts cannot all pass
+        // the check; only a success gives it back, a failure or an exception keeps it counted
+        var reservation = ReserveAttempt(actor, exempt);
         var typed = username.Trim();
-        var user = await _users.GetByUsernameAsync(typed, cancellationToken);
-        if (user is not { Enabled: true })
+        var added = false;
+        try
         {
-            await RegisterFailureAsync(actor, projectId, typed, exempt, cancellationToken);
-            throw new DomainRuleException(DomainRule.UserNotFound, CannotAddMessage);
-        }
+            // Resolve the exact name; the one message hides whether the name exists, is disabled or is only misspelled
+            var user = await _users.GetByUsernameAsync(typed, cancellationToken);
+            if (user is not { Enabled: true })
+            {
+                await RegisterFailureAsync(actor, projectId, typed, cancellationToken);
+                throw new DomainRuleException(DomainRule.UserNotFound, CannotAddMessage);
+            }
 
-        await _store.AddMembershipAsync(
-            new ProjectMembership(user.Id, projectId, role),
-            AuditDraft.By(actor, "project.member-added", $"user '{user.Username}', role {role}", projectId),
-            cancellationToken);
-        return new ProjectMember(user.Id, user.Username, user.DisplayName, user.Enabled, role);
+            await _store.AddMembershipAsync(
+                new ProjectMembership(user.Id, projectId, role),
+                AuditDraft.By(actor, "project.member-added", $"user '{user.Username}', role {role}", projectId),
+                cancellationToken);
+            added = true;
+            return new ProjectMember(user.Id, user.Username, user.DisplayName, user.Enabled, role);
+        }
+        finally
+        {
+            if (added)
+            {
+                ReleaseAttempt(actor, reservation);
+            }
+        }
     }
 
     /// <summary>
@@ -382,15 +399,27 @@ public sealed class ProjectService
         ValidateRole(role);
         await _access.RequireAdministerAsync(actor, projectId, cancellationToken);
         var exempt = await _access.IsSystemAdminAsync(actor, cancellationToken);
-        EnsureNotThrottled(actor, exempt);
 
-        // Reject invalid input before any write; the same rules as every other way to create a user
+        // Reserved before the store is asked, like in AddMemberAsync; input that is refused before any write is
+        // given back, so a typing mistake is not a failed guess
+        var reservation = ReserveAttempt(actor, exempt);
         var typed = username.Trim();
-        UserService.ValidateUsername(typed);
-        var trimmedDisplayName = UserService.ValidateDisplayName(displayName);
+        string trimmedDisplayName;
+        try
+        {
+            // Reject invalid input before any write; the same rules as every other way to create a user
+            UserService.ValidateUsername(typed);
+            trimmedDisplayName = UserService.ValidateDisplayName(displayName);
+        }
+        catch
+        {
+            ReleaseAttempt(actor, reservation);
+            throw;
+        }
 
         // The password is drawn from a cryptographic source and only its hash leaves this method
         var password = NewTemporaryPassword();
+        var created = false;
         try
         {
             var stored = await _users.AddToProjectAsync(
@@ -406,21 +435,29 @@ public sealed class ProjectService
                 },
                 projectId,
                 role,
-                created => AuditDraft.By(
+                account => AuditDraft.By(
                     actor,
                     "project.account-created",
-                    $"user '{created.Username}', role {role}, temporary password",
+                    $"user '{account.Username}', role {role}, temporary password",
                     projectId),
                 cancellationToken);
+            created = true;
             return new NewMemberAccount(
                 new ProjectMember(stored.Id, stored.Username, stored.DisplayName, stored.Enabled, role),
                 password);
         }
         catch (DomainRuleException ex) when (ex.Rule == DomainRule.UserNameTaken)
         {
-            // Counted and audited like a failed add; the message does not say more than "not available"
-            await RegisterFailureAsync(actor, projectId, typed, exempt, cancellationToken);
+            // Stays counted and is audited like a failed add; the message does not say more than "not available"
+            await RegisterFailureAsync(actor, projectId, typed, cancellationToken);
             throw new DomainRuleException(DomainRule.UserNameTaken, "That user name is not available.");
+        }
+        finally
+        {
+            if (created)
+            {
+                ReleaseAttempt(actor, reservation);
+            }
         }
     }
 
@@ -557,34 +594,75 @@ public sealed class ProjectService
     }
 
     /// <summary>
-    ///     Refuses an actor that failed too often lately.
+    ///     Reserves one attempt for the actor, or refuses an actor that has used up the attempts.
     /// </summary>
     /// <param name="actor">The actor.</param>
     /// <param name="exempt"><c>true</c> for a system administrator, who is never throttled.</param>
+    /// <returns>
+    ///     The reservation to give to <see cref="ReleaseAttempt"/> when the attempt succeeds; <c>null</c> for an
+    ///     exempt actor, which is never counted.
+    /// </returns>
+    /// <remarks>
+    ///     The check and the count are one step under one lock, taken before the user lookup, so concurrent attempts
+    ///     of one actor cannot all pass the check before any failure is counted. An attempt that is not released
+    ///     stays counted, so a failure (or an exception) needs no extra bookkeeping.
+    /// </remarks>
     /// <exception cref="DomainRuleException">
-    ///     Thrown with <see cref="DomainRule.TooManyAttempts"/> over the limit.
+    ///     Thrown with <see cref="DomainRule.TooManyAttempts"/> over the limit; nothing is counted then.
     /// </exception>
-    private void EnsureNotThrottled(Actor actor, bool exempt)
+    private AttemptReservation? ReserveAttempt(Actor actor, bool exempt)
     {
         if (exempt)
+        {
+            return null;
+        }
+
+        lock (_failuresLock)
+        {
+            var now = _timeProvider.GetUtcNow();
+            if (!_failures.TryGetValue(actor.Username, out var attempts))
+            {
+                attempts = [];
+                _failures[actor.Username] = attempts;
+            }
+
+            attempts.RemoveAll(a => now - a.Time >= ThrottleWindow);
+            if (attempts.Count >= MaxFailedAttempts)
+            {
+                throw new DomainRuleException(
+                    DomainRule.TooManyAttempts,
+                    "Too many attempts. Try again in a few minutes.");
+            }
+
+            var reservation = new AttemptReservation(now);
+            attempts.Add(reservation);
+            return reservation;
+        }
+    }
+
+    /// <summary>
+    ///     Gives a reserved attempt back, because the attempt did not fail.
+    /// </summary>
+    /// <param name="actor">The actor.</param>
+    /// <param name="reservation">The reservation from <see cref="ReserveAttempt"/>; <c>null</c> does nothing.</param>
+    /// <remarks>
+    ///     Only that reservation is removed; one that has left the window already is gone and nothing else changes.
+    /// </remarks>
+    private void ReleaseAttempt(Actor actor, AttemptReservation? reservation)
+    {
+        if (reservation is null)
         {
             return;
         }
 
         lock (_failuresLock)
         {
-            if (_failures.TryGetValue(actor.Username, out var times))
+            if (_failures.TryGetValue(actor.Username, out var attempts))
             {
-                Prune(times, _timeProvider.GetUtcNow());
-                if (times.Count >= MaxFailedAttempts)
-                {
-                    throw new DomainRuleException(
-                        DomainRule.TooManyAttempts,
-                        "Too many attempts. Try again in a few minutes.");
-                }
+                attempts.Remove(reservation);
 
-                // An actor without recent failures needs no entry
-                if (times.Count == 0)
+                // An actor without recent attempts needs no entry
+                if (attempts.Count == 0)
                 {
                     _failures.Remove(actor.Username);
                 }
@@ -593,37 +671,19 @@ public sealed class ProjectService
     }
 
     /// <summary>
-    ///     Counts a failed attempt against the actor (unless exempt) and records it in the audit trail.
+    ///     Records a failed attempt in the audit trail; the attempt itself stays counted from its reservation.
     /// </summary>
     /// <param name="actor">The actor.</param>
     /// <param name="projectId">The project of the attempt.</param>
     /// <param name="typedName">The user name that was tried; recorded as typed (cleaned by the audit store).</param>
-    /// <param name="exempt"><c>true</c> for a system administrator, whose failures are audited but not counted.</param>
     /// <param name="cancellationToken">Cancels the operation.</param>
-    /// <returns>A task that completes when the failure is counted and the record attempted.</returns>
+    /// <returns>A task that completes when the record was attempted.</returns>
     private async Task RegisterFailureAsync(
         Actor actor,
         int projectId,
         string typedName,
-        bool exempt,
         CancellationToken cancellationToken)
     {
-        if (!exempt)
-        {
-            lock (_failuresLock)
-            {
-                var now = _timeProvider.GetUtcNow();
-                if (!_failures.TryGetValue(actor.Username, out var times))
-                {
-                    times = new Queue<DateTimeOffset>();
-                    _failures[actor.Username] = times;
-                }
-
-                Prune(times, now);
-                times.Enqueue(now);
-            }
-        }
-
         // Best effort: the refusal itself must not fail because the trail could not be written. The throttle caps
         // how many entries one actor can cause, so no coalescing is needed
         if (_audit is not null)
@@ -635,16 +695,15 @@ public sealed class ProjectService
     }
 
     /// <summary>
-    ///     Removes the attempts that left the sliding window.
+    ///     One reserved attempt of an actor, counted until it is released or leaves the window.
     /// </summary>
-    /// <param name="times">The attempt times, oldest first.</param>
-    /// <param name="now">The current time.</param>
-    private static void Prune(Queue<DateTimeOffset> times, DateTimeOffset now)
+    /// <param name="time">When the attempt was reserved.</param>
+    private sealed class AttemptReservation(DateTimeOffset time)
     {
-        while (times.Count > 0 && now - times.Peek() >= ThrottleWindow)
-        {
-            times.Dequeue();
-        }
+        /// <summary>
+        ///     Gets when the attempt was reserved.
+        /// </summary>
+        public DateTimeOffset Time { get; } = time;
     }
 
     /// <summary>

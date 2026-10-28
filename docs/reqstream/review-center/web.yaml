@@ -297,6 +297,7 @@ sections:
         tests:
           - IdentitySubsystem_SignInJourney_LoginUseAndLogout_WorksEndToEnd
           - MainLayout_Render_TemporaryPassword_ConfinesUserToAccountPage
+          - MainLayout_Navigate_TemporaryPassword_RedirectsLaterNavigationAndStopsAfterDispose
           - AccountPage_ChangePassword_TemporaryPassword_RedirectsToLoginWithNotice
           - WebSubsystem_AllPages_EveryInteractiveElementHasTestId
 

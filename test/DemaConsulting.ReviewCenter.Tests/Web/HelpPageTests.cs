@@ -145,6 +145,8 @@ public sealed class HelpPageTests : PageTestBase
 
         // Assert: the topic names the buttons and the rules
         var text = page.Markup;
+        Assert.Contains("Ordinary users see only the projects they belong to", text, StringComparison.Ordinal);
+        Assert.Contains("system administrators see all projects", text, StringComparison.Ordinal);
         Assert.Contains("+ Add member", text, StringComparison.Ordinal);
         Assert.Contains("exact user name", text, StringComparison.Ordinal);
         Assert.Contains("temporary", text, StringComparison.Ordinal);

@@ -59,8 +59,9 @@ server. It has one screenshot,
 `signed-attestation-1.png`, of the review page with the download button and the key note.
 
 **Project members topic** (`HelpMembersPage`, slug `project-members`, title "Managing project members"): The topic after
-Planning reviews and before the API tokens. It explains, in static text, that a project is seen only by its members and
-that a project admin or a system administrator manages them from the Members section of the project page; how to add
+Planning reviews and before the API tokens. It explains, in static text, that ordinary users see only the projects they
+belong to while system administrators see all projects, and that a project admin or a system administrator manages the
+members from the Members section of the project page; how to add
 someone who has an account (the "+ Add member" button, the exact user name, no list of users, one message for every
 reason a name cannot be added, and that repeated failures are audited and slow the person down); how to create an
 account for someone new (the "Create a new account" button, the temporary password shown once, and that the person must

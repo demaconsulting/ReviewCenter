@@ -443,6 +443,7 @@ projects: ask the person for the user name. If the name cannot be added you get 
 misspelled name, an account that does not exist, or a disabled account). Every such failure is recorded in the audit
 trail as `project.member-add-failed`, and after 10 failures in 10 minutes the page refuses further attempts until time
 has passed. System administrators are not limited, and the count is kept in memory, so it starts again at a restart.
+Each attempt is counted when it starts, so many attempts made at the same time cannot get past the limit.
 
 **Create an account for someone new.** On the same page, **Create a new account** opens
 `/projects/{id}/members/account`. Enter a user name and a display name, choose whether the person is a project admin,
@@ -465,6 +466,19 @@ act at the same moment.
 
 **Reviewers who are removed.** A reviewer slot keeps its reviewer when the person is removed from the project. The
 review page marks the reviewer as **No longer a project member**, and that reviewer cannot sign until added again.
+
+**Limits of member management.**
+
+- The rights of the person who changes the members are checked just before the change is stored, and not again inside
+  it. If someone takes away a project administrator's right (removes, demotes, or disables the person) in the same few
+  milliseconds in which that administrator changes a member, that one change can still go through; the next one is
+  refused. This is the same kind of limit as the access rules in general (see
+  [Access and Visibility](#access-and-visibility)).
+- Adding a person by the exact user name necessarily tells a project administrator whether an enabled account with
+  that name exists, because the add then works. This is accepted: every successful add is visible in the member list,
+  is recorded in the audit trail, and can be undone by removing the member; failed attempts are limited and recorded
+  as described above; and system administrators and project administrators can already create accounts, which also
+  shows whether a name is taken. There is still no list or search of users.
 
 Every member change is recorded in the audit trail (see [Recorded Actions](#recorded-actions)).
 

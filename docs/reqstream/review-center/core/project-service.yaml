@@ -112,14 +112,20 @@ sections:
         title: >-
           The ProjectService class shall refuse an actor who is not a system administrator with a too-many-attempts
           rule once the actor has failed ten times within ten minutes to add or create a member, counting each
-          actor separately, shall accept attempts again when the ten minutes have passed, and shall never refuse a
-          system administrator for this reason.
+          actor separately and reserving each attempt atomically before the user is looked up, so that attempts
+          made at the same time cannot exceed the limit, shall accept attempts again when the ten minutes have
+          passed, and shall never refuse a system administrator for this reason.
         justification: |
           Trying names one after the other is the only way left to find out which accounts exist. A limit on
           failures per actor makes that slow and visible, while system administrators, who may list the users
-          anyway, are not hindered.
+          anyway, are not hindered. Reserving the attempt before the lookup closes the gap in which many parallel
+          attempts would all pass a check that has not yet seen their failures.
         tests:
           - ProjectService_AddMemberAsync_TooManyFailures_ThrottlesPerActorUntilTheWindowEnds
+          - ProjectService_AddMemberAsync_ConcurrentAttempts_AreAdmittedUpToTheLimitOnly
+          - ProjectService_AddMemberAsync_ConcurrentAttemptsOfSystemAdministrator_AreNeverThrottled
+          - ProjectService_AddMemberAsync_LookupThrows_KeepsTheAttemptCounted
+          - ProjectService_CreateMemberAccountAsync_Successes_DoNotCountAgainstTheLimit
 
       - id: ReviewCenter-ProjectService-LastAdmin
         title: >-

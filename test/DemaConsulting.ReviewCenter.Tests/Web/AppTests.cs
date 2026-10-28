@@ -250,6 +250,61 @@ public class AppTests : PageTestBase
     }
 
     /// <summary>
+    ///     Test that the confinement also applies to navigation after the layout was rendered, because the layout
+    ///     lives on while a user clicks from page to page: a flagged user who goes to another page is sent to the
+    ///     account page, one who goes to an open page is not, and a layout that was disposed no longer redirects.
+    /// </summary>
+    [Fact]
+    public void MainLayout_Navigate_TemporaryPassword_RedirectsLaterNavigationAndStopsAfterDispose()
+    {
+        // Arrange: a flagged session on the help page, which is open
+        SignInAsTemporaryPassword("bea", "Bea");
+        var navigation = Services.GetRequiredService<NavigationManager>();
+        navigation.NavigateTo("/help");
+        var layout = Render<MainLayout>();
+        Assert.NotNull(layout.Markup);
+
+        // Act: navigate to an open page, then to a page that is not open
+        navigation.NavigateTo("/account");
+        var afterOpen = navigation.Uri;
+        navigation.NavigateTo("/help/project-members");
+        var afterOpenHelp = navigation.Uri;
+        navigation.NavigateTo("/projects");
+        var afterClosed = navigation.Uri;
+
+        // Assert: only the closed page is redirected
+        Assert.EndsWith("/account", afterOpen, StringComparison.Ordinal);
+        Assert.EndsWith("/help/project-members", afterOpenHelp, StringComparison.Ordinal);
+        Assert.EndsWith("/account", afterClosed, StringComparison.Ordinal);
+
+        // Act: the layout is disposed and the user navigates again
+        layout.Instance.Dispose();
+        navigation.NavigateTo("/projects");
+
+        // Assert: the handler was removed, so nothing redirects any more
+        Assert.EndsWith("/projects", navigation.Uri, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    ///     Test that a user without a temporary password is never redirected by a later navigation.
+    /// </summary>
+    [Fact]
+    public void MainLayout_Navigate_OrdinaryUser_IsNotRedirected()
+    {
+        // Arrange
+        SignInAs("bea", "Bea", UserRole.Reviewer);
+        var navigation = Services.GetRequiredService<NavigationManager>();
+        navigation.NavigateTo("/help");
+        _ = Render<MainLayout>();
+
+        // Act
+        navigation.NavigateTo("/projects");
+
+        // Assert
+        Assert.EndsWith("/projects", navigation.Uri, StringComparison.Ordinal);
+    }
+
+    /// <summary>
     ///     Test that the sign-in page shows the notice to sign in with the new password only after a password
     ///     change.
     /// </summary>

@@ -88,7 +88,11 @@ is the only one.
 **Confinement of a temporary password**: A user whose password is temporary may use only the account page, the login
 page, the help, and the About page. `OnInitializedAsync` therefore checks the first segment of the requested path
 (compared without regard to case: `account`, `login`, `help`, or `about`) and, for any other page, navigates to
-`SignIn.AccountPath` with a full page load. The claim is enough for this, so no service is called per navigation; the
+`SignIn.AccountPath` with a full page load. The layout stays alive while a user navigates inside an interactive
+circuit, so for a flagged user it also subscribes to `NavigationManager.LocationChanged` and runs the same check on
+every later navigation (for example a click from Help to `/projects`); `Dispose` removes the handler (the standard
+dispose pattern; a user without the claim never subscribes). The claim is enough for this, so no service is called per
+navigation; the
 data is refused by the `Core` access rules anyway, so the redirect is a convenience and not the protection.
 
 The footer is on every page, and shows `ReviewCenter {version} · © DEMA Consulting · Web-based code review for regulated
@@ -140,7 +144,13 @@ home page are open to everyone and do not use it.
 - *Preconditions*: The authentication state provider is available by injection.
 - *Postconditions*: `Actor` is the signed-in user, or `null` when nobody is; `IsAdmin` is true only for a signed-in user
   who is a system administrator without a temporary password; `MustChangePassword` is true for a signed-in user with
-  the claim, and then the request has been redirected to the account page unless its path is open during the change.
+  the claim, and then the request has been redirected to the account page unless its path is open during the change;
+  for such a user the layout also watches `LocationChanged` until it is disposed.
+
+**Dispose (MainLayout)**: Removes the `LocationChanged` handler, if one was added.
+
+- *Parameters*: None (the standard `Dispose()` and `Dispose(bool)` pattern).
+- *Postconditions*: Later navigation is no longer checked by this layout instance; calling it twice is harmless.
 
 **ShortVersion (MainLayout)**: Shortens the version for the footer.
 

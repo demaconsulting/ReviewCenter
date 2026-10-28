@@ -640,6 +640,7 @@ reviews:
       - "src/DemaConsulting.ReviewCenter.Core/ReviewLimits.cs"
       - "test/**/Core/ProjectServiceTests.cs"
       - "test/**/Core/ProjectMemberServiceTests.cs"
+      - "test/**/Core/GatedUserStore.cs"
       - "test/**/Core/AuditEventTests.cs"
 
   - id: ReviewCenter-Core-ProjectAccess

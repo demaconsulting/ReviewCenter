@@ -380,7 +380,10 @@ in it (creates reviews, comments, answers the checklist, and takes a reviewer sl
 anonymous actor, the command line actor, a disabled user, an unknown user, and a user who still has a temporary
 password get nothing. `ProjectAccess` looks the
 user up by the name of the `Actor` and reads the memberships on every call, with no cache, so a revocation takes
-effect on the next call; an actor that came in with a token has the rights of its owner. A project that an actor may
+effect on the next call; an actor that came in with a token has the rights of its owner. The check of one operation
+happens before its store transaction and is not repeated inside it, so a revocation that lands within the few
+milliseconds of one handler is not caught for that operation (the same limitation applies to the membership
+operations of `ProjectService`). A project that an actor may
 not see fails exactly like a project that does not exist (`ProjectNotFound`), so the existence of a project is not
 revealed. The system administrator right is not a membership: it does not let a user be chosen for a slot or sign a
 review.

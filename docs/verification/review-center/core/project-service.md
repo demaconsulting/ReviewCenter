@@ -10,7 +10,9 @@ rule tests run as a system administrator over the real `ProjectAccess`. The acce
 users of every kind, as described for the `ProjectAccess` unit. The member management tests of
 `ProjectMemberServiceTests.cs` arrange one project with a system administrator, two project administrators (one
 disabled), a plain member, and outsiders, over the real `ProjectAccess` and a `MovableTimeProvider` that lets the
-tests advance the throttle window; the audit entries of failed attempts are read from `FakeAuditStore` through a real
+tests advance the throttle window; a `GatedUserStore` (over the fake user store) holds back the lookup of the names
+that start with a given prefix, so the concurrency tests keep many attempts inside the lookup at the same time; the
+audit entries of failed attempts are read from `FakeAuditStore` through a real
 `AuditService`, and the drafts of the changes from the fake stores. Failures are checked through the rule carried by
 the `DomainRuleException`. The blank-name test is a theory over several kinds of blank value, and the test of the
 actor kinds is a theory over the user names of the arranged world.
@@ -38,6 +40,9 @@ N/A - standard test environment.
 - After ten failed attempts within ten minutes an actor who is no system administrator is refused with
   `TooManyAttempts`, other actors are not, the actor may try again when the window has passed, and a system
   administrator is never refused; every failed attempt is audited with the project and the typed name.
+- Attempts made at the same time cannot exceed the limit: with the lookups held back, exactly ten attempts of one
+  actor are admitted and the rest are refused; a system administrator is never limited; an attempt whose lookup throws
+  stays counted; a success gives its reservation back.
 - The last enabled project administrator cannot be removed or demoted by a project administrator (itself included),
   a disabled administrator does not count, a system administrator is not blocked, and a refusal changes and audits
   nothing.
@@ -115,6 +120,26 @@ ten times; the eleventh add (even of an existing name) and an account creation a
 second project administrator is not refused; a system administrator fails twelve times and is never refused. After
 the clock advances by the throttle window the first actor adds the member. This scenario is tested by
 `ProjectService_AddMemberAsync_TooManyFailures_ThrottlesPerActorUntilTheWindowEnds`.
+
+**ProjectService_AddMemberAsync_ConcurrentAttempts_AreAdmittedUpToTheLimitOnly**: Twenty-five attempts of one project
+administrator run at the same time, while the user lookup of every admitted attempt is held back by a gated user store.
+The five attempts over the limit are refused with `TooManyAttempts` before they reach the lookup; exactly ten reach the
+lookup. After the gate opens, those ten fail with `UserNotFound` and exactly ten failures are audited. This scenario
+is tested by `ProjectService_AddMemberAsync_ConcurrentAttempts_AreAdmittedUpToTheLimitOnly`.
+
+**ProjectService_AddMemberAsync_ConcurrentAttemptsOfSystemAdministrator_AreNeverThrottled**: Twenty-five attempts of a
+system administrator run at the same time; all of them reach the held lookup and none is refused for the throttle.
+This scenario is tested by
+`ProjectService_AddMemberAsync_ConcurrentAttemptsOfSystemAdministrator_AreNeverThrottled`.
+
+**ProjectService_AddMemberAsync_LookupThrows_KeepsTheAttemptCounted**: The user lookup throws ten times; the eleventh
+attempt is refused with `TooManyAttempts`, so an exception keeps the reservation counted. This scenario is tested by
+`ProjectService_AddMemberAsync_LookupThrows_KeepsTheAttemptCounted`.
+
+**ProjectService_CreateMemberAccountAsync_Successes_DoNotCountAgainstTheLimit**: After nine failed adds, fifteen created
+accounts all succeed, an invalid user name is refused without counting, one more failed add is still allowed, and the
+next add is refused with `TooManyAttempts`; a success gives its reservation back. This scenario is tested by
+`ProjectService_CreateMemberAccountAsync_Successes_DoNotCountAgainstTheLimit`.
 
 **ProjectService_AddMemberAsync_FailedAttempts_AreAuditedWithTheProject**: A failure of a project administrator, a
 failure of a system administrator, and then a success; exactly two `project.member-add-failed` entries exist, each

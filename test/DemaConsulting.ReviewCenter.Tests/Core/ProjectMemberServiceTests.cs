@@ -208,6 +208,144 @@ public class ProjectMemberServiceTests
     }
 
     /// <summary>
+    ///     Test that parallel attempts of one actor cannot get past the limit while their lookups are still running:
+    ///     the attempt is reserved before the lookup, so exactly the limit is admitted and the rest is refused with the
+    ///     throttle rule before it reaches the lookup.
+    /// </summary>
+    [Fact]
+    public async Task ProjectService_AddMemberAsync_ConcurrentAttempts_AreAdmittedUpToTheLimitOnly()
+    {
+        // Arrange: a lookup that holds every attempt that is admitted
+        var world = await WorldAsync(gatedPrefix: "guess-");
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var actor = new Actor("pa", "pa");
+        const int attempts = ProjectService.MaxFailedAttempts + 15;
+
+        // Act: many attempts at once; the refused ones finish while the admitted ones wait in the lookup
+        var tasks = Enumerable.Range(0, attempts)
+            .Select(i => Task.Run(
+                () => world.Projects.AddMemberAsync(
+                    actor, world.Project, $"guess-{i}", ProjectRole.User, cancellationToken),
+                cancellationToken))
+            .ToList();
+        await WaitUntilAsync(
+            () => tasks.Count(t => t.IsCompleted) >= attempts - ProjectService.MaxFailedAttempts);
+        await WaitUntilAsync(() => world.Gate!.Entered >= ProjectService.MaxFailedAttempts);
+        var refusedBeforeRelease = tasks.Count(t => t.IsCompleted);
+        var enteredBeforeRelease = world.Gate!.Entered;
+        world.Gate.Open();
+        var rules = new List<DomainRule>();
+        foreach (var task in tasks)
+        {
+            rules.Add((await Assert.ThrowsAsync<DomainRuleException>(() => task)).Rule);
+        }
+
+        // Assert: exactly the limit got to the lookup (and failed there); the others were refused without it
+        Assert.Equal(attempts - ProjectService.MaxFailedAttempts, refusedBeforeRelease);
+        Assert.Equal(ProjectService.MaxFailedAttempts, enteredBeforeRelease);
+        Assert.Equal(ProjectService.MaxFailedAttempts, world.Gate.Entered);
+        Assert.Equal(ProjectService.MaxFailedAttempts, rules.Count(r => r == DomainRule.UserNotFound));
+        Assert.Equal(attempts - ProjectService.MaxFailedAttempts, rules.Count(r => r == DomainRule.TooManyAttempts));
+        Assert.Equal(
+            ProjectService.MaxFailedAttempts,
+            world.AuditStore.Entries.Count(e => e.Action == "project.member-add-failed"));
+    }
+
+    /// <summary>
+    ///     Test that a system administrator is not limited by the reservation either: every parallel attempt
+    ///     reaches the lookup.
+    /// </summary>
+    [Fact]
+    public async Task ProjectService_AddMemberAsync_ConcurrentAttemptsOfSystemAdministrator_AreNeverThrottled()
+    {
+        // Arrange
+        var world = await WorldAsync(gatedPrefix: "guess-");
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var actor = new Actor("root", "root");
+        const int attempts = ProjectService.MaxFailedAttempts + 15;
+
+        // Act
+        var tasks = Enumerable.Range(0, attempts)
+            .Select(i => Task.Run(
+                () => world.Projects.AddMemberAsync(
+                    actor, world.Project, $"guess-{i}", ProjectRole.User, cancellationToken),
+                cancellationToken))
+            .ToList();
+        await WaitUntilAsync(() => world.Gate!.Entered >= attempts);
+        world.Gate!.Open();
+
+        // Assert: all of them were looked up and failed with the one message
+        foreach (var task in tasks)
+        {
+            Assert.Equal(DomainRule.UserNotFound, (await Assert.ThrowsAsync<DomainRuleException>(() => task)).Rule);
+        }
+    }
+
+    /// <summary>
+    ///     Test that an attempt whose lookup throws stays counted, so a failing lookup cannot be used to try names
+    ///     without limit.
+    /// </summary>
+    [Fact]
+    public async Task ProjectService_AddMemberAsync_LookupThrows_KeepsTheAttemptCounted()
+    {
+        // Arrange: a lookup that fails as soon as it runs
+        var world = await WorldAsync(gatedPrefix: "guess-");
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var actor = new Actor("pa", "pa");
+        world.Gate!.LookupFailure = new InvalidOperationException("The store is down.");
+        world.Gate.Open();
+
+        // Act
+        for (var i = 0; i < ProjectService.MaxFailedAttempts; i++)
+        {
+            await Assert.ThrowsAsync<InvalidOperationException>(() => world.Projects.AddMemberAsync(
+                actor, world.Project, $"guess-{i}", ProjectRole.User, cancellationToken));
+        }
+
+        var stopped = await Assert.ThrowsAsync<DomainRuleException>(() => world.Projects.AddMemberAsync(
+            actor, world.Project, "guess-next", ProjectRole.User, cancellationToken));
+
+        // Assert
+        Assert.Equal(DomainRule.TooManyAttempts, stopped.Rule);
+    }
+
+    /// <summary>
+    ///     Test that a success gives its reservation back: after nine failures any number of created accounts
+    ///     succeeds, one more failure is still allowed, and then the actor is stopped.
+    /// </summary>
+    [Fact]
+    public async Task ProjectService_CreateMemberAccountAsync_Successes_DoNotCountAgainstTheLimit()
+    {
+        // Arrange: one failure short of the limit
+        var world = await WorldAsync();
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var actor = new Actor("pa", "pa");
+        for (var i = 0; i < ProjectService.MaxFailedAttempts - 1; i++)
+        {
+            await Assert.ThrowsAsync<DomainRuleException>(() => world.Projects.AddMemberAsync(
+                actor, world.Project, $"guess-{i}", ProjectRole.User, cancellationToken));
+        }
+
+        // Act: more successes than the limit, an invalid input (not a failed guess), the last allowed failure
+        for (var i = 0; i < ProjectService.MaxFailedAttempts + 5; i++)
+        {
+            await world.Projects.CreateMemberAccountAsync(
+                actor, world.Project, $"fresh-{i}", "Fresh Person", ProjectRole.User, cancellationToken);
+        }
+
+        await Assert.ThrowsAsync<DomainRuleException>(() => world.Projects.CreateMemberAccountAsync(
+            actor, world.Project, "x", "Fresh Person", ProjectRole.User, cancellationToken));
+        var lastFailure = await Assert.ThrowsAsync<DomainRuleException>(() => world.Projects.AddMemberAsync(
+            actor, world.Project, "guess-last", ProjectRole.User, cancellationToken));
+        var stopped = await Assert.ThrowsAsync<DomainRuleException>(() => world.Projects.AddMemberAsync(
+            actor, world.Project, "carol", ProjectRole.User, cancellationToken));
+
+        // Assert
+        Assert.Equal(DomainRule.UserNotFound, lastFailure.Rule);
+        Assert.Equal(DomainRule.TooManyAttempts, stopped.Rule);
+    }
+
+    /// <summary>
     ///     Test that every failed attempt to add a member is audited with the project and the name typed, also for a
     ///     system administrator, and that a success writes no failure entry.
     /// </summary>
@@ -445,11 +583,35 @@ public class ProjectMemberServiceTests
     }
 
     /// <summary>
+    ///     Waits until a condition holds, so a test does not depend on how fast the parallel work runs.
+    /// </summary>
+    /// <param name="condition">The condition.</param>
+    /// <returns>A task that completes when the condition holds.</returns>
+    /// <exception cref="TimeoutException">Thrown when the condition does not hold within ten seconds.</exception>
+    private static async Task WaitUntilAsync(Func<bool> condition)
+    {
+        var deadline = DateTime.UtcNow.AddSeconds(10);
+        while (!condition())
+        {
+            if (DateTime.UtcNow > deadline)
+            {
+                throw new TimeoutException("The condition did not hold in time.");
+            }
+
+            await Task.Delay(5, TestContext.Current.CancellationToken);
+        }
+    }
+
+    /// <summary>
     ///     Arranges the stores, the users and one project with its members.
     /// </summary>
     /// <param name="withSecondAdmin">Whether <c>pb</c> is a second enabled project administrator.</param>
+    /// <param name="gatedPrefix">
+    ///     When set, the service reads users through a <see cref="GatedUserStore"/> that holds back the lookup of the
+    ///     names that start with it.
+    /// </param>
     /// <returns>The arranged world.</returns>
-    private static async Task<World> WorldAsync(bool withSecondAdmin = true)
+    private static async Task<World> WorldAsync(bool withSecondAdmin = true, string? gatedPrefix = null)
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         var clock = new MovableTimeProvider(_now);
@@ -481,8 +643,10 @@ public class ProjectMemberServiceTests
 
         var auditStore = new FakeAuditStore(clock);
         var access = new ProjectAccess(userStore, store);
+        var gate = gatedPrefix is null ? null : new GatedUserStore(userStore, gatedPrefix);
         var projects = new ProjectService(
-            store, userStore, access, new FakePasswordHasher(), clock, new AuditService(auditStore));
+            store,
+            gate is null ? userStore : gate, access, new FakePasswordHasher(), clock, new AuditService(auditStore));
         var project = await projects.CreateAsync("Own", null, new Actor("root", "root"), cancellationToken);
         var other = await projects.CreateAsync("Other", null, new Actor("root", "root"), cancellationToken);
         await store.AddMembershipAsync(ids["pa"], project.Id, ProjectRole.ProjectAdmin, cancellationToken);
@@ -495,7 +659,7 @@ public class ProjectMemberServiceTests
         await store.AddMembershipAsync(ids["off"], project.Id, ProjectRole.User, cancellationToken);
         await store.AddMembershipAsync(ids["offadm"], project.Id, ProjectRole.ProjectAdmin, cancellationToken);
         await store.AddMembershipAsync(ids["padm"], other.Id, ProjectRole.ProjectAdmin, cancellationToken);
-        return new World(store, userStore, projects, auditStore, clock, project.Id, ids);
+        return new World(store, userStore, projects, auditStore, clock, project.Id, ids, gate);
     }
 
     /// <summary>
@@ -508,6 +672,7 @@ public class ProjectMemberServiceTests
     /// <param name="Clock">The clock the service reads.</param>
     /// <param name="Project">The project the tests work on.</param>
     /// <param name="Ids">The identities of the users by user name.</param>
+    /// <param name="Gate">The user store that holds back lookups, when the world was arranged with one.</param>
     private sealed record World(
         FakeReviewStore Store,
         FakeUserStore UserStore,
@@ -515,7 +680,8 @@ public class ProjectMemberServiceTests
         FakeAuditStore AuditStore,
         MovableTimeProvider Clock,
         int Project,
-        IReadOnlyDictionary<string, int> Ids)
+        IReadOnlyDictionary<string, int> Ids,
+        GatedUserStore? Gate = null)
     {
         /// <summary>
         ///     Reads the memberships of the project as text, in a stable order.

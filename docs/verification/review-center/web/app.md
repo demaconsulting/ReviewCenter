@@ -130,6 +130,15 @@ scenario is tested by `MainLayout_Render_NobodySignedIn_ShowsFooterWithVersionAn
 is rendered with no projects and no users tab, and the browser is sent to `/account` from the first two pages only. This
 scenario is tested by `MainLayout_Render_TemporaryPassword_ConfinesUserToAccountPage`.
 
+**MainLayout_Navigate_TemporaryPassword_RedirectsLaterNavigationAndStopsAfterDispose**: A flagged session renders
+`MainLayout` on `/help`, then navigates (the layout stays alive) to `/account` and `/help/project-members`, which are
+not redirected, and to `/projects`, which is sent to `/account`. After the layout instance is disposed, navigating to
+`/projects` is no longer redirected, so the handler was removed. This scenario is tested by
+`MainLayout_Navigate_TemporaryPassword_RedirectsLaterNavigationAndStopsAfterDispose`.
+
+**MainLayout_Navigate_OrdinaryUser_IsNotRedirected**: A signed-in user without the claim navigates from `/help` to
+`/projects` and stays there. This scenario is tested by `MainLayout_Navigate_OrdinaryUser_IsNotRedirected`.
+
 **SessionGate_Render_SignedInUser_ShowsContent**: `SessionGate` is rendered around some content for a signed-in user;
 the content is shown and no session-ended message. This scenario is tested by
 `SessionGate_Render_SignedInUser_ShowsContent`.

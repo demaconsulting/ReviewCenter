@@ -40,6 +40,14 @@ cannot leak it.
 **Throttle constants**: `MaxFailedAttempts` (10), `ThrottleWindow` (10 minutes), and `MemberAddFailedAction`
 (`project.member-add-failed`).
 
+**Attempt reservation** (private): the throttle reserves an attempt before the user is looked up, not after it has
+failed. `ReserveAttempt` checks the limit and records the attempt in one step under the lock, so attempts of one actor
+that run at the same time cannot all pass the check before any failure is counted (a system administrator gets no
+reservation and is never counted). `ReleaseAttempt` gives only that reservation back, and only when the attempt
+succeeded; a failure, or any exception, leaves the reservation counted. It follows the reservation pattern of
+`SignInThrottle` in the `Identity` subsystem, simplified to one counter per actor (that class belongs to the web
+project and counts per client address, so it is not reused).
+
 **DomainRuleException**: an exception with a `Rule` (`DomainRule`) and a user-presentable message. Three rules belong to
 member management: `LastProjectAdmin` (the change would leave the project without an enabled project administrator),
 `TooManyAttempts` (too many failed adds lately), and `PasswordChangeRequired` (the account still has a temporary
@@ -56,8 +64,8 @@ without an enabled project administrator (the check and the change are one atomi
 `ReviewStore` in the `Storage` subsystem.
 
 The service holds the injected store, user store, project access, password hasher, clock, and optional audit service,
-and one piece of state: the in-memory failure times per actor (by user name without regard to case), guarded by a lock
-that is never held across an await. That state is per process and lost on restart. The membership types
+and one piece of state: the in-memory attempt reservations per actor (by user name without regard to case), guarded by a
+lock that is never held across an await. That state is per process and lost on restart. The membership types
 `ProjectMembership`, `ProjectRole`, and `ProjectMember` are described with the `ProjectAccess` unit.
 
 #### Key Methods
@@ -89,8 +97,9 @@ an administrator of the project (`ProjectNotFound` when it is not visible, `Acto
 - *Returns*: `Task<ProjectMember>` — the new member.
 - *Preconditions*: The actor administers the project or is a system administrator (`ProjectNotFound` or
   `ActorNotAllowed` otherwise, as `RequireAdministerAsync` decides); the role is defined
-  (`ArgumentOutOfRangeException`); a non-exempt actor has fewer than `MaxFailedAttempts` failures in the last
-  `ThrottleWindow` (`TooManyAttempts` otherwise).
+  (`ArgumentOutOfRangeException`); a non-exempt actor has fewer than `MaxFailedAttempts` reserved attempts in the last
+  `ThrottleWindow` (`TooManyAttempts` otherwise); the attempt is reserved atomically before the user lookup and stays
+  counted unless the add succeeds.
 - *Postconditions*: The membership is stored with the audit event `project.member-added`. The name is trimmed and looked
   up exactly: there is no search and no operation lists users, so a project administrator cannot browse the user base.
   A name that does not exist and the name of a disabled user are refused with the same message and the rule
@@ -103,7 +112,9 @@ an administrator of the project (`ProjectNotFound` when it is not visible, `Acto
 - *Parameters*: the `Actor`, the project identity, the new user name, the display name, the `ProjectRole`, and a
   cancellation token.
 - *Returns*: `Task<NewMemberAccount>` — the new member and the temporary password, returned only here.
-- *Preconditions*: The same access and throttle checks as `AddMemberAsync`; the user name and display name pass the same
+- *Preconditions*: The same access and throttle checks as `AddMemberAsync` (the attempt is reserved before the account
+  is stored; input refused before any write gives the reservation back, so a typing mistake is not a failed guess);
+  the user name and display name pass the same
   rules as for a user created by a system administrator (`UserNameInvalid`, `DisplayNameInvalid`).
 - *Postconditions*: The account is created with `IsSystemAdmin` false, enabled, `MustChangePassword` true, and the hash
   of a generated temporary password, and the membership is created, in one transaction through
@@ -147,6 +158,20 @@ be used to find out which accounts exist. A failure to write the audit entry of 
 Constructing the service with a null store, user store, access, hasher, or clock raises `ArgumentNullException`; the
 audit service is optional. Store failures propagate unchanged, except that the `LastProjectAdmin` and `UserNameTaken`
 failures of the stores are turned into the friendly messages above.
+
+#### Known Limitations
+
+- The membership operations check the authorization (`RequireAdministerAsync`) before the store transaction and do not
+  revalidate the actor inside it. An administrator whose right is revoked (removed from the project, demoted, or
+  disabled) within the few milliseconds between the check and the store transaction of one handler is therefore not
+  stopped for that one operation; the next call is refused. This is the same class of limitation as for the access
+  rules of project-based access control (see `ProjectAccess`: a revocation takes effect on the next call), is
+  deliberate, and is not mitigated.
+- Adding a member by the exact user name necessarily tells a project administrator whether an enabled account with
+  that name exists, because a successful add shows it. That is accepted: successful adds are visible in the member list,
+  audited (`project.member-added`) and reversible by removing the member, failures are throttled and audited, and
+  system administrators and project administrators can already create accounts, which reveals name collisions
+  (`UserNameTaken`). There is still no search and no list of users.
 
 #### Dependencies
 
