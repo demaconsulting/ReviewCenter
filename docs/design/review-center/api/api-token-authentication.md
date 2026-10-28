@@ -27,7 +27,11 @@ from the evidence settings of a project to the one switch that the route depends
 `AnonymousRateLimit.cs` holds `AnonymousRateLimit`, a singleton that counts the requests of each client address in a
 fixed window of one minute and allows 30 requests in a window. The counters are in memory (a concurrent dictionary of
 one small counter object per address, locked while it is changed), so they start empty after a restart, and the
-dictionary is pruned of ended windows when it holds more than 4096 addresses.
+dictionary is pruned of ended windows when it holds more than 4096 addresses. The address is the one that
+`SignIn.ClientAddress` gives, the address of the direct connection (`Connection.RemoteIpAddress`). Behind a reverse
+proxy without `ASPNETCORE_FORWARDEDHEADERS_ENABLED=true` it is the address of the proxy, so all anonymous callers share
+one counter and the limit is reached sooner (it fails safe). This is the same limitation as for `SignInThrottle`
+(see `identity/sign-in-throttle.md`).
 
 `ApiTokenHandler` is the authentication handler of the scheme. A new instance serves each request. It holds the three
 services it uses (`PersonalAccessTokenService`, `SignInThrottle`, and `AuditService`) and no state of its own; the

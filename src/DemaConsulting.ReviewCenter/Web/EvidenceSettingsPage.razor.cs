@@ -269,6 +269,27 @@ public partial class EvidenceSettingsPage : ComponentBase
     private static bool Checked(ChangeEventArgs e) => e.Value is true;
 
     /// <summary>
+    ///     Applies a change of a switch to the draft, after re-checking that the user still administers the project.
+    /// </summary>
+    /// <param name="item">The switch that changed. Must not be null.</param>
+    /// <param name="e">The change event. Must not be null.</param>
+    /// <returns>A task that completes when the change has been handled.</returns>
+    /// <remarks>
+    ///     When the right was lost while the page was open the page drops the settings and the draft is not touched,
+    ///     so no setting or warning about it stays visible.
+    /// </remarks>
+    private async Task ChangeAsync(SettingSwitch item, ChangeEventArgs e)
+    {
+        // An open page re-checks its user only every revalidation interval, so ask who the user is now
+        if (!await GuardAsync())
+        {
+            return;
+        }
+
+        item.Set(Checked(e));
+    }
+
+    /// <summary>
     ///     Saves the draft, based on the settings the page loaded.
     /// </summary>
     /// <returns>A task that completes when the save has been handled.</returns>

@@ -382,7 +382,8 @@ sections:
 
       - id: ReviewCenter-ProjectPage-EvidenceSettingsRightLost
         title: >-
-          The ProjectPage unit shall check on every save that the user still administers the project and, when the
+          The ProjectPage unit shall check on every switch change and every save that the user still administers the
+          project and, when the
           right was lost while the page was open (the membership was revoked, the user was demoted, or the sign-in
           state ended), store and record nothing and replace the page with the not-found message and none of the
           settings or messages, and shall drop the choices and the project when the page is reused for another
@@ -393,4 +394,5 @@ sections:
           another.
         tests:
           - EvidenceSettingsPage_Save_RightLostWhileOpen_StoresNothingAndDropsThePage
+          - EvidenceSettingsPage_Switch_RightLostWhileOpen_DropsThePageAndTakesNoChange
           - EvidenceSettingsPage_Load_OtherProject_DropsTheChoicesAndTheProject

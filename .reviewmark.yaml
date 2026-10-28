@@ -980,6 +980,7 @@ reviews:
       - "test/**/Storage/ReviewStoreRepositoryTests.cs"
       - "test/**/Storage/ReviewStoreSigningTests.cs"
       - "test/**/Storage/ReviewStoreMembershipTests.cs"
+      - "test/**/Storage/EvidenceSettingsStoreTests.cs"
       - "test/**/Storage/ProjectMembersStoreTests.cs"
 
   - id: ReviewCenter-Storage-UserStore

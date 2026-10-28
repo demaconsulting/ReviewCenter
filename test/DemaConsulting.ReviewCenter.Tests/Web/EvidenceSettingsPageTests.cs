@@ -92,6 +92,28 @@ public class EvidenceSettingsPageTests : PageTestBase
     }
 
     /// <summary>
+    ///     Takes the right to administer the project away from <c>padm</c>, without the open page knowing.
+    /// </summary>
+    /// <param name="projectId">The project identity.</param>
+    /// <param name="how">How the right is lost: <c>revoked</c>, <c>demoted</c> or <c>ended</c>.</param>
+    /// <returns>A task that completes when the right is gone.</returns>
+    private async Task LoseRightAsync(int projectId, string how)
+    {
+        switch (how)
+        {
+            case "revoked":
+                await RevokeMembershipAsync(projectId, "padm");
+                break;
+            case "demoted":
+                await ChangeMemberRoleAsync(projectId, "padm", ProjectRole.User);
+                break;
+            default:
+                SignOutQuietly();
+                break;
+        }
+    }
+
+    /// <summary>
     ///     Test that whoever administers the project gets the defaults: the two anonymous switches off, the five
     ///     content switches on, no warning and no banner, a Save button and a button back to the project.
     /// </summary>
@@ -415,18 +437,7 @@ public class EvidenceSettingsPageTests : PageTestBase
         SignInAs("padm", "Padm", isSystemAdmin: false);
         var cut = RenderPage(apollo);
         await SetAsync(cut, "anonymous-index", on: true);
-        switch (how)
-        {
-            case "revoked":
-                await RevokeMembershipAsync(apollo, "padm");
-                break;
-            case "demoted":
-                await ChangeMemberRoleAsync(apollo, "padm", ProjectRole.User);
-                break;
-            default:
-                SignOutQuietly();
-                break;
-        }
+        await LoseRightAsync(apollo, how);
 
         // Act
         await cut.Find("[data-testid='evidence-settings-save']").ClickAsync();
@@ -439,6 +450,41 @@ public class EvidenceSettingsPageTests : PageTestBase
         Assert.DoesNotContain("Apollo", cut.Markup, StringComparison.Ordinal);
         var stored = await SettingsService.GetAsync(TestActors.Ann, apollo, TestContext.Current.CancellationToken);
         Assert.False(stored.AnonymousIndex);
+        Assert.DoesNotContain(Store.Audits, a => a.Action == EvidenceSettingsService.ChangedAction);
+    }
+
+    /// <summary>
+    ///     Test that turning a switch after the right was lost while the page was open (membership revoked, demoted
+    ///     to plain member, or session ended without the page knowing) takes no change: the page drops to the
+    ///     not-found state with no switches, no warning, no banner and none of the project's data, and nothing is
+    ///     stored or recorded.
+    /// </summary>
+    /// <param name="how">How the right is lost: <c>revoked</c>, <c>demoted</c> or <c>ended</c>.</param>
+    [Theory]
+    [InlineData("revoked")]
+    [InlineData("demoted")]
+    [InlineData("ended")]
+    public async Task EvidenceSettingsPage_Switch_RightLostWhileOpen_DropsThePageAndTakesNoChange(string how)
+    {
+        // Arrange: the page is open for a project admin
+        var apollo = await ArrangeAsync();
+        SignInAs("padm", "Padm", isSystemAdmin: false);
+        var cut = RenderPage(apollo);
+        await LoseRightAsync(apollo, how);
+
+        // Act: a content switch, which would show a warning and the banner while the right holds
+        await SetAsync(cut, "files", on: false);
+
+        // Assert
+        Assert.NotEmpty(cut.FindAll("[data-testid='project-not-found']"));
+        Assert.Empty(cut.FindAll("[data-testid='evidence-settings-form']"));
+        Assert.Empty(cut.FindAll("[data-testid='evidence-files-warning']"));
+        Assert.Empty(cut.FindAll("[data-testid='evidence-reduced-banner']"));
+        Assert.Empty(cut.FindAll("[data-testid='evidence-settings-error']"));
+        Assert.Empty(cut.FindAll("[data-testid='evidence-settings-status']"));
+        Assert.DoesNotContain("Apollo", cut.Markup, StringComparison.Ordinal);
+        var stored = await SettingsService.GetAsync(TestActors.Ann, apollo, TestContext.Current.CancellationToken);
+        Assert.True(stored.IncludeFiles);
         Assert.DoesNotContain(Store.Audits, a => a.Action == EvidenceSettingsService.ChangedAction);
     }
 

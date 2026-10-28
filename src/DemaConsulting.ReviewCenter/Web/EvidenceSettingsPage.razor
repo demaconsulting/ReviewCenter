@@ -74,7 +74,7 @@
             {
                 <div class="field setting" data-testid="evidence-setting-@item.TestId">
                     <label class="switch">
-                        <input type="checkbox" checked="@item.Get()" @onchange="e => item.Set(Checked(e))"
+                        <input type="checkbox" checked="@item.Get()" @onchange="e => ChangeAsync(item, e)"
                                data-testid="evidence-@item.TestId-switch" />
                         @item.Title
                     </label>
@@ -107,7 +107,7 @@
             {
                 <div class="field setting" data-testid="evidence-setting-@item.TestId">
                     <label class="switch">
-                        <input type="checkbox" checked="@item.Get()" @onchange="e => item.Set(Checked(e))"
+                        <input type="checkbox" checked="@item.Get()" @onchange="e => ChangeAsync(item, e)"
                                data-testid="evidence-@item.TestId-switch" />
                         @item.Title
                     </label>

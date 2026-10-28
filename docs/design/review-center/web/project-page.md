@@ -222,6 +222,10 @@ asks `GuardAdministerAsync` of the shared guard whether the user administers the
 project (`ProjectService.GetAsync`) and the stored settings (`EvidenceSettingsService.GetAsync`) into `Saved` and
 `Draft`; anyone else sees the same "does not exist" message and no form.
 
+**ChangeAsync** (`EvidenceSettingsPage`): Runs `GuardAsync` first (`ProjectViewGuard.GuardAdministerAsync`). When the
+right is gone `ShowNoAccess` clears the project, the settings and the messages and the page shows the not-found
+message, so no switch, warning or banner stays; otherwise it writes the switch into `Draft` and does nothing else.
+
 **SaveAsync** (`EvidenceSettingsPage`): Clears the messages, runs `GuardAsync` (`ProjectViewGuard.GuardAdministerAsync`;
 when the right is gone `ShowNoAccess` clears the project, the settings and the messages and the page shows the
 not-found message), asks for the current user, and calls `EvidenceSettingsService.SetAsync` with the user, the project,
@@ -236,8 +240,8 @@ of the stale draft.
 
 **Switches** (`EvidenceSettingsPage`): A switch is one entry of a list that holds its key, its title, its description,
 its regulatory warning (the content switches only), and how it reads and writes `Draft`, so the seven rows, the warnings,
-and the test identifiers come from one table. A change replaces `Draft` and changes nothing else; saving is the only
-action that reaches the service.
+and the test identifiers come from one table. A change first re-checks the access (`ChangeAsync`) and then replaces
+`Draft` and changes nothing else; saving is the only action that reaches the service.
 
 **OnParametersSetAsync** (`NewReviewPage`): Loads the project (for the actor, so a project the user may not see shows
 the not-found message and no form) and the enabled repositories of the project. When the project

@@ -444,6 +444,12 @@ Save settings is pressed; the page shows the not-found message and no form, erro
 project name, the stored settings are unchanged, and no audit entry exists. This scenario is tested by
 `EvidenceSettingsPage_Save_RightLostWhileOpen_StoresNothingAndDropsThePage`.
 
+**EvidenceSettingsPage_Switch_RightLostWhileOpen_DropsThePageAndTakesNoChange**: With the page open, the membership is
+revoked, the user is demoted to plain member, or the sign-in state is ended without the page knowing; the file list
+switch is turned off; the page shows the not-found message and no form, no file list warning, no summary banner, no
+error or status, does not contain the project name, the stored file list setting is unchanged, and no audit entry
+exists. This scenario is tested by `EvidenceSettingsPage_Switch_RightLostWhileOpen_DropsThePageAndTakesNoChange`.
+
 **EvidenceSettingsPage_Load_OtherProject_DropsTheChoicesAndTheProject**: With a switch changed for the first project, the
 page is given the identity of a second project that the user does not administer; it shows the not-found message and
 neither project name. This scenario is tested by `EvidenceSettingsPage_Load_OtherProject_DropsTheChoicesAndTheProject`.

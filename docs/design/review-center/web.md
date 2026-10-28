@@ -484,8 +484,8 @@ the attestation PDFs contain. The page contains no rule about the effect of a sw
 the switches with their defaults, to warn while a choice is made (a warning below each content switch that is off, a
 summary of what is left out, and an exposure warning while an anonymous switch is on), to save all the switches
 together on one button, and to say what happened. A change made by someone else after the page loaded is never
-overwritten: the page shows the stored settings and says so. Every save re-checks that the user still administers the
-project. The Help topic `evidence-settings` explains the switches and their consequences.
+overwritten: the page shows the stored settings and says so. Every switch change and every save re-checks that the user
+still administers the project. The Help topic `evidence-settings` explains the switches and their consequences.
 
 #### Personal access tokens
 
