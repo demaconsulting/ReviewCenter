@@ -1,0 +1,136 @@
+@* EvidenceSettingsPage: the evidence settings of one project, at "/projects/{id}/evidence-settings". Two groups of
+   switches: who may read the evidence without signing in (the evidence index and the attestation PDFs, independent
+   of each other) and what every attestation PDF of the project contains (review discussion threads, reviewer names,
+   checklist wording, the file list with hashes, the git context). One "Save settings" button saves all of them and a
+   "Back to project" button leaves. Only whoever may administer the project (a system administrator or a project
+   admin of it) gets the page; anybody else sees the not-found message of a missing project.
+
+   Presentation only; state and event handling live in EvidenceSettingsPage.razor.cs. Each switch has a short
+   description. A switch that REMOVES content from the PDFs shows a regulatory warning right below it while it is
+   off, a summary notice at the top lists everything that is left out, and a distinct exposure warning shows while
+   an anonymous switch is on (stronger when the PDFs still carry comments or names). All of that follows the
+   choices on the page at once, before saving. Every key value carries a stable kebab-case data-testid, and the
+   data-interactive marker on the root flips to "true" once the live circuit is connected.
+
+   Human factors: (a) the settings and nothing else, anonymous access first because it is the riskiest, one save
+   button; (b) each switch says what it does in one sentence and what turning it off or on costs, so nobody has to
+   guess; (c) the warnings appear next to the switch that causes them and a saved change is confirmed in words.
+
+   The page body is inside SessionGate, which replaces it with a "Session ended" message when the user is no longer
+   valid while the page is open. *@
+@page "/projects/{ProjectId:int}/evidence-settings"
+@rendermode InteractiveServer
+@attribute [Authorize]
+
+<PageTitle>Evidence settings - ReviewCenter</PageTitle>
+
+<SessionGate>
+<main class="page narrow" data-testid="evidence-settings-page" data-interactive="@InteractiveMarker">
+    <nav class="breadcrumb">
+        <a href="/projects" data-testid="breadcrumb-projects-link">Projects</a>
+        @if (Project is not null)
+        {
+            <span aria-hidden="true">/</span>
+            <a href="/projects/@ProjectId" data-testid="breadcrumb-project-link">@Project.Name</a>
+            <span aria-hidden="true">/</span>
+            <span aria-current="page">Evidence settings</span>
+        }
+    </nav>
+
+    @if (!Loaded)
+    {
+        <p class="muted" data-testid="evidence-settings-loading">Loading...</p>
+    }
+    else if (Project is null)
+    {
+        <p class="error" role="alert" data-testid="project-not-found">Project @ProjectId does not exist.</p>
+    }
+    else
+    {
+    <h1>Evidence settings</h1>
+    <p class="page-lead">Decide who may read this project's evidence and what its attestation PDFs contain.</p>
+
+    @if (ErrorMessage is not null)
+    {
+        <p class="error" role="alert" data-testid="evidence-settings-error">@ErrorMessage</p>
+    }
+    @if (StatusMessage is not null)
+    {
+        <p class="notice" role="status" data-testid="evidence-settings-status">@StatusMessage</p>
+    }
+    @if (OmittedSections.Count > 0)
+    {
+        <p class="notice warning" role="status" data-testid="evidence-reduced-banner">
+            These choices leave out of every attestation PDF: @string.Join(", ", OmittedSections).
+            Check that your regulatory regime allows it.
+        </p>
+    }
+
+    <form data-testid="evidence-settings-form" @onsubmit="SaveAsync">
+        <section class="card">
+            <h2 class="section-title">Anonymous access</h2>
+            <p class="muted hint">Both are off by default, so everything needs a sign-in or an API token.</p>
+            @foreach (var item in Switches.Where(s => s.Anonymous))
+            {
+                <div class="field setting" data-testid="evidence-setting-@item.TestId">
+                    <label class="switch">
+                        <input type="checkbox" checked="@item.Get()" @onchange="e => item.Set(Checked(e))"
+                               data-testid="evidence-@item.TestId-switch" />
+                        @item.Title
+                    </label>
+                    <p class="muted hint">@item.Description</p>
+                </div>
+            }
+            @if (AnonymousIsOn)
+            {
+                <p class="notice warning" data-testid="evidence-anonymous-warning">
+                    Anyone who can reach this server can read what you opened, without signing in.
+                    Anonymous requests are limited to @AnonymousLimit per minute per address.
+                    @if (AnonymousPdfsShowPeopleOrComments)
+                    {
+                        <strong data-testid="evidence-anonymous-people-warning">
+                            The attestation PDFs still contain @AnonymousPdfExposure; anonymous readers will see
+                            them. Turn those switches off below if that is not acceptable.
+                        </strong>
+                    }
+                </p>
+            }
+        </section>
+
+        <section class="card">
+            <h2 class="section-title">PDF content</h2>
+            <p class="muted hint">
+                These apply to every attestation PDF of this project, for sign-in and anonymous readers alike.
+                Each PDF has a Content scope section that says what was left out.
+            </p>
+            @foreach (var item in Switches.Where(s => !s.Anonymous))
+            {
+                <div class="field setting" data-testid="evidence-setting-@item.TestId">
+                    <label class="switch">
+                        <input type="checkbox" checked="@item.Get()" @onchange="e => item.Set(Checked(e))"
+                               data-testid="evidence-@item.TestId-switch" />
+                        @item.Title
+                    </label>
+                    <p class="muted hint">@item.Description</p>
+                    @if (!item.Get())
+                    {
+                        <p class="notice warning" data-testid="evidence-@item.TestId-warning">@item.Warning</p>
+                    }
+                </div>
+            }
+            <p class="muted hint">
+                Always included: the review and project identifiers, the content fingerprint, the checklist
+                outcomes, the signatures, the record digest and the signing-key note. Names typed into comments or
+                other free text are not removed; only the PDF's own name fields are.
+            </p>
+        </section>
+
+        <div class="plan-actions">
+            <button type="submit" data-testid="evidence-settings-save">Save settings</button>
+            <a class="action outline" href="/projects/@ProjectId"
+               data-testid="evidence-settings-back">Back to project</a>
+        </div>
+    </form>
+    }
+</main>
+</SessionGate>

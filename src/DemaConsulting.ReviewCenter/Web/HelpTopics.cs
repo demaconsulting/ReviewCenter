@@ -59,6 +59,10 @@ internal static class HelpTopics
             "Managing project members",
             "Add people to a project, create an account, change a role or remove a member."),
         new("api-tokens", "Automation and API tokens", "Use a personal access token to read reviews and create drafts from a script."),
+        new(
+            "evidence-settings",
+            "Evidence settings",
+            "Open the evidence index and PDFs to anonymous readers and choose what the PDFs contain."),
     ];
 
     /// <summary>

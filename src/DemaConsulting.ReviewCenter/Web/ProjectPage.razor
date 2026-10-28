@@ -2,7 +2,8 @@
    title, state and approval badges, creation date), each row a link to the review, with a "+ New review" button
    that leads to the separate creation page at "/projects/{id}/reviews/new" and a "Plan reviews" button. Whoever
    may administer the project (a system administrator or a project admin) also gets a "Repositories" button to the
-   repository page of the project and an "Audit trail" button to the project audit page. Whoever may administer the
+   repository page of the project, an "Audit trail" button to the project audit page and an "Evidence settings"
+   button to the page that decides who may read the evidence anonymously and what the attestation PDFs contain. Whoever may administer the
    project also sees a Members section below the reviews: the members with a role button and a Remove button, and a
    "+ Add member" button that leads to its own page (members are rarely changed, so the form is not here and no list
    of users is ever shown). A project the user may not see looks exactly like a project that does not exist.
@@ -53,6 +54,8 @@
                     <a class="action outline" href="/projects/@ProjectId/audit"
                        data-testid="project-audit-link">Audit trail</a>
                     <a class="action outline" href="/projects/@ProjectId/repositories" data-testid="repositories-link">Repositories</a>
+                    <a class="action outline" href="/projects/@ProjectId/evidence-settings"
+                       data-testid="evidence-settings-link">Evidence settings</a>
                 }
                 @if (Repositories.Count > 0)
                 {

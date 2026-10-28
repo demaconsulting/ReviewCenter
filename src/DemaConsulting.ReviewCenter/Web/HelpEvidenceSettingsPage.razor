@@ -1,0 +1,72 @@
+@* HelpEvidenceSettingsPage: help topic "Evidence settings" at "/help/evidence-settings". Static text and two
+   screenshots of the Evidence settings page of a project. *@
+@page "/help/evidence-settings"
+
+<HelpTopicFrame Slug="evidence-settings">
+    <section class="card">
+        <p>Every project has <strong>evidence settings</strong>. They decide who may read the project's evidence without
+            signing in, and what its attestation PDFs contain. Only a <strong>project admin</strong> or a
+            <strong>system administrator</strong> can see and change them: use the <strong>Evidence settings</strong>
+            button on the project page. Every change is recorded in the project's audit trail, with what was changed
+            and the old and new values.</p>
+        <figure class="help-figure">
+            <img class="help-shot" src="/help/evidence-settings-1.png" loading="lazy"
+                 alt="The Evidence settings page with the two anonymous access switches, both off, and the five PDF content switches, all on, above the Save settings button." />
+            <figcaption>The Evidence settings page with the default choices.</figcaption>
+        </figure>
+        <h2>Anonymous access</h2>
+        <p>Both switches are <strong>off</strong> by default, and they are independent of each other.</p>
+        <ul>
+            <li><strong>Anonymous evidence index</strong>: anyone may read the evidence index of the project without
+                signing in. The index lists review-set names, fingerprints, dates and results. On its own it is of no
+                use to ReviewMark: ReviewMark also needs the PDFs, so turn on anonymous PDFs as well, or give the
+                client credentials.</li>
+            <li><strong>Anonymous attestation PDFs</strong>: anyone may download the attestation PDFs of the project
+                without signing in.</li>
+        </ul>
+        <p>Only these two addresses are ever open, and only for a project that turned the matching switch on. Everything
+            else needs a sign-in or an API token. A request with a wrong token is still refused. Anonymous requests are
+            limited in number per address. A project that has not opened a switch answers exactly as if the project did
+            not exist, so nobody learns that it is there.</p>
+        <p><strong>Think before you turn them on.</strong> Anyone who can reach the server can then read what you opened.
+            If the PDFs still include the discussion threads or the reviewer names, anonymous readers see those too; the
+            page warns you in that case.</p>
+        <h2>PDF content</h2>
+        <p>These five switches are <strong>on</strong> by default and apply to <strong>every</strong> attestation PDF
+            of the project, whoever downloads it.</p>
+        <ul>
+            <li><strong>Review discussion threads</strong>: the comment threads and how each ended.</li>
+            <li><strong>Reviewer names</strong>: when off, the PDF says <em>Reviewer 1 (primary)</em>,
+                <em>Participant 1</em> and similar instead of names.</li>
+            <li><strong>Checklist wording</strong>: when off, the PDF shows outcomes without the question text.</li>
+            <li><strong>File list and hashes</strong>: when off, the files are not listed; the content fingerprint is
+                still printed.</li>
+            <li><strong>Git context</strong>: when off, the repository and the baseline and head revisions are left
+                out.</li>
+        </ul>
+        <p>Always in the PDF: the review and project identifiers, the content fingerprint, the checklist outcomes, the
+            signatures, the record digest and the signing-key note. The PDF is signed after the content is chosen, so
+            its digital signature stays valid. Names that someone typed into a comment or another free-text field are
+            not removed.</p>
+        <figure class="help-figure">
+            <img class="help-shot" src="/help/evidence-settings-2.png" loading="lazy"
+                 alt="The Evidence settings page with reviewer names and the file list turned off: a summary notice and a warning below each switch that was turned off, and the exposure warning below the anonymous switches." />
+            <figcaption>Leaving content out shows a warning at the switch and a summary at the top.</figcaption>
+        </figure>
+        <h2>Regulatory warnings</h2>
+        <p>Leaving content out can make a record unacceptable for your regulatory regime, for example one that expects
+            the reviewers to be named. Each switch that is off shows a warning, and a notice at the top lists
+            everything that is left out. ReviewCenter cannot know your rules: confirm with your quality or compliance
+            lead before you reduce a PDF.</p>
+        <h2>Content scope</h2>
+        <p>Every attestation PDF has a <strong>Content scope</strong> section, right after the review section. It
+            states which sections were omitted and the settings that were in effect when the PDF was created, so a
+            reader of the PDF always knows what it does not show. The record digest of the PDF always covers the full
+            record, whatever was left out.</p>
+        <h2>Saving</h2>
+        <p>Choose <strong>Save settings</strong> to save all the switches at once. If someone else changed the settings
+            while you were editing, nothing is overwritten: the page shows the current settings and asks you to check
+            and save again. A change takes effect at once for new downloads; PDFs that someone downloaded before keep
+            the content they had.</p>
+    </section>
+</HelpTopicFrame>

@@ -55,7 +55,10 @@
             <code>evidence-source</code> of <code>.reviewmark.yaml</code> as a <code>url</code> source, and give
             ReviewMark the user name and the token through two environment variables. Only reviews that were planned
             from a review-set, that are complete, and that have not changed since they were signed are listed, and
-            only as <strong>pass</strong>. The user guide has the details.</p>
+            only as <strong>pass</strong>. A project administrator can also let anyone read the index and the PDFs
+            without credentials, with the switches of the project's <a href="/help/evidence-settings">Evidence
+            settings</a>; the index alone is of no use to ReviewMark without the PDFs. The user guide has the
+            details.</p>
         <h2>A review created through the API</h2>
         <p>A review created with a token starts as a <strong>Draft</strong>, like one created on the web pages. It is
             flagged <strong>created via API</strong>: the review data of the API says so (<code>createdViaApi</code>), and
@@ -66,7 +69,9 @@
             <li>A request without a token, or with a token that is wrong, malformed, expired or revoked, or whose owner
                 is disabled or locked, always gets the same plain <strong>401 Unauthorized</strong> answer. It does not say
                 which of these it was, so it tells nobody which tokens exist. The reason is recorded in the audit
-                trail.</li>
+                trail. The one exception is a request <em>without any token</em> for the evidence index or an
+                attestation PDF of a project whose administrators opened that to anonymous readers (see
+                <a href="/help/evidence-settings">Evidence settings</a>); a token that is wrong is still refused.</li>
             <li>Too many refused attempts from one address in a short time are answered with <strong>429 Too many
                 requests</strong>, whatever token is sent. Wait a few minutes and try again.</li>
             <li>A token is for the API only. It does not sign you in to the web pages, and the session cookie of the web

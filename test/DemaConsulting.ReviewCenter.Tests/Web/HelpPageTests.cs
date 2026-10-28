@@ -207,6 +207,47 @@ public sealed class HelpPageTests : PageTestBase
     }
 
     /// <summary>
+    ///     Test that the evidence settings topic explains who may change the settings, the two anonymous switches
+    ///     and their warning, the five content switches, the regulatory warning, the Content scope section and the
+    ///     saving rule, and shows its two screenshots.
+    /// </summary>
+    [Fact]
+    public void HelpEvidenceSettingsPage_Render_ExplainsAnonymousAccessContentSwitchesAndScope()
+    {
+        // Act: render the topic page
+        var page = Render<HelpEvidenceSettingsPage>();
+
+        // Assert: the title and both screenshots with alternative text
+        var text = page.Markup;
+        Assert.Equal("Evidence settings", page.Find("h1").TextContent);
+        var shots = page.FindAll("img.help-shot");
+        Assert.Equal(
+            ["/help/evidence-settings-1.png", "/help/evidence-settings-2.png"],
+            shots.Select(s => s.GetAttribute("src")!).ToArray());
+        Assert.All(shots, s => Assert.False(string.IsNullOrWhiteSpace(s.GetAttribute("alt"))));
+
+        // Assert: who, the anonymous switches (off by default, independent, useless index alone), the exposure
+        Assert.Contains("project admin", text, StringComparison.Ordinal);
+        Assert.Contains("system administrator", text, StringComparison.Ordinal);
+        Assert.Contains("<strong>Anonymous evidence index</strong>", text, StringComparison.Ordinal);
+        Assert.Contains("<strong>Anonymous attestation PDFs</strong>", text, StringComparison.Ordinal);
+        Assert.Contains("independent", text, StringComparison.Ordinal);
+        Assert.Contains("ReviewMark", text, StringComparison.Ordinal);
+        Assert.Contains("Think before you turn them on", text, StringComparison.Ordinal);
+
+        // Assert: the five content switches, the regulatory warning, the Content scope and the audit
+        foreach (var name in new[] { "Review discussion threads", "Reviewer names", "Checklist wording", "File list and hashes", "Git context" })
+        {
+            Assert.Contains($"<strong>{name}</strong>", text, StringComparison.Ordinal);
+        }
+
+        Assert.Contains("regulatory", text, StringComparison.Ordinal);
+        Assert.Contains("<strong>Content scope</strong>", text, StringComparison.Ordinal);
+        Assert.Contains("audit trail", text, StringComparison.Ordinal);
+        AssertNoAnchorLinks(page);
+    }
+
+    /// <summary>
     ///     Test that an unknown help address shows a friendly message and a link back to the index.
     /// </summary>
     [Fact]
