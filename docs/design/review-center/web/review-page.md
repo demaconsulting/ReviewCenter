@@ -206,8 +206,10 @@ Head view); a binary file shows the binary notice.
 
 `DiffView` has the parameters `Result`, `OnlyLineEndingsDiffer`, `Threads`, `FocusedThreadId`, `SelectedSide`,
 `SelectedStart`, `SelectedEnd`, `ThreadTemplate` (how the page draws a thread, so the reply, resolve and reopen
-controls are the ones of the thread list), `Composer` (the new-thread form, drawn under the selected row), and the
-event `OnComment`, which carries a `DiffCommentRequest(Side, Line, Extend)`. The control of a left cell asks for the
+controls are the ones of the thread list), `Composer` (the new-thread form, drawn under the selected row), `CanReveal`
+(a check that the page runs before a collapsed run is expanded, so a user who lost the access is not shown loaded
+lines), and the event `OnComment`, which carries a `DiffCommentRequest(Side, Line, Extend)`. The control of a left
+cell asks for the
 Baseline side and its baseline line number (a removed line, or the baseline copy of an unchanged line); the control
 of a right cell asks for the Head side and its head line number. The control is a button in the gutter of every cell
 that is revealed by the stylesheet when the row is hovered, has keyboard focus inside it (`:focus-within`), or is the
@@ -368,7 +370,9 @@ raises no other errors of its own.
 **Access re-check**: Every handler that reads or stores something starts with `GuardAsync`, which asks
 `ProjectViewGuard.GuardViewAsync` whether the signed-in user may still see the project (`ShowNoAccess` is the callback).
 The view-only handlers (thread filter, expanding a thread, the diff, head, and baseline views, and the comment
-buttons) are wrapped at their binding by `GuardedAsync`; cancelling a comment and copying a thread link show no project
+buttons) are wrapped at their binding by `GuardedAsync`, and expanding a collapsed run of the diff asks the same check
+through the `CanReveal` parameter of `DiffView` before it shows lines that were loaded but not yet displayed;
+cancelling a comment and copying a thread link show no project
 data and are not guarded. When access is lost, `ShowNoAccess` resets the component state exactly as a change of address
 does (review, project name, files, selection, threads, checklist progress, approval, candidates, and the forms), shows
 the same message as for a review that does not exist, and the handler returns without calling a service. An ended

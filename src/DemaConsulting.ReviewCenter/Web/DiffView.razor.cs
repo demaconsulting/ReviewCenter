@@ -169,6 +169,14 @@ public partial class DiffView : ComponentBase
     public EventCallback<DiffCommentRequest> OnComment { get; set; }
 
     /// <summary>
+    ///     Gets or sets the check that runs before a collapsed run is expanded; supplied by the page so that lines of
+    ///     the loaded diff are not revealed once the reader may no longer see the project. When it returns
+    ///     <c>false</c> nothing is expanded. When it is <c>null</c> the run is expanded without a check.
+    /// </summary>
+    [Parameter]
+    public Func<Task<bool>>? CanReveal { get; set; }
+
+    /// <summary>
     ///     Finds the row that carries a line number of one side.
     /// </summary>
     /// <param name="result">The diff. Must not be null.</param>
@@ -342,8 +350,15 @@ public partial class DiffView : ComponentBase
     ///     Expands a collapsed run so its rows stay visible.
     /// </summary>
     /// <param name="segment">The collapsed run.</param>
-    private void Reveal(DiffSegment segment)
+    /// <returns>A task that completes when the run is expanded or the check refused it.</returns>
+    private async Task Reveal(DiffSegment segment)
     {
+        // The lines of the run are already in memory but were never sent to the browser, so the page decides first
+        if (CanReveal is not null && !await CanReveal())
+        {
+            return;
+        }
+
         for (var i = segment.Start; i < segment.Start + segment.Count; i++)
         {
             _revealed.Add(i);

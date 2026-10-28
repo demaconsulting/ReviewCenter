@@ -486,7 +486,8 @@
                                   SelectedEnd="composerRange?.End"
                                   ThreadTemplate="threadCard"
                                   Composer="newThreadForm"
-                                  OnComment="request => GuardedAsync(() => CommentOnDiffLine(request))" />
+                                  OnComment="request => GuardedAsync(() => CommentOnDiffLine(request))"
+                                  CanReveal="GuardChildAsync" />
                     }
                 }
                 else if (BaselineView)

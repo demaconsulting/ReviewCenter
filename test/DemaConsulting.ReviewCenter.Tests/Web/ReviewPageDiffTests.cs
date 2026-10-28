@@ -993,4 +993,32 @@ public class ReviewPageDiffTests : PageTestBase
         Assert.Equal(string.Empty, cut.Find("[data-testid='thread-start-line-input']").GetAttribute("value") ?? string.Empty);
         Assert.Equal("Comment on the whole file.", cut.Find("[data-testid='thread-target']").TextContent);
     }
+
+    /// <summary>
+    ///     Test that expanding a collapsed run of the diff re-checks the access: the lines of the loaded diff that were
+    ///     never shown are not revealed to a member whose membership was removed while the page was open.
+    /// </summary>
+    [Fact]
+    public async Task ReviewPage_DiffView_RevealRun_MembershipRevoked_RevealsNothingAndShowsNotFound()
+    {
+        // Arrange: a member has the diff open, with the first unchanged run (line l1) still collapsed
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var projectId = await CreateReviewAsync();
+        var member = await Users.CreateAsync("mem", "Mem", UserRole.Reviewer, "correct horse battery", cancellationToken);
+        await Store.AddMembershipAsync(member.Id, projectId, cancellationToken);
+        SignInAs("mem", "Mem", UserRole.Reviewer);
+        var cut = RenderPage(projectId);
+        await SelectFileAsync(cut, ModPath);
+        Assert.NotEmpty(cut.FindAll("[data-testid='diff-gap-0']"));
+        Assert.Empty(cut.FindAll("[data-testid='diff-row-0']"));
+        await RevokeMembershipAsync(projectId, "mem");
+
+        // Act: expand the run
+        await cut.Find("[data-testid='diff-gap-0']").ClickAsync();
+
+        // Assert: the page is the not-found page and the hidden lines were not revealed
+        Assert.NotEmpty(cut.FindAll("[data-testid='review-not-found']"));
+        Assert.Empty(cut.FindAll("[data-testid='diff-content']"));
+        Assert.Empty(cut.FindAll("[data-testid='diff-text-0']"));
+    }
 }

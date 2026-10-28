@@ -515,6 +515,26 @@ public partial class ReviewPage : ComponentBase, IDisposable
     }
 
     /// <summary>
+    ///     Re-checks the access for a child component that asks before it shows loaded data, and renders this page
+    ///     when the access is gone.
+    /// </summary>
+    /// <returns><c>true</c> when the child may go on; <c>false</c> when the page has dropped its data.</returns>
+    /// <remarks>
+    ///     A child that calls a plain delegate does not make this page render, as an event callback would, so the page
+    ///     asks for the render itself; otherwise the child would stay on screen with what it already holds.
+    /// </remarks>
+    private async Task<bool> GuardChildAsync()
+    {
+        var allowed = await GuardAsync();
+        if (!allowed)
+        {
+            StateHasChanged();
+        }
+
+        return allowed;
+    }
+
+    /// <summary>
     ///     Runs an action that only changes what the page shows of already loaded data, after the access re-check.
     /// </summary>
     /// <param name="action">The action to run while the user may still view the project.</param>

@@ -526,6 +526,11 @@ data. This scenario is tested by `ReviewPage_FilterIndex_MembershipRevoked_Shows
 and the membership is removed; posting the reply shows the not-found page without data, and the thread still has its one
 comment. This scenario is tested by `ReviewPage_Reply_MembershipRevoked_ShowsNotFoundAndStoresNothing`.
 
+**ReviewPage_DiffView_RevealRun_MembershipRevoked_RevealsNothingAndShowsNotFound**: A member has the diff of a modified
+file open with the first run of unchanged lines collapsed, and the membership is removed; choosing "Show 6 unchanged
+lines" shows the not-found page, the diff is gone, and the hidden lines were not revealed. This scenario is tested by
+`ReviewPage_DiffView_RevealRun_MembershipRevoked_RevealsNothingAndShowsNotFound`.
+
 **ReviewPage_Render_ExistingReview_ShowsHistoryLink**: A review is rendered; the page contains the history link
 that points to the history page of the review. This scenario is tested by
 `ReviewPage_Render_ExistingReview_ShowsHistoryLink`.
