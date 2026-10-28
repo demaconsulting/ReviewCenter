@@ -114,10 +114,20 @@ sections:
 
       - id: ReviewCenter-AttestationKeyProvider-CodeSigningWarning
         title: >-
-          The AttestationKeyProvider unit shall warn, without refusing the certificate, when the extended key usage of
-          a certificate allows code signing only and not document signing.
+          The AttestationKeyProvider unit shall warn, without refusing the certificate for that reason, when the
+          extended key usage of
+          a certificate allows code signing and none of the document signing purposes (e-mail protection, Microsoft or
+          Adobe document signing, any purpose), with the text "This certificate is a code-signing certificate. Adobe
+          Acrobat will not trust it for document signatures; use a document-signing certificate for production.", log
+          that warning once when the key is first loaded, and report the classification in the description of the key.
+          A certificate without an extended key usage shall not be classified as code signing only, and the
+          RequireTrustedKey rules and the lack of a chain and revocation check shall be unchanged.
         justification: |
-          A code-signing certificate is not meant for documents and many PDF readers do not accept it, but some
-          organizations have only such a certificate. The operator should know, and the decision stays with them.
+          A code-signing certificate is not meant for documents and Adobe Acrobat does not trust it for document
+          signatures, but some organizations have only such a certificate. The operator should know, and the decision
+          stays with them. The server does not check the chain or revocation; the PDF reader does.
         tests:
-          - AttestationKeyPolicy_Warnings_ExtendedKeyUsage_WarnsOnlyForCodeSigningOnly
+          - AttestationKeyPolicy_IsCodeSigningOnly_ExtendedKeyUsage_ClassifiesCertificates
+          - AttestationKeyPolicy_CodeSigningNotice_HasTheDefinedWording
+          - AttestationSigningKey_Create_CodeSigningOnlyCertificate_SetsInfoFlag
+          - AttestationKeyProviderBase_GetSigningKey_CodeSigningOnlyCertificate_LogsWarningOnceAndDoesNotRefuse

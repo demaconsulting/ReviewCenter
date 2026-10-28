@@ -173,6 +173,86 @@ public class AttestationSignerTests
     }
 
     /// <summary>
+    ///     Test that the signature is a certifying signature: a DocMDP reference with permission 1 (no changes allowed)
+    ///     in the signature dictionary, named by the catalog's permissions.
+    /// </summary>
+    [Fact]
+    public void AttestationSigner_Sign_Output_IsCertifiedWithDocMdpNoChangesAllowed()
+    {
+        // Arrange: a PDF and a key
+        using var key = TestKeys.SelfSignedRsa();
+
+        // Act: sign
+        var (_, signed, _) = SignAndVerify(key);
+
+        // Assert: the reference has the DocMDP shape, with permission 1 and not 2
+        Assert.Contains(
+            "/Reference [<< /Type /SigRef /TransformMethod /DocMDP /TransformParams "
+            + "<< /Type /TransformParams /P 1 /V /1.2 >> /Data ",
+            signed.Text,
+            StringComparison.Ordinal);
+        Assert.Equal(1, signed.DocMdpPermission);
+
+        // Assert: certification and /Perms are PDF 1.5 features, so the signed file declares at least that version
+        Assert.StartsWith("%PDF-1.5\n", signed.Text, StringComparison.Ordinal);
+        // Assert: one signature and one DocMDP entry; the catalog and the signature field refer to the same object
+        var signature = Assert.Single(signed.SignatureObjectNumbers);
+        Assert.Equal(signature, signed.PermsDocMdpObject);
+        Assert.Equal(signature, signed.WidgetSignatureObject);
+        Assert.Single(System.Text.RegularExpressions.Regex.Matches(signed.Text, "/TransformMethod /DocMDP"));
+        Assert.Single(System.Text.RegularExpressions.Regex.Matches(signed.Text, "/Perms <<"));
+    }
+
+    /// <summary>
+    ///     Test that the certified signature still verifies over the byte range, for RSA and ECDSA, and that the
+    ///     update is a consistent extension of the original.
+    /// </summary>
+    /// <param name="algorithm">The key algorithm.</param>
+    [Theory]
+    [InlineData("RSA")]
+    [InlineData("ECDSA")]
+    public void AttestationSigner_Sign_CertifiedOutput_SignatureStillVerifiesOverTheByteRange(string algorithm)
+    {
+        // Arrange: a PDF and a key
+        using var key = algorithm == "RSA" ? TestKeys.SelfSignedRsa() : TestKeys.SelfSignedEcdsa();
+
+        // Act: sign; SignAndVerify checks the CMS signature over the byte range and the signer's thumbprint
+        var (unsigned, signed, cms) = SignAndVerify(key);
+
+        // Assert: the range covers everything but the contents, and the permission is among the signed bytes
+        Assert.True(signed.ByteRangeCoversEverythingButContents());
+        Assert.Equal(key.Info.Thumbprint, cms.SignerInfos[0].Certificate!.Thumbprint);
+        var covered = Encoding.Latin1.GetString(signed.SignedBytes);
+        Assert.Contains("/P 1 /V /1.2", covered, StringComparison.Ordinal);
+        Assert.Contains("/Perms << /DocMDP ", covered, StringComparison.Ordinal);
+        Assert.Equal(unsigned, signed.Bytes[..unsigned.Length]);
+        Assert.Equal(2, signed.CrossReferenceChain.Count);
+        Assert.True(signed.CrossReferenceIsConsistent());
+    }
+
+    /// <summary>
+    ///     Test that changing the permission to a weaker one breaks the signature: the permission is signed.
+    /// </summary>
+    [Fact]
+    public void AttestationSigner_Sign_CertifiedOutput_TamperedPermission_SignatureNoLongerVerifies()
+    {
+        // Arrange: a signed PDF whose permission is changed from 1 to 2 (same length, so the offsets stay valid)
+        using var key = TestKeys.SelfSignedRsa();
+        var (_, signed, _) = SignAndVerify(key);
+        var tampered = (byte[])signed.Bytes.Clone();
+        var at = signed.Text.IndexOf("/P 1 /V /1.2", StringComparison.Ordinal) + "/P ".Length;
+        tampered[at] = (byte)'2';
+
+        // Act: verify the tampered file
+        var inspector = new PdfInspector(tampered);
+        var exception = Record.Exception(() => inspector.VerifySignature());
+
+        // Assert: the file reads as permission 2, but the signature no longer verifies
+        Assert.Equal(2, inspector.DocMdpPermission);
+        Assert.IsAssignableFrom<CryptographicException>(exception);
+    }
+
+    /// <summary>
     ///     Test that the byte range leaves out only the hexadecimal signature contents.
     /// </summary>
     [Fact]

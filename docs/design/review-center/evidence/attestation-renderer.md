@@ -74,13 +74,16 @@ signature proves that the document is unchanged since the signing and that it wa
 the embedded certificate; it says that the signature does not prove the identity of the reviewers, that their identity is
 the re-authenticated signatures shown in the sign-offs section, and that the time of the signing is the clock of the
 server and not a trusted timestamp. For a self-signed key the document begins the signature section with the prominent
-notice. For an organization key it names the subject and the issuer of the certificate and prints no warning.
+notice. For an organization key it names the subject and the issuer of the certificate and prints no warning. For a
+certificate that is for code signing only (`AttestationKeyInfo.IsCodeSigningOnly`) it also prints the one-line
+`AttestationKeyPolicy.CodeSigningNotice` below the issuer text, because Adobe Acrobat will not trust such a certificate
+for document signatures; the key is still used.
 
 #### Dependencies
 
 - **PdfDocumentWriter** — lays the content out.
-- **AttestationKeyInfo** — the description of the key that will sign (subject, issuer, thumbprint, and whether it is
-  self-signed).
+- **AttestationKeyInfo** — the description of the key that will sign (subject, issuer, thumbprint, whether it is
+  self-signed, and whether it is for code signing only).
 
 #### Callers
 

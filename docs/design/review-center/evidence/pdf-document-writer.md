@@ -4,7 +4,7 @@
 
 #### Purpose
 
-`PdfDocumentWriter` writes a small, plain PDF 1.4 document. Its single responsibility is to lay out titles, headings,
+`PdfDocumentWriter` writes a small, plain PDF 1.5 document. Its single responsibility is to lay out titles, headings,
 paragraphs, and label and value rows on A4 pages, with a header and a footer that carries the page number, and to
 return the bytes of the file. It has no dependency, so the attestation does not need a PDF library.
 

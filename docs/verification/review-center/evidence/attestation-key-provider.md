@@ -26,7 +26,9 @@ certificate store tests need the store of the current user.
 - Every problem of the self-signed provider and of the certificate store provider names the setting or the file.
 - `RequireTrustedKey` is checked on every call; the rule accepts an organization certificate and refuses a self-signed
   one, one without a signing key usage, and one outside its validity.
-- A certificate for code signing only is warned about and not refused.
+- A certificate for code signing only is classified (not when it has no extended key usage or a document purpose), is
+  warned about once with the defined text, is flagged in the key description, and is not refused because of its
+  code-signing usage.
 - `Describe` never throws: a known key problem is reported with its message, and an unexpected failure is reported as
   unavailable with a generic message.
 
@@ -70,9 +72,25 @@ key usages are examined. Only digital signature and non-repudiation allow signin
 examined. It allows signing. This scenario is tested by
 `AttestationKeyPolicy_HasSigningKeyUsage_NoExtension_AllowsSigning`.
 
-**AttestationKeyPolicy_Warnings_ExtendedKeyUsage_WarnsOnlyForCodeSigningOnly**: Certificates with several extended key
-usages are examined. Only one that allows code signing and no document signing gets a warning. This scenario is tested by
-`AttestationKeyPolicy_Warnings_ExtendedKeyUsage_WarnsOnlyForCodeSigningOnly`.
+**AttestationKeyPolicy_IsCodeSigningOnly_ExtendedKeyUsage_ClassifiesCertificates**: Certificates with several extended
+key usages, and one without the extension, are generated and classified. Only one that allows code signing and no
+document signing purpose (code signing alone, or with server authentication) is code-signing-only; document signing
+(Microsoft or Adobe), e-mail protection, any purpose, no extension, and a mix of code signing with a document purpose are
+not. The warning list agrees and holds exactly the defined text. This scenario is tested by
+`AttestationKeyPolicy_IsCodeSigningOnly_ExtendedKeyUsage_ClassifiesCertificates`.
+
+**AttestationKeyPolicy_CodeSigningNotice_HasTheDefinedWording**: The notice is compared with the defined text. This
+scenario is tested by `AttestationKeyPolicy_CodeSigningNotice_HasTheDefinedWording`.
+
+**AttestationSigningKey_Create_CodeSigningOnlyCertificate_SetsInfoFlag**: Keys are created for a code-signing-only
+certificate, a certificate without extended key usage, and the default test key. Only the first has
+`IsCodeSigningOnly` set. This scenario is tested by `AttestationSigningKey_Create_CodeSigningOnlyCertificate_SetsInfoFlag`.
+
+**AttestationKeyProviderBase_GetSigningKey_CodeSigningOnlyCertificate_LogsWarningOnceAndDoesNotRefuse**: A provider
+that returns a code-signing-only certificate issued by an authority is asked for the key twice with `RequireTrustedKey`
+on. The key is returned both times, and one warning with the notice and the thumbprint is logged. The certificate store
+provider is not exercised with a code-signing certificate; it shares this base class. This scenario is tested by
+`AttestationKeyProviderBase_GetSigningKey_CodeSigningOnlyCertificate_LogsWarningOnceAndDoesNotRefuse`.
 
 **SelfSignedKeyProvider_GetSigningKey_FirstUse_CreatesSelfSignedKeyFile**: The key is requested from an empty folder. A
 key file is created and the certificate is self-signed. This scenario is tested by

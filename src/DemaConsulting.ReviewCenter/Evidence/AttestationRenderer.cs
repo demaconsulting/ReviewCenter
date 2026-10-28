@@ -269,7 +269,7 @@ internal sealed class AttestationRenderer : IAttestationRenderer
     }
 
     /// <summary>
-    ///     Writes the signing key, the self-signed notice when it applies, and what the signature proves.
+    ///     Writes the signing key, the self-signed and code-signing notices when they apply, and what the signature proves.
     /// </summary>
     /// <param name="writer">The writer.</param>
     /// <param name="document">The document.</param>
@@ -284,6 +284,12 @@ internal sealed class AttestationRenderer : IAttestationRenderer
         else
         {
             writer.Paragraph($"Certificate issued by {key.Issuer}. Whether to trust it depends on whether you trust that issuer.");
+        }
+
+        // A certificate that readers will not trust for documents is called out in the document itself
+        if (key.IsCodeSigningOnly)
+        {
+            writer.Paragraph(AttestationKeyPolicy.CodeSigningNotice);
         }
 
         writer.Space(4);

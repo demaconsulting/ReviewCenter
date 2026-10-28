@@ -25,7 +25,7 @@ using System.Text;
 namespace DemaConsulting.ReviewCenter.Evidence;
 
 /// <summary>
-///     A minimal PDF 1.4 writer: A4 portrait pages of wrapped text in standard fonts, with a header, a footer with
+///     A minimal PDF 1.5 writer: A4 portrait pages of wrapped text in standard fonts, with a header, a footer with
 ///     page numbers, and document information.
 /// </summary>
 /// <remarks>
@@ -373,7 +373,7 @@ internal sealed class PdfDocumentWriter
 
         // The file: header with a binary comment (marks the file as binary for transfer tools), the objects, the
         // cross-reference table and the trailer
-        var file = new StringBuilder("%PDF-1.4\n%\u00E2\u00E3\u00CF\u00D3\n");
+        var file = new StringBuilder("%PDF-1.5\n%\u00E2\u00E3\u00CF\u00D3\n");
         var offsets = new List<int>();
         for (var number = 1; number <= objects.Count; number++)
         {

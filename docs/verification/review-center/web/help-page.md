@@ -56,8 +56,10 @@ does not prove who the reviewers are, shows the label "SELF-SIGNED KEY - NOT AN 
 settings `Attestation:Provider` and `Attestation:RequireTrustedKey`. It says that `RequireTrustedKey` makes the server
 refuse to start for a self-signed key or a certificate without a signing key usage, that a certificate that stops being
 valid while the server runs is reported on the review page instead of the button, and that the note of a self-signed
-certificate from the store says that the administrator supplied it. This scenario is tested by
-`HelpAttestationPage_Render_ExplainsWhatTheSignatureProvesAndTheKey`.
+certificate from the store says that the administrator supplied it. It also says that the signature certifies the
+document with no changes allowed, that a certificate for code signing only is used, not refused for that reason, with
+a note in the PDF and a start-up warning, and that the server does not check the certificate chain or revocation. This
+scenario is tested by `HelpAttestationPage_Render_ExplainsWhatTheSignatureProvesAndTheKey`.
 
 **HelpApiTokensPage_Render_ExplainsTokensCurlEndpointsAndErrors**: The API tokens page is rendered; the heading is
 "Automation and API tokens", the screenshot is served from `/help/` with alternative text, and the text names the

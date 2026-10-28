@@ -120,7 +120,8 @@ internal sealed class AttestationSigningKey : IDisposable
             new DateTimeOffset(certificate.NotAfter.ToUniversalTime(), TimeSpan.Zero),
             AttestationKeyPolicy.IsSelfSigned(certificate),
             AttestationKeyPolicy.HasSigningKeyUsage(certificate),
-            requireTrustedKey);
+            requireTrustedKey,
+            AttestationKeyPolicy.IsCodeSigningOnly(certificate));
         return new AttestationSigningKey(certificate, chain, privateKey, info);
     }
 

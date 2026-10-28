@@ -61,7 +61,9 @@ sections:
           (who the reviewers are, and when the signing happened), that the self-signed key is for development and test
           only, how to use a certificate from a certificate store, and what RequireTrustedKey checks (the server refuses
           to start for a self-signed key or a certificate without a signing key usage, and the review page shows why
-          attestation is unavailable when a certificate stops being valid while the server runs), with a
+          attestation is unavailable when a certificate stops being valid while the server runs), that the signature
+          certifies the document with no changes allowed, and that a code-signing-only certificate is used with a
+          note and a start-up warning while the server does not check the chain or revocation, with a
           screenshot of the download of an approved review.
         justification: |
           The attestation is easy to take for more than it is. The place the user is sent from the review page must

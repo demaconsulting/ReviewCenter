@@ -48,6 +48,25 @@ internal static class TestKeys
     }
 
     /// <summary>
+    ///     Creates a self-signed RSA signing key whose certificate lists the given Extended Key Usage purposes.
+    /// </summary>
+    /// <param name="requireTrusted">Whether the key says the trusted-key policy is in effect.</param>
+    /// <param name="purposes">The purpose object identifiers; none means the certificate has no such extension.</param>
+    /// <returns>The key; the caller disposes it.</returns>
+    public static AttestationSigningKey WithPurposes(bool requireTrusted, params string[] purposes)
+    {
+        var rsa = RSA.Create(2048);
+        var request = new CertificateRequest("CN=Test purposes RSA", rsa, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
+        request.CertificateExtensions.Add(new X509KeyUsageExtension(X509KeyUsageFlags.DigitalSignature, true));
+        if (purposes.Length > 0)
+        {
+            request.CertificateExtensions.Add(new X509EnhancedKeyUsageExtension([.. purposes.Select(p => new Oid(p))], false));
+        }
+
+        return Wrap("Test", request.CreateSelfSigned(Past, Future), [], rsa, requireTrusted);
+    }
+
+    /// <summary>
     ///     Creates a self-signed RSA signing key as the certificate store provider reports it: a self-signed
     ///     certificate that the administrator supplied.
     /// </summary>
@@ -76,10 +95,12 @@ internal static class TestKeys
     /// </summary>
     /// <param name="usage">The key usage of the certificate.</param>
     /// <param name="notAfter">The end of the validity of the certificate.</param>
+    /// <param name="purposes">The Extended Key Usage purposes of the certificate; <c>null</c> for none.</param>
     /// <returns>The key; the caller disposes it.</returns>
     public static AttestationSigningKey Organization(
         X509KeyUsageFlags usage = X509KeyUsageFlags.DigitalSignature,
-        DateTimeOffset? notAfter = null)
+        DateTimeOffset? notAfter = null,
+        string[]? purposes = null)
     {
         var past = Past;
         var future = Future;
@@ -91,6 +112,11 @@ internal static class TestKeys
         var rsa = RSA.Create(2048);
         var request = new CertificateRequest("CN=Test organization signer, O=Test", rsa, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
         request.CertificateExtensions.Add(new X509KeyUsageExtension(usage, true));
+        if (purposes is not null)
+        {
+            request.CertificateExtensions.Add(new X509EnhancedKeyUsageExtension([.. purposes.Select(p => new Oid(p))], false));
+        }
+
         var serial = new byte[] { 0x01, 0x02, 0x03, 0x04 };
         using var issued = request.Create(authority, past, notAfter ?? future, serial);
         var certificate = issued.CopyWithPrivateKey(rsa);

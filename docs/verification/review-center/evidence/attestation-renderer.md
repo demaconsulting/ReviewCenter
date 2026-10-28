@@ -85,6 +85,11 @@ the notice that the key is self-signed and not an organization key. This scenari
 rendered. The text has the subject and the issuer and does not have the notice. This scenario is tested by
 `AttestationRenderer_Render_OrganizationKey_PrintsSubjectIssuerAndNoNotice`.
 
+**AttestationRenderer_Render_CodeSigningKey_PrintsTheNoteOnlyWhenItApplies**: Documents are rendered with a key that is
+for code signing only and with one that is not. The text of the first has the code-signing note (the lines of the
+wrapped paragraph joined), the second does not, and the self-signed notice is printed in both. This scenario is tested
+by `AttestationRenderer_Render_CodeSigningKey_PrintsTheNoteOnlyWhenItApplies`.
+
 **AttestationRenderer_Render_Document_ExplainsWhatTheSignatureProves**: A document is rendered. The text states what the
 signature proves, that it does not prove who the reviewers are, and that the time is the clock of the server and not a
 trusted timestamp. This scenario is tested by `AttestationRenderer_Render_Document_ExplainsWhatTheSignatureProves`.

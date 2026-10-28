@@ -41,6 +41,20 @@ sections:
           - AttestationSigner_Sign_Output_DeclaresAcroFormSignatureFieldAndAdobeFilter
           - AttestationSigner_Sign_ByteRange_CoversEverythingExceptTheContentsHex
 
+      - id: ReviewCenter-AttestationSigner-Certification
+        title: >-
+          The AttestationSigner class shall make the signature a certifying signature that allows no changes: a
+          DocMDP reference with permission 1 in the signature dictionary, named by the permissions of the catalog, so
+          that the permission is covered by the signature and a changed permission breaks it.
+        justification: |
+          An attestation must not be changed after it was signed, not even by form filling or commenting. A
+          signature without the DocMDP entry is an approval signature, for which a PDF reader allows later changes.
+          Readers state the permission to the person who opens the document.
+        tests:
+          - AttestationSigner_Sign_Output_IsCertifiedWithDocMdpNoChangesAllowed
+          - AttestationSigner_Sign_CertifiedOutput_SignatureStillVerifiesOverTheByteRange
+          - AttestationSigner_Sign_CertifiedOutput_TamperedPermission_SignatureNoLongerVerifies
+
       - id: ReviewCenter-AttestationSigner-TamperEvident
         title: >-
           The AttestationSigner class shall produce a signature that no longer verifies when a byte of the signed
