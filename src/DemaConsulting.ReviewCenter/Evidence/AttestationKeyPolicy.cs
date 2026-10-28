@@ -29,10 +29,18 @@ namespace DemaConsulting.ReviewCenter.Evidence;
 /// <remarks>
 ///     The policy checks what can be known locally from the certificate: whether it is self-signed, whether its key
 ///     usage allows signing documents, and whether it is within its validity period. It deliberately does not check
-///     that the chain is trusted or that the certificate is not revoked; that is the verifier's decision.
+///     that the chain is trusted or that the certificate is not revoked; that is the verifier's decision. A
+///     code-signing-only certificate is classified and reported, never refused.
 /// </remarks>
 internal static class AttestationKeyPolicy
 {
+    /// <summary>
+    ///     The note for a code-signing-only certificate; it is logged at start-up and printed in the attestation.
+    /// </summary>
+    internal const string CodeSigningNotice =
+        "This certificate is a code-signing certificate. Adobe Acrobat will not trust it for document signatures; "
+        + "use a document-signing certificate for production.";
+
     /// <summary>
     ///     The object identifier of the Extended Key Usage "code signing" purpose.
     /// </summary>
@@ -121,17 +129,31 @@ internal static class AttestationKeyPolicy
         ArgumentNullException.ThrowIfNull(certificate);
         var warnings = new List<string>();
 
-        // A certificate that is for code signing only is not meant for documents; readers may flag it
-        var purposes = certificate.Extensions.OfType<X509EnhancedKeyUsageExtension>().FirstOrDefault()?.EnhancedKeyUsages;
-        if (purposes is not null
-            && purposes.OfType<System.Security.Cryptography.Oid>().Any(oid => oid.Value == CodeSigningOid)
-            && !purposes.OfType<System.Security.Cryptography.Oid>().Any(oid => oid.Value is not null && DocumentSigningOids.Contains(oid.Value)))
+        // A certificate that is for code signing only is not meant for documents; readers will not trust it
+        if (IsCodeSigningOnly(certificate))
         {
-            warnings.Add(
-                "The certificate is for code signing only; PDF readers may not accept it for signing documents. "
-                + "Use a document-signing certificate.");
+            warnings.Add(CodeSigningNotice);
         }
 
         return warnings;
+    }
+
+    /// <summary>
+    ///     Gets whether a certificate is for code signing only.
+    /// </summary>
+    /// <param name="certificate">The certificate.</param>
+    /// <returns>
+    ///     True when the Extended Key Usage extension lists code signing and none of the document signing purposes
+    ///     (e-mail protection, Microsoft or Adobe document signing, any purpose). A certificate without the
+    ///     extension has no restriction and is not code-signing-only.
+    /// </returns>
+    public static bool IsCodeSigningOnly(X509Certificate2 certificate)
+    {
+        ArgumentNullException.ThrowIfNull(certificate);
+        var purposes = certificate.Extensions.OfType<X509EnhancedKeyUsageExtension>().FirstOrDefault()?.EnhancedKeyUsages;
+        return purposes is not null
+            && purposes.OfType<System.Security.Cryptography.Oid>().Any(oid => oid.Value == CodeSigningOid)
+            && !purposes.OfType<System.Security.Cryptography.Oid>()
+                .Any(oid => oid.Value is not null && DocumentSigningOids.Contains(oid.Value));
     }
 }

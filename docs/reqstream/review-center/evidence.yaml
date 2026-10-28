@@ -45,6 +45,7 @@ sections:
           - ReviewCenter-AttestationSigner-Signature
           - ReviewCenter-AttestationSigner-NonExportableKey
           - ReviewCenter-AttestationSigner-Structure
+          - ReviewCenter-AttestationSigner-Certification
           - ReviewCenter-AttestationSigner-TamperEvident
           - ReviewCenter-AttestationSigner-Chain
           - ReviewCenter-AttestationSigner-Deterministic

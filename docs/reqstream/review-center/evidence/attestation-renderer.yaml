@@ -65,13 +65,15 @@ sections:
         title: >-
           The AttestationRenderer class shall name the subject and the issuer of the signing certificate and print no
           warning for an organization key, and shall print a prominent notice that the key is self-signed, not an
-          organization key, and for development and test only, for a self-signed key.
+          organization key, and for development and test only, for a self-signed key, and one line that a code-signing
+          certificate is not trusted by Adobe Acrobat for document signatures, for a code-signing-only key.
         justification: |
           A document that looks official but is signed with a key that anyone can create must say so on its face.
           Whoever reads a printed copy never sees the user interface.
         tests:
           - AttestationRenderer_Render_SelfSignedKey_PrintsTheNotice
           - AttestationRenderer_Render_OrganizationKey_PrintsSubjectIssuerAndNoNotice
+          - AttestationRenderer_Render_CodeSigningKey_PrintsTheNoteOnlyWhenItApplies
 
       - id: ReviewCenter-AttestationRenderer-ProvesStatement
         title: >-

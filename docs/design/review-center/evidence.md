@@ -101,7 +101,9 @@ same input, and has a layout that `AttestationSigner` can rely on. The price is 
 encoding are shown as question marks. `AttestationSigner` leaves those bytes unchanged and adds an incremental update
 with a signature field, a form, and a signature dictionary (`adbe.pkcs7.detached`) whose value is a detached CMS
 signature
-with SHA-256 over the whole file except the hexadecimal value of the signature. The space for the signature is reserved
+with SHA-256 over the whole file except the hexadecimal value of the signature. The signature is a **certifying
+signature** (DocMDP permission 1, no changes allowed): a PDF reader reports any later change, and Adobe Acrobat shows
+that no changes are permitted. The space for the signature is reserved
 before the signature is known, so a certificate chain that does not fit is reported and no broken document is produced.
 The signer works only with a document that has the layout of its own writer.
 
@@ -120,11 +122,12 @@ the memory of the server in a form that could be copied. The server account need
 supports RSA and ECDSA keys, and keeps the intermediate certificates of the chain (without revocation checks) so that
 the signature carries them. It does not sign a test value at start-up, so a smart card is not asked for its PIN just
 because the server
-started. A certificate that is meant for code signing only is not suited to signing a PDF: many readers do not accept
-it.
+started. A certificate that is meant for code signing only is not suited to signing a PDF: Adobe Acrobat will not trust
+it for document signatures.
 Use a document-signing certificate (an internal certification authority is fine, if its root is distributed to
-the readers). The provider logs a warning for a certificate whose extended key usage allows code signing only; it does
-not refuse it.
+the readers). The provider logs a warning at start-up for such a certificate, and the attestation prints a one-line
+note in its signing-key section; it does not refuse the certificate. The server does not check the certificate chain
+or revocation; the PDF viewer does.
 
 **RequireTrustedKey**: When this setting is on, the server refuses a key that is self-signed, a certificate whose key
 usage does not allow digital signatures or non-repudiation, and a certificate that is not within its validity period. It

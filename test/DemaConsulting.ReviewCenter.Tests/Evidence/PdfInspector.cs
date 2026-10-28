@@ -233,6 +233,54 @@ internal sealed class PdfInspector
     }
 
     /// <summary>
+    ///     Gets the DocMDP permission of the signature's transform parameters, or <c>null</c> when there is none.
+    /// </summary>
+    public int? DocMdpPermission
+    {
+        get
+        {
+            var match = Regex.Match(
+                _text,
+                @"/TransformMethod /DocMDP /TransformParams << ([^>]*?)/P (\d)\b",
+                RegexOptions.None,
+                _timeout);
+            return match.Success ? int.Parse(match.Groups[2].Value, CultureInfo.InvariantCulture) : null;
+        }
+    }
+
+    /// <summary>
+    ///     Gets the object number that the catalog's <c>/Perms</c> names as the DocMDP signature, or <c>null</c>.
+    /// </summary>
+    public int? PermsDocMdpObject
+    {
+        get
+        {
+            var match = Regex.Match(_text, @"/Perms << /DocMDP (\d+) 0 R >>", RegexOptions.None, _timeout);
+            return match.Success ? int.Parse(match.Groups[1].Value, CultureInfo.InvariantCulture) : null;
+        }
+    }
+
+    /// <summary>
+    ///     Gets the numbers of the objects that hold a signature dictionary (<c>/Type /Sig</c>).
+    /// </summary>
+    public IReadOnlyList<int> SignatureObjectNumbers =>
+        Regex.Matches(_text, @"(\d+) 0 obj\n<< /Type /Sig ", RegexOptions.None, _timeout)
+            .Select(m => int.Parse(m.Groups[1].Value, CultureInfo.InvariantCulture))
+            .ToList();
+
+    /// <summary>
+    ///     Gets the signature object that the signature field (widget) refers to with <c>/V</c>, or <c>null</c>.
+    /// </summary>
+    public int? WidgetSignatureObject
+    {
+        get
+        {
+            var match = Regex.Match(_text, @"/FT /Sig [^>]*?/V (\d+) 0 R", RegexOptions.None, _timeout);
+            return match.Success ? int.Parse(match.Groups[1].Value, CultureInfo.InvariantCulture) : null;
+        }
+    }
+
+    /// <summary>
     ///     Gets the value of a document information entry.
     /// </summary>
     /// <param name="key">The entry name, such as <c>Title</c>.</param>

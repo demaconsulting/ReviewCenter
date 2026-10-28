@@ -37,6 +37,10 @@ namespace DemaConsulting.ReviewCenter.Evidence;
 ///     signature or non-repudiation.
 /// </param>
 /// <param name="RequireTrustedKey">Whether the <c>Attestation:RequireTrustedKey</c> policy is in effect.</param>
+/// <param name="IsCodeSigningOnly">
+///     Whether the certificate is for code signing only (see <see cref="AttestationKeyPolicy.IsCodeSigningOnly"/>);
+///     such a certificate is used, but PDF readers do not trust it for document signatures.
+/// </param>
 internal sealed record AttestationKeyInfo(
     string Provider,
     string Subject,
@@ -48,4 +52,5 @@ internal sealed record AttestationKeyInfo(
     DateTimeOffset NotAfter,
     bool IsSelfSigned,
     bool HasDigitalSignatureUsage,
-    bool RequireTrustedKey);
+    bool RequireTrustedKey,
+    bool IsCodeSigningOnly = false);

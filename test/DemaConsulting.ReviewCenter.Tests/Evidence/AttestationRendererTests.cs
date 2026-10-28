@@ -48,8 +48,9 @@ public class AttestationRendererTests
     ///     Describes a self-signed key.
     /// </summary>
     /// <param name="selfSigned">Whether the key is self-signed.</param>
+    /// <param name="codeSigningOnly">Whether the certificate is for code signing only.</param>
     /// <returns>The description.</returns>
-    internal static AttestationKeyInfo KeyInfo(bool selfSigned = true)
+    internal static AttestationKeyInfo KeyInfo(bool selfSigned = true, bool codeSigningOnly = false)
     {
         return new AttestationKeyInfo(
             selfSigned ? "SelfSigned" : "CertificateStore",
@@ -62,7 +63,8 @@ public class AttestationRendererTests
             new DateTimeOffset(2035, 1, 1, 0, 0, 0, TimeSpan.Zero),
             selfSigned,
             true,
-            !selfSigned);
+            !selfSigned,
+            codeSigningOnly);
     }
 
     /// <summary>
@@ -464,6 +466,28 @@ public class AttestationRendererTests
         Assert.Contains("CN=Self signed test key", lines);
         Assert.Contains("0123456789ABCDEF0123456789ABCDEF01234567", lines);
         Assert.Contains("yes", lines);
+    }
+
+    /// <summary>
+    ///     Test that a code-signing-only key gets the one-line note in the document, and a document-signing key does
+    ///     not; the self-signed notice is unaffected.
+    /// </summary>
+    /// <param name="codeSigningOnly">Whether the key is for code signing only.</param>
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void AttestationRenderer_Render_CodeSigningKey_PrintsTheNoteOnlyWhenItApplies(bool codeSigningOnly)
+    {
+        // Arrange: a self-signed key, for code signing only or not
+        var key = KeyInfo(selfSigned: true, codeSigningOnly: codeSigningOnly);
+
+        // Act: render; a paragraph is wrapped into several lines, so the lines are joined again
+        var lines = Render(Sample(key)).TextLines;
+        var text = string.Join(' ', lines);
+
+        // Assert: the note is there only for code signing, and the self-signed notice is there in both cases
+        Assert.Equal(codeSigningOnly, text.Contains(AttestationKeyPolicy.CodeSigningNotice, StringComparison.Ordinal));
+        Assert.Contains(lines, l => l.StartsWith("SELF-SIGNED KEY - NOT AN ORGANIZATION KEY", StringComparison.Ordinal));
     }
 
     /// <summary>

@@ -21,6 +21,7 @@
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
 using DemaConsulting.ReviewCenter.Evidence;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 
 namespace DemaConsulting.ReviewCenter.Tests.Evidence;
@@ -161,27 +162,115 @@ public class AttestationKeyPolicyTests
     }
 
     /// <summary>
-    ///     Test that a certificate for code signing only is warned about, and one that also allows documents is not.
+    ///     Test how certificates are classified by their Extended Key Usage, and that the warning agrees and has the
+    ///     defined text.
     /// </summary>
-    /// <param name="purposeOid">The extended key usage that the certificate has.</param>
-    /// <param name="expectWarning">Whether a warning is expected.</param>
+    /// <param name="purposeOids">The purposes of the certificate, separated by semicolons; empty for no extension.</param>
+    /// <param name="expected">Whether the certificate is for code signing only.</param>
     [Theory]
     [InlineData("1.3.6.1.5.5.7.3.3", true)]
-    [InlineData("1.3.6.1.5.5.7.3.4", false)]
+    [InlineData("1.3.6.1.5.5.7.3.3;1.3.6.1.5.5.7.3.1", true)]
+    [InlineData("1.3.6.1.4.1.311.10.3.12", false)]
     [InlineData("1.2.840.113583.1.1.5", false)]
-    public void AttestationKeyPolicy_Warnings_ExtendedKeyUsage_WarnsOnlyForCodeSigningOnly(string purposeOid, bool expectWarning)
+    [InlineData("1.3.6.1.5.5.7.3.4", false)]
+    [InlineData("2.5.29.37.0", false)]
+    [InlineData("", false)]
+    [InlineData("1.3.6.1.5.5.7.3.3;1.3.6.1.4.1.311.10.3.12", false)]
+    [InlineData("1.3.6.1.5.5.7.3.3;1.3.6.1.5.5.7.3.4", false)]
+    public void AttestationKeyPolicy_IsCodeSigningOnly_ExtendedKeyUsage_ClassifiesCertificates(string purposeOids, bool expected)
     {
-        // Arrange: a certificate with that purpose
+        // Arrange: a certificate with those purposes (or none)
         using var rsa = RSA.Create(2048);
         var request = new CertificateRequest("CN=Purpose test", rsa, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
-        request.CertificateExtensions.Add(new X509EnhancedKeyUsageExtension([new Oid(purposeOid)], false));
+        if (purposeOids.Length > 0)
+        {
+            var purposes = purposeOids.Split(';').Select(oid => new Oid(oid)).ToArray();
+            request.CertificateExtensions.Add(new X509EnhancedKeyUsageExtension([.. purposes], false));
+        }
+
         using var certificate = request.CreateSelfSigned(DateTimeOffset.UtcNow.AddDays(-1), DateTimeOffset.UtcNow.AddDays(1));
 
-        // Act: ask for warnings
+        // Act: classify and ask for warnings
+        var result = AttestationKeyPolicy.IsCodeSigningOnly(certificate);
         var warnings = AttestationKeyPolicy.Warnings(certificate);
 
-        // Assert: a warning only for code signing alone
-        Assert.Equal(expectWarning, warnings.Count > 0);
+        // Assert: classified as expected; the warning is exactly the defined notice, and only for code signing only
+        Assert.Equal(expected, result);
+        Assert.Equal(expected ? [AttestationKeyPolicy.CodeSigningNotice] : [], warnings);
+    }
+
+    /// <summary>
+    ///     Test that the notice has the defined wording.
+    /// </summary>
+    [Fact]
+    public void AttestationKeyPolicy_CodeSigningNotice_HasTheDefinedWording()
+    {
+        // Assert: the text that the log and the attestation show
+        Assert.Equal(
+            "This certificate is a code-signing certificate. Adobe Acrobat will not trust it for document signatures; "
+            + "use a document-signing certificate for production.",
+            AttestationKeyPolicy.CodeSigningNotice);
+    }
+
+    /// <summary>
+    ///     Test that the key description tells whether the certificate is for code signing only.
+    /// </summary>
+    [Fact]
+    public void AttestationSigningKey_Create_CodeSigningOnlyCertificate_SetsInfoFlag()
+    {
+        // Arrange: keys with code signing only, no purposes, and the default test key
+        using var codeSigning = TestKeys.WithPurposes(false, "1.3.6.1.5.5.7.3.3");
+        using var noPurpose = TestKeys.WithPurposes(false);
+        using var defaultKey = TestKeys.SelfSignedRsa();
+
+        // Assert: only the first is flagged
+        Assert.True(codeSigning.Info.IsCodeSigningOnly);
+        Assert.False(noPurpose.Info.IsCodeSigningOnly);
+        Assert.False(defaultKey.Info.IsCodeSigningOnly);
+    }
+
+    /// <summary>
+    ///     Test that a code-signing-only certificate is warned about once, at first load, and never refused, also
+    ///     when a trusted key is required: that policy does not look at the purpose.
+    /// </summary>
+    [Fact]
+    public void AttestationKeyProviderBase_GetSigningKey_CodeSigningOnlyCertificate_LogsWarningOnceAndDoesNotRefuse()
+    {
+        // Arrange: a provider whose key was issued by an authority and is for code signing only; the policy is on
+        var logs = new CapturingLoggerProvider();
+        using var factory = LoggerFactory.Create(builder => builder.AddProvider(logs));
+        using var provider = new FixedKeyProvider(
+            TestKeys.Organization(purposes: ["1.3.6.1.5.5.7.3.3"]),
+            new AttestationOptions { RequireTrustedKey = true },
+            factory.CreateLogger("test"));
+
+        // Act: ask twice
+        var first = provider.GetSigningKey();
+        var second = provider.GetSigningKey();
+
+        // Assert: the same key is returned both times, and the warning with the thumbprint is logged once
+        Assert.Same(first, second);
+        Assert.True(first.Info.IsCodeSigningOnly);
+        var warning = Assert.Single(
+            logs.Entries,
+            e => e.Level == LogLevel.Warning && e.Message.Contains(AttestationKeyPolicy.CodeSigningNotice, StringComparison.Ordinal));
+        Assert.Contains(first.Info.Thumbprint, warning.Message, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    ///     A provider that returns a key it was given, to test the part that every provider shares.
+    /// </summary>
+    /// <param name="key">The key to return.</param>
+    /// <param name="options">The attestation settings.</param>
+    /// <param name="log">The logger.</param>
+    private sealed class FixedKeyProvider(AttestationSigningKey key, AttestationOptions options, ILogger log)
+        : AttestationKeyProviderBase(options, TimeProvider.System, log)
+    {
+        /// <inheritdoc />
+        public override string Name => "Fixed";
+
+        /// <inheritdoc />
+        protected override AttestationSigningKey Load() => key;
     }
 
     /// <summary>

@@ -35,7 +35,9 @@ namespace DemaConsulting.ReviewCenter.Evidence;
 ///     The original bytes are never changed. The update appends a signature dictionary with a fixed-size
 ///     <c>/Contents</c> placeholder and a <c>/ByteRange</c> that covers every byte of the file except that
 ///     placeholder, a signature field (widget) on the first page, the rewritten page and catalog objects that
-///     reference it, a new cross-reference section and a trailer that points back to the old one. The CMS signature
+///     reference it, a new cross-reference section and a trailer that points back to the old one. The signature is
+///     a certifying signature: its <c>/Reference</c> carries a DocMDP transform with <c>/P 1</c> (no changes allowed)
+///     and the catalog names it in <c>/Perms</c>, so a reader reports any later change as invalid. The CMS signature
 ///     is then computed over exactly the covered bytes and written into the placeholder. The signer understands only
 ///     the layout that <see cref="PdfDocumentWriter"/> writes (a classic cross-reference table and one revision)
 ///     and refuses any other PDF. It is stateless and thread-safe.
@@ -56,6 +58,12 @@ internal sealed class AttestationSigner : IAttestationSigner
     ///     The text that stands in the byte range until the final values are known; it has the same length as the final text.
     /// </summary>
     private const string ByteRangePlaceholder = "[0 0000000000 0000000000 0000000000]";
+
+    /// <summary>
+    ///     The DocMDP permission (ISO 32000-1, 12.8.2.2): 1 certifies the document and allows no changes at all. The
+    ///     attestation has no form fields to fill in, so nothing needs to be left open.
+    /// </summary>
+    private const int DocMdpPermission = 1;
 
     /// <summary>
     ///     The time limit of each pattern search in the file.
@@ -253,12 +261,18 @@ internal sealed class AttestationSigner : IAttestationSigner
             + " /Contents <" + new string('0', SignatureCapacity * 2) + ">"
             + " /Name " + PdfDocumentWriter.EncodeTextString(name)
             + " /Reason " + PdfDocumentWriter.EncodeTextString(reason)
-            + " /M " + when + " >>");
+            + " /M " + when
+            + " /Reference [<< /Type /SigRef /TransformMethod /DocMDP /TransformParams "
+            + $"<< /Type /TransformParams /P {DocMdpPermission} /V /1.2 >> /Data {layout.Root} 0 R >>] >>");
         WriteObject(
             widgetObject,
             $"<< /Type /Annot /Subtype /Widget /FT /Sig /Rect [0 0 0 0] /F 132 /T (Signature1) /V {signatureObject} 0 R /P {layout.Page} 0 R >>");
         WriteObject(layout.Page, InsertBeforeEnd(layout.PageBody, $" /Annots [{widgetObject} 0 R]"));
-        WriteObject(layout.Root, InsertBeforeEnd(layout.Catalog, $" /AcroForm << /Fields [{widgetObject} 0 R] /SigFlags 3 >>"));
+        WriteObject(
+            layout.Root,
+            InsertBeforeEnd(
+                layout.Catalog,
+                $" /AcroForm << /Fields [{widgetObject} 0 R] /SigFlags 3 >> /Perms << /DocMDP {signatureObject} 0 R >>"));
 
         // The new cross-reference section lists only the objects that were added or rewritten
         var xref = text.Length + update.Length;

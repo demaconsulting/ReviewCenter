@@ -14,9 +14,17 @@ The signer is stateless and thread-safe. It works on the layout of `PdfDocumentW
 no compression), which it finds by a bounded search of the end of the file. It adds an incremental update, so the
 original bytes stay exactly as they were: a new revision of the page that carries the signature field, an
 interactive form (`AcroForm`) that lists the field, the signature dictionary with the filter, the sub-filter, the
-reason, the signing time, and the byte range, and a new cross-reference section and trailer. The byte range is a
+reason, the signing time, the byte range, and a `/Reference` entry for the DocMDP transform, the catalog with a
+`/Perms` entry that names the signature, and a new cross-reference section and trailer. The signature is a
+**certifying signature**: the DocMDP transform (ISO 32000-1, 12.8.2.2) has permission `P` 1, no changes allowed,
+because the attestation has no form fields to fill in and nothing is meant to be added to it. Without the DocMDP entry
+the signature is an approval signature, for which a reader allows later changes. The `/Reference` entry is the
+signature reference dictionary (`/Type /SigRef`, `/TransformMethod /DocMDP`, transform parameters with `/P 1` and
+`/V /1.2`, and `/Data` that points to the catalog); `/Perms` reuses the signature object, so no object is added. The
+byte range is a
 placeholder of fixed width that is filled in last, with four numbers that cover the whole file except the hexadecimal
-value of the signature. The value has room for 32768 bytes of signature; the signature includes the certificate of the
+value of the signature. Both entries are inside the covered bytes, so changing the permission breaks the signature. The
+value has room for 32768 bytes of signature; the signature includes the certificate of the
 signer and the intermediate certificates of the key.
 
 #### Key Methods
@@ -29,7 +37,9 @@ signer and the intermediate certificates of the key.
   attribute of the CMS signature); `string reason` — the reason text.
 - *Returns*: `byte[]` — the document with the signature.
 - *Preconditions*: `pdf` has the layout of `PdfDocumentWriter` and is not signed.
-- *Postconditions*: The result starts with the bytes of `pdf`. The signature is made with the private key handle that
+- *Postconditions*: The result starts with the bytes of `pdf`. The signature is a certifying signature with DocMDP
+  permission 1 (no changes allowed), and the permission is covered by the signature. The signature is made with the
+  private key handle that
   the key holds (RSA or ECDSA, SHA-256), through the `CmsSigner` of `System.Security.Cryptography.Pkcs`, so a key that
   cannot be exported signs as well as one that can. The same input and RSA key give the same bytes. Data that is
   appended after the signing is not covered by the byte range.

@@ -20,13 +20,19 @@ group of small types that belong together: the interface `IAttestationKeyProvide
 Protection keys unless the operator sets it). An `AttestationSigningKey` holds the private key as an RSA or ECDSA object
 (a handle, not key material), the signer certificate, the intermediate certificates, and an `AttestationKeyInfo` (provider,
 subject, issuer, thumbprint, serial number, algorithm, validity, whether the certificate is self-signed, whether its key
-usage allows signing, and whether `RequireTrustedKey` is on). `AttestationKeyStatus` (provider, whether a key can be
+usage allows signing, whether the certificate is for code signing only, and whether `RequireTrustedKey` is on).
+`AttestationKeyStatus` (provider, whether a key can be
 used, the `AttestationKeyInfo`, and the problem) is the answer for the review page.
 
 `AttestationKeyProviderBase` loads the key once, on the first request, and keeps it; a failure is not kept, so the next
 call tries again. It logs the choice at information level and a warning for a self-signed key and for a certificate
-that allows code signing only. `AttestationKeyPolicy.Enforce` runs on every call, not only on the first, so a certificate
+that is for code signing only. `AttestationKeyPolicy.Enforce` runs on every call, not only on the first, so a certificate
 that expires while the server runs stops the attestation and not the server.
+
+The kinds of key, from the weakest to the strongest evidence: a **self-signed** key (the default, labeled in the
+attestation and logged), a **code-signing** certificate (used, with a note in the attestation and a warning in the log:
+Adobe Acrobat will not trust it for document signatures), and a **document-signing** certificate (no note). The server
+does not check the chain or revocation for any of them; the PDF viewer does, against its own trust store.
 
 The **self-signed provider** creates, when its file is missing, an RSA key of 3072 bits with a certificate that is signed
 by itself (SHA-256, the subject "ReviewCenter self-signed attestation key (not an organization key)", ten years of
@@ -54,10 +60,13 @@ the signature carries what a reader needs to follow the chain, and the root is l
 - *Postconditions*: The policy was checked with the current time: when `RequireTrustedKey` is set, the certificate must
   not be self-signed, its key usage (when it has one) must allow digital signatures or non-repudiation, and now must be
   within its validity period. **This is all that the rule checks: it does not check that the chain leads to a trusted
-  root and does not check revocation**, because the server cannot know whom its readers trust. A warning is logged for a
-  certificate whose extended key usage allows code signing only (and not e-mail protection, document signing, the Adobe
-  document signing usage, or any usage), because a certificate for code signing is not suited to PDF signing; it is not
-  refused.
+  root and does not check revocation**, because the server cannot know whom its readers trust. A warning is logged once,
+  when the key is first loaded, for a certificate that is for code signing only (`AttestationKeyPolicy.IsCodeSigningOnly`:
+  the extended key usage lists code signing and none of e-mail protection, Microsoft or Adobe document signing, or any
+  usage; a certificate without the extension is not code-signing-only). The text is
+  `AttestationKeyPolicy.CodeSigningNotice`: "This certificate is a code-signing certificate. Adobe Acrobat will not trust
+  it for document signatures; use a document-signing certificate for production." The key is not refused, also not when
+  `RequireTrustedKey` is set, and `AttestationKeyInfo.IsCodeSigningOnly` carries the classification to the attestation.
 
 **Describe**: Returns the status for the page.
 
@@ -75,7 +84,7 @@ the signature carries what a reader needs to follow the chain, and the root is l
 - *Parameters*: The options, the clock, and the logger factory.
 - *Returns*: The provider for `SelfSigned` (also for an empty value) or `CertificateStore`.
 
-**AttestationKeyPolicy.Enforce, HasSigningKeyUsage, Warnings**: The rules above.
+**AttestationKeyPolicy.Enforce, HasSigningKeyUsage, IsCodeSigningOnly, Warnings**: The rules above.
 
 #### Error Handling
 
