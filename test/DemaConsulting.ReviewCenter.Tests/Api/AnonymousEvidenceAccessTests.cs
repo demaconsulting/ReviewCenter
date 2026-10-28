@@ -39,7 +39,7 @@ public class AnonymousEvidenceAccessTests
     ///     same generic 401 as for a project that does not exist, so that nothing tells whether the project exists.
     /// </summary>
     /// <param name="route">The route.</param>
-    [Theory(Timeout = 180000)]
+    [Theory(Timeout = 120000)]
     [InlineData(IndexRoute)]
     [InlineData(PdfRoute)]
     public async Task AnonymousEvidenceAccess_SwitchOff_Anonymous_AnswersLikeAMissingProject(string route)
@@ -68,7 +68,7 @@ public class AnonymousEvidenceAccessTests
     ///     also when the switch is on.
     /// </summary>
     /// <param name="route">The route.</param>
-    [Theory(Timeout = 180000)]
+    [Theory(Timeout = 120000)]
     [InlineData(IndexRoute)]
     [InlineData(PdfRoute)]
     public async Task AnonymousEvidenceAccess_Matrix_ServesOnlyWhoMay(string route)
@@ -122,7 +122,7 @@ public class AnonymousEvidenceAccessTests
     ///     Test that the two switches are independent: with only the index open the PDF is still refused to an
     ///     anonymous caller, and the other way round.
     /// </summary>
-    [Fact(Timeout = 180000)]
+    [Fact(Timeout = 120000)]
     public async Task AnonymousEvidenceAccess_OneSwitchOn_DoesNotOpenTheOtherRoute()
     {
         // Arrange
@@ -145,7 +145,7 @@ public class AnonymousEvidenceAccessTests
     /// <summary>
     ///     Test that a switch of one project does not open another project.
     /// </summary>
-    [Fact(Timeout = 180000)]
+    [Fact(Timeout = 120000)]
     public async Task AnonymousEvidenceAccess_SwitchOn_OpensOnlyItsOwnProject()
     {
         // Arrange: two projects, the first open
@@ -165,7 +165,7 @@ public class AnonymousEvidenceAccessTests
     ///     Test that the anonymous index lists a complete review of a review set with its attestation address, and that
     ///     an anonymous download of the PDF is a signed PDF that is audited as an anonymous request.
     /// </summary>
-    [Fact(Timeout = 180000)]
+    [Fact(Timeout = 120000)]
     public async Task AnonymousEvidenceAccess_BothOn_ServesIndexEntryAndSignedPdfAndAuditsAnonymous()
     {
         // Arrange
@@ -198,7 +198,7 @@ public class AnonymousEvidenceAccessTests
     ///     are answered with the same 404 and the same body, nothing is recorded, while a member still gets the 409
     ///     for the incomplete review and the 404 for the unknown one.
     /// </summary>
-    [Fact(Timeout = 180000)]
+    [Fact(Timeout = 120000)]
     public async Task AnonymousEvidenceAccess_AttestationPdf_IncompleteReview_AnswersLikeMissingReview()
     {
         // Arrange: a review nobody signed in a project that opens the PDFs, and a member
@@ -238,7 +238,7 @@ public class AnonymousEvidenceAccessTests
     /// <param name="method">The HTTP method.</param>
     /// <param name="route">The address.</param>
     /// <param name="expected">The expected status.</param>
-    [Theory(Timeout = 180000)]
+    [Theory(Timeout = 120000)]
     [InlineData("GET", "/api/projects", 401)]
     [InlineData("GET", "/api/projects/{p}/reviews", 401)]
     [InlineData("GET", "/api/projects/{p}/reviews/REV-1", 401)]
@@ -271,7 +271,7 @@ public class AnonymousEvidenceAccessTests
     ///     Test that the page route of the attestation (cookie, not token) is not opened to anonymous callers by the
     ///     switch: it still sends a caller who is not signed in to the sign-in page.
     /// </summary>
-    [Fact(Timeout = 180000)]
+    [Fact(Timeout = 120000)]
     public async Task AnonymousEvidenceAccess_BothOn_AttestationPageRoute_StillNeedsSignIn()
     {
         // Arrange
@@ -292,7 +292,7 @@ public class AnonymousEvidenceAccessTests
     /// <summary>
     ///     Test that a request is refused as soon as a switch is turned off, without a restart.
     /// </summary>
-    [Fact(Timeout = 180000)]
+    [Fact(Timeout = 120000)]
     public async Task AnonymousEvidenceAccess_SwitchTurnedOff_RefusesAtOnce()
     {
         // Arrange: an open index that was served
@@ -316,7 +316,7 @@ public class AnonymousEvidenceAccessTests
     ///     Test that the anonymous callers of the two routes are limited per address with a 429 and
     ///     <c>Retry-After</c>, and that a caller with a token is not limited.
     /// </summary>
-    [Fact(Timeout = 180000)]
+    [Fact(Timeout = 120000)]
     public async Task AnonymousEvidenceAccess_TooManyAnonymousRequests_Answers429WithRetryAfter()
     {
         // Arrange
@@ -383,7 +383,7 @@ public class AnonymousEvidenceAccessTests
     ///     Test that exactly two endpoints of the API can be reached without a token, that they are the evidence index
     ///     and the attestation PDF, and that every other endpoint of the API requires the token policy.
     /// </summary>
-    [Fact(Timeout = 180000)]
+    [Fact(Timeout = 120000)]
     public async Task AnonymousEvidenceAccess_Endpoints_OnlyTheTwoRoutesUseTheOpenPolicies()
     {
         // Arrange

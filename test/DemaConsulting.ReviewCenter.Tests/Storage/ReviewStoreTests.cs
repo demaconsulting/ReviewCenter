@@ -40,13 +40,22 @@ internal sealed class TestStore : IDisposable
     /// <summary>
     ///     Initializes a new instance of the <see cref="TestStore"/> class with an empty, created database.
     /// </summary>
-    public TestStore()
+    /// <param name="fastCommits">
+    ///     <c>true</c> to let commits skip the disk waits (see <see cref="FastCommitInterceptor"/>), for tests that use
+    ///     the store only as a place to keep data; the tests of the store itself keep the product settings.
+    /// </param>
+    public TestStore(bool fastCommits = false)
     {
         var options = new DatabaseOptions { ConnectionString = TestDatabase.NewConnectionString() };
         ConnectionString = options.ConnectionString;
-        _provider = new ServiceCollection()
-            .AddDbContextFactory<ReviewCenterDbContext>(builder => DatabaseSetup.Configure(builder, options))
-            .BuildServiceProvider();
+        var services = new ServiceCollection()
+            .AddDbContextFactory<ReviewCenterDbContext>(builder => DatabaseSetup.Configure(builder, options));
+        if (fastCommits)
+        {
+            FastCommitInterceptor.AddTo(services);
+        }
+
+        _provider = services.BuildServiceProvider();
         var factory = _provider.GetRequiredService<IDbContextFactory<ReviewCenterDbContext>>();
         DatabaseSetup.EnsureCreated(factory, options);
         var appender = new AuditAppender(TimeProvider.System);

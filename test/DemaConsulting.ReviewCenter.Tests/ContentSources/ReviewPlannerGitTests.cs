@@ -100,15 +100,18 @@ public class ReviewPlannerGitTests
         string First);
 
     /// <summary>
-    ///     Creates the origin: <c>v0</c> without a configuration, <c>v1</c> with it, and <c>main</c> one commit
+    ///     The origin that is built once for the test run and copied for every test, which changes its copy.
+    /// </summary>
+    private static readonly Lazy<(string Folder, string First)> Template = new(() => BuildOrigin(GitTestSupport.NewTemplateFolder()));
+
+    /// <summary>
+    ///     Builds the origin: <c>v0</c> without a configuration, <c>v1</c> with it, and <c>main</c> one commit
     ///     later with <c>src/a.cs</c> modified and <c>src/b.cs</c> added.
     /// </summary>
-    /// <param name="root">The temporary folder.</param>
-    /// <param name="db">The database.</param>
-    /// <returns>The scenario.</returns>
-    private static async Task<Scenario> CreateAsync(TempFolder root, TestStore db)
+    /// <param name="origin">The folder of the origin.</param>
+    /// <returns>The folder and the commit tagged <c>v1</c>.</returns>
+    private static (string Folder, string First) BuildOrigin(string origin)
     {
-        var origin = Path.Combine(root.Path, "origin");
         Directory.CreateDirectory(origin);
         GitTestSupport.Init(origin);
         GitTestSupport.Write(origin, "README.txt", "readme\n");
@@ -122,6 +125,20 @@ public class ReviewPlannerGitTests
         GitTestSupport.Write(origin, "src/a.cs", "two\n");
         GitTestSupport.Write(origin, "src/b.cs", "new\n");
         GitTestSupport.Commit(origin, "two");
+        return (origin, first);
+    }
+
+    /// <summary>
+    ///     Creates the origin, a copy of the template, and the services over it and a database.
+    /// </summary>
+    /// <param name="root">The temporary folder.</param>
+    /// <param name="db">The database.</param>
+    /// <returns>The scenario.</returns>
+    private static async Task<Scenario> CreateAsync(TempFolder root, TestStore db)
+    {
+        var origin = Path.Combine(root.Path, "origin");
+        GitTestSupport.CopyFolder(Template.Value.Folder, origin);
+        var first = Template.Value.First;
 
         var cancellationToken = TestContext.Current.CancellationToken;
         var clock = TimeProvider.System;
@@ -211,7 +228,7 @@ public class ReviewPlannerGitTests
         // Arrange: the origin, the database and the planner
         Assert.SkipWhen(!GitTestSupport.Available, GitTestSupport.MissingMessage);
         using var root = new TempFolder();
-        using var db = new TestStore();
+        using var db = new TestStore(fastCommits: true);
         var s = await CreateAsync(root, db);
 
         // Act: plan main with no baseline, then since the tag v1
@@ -241,7 +258,7 @@ public class ReviewPlannerGitTests
         // Arrange: reviews of core and docs at v1, with core signed
         Assert.SkipWhen(!GitTestSupport.Available, GitTestSupport.MissingMessage);
         using var root = new TempFolder();
-        using var db = new TestStore();
+        using var db = new TestStore(fastCommits: true);
         var s = await CreateAsync(root, db);
         var atV1 = await CreateRowsAsync(s, await PlanAsync(s, "v1", BaselineMode.None));
         await SignAsync(s, "core");
@@ -287,7 +304,7 @@ public class ReviewPlannerGitTests
         // Arrange: a signed review of core made at the head of a side branch that main does not contain
         Assert.SkipWhen(!GitTestSupport.Available, GitTestSupport.MissingMessage);
         using var root = new TempFolder();
-        using var db = new TestStore();
+        using var db = new TestStore(fastCommits: true);
         var s = await CreateAsync(root, db);
         GitTestSupport.Git(s.Origin, "checkout", "-b", "side", "v1");
         GitTestSupport.Write(s.Origin, "src/side.cs", "side\n");
@@ -317,7 +334,7 @@ public class ReviewPlannerGitTests
         // Arrange: a signed review of core at v1, then a configuration on main that selects docs too
         Assert.SkipWhen(!GitTestSupport.Available, GitTestSupport.MissingMessage);
         using var root = new TempFolder();
-        using var db = new TestStore();
+        using var db = new TestStore(fastCommits: true);
         var s = await CreateAsync(root, db);
         await CreateRowsAsync(s, await PlanAsync(s, "v1", BaselineMode.None), "core");
         await SignAsync(s, "core");
@@ -344,7 +361,7 @@ public class ReviewPlannerGitTests
         // Arrange: the origin, where v0 has no .reviewmark.yaml
         Assert.SkipWhen(!GitTestSupport.Available, GitTestSupport.MissingMessage);
         using var root = new TempFolder();
-        using var db = new TestStore();
+        using var db = new TestStore(fastCommits: true);
         var s = await CreateAsync(root, db);
 
         // Act: plan v0 and a branch that does not exist

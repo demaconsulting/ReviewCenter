@@ -212,7 +212,7 @@ public class ProjectMemberServiceTests
     ///     the attempt is reserved before the lookup, so exactly the limit is admitted and the rest is refused with the
     ///     throttle rule before it reaches the lookup.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 60000)]
     public async Task ProjectService_AddMemberAsync_ConcurrentAttempts_AreAdmittedUpToTheLimitOnly()
     {
         // Arrange: a lookup that holds every attempt that is admitted
@@ -228,11 +228,10 @@ public class ProjectMemberServiceTests
                     actor, world.Project, $"guess-{i}", ProjectRole.User, cancellationToken),
                 cancellationToken))
             .ToList();
-        await WaitUntilAsync(
-            () => tasks.Count(t => t.IsCompleted) >= attempts - ProjectService.MaxFailedAttempts);
-        await WaitUntilAsync(() => world.Gate!.Entered >= ProjectService.MaxFailedAttempts);
+        await world.Gate!.WhenEnteredAsync(ProjectService.MaxFailedAttempts);
+        await WhenCompletedAsync(tasks, attempts - ProjectService.MaxFailedAttempts);
         var refusedBeforeRelease = tasks.Count(t => t.IsCompleted);
-        var enteredBeforeRelease = world.Gate!.Entered;
+        var enteredBeforeRelease = world.Gate.Entered;
         world.Gate.Open();
         var rules = new List<DomainRule>();
         foreach (var task in tasks)
@@ -255,7 +254,7 @@ public class ProjectMemberServiceTests
     ///     Test that a system administrator is not limited by the reservation either: every parallel attempt
     ///     reaches the lookup.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 60000)]
     public async Task ProjectService_AddMemberAsync_ConcurrentAttemptsOfSystemAdministrator_AreNeverThrottled()
     {
         // Arrange
@@ -271,8 +270,8 @@ public class ProjectMemberServiceTests
                     actor, world.Project, $"guess-{i}", ProjectRole.User, cancellationToken),
                 cancellationToken))
             .ToList();
-        await WaitUntilAsync(() => world.Gate!.Entered >= attempts);
-        world.Gate!.Open();
+        await world.Gate!.WhenEnteredAsync(attempts);
+        world.Gate.Open();
 
         // Assert: all of them were looked up and failed with the one message
         foreach (var task in tasks)
@@ -583,22 +582,17 @@ public class ProjectMemberServiceTests
     }
 
     /// <summary>
-    ///     Waits until a condition holds, so a test does not depend on how fast the parallel work runs.
+    ///     Waits until a number of tasks have completed, without polling: each wait ends when one more task finishes,
+    ///     so the test does not depend on how fast the parallel work runs.
     /// </summary>
-    /// <param name="condition">The condition.</param>
-    /// <returns>A task that completes when the condition holds.</returns>
-    /// <exception cref="TimeoutException">Thrown when the condition does not hold within ten seconds.</exception>
-    private static async Task WaitUntilAsync(Func<bool> condition)
+    /// <param name="tasks">The tasks.</param>
+    /// <param name="count">The number of tasks that must have completed.</param>
+    /// <returns>A task that completes when that many tasks have completed.</returns>
+    private static async Task WhenCompletedAsync(IReadOnlyList<Task> tasks, int count)
     {
-        var deadline = DateTime.UtcNow.AddSeconds(10);
-        while (!condition())
+        while (tasks.Count(t => t.IsCompleted) < count)
         {
-            if (DateTime.UtcNow > deadline)
-            {
-                throw new TimeoutException("The condition did not hold in time.");
-            }
-
-            await Task.Delay(5, TestContext.Current.CancellationToken);
+            await Task.WhenAny(tasks.Where(t => !t.IsCompleted));
         }
     }
 

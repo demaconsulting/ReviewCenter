@@ -244,11 +244,79 @@ public class DatabaseSetupTests
             .BuildServiceProvider();
         var factory = provider.GetRequiredService<IDbContextFactory<ReviewCenterDbContext>>();
 
-        // Act: attempt to create the database
-        var exception = Assert.Throws<InvalidOperationException>(() => DatabaseSetup.EnsureCreated(factory, options));
+        try
+        {
+            // Act: attempt to create the database
+            var exception = Assert.Throws<InvalidOperationException>(() => DatabaseSetup.EnsureCreated(factory, options));
 
-        // Assert: the error names the provider and the folder was never created
-        Assert.Contains("Oracle", exception.Message, StringComparison.Ordinal);
-        Assert.False(Directory.Exists(folder));
+            // Assert: the error names the provider and the folder was never created
+            Assert.Contains("Oracle", exception.Message, StringComparison.Ordinal);
+            Assert.False(Directory.Exists(folder));
+        }
+        finally
+        {
+            if (Directory.Exists(folder))
+            {
+                Directory.Delete(folder, recursive: true);
+            }
+        }
+    }
+
+    /// <summary>
+    ///     Test that a database opened the way the product opens it keeps SQLite's durable commit settings (a rollback
+    ///     journal on disk and full synchronization), while the test-only commit interceptor, which the heavy
+    ///     application tests use to skip the disk waits, is the only thing that relaxes them. This test is not cost
+    ///     reduced on purpose: it pins the production behavior that the faster tests do not exercise.
+    /// </summary>
+    [Fact]
+    public void DatabaseSetup_Configure_ProductionSettings_KeepDurableCommits_AndOnlyTheTestInterceptorRelaxesThem()
+    {
+        // Arrange: one database as the product configures it, one with the test-only interceptor on top
+        var folder = Path.Combine(Path.GetTempPath(), "ReviewCenterTests-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(folder);
+        var plainOptions = new DatabaseOptions { ConnectionString = $"Data Source={Path.Combine(folder, "plain.db")};Pooling=False" };
+        var fastOptions = new DatabaseOptions { ConnectionString = $"Data Source={Path.Combine(folder, "fast.db")};Pooling=False" };
+        var services = new ServiceCollection()
+            .AddDbContextFactory<ReviewCenterDbContext>(builder => DatabaseSetup.Configure(builder, plainOptions));
+        using var plainProvider = services.BuildServiceProvider();
+        var fastServices = new ServiceCollection()
+            .AddDbContextFactory<ReviewCenterDbContext>(builder => DatabaseSetup.Configure(builder, fastOptions));
+        FastCommitInterceptor.AddTo(fastServices);
+        using var fastProvider = fastServices.BuildServiceProvider();
+
+        try
+        {
+            // Act: read the pragmas on a connection that the context opened
+            var plain = ReadCommitSettings(plainProvider);
+            var fast = ReadCommitSettings(fastProvider);
+
+            // Assert: the product keeps a rollback journal on disk and FULL synchronization; the interceptor relaxes both
+            Assert.Equal(("delete", 2L), plain);
+            Assert.Equal(("memory", 0L), fast);
+        }
+        finally
+        {
+            SqliteConnection.ClearAllPools();
+            Directory.Delete(folder, recursive: true);
+        }
+    }
+
+    /// <summary>
+    ///     Reads the journal mode and synchronous setting of a connection that a context of the provider opened.
+    /// </summary>
+    /// <param name="provider">The service provider with the context factory.</param>
+    /// <returns>The journal mode and the synchronous level.</returns>
+    private static (string JournalMode, long Synchronous) ReadCommitSettings(ServiceProvider provider)
+    {
+        using var context = provider.GetRequiredService<IDbContextFactory<ReviewCenterDbContext>>().CreateDbContext();
+        context.Database.OpenConnection();
+        var connection = context.Database.GetDbConnection();
+        using var journal = connection.CreateCommand();
+        journal.CommandText = "PRAGMA journal_mode";
+        var mode = (string)journal.ExecuteScalar()!;
+        using var sync = connection.CreateCommand();
+        sync.CommandText = "PRAGMA synchronous";
+        var level = (long)sync.ExecuteScalar()!;
+        return (mode, level);
     }
 }

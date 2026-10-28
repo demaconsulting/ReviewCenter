@@ -70,6 +70,8 @@ internal static class ApiTestSupport
                 {
                     ["Database:ConnectionString"] = TestDatabase.NewConnectionString()
                 });
+                FastCommitInterceptor.AddTo(builder.Services);
+                TestDatabase.EnsureAttestationKey();
             }
         });
         await app.StartAsync(TestContext.Current.CancellationToken);

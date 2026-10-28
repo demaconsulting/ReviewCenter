@@ -80,7 +80,7 @@ public class ReviewFromGitTests
 
         var cancellationToken = TestContext.Current.CancellationToken;
         var clock = TimeProvider.System;
-        using var db = new TestStore();
+        using var db = new TestStore(fastCommits: true);
         var project = await TestServices.Projects(db.Store, clock).CreateAsync("Apollo", null, cancellationToken);
         var repositories = TestServices.Repositories(db.Store, clock);
         var repository = await repositories.CreateAsync(

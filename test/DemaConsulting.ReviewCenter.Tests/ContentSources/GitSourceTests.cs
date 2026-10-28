@@ -69,14 +69,32 @@ public class GitSourceTests
         new(id, "origin", location, null, null);
 
     /// <summary>
+    ///     The origin that is built once for the test run and copied for every test, because building it takes a dozen
+    ///     git processes and every test changes (or only reads) a copy of its own.
+    /// </summary>
+    private static readonly Lazy<Origin> Template = new(() => BuildOrigin(GitTestSupport.NewTemplateFolder()));
+
+    /// <summary>
     ///     Creates an origin repository with a modification, an addition, a deletion, a rename, a symbolic link, a
     ///     submodule entry and a mode-only change between its two commits.
     /// </summary>
     /// <param name="root">The folder under which the origin is created.</param>
-    /// <returns>The origin.</returns>
+    /// <returns>The origin, a copy that the test may change.</returns>
     private static Origin CreateOrigin(string root)
     {
+        var template = Template.Value;
         var folder = Path.Combine(root, "origin");
+        GitTestSupport.CopyFolder(template.Folder, folder);
+        return template with { Folder = folder };
+    }
+
+    /// <summary>
+    ///     Builds the origin repository in a folder.
+    /// </summary>
+    /// <param name="folder">The folder of the origin.</param>
+    /// <returns>The origin.</returns>
+    private static Origin BuildOrigin(string folder)
+    {
         Directory.CreateDirectory(folder);
         GitTestSupport.Init(folder);
         GitTestSupport.Write(folder, "a.txt", FirstText);

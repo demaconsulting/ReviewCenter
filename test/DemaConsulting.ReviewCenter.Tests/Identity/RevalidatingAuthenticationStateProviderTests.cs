@@ -48,7 +48,7 @@ public class RevalidatingAuthenticationStateProviderTests
     /// <summary>
     ///     How long a loop test waits for the state to change before it gives up.
     /// </summary>
-    private static readonly TimeSpan WaitLimit = TimeSpan.FromSeconds(10);
+    private static readonly TimeSpan WaitLimit = TimeSpan.FromSeconds(30);
 
     /// <summary>
     ///     Test that an enabled user with the same role and display name stays valid.

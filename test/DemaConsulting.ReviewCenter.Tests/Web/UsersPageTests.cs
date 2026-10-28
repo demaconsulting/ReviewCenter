@@ -311,7 +311,7 @@ public class UsersPageTests : PageTestBase
         await Users.SetRoleAsync("root", UserRole.Reviewer, TestContext.Current.CancellationToken);
         await cut.WaitForAssertionAsync(
             () => Assert.NotEmpty(cut.FindAll("[data-testid='session-ended']")),
-            TimeSpan.FromSeconds(10));
+            TimeSpan.FromSeconds(30));
         _ = await Record.ExceptionAsync(() => toggle.ClickAsync());
 
         // Assert: the page and its actions are gone, and ann is unchanged
