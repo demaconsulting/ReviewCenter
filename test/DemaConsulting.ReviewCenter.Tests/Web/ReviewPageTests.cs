@@ -1492,7 +1492,7 @@ public class ReviewPageTests : PageTestBase
         await Users.SetEnabledAsync("ann", false, TestContext.Current.CancellationToken);
         await cut.WaitForAssertionAsync(
             () => Assert.NotEmpty(cut.FindAll("[data-testid='session-ended']")),
-            TimeSpan.FromSeconds(10));
+            TimeSpan.FromSeconds(30));
 
         // Assert: the page, its forms and the typed text are gone
         Assert.Empty(cut.FindAll("[data-testid='review-page']"));

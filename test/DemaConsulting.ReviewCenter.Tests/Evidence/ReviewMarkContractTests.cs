@@ -72,7 +72,7 @@ public class ReviewMarkContractTests
     ///     Test that the index of the fixed project is the committed golden file, byte for byte after the line endings
     ///     are normalized.
     /// </summary>
-    [Fact(Timeout = 180000)]
+    [Fact(Timeout = 120000)]
     public async Task ReviewMarkContract_GoldenIndex_MatchesCommittedFile()
     {
         // Arrange: the index of the fixed project, as indented JSON, and the golden file
@@ -91,7 +91,7 @@ public class ReviewMarkContractTests
     ///     Test that the index has the schema ReviewMark reads and that ReviewMark's reader loads every entry without
     ///     overwriting another.
     /// </summary>
-    [Fact(Timeout = 180000)]
+    [Fact(Timeout = 120000)]
     public async Task ReviewMarkContract_Index_HasTheSchemaReviewMarkReads()
     {
         // Arrange: the index of the fixed project
@@ -128,7 +128,7 @@ public class ReviewMarkContractTests
     ///     Test that the fingerprints in the index are the ones ReviewMark's algorithm gives for the same files, and
     ///     that the known vectors agree with it too.
     /// </summary>
-    [Fact(Timeout = 180000)]
+    [Fact(Timeout = 120000)]
     public async Task ReviewMarkContract_IndexFingerprint_EqualsReviewMarkAlgorithm()
     {
         // Arrange: the index of the fixed project, as ReviewMark reads it
@@ -155,7 +155,7 @@ public class ReviewMarkContractTests
     ///     review, stale for another fingerprint of a listed id (naming the newest entry by its date), missing for an
     ///     id that is not listed.
     /// </summary>
-    [Fact(Timeout = 180000)]
+    [Fact(Timeout = 120000)]
     public async Task ReviewMarkContract_Index_FollowsReviewMarkSemantics()
     {
         // Arrange: the index of the fixed project, as ReviewMark reads it

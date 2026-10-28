@@ -23,13 +23,17 @@ using DemaConsulting.ReviewCenter.Cli;
 using DemaConsulting.ReviewCenter.Core;
 using DemaConsulting.ReviewCenter.Evidence;
 using DemaConsulting.ReviewCenter.Hosting;
+using DemaConsulting.ReviewCenter.Storage;
 using DemaConsulting.ReviewCenter.Web;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.TestHost;
+using Microsoft.Data.Sqlite;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace DemaConsulting.ReviewCenter.Tests.Evidence;
 
@@ -42,7 +46,7 @@ public class AttestationEndpointTests
     /// <summary>
     ///     Test that a visitor who is not signed in is sent to the login page and gets no document.
     /// </summary>
-    [Fact(Timeout = 180000)]
+    [Fact(Timeout = 120000)]
     public async Task AttestationEndpoint_Get_SignedOut_RedirectsToLogin()
     {
         // Arrange: an application with a complete review and a visitor who is not signed in
@@ -67,7 +71,7 @@ public class AttestationEndpointTests
     /// </summary>
     /// <param name="projectOffset">The number to add to the project number.</param>
     /// <param name="reviewId">The review identifier to ask for.</param>
-    [Theory(Timeout = 180000)]
+    [Theory(Timeout = 120000)]
     [InlineData(0, "NOPE")]
     [InlineData(99, "REV-1")]
     public async Task AttestationEndpoint_Get_UnknownReview_Answers404(int projectOffset, string reviewId)
@@ -89,7 +93,7 @@ public class AttestationEndpointTests
     /// <summary>
     ///     Test that a review that is not complete answers 409 Conflict with the reason, and no document.
     /// </summary>
-    [Fact(Timeout = 180000)]
+    [Fact(Timeout = 120000)]
     public async Task AttestationEndpoint_Get_ReviewNotSigned_Answers409()
     {
         // Arrange: an application with a review that nobody has signed
@@ -113,7 +117,7 @@ public class AttestationEndpointTests
     ///     Test that a review that changes while the document is being prepared answers 409 Conflict with the
     ///     "changed" problem, no document, and no audit event.
     /// </summary>
-    [Fact(Timeout = 180000)]
+    [Fact(Timeout = 120000)]
     public async Task AttestationEndpoint_Get_ReviewChangesDuringGeneration_Answers409AndRecordsNothing()
     {
         // Arrange: an application whose attestation service changes the checklist answers after rendering
@@ -159,7 +163,7 @@ public class AttestationEndpointTests
     ///     Test that a complete review gives a PDF download whose signature verifies against the organization key,
     ///     and that the download is recorded in the audit trail.
     /// </summary>
-    [Fact(Timeout = 180000)]
+    [Fact(Timeout = 120000)]
     public async Task AttestationEndpoint_Get_CompleteReview_ReturnsSignedPdfDownloadAndRecordsEvent()
     {
         // Arrange: an application whose key is an organization key, a complete review, a signed-in user
@@ -197,7 +201,7 @@ public class AttestationEndpointTests
     ///     Test that the application's own key, the self-signed one that the server creates when nothing is
     ///     configured, signs the attestation.
     /// </summary>
-    [Fact(Timeout = 180000)]
+    [Fact(Timeout = 120000)]
     public async Task AttestationEndpoint_Get_DefaultConfiguration_SignsWithTheServerGeneratedSelfSignedKey()
     {
         // Arrange: an application with the default configuration, a complete review, a signed-in user
@@ -221,7 +225,7 @@ public class AttestationEndpointTests
     /// <summary>
     ///     Test that a key that stops working after start-up answers 500 with the problem, and records nothing.
     /// </summary>
-    [Fact(Timeout = 180000)]
+    [Fact(Timeout = 120000)]
     public async Task AttestationEndpoint_Get_KeyBecomesUnavailable_Answers500AndRecordsNothing()
     {
         // Arrange: an application whose key works at start-up and then fails, and a complete review
@@ -263,6 +267,8 @@ public class AttestationEndpointTests
                     ["Database:ConnectionString"] = TestDatabase.NewConnectionString()
                 });
                 builder.Services.AddSingleton(keys);
+                FastCommitInterceptor.AddTo(builder.Services);
+                TestDatabase.EnsureAttestationKey();
                 configureServices?.Invoke(builder.Services);
             }
         });
@@ -276,7 +282,83 @@ public class AttestationEndpointTests
     /// <param name="app">The application.</param>
     /// <param name="signed">Whether ann signs the slot, which completes the review.</param>
     /// <returns>The project number.</returns>
+    /// <remarks>
+    ///     Arranging a review through the services takes seconds (users with hashed passwords, about sixty checklist
+    ///     answers, a signature), and many tests need exactly the same one. When the database of the application is
+    ///     still empty, the review is therefore restored from a copy that was arranged once for the test run, through
+    ///     the same services; every application still has a database of its own and may change it freely. An
+    ///     application that has data already is arranged the long way.
+    /// </remarks>
     internal static async Task<int> CreateReviewAsync(WebApplication app, bool signed)
+    {
+        var restored = await TryRestoreReviewAsync(app, signed);
+        return restored ?? await ArrangeReviewAsync(app, signed);
+    }
+
+    /// <summary>
+    ///     The database with a signed review, arranged once for all tests of the run.
+    /// </summary>
+    private static readonly Lazy<Task<string>> SignedTemplate = new(() => ArrangeTemplateAsync(signed: true));
+
+    /// <summary>
+    ///     The database with a review nobody signed, arranged once for all tests of the run.
+    /// </summary>
+    private static readonly Lazy<Task<string>> UnsignedTemplate = new(() => ArrangeTemplateAsync(signed: false));
+
+    /// <summary>
+    ///     Arranges the review in an application of its own that is stopped again, which leaves its database.
+    /// </summary>
+    /// <param name="signed">Whether ann signs the slot.</param>
+    /// <returns>The connection string of the database that holds the review.</returns>
+    private static async Task<string> ArrangeTemplateAsync(bool signed)
+    {
+        var connectionString = TestDatabase.NewConnectionString();
+        await using var app = await TestWebApp.StartAsync(new CapturingLoggerProvider(), connectionString, ["serve", "--silent"]);
+        await ArrangeReviewAsync(app, signed);
+        return connectionString;
+    }
+
+    /// <summary>
+    ///     Copies the arranged review into the database of an application that has no data yet.
+    /// </summary>
+    /// <param name="app">The application.</param>
+    /// <param name="signed">Whether the review is signed.</param>
+    /// <returns>The project number, or <c>null</c> when the application has data already and nothing was copied.</returns>
+    private static async Task<int?> TryRestoreReviewAsync(WebApplication app, bool signed)
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var factory = app.Services.GetRequiredService<IDbContextFactory<ReviewCenterDbContext>>();
+        await using (var context = await factory.CreateDbContextAsync(cancellationToken))
+        {
+            if (await context.Users.AnyAsync(cancellationToken)
+                || await context.Projects.AnyAsync(cancellationToken)
+                || await context.AuditEntries.AnyAsync(cancellationToken))
+            {
+                return null;
+            }
+        }
+
+        var template = await (signed ? SignedTemplate : UnsignedTemplate).Value.WaitAsync(cancellationToken);
+        var options = app.Services.GetRequiredService<IOptions<DatabaseOptions>>().Value;
+        await using (var source = new SqliteConnection(template + ";Mode=ReadOnly"))
+        await using (var destination = new SqliteConnection(DatabaseSetup.ResolveConnectionString(options)))
+        {
+            await source.OpenAsync(cancellationToken);
+            await destination.OpenAsync(cancellationToken);
+            source.BackupDatabase(destination);
+        }
+
+        await using var restored = await factory.CreateDbContextAsync(cancellationToken);
+        return (await restored.Projects.SingleAsync(cancellationToken)).Id;
+    }
+
+    /// <summary>
+    ///     Creates the project and the review <c>REV-1</c> through the services of the application.
+    /// </summary>
+    /// <param name="app">The application.</param>
+    /// <param name="signed">Whether ann signs the slot, which completes the review.</param>
+    /// <returns>The project number.</returns>
+    private static async Task<int> ArrangeReviewAsync(WebApplication app, bool signed)
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         var users = app.Services.GetRequiredService<UserService>();

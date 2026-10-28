@@ -37,15 +37,33 @@ internal sealed class GatedUserStore(IUserStore inner, string gatedPrefix) : IUs
     private readonly TaskCompletionSource _gate = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
     /// <summary>
+    ///     Guards <see cref="_entered"/> and <see cref="_waiters"/>.
+    /// </summary>
+    private readonly object _lock = new();
+
+    /// <summary>
+    ///     The callers of <see cref="WhenEnteredAsync"/> that wait for a number of lookups.
+    /// </summary>
+    private readonly List<(int Count, TaskCompletionSource Source)> _waiters = [];
+
+    /// <summary>
     ///     How many lookups of a gated name have started.
     /// </summary>
     private int _entered;
 
     /// <summary>
-    ///     Gets how many lookups of a gated name have started, so a test can wait until the attempts that passed the
-    ///     throttle are all inside the lookup.
+    ///     Gets how many lookups of a gated name have started.
     /// </summary>
-    public int Entered => Volatile.Read(ref _entered);
+    public int Entered
+    {
+        get
+        {
+            lock (_lock)
+            {
+                return _entered;
+            }
+        }
+    }
 
     /// <summary>
     ///     Gets or sets the exception thrown by a gated lookup once the gate is open; <c>null</c> for none.
@@ -56,6 +74,27 @@ internal sealed class GatedUserStore(IUserStore inner, string gatedPrefix) : IUs
     ///     Lets the held lookups (and every later one) go on.
     /// </summary>
     public void Open() => _gate.TrySetResult();
+
+    /// <summary>
+    ///     Returns a task that completes as soon as a number of lookups of gated names have started, so a test waits
+    ///     for the attempts to be inside the lookup without polling or sleeping.
+    /// </summary>
+    /// <param name="count">The number of started lookups to wait for.</param>
+    /// <returns>A task that completes when at least that many lookups have started.</returns>
+    public Task WhenEnteredAsync(int count)
+    {
+        lock (_lock)
+        {
+            if (_entered >= count)
+            {
+                return Task.CompletedTask;
+            }
+
+            var source = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            _waiters.Add((count, source));
+            return source.Task;
+        }
+    }
 
     /// <inheritdoc/>
     public Task<User> AddAsync(User user, Func<User, AuditDraft> audit, CancellationToken cancellationToken = default)
@@ -79,7 +118,16 @@ internal sealed class GatedUserStore(IUserStore inner, string gatedPrefix) : IUs
     {
         if (username.StartsWith(gatedPrefix, StringComparison.Ordinal))
         {
-            Interlocked.Increment(ref _entered);
+            lock (_lock)
+            {
+                _entered++;
+                foreach (var waiter in _waiters.Where(w => w.Count <= _entered).ToList())
+                {
+                    waiter.Source.TrySetResult();
+                    _waiters.Remove(waiter);
+                }
+            }
+
             await _gate.Task.WaitAsync(cancellationToken);
             if (LookupFailure is { } failure)
             {

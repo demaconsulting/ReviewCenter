@@ -36,7 +36,7 @@ public class EvidenceSubsystemTests
     ///     attestation, the download is a PDF signed by the server's self-signed key that holds the review, and the
     ///     download is in the audit trail.
     /// </summary>
-    [Fact(Timeout = 180000)]
+    [Fact(Timeout = 120000)]
     public async Task EvidenceSubsystem_CompletedReview_IsOfferedAndDownloadedAsSignedPdf()
     {
         // Arrange: the real application with its default (self-signed) key, a complete review, a signed-in user
@@ -68,7 +68,7 @@ public class EvidenceSubsystemTests
     /// <summary>
     ///     Test that a review that is not complete is not offered and cannot be downloaded through the real application.
     /// </summary>
-    [Fact(Timeout = 180000)]
+    [Fact(Timeout = 120000)]
     public async Task EvidenceSubsystem_ReviewNotComplete_IsNotOfferedAndRefused()
     {
         // Arrange: the real application, a review that nobody has signed, a signed-in user

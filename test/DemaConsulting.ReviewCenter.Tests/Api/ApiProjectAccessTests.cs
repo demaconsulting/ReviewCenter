@@ -49,7 +49,7 @@ public class ApiProjectAccessTests
     ///     bearer token and for the Basic credentials ReviewMark uses.
     /// </summary>
     /// <param name="basic">Whether the token is sent as the password of Basic credentials.</param>
-    [Theory(Timeout = 180000)]
+    [Theory(Timeout = 120000)]
     [InlineData(false)]
     [InlineData(true)]
     public async Task ApiProjectAccess_EveryProjectRoute_NonMemberToken_AnswersLikeAMissingProject(bool basic)
@@ -83,7 +83,7 @@ public class ApiProjectAccessTests
     ///     route, so the refusal above is about membership and not about the route.
     /// </summary>
     /// <param name="username">The user who calls: the member or the system administrator.</param>
-    [Theory(Timeout = 180000)]
+    [Theory(Timeout = 120000)]
     [InlineData("mem")]
     [InlineData("ann")]
     public async Task ApiProjectAccess_EveryProjectRoute_MemberAndSystemAdmin_AreNotRefused(string username)
@@ -110,7 +110,7 @@ public class ApiProjectAccessTests
     /// <summary>
     ///     Test that the project list holds only the projects the owner of the token may see.
     /// </summary>
-    [Fact(Timeout = 180000)]
+    [Fact(Timeout = 120000)]
     public async Task ApiProjectAccess_ListProjects_ShowsOnlyMemberProjectsExceptToSystemAdmins()
     {
         // Arrange: two projects, a member of the first, an outsider and a system administrator
@@ -133,7 +133,7 @@ public class ApiProjectAccessTests
     ///     Test that the attestation web route, used with a browser session, answers a non-member like a missing
     ///     project and does not record an attestation.
     /// </summary>
-    [Fact(Timeout = 180000)]
+    [Fact(Timeout = 120000)]
     public async Task ApiProjectAccess_AttestationPage_NonMemberSession_Answers404()
     {
         // Arrange: a project with a review, and a signed-in non-member
@@ -160,7 +160,7 @@ public class ApiProjectAccessTests
     ///     Test that a token follows the memberships of its owner at once: after the owner is removed from the
     ///     project the same token gets 404.
     /// </summary>
-    [Fact(Timeout = 180000)]
+    [Fact(Timeout = 120000)]
     public async Task ApiProjectAccess_Token_OwnerRemovedFromProject_Gets404AtOnce()
     {
         // Arrange: a member with a token who is served

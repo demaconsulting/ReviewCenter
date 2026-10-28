@@ -145,6 +145,48 @@ internal static class GitTestSupport
     public static void Init(string folder) => Git(folder, "init", "-b", "main");
 
     /// <summary>
+    ///     The folder that holds the template repositories of the test run, removed when the process exits.
+    /// </summary>
+    private static readonly Lazy<TempFolder> _templates = new(() =>
+    {
+        var folder = new TempFolder();
+        AppDomain.CurrentDomain.ProcessExit += (_, _) => folder.Dispose();
+        return folder;
+    });
+
+    /// <summary>
+    ///     Creates a new, empty folder for a template repository: one that is built once and then copied by every
+    ///     test that needs a repository of that shape, instead of building it again with a dozen git processes.
+    /// </summary>
+    /// <returns>The full path of the folder.</returns>
+    public static string NewTemplateFolder()
+    {
+        var folder = System.IO.Path.Combine(_templates.Value.Path, Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(folder);
+        return folder;
+    }
+
+    /// <summary>
+    ///     Copies a folder with everything in it, git repositories included; the copy is a working repository of its
+    ///     own, because git keeps no absolute path in it.
+    /// </summary>
+    /// <param name="source">The folder to copy.</param>
+    /// <param name="destination">The folder to create.</param>
+    public static void CopyFolder(string source, string destination)
+    {
+        Directory.CreateDirectory(destination);
+        foreach (var directory in Directory.EnumerateDirectories(source, "*", SearchOption.AllDirectories))
+        {
+            Directory.CreateDirectory(System.IO.Path.Combine(destination, System.IO.Path.GetRelativePath(source, directory)));
+        }
+
+        foreach (var file in Directory.EnumerateFiles(source, "*", SearchOption.AllDirectories))
+        {
+            File.Copy(file, System.IO.Path.Combine(destination, System.IO.Path.GetRelativePath(source, file)));
+        }
+    }
+
+    /// <summary>
     ///     Creates the start information of a git process.
     /// </summary>
     /// <param name="folder">The working folder.</param>

@@ -37,7 +37,7 @@ public class ApiSubsystemTests
     ///     Test the token journey end to end: a user creates a token, a script uses it, and after the user revokes
     ///     it the same request is refused.
     /// </summary>
-    [Fact(Timeout = 180000)]
+    [Fact(Timeout = 120000)]
     public async Task ApiSubsystem_TokenJourney_CreateUseRevoke_WorksEndToEnd()
     {
         // Arrange: a user with a new token
@@ -60,7 +60,7 @@ public class ApiSubsystemTests
     ///     Test the review journey end to end: a script creates a draft review from files, reads it back, finds that
     ///     the attestation of a draft is refused, and downloads the attestation of a complete review.
     /// </summary>
-    [Fact(Timeout = 180000)]
+    [Fact(Timeout = 120000)]
     public async Task ApiSubsystem_ReviewJourney_CreateDraftReadAndDownloadAttestation_WorksEndToEnd()
     {
         // Arrange: a project, a token, and a second project with a complete review
@@ -98,7 +98,7 @@ public class ApiSubsystemTests
     ///     as the password, a script reads the evidence index of a project, follows the link of its entry to the
     ///     attestation, and once the token is revoked the same request is refused.
     /// </summary>
-    [Fact(Timeout = 180000)]
+    [Fact(Timeout = 120000)]
     public async Task ApiSubsystem_EvidenceJourney_BasicCredentials_ReadIndexAndFollowLink_WorksEndToEnd()
     {
         // Arrange: a complete review with a review-set id, and a token
@@ -133,7 +133,7 @@ public class ApiSubsystemTests
     ///     Test that a token never signs and never opens the web pages: the API has no signing route, the signing
     ///     service refuses an actor that came through a token, and the account page treats the token as signed out.
     /// </summary>
-    [Fact(Timeout = 180000)]
+    [Fact(Timeout = 120000)]
     public async Task ApiSubsystem_TokenPrincipal_SigningAndWebPages_AreNotReachable()
     {
         // Arrange: a draft review, a token, and an actor that came through that token
