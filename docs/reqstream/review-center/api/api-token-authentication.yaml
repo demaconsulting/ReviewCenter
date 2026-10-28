@@ -111,9 +111,20 @@ sections:
         title: >-
           The ApiTokenAuthentication unit shall allow a client address at most 30 requests without credentials in a
           window of one minute to the two routes that a project can open, count each address on its own, start a new
-          window when the old one has ended, and tell how long the window lasts.
+          window when the old one has ended, and tell how long the window lasts; and shall keep the windows of at most
+          4096 addresses, removing the windows that have ended first and then the oldest ones, never a renewed window
+          by pruning, and be safe for concurrent use.
         justification: |
           An anonymous attestation costs a signature and the caller has no account to hold responsible, so one address
-          must not be able to use up the server. A count by address does not stop other clients.
+          must not be able to use up the server. A count by address does not stop other clients. The caller chooses
+          the address (for example by rotating through an IPv6 range), so the table must have a hard bound or it
+          could be used to exhaust memory.
         tests:
           - AnonymousRateLimit_TryAcquire_CountsPerAddressAndWindow
+          - AnonymousRateLimit_TryAcquire_ManyDistinctAddresses_NeverExceedsCapacity
+          - AnonymousRateLimit_TryAcquire_FullTable_RemovesExpiredBeforeEvictingLive
+          - AnonymousRateLimit_TryAcquire_FullOfLiveWindows_EvictsOldestFirst
+          - AnonymousRateLimit_TryAcquire_RenewedWindow_IsNotRemovedByPruning
+          - AnonymousRateLimit_TryAcquire_ClockStepsBack_StillBoundedAndConsistent
+          - AnonymousRateLimit_TryAcquire_Concurrent_GrantsExactlyTheLimitPerAddress
+          - AnonymousRateLimit_TryAcquire_ConcurrentDistinctAddresses_StaysWithinCapacity

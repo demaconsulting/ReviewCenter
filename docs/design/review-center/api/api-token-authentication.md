@@ -25,9 +25,16 @@ from the evidence settings of a project to the one switch that the route depends
 `EvidenceSettingsService`.
 
 `AnonymousRateLimit.cs` holds `AnonymousRateLimit`, a singleton that counts the requests of each client address in a
-fixed window of one minute and allows 30 requests in a window. The counters are in memory (a concurrent dictionary of
-one small counter object per address, locked while it is changed), so they start empty after a restart, and the
-dictionary is pruned of ended windows when it holds more than 4096 addresses. The address is the one that
+fixed window of one minute and allows 30 requests in a window. The counters are in memory, so they start empty after a
+restart. All state is behind one lock: a dictionary of one small window object per address and a linked list of the
+addresses in the order their windows were created (the same pattern as `SignInThrottle`). The table holds at most 4096
+addresses. When a new address needs room, the windows that have ended are removed first (cheaply from the head of the
+list, and by a full scan when the table is still full, because a clock that stepped backwards breaks the order), and if
+the table is still full the oldest windows are dropped, only as many as are needed; the table is never cleared as a
+whole. Pruning removes only windows that have ended and runs under the same lock as the renewal of a window, so a
+renewed window is never lost. A flood of more than 4096 addresses within one minute (for example from one IPv6 /64 or
+with a forged forwarded header) can push live windows out, so those clients get a fresh budget: the limit degrades
+toward failing open for them but never refuses anybody. The address is the one that
 `SignIn.ClientAddress` gives, the address of the direct connection (`Connection.RemoteIpAddress`). Behind a reverse
 proxy without `ASPNETCORE_FORWARDEDHEADERS_ENABLED=true` it is the address of the proxy, so all anonymous callers share
 one counter and the limit is reached sooner (it fails safe). This is the same limitation as for `SignInThrottle`
@@ -74,7 +81,10 @@ of the token, which is not secret).
 - *Returns*: `true` when the request is within the limit, and in an out parameter how long until the window ends.
 - *Postconditions*: The first request of an address, or the first request after a window has ended, starts a new window
   with a count of one. Every later request in the window adds one. The 31st and later requests of a window are refused.
-  The clock is the `TimeProvider`, so a test can move it.
+  The clock is the `TimeProvider`, so a test can move it. The table never holds more than 4096 addresses: to add an
+  address to a full table the windows that have ended are removed first and then the oldest windows, never the address
+  that is being counted. A window that has not ended is removed only by that last step, and a renewed window is never
+  removed by pruning. The method is safe to call from many threads.
 
 **HandleAuthenticateAsync**: Authenticates a request.
 

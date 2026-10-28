@@ -62,7 +62,8 @@ route of the attestation stay closed (`AnonymousEvidenceAccess_BothOn_OtherRoute
 `AnonymousEvidenceAccess_BothOn_AttestationPageRoute_StillNeedsSignIn`, and
 `AnonymousEvidenceAccess_Endpoints_OnlyTheTwoRoutesUseTheOpenPolicies`), and that the limit by address answers 429 with
 `Retry-After` (`AnonymousEvidenceAccess_TooManyAnonymousRequests_Answers429WithRetryAfter` and
-`AnonymousRateLimit_TryAcquire_CountsPerAddressAndWindow`). The details are in the `ApiTokenAuthentication` verification.
+`AnonymousRateLimit_TryAcquire_CountsPerAddressAndWindow`; the bound of the table at 4096 addresses is verified by the
+tests of `AnonymousRateLimitTests.cs`). The details are in the `ApiTokenAuthentication` verification.
 The two operations in the document are verified by `ApiDocument_Get_NoToken_DescribesTheApiWithBearerScheme`.
 
 **ApiProjectAccess scenarios**: The tests in `ApiProjectAccessTests.cs` run the real application and call every route

@@ -12,7 +12,8 @@ limit is lowered by a setting of the test, and the clock is a movable `TimeProvi
 matters.
 
 The anonymous access of the two evidence routes (`AnonymousEvidenceAccess.cs`, `AnonymousRateLimit.cs`) is verified with
-the tests of `AnonymousEvidenceAccessTests.cs`. They start the same in-process application, create a project with a
+the tests of `AnonymousEvidenceAccessTests.cs` and, for the memory bound and the thread safety of the limit,
+`AnonymousRateLimitTests.cs`. The first start the same in-process application, create a project with a
 review that all reviewers signed, set the evidence settings of the project through the real
 `EvidenceSettingsService`, and send requests with and without an `Authorization` header. The responses are examined for
 the status, the body, the cache header, and `Retry-After`; the audit trail is read through the services, and the rate
@@ -47,6 +48,8 @@ N/A - standard test environment (a temporary database is created by each test).
 - An anonymous release of an attestation is audited with the actor `anonymous`, and a served response is never cached.
 - A client address is limited to 30 anonymous requests per minute with 429 and `Retry-After`, and a request with a
   token is not limited.
+- The table of addresses never holds more than 4096 addresses: ended windows are removed first, then the oldest
+  ones; a renewed window is not lost to pruning; the limit is exact under parallel requests.
 - Exactly two endpoints use the open policies.
 
 #### Test Scenarios
@@ -172,6 +175,40 @@ a token from the same address is still answered with 200. This scenario is teste
 is refused with a wait that is longer than zero and at most the window; another address and an unknown address are
 still served, and after the window ended the first address is served again. This scenario is tested by
 `AnonymousRateLimit_TryAcquire_CountsPerAddressAndWindow`.
+
+**AnonymousRateLimit_TryAcquire_ManyDistinctAddresses_NeverExceedsCapacity**: Three times the capacity of distinct
+addresses ask once each inside one window; every request is granted and the table never holds more than 4096 addresses
+(it holds exactly 4096 at the end). This scenario is tested by
+`AnonymousRateLimit_TryAcquire_ManyDistinctAddresses_NeverExceedsCapacity`.
+
+**AnonymousRateLimit_TryAcquire_FullTable_RemovesExpiredBeforeEvictingLive**: A table that is full of two halves, one
+ended and one live with an address that is used up, takes a new address: the ended half is removed, the live half is
+kept and the used-up address is still refused. This scenario is tested by
+`AnonymousRateLimit_TryAcquire_FullTable_RemovesExpiredBeforeEvictingLive`.
+
+**AnonymousRateLimit_TryAcquire_FullOfLiveWindows_EvictsOldestFirst**: A table full of live windows takes a new
+address: the new address is granted, the table stays at 4096, the oldest window is dropped (its address starts again)
+and the next oldest is still there (still refused). This scenario is tested by
+`AnonymousRateLimit_TryAcquire_FullOfLiveWindows_EvictsOldestFirst`.
+
+**AnonymousRateLimit_TryAcquire_RenewedWindow_IsNotRemovedByPruning**: Regression of the pruning race: an address
+renews its window after the first one ended and is then over its limit; new addresses make the table prune the ended
+windows of the others, and the renewed address is still refused. This scenario is tested by
+`AnonymousRateLimit_TryAcquire_RenewedWindow_IsNotRemovedByPruning`.
+
+**AnonymousRateLimit_TryAcquire_ClockStepsBack_StillBoundedAndConsistent**: After the clock steps back, ended windows
+that sit behind a live window are still found by the full scan, the wait is not negative, and a flood of addresses
+keeps the table at its capacity without an error. This scenario is tested by
+`AnonymousRateLimit_TryAcquire_ClockStepsBack_StillBoundedAndConsistent`.
+
+**AnonymousRateLimit_TryAcquire_Concurrent_GrantsExactlyTheLimitPerAddress**: Eight workers make 1600 parallel
+requests of one address with a fixed clock; exactly 30 are granted. This scenario is tested by
+`AnonymousRateLimit_TryAcquire_Concurrent_GrantsExactlyTheLimitPerAddress`.
+
+**AnonymousRateLimit_TryAcquire_ConcurrentDistinctAddresses_StaysWithinCapacity**: Parallel requests of many distinct
+addresses next to four hot addresses: while the table is not full each hot address is granted exactly 30, and after a
+parallel flood of three times the capacity the table holds exactly 4096 addresses. This scenario is tested by
+`AnonymousRateLimit_TryAcquire_ConcurrentDistinctAddresses_StaysWithinCapacity`.
 
 **AnonymousEvidenceAccess_Endpoints_OnlyTheTwoRoutesUseTheOpenPolicies**: The endpoints of the application are
 enumerated. Exactly the evidence index and the attestation PDF use the open policies, and every other endpoint of the

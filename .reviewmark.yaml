@@ -1312,6 +1312,7 @@ reviews:
       - "src/**/Api/AnonymousRateLimit.cs"
       - "test/**/Api/ApiTokenAuthenticationTests.cs"
       - "test/**/Api/AnonymousEvidenceAccessTests.cs"
+      - "test/**/Api/AnonymousRateLimitTests.cs"
 
   - id: ReviewCenter-Api-ApiEndpoints
     title: Review of ReviewCenter ApiEndpoints unit implementation

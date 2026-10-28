@@ -311,7 +311,8 @@ public class AnonymousEvidenceAccessTests
     }
 
     /// <summary>
-    ///     Test that the limiter counts per address, starts a new window after the old one, and prunes.
+    ///     Test that the limiter counts per address and starts a new window after the old one. Its bound on memory is
+    ///     tested in <see cref="AnonymousRateLimitTests"/>.
     /// </summary>
     [Fact]
     public void AnonymousRateLimit_TryAcquire_CountsPerAddressAndWindow()

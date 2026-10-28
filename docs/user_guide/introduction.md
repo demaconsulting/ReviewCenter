@@ -1010,7 +1010,9 @@ Both work without signing in.
 - Answers have `Cache-Control: no-store`.
 - Requests without a token are limited to 30 a minute for each client address, and a caller over the limit is answered
   429 with a `Retry-After` header. Behind a reverse proxy the proxy settings described in Secure Cookie Behind a Reverse
-  Proxy are needed, or all clients share one address and one limit.
+  Proxy are needed, or all clients share one address and one limit. The server tracks at most 4096 addresses; under a
+  flood of addresses the counters of the oldest ones are dropped first, so those clients start again with a full
+  allowance, but nobody is refused because of it.
 - An anonymous download is recorded in the audit trail as `attestation.generated` with the actor `anonymous`.
 
 **Exposure warning.** While an anonymous switch is on, the page shows a warning that anyone who can reach the server can
