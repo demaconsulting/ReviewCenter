@@ -20,6 +20,7 @@
 
 using Bunit;
 using DemaConsulting.ReviewCenter.Core;
+using DemaConsulting.ReviewCenter.Tests.Core;
 using DemaConsulting.ReviewCenter.Web;
 using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.DependencyInjection;
@@ -42,6 +43,11 @@ public class RepositoriesPageTests : PageTestBase
     ///     A token used to check that it never reaches the markup.
     /// </summary>
     private const string Secret = "tkn-PageSecret-123";
+
+    /// <summary>
+    ///     A second token, typed into a form, used to check that it never stays on the page after access is lost.
+    /// </summary>
+    private const string NewSecret = "tkn-TypedSecret-456";
 
     /// <summary>
     ///     The location used for private test repositories.
@@ -335,11 +341,11 @@ public class RepositoriesPageTests : PageTestBase
     }
 
     /// <summary>
-    ///     Test that an action is refused with an error when the signed-in administrator was demoted after the
-    ///     page was opened.
+    ///     Test that an action shows the not-found state, and no repository data, when the signed-in administrator
+    ///     was demoted after the page was opened.
     /// </summary>
     [Fact]
-    public async Task RepositoriesPage_Action_SignedInAdminLaterDemoted_IsRefusedWithError()
+    public async Task RepositoriesPage_Action_SignedInAdminLaterDemoted_ShowsNotFoundAndNoData()
     {
         // Arrange: two administrators and a repository; one has the page open and is then demoted
         await Users.CreateAsync("root", "Root", UserRole.Admin, Password, TestContext.Current.CancellationToken);
@@ -354,9 +360,111 @@ public class RepositoriesPageTests : PageTestBase
         // Act: try to disable the repository from the page that is still open
         await cut.Find($"[data-testid='repository-toggle-enabled-{repo.Id}']").ClickAsync();
 
-        // Assert: refused with an error and nothing changed
-        Assert.Contains("administrator rights", cut.Find("[data-testid='repositories-error']").TextContent, StringComparison.Ordinal);
+        // Assert: the state of a non-member and nothing changed
+        AssertNotFoundWithoutRepositoryData(cut, "alpha", null);
         Assert.Single(await Repositories.ListEnabledAsync(_admin, _projectId, TestContext.Current.CancellationToken));
+    }
+
+    /// <summary>
+    ///     Test that a project admin who is demoted to a plain member while the page is open, with an edit form and
+    ///     a typed token on screen, gets the not-found state and none of the repository, edit or token state when
+    ///     the next action runs, and that nothing is changed.
+    /// </summary>
+    [Fact]
+    public async Task RepositoriesPage_Action_ProjectAdminDemotedToMember_ShowsNotFoundAndNoRepositoryData()
+    {
+        // Arrange: a project admin with the page open, an edit form with a typed replacement token, then demoted
+        var repo = await ArrangeProjectAdminAsync();
+        var before = RepositoryStore.StoredToken(repo.Id);
+        var cut = RenderList();
+        await cut.Find($"[data-testid='repository-edit-{repo.Id}']").ClickAsync();
+        await cut.Find("[data-testid='edit-repository-token-action-select']").ChangeAsync("Replace");
+        await cut.Find("[data-testid='edit-repository-token-input']").InputAsync(NewSecret);
+        await ChangeMemberRoleAsync(_projectId, "pam", ProjectRole.User);
+
+        // Act: use a control of the page that is still open
+        await cut.Find($"[data-testid='repository-toggle-enabled-{repo.Id}']").ClickAsync();
+
+        // Assert: the state of a plain member, no edit or token state anywhere, and the repository is unchanged
+        AssertNotFoundWithoutRepositoryData(cut, "alpha", "svc-user");
+        Assert.DoesNotContain(NewSecret, cut.Markup, StringComparison.Ordinal);
+        Assert.Empty(cut.FindAll("[data-testid='edit-repository-token-input']"));
+        Assert.Single(await Repositories.ListEnabledAsync(_admin, _projectId, TestContext.Current.CancellationToken));
+        Assert.Equal(before, RepositoryStore.StoredToken(repo.Id));
+    }
+
+    /// <summary>
+    ///     Test that opening the edit form after the project admin was demoted to a plain member does not copy the
+    ///     stored values into a form, but shows the not-found state.
+    /// </summary>
+    [Fact]
+    public async Task RepositoriesPage_StartEdit_ProjectAdminDemoted_ShowsNotFoundAndNoEditForm()
+    {
+        // Arrange: a project admin with the page open, then demoted
+        var repo = await ArrangeProjectAdminAsync();
+        var cut = RenderList();
+        await ChangeMemberRoleAsync(_projectId, "pam", ProjectRole.User);
+
+        // Act: open the edit form of the repository
+        await cut.Find($"[data-testid='repository-edit-{repo.Id}']").ClickAsync();
+
+        // Assert: no edit form and none of the stored values on the page
+        AssertNotFoundWithoutRepositoryData(cut, "alpha", "svc-user");
+        Assert.Empty(cut.FindAll($"[data-testid='repository-edit-form-{repo.Id}']"));
+    }
+
+    /// <summary>
+    ///     Test that when the right to administer is lost during the action, so that the reload of the list is
+    ///     refused, the page shows the not-found state and neither the old rows nor the outcome of the change.
+    /// </summary>
+    [Fact]
+    public async Task RepositoriesPage_Action_AccessLostBeforeTheReload_ShowsNotFoundNotStaleList()
+    {
+        // Arrange: a project admin with the page open; the registry loses the right right after it let the change
+        // through, so that only the reload of the list is refused
+        var repo = await ArrangeProjectAdminAsync();
+        var revoking = new RevokingAccess(Access, () => ChangeMemberRoleAsync(_projectId, "pam", ProjectRole.User));
+        Services.AddSingleton(new RepositoryService(RepositoryStore, new FakeCredentialProtector(), revoking, Time));
+        var cut = RenderList();
+        revoking.Arm();
+
+        // Act: disable the repository
+        await cut.Find($"[data-testid='repository-toggle-enabled-{repo.Id}']").ClickAsync();
+
+        // Assert: the change was stored, but the page shows the state of a plain member, with no old rows and no
+        // success message
+        Assert.True(revoking.Revoked);
+        AssertNotFoundWithoutRepositoryData(cut, "alpha", "svc-user");
+        Assert.Empty(await Repositories.ListEnabledAsync(_admin, _projectId, TestContext.Current.CancellationToken));
+    }
+
+    /// <summary>
+    ///     Test that a project admin who is demoted to a plain member while the add form is filled in gets the
+    ///     not-found state, no form and no typed values on screen, and that nothing is registered.
+    /// </summary>
+    [Fact]
+    public async Task NewRepositoryPage_CreateForm_ProjectAdminDemoted_ShowsNotFoundAndCreatesNothing()
+    {
+        // Arrange: a project admin with the filled-in add form open, then demoted
+        await ArrangeProjectAdminAsync();
+        var cut = RenderNew();
+        await cut.Find("[data-testid='new-repository-name-input']").InputAsync("typed-name");
+        await cut.Find("[data-testid='new-repository-location-input']").InputAsync("https://example.com/typed.git");
+        await cut.Find("[data-testid='new-repository-username-input']").InputAsync("typed-user");
+        await cut.Find("[data-testid='new-repository-token-input']").InputAsync(NewSecret);
+        await ChangeMemberRoleAsync(_projectId, "pam", ProjectRole.User);
+
+        // Act: submit the form
+        await cut.Find("[data-testid='new-repository-form']").SubmitAsync();
+
+        // Assert: the state of a plain member, none of the typed values, and only the arranged repository exists
+        Assert.NotEmpty(cut.FindAll("[data-testid='project-not-found']"));
+        Assert.Empty(cut.FindAll("[data-testid='new-repository-form']"));
+        Assert.Empty(cut.FindAll("[data-testid='repositories-error']"));
+        Assert.DoesNotContain("typed-name", cut.Markup, StringComparison.Ordinal);
+        Assert.DoesNotContain("typed-user", cut.Markup, StringComparison.Ordinal);
+        Assert.DoesNotContain(NewSecret, cut.Markup, StringComparison.Ordinal);
+        Assert.Single(await Repositories.ListAsync(_admin, _projectId, TestContext.Current.CancellationToken));
     }
 
     /// <summary>
@@ -391,11 +499,11 @@ public class RepositoriesPageTests : PageTestBase
     }
 
     /// <summary>
-    ///     Test that an action sent after the session ended, but before the page learned of it, shows a clear
-    ///     message and changes nothing.
+    ///     Test that an action sent after the session ended, but before the page learned of it, shows the same
+    ///     not-found state as for a user without the right, with no repository data, and changes nothing.
     /// </summary>
     [Fact]
-    public async Task RepositoriesPage_Action_SessionEndedBeforePageKnows_ShowsClearErrorAndChangesNothing()
+    public async Task RepositoriesPage_Action_SessionEndedBeforePageKnows_ShowsNotFoundAndChangesNothing()
     {
         // Arrange: an administrator with the page open, then the session ends without the page being told
         await SignInAsNewAdminAsync();
@@ -406,9 +514,50 @@ public class RepositoriesPageTests : PageTestBase
         // Act: try to disable the repository
         await cut.Find($"[data-testid='repository-toggle-enabled-{repo.Id}']").ClickAsync();
 
-        // Assert: a message says why and nothing changed
-        Assert.Contains("no longer signed in", cut.Find("[data-testid='repositories-error']").TextContent, StringComparison.Ordinal);
+        // Assert: the not-found state without data, and nothing changed
+        AssertNotFoundWithoutRepositoryData(cut, "alpha", null);
         Assert.Single(await Repositories.ListEnabledAsync(_admin, _projectId, TestContext.Current.CancellationToken));
+    }
+
+    /// <summary>
+    ///     Creates a system administrator, a project with one private repository and a project admin of it, and
+    ///     signs in as the project admin.
+    /// </summary>
+    /// <returns>The repository, with the name <c>alpha</c>, the user name <c>svc-user</c> and a token.</returns>
+    private async Task<SourceRepository> ArrangeProjectAdminAsync()
+    {
+        await SignInAsNewAdminAsync();
+        var repo = await Repositories.CreateAsync(_projectId, "alpha", Location, "svc-user", Secret, _admin, TestContext.Current.CancellationToken);
+        var pam = await Users.CreateAsync("pam", "Pam", false, Password, TestContext.Current.CancellationToken);
+        await Store.AddMembershipAsync(pam.Id, _projectId, ProjectRole.ProjectAdmin, TestContext.Current.CancellationToken);
+        SignInAs("pam", "Pam", false);
+        return repo;
+    }
+
+    /// <summary>
+    ///     Asserts that a page shows only the not-found state of a non-member: no list, row, edit form, token input,
+    ///     message or button, and none of the repository details in the markup.
+    /// </summary>
+    /// <param name="cut">The rendered repositories page.</param>
+    /// <param name="name">The repository name that must not appear.</param>
+    /// <param name="username">The repository user name that must not appear, or <c>null</c> when there is none.</param>
+    private static void AssertNotFoundWithoutRepositoryData(IRenderedComponent<RepositoriesPage> cut, string name, string? username)
+    {
+        Assert.NotEmpty(cut.FindAll("[data-testid='project-not-found']"));
+        Assert.Empty(cut.FindAll("[data-testid='repositories-list']"));
+        Assert.Empty(cut.FindAll("[data-testid^='repository-row-']"));
+        Assert.Empty(cut.FindAll("[data-testid^='repository-edit-form-']"));
+        Assert.Empty(cut.FindAll("[data-testid='edit-repository-token-input']"));
+        Assert.Empty(cut.FindAll("[data-testid='repositories-error']"));
+        Assert.Empty(cut.FindAll("[data-testid='repositories-status']"));
+        Assert.Empty(cut.FindAll("[data-testid='new-repository-button']"));
+        Assert.DoesNotContain(Location, cut.Markup, StringComparison.Ordinal);
+        Assert.DoesNotContain(name, cut.Markup, StringComparison.Ordinal);
+        Assert.DoesNotContain(Secret, cut.Markup, StringComparison.Ordinal);
+        if (username is not null)
+        {
+            Assert.DoesNotContain(username, cut.Markup, StringComparison.Ordinal);
+        }
     }
 
     /// <summary>
@@ -439,5 +588,107 @@ public class RepositoriesPageTests : PageTestBase
         var project = await Projects.CreateAsync("Apollo", null, TestContext.Current.CancellationToken);
         _projectId = project.Id;
         SignInAs("root", "Root", UserRole.Admin);
+    }
+
+    /// <summary>
+    ///     Access rules that behave as the wrapped ones, except that once armed they run a change (the loss of a
+    ///     right) right after the next administer check has passed, so that a later check of the same operation
+    ///     fails: the right is lost in the middle of a page action.
+    /// </summary>
+    private sealed class RevokingAccess : IProjectAccess
+    {
+        /// <summary>
+        ///     The rules everything is delegated to.
+        /// </summary>
+        private readonly IProjectAccess _inner;
+
+        /// <summary>
+        ///     The change that takes the right away.
+        /// </summary>
+        private readonly Func<Task> _revoke;
+
+        /// <summary>
+        ///     Whether the next passed administer check runs the change.
+        /// </summary>
+        private bool _armed;
+
+        /// <summary>
+        ///     Initializes a new instance of the <see cref="RevokingAccess"/> class.
+        /// </summary>
+        /// <param name="inner">The rules everything is delegated to.</param>
+        /// <param name="revoke">The change that takes the right away.</param>
+        public RevokingAccess(IProjectAccess inner, Func<Task> revoke)
+        {
+            _inner = inner;
+            _revoke = revoke;
+        }
+
+        /// <summary>
+        ///     Gets a value indicating whether the change has run.
+        /// </summary>
+        public bool Revoked { get; private set; }
+
+        /// <summary>
+        ///     Makes the next passed administer check run the change.
+        /// </summary>
+        public void Arm()
+        {
+            _armed = true;
+        }
+
+        /// <inheritdoc />
+        public Task<bool> IsSystemAdminAsync(Actor? actor, CancellationToken cancellationToken = default)
+        {
+            return _inner.IsSystemAdminAsync(actor, cancellationToken);
+        }
+
+        /// <inheritdoc />
+        public Task<bool> CanViewAsync(Actor? actor, int projectId, CancellationToken cancellationToken = default)
+        {
+            return _inner.CanViewAsync(actor, projectId, cancellationToken);
+        }
+
+        /// <inheritdoc />
+        public Task<bool> CanAdministerAsync(Actor? actor, int projectId, CancellationToken cancellationToken = default)
+        {
+            return _inner.CanAdministerAsync(actor, projectId, cancellationToken);
+        }
+
+        /// <inheritdoc />
+        public Task<bool> IsMemberAsync(int userId, int projectId, CancellationToken cancellationToken = default)
+        {
+            return _inner.IsMemberAsync(userId, projectId, cancellationToken);
+        }
+
+        /// <inheritdoc />
+        public Task<IReadOnlyList<Project>> ListVisibleProjectsAsync(Actor? actor, CancellationToken cancellationToken = default)
+        {
+            return _inner.ListVisibleProjectsAsync(actor, cancellationToken);
+        }
+
+        /// <inheritdoc />
+        public Task RequireViewAsync(Actor? actor, int projectId, CancellationToken cancellationToken = default)
+        {
+            return _inner.RequireViewAsync(actor, projectId, cancellationToken);
+        }
+
+        /// <inheritdoc />
+        public async Task RequireAdministerAsync(Actor? actor, int projectId, CancellationToken cancellationToken = default)
+        {
+            // The check passes first; then the right is taken away, once, so that the next check fails
+            await _inner.RequireAdministerAsync(actor, projectId, cancellationToken);
+            if (_armed)
+            {
+                _armed = false;
+                Revoked = true;
+                await _revoke();
+            }
+        }
+
+        /// <inheritdoc />
+        public Task RequireSystemAdminAsync(Actor? actor, CancellationToken cancellationToken = default)
+        {
+            return _inner.RequireSystemAdminAsync(actor, cancellationToken);
+        }
     }
 }

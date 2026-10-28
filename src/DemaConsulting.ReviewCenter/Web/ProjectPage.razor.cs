@@ -189,12 +189,7 @@ public partial class ProjectPage : ComponentBase
         Project = await ProjectService.GetAsync(actor, ProjectId);
         if (actor is null || Project is null)
         {
-            Reviews = [];
-            Repositories = [];
-            IsSystemAdmin = false;
-            CanAdminister = false;
-            Members = [];
-            Loaded = true;
+            ShowNoAccess();
             return;
         }
 
@@ -228,10 +223,77 @@ public partial class ProjectPage : ComponentBase
     }
 
     /// <summary>
+    ///     Re-checks, at the start of a member action on the open page, that the signed-in user may still view the
+    ///     project and is still a system administrator.
+    /// </summary>
+    /// <returns>
+    ///     <c>true</c> when the action may go on. <c>false</c> when the view is gone (the page has dropped
+    ///     everything and shows the not-found state) or only the system administrator right is gone (the page has
+    ///     dropped the members section, and the project stays visible); the action must stop in both cases.
+    /// </returns>
+    /// <remarks>
+    ///     The members and the users that can be added are data only a system administrator may read, so they must
+    ///     not stay rendered once the right is gone. A user who lost the right may still be a project admin, so the
+    ///     link to the repositories is refreshed to what the user may do now.
+    /// </remarks>
+    private async Task<bool> GuardMembersAsync()
+    {
+        // The view comes first: without it the whole page goes, not only the members section
+        if (!await Access.GuardViewAsync(AuthenticationState, ProjectId, ShowNoAccess))
+        {
+            return false;
+        }
+
+        if (await Access.GuardSystemAdminAsync(AuthenticationState, ShowMembersLost))
+        {
+            return true;
+        }
+
+        // Only the system administrator right is gone; show what the user may still do on this project
+        CanAdminister = await Access.CanAdministerAsync(await AuthenticationState.GetActorOrNullAsync(), ProjectId);
+        return false;
+    }
+
+    /// <summary>
+    ///     Drops everything loaded and shows the same "does not exist" state as for a non-member.
+    /// </summary>
+    private void ShowNoAccess()
+    {
+        Project = null;
+        Reviews = [];
+        ApprovedReviews.Clear();
+        Repositories = [];
+        CanAdminister = false;
+        ShowMembersLost();
+        Loaded = true;
+    }
+
+    /// <summary>
+    ///     Drops what only a system administrator may see: the members, the users that can be added and the forms.
+    /// </summary>
+    private void ShowMembersLost()
+    {
+        IsSystemAdmin = false;
+        Members = [];
+        Candidates = [];
+        ShowAddForm = false;
+        AddUsername = string.Empty;
+        AddAsProjectAdmin = false;
+        MemberError = null;
+        MemberStatus = null;
+    }
+
+    /// <summary>
     ///     Shows the add-member form.
     /// </summary>
-    private void OpenAddForm()
+    /// <returns>A task that completes when the form is shown or the page has dropped what it may no longer show.</returns>
+    private async Task OpenAddFormAsync()
     {
+        if (!await GuardMembersAsync())
+        {
+            return;
+        }
+
         MemberError = null;
         MemberStatus = null;
         AddUsername = Candidates.Count > 0 ? Candidates[0].Username : string.Empty;
@@ -304,21 +366,37 @@ public partial class ProjectPage : ComponentBase
     /// <param name="change">The change; it receives the signed-in user as the actor to audit.</param>
     /// <param name="success">The message to show when the change is stored.</param>
     /// <returns><c>true</c> when the change was stored.</returns>
+    /// <remarks>
+    ///     The change runs only while the user may still view the project and is still a system administrator; when
+    ///     either is gone the page drops what the user may no longer see instead of showing an error next to it.
+    ///     The status is shown only after the lists have been reloaded, so it never stands next to a stale list.
+    /// </remarks>
     private async Task<bool> RunMemberChangeAsync(Func<Actor, Task> change, string success)
     {
         MemberError = null;
         MemberStatus = null;
+        if (!await GuardMembersAsync())
+        {
+            return false;
+        }
+
         try
         {
             var actor = await AuthenticationState.GetActorAsync();
             await change(actor);
-            MemberStatus = success;
             await LoadMembersAsync(actor);
+            MemberStatus = success;
             return true;
         }
         catch (DomainRuleException ex)
         {
-            MemberError = ex.Message;
+            // A refusal can also mean the right was lost during the call (or the sign-in ended); ask again so that
+            // the error is shown only when the user may still see the section
+            if (await GuardMembersAsync())
+            {
+                MemberError = ex.Message;
+            }
+
             return false;
         }
     }

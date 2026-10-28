@@ -232,9 +232,63 @@ public class UsersPageTests : PageTestBase
         // Act: try to disable a user from the page that is still open
         await cut.Find($"[data-testid='user-toggle-enabled-{ann.Id}']").ClickAsync();
 
-        // Assert: refused with an error, and nothing changed
+        // Assert: refused with an error, no list and no controls on the page, and nothing changed
         Assert.Contains("System administrator", cut.Find("[data-testid='users-error']").TextContent, StringComparison.Ordinal);
+        Assert.Empty(cut.FindAll("[data-testid='users-list']"));
+        Assert.Empty(cut.FindAll("[data-testid^='user-row-']"));
         Assert.True((await Users.GetAsync("ann", TestContext.Current.CancellationToken))?.Enabled);
+    }
+
+    /// <summary>
+    ///     Test that an administrator who was demoted after opening the page loses the user list and the passwords
+    ///     typed into it when the next action runs, and that no password is changed.
+    /// </summary>
+    [Fact]
+    public async Task UsersPage_Action_AdminDemotedAfterOpening_DropsUserListAndTypedPasswords()
+    {
+        // Arrange: two administrators and a reviewer; one has the page open with a typed password, then is demoted
+        await Users.CreateAsync("root", "Root", UserRole.Admin, Password, TestContext.Current.CancellationToken);
+        await Users.CreateAsync("boss", "Boss", UserRole.Admin, Password, TestContext.Current.CancellationToken);
+        var ann = await Users.CreateAsync("ann", "Ann", UserRole.Reviewer, Password, TestContext.Current.CancellationToken);
+        SignInAs("root", "Root", UserRole.Admin);
+        var cut = Render<UsersPage>();
+        await cut.Find($"[data-testid='user-password-input-{ann.Id}']").InputAsync("typed secret password");
+        await Users.SetRoleAsync("root", UserRole.Reviewer, TestContext.Current.CancellationToken);
+
+        // Act: try to set the password from the page that is still open
+        await cut.Find($"[data-testid='user-set-password-{ann.Id}']").ClickAsync();
+
+        // Assert: the reason is shown instead of the list, the typed password is gone, and nothing changed
+        Assert.Contains("System administrator", cut.Find("[data-testid='users-error']").TextContent, StringComparison.Ordinal);
+        Assert.Empty(cut.FindAll("[data-testid='users-list']"));
+        Assert.Empty(cut.FindAll("[data-testid^='user-row-']"));
+        Assert.Empty(cut.FindAll("[data-testid^='user-password-input-']"));
+        Assert.Empty(cut.FindAll("[data-testid='new-user-button']"));
+        Assert.DoesNotContain("typed secret password", cut.Markup, StringComparison.Ordinal);
+        Assert.NotNull(await Users.AuthenticateAsync("ann", Password, TestContext.Current.CancellationToken));
+    }
+
+    /// <summary>
+    ///     Test that an administrator who takes the right away from themselves gets the stored change acknowledged,
+    ///     but is not shown the reloaded user list.
+    /// </summary>
+    [Fact]
+    public async Task UsersPage_ToggleSystemAdmin_AdminDemotesSelf_ShowsStatusButDropsTheList()
+    {
+        // Arrange: two administrators, one has the page open
+        var root = await Users.CreateAsync("root", "Root", UserRole.Admin, Password, TestContext.Current.CancellationToken);
+        await Users.CreateAsync("boss", "Boss", UserRole.Admin, Password, TestContext.Current.CancellationToken);
+        SignInAs("root", "Root", UserRole.Admin);
+        var cut = Render<UsersPage>();
+
+        // Act: take the administrator right away from the signed-in user
+        await cut.Find($"[data-testid='user-toggle-admin-{root.Id}']").ClickAsync();
+
+        // Assert: the change is stored and acknowledged, and the list is no longer rendered
+        Assert.False((await Users.GetAsync("root", TestContext.Current.CancellationToken))?.IsSystemAdmin);
+        Assert.Contains("no longer a system administrator", cut.Find("[data-testid='users-status']").TextContent, StringComparison.Ordinal);
+        Assert.Empty(cut.FindAll("[data-testid='users-list']"));
+        Assert.Empty(cut.FindAll("[data-testid^='user-row-']"));
     }
 
     /// <summary>
@@ -282,8 +336,10 @@ public class UsersPageTests : PageTestBase
         // Act: try to disable a user
         await cut.Find($"[data-testid='user-toggle-enabled-{ann.Id}']").ClickAsync();
 
-        // Assert: a message says why, and ann is unchanged
+        // Assert: a message says why, the list is gone, and ann is unchanged
         Assert.Contains("no longer signed in", cut.Find("[data-testid='users-error']").TextContent, StringComparison.Ordinal);
+        Assert.Empty(cut.FindAll("[data-testid='users-list']"));
+        Assert.Empty(cut.FindAll("[data-testid^='user-row-']"));
         Assert.True((await Users.GetAsync("ann", TestContext.Current.CancellationToken))?.Enabled);
     }
 

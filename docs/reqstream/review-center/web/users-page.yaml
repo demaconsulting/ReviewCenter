@@ -78,11 +78,15 @@ sections:
         title: >-
           The UsersPage unit shall refuse every create or change action, showing an error and changing nothing,
           when the signed-in user is no longer an enabled system administrator in the user store, or nobody is
-          signed in any more.
+          signed in any more, and shall then stop rendering the user list, the typed passwords and the button
+          that creates a user.
         justification: |
           An open page can keep the sign-in state it started with for up to one revalidation interval, so a user
           who was demoted or disabled after opening the page must not be able to go on managing users in that
-          time. The check is made on every action, so it does not wait for the next revalidation.
+          time. The check is made on every action, so it does not wait for the next revalidation. An error shown
+          above the list would still leave the names and roles readable, so the list is dropped with it.
         tests:
           - UsersPage_Action_SignedInAdminLaterDemoted_IsRefusedWithError
           - UsersPage_Action_SessionEndedBeforePageKnows_ShowsClearErrorAndChangesNothing
+          - UsersPage_Action_AdminDemotedAfterOpening_DropsUserListAndTypedPasswords
+          - UsersPage_ToggleSystemAdmin_AdminDemotesSelf_ShowsStatusButDropsTheList

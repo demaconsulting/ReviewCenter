@@ -25,7 +25,10 @@
 <main class="page" data-testid="users-page" data-interactive="@InteractiveMarker">
     <div class="page-heading">
         <h1>Users</h1>
-        <a class="action" href="/users/new" data-testid="new-user-button">+ New user</a>
+        @if (!AccessLost)
+        {
+            <a class="action" href="/users/new" data-testid="new-user-button">+ New user</a>
+        }
     </div>
     <p class="page-lead">
         Everyone who can sign in. System administrators manage users, projects and the audit trail; what everyone
@@ -44,6 +47,8 @@
         }
     }
 
+    @if (!AccessLost)
+    {
     <ul class="row-list" data-testid="users-list">
         @foreach (var user in Users)
         {
@@ -93,5 +98,6 @@
             </li>
         }
     </ul>
+    }
 </main>
 </SessionGate>

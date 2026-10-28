@@ -29,6 +29,9 @@ N/A - standard test environment.
   and a Remove button, and says so when the project has no members; the + Add member button reveals an inline form that
   offers only users who are not members yet, and adds the chosen user with the chosen role; the role button and Remove
   change the membership. The Repositories button is shown to whoever manages the project.
+- A system administrator who lost the flag after the page was opened changes nothing when acting, and the members, the
+  candidates, and the add form are dropped, while the reviews stay for a user who still is a member; a user who also
+  has no membership is shown the not-found message and none of the project.
 - Selected files are listed with names and sizes, and a new selection replaces the previous one; reusing the form
   page for another project shows that project and discards the previous form values and selection.
 - A valid form creates the review with the exact bytes and the correct fingerprint and opens the review page.
@@ -126,6 +129,27 @@ form is closed. This scenario is tested by `ProjectPage_AddMember_ChosenUser_Bec
 stored role becomes project administrator and the button reads "Make member". Remove is then pressed; the membership is
 gone, the row is gone, and the empty message is shown. This scenario is tested by
 `ProjectPage_MemberActions_ToggleRoleAndRemove_ChangeTheMembership`.
+
+**ProjectPage_MemberChange_SystemAdminDemotedButStillMember_DropsMembersSectionKeepsReviews**: A system administrator
+who also is a plain member of the project has the page open with the Members section, and a second administrator
+exists; the first loses the flag and presses Remove on a member. Nothing is removed, no error is shown, the Members
+section and the member rows are gone, and the reviews are still listed. This scenario is tested by
+`ProjectPage_MemberChange_SystemAdminDemotedButStillMember_DropsMembersSectionKeepsReviews`.
+
+**ProjectPage_MemberChange_SystemAdminDemotedAndNotMember_ShowsNotFoundAndNoData**: The same arrangement for an
+administrator who is no member of the project. After the demotion, Remove shows only the not-found message, with no
+member, review, or project name on the page, and the membership of the member is unchanged. This scenario is tested by
+`ProjectPage_MemberChange_SystemAdminDemotedAndNotMember_ShowsNotFoundAndNoData`.
+
+**ProjectPage_OpenAddForm_SystemAdminDemoted_DropsCandidatesAndForm**: A system administrator who is a plain member
+is demoted while the page is open, and the + Add member button is pressed. No form and no Members section are
+rendered, and no candidate user is in the markup. This scenario is tested by
+`ProjectPage_OpenAddForm_SystemAdminDemoted_DropsCandidatesAndForm`.
+
+**ProjectPage_MemberChange_SessionEndedBeforePageKnows_ShowsNotFoundAndChangesNothing**: The sign-in state ends without
+the page being told, and Remove is pressed. The page shows the not-found message and no members, and the membership is
+unchanged. This scenario is tested by
+`ProjectPage_MemberChange_SessionEndedBeforePageKnows_ShowsNotFoundAndChangesNothing`.
 
 **ProjectPage_Render_ProjectWithoutReviews_ShowsNameAndEmptyMessage**: The page is rendered for a project without
 reviews; the name, the description, the empty message, and the New review button, which links to the review creation

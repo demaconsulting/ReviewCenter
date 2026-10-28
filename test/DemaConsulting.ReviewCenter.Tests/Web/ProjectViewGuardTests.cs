@@ -28,8 +28,8 @@ using TestContext = Xunit.TestContext;
 namespace DemaConsulting.ReviewCenter.Tests.Web;
 
 /// <summary>
-///     Unit tests for <see cref="ProjectViewGuard"/>, the one re-check of project view access that the project pages
-///     run at the start of every action on an open circuit.
+///     Unit tests for <see cref="ProjectViewGuard"/>, the one re-check of access (view, administer and system
+///     administrator) that the pages run at the start of every action on an open circuit.
 /// </summary>
 public class ProjectViewGuardTests : PageTestBase
 {
@@ -131,6 +131,195 @@ public class ProjectViewGuardTests : PageTestBase
 
         // Act
         var allowed = await GuardAsync(projectId, () => lost++);
+
+        // Assert
+        Assert.False(allowed);
+        Assert.Equal(1, lost);
+    }
+
+    /// <summary>
+    ///     Creates the project <c>Apollo</c> with <c>pam</c> as a project admin and <c>mem</c> as a plain member.
+    /// </summary>
+    /// <returns>The project identity.</returns>
+    private async Task<int> ArrangeAdminAsync()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var project = await Projects.CreateAsync("Apollo", null, cancellationToken);
+        var pam = await Users.CreateAsync("pam", "Pam", UserRole.Reviewer, "correct horse battery", cancellationToken);
+        var member = await Users.CreateAsync("mem", "Mem", UserRole.Reviewer, "correct horse battery", cancellationToken);
+        await Store.AddMembershipAsync(pam.Id, project.Id, ProjectRole.ProjectAdmin, cancellationToken);
+        await Store.AddMembershipAsync(member.Id, project.Id, cancellationToken);
+        return project.Id;
+    }
+
+    /// <summary>
+    ///     Runs the administer guard for the signed-in user.
+    /// </summary>
+    /// <param name="projectId">The project identity.</param>
+    /// <param name="lost">Counts how many times the access-lost callback ran.</param>
+    /// <returns><c>true</c> when the user may still administer the project.</returns>
+    private async Task<bool> GuardAdministerAsync(int projectId, Action lost)
+    {
+        return await Access.GuardAdministerAsync(
+            Services.GetRequiredService<AuthenticationStateProvider>(), projectId, lost);
+    }
+
+    /// <summary>
+    ///     Runs the system administrator guard for the signed-in user.
+    /// </summary>
+    /// <param name="lost">Counts how many times the access-lost callback ran.</param>
+    /// <returns><c>true</c> when the user is still a system administrator.</returns>
+    private async Task<bool> GuardSystemAdminAsync(Action lost)
+    {
+        return await Access.GuardSystemAdminAsync(
+            Services.GetRequiredService<AuthenticationStateProvider>(), lost);
+    }
+
+    /// <summary>
+    ///     Test that a project admin may continue and that the access-lost callback does not run.
+    /// </summary>
+    [Fact]
+    public async Task ProjectViewGuard_GuardAdminister_ProjectAdmin_ReturnsTrueWithoutCallback()
+    {
+        // Arrange: a project admin is signed in
+        var projectId = await ArrangeAdminAsync();
+        SignInAs("pam", "Pam", UserRole.Reviewer);
+        var lost = 0;
+
+        // Act
+        var allowed = await GuardAdministerAsync(projectId, () => lost++);
+
+        // Assert
+        Assert.True(allowed);
+        Assert.Equal(0, lost);
+    }
+
+    /// <summary>
+    ///     Test that a plain member is refused and that the access-lost callback runs once.
+    /// </summary>
+    [Fact]
+    public async Task ProjectViewGuard_GuardAdminister_PlainMember_ReturnsFalseAndCallsBackOnce()
+    {
+        // Arrange: a plain member is signed in
+        var projectId = await ArrangeAdminAsync();
+        SignInAs("mem", "Mem", UserRole.Reviewer);
+        var lost = 0;
+
+        // Act
+        var allowed = await GuardAdministerAsync(projectId, () => lost++);
+
+        // Assert
+        Assert.False(allowed);
+        Assert.Equal(1, lost);
+    }
+
+    /// <summary>
+    ///     Test that a project admin who is demoted after a first successful check is refused by the next check.
+    /// </summary>
+    [Fact]
+    public async Task ProjectViewGuard_GuardAdminister_AdminDemotedBetweenChecks_SecondCheckReturnsFalse()
+    {
+        // Arrange: a project admin passes the first check
+        var projectId = await ArrangeAdminAsync();
+        SignInAs("pam", "Pam", UserRole.Reviewer);
+        var lost = 0;
+        Assert.True(await GuardAdministerAsync(projectId, () => lost++));
+
+        // Act: the project admin becomes a plain member and the guard runs again
+        await ChangeMemberRoleAsync(projectId, "pam", ProjectRole.User);
+        var allowed = await GuardAdministerAsync(projectId, () => lost++);
+
+        // Assert
+        Assert.False(allowed);
+        Assert.Equal(1, lost);
+    }
+
+    /// <summary>
+    ///     Test that nobody being signed in is refused by the administer guard and that the callback runs once.
+    /// </summary>
+    [Fact]
+    public async Task ProjectViewGuard_GuardAdminister_NobodySignedIn_ReturnsFalseAndCallsBackOnce()
+    {
+        // Arrange: a project and nobody signed in
+        var projectId = await ArrangeAdminAsync();
+        SignOut();
+        var lost = 0;
+
+        // Act
+        var allowed = await GuardAdministerAsync(projectId, () => lost++);
+
+        // Assert
+        Assert.False(allowed);
+        Assert.Equal(1, lost);
+    }
+
+    /// <summary>
+    ///     Test that a system administrator may continue and that the access-lost callback does not run.
+    /// </summary>
+    [Fact]
+    public async Task ProjectViewGuard_GuardSystemAdmin_SystemAdmin_ReturnsTrueWithoutCallback()
+    {
+        // Arrange: a system administrator is signed in
+        await Users.CreateAsync("root", "Root", UserRole.Admin, "correct horse battery", TestContext.Current.CancellationToken);
+        SignInAs("root", "Root", UserRole.Admin);
+        var lost = 0;
+
+        // Act
+        var allowed = await GuardSystemAdminAsync(() => lost++);
+
+        // Assert
+        Assert.True(allowed);
+        Assert.Equal(0, lost);
+    }
+
+    /// <summary>
+    ///     Test that a system administrator who is demoted or disabled after the page was opened is refused and that
+    ///     the access-lost callback runs once.
+    /// </summary>
+    /// <param name="disable"><c>true</c> to disable the user; <c>false</c> to take the administrator right away.</param>
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ProjectViewGuard_GuardSystemAdmin_DemotedOrDisabled_ReturnsFalseAndCallsBackOnce(bool disable)
+    {
+        // Arrange: two system administrators, one signed in and passing the first check
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await Users.CreateAsync("root", "Root", UserRole.Admin, "correct horse battery", cancellationToken);
+        await Users.CreateAsync("boss", "Boss", UserRole.Admin, "correct horse battery", cancellationToken);
+        SignInAs("root", "Root", UserRole.Admin);
+        var lost = 0;
+        Assert.True(await GuardSystemAdminAsync(() => lost++));
+
+        // Act: the signed-in user is demoted (or disabled) and the guard runs again
+        if (disable)
+        {
+            await Users.SetEnabledAsync("root", false, cancellationToken);
+        }
+        else
+        {
+            await Users.SetRoleAsync("root", UserRole.Reviewer, cancellationToken);
+        }
+
+        var allowed = await GuardSystemAdminAsync(() => lost++);
+
+        // Assert
+        Assert.False(allowed);
+        Assert.Equal(1, lost);
+    }
+
+    /// <summary>
+    ///     Test that nobody being signed in is refused by the system administrator guard and that the callback runs
+    ///     once.
+    /// </summary>
+    [Fact]
+    public async Task ProjectViewGuard_GuardSystemAdmin_NobodySignedIn_ReturnsFalseAndCallsBackOnce()
+    {
+        // Arrange: nobody signed in
+        SignOut();
+        var lost = 0;
+
+        // Act
+        var allowed = await GuardSystemAdminAsync(() => lost++);
 
         // Assert
         Assert.False(allowed);

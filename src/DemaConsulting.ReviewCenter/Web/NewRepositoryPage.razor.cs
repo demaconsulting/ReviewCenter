@@ -166,22 +166,22 @@ public partial class NewRepositoryPage : ComponentBase
         var token = NewToken;
         NewToken = string.Empty;
 
-        // Defense in depth: an open page re-checks its user only every revalidation interval, so ask the store
-        // who the user is now. An ended sign-in state is shown as a message, not raised as a fault
+        // Defense in depth: an open page re-checks its user only every revalidation interval, so ask who the user
+        // is now; when the right is gone the page drops the form and nothing is registered
+        if (!await GuardAsync())
+        {
+            return;
+        }
+
+        // The sign-in state can only end between the two reads; it counts as the right being gone
         Actor actor;
         try
         {
             actor = await AuthenticationState.GetActorAsync();
         }
-        catch (DomainRuleException ex)
+        catch (DomainRuleException)
         {
-            ErrorMessage = ex.Message;
-            return;
-        }
-
-        if (!await Access.CanAdministerAsync(actor, ProjectId))
-        {
-            ErrorMessage = "Project administrator rights are required.";
+            ShowNoAccess();
             return;
         }
 
@@ -191,10 +191,46 @@ public partial class NewRepositoryPage : ComponentBase
         }
         catch (DomainRuleException ex)
         {
-            ErrorMessage = ex.Message;
+            // The service also refuses when the right was lost during the call; ask again so that the form does
+            // not stay next to an error in that case
+            if (await GuardAsync())
+            {
+                ErrorMessage = ex.Message;
+            }
+
             return;
         }
 
         Navigation.NavigateTo($"/projects/{ProjectId}/repositories");
+    }
+
+    /// <summary>
+    ///     Re-checks that the signed-in user may still administer the project, at the start of the submission.
+    /// </summary>
+    /// <returns>
+    ///     <c>true</c> when the submission may go on; <c>false</c> when the right is gone, in which case the page
+    ///     has already dropped the form and shows the not-found state, and the submission must stop.
+    /// </returns>
+    private Task<bool> GuardAsync()
+    {
+        return Access.GuardAdministerAsync(AuthenticationState, ProjectId, ShowNoAccess);
+    }
+
+    /// <summary>
+    ///     Drops the project and everything typed and shows the same "does not exist" state as for a non-member.
+    /// </summary>
+    /// <remarks>
+    ///     The form registers a repository for a project the user may no longer administer, so it must not stay
+    ///     rendered or submittable.
+    /// </remarks>
+    private void ShowNoAccess()
+    {
+        Project = null;
+        NewName = string.Empty;
+        NewLocation = string.Empty;
+        NewUsername = string.Empty;
+        NewToken = string.Empty;
+        ErrorMessage = null;
+        Loaded = true;
     }
 }

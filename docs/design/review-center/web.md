@@ -294,7 +294,8 @@ The access above is decided when a page loads. A page that stays open does not l
 was removed meanwhile would keep reading through it: the files, comments, checklist answers, and plans that the page
 loads from the services in its handlers, and the data already in its component state. The pages of a project therefore
 ask again, at the start of every handler of the open circuit, with one shared helper,
-`ProjectViewGuard.GuardViewAsync` (an extension of `IProjectAccess`): it reads the actor from the authentication state
+`ProjectViewGuard.GuardViewAsync` (an extension of `IProjectAccess`, which also offers `GuardAdministerAsync` and
+`GuardSystemAdminAsync` over the same core, see below): it reads the actor from the authentication state
 and returns whether `IProjectAccess.CanViewAsync` allows that actor to see the project; when it does not, it runs a
 callback of the page, which resets the component state (so that no loaded data is kept) and shows the same not-found
 page as for a project the user may not see. Nobody being signed in is treated as no access. The handler then returns
@@ -311,6 +312,18 @@ interaction after a removal also drops the data. `HistoryPage` has no handler: i
 new address, which is its one check. `ProjectPage` and the administration pages already re-check, as described above.
 Three handlers are left unguarded on purpose because they show no project data: cancelling a comment form,
 copying a thread link, and reading the file names of a browser selection.
+
+The pages that show data for administrators only use the two other levels of the same guard, because an error shown
+above data that stays rendered still leaves the data readable. `GuardAdministerAsync` (the user manages the project, a
+system administrator or a project admin of it) guards `RepositoriesPage` (every action and the start of an edit) and
+`NewRepositoryPage` (the creation). `GuardSystemAdminAsync` (the user is an enabled system administrator) guards the
+members section of `ProjectPage`, after the view check, and every action of `UsersPage`. All three call one private
+core that reads the actor and runs the callback when the check fails. When the check fails, the page clears what it had
+loaded and shows what an ordinary member would see: the not-found page of the project for the repositories pages and
+for `ProjectPage` when the project is no longer visible, only the members section dropped for `ProjectPage` when the
+user still sees the project, and no user list for `UsersPage`, which has no project and keeps its message. The same
+clearing happens when the list is read again after an action and the service refuses it because the right was lost in
+between.
 
 The Core read services (`ReviewService.GetFileContentAsync` and the like) keep their signatures and take no actor:
 every page reaches them only after the guard, so a second check inside them would only repeat it, and the services

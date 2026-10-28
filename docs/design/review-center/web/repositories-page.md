@@ -86,27 +86,31 @@ Every interactive element and key value has a stable `data-testid`:
 
 **RunAsync** (private): The common path of every action.
 
-- *Algorithm*: Clear the previous messages; read the signed-in user from the authentication state (an ended session shows
-  its message and changes nothing); re-check through `IProjectAccess.CanAdministerAsync` that the user still manages
-  the project, otherwise show "Project administrator rights are required."; run the action; show the status message, or
-  the message of a
-  `DomainRuleException`, next to the control that was used; reload the list (also after a refusal, so the rows show
-  what is
-  stored). An ended session or a user who no longer manages the project is refused without a reload. The check is
-  kept on every action although
-  the page shows its content only to whoever manages the project and is replaced when the sign-in state ends (see
-  `SessionGate`),
-  because an open page can keep its state for up to one revalidation interval after the user was demoted or disabled.
+- *Algorithm*: Clear the previous messages; ask `ProjectViewGuard.GuardAdministerAsync` (through `GuardAsync`) whether
+  the signed-in user still manages the project, which also covers a sign-in state that has ended; when it does not,
+  call `ShowNoAccess` and return without calling a service; read the signed-in user from the authentication state; run
+  the action; show the status message, or the message of a `DomainRuleException`, next to the control that was used;
+  reload the list (also after a refusal, so the rows show what is stored). When the reload fails because the user lost
+  the right in the meantime, `ShowNoAccess` runs as well. The check is kept on every action although the page shows its
+  content only to whoever manages the project and is replaced when the sign-in state ends (see `SessionGate`), because
+  an open page can keep its state for up to one revalidation interval after the user was demoted or disabled.
+
+**ShowNoAccess** (private): Resets the page to the state of a project the user may not manage: `Project` and
+`Repositories` are cleared, the edit form, the token action, the typed token, the messages, and `MessageRepositoryId`
+are reset, and `Loaded` is set, so the page shows only "Project N does not exist." The same call is made by
+`OnParametersSetAsync` when the load fails. A plain member must not read the locations or user names of the
+repositories, so an error shown above data that stays rendered would not be enough.
 
 **CreateRepositoryAsync** (`NewRepositoryPage`): Registers the repository in the project from the form with
-`RepositoryService.CreateAsync`, after the same checks as `RunAsync` (the signed-in state has not ended and the user
-still manages the project). The token field is cleared before the call, whether or not it succeeds. On success the
-page navigates to `/projects/{ProjectId}/repositories`; on a refusal the page stays, shows the message above the form,
-and keeps the other
-fields so that the user can correct them.
+`RepositoryService.CreateAsync`, after `ProjectViewGuard.GuardAdministerAsync` has confirmed that the user still
+manages the project; otherwise its own `ShowNoAccess` clears `Project`, the typed fields (including the token), and the
+error, and the page shows the not-found message. The token field is cleared before the call, whether or not it
+succeeds. On success the page navigates to `/projects/{ProjectId}/repositories`; on a refusal the page stays, shows the
+message above the form (after asking the guard again, so that a refusal caused by a lost right is not shown), and keeps
+the other fields so that the user can correct them.
 
-**StartEdit** and **CancelEdit**: Open the edit form for a row, filled from the registration with the token action set to
-keep, and close it without a change.
+**StartEditAsync** and **CancelEdit**: Open the edit form for a row, filled from the registration with the token action
+set to keep (after the same guard as `RunAsync`), and close it without a change.
 
 **SaveEditAsync**: Updates the repository with `RepositoryService.UpdateAsync` and a `TokenChange` built from the chosen
 action. The token field is cleared before the call, and the form is closed on success and stays open on a refusal.
@@ -118,8 +122,10 @@ action. The token field is cleared before the call, and the form is closed on su
 #### Error Handling
 
 A refusal from the service (an invalid name, location, or credential, a name already used, an unknown or unreadable
-repository) is shown as its message next to the control and not raised. A user who no longer manages the project is
-refused with a message and nothing is changed. The page handles no other exception of its own. The token fields are
+repository) is shown as its message next to the control and not raised. A user who no longer manages the project, or
+nobody signed in, is not refused with a message above the data: the page drops the project, the repositories, and the
+edit and token state and shows the not-found message, and nothing is changed. The page handles no other exception of
+its own. The token fields are
 password inputs, and neither a token nor an encrypted token is ever rendered into the page.
 
 #### Dependencies
@@ -127,7 +133,8 @@ password inputs, and neither a token nor an encrypted token is ever rendered int
 - **SessionGate** (App) — wraps the whole page content.
 - **RepositoryService** — lists the repositories of the project, creates, updates, and enables or disables them.
 - **ProjectService** — reads the project for its name in the breadcrumb.
-- **IProjectAccess** (Core) — decides whether the user manages the project, on load and before every action.
+- **IProjectAccess** (Core) — decides whether the user manages the project on load and, through
+  `ProjectViewGuard.GuardAdministerAsync`, before every action.
 - **AuthenticationStateProvider** (ASP.NET Core) — gives the signed-in user.
 - **NavigationManager** (ASP.NET Core) — used by `NewRepositoryPage` to return to the list.
 - **ASP.NET Core Blazor components** — the component base class, forms, events, authorization attribute, and the

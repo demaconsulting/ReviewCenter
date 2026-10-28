@@ -97,7 +97,7 @@
                         <button type="button" class="outline small" data-testid="repository-toggle-enabled-@repositoryId"
                                 @onclick="() => ToggleEnabledAsync(repository)">@(repository.Enabled ? "Disable" : "Enable")</button>
                         <button type="button" class="outline small" data-testid="repository-edit-@repositoryId"
-                                @onclick="() => StartEdit(repository)">Edit</button>
+                                @onclick="() => StartEditAsync(repository)">Edit</button>
                     </div>
                     @if (EditingId == repositoryId)
                     {

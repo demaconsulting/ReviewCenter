@@ -172,9 +172,11 @@ public partial class RepositoriesPage : ComponentBase
             {
                 Repositories = await RepositoryService.ListAsync(actor, ProjectId);
             }
-            catch (DomainRuleException ex)
+            catch (DomainRuleException)
             {
-                ErrorMessage = ex.Message;
+                // The right was lost between the check and the read; an ordinary member may not read the list, so
+                // show the same state as for one instead of an error next to a page without its data
+                ShowNoAccess();
             }
         }
 
@@ -196,11 +198,56 @@ public partial class RepositoriesPage : ComponentBase
     }
 
     /// <summary>
+    ///     Re-checks that the signed-in user may still administer the project, at the start of an action on the open
+    ///     page.
+    /// </summary>
+    /// <returns>
+    ///     <c>true</c> when the action may go on; <c>false</c> when the right is gone, in which case the page has
+    ///     already dropped everything it loaded and shows the not-found state, and the action must stop.
+    /// </returns>
+    private Task<bool> GuardAsync()
+    {
+        return Access.GuardAdministerAsync(AuthenticationState, ProjectId, ShowNoAccess);
+    }
+
+    /// <summary>
+    ///     Drops everything loaded or typed and shows the same "does not exist" state as for a non-member.
+    /// </summary>
+    /// <remarks>
+    ///     An ordinary member may not read the locations, user names and token state of the repositories, so none of
+    ///     it, and no edit form, stays rendered once the right to administer the project is gone.
+    /// </remarks>
+    private void ShowNoAccess()
+    {
+        Project = null;
+        Repositories = [];
+        EditingId = null;
+        EditName = string.Empty;
+        EditLocation = string.Empty;
+        EditUsername = string.Empty;
+        EditTokenAction = TokenAction.Keep;
+        EditToken = string.Empty;
+        ErrorMessage = null;
+        StatusMessage = null;
+        MessageRepositoryId = null;
+        Loaded = true;
+    }
+
+    /// <summary>
     ///     Opens the edit form for a repository, with the stored values and the token kept.
     /// </summary>
     /// <param name="repository">The repository as shown.</param>
-    private void StartEdit(SourceRepository repository)
+    /// <returns>A task that completes when the form is open or the page has dropped its data.</returns>
+    /// <remarks>
+    ///     The stored values are copied into the form, so the right to administer is asked first.
+    /// </remarks>
+    private async Task StartEditAsync(SourceRepository repository)
     {
+        if (!await GuardAsync())
+        {
+            return;
+        }
+
         EditingId = repository.Id;
         EditName = repository.Name;
         EditLocation = repository.Location;
@@ -260,9 +307,10 @@ public partial class RepositoriesPage : ComponentBase
     /// <param name="action">The change to run; it receives the verified administrator as the actor to audit.</param>
     /// <returns>A task that completes when the change is stored or the problem is shown.</returns>
     /// <remarks>
-    ///     The change is refused, without reloading, unless the signed-in user is still an enabled
-    ///     administrator in the user store, and also when the sign-in state has already ended (the message then
-    ///     says so).
+    ///     The change is refused, without reloading, unless the signed-in user may still administer the project.
+    ///     When the right is gone (the user was demoted or removed, or the sign-in state has ended) the page drops
+    ///     everything it loaded and shows the not-found state of a non-member instead of an error next to data
+    ///     that user may no longer read. The same happens when the reload after the change is refused.
     /// </remarks>
     private async Task RunAsync(int? repositoryId, string success, Func<Actor, Task> action)
     {
@@ -271,22 +319,22 @@ public partial class RepositoriesPage : ComponentBase
         ErrorMessage = null;
         StatusMessage = null;
 
-        // Defense in depth: an open page re-checks its user only every revalidation interval, so ask the store
-        // who the user is now. An ended sign-in state is shown as a message, not raised as a fault
+        // Defense in depth: an open page re-checks its user only every revalidation interval, so ask who the user
+        // is now; when the right is gone the page drops its data and the change does not run
+        if (!await GuardAsync())
+        {
+            return;
+        }
+
+        // The sign-in state can only end between the two reads; it counts as the right being gone
         Actor actor;
         try
         {
             actor = await AuthenticationState.GetActorAsync();
         }
-        catch (DomainRuleException ex)
+        catch (DomainRuleException)
         {
-            ErrorMessage = ex.Message;
-            return;
-        }
-
-        if (!await Access.CanAdministerAsync(actor, ProjectId))
-        {
-            ErrorMessage = "Project administrator rights are required.";
+            ShowNoAccess();
             return;
         }
 
@@ -305,9 +353,10 @@ public partial class RepositoriesPage : ComponentBase
         {
             Repositories = await RepositoryService.ListAsync(actor, ProjectId);
         }
-        catch (DomainRuleException ex)
+        catch (DomainRuleException)
         {
-            ErrorMessage = ex.Message;
+            // The list is refused only when the right to administer is gone; drop the old rows and the outcome
+            ShowNoAccess();
         }
     }
 }

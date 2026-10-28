@@ -110,9 +110,19 @@ the review is in
 **AddMemberAsync**, **RemoveMemberAsync**, **ToggleRoleAsync** (`ProjectPage`): Add the chosen user with the role of
 the checkbox (`ProjectService.AddMemberAsync`), remove a member (`RemoveMemberAsync`), and switch a member between
 `ProjectRole.User` and `ProjectRole.ProjectAdmin` (`SetMemberRoleAsync`). Each goes through one shared step
-(`RunMemberChangeAsync`) that asks for the current user, runs the change, shows the outcome in `member-status` or the
-message of a `DomainRuleException` in `member-error`, and reloads the members and the candidates. The page holds no
-membership rule. **OpenAddForm** and **CloseAddForm** show and hide the inline form of the + Add member button.
+(`RunMemberChangeAsync`) that first runs `GuardMembersAsync`, then asks for the current user, runs the change, shows the
+outcome in `member-status` (only after the members were reloaded) or the message of a `DomainRuleException` in
+`member-error` (only when the guard, asked again, still allows it), and reloads the members and the candidates. The
+page holds no membership rule. **OpenAddFormAsync** (guarded in the same way) and **CloseAddForm** show and hide the
+inline form of the + Add member button.
+
+**GuardMembersAsync** (`ProjectPage`): Asks `ProjectViewGuard.GuardViewAsync` whether the user still sees the project;
+when not, `ShowNoAccess` drops the project, the reviews, the approved set, the repositories, and the member state, and
+the page shows the not-found message. Then it asks `ProjectViewGuard.GuardSystemAdminAsync` whether the user is still a
+system administrator; when not, `ShowMembersLost` clears `IsSystemAdmin`, the members, the candidates, the add form, and
+the member messages, `CanAdminister` is read again, and the reviews stay, because the user may still be a member. The
+action is then not run. Members and candidates are for system administrators only, so an error shown above them
+would not be enough.
 
 **OnParametersSetAsync** (`NewReviewPage`): Loads the project (for the actor, so a project the user may not see shows
 the not-found message and no form) and the enabled repositories of the project. When the project
@@ -180,7 +190,8 @@ the subsystem.
   the plan link and for the drop-down.
 - **UserService** — lists the users that can be added as members (`ProjectPage`).
 - **IProjectAccess** (Core) — tells whether the user is a system administrator and whether the user manages the project
-  (`ProjectPage`), and, through `ProjectViewGuard`, whether the user may still see the project (`NewReviewPage`).
+  (`ProjectPage`), and, through `ProjectViewGuard`, whether the user may still see the project (both pages) and is still
+  a system administrator (the members section of `ProjectPage`).
 - **SigningService** — computes whether each review is approved (`ProjectPage`).
 - **ReviewLimits** (Core) — the upload limits.
 - **ASP.NET Core Blazor components** — the component base class, file input, navigation, the authorization

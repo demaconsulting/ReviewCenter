@@ -184,14 +184,24 @@ repositories of its project, which is tested by `NewReviewPage_RepositorySelect_
 `ProjectViewGuard`. The guard is tested directly by `ProjectViewGuard_GuardView_Member_ReturnsTrueWithoutCallback`,
 `ProjectViewGuard_GuardView_NonMember_ReturnsFalseAndCallsBackOnce`,
 `ProjectViewGuard_GuardView_MembershipRemovedBetweenChecks_SecondCheckReturnsFalse` and
-`ProjectViewGuard_GuardView_NobodySignedIn_ReturnsFalseAndCallsBackOnce`. On the pages, a member opens the page, the
+`ProjectViewGuard_GuardView_NobodySignedIn_ReturnsFalseAndCallsBackOnce`. The administer and system administrator
+levels of the same guard are tested by `ProjectViewGuard_GuardAdminister_ProjectAdmin_ReturnsTrueWithoutCallback`,
+`ProjectViewGuard_GuardAdminister_PlainMember_ReturnsFalseAndCallsBackOnce`,
+`ProjectViewGuard_GuardAdminister_AdminDemotedBetweenChecks_SecondCheckReturnsFalse`,
+`ProjectViewGuard_GuardAdminister_NobodySignedIn_ReturnsFalseAndCallsBackOnce`,
+`ProjectViewGuard_GuardSystemAdmin_SystemAdmin_ReturnsTrueWithoutCallback`,
+`ProjectViewGuard_GuardSystemAdmin_DemotedOrDisabled_ReturnsFalseAndCallsBackOnce` and
+`ProjectViewGuard_GuardSystemAdmin_NobodySignedIn_ReturnsFalseAndCallsBackOnce`. On the pages, a member opens the page,
+the
 membership is removed in the store, and an action is triggered; the page then shows the page for a missing project and
 none of the data it had loaded, which is tested by `ReviewPage_SelectFile_MembershipRevoked_ShowsNotFoundAndNoData`,
 `ChecklistPage_Choose_MembershipRevoked_ShowsNotFoundAndNoData`,
 `HistoryPage_Reparameterize_MembershipRevoked_ShowsNotFoundAndNoEntries`,
 `PlanPage_ShowPlan_MembershipRevoked_ShowsNotFoundAndNoPlan` and
 `NewReviewPage_CreateForm_MembershipRevoked_ShowsNotFoundAndCreatesNothing`; the other actions are covered in the
-verification of each page. A revocation that lands inside a single action, after its check, and data that is already in
+verification of each page. The pages that show data for administrators only clear it in the same way: the repositories
+pages, the members section of the project page, and the users page. A revocation that lands inside a single action,
+after its check, and data that is already in
 the browser until the next action are not covered; the rule is checked per action, not pushed to the browser.
 
 **Audit pages**: The history and audit pages are verified by their unit tests, which render them with the component

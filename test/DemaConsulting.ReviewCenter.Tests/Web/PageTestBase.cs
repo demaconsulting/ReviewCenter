@@ -290,6 +290,26 @@ public abstract class PageTestBase : BunitContext
     }
 
     /// <summary>
+    ///     Changes the role of a member of a project, as a system administrator would while the member still has a
+    ///     page open (for instance to demote a project admin to a plain member).
+    /// </summary>
+    /// <param name="projectId">The project identity.</param>
+    /// <param name="username">The user name of the member; the user must exist and be a member.</param>
+    /// <param name="role">The new role.</param>
+    /// <returns>A task that completes when the role is changed.</returns>
+    protected async Task ChangeMemberRoleAsync(int projectId, string username, ProjectRole role)
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var user = await UserStore.GetByUsernameAsync(username, cancellationToken)
+                   ?? throw new InvalidOperationException($"The user '{username}' does not exist.");
+        var changed = await Store.SetMembershipRoleAsync(projectId, user.Id, role, AuditTestExtensions.Draft(), cancellationToken);
+        if (!changed)
+        {
+            throw new InvalidOperationException($"The user '{username}' is no member of the project.");
+        }
+    }
+
+    /// <summary>
     ///     Replaces the authentication state provider by the real <see cref="RevalidatingAuthenticationStateProvider"/>,
     ///     so that the page ends its session when the user in the store is no longer valid.
     /// </summary>

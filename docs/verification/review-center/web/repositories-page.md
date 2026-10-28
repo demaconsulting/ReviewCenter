@@ -32,9 +32,12 @@ N/A - standard test environment.
 - A repository can be disabled and enabled again.
 - A project administrator manages the repositories of the project; a plain member and a user who is no member see only
   the not-found message of a missing project, with no repositories and no controls, on both pages.
-- An administrator who lost the right after the page was opened is refused with an error when acting, and the page of
-  such an administrator ends its session when the sign-in state is re-checked, so that no actions remain.
-- An action sent after the session ended, but before the page learned of it, shows a clear message and changes nothing.
+- An administrator who lost the right after the page was opened sees, when acting, only the not-found message of a
+  missing project, with no repository, edit form, or token state left on the page, also when the list is read again
+  after the action and that fails; the page of such an administrator ends its session when the sign-in state is
+  re-checked, so that no actions remain.
+- An action sent after the session ended, but before the page learned of it, shows the not-found message and changes
+  nothing. The add page does the same when its administrator lost the right.
 
 #### Test Scenarios
 
@@ -82,19 +85,40 @@ scenario is tested by `RepositoriesPage_Edit_Cancel_ClosesFormAndChangesNothing`
 disabling is the only way to retire it. This scenario is tested by
 `RepositoriesPage_ToggleEnabled_Repository_DisablesAndEnablesAgain`.
 
-**RepositoriesPage_Action_SignedInAdminLaterDemoted_IsRefusedWithError**: Two system administrators and a repository
+**RepositoriesPage_Action_SignedInAdminLaterDemoted_ShowsNotFoundAndNoData**: Two system administrators and a repository
 exist and one administrator opens the page; that administrator then loses the flag and tries to disable the repository
-from the page that is still open. The action is refused with an error that says administrator rights are required, and
-the repository stays enabled. This scenario is tested by
-`RepositoriesPage_Action_SignedInAdminLaterDemoted_IsRefusedWithError`.
+from the page that is still open. The page shows only the not-found message with no repository row, and the repository
+stays enabled. This scenario is tested by
+`RepositoriesPage_Action_SignedInAdminLaterDemoted_ShowsNotFoundAndNoData`.
+
+**RepositoriesPage_Action_ProjectAdminDemotedToMember_ShowsNotFoundAndNoRepositoryData**: A project administrator, who
+is no system administrator, opens the page that lists a repository with a location and a user name; the membership is
+then changed to a plain member in the store, and the disable button is used. The page shows only the not-found message,
+neither the name, the location, nor the user name of the repository is in the markup, and the repository stays enabled.
+This scenario is tested by `RepositoriesPage_Action_ProjectAdminDemotedToMember_ShowsNotFoundAndNoRepositoryData`.
+
+**RepositoriesPage_StartEdit_ProjectAdminDemoted_ShowsNotFoundAndNoEditForm**: The same project administrator is
+demoted to a plain member while the page is open, and the Edit button is used. No edit form, and none of its filled
+fields, is rendered; the page shows only the not-found message. This scenario is tested by
+`RepositoriesPage_StartEdit_ProjectAdminDemoted_ShowsNotFoundAndNoEditForm`.
+
+**RepositoriesPage_Action_AccessLostBeforeTheReload_ShowsNotFoundNotStaleList**: The access service is wrapped so that
+the right is taken away right after the check of the action has passed, so the action runs and the list that is read
+afterwards is refused. The page shows only the not-found message, not the list it had loaded before. This scenario is
+tested by `RepositoriesPage_Action_AccessLostBeforeTheReload_ShowsNotFoundNotStaleList`.
+
+**NewRepositoryPage_CreateForm_ProjectAdminDemoted_ShowsNotFoundAndCreatesNothing**: A project administrator opens the
+add page and fills in the form including a token; the membership is changed to a plain member and the form is submitted.
+The page shows only the not-found message, no form field or typed value is in the markup, and no repository is created.
+This scenario is tested by `NewRepositoryPage_CreateForm_ProjectAdminDemoted_ShowsNotFoundAndCreatesNothing`.
 
 **RepositoriesPage_Revalidation_AdminDemoted_PageShowsSessionEndedAndNoActions**: When the sign-in state is re-checked
 after the administrator lost the flag, the page shows the session-ended message and no actions. This scenario is tested
 by `RepositoriesPage_Revalidation_AdminDemoted_PageShowsSessionEndedAndNoActions`.
 
-**RepositoriesPage_Action_SessionEndedBeforePageKnows_ShowsClearErrorAndChangesNothing**: An action sent after the session
-ended, but before the page learned of it, shows a clear message and changes nothing. This scenario is tested by
-`RepositoriesPage_Action_SessionEndedBeforePageKnows_ShowsClearErrorAndChangesNothing`.
+**RepositoriesPage_Action_SessionEndedBeforePageKnows_ShowsNotFoundAndChangesNothing**: An action sent after the session
+ended, but before the page learned of it, shows only the not-found message and changes nothing. This scenario is tested
+by `RepositoriesPage_Action_SessionEndedBeforePageKnows_ShowsNotFoundAndChangesNothing`.
 
 **Route restriction**: Through the real server pipeline, a user who is no member of a project requests
 `/projects/{id}/repositories` and receives a page that says the project does not exist, while a system administrator

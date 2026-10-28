@@ -40,13 +40,22 @@ sections:
           The ProjectPage unit shall let a system administrator reveal an inline form with the button + Add member
           that offers the enabled users who are not members yet and a project admin choice, add the chosen user as a
           member, switch a member between member and project admin, and remove a member, show the outcome or the
-          reason for a refusal, and list the members again afterwards.
+          reason for a refusal, and list the members again afterwards; and shall check on every such action that
+          the user is still a system administrator and still sees the project, and, when not, change nothing and
+          drop the members, the candidates and the add form, or replace the page with the not-found message when
+          the user also lost the view of the project.
         justification: |
           Members are changed rarely, so the form stays hidden until asked for. Showing only users who are not yet
           members prevents a duplicate, and showing the outcome next to the list tells the administrator what changed.
+          An open page keeps its state after the user is demoted, and the member names and the candidate list are
+          for system administrators only, so a failed check clears them instead of showing an error above them.
         tests:
           - ProjectPage_AddMember_ChosenUser_BecomesMemberWithTheRole
           - ProjectPage_MemberActions_ToggleRoleAndRemove_ChangeTheMembership
+          - ProjectPage_MemberChange_SystemAdminDemotedButStillMember_DropsMembersSectionKeepsReviews
+          - ProjectPage_MemberChange_SystemAdminDemotedAndNotMember_ShowsNotFoundAndNoData
+          - ProjectPage_OpenAddForm_SystemAdminDemoted_DropsCandidatesAndForm
+          - ProjectPage_MemberChange_SessionEndedBeforePageKnows_ShowsNotFoundAndChangesNothing
 
       - id: ReviewCenter-ProjectPage-RepositoriesLink
         title: >-

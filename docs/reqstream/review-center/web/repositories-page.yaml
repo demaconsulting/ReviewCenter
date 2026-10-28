@@ -78,15 +78,22 @@ sections:
           The RepositoriesPage component shall be available only to a system administrator and to a project admin of
           the project, shall show anybody else, a plain member or a user who is no member, only the not-found
           message of a project that does not exist, with no repository and no control, shall check on every action
-          that the user still manages the project, and shall replace the page with a message that the session has
-          ended, or refuse the action with an error and change nothing, when the user no longer does.
+          that the user still manages the project, and, when the user no longer does or nobody is signed in, shall
+          change nothing and replace the page with the not-found message, dropping the project, the repositories,
+          the edit form and the token state, even when the check that follows an action fails.
         justification: |
           The repositories control what the server reads and hold secrets. An open page keeps its state for a while
-          after a user is demoted, disabled, or signed out. A refusal that said "not allowed" would show that the
-          project exists, so the page answers as for a missing project.
+          after a user is demoted, disabled, or signed out, and a plain member must not read the locations and user
+          names of the repositories. A refusal that said "not allowed" would show that the project exists, and an
+          error shown above the stale data would still leave it readable, so the page answers as for a missing
+          project and clears everything it loaded.
         tests:
           - SignIn_RepositoriesPage_NonMemberAndSystemAdmin_OnlyAdminIsServed
           - RepositoriesPage_Render_MemberOrNonMember_ShowsNotFoundOnly
-          - RepositoriesPage_Action_SignedInAdminLaterDemoted_IsRefusedWithError
+          - RepositoriesPage_Action_SignedInAdminLaterDemoted_ShowsNotFoundAndNoData
+          - RepositoriesPage_Action_ProjectAdminDemotedToMember_ShowsNotFoundAndNoRepositoryData
+          - RepositoriesPage_StartEdit_ProjectAdminDemoted_ShowsNotFoundAndNoEditForm
+          - RepositoriesPage_Action_AccessLostBeforeTheReload_ShowsNotFoundNotStaleList
           - RepositoriesPage_Revalidation_AdminDemoted_PageShowsSessionEndedAndNoActions
-          - RepositoriesPage_Action_SessionEndedBeforePageKnows_ShowsClearErrorAndChangesNothing
+          - RepositoriesPage_Action_SessionEndedBeforePageKnows_ShowsNotFoundAndChangesNothing
+          - NewRepositoryPage_CreateForm_ProjectAdminDemoted_ShowsNotFoundAndCreatesNothing

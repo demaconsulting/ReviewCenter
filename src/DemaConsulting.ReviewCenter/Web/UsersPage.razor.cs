@@ -33,8 +33,9 @@ namespace DemaConsulting.ReviewCenter.Web;
 ///     An attribute on the page limits entry to system administrators. An open page re-checks its user only every
 ///     <see cref="AuthOptions.RevalidationSeconds"/>, so for the time before the next check every
 ///     action also re-checks that the signed-in user is still an enabled system administrator in the user store,
-///     and is refused with an error otherwise (defense in depth). The page talks to the domain only through
-///     <see cref="UserService"/>, which owns the rules (including the rule that the last enabled system administrator
+///     and drops the list and the typed passwords otherwise (defense in depth). The page talks to the domain only
+///     through <see cref="UserService"/>, which owns the rules (including the rule that the last enabled system
+///     administrator
 ///     cannot be disabled or demoted). A rule violation, like a stored change, is shown next to the control that was
 ///     used instead of being thrown. Passwords are never shown or logged, and a password field is emptied once it has been used. Each
 ///     browser connection (circuit) gets its own page instance, so the state here is per-user and needs no
@@ -42,6 +43,11 @@ namespace DemaConsulting.ReviewCenter.Web;
 /// </remarks>
 public partial class UsersPage : ComponentBase
 {
+    /// <summary>
+    ///     The reason shown when the signed-in user is no system administrator any more.
+    /// </summary>
+    private const string SystemAdminRequired = "System administrator rights are required.";
+
     /// <summary>
     ///     Backing field for <see cref="InteractiveMarker"/>; flips to <c>true</c> after the first render
     ///     on a live circuit.
@@ -55,6 +61,12 @@ public partial class UsersPage : ComponentBase
     private UserService UserService { get; set; } = null!;
 
     /// <summary>
+    ///     Gets or sets the access service, supplied by dependency injection; decides who is a system administrator.
+    /// </summary>
+    [Inject]
+    private IProjectAccess Access { get; set; } = null!;
+
+    /// <summary>
     ///     Gets or sets the authentication state of the current user, supplied by dependency injection.
     /// </summary>
     [Inject]
@@ -64,6 +76,12 @@ public partial class UsersPage : ComponentBase
     ///     Gets the users shown in the list.
     /// </summary>
     private IReadOnlyList<User> Users { get; set; } = [];
+
+    /// <summary>
+    ///     Gets a value indicating whether the signed-in user turned out to be no system administrator any more, so
+    ///     that the list and its controls are not rendered.
+    /// </summary>
+    private bool AccessLost { get; set; }
 
     /// <summary>
     ///     Gets the new passwords typed in the rows, by user identity.
@@ -182,9 +200,11 @@ public partial class UsersPage : ComponentBase
     /// <param name="action">The change to run; it receives the verified administrator as the actor to audit.</param>
     /// <returns>A task that completes when the change is stored or the problem is shown.</returns>
     /// <remarks>
-    ///     The change is refused, without reloading, unless the signed-in user is still an enabled
-    ///     administrator in the user store, and also when the sign-in state has already ended (the message then
-    ///     says so).
+    ///     The change is refused, without reloading, unless the signed-in user is still an enabled system
+    ///     administrator, and also when the sign-in state has already ended (the message then says so). A refusal
+    ///     drops the user list and the typed passwords, because the list is for system administrators only. The
+    ///     same happens after the change when the user is no longer an administrator (for instance after taking
+    ///     the right away from themselves); the status of the stored change stays so that it is acknowledged.
     /// </remarks>
     private async Task RunAsync(int? userId, string success, Func<Actor, Task> action)
     {
@@ -193,8 +213,8 @@ public partial class UsersPage : ComponentBase
         ErrorMessage = null;
         StatusMessage = null;
 
-        // Defense in depth: an open page re-checks its user only every revalidation interval, so ask the store
-        // who the user is now. An ended sign-in state is shown as a message, not raised as a fault
+        // Defense in depth: an open page re-checks its user only every revalidation interval, so ask who the user
+        // is now. An ended sign-in state is shown as a message, not raised as a fault
         Actor actor;
         try
         {
@@ -202,14 +222,12 @@ public partial class UsersPage : ComponentBase
         }
         catch (DomainRuleException ex)
         {
-            ErrorMessage = ex.Message;
+            ShowAccessLost(ex.Message);
             return;
         }
 
-        var current = await UserService.GetAsync(actor.Username);
-        if (current is not { Enabled: true, IsSystemAdmin: true })
+        if (!await GuardAsync())
         {
-            ErrorMessage = "System administrator rights are required.";
             return;
         }
 
@@ -223,7 +241,43 @@ public partial class UsersPage : ComponentBase
             ErrorMessage = ex.Message;
         }
 
+        // The change may have taken the right from this very user; then the list is not reloaded and not shown
+        if (!await GuardAsync())
+        {
+            return;
+        }
+
         // Reload so the rows show what is stored, whether or not the change succeeded
         Users = await UserService.ListAsync();
+    }
+
+    /// <summary>
+    ///     Re-checks that the signed-in user is still an enabled system administrator.
+    /// </summary>
+    /// <returns>
+    ///     <c>true</c> when the action may go on; <c>false</c> when the right is gone, in which case the page has
+    ///     already dropped the list and the typed passwords, and the action must stop.
+    /// </returns>
+    private Task<bool> GuardAsync()
+    {
+        return Access.GuardSystemAdminAsync(AuthenticationState, () => ShowAccessLost(SystemAdminRequired));
+    }
+
+    /// <summary>
+    ///     Drops the user list and the typed passwords and shows why.
+    /// </summary>
+    /// <param name="message">The reason shown instead of the list.</param>
+    /// <remarks>
+    ///     The usernames, display names and flags of all users are for system administrators only. The status
+    ///     message is left as it is, so that a change that was stored just before the right was lost stays
+    ///     acknowledged.
+    /// </remarks>
+    private void ShowAccessLost(string message)
+    {
+        Users = [];
+        Passwords.Clear();
+        MessageUserId = null;
+        AccessLost = true;
+        ErrorMessage = message;
     }
 }

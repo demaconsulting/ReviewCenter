@@ -28,10 +28,12 @@ N/A - standard test environment.
 - A new password set for a user works, the old one does not, and the field is emptied.
 - Disabling or demoting the last enabled system administrator is refused with an error.
 - An action is refused with an error, and changes nothing, when the signed-in system administrator lost the flag or was
-  disabled after the page was opened.
+  disabled after the page was opened; the user list, the typed passwords, and the button that creates a user are then no
+  longer rendered, and an administrator who takes the flag from themselves sees the change acknowledged but not the
+  reloaded list.
 - When the sign-in state of the open page ends because the administrator lost the flag, the page is replaced by the
   "Session ended" message and offers no actions; an action sent after the session ended, before the page learned of
-  it, shows an error that says the user is no longer signed in and changes nothing.
+  it, shows an error that says the user is no longer signed in, without the list, and changes nothing.
 
 #### Test Scenarios
 
@@ -72,9 +74,21 @@ administrator. This scenario is tested by `UsersPage_LastAdmin_DisableOrDemote_I
 
 **UsersPage_Action_SignedInAdminLaterDemoted_IsRefusedWithError**: Two system administrators and an ordinary user exist
 and one administrator opens the page; that administrator then loses the flag, and the disable button of the ordinary
-user is used; an error that says system administrator rights are required is shown, and the user stays enabled. This
-scenario is tested by
+user is used; an error that says system administrator rights are required is shown, no user list or row is rendered, and
+the user stays enabled. This scenario is tested by
 `UsersPage_Action_SignedInAdminLaterDemoted_IsRefusedWithError`.
+
+**UsersPage_Action_AdminDemotedAfterOpening_DropsUserListAndTypedPasswords**: Two system administrators and a reviewer
+exist; one administrator opens the page and types a password in the row of the reviewer, then loses the flag, and the
+Set password button is used. The error that says system administrator rights are required is shown, the list, the
+rows, the password inputs, and the new user button are gone, the typed password is not in the markup, and the password
+of the reviewer is unchanged. This scenario is tested by
+`UsersPage_Action_AdminDemotedAfterOpening_DropsUserListAndTypedPasswords`.
+
+**UsersPage_ToggleSystemAdmin_AdminDemotesSelf_ShowsStatusButDropsTheList**: Two system administrators exist and one
+opens the page and removes the flag from their own row. The flag is stored as removed, the status message says that
+the user is no longer a system administrator, and neither the list nor a row is rendered. This scenario is tested by
+`UsersPage_ToggleSystemAdmin_AdminDemotesSelf_ShowsStatusButDropsTheList`.
 
 **UsersPage_Revalidation_AdminDemoted_PageShowsSessionEndedAndNoActions**: Two system administrators and an ordinary
 user exist and
@@ -85,5 +99,5 @@ a click on the stale button changes nothing, and the ordinary user is still enab
 
 **UsersPage_Action_SessionEndedBeforePageKnows_ShowsClearErrorAndChangesNothing**: An administrator has the page open
 and the sign-in state ends without the page being told; the disable button of a user is used. The error area says that
-the user is no longer signed in, and the user is still enabled. This scenario is tested by
+the user is no longer signed in and no list is rendered, and the user is still enabled. This scenario is tested by
 `UsersPage_Action_SessionEndedBeforePageKnows_ShowsClearErrorAndChangesNothing`.

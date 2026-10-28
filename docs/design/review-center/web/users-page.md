@@ -74,13 +74,19 @@ administrator." or "'{user}' is no longer a system administrator." A change that
 system administrator is refused by Core and shown as a message.
 
 Every change reloads the list, whether or not it succeeded, so the rows show what is stored. Every change first goes
-through one shared step (`RunAsync`) that reads the signed-in user from the
-authentication state and looks the user up in the user store; unless that user is enabled and is a system administrator,
-the action is not run, nothing is reloaded, and the message "System administrator rights are required." is shown. This
+through one shared step (`RunAsync`) that reads the signed-in user from the authentication state and then asks
+`ProjectViewGuard.GuardSystemAdminAsync` (through `GuardAsync`, over `IProjectAccess`) whether that user is still an
+enabled system administrator; unless so, the action is not run, nothing is reloaded, and `ShowAccessLost` is called
+with the message "System administrator rights are required." The guard is asked a second time before the reload,
+because the change may have taken the right from the very user who made it; the stored change is then still
+acknowledged, but the list is not shown. `ShowAccessLost` clears `Users`, `Passwords`, and `MessageUserId`, sets
+`AccessLost`, and shows the message, and the page then renders neither the "+ New user" button nor the list, so the names
+and roles of the users, and the passwords typed into the rows, are no longer readable. This
 check is
 kept on every action although the page itself is replaced when the sign-in state ends (see `SessionGate`), because an
 open page can keep its state for up to one revalidation interval after the user was demoted or disabled. When the state
-has already ended, `GetActorAsync` refuses with a rule violation, which `RunAsync` catches and shows as a message.
+has already ended, `GetActorAsync` refuses with a rule violation, which `RunAsync` catches and shows through
+`ShowAccessLost` as a message, again without the list.
 
 **OnAfterRender**: Marks the page interactive after the first render on a live connection.
 
@@ -92,9 +98,10 @@ checked against the stored user (see the `Identity` design).
 
 A `DomainRuleException` from `UserService` is caught and its message shown in the page; no other exception is handled
 by the page. An action by a signed-in user who is no longer an enabled system administrator is refused with the message
-"System administrator rights are required." A state that has already ended is shown with the message of the refusal
-("You are
-no longer signed in, so nothing was saved. Reload the page to sign in again."). The inputs carry the maximum lengths as
+"System administrator rights are required." and the user list is no longer rendered. A state that has already ended is
+shown with the message of the refusal ("You are
+no longer signed in, so nothing was saved. Reload the page to sign in again."), also without the list. The inputs carry
+the maximum lengths as
 a convenience; the service remains the authority. Passwords are never shown or logged.
 
 #### Dependencies
@@ -102,6 +109,8 @@ a convenience; the service remains the authority. Passwords are never shown or l
 - **SessionGate** (App) — wraps the whole page content, so the page is replaced by a "Session ended" message when the
   sign-in state of the open page ends.
 - **UserService** — lists, creates, and changes users, and looks up the signed-in user.
+- **IProjectAccess** (Core) — through `ProjectViewGuard.GuardSystemAdminAsync`, tells whether the signed-in user is
+  still an enabled system administrator, before and after every action.
 - **AuthenticationStateProvider** (ASP.NET Core) — gives the signed-in user; read through the `Identity` helper that
   turns it into an `Actor`.
 - **ReviewLimits** (Core) — the input limits.

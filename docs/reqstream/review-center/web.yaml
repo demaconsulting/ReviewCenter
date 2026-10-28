@@ -110,13 +110,16 @@ sections:
           open its repositories, and offer in a new review only the repositories of that project; and shall keep
           that rule for a page that stays open, by checking the view access again at the start of every action of
           a project page and, once the user has lost it, showing the page for a project that does not exist and
-          none of the data the page had loaded.
+          none of the data the page had loaded; and shall do the same for the administer or system administrator
+          right that the repositories, new repository, project members and users pages need, so that a user who
+          was demoted sees no repository, member or user data that the page had loaded.
         justification: |
           Reviews of one body of work must not be visible to people who do not work on it, and the answer for a
           project the user may not see must not reveal that it exists. Membership is the one rule that decides what
           a user sees, so the pages ask the Core access service instead of deciding for themselves. A page that
           stays open does not load again, so a user whose membership was removed would otherwise keep reading
-          through it; the shared ProjectViewGuard asks again at every action, and the read services need no
+          through it; the shared ProjectViewGuard asks again at every action, for the view, the administer and the
+          system administrator right, and the read services need no
           guard of their own because every page reaches them only after that check. The subsystem
           requirement is verified by the page tests of the units, which render the pages for a system administrator,
           a member, and a user who is no member, and remove the membership while the page is open.
@@ -145,6 +148,13 @@ sections:
           - ProjectViewGuard_GuardView_NonMember_ReturnsFalseAndCallsBackOnce
           - ProjectViewGuard_GuardView_MembershipRemovedBetweenChecks_SecondCheckReturnsFalse
           - ProjectViewGuard_GuardView_NobodySignedIn_ReturnsFalseAndCallsBackOnce
+          - ProjectViewGuard_GuardAdminister_ProjectAdmin_ReturnsTrueWithoutCallback
+          - ProjectViewGuard_GuardAdminister_PlainMember_ReturnsFalseAndCallsBackOnce
+          - ProjectViewGuard_GuardAdminister_AdminDemotedBetweenChecks_SecondCheckReturnsFalse
+          - ProjectViewGuard_GuardAdminister_NobodySignedIn_ReturnsFalseAndCallsBackOnce
+          - ProjectViewGuard_GuardSystemAdmin_SystemAdmin_ReturnsTrueWithoutCallback
+          - ProjectViewGuard_GuardSystemAdmin_DemotedOrDisabled_ReturnsFalseAndCallsBackOnce
+          - ProjectViewGuard_GuardSystemAdmin_NobodySignedIn_ReturnsFalseAndCallsBackOnce
           - ReviewPage_SelectFile_MembershipRevoked_ShowsNotFoundAndNoData
           - ChecklistPage_Choose_MembershipRevoked_ShowsNotFoundAndNoData
           - HistoryPage_Reparameterize_MembershipRevoked_ShowsNotFoundAndNoEntries
