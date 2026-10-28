@@ -234,6 +234,7 @@ internal static class ServerHost
         services.AddSingleton<IPasswordHasher, PasswordHasher>();
         services.AddSingleton<IProjectAccess, ProjectAccess>();
         services.AddSingleton<ProjectService>();
+        services.AddSingleton<EvidenceSettingsService>();
         services.AddSingleton<ReviewService>();
         services.AddSingleton<ThreadService>();
         services.AddSingleton<ChecklistService>();

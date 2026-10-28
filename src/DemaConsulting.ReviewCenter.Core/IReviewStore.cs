@@ -64,6 +64,29 @@ public interface IReviewStore
     Task<IReadOnlyList<Project>> ListProjectsAsync(CancellationToken cancellationToken = default);
 
     /// <summary>
+    ///     Changes the evidence settings of a project, if they still hold the value the caller based its change on.
+    /// </summary>
+    /// <remarks>
+    ///     The comparison and the update are one atomic step (compare-and-set), so two administrators who save at
+    ///     the same time cannot silently overwrite each other: the later one gets <c>false</c> and must look again.
+    /// </remarks>
+    /// <param name="projectId">The project identity.</param>
+    /// <param name="expected">The settings the caller read and based its change on. Must not be null.</param>
+    /// <param name="updated">The new settings. Must not be null.</param>
+    /// <param name="audit">The audit draft of the change, saved in the same transaction. Must not be null.</param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <returns>
+    ///     <c>true</c> when the settings were changed; <c>false</c> (and nothing recorded) when the project does not
+    ///     exist or its settings are no longer <paramref name="expected"/>.
+    /// </returns>
+    Task<bool> UpdateEvidenceSettingsAsync(
+        int projectId,
+        EvidenceSettings expected,
+        EvidenceSettings updated,
+        AuditDraft audit,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
     ///     Stores a new project membership.
     /// </summary>
     /// <param name="membership">The membership to store. Must not be null.</param>

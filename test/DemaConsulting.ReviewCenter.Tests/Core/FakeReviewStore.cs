@@ -114,11 +114,40 @@ internal sealed class FakeReviewStore : IReviewStore
             Id = _projects.Count + 1,
             Name = project.Name,
             Description = project.Description,
-            Created = project.Created
+            Created = project.Created,
+            Evidence = project.Evidence
         };
         _projects.Add(stored);
         Audits.Add(audit(stored));
         return Task.FromResult(stored);
+    }
+
+    /// <inheritdoc />
+    public Task<bool> UpdateEvidenceSettingsAsync(
+        int projectId,
+        EvidenceSettings expected,
+        EvidenceSettings updated,
+        AuditDraft audit,
+        CancellationToken cancellationToken = default)
+    {
+        // Like the real store: compare and set in one step; a lost race or an unknown project changes nothing
+        var index = _projects.FindIndex(p => p.Id == projectId);
+        if (index < 0 || _projects[index].Evidence != expected)
+        {
+            return Task.FromResult(false);
+        }
+
+        var old = _projects[index];
+        _projects[index] = new Project
+        {
+            Id = old.Id,
+            Name = old.Name,
+            Description = old.Description,
+            Created = old.Created,
+            Evidence = updated
+        };
+        Audits.Add(audit);
+        return Task.FromResult(true);
     }
 
     /// <inheritdoc />
