@@ -30,7 +30,9 @@ N/A - standard test environment.
   identities, does not change the digest; a different order of the comments of a thread does.
 - Who answered a check (display name or user name) changes the digest; when it was answered, and a section that
   applies, do not.
-- A stored checklist definition that is not valid JSON is not hidden: it raises a `JsonException`.
+- A stored checklist definition that is not valid JSON, or is incomplete (a missing version, sections, section id,
+  title or items, or item id or text), is not hidden: it raises a `JsonException`. A minimal complete definition
+  still computes.
 - Text that contains the delimiters of the format cannot produce the digest of another record.
 - A null record is rejected with an `ArgumentNullException` by both methods.
 
@@ -69,9 +71,15 @@ or in the user name of the person give digests that differ from the original; an
 time of answering has the same digest. This scenario is tested by
 `RecordDigest_Compute_AnsweredByChanged_ChangesDigestButAnsweredAtDoesNot`.
 
-**RecordDigest_Canonicalize_MalformedChecklistDefinition_Throws**: A record whose stored checklist definition is not
-valid JSON is refused with a `JsonException`. This scenario is tested by
+**RecordDigest_Canonicalize_MalformedChecklistDefinition_Throws**: A theory over corrupted stored definitions: text
+that is not JSON, `null`, `{}`, a missing or null version, a missing or null list of sections, a null section, a
+section without id, title or items, a null item, and an item without id or text. Each is refused with a
+`JsonException` (never a `NullReferenceException`). This scenario is tested by
 `RecordDigest_Canonicalize_MalformedChecklistDefinition_Throws`.
+
+**RecordDigest_Canonicalize_MinimalChecklistDefinition_Computes**: A theory over a definition without sections and a
+section without an applicability hint: the canonical text is still built, so the check is not too strict. This scenario
+is tested by `RecordDigest_Canonicalize_MinimalChecklistDefinition_Computes`.
 
 **RecordDigest_Compute_ThreadSide_IsWrittenAndMatchesKnownValue**: A theory over the side `Head` and the side
 `Baseline`: the thread line of the canonical text carries `4:Head` or `8:Baseline` between the path and the range,

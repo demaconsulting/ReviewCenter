@@ -110,6 +110,34 @@ public class ChecklistServiceTests
     }
 
     /// <summary>
+    ///     Test that a definition that is valid JSON but not complete is rejected with a JSON error when it is read,
+    ///     both directly and through the stored checklist of a review, so no reader meets a null part.
+    /// </summary>
+    /// <param name="json">The incomplete definition text.</param>
+    [Theory]
+    [InlineData("null")]
+    [InlineData("{}")]
+    [InlineData("{\"Version\":\"1\"}")]
+    [InlineData("{\"Version\":\"1\",\"Sections\":null}")]
+    [InlineData("{\"Version\":\"1\",\"Sections\":[null]}")]
+    [InlineData("{\"Sections\":[]}")]
+    [InlineData("{\"Version\":\"1\",\"Sections\":[{\"Title\":\"T\",\"Items\":[]}]}")]
+    [InlineData("{\"Version\":\"1\",\"Sections\":[{\"Id\":\"A\",\"Items\":[]}]}")]
+    [InlineData("{\"Version\":\"1\",\"Sections\":[{\"Id\":\"A\",\"Title\":\"T\"}]}")]
+    [InlineData("{\"Version\":\"1\",\"Sections\":[{\"Id\":\"A\",\"Title\":\"T\",\"Items\":[null]}]}")]
+    [InlineData("{\"Version\":\"1\",\"Sections\":[{\"Id\":\"A\",\"Title\":\"T\",\"Items\":[{\"Id\":\"A-1\"}]}]}")]
+    [InlineData("{\"Version\":\"1\",\"Sections\":[{\"Id\":\"A\",\"Title\":\"T\",\"Items\":[{\"Text\":\"q\"}]}]}")]
+    public void ChecklistService_FromJson_IncompleteDefinition_ThrowsJsonException(string json)
+    {
+        // Arrange: a stored checklist holding the incomplete text
+        var checklist = new ReviewChecklist { ProjectId = 1, ReviewId = "rev-1", Version = "x", Definition = json };
+
+        // Act, Assert: both ways of reading it fail with a JSON error
+        Assert.ThrowsAny<System.Text.Json.JsonException>(() => ChecklistDefinition.FromJson(json));
+        Assert.ThrowsAny<System.Text.Json.JsonException>(() => checklist.Parse());
+    }
+
+    /// <summary>
     ///     Test that the service uses the snapshot stored with the review, not the current default.
     /// </summary>
     [Fact]

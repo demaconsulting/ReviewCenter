@@ -211,8 +211,10 @@ the two side vectors, and the exact canonical text of the second, the third, and
 
 #### Error Handling
 
-A null record raises `ArgumentNullException`. A stored checklist definition that is not valid JSON raises
-`JsonException`: the store only holds text written by the definition itself, so this signals corrupted data and is
+A null record raises `ArgumentNullException`. A stored checklist definition that is not valid JSON, or not a complete
+definition (`ChecklistDefinition.FromJson` rejects a missing version, section list, section, item, identifier, title or
+text), raises `JsonException`, never a `NullReferenceException`: the store only holds text written by the definition
+itself, so this signals corrupted data and is
 not hidden. Whether a record is signable is not decided here (see `SigningService`).
 
 #### Dependencies

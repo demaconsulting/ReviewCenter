@@ -65,11 +65,77 @@ public sealed record ChecklistDefinition(string Version, IReadOnlyList<Checklist
     /// <param name="json">The JSON text. Must not be null.</param>
     /// <returns>The definition.</returns>
     /// <exception cref="ArgumentNullException">Thrown when <paramref name="json"/> is null.</exception>
-    /// <exception cref="JsonException">Thrown when the text is not a valid definition.</exception>
+    /// <exception cref="JsonException">
+    ///     Thrown when the text is not valid JSON or not a complete definition: the version, the list of sections, a
+    ///     section, its identifier, title or list of items, an item, or its identifier or text is missing. The
+    ///     applicability hint is not required.
+    /// </exception>
     public static ChecklistDefinition FromJson(string json)
     {
         ArgumentNullException.ThrowIfNull(json);
-        return JsonSerializer.Deserialize<ChecklistDefinition>(json)
-               ?? throw new JsonException("The checklist definition is empty.");
+        var definition = JsonSerializer.Deserialize<ChecklistDefinition>(json)
+                         ?? throw new JsonException("The checklist definition is empty.");
+        Validate(definition);
+        return definition;
+    }
+
+    /// <summary>
+    ///     Checks that nothing a reader depends on is missing; the deserializer leaves the members that the text does
+    ///     not mention null even though the types say otherwise.
+    /// </summary>
+    /// <param name="definition">The deserialized definition.</param>
+    /// <exception cref="JsonException">Thrown when a required part is missing.</exception>
+    private static void Validate(ChecklistDefinition definition)
+    {
+        if (definition.Version is null)
+        {
+            throw new JsonException("The checklist definition has no version.");
+        }
+
+        if (definition.Sections is null)
+        {
+            throw new JsonException("The checklist definition has no sections.");
+        }
+
+        foreach (var section in definition.Sections)
+        {
+            if (section is null)
+            {
+                throw new JsonException("The checklist definition has an empty section.");
+            }
+
+            if (section.Id is null)
+            {
+                throw new JsonException("A section of the checklist definition has no identifier.");
+            }
+
+            if (section.Title is null)
+            {
+                throw new JsonException($"Section '{section.Id}' of the checklist definition has no title.");
+            }
+
+            if (section.Items is null)
+            {
+                throw new JsonException($"Section '{section.Id}' of the checklist definition has no items.");
+            }
+
+            foreach (var item in section.Items)
+            {
+                if (item is null)
+                {
+                    throw new JsonException($"Section '{section.Id}' of the checklist definition has an empty item.");
+                }
+
+                if (item.Id is null)
+                {
+                    throw new JsonException($"An item of section '{section.Id}' of the checklist definition has no identifier.");
+                }
+
+                if (item.Text is null)
+                {
+                    throw new JsonException($"Item '{item.Id}' of the checklist definition has no text.");
+                }
+            }
+        }
     }
 }

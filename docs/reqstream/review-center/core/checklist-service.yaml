@@ -21,6 +21,7 @@ sections:
           - ChecklistService_DefaultChecklist_HasTemplateSectionsAndItemIdsInOrder
           - ChecklistService_DefaultChecklist_IdsUniqueAndPrefixedBySection
           - ChecklistService_DefaultChecklist_RoundTripsThroughJson
+          - ChecklistService_FromJson_IncompleteDefinition_ThrowsJsonException
 
       - id: ReviewCenter-ChecklistService-Freeze
         title: >-

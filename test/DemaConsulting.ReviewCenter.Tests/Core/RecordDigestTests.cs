@@ -447,19 +447,58 @@ public class RecordDigestTests
     }
 
     /// <summary>
-    ///     Test that a stored definition that is not valid JSON is not hidden: the digest refuses it.
+    ///     Test that a stored definition that is not valid JSON, or not a complete definition, is not hidden: the
+    ///     digest refuses it with a JSON error (never a null reference error).
     /// </summary>
-    [Fact]
-    public void RecordDigest_Canonicalize_MalformedChecklistDefinition_Throws()
+    /// <param name="definition">The corrupted definition text.</param>
+    [Theory]
+    [InlineData("{not json")]
+    [InlineData("null")]
+    [InlineData("{}")]
+    [InlineData("{\"Version\":\"1\"}")]
+    [InlineData("{\"Version\":\"1\",\"Sections\":null}")]
+    [InlineData("{\"Version\":\"1\",\"Sections\":[null]}")]
+    [InlineData("{\"Sections\":[]}")]
+    [InlineData("{\"Version\":\"1\",\"Sections\":[{\"Title\":\"T\",\"Items\":[]}]}")]
+    [InlineData("{\"Version\":\"1\",\"Sections\":[{\"Id\":\"A\",\"Items\":[]}]}")]
+    [InlineData("{\"Version\":\"1\",\"Sections\":[{\"Id\":\"A\",\"Title\":\"T\"}]}")]
+    [InlineData("{\"Version\":\"1\",\"Sections\":[{\"Id\":\"A\",\"Title\":\"T\",\"Items\":null}]}")]
+    [InlineData("{\"Version\":\"1\",\"Sections\":[{\"Id\":\"A\",\"Title\":\"T\",\"Items\":[null]}]}")]
+    [InlineData("{\"Version\":\"1\",\"Sections\":[{\"Id\":\"A\",\"Title\":\"T\",\"Items\":[{\"Id\":\"A-1\"}]}]}")]
+    [InlineData("{\"Version\":\"1\",\"Sections\":[{\"Id\":\"A\",\"Title\":\"T\",\"Items\":[{\"Text\":\"q\"}]}]}")]
+    public void RecordDigest_Canonicalize_MalformedChecklistDefinition_Throws(string definition)
     {
         // Arrange: a record whose frozen checklist holds corrupted text
         var record = ChecklistRecord() with
         {
-            Checklist = new ReviewChecklist { ProjectId = 1, ReviewId = "rev-1", Version = "x", Definition = "{not json" }
+            Checklist = new ReviewChecklist { ProjectId = 1, ReviewId = "rev-1", Version = "x", Definition = definition }
         };
 
         // Act, Assert: reading the definition fails with a JSON error
         Assert.ThrowsAny<System.Text.Json.JsonException>(() => RecordDigest.Canonicalize(record));
+    }
+
+    /// <summary>
+    ///     Test that the check for a complete definition is not too strict: a definition without sections, and a
+    ///     section without an applicability hint, still give a canonical text.
+    /// </summary>
+    /// <param name="definition">The minimal definition text.</param>
+    [Theory]
+    [InlineData("{\"Version\":\"1\",\"Sections\":[]}")]
+    [InlineData("{\"Version\":\"1\",\"Sections\":[{\"Id\":\"A\",\"Title\":\"T\",\"Items\":[{\"Id\":\"A-1\",\"Text\":\"q\"}]}]}")]
+    public void RecordDigest_Canonicalize_MinimalChecklistDefinition_Computes(string definition)
+    {
+        // Arrange: a record whose frozen checklist holds a minimal but complete definition
+        var record = ChecklistRecord() with
+        {
+            Checklist = new ReviewChecklist { ProjectId = 1, ReviewId = "rev-1", Version = "x", Definition = definition }
+        };
+
+        // Act: build the canonical text
+        var text = RecordDigest.Canonicalize(record);
+
+        // Assert: the checklist block is written
+        Assert.Contains("checklist 1", text);
     }
 
     /// <summary>

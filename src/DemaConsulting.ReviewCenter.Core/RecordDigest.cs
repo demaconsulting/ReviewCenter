@@ -136,7 +136,8 @@ public static class RecordDigest
     /// <param name="lines">The lines written so far.</param>
     /// <param name="checklist">The frozen checklist, or <c>null</c> when the review has none.</param>
     /// <exception cref="System.Text.Json.JsonException">
-    ///     Thrown when the stored definition is not valid; the store only holds text written by
+    ///     Thrown when the stored definition is not valid JSON or not a complete definition
+    ///     (<see cref="ChecklistDefinition.FromJson"/> rejects both); the store only holds text written by
     ///     <see cref="ChecklistDefinition.ToJson"/>, so this signals corrupted data and must not be hidden.
     /// </exception>
     private static void AddChecklist(List<string> lines, ReviewChecklist? checklist)

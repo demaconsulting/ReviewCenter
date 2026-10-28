@@ -14,7 +14,9 @@ which derive what is left to do.
 
 **ChecklistDefinition**: a record of a `Version` label and a list of `ChecklistSection` (`Id`, `Title`, an
 applicability hint, and a list of `ChecklistItem` with `Id` and `Text`). It serializes to and from JSON
-(`ToJson`, `FromJson`).
+(`ToJson`, `FromJson`). `FromJson` also checks the structure it reads: JSON that is invalid, or that lacks the version,
+the sections, a section with its id, title or items, or an item with its id or text, raises `JsonException`, so no
+reader of a stored definition meets a null part. The applicability hint is display help and is not required.
 
 **DefaultChecklist**: the checklist given to every new review, `DefaultChecklist.Current`, with version
 `default-1`. It is seeded from the Continuous Compliance review template: 14 sections and 58 checks, with the

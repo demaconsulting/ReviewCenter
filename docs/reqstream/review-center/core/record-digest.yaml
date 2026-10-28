@@ -43,15 +43,18 @@ sections:
           The RecordDigest class shall cover the checklist the review was created with in the canonical text: its
           version and, sorted by identifier, the identifier and title of every section and the identifier and
           question wording of every check (none for a review without a checklist), and shall give a different
-          digest when any of them changes, and the same digest whatever order the definition lists them in.
+          digest when any of them changes, and the same digest whatever order the definition lists them in; a
+          stored definition that is invalid or incomplete shall be refused with a JSON error, not hidden.
         justification: |
           A signed answer only has meaning together with the question it answers. If the wording were not covered,
-          a signature would not show which question the reviewer vouched for.
+          a signature would not show which question the reviewer vouched for. Corrupted stored text must stop the
+          digest instead of being read as a different definition.
         tests:
           - RecordDigest_Compute_ChecklistRecord_MatchesDocumentedFormatAndKnownValue
           - RecordDigest_Compute_ChecklistWordingChange_ChangesDigest
           - RecordDigest_Compute_ChecklistDefinitionOrder_SameDigest
           - RecordDigest_Canonicalize_MalformedChecklistDefinition_Throws
+          - RecordDigest_Canonicalize_MinimalChecklistDefinition_Computes
 
       - id: ReviewCenter-RecordDigest-AnsweredBy
         title: >-
