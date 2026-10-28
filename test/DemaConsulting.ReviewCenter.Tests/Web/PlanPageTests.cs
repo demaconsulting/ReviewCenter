@@ -1021,4 +1021,101 @@ public class PlanPageTests : PageTestBase
         Assert.Equal("<b id=\"x\">Core</b>", TextOf(cut, "plan-row-title-core"));
         Assert.Empty(cut.FindAll("#x"));
     }
+
+    /// <summary>
+    ///     Creates the arrangement for the access tests, with <c>mem</c> as a member of the project and
+    ///     <c>out</c> as no member.
+    /// </summary>
+    /// <returns>The project identity.</returns>
+    private async Task<int> ArrangeForMemberAsync()
+    {
+        var (projectId, _) = await ArrangeAsync();
+        var member = await Users.CreateAsync("mem", "Mem", UserRole.Reviewer, "correct horse battery", TestContext.Current.CancellationToken);
+        await Users.CreateAsync("out", "Out", UserRole.Reviewer, "correct horse battery", TestContext.Current.CancellationToken);
+        await Store.AddMembershipAsync(member.Id, projectId, TestContext.Current.CancellationToken);
+        return projectId;
+    }
+
+    /// <summary>
+    ///     Asserts that the page shows only the not-found message and nothing of the project, its repositories or a
+    ///     plan.
+    /// </summary>
+    /// <param name="cut">The rendered page.</param>
+    private static void AssertNothingOfThePlanIsShown(IRenderedComponent<PlanPage> cut)
+    {
+        Assert.True(Has(cut, "plan-project-not-found"));
+        Assert.False(Has(cut, "plan-form"));
+        Assert.False(Has(cut, "plan-summary"));
+        Assert.False(Has(cut, "plan-create-button"));
+        foreach (var secret in new[] { "Apollo", "main-repo", "hidden-token-42", "Core", "Documentation", "src/a.cs" })
+        {
+            Assert.DoesNotContain(secret, cut.Markup, StringComparison.Ordinal);
+        }
+    }
+
+    /// <summary>
+    ///     Test that a user who is no member of the project gets the same page as for a project that does not exist
+    ///     and sees nothing of the project or its repositories.
+    /// </summary>
+    [Fact]
+    public async Task PlanPage_Render_NonMember_LooksLikeAMissingProject()
+    {
+        // Arrange: a project with a repository, opened by a user who is no member
+        var projectId = await ArrangeForMemberAsync();
+        SignInAs("out", "Out", UserRole.Reviewer);
+
+        // Act
+        var cut = RenderPage(projectId);
+        var missing = RenderPage(999);
+
+        // Assert: the message is the one for a missing project and nothing of the project is shown
+        Assert.Equal(
+            TextOf(missing, "plan-project-not-found").Replace("999", "#"),
+            TextOf(cut, "plan-project-not-found").Replace(projectId.ToString(), "#"));
+        AssertNothingOfThePlanIsShown(cut);
+    }
+
+    /// <summary>
+    ///     Test that a member who loses the membership while the form is open gets the not-found page and no plan
+    ///     when asking for a plan, and that the plan is not read.
+    /// </summary>
+    [Fact]
+    public async Task PlanPage_ShowPlan_MembershipRevoked_ShowsNotFoundAndNoPlan()
+    {
+        // Arrange: a member has the form open and sees it
+        var projectId = await ArrangeForMemberAsync();
+        SignInAs("mem", "Mem", UserRole.Reviewer);
+        var cut = RenderPage(projectId);
+        Assert.True(Has(cut, "plan-form"));
+        await RevokeMembershipAsync(projectId, "mem");
+
+        // Act: ask for the plan
+        await ShowPlanAsync(cut);
+
+        // Assert
+        AssertNothingOfThePlanIsShown(cut);
+    }
+
+    /// <summary>
+    ///     Test that a member who loses the membership while a plan is shown cannot create the reviews: nothing is
+    ///     created and nothing of the plan stays in the page.
+    /// </summary>
+    [Fact]
+    public async Task PlanPage_CreateReviews_MembershipRevoked_CreatesNothing()
+    {
+        // Arrange: a member has a plan shown
+        var projectId = await ArrangeForMemberAsync();
+        SignInAs("mem", "Mem", UserRole.Reviewer);
+        var cut = RenderPage(projectId);
+        await ShowPlanAsync(cut);
+        Assert.True(Has(cut, "plan-create-button"));
+        await RevokeMembershipAsync(projectId, "mem");
+
+        // Act: create the ticked reviews
+        await cut.Find("[data-testid='plan-create-button']").ClickAsync();
+
+        // Assert: not found, nothing of the plan, and no review exists
+        AssertNothingOfThePlanIsShown(cut);
+        Assert.Empty(await Reviews.ListAsync(projectId, TestContext.Current.CancellationToken));
+    }
 }

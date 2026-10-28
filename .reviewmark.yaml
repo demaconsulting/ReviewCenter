@@ -327,6 +327,8 @@ reviews:
       - "docs/design/review-center/web.md"
       - "docs/verification/review-center/web.md"
       - "test/**/Web/WebSubsystemTests.cs"
+      - "src/**/Web/ProjectViewGuard.cs"
+      - "test/**/Web/ProjectViewGuardTests.cs"
       - "test/**/TestWebApp.cs"
 
   - id: ReviewCenter-Web-App

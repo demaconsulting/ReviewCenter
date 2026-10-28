@@ -166,3 +166,16 @@ nothing is created. This scenario is tested by `PlanPage_Create_WholeBatchRefuse
 
 **PlanPage_AfterRender_Interactive_SetsMarker**: After the first render the root element reports `true`. This scenario is
 tested by `PlanPage_AfterRender_Interactive_SetsMarker`.
+
+**PlanPage_Render_NonMember_LooksLikeAMissingProject**: A project with a repository is opened by a user who is no
+member. The not-found text equals the text for a project that does not exist (apart from the project number), and no
+form, plan, project name, repository name or set title is shown. This scenario is tested by
+`PlanPage_Render_NonMember_LooksLikeAMissingProject`.
+
+**PlanPage_ShowPlan_MembershipRevoked_ShowsNotFoundAndNoPlan**: A member has the form open and the membership is
+removed; asking for the plan shows the not-found message, and nothing of the project, the repository or a plan is in
+the markup. This scenario is tested by `PlanPage_ShowPlan_MembershipRevoked_ShowsNotFoundAndNoPlan`.
+
+**PlanPage_CreateReviews_MembershipRevoked_CreatesNothing**: A member has a plan shown and the membership is removed;
+pressing the create button shows the not-found message without the plan, and no review exists. This scenario is tested
+by `PlanPage_CreateReviews_MembershipRevoked_CreatesNothing`.

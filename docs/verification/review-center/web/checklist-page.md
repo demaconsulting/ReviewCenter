@@ -114,3 +114,16 @@ button, input, and text area of the page has a kebab-case `data-testid`. This sc
 
 **ChecklistPage_AfterRender_Interactive_SetsMarker**: The page is rendered; the root element reports interactivity.
 This scenario is tested by `ChecklistPage_AfterRender_Interactive_SetsMarker`.
+
+**ChecklistPage_Render_NonMember_LooksLikeAMissingReview**: A review is opened by a user who is no member of the
+project. The not-found text equals the text for a project that does not exist (apart from the project number), and no
+status, progress, check text, project name or review title is shown. This scenario is tested by
+`ChecklistPage_Render_NonMember_LooksLikeAMissingReview`.
+
+**ChecklistPage_Choose_MembershipRevoked_ShowsNotFoundAndNoData**: A member has the checklist open and the membership is
+removed; passing a check shows the not-found message, nothing of the checklist remains in the markup, and no answer is
+stored. This scenario is tested by `ChecklistPage_Choose_MembershipRevoked_ShowsNotFoundAndNoData`.
+
+**ChecklistPage_ToggleSection_MembershipRevoked_ShowsNotFoundAndNoData**: The same arrangement, and a section is opened,
+an action that reads no service; the access check still runs and the result is the not-found page without data. This
+scenario is tested by `ChecklistPage_ToggleSection_MembershipRevoked_ShowsNotFoundAndNoData`.

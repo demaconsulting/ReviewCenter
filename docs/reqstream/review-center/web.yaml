@@ -107,13 +107,19 @@ sections:
           a user cannot tell a hidden project from a missing one; shall let only a system administrator create
           projects and manage their members, on the project page, with a role of project admin or member for each
           member; and shall let only whoever manages a project, a system administrator or a project admin of it,
-          open its repositories, and offer in a new review only the repositories of that project.
+          open its repositories, and offer in a new review only the repositories of that project; and shall keep
+          that rule for a page that stays open, by checking the view access again at the start of every action of
+          a project page and, once the user has lost it, showing the page for a project that does not exist and
+          none of the data the page had loaded.
         justification: |
           Reviews of one body of work must not be visible to people who do not work on it, and the answer for a
           project the user may not see must not reveal that it exists. Membership is the one rule that decides what
-          a user sees, so the pages ask the Core access service instead of deciding for themselves. The subsystem
+          a user sees, so the pages ask the Core access service instead of deciding for themselves. A page that
+          stays open does not load again, so a user whose membership was removed would otherwise keep reading
+          through it; the shared ProjectViewGuard asks again at every action, and the read services need no
+          guard of their own because every page reaches them only after that check. The subsystem
           requirement is verified by the page tests of the units, which render the pages for a system administrator,
-          a member, and a user who is no member.
+          a member, and a user who is no member, and remove the membership while the page is open.
         children:
           - ReviewCenter-ProjectsPage-Visibility
           - ReviewCenter-ProjectsPage-CreateAccess
@@ -124,6 +130,10 @@ sections:
           - ReviewCenter-ProjectPage-RepositoryForm
           - ReviewCenter-RepositoriesPage-Admin
           - ReviewCenter-PlanPage-Form
+          - ReviewCenter-ReviewPage-Access
+          - ReviewCenter-ChecklistPage-Access
+          - ReviewCenter-PlanPage-Access
+          - ReviewCenter-HistoryPage-Access
         tests:
           - ProjectsPage_Render_MemberAndSystemAdmin_ListOnlyWhatEachMaySee
           - ProjectPage_Render_NonMember_LooksLikeAMissingProject
@@ -131,6 +141,15 @@ sections:
           - ProjectPage_MemberActions_ToggleRoleAndRemove_ChangeTheMembership
           - RepositoriesPage_Render_MemberOrNonMember_ShowsNotFoundOnly
           - NewReviewPage_RepositorySelect_OffersOnlyRepositoriesOfThisProject
+          - ProjectViewGuard_GuardView_Member_ReturnsTrueWithoutCallback
+          - ProjectViewGuard_GuardView_NonMember_ReturnsFalseAndCallsBackOnce
+          - ProjectViewGuard_GuardView_MembershipRemovedBetweenChecks_SecondCheckReturnsFalse
+          - ProjectViewGuard_GuardView_NobodySignedIn_ReturnsFalseAndCallsBackOnce
+          - ReviewPage_SelectFile_MembershipRevoked_ShowsNotFoundAndNoData
+          - ChecklistPage_Choose_MembershipRevoked_ShowsNotFoundAndNoData
+          - HistoryPage_Reparameterize_MembershipRevoked_ShowsNotFoundAndNoEntries
+          - PlanPage_ShowPlan_MembershipRevoked_ShowsNotFoundAndNoPlan
+          - NewReviewPage_CreateForm_MembershipRevoked_ShowsNotFoundAndCreatesNothing
 
       - id: ReviewCenter-Web-Reviews
         title: >-
@@ -269,7 +288,8 @@ sections:
           already queued when the state ended can still reach a handler of the replaced page, so every handler
           that changes something asks for the current user first, even where its service takes no actor yet. The
           component tests of the page units cover the live pages, because ending an open page needs a live
-          connection.
+          connection. On the pages of a project, the message is the one for a project that does not exist,
+          because the access check that runs first finds no signed-in user.
         children:
           - ReviewCenter-App-SessionGate
           - ReviewCenter-UsersPage-AdminCheck
@@ -278,8 +298,8 @@ sections:
           - UsersPage_Revalidation_AdminDemoted_PageShowsSessionEndedAndNoActions
           - SessionGate_Render_EveryProtectedPageSignedOut_ShowsSessionEndedAndNoPage
           - NewProjectPage_CreateForm_SessionEndedBeforePageKnows_ShowsClearErrorAndCreatesNothing
-          - NewReviewPage_CreateForm_SessionEndedBeforePageKnows_ShowsClearErrorAndCreatesNothing
-          - ReviewPage_ResolveAndReopen_SessionEndedBeforePageKnows_ShowsClearErrorAndChangesNothing
+          - NewReviewPage_CreateForm_SessionEndedBeforePageKnows_ShowsNotFoundAndCreatesNothing
+          - ReviewPage_ResolveAndReopen_SessionEndedBeforePageKnows_ShowsNotFoundAndChangesNothing
 
       - id: ReviewCenter-Web-TestIds
         title: >-

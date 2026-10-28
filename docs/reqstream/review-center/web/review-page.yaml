@@ -22,6 +22,22 @@ sections:
           - ReviewPage_Render_FileSelected_ShowsProjectNameAndHighlightsRow
           - ReviewPage_ParametersChange_OtherReview_ShowsNewReviewAndClearsSelection
 
+      - id: ReviewCenter-ReviewPage-Access
+        title: >-
+          The ReviewPage unit shall show a user who may not see the project the page for a review that does not
+          exist and none of the data of the project, and shall check the view access again at the start of every
+          action of the open page, so that a user whose membership was removed meanwhile gets that page and
+          nothing that was loaded, and an action that would change the review stores nothing.
+        justification: |
+          A page that stays open does not load again, so without a new check a removed member would keep reading
+          files, comments and checklist answers, and could keep commenting, through the open page. A hidden
+          project looks like a missing one, so the page does not reveal it either.
+        tests:
+          - ReviewPage_Render_NonMember_LooksLikeAMissingReview
+          - ReviewPage_SelectFile_MembershipRevoked_ShowsNotFoundAndNoData
+          - ReviewPage_SelectThread_MembershipRevoked_ShowsNotFoundAndNoData
+          - ReviewPage_FilterIndex_MembershipRevoked_ShowsNotFoundAndNoData
+          - ReviewPage_Reply_MembershipRevoked_ShowsNotFoundAndStoresNothing
       - id: ReviewCenter-ReviewPage-Layout
         title: >-
           The ReviewPage unit shall present the next-step line, the files, the thread index and the content of
@@ -294,7 +310,7 @@ sections:
           - ReviewPage_StartThread_WholeFile_CreatesThreadAndClearsText
           - ReviewPage_StartThread_LineRangeAndSingleLine_AnchorLines
           - ReviewPage_StartThread_InvalidInput_ShowsErrorAndKeepsValues
-          - ReviewPage_StartThread_SessionEndedBeforePageKnows_ShowsClearErrorAndStoresNothing
+          - ReviewPage_StartThread_SessionEndedBeforePageKnows_ShowsNotFoundAndStoresNothing
           - ReviewPage_StartThread_BinaryFile_WholeFileAllowedAndRangeRefused
 
       - id: ReviewCenter-ReviewPage-ThreadShow

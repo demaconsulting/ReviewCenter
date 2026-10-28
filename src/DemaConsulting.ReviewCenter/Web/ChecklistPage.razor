@@ -51,7 +51,7 @@
             <p data-testid="checklist-progress">@ProgressLine()</p>
             @if (!State.IsComplete)
             {
-                <button type="button" data-testid="next-unanswered-button" @onclick="GoToNextUnanswered">Next unanswered check</button>
+                <button type="button" data-testid="next-unanswered-button" @onclick="() => GuardedAsync(GoToNextUnanswered)">Next unanswered check</button>
             }
             else
             {
@@ -70,7 +70,7 @@
                 <li class="checklist-section" data-testid="section-@sid">
                     <h2 class="section-heading">
                         <button type="button" class="section-toggle" aria-expanded="@(isOpen ? "true" : "false")"
-                                data-testid="section-@sid-toggle" @onclick="() => ToggleSection(sectionId)">
+                                data-testid="section-@sid-toggle" @onclick="() => GuardedAsync(() => ToggleSection(sectionId))">
                             <span class="section-title"><span class="section-chevron" aria-hidden="true">@(isOpen ? "\u25BE" : "\u25B8")</span>@section.Title</span>
                             <span class="badge @(State.IsApplicable(section.Id) && progress.IsDone ? "resolved" : null)"
                                   data-testid="section-@sid-progress">@SectionProgressLabel(section.Id)</span>
@@ -165,7 +165,7 @@
                                 }
                                 else
                                 {
-                                    <p class="section-next"><button type="button" data-testid="section-@sid-next" @onclick="GoToNextUnanswered">Next unanswered check</button></p>
+                                    <p class="section-next"><button type="button" data-testid="section-@sid-next" @onclick="() => GuardedAsync(GoToNextUnanswered)">Next unanswered check</button></p>
                                 }
                             }
                         </div>

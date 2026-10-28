@@ -207,6 +207,12 @@ public partial class ReviewPage : ComponentBase, IDisposable
     private AuthenticationStateProvider AuthenticationState { get; set; } = null!;
 
     /// <summary>
+    ///     Gets or sets the project access rules that every action re-checks, supplied by dependency injection.
+    /// </summary>
+    [Inject]
+    private IProjectAccess Access { get; set; } = null!;
+
+    /// <summary>
     ///     Writes the note that tells what kind of key signs the attestation.
     /// </summary>
     /// <param name="key">The description of the signing key.</param>
@@ -482,7 +488,72 @@ public partial class ReviewPage : ComponentBase, IDisposable
     {
         // Clear the previous review before the first await so the loading state is shown, and a stale
         // review is never displayed or acted on under the new address
+        ResetState();
         Loaded = false;
+
+        // A project the user may not see is treated like a missing one: nothing of its review is loaded
+        var project = await ProjectService.GetAsync(await AuthenticationState.GetActorOrNullAsync(), ProjectId);
+        ProjectName = project?.Name;
+        Review = project is null ? null : await ReviewService.GetAsync(ProjectId, ReviewId);
+        await RefreshAsync();
+
+        // Open what the address names (a file, a line of it, or a thread); the address stays as it is
+        await ApplyAddressAsync();
+        Loaded = true;
+    }
+
+    /// <summary>
+    ///     Re-checks that the signed-in user may still view the project, at the start of an action on the open page.
+    /// </summary>
+    /// <returns>
+    ///     <c>true</c> when the action may go on; <c>false</c> when the access is gone, in which case the page has
+    ///     already dropped everything it loaded and shows the not-found state, and the action must stop.
+    /// </returns>
+    private Task<bool> GuardAsync()
+    {
+        return Access.GuardViewAsync(AuthenticationState, ProjectId, ShowNoAccess);
+    }
+
+    /// <summary>
+    ///     Runs an action that only changes what the page shows of already loaded data, after the access re-check.
+    /// </summary>
+    /// <param name="action">The action to run while the user may still view the project.</param>
+    /// <returns>A task that completes when the action has run or the page has dropped its data.</returns>
+    private async Task GuardedAsync(Action action)
+    {
+        if (await GuardAsync())
+        {
+            action();
+        }
+    }
+
+    /// <summary>
+    ///     Runs an action that loads or shows project data, after the access re-check.
+    /// </summary>
+    /// <param name="action">The action to run while the user may still view the project.</param>
+    /// <returns>A task that completes when the action has run or the page has dropped its data.</returns>
+    private async Task GuardedAsync(Func<Task> action)
+    {
+        if (await GuardAsync())
+        {
+            await action();
+        }
+    }
+
+    /// <summary>
+    ///     Drops everything loaded and shows the same "does not exist" state as for a non-member.
+    /// </summary>
+    private void ShowNoAccess()
+    {
+        ResetState();
+        Loaded = true;
+    }
+
+    /// <summary>
+    ///     Forgets the review and everything loaded or typed for it.
+    /// </summary>
+    private void ResetState()
+    {
         Review = null;
         ProjectName = null;
         SelectedPath = null;
@@ -514,16 +585,6 @@ public partial class ReviewPage : ComponentBase, IDisposable
         DeepLinkMessage = null;
         _scrollTarget = null;
         _pendingUrl = null;
-
-        // A project the user may not see is treated like a missing one: nothing of its review is loaded
-        var project = await ProjectService.GetAsync(await AuthenticationState.GetActorOrNullAsync(), ProjectId);
-        ProjectName = project?.Name;
-        Review = project is null ? null : await ReviewService.GetAsync(ProjectId, ReviewId);
-        await RefreshAsync();
-
-        // Open what the address names (a file, a line of it, or a thread); the address stays as it is
-        await ApplyAddressAsync();
-        Loaded = true;
     }
 
     /// <summary>
@@ -757,6 +818,11 @@ public partial class ReviewPage : ComponentBase, IDisposable
     /// </remarks>
     private async Task ViewFileAsync(int index)
     {
+        if (!await GuardAsync())
+        {
+            return;
+        }
+
         await SelectFileAsync(index);
         if (Review is not null && SelectedPath is not null && index >= 0 && index < Review.Files.Count)
         {
@@ -771,6 +837,11 @@ public partial class ReviewPage : ComponentBase, IDisposable
     /// <returns>A task that completes when the thread is shown.</returns>
     private async Task ViewThreadAsync(ReviewThread thread)
     {
+        if (!await GuardAsync())
+        {
+            return;
+        }
+
         await SelectThreadAsync(thread);
         _pendingUrl = ReviewLinks.ForThread(ProjectId, ReviewId, thread.Id);
     }
@@ -1210,7 +1281,7 @@ public partial class ReviewPage : ComponentBase, IDisposable
     /// </remarks>
     private async Task StartThreadAsync()
     {
-        if (SelectedPath is null)
+        if (!await GuardAsync() || SelectedPath is null)
         {
             return;
         }
@@ -1246,6 +1317,11 @@ public partial class ReviewPage : ComponentBase, IDisposable
     /// <returns>A task that completes when the reply is stored or the problem is shown.</returns>
     private async Task ReplyAsync(int threadId)
     {
+        if (!await GuardAsync())
+        {
+            return;
+        }
+
         try
         {
             await ThreadService.ReplyAsync(
@@ -1274,6 +1350,11 @@ public partial class ReviewPage : ComponentBase, IDisposable
     /// </remarks>
     private async Task ToggleThreadAsync(ReviewThread thread)
     {
+        if (!await GuardAsync())
+        {
+            return;
+        }
+
         try
         {
             // The actor is audited; asking for it also refuses an ended sign-in state
@@ -1304,6 +1385,11 @@ public partial class ReviewPage : ComponentBase, IDisposable
     /// <returns>A task that completes when the slot is stored or the problem is shown.</returns>
     private async Task AddSlotAsync()
     {
+        if (!await GuardAsync())
+        {
+            return;
+        }
+
         if (ParseUserId(NewSlotPrimary) is not { } primary)
         {
             NewSlotError = "Choose a primary reviewer.";
@@ -1334,6 +1420,11 @@ public partial class ReviewPage : ComponentBase, IDisposable
     /// <returns>A task that completes when the change is stored or the problem is shown.</returns>
     private async Task SaveSlotAsync(SlotStatus slot)
     {
+        if (!await GuardAsync())
+        {
+            return;
+        }
+
         try
         {
             if (ParseUserId(PrimaryChoice(slot)) is not { } primary)
@@ -1363,6 +1454,11 @@ public partial class ReviewPage : ComponentBase, IDisposable
     /// <returns>A task that completes when the slot is removed or the problem is shown.</returns>
     private async Task RemoveSlotAsync(int slotId)
     {
+        if (!await GuardAsync())
+        {
+            return;
+        }
+
         try
         {
             await SigningService.RemoveSlotAsync(await AuthenticationState.GetActorAsync(), ProjectId, ReviewId, slotId);
@@ -1388,6 +1484,11 @@ public partial class ReviewPage : ComponentBase, IDisposable
     /// </remarks>
     private async Task SignAsync(int slotId)
     {
+        if (!await GuardAsync())
+        {
+            return;
+        }
+
         try
         {
             await SigningService.SignAsync(

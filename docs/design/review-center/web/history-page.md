@@ -60,6 +60,12 @@ An unknown review is shown as a message and is not an error. The page handles no
 database during loading surfaces as a failed connection like for the other pages. The page shows only what the service
 returns; it cannot show a text that was never stored, and in particular never any comment text.
 
+**Access on an open page**: `OnParametersSetAsync` is the only place where the page reads data, and the page has no
+handler of its own, so it needs no `ProjectViewGuard`. The page that is already open is read again, with the actor
+from the authentication state, whenever the address (its position) changes; a user whose membership was removed meanwhile
+gets the not-found message and no entries at that point. The entries already on screen stay until the next change of
+the address, as nothing is pushed.
+
 #### Dependencies
 
 - **SessionGate** (App) — wraps the whole page content, so the page is replaced by a "Session ended" message when the

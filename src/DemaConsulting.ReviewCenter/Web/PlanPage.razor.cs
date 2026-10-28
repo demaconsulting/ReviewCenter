@@ -137,6 +137,12 @@ public partial class PlanPage : ComponentBase
     private AuthenticationStateProvider AuthenticationState { get; set; } = null!;
 
     /// <summary>
+    ///     Gets or sets the project access rules that every action re-checks, supplied by dependency injection.
+    /// </summary>
+    [Inject]
+    private IProjectAccess Access { get; set; } = null!;
+
+    /// <summary>
     ///     Gets a value indicating whether the project lookup has finished.
     /// </summary>
     private bool Loaded { get; set; }
@@ -471,6 +477,50 @@ public partial class PlanPage : ComponentBase
     }
 
     /// <summary>
+    ///     Re-checks that the signed-in user may still view the project, at the start of an action on the open page.
+    /// </summary>
+    /// <returns>
+    ///     <c>true</c> when the action may go on; <c>false</c> when the access is gone, in which case the page has
+    ///     already dropped everything it loaded and shows the not-found state, and the action must stop.
+    /// </returns>
+    private Task<bool> GuardAsync()
+    {
+        return Access.GuardViewAsync(AuthenticationState, ProjectId, ShowNoAccess);
+    }
+
+    /// <summary>
+    ///     Runs an action that only changes what the page shows of the loaded plan, after the access re-check.
+    /// </summary>
+    /// <param name="action">The action to run while the user may still view the project.</param>
+    /// <returns>A task that completes when the action has run or the page has dropped its data.</returns>
+    private async Task GuardedAsync(Action action)
+    {
+        if (await GuardAsync())
+        {
+            action();
+        }
+    }
+
+    /// <summary>
+    ///     Drops the project, its repositories, the plan and the form, and shows the same "does not exist" state
+    ///     as for a non-member.
+    /// </summary>
+    private void ShowNoAccess()
+    {
+        // A plan or create call still awaited must not touch the page (Discard moves the version on) or keep it busy
+        Busy = false;
+        Reading = false;
+        _repositoryIdText = string.Empty;
+        _headRevision = string.Empty;
+        _baselineRevision = string.Empty;
+        _mode = BaselineMode.LastReviewed;
+        Discard();
+        Project = null;
+        Repositories = [];
+        Loaded = true;
+    }
+
+    /// <summary>
     ///     Chooses how baselines are picked.
     /// </summary>
     /// <param name="mode">The baseline mode.</param>
@@ -491,6 +541,11 @@ public partial class PlanPage : ComponentBase
     /// </remarks>
     private async Task LoadPlanAsync()
     {
+        if (!await GuardAsync())
+        {
+            return;
+        }
+
         // A second submit while the first still runs (a fetch can take a while) would only repeat the work
         if (Busy)
         {
@@ -574,6 +629,11 @@ public partial class PlanPage : ComponentBase
     /// </remarks>
     private async Task CreateReviewsAsync()
     {
+        if (!await GuardAsync())
+        {
+            return;
+        }
+
         if (Busy || Plan is null || _ticked.Count == 0)
         {
             return;

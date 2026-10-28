@@ -27,6 +27,20 @@ sections:
           - PlanPage_BaselineMode_ExplicitOnly_ShowsBaselineInput
           - PlanPage_ShowPlan_IncompleteForm_SaysWhatIsMissing
 
+      - id: ReviewCenter-PlanPage-Access
+        title: >-
+          The PlanPage unit shall show a user who may not see the project the page for a project that does not
+          exist and nothing of the project, its repositories or a plan, and shall check the view access again at
+          the start of every action of the open page, so that a user whose membership was removed meanwhile gets
+          that page, no plan is read, and no review is created.
+        justification: |
+          A page that stays open does not load again, so without a new check a removed member would keep reading
+          plans from the repository and could keep creating reviews. A hidden project looks like a missing one, so
+          the page does not reveal it either.
+        tests:
+          - PlanPage_Render_NonMember_LooksLikeAMissingProject
+          - PlanPage_ShowPlan_MembershipRevoked_ShowsNotFoundAndNoPlan
+          - PlanPage_CreateReviews_MembershipRevoked_CreatesNothing
       - id: ReviewCenter-PlanPage-Summary
         title: >-
           The PlanPage unit shall show a plan as one plain summary sentence first, such as "3 sets need review, 1

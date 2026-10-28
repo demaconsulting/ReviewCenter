@@ -711,11 +711,11 @@ public class ReviewPageTests : PageTestBase
     }
 
     /// <summary>
-    ///     Test that resolving and reopening a thread after the session ended, but before the page learned of it,
-    ///     shows a clear message and leaves the thread state, and so the approval state, unchanged.
+    ///     Test that resolving a thread after the session ended, but before the page learned of it, changes nothing:
+    ///     the page leaves for the not-found page (the access check finds no user).
     /// </summary>
     [Fact]
-    public async Task ReviewPage_ResolveAndReopen_SessionEndedBeforePageKnows_ShowsClearErrorAndChangesNothing()
+    public async Task ReviewPage_ResolveAndReopen_SessionEndedBeforePageKnows_ShowsNotFoundAndChangesNothing()
     {
         // Arrange: an open thread and a resolved thread on the selected file
         var projectId = await CreateReviewAsync(new UploadedFile("a.txt", TestContent.A));
@@ -727,13 +727,12 @@ public class ReviewPageTests : PageTestBase
         await cut.Find($"[data-testid='thread-expand-{resolved.Id}']").ClickAsync();
         SignOutQuietly();
 
-        // Act: resolve the open thread, and reopen the resolved one
+        // Act: resolve the open thread
         await cut.Find($"[data-testid='thread-toggle-{open.Id}']").ClickAsync();
-        await cut.Find($"[data-testid='thread-toggle-{resolved.Id}']").ClickAsync();
 
-        // Assert: each shows why nothing was saved, and both threads keep their state
-        Assert.Contains("no longer signed in", cut.Find($"[data-testid='reply-error-{open.Id}']").TextContent, StringComparison.Ordinal);
-        Assert.Contains("no longer signed in", cut.Find($"[data-testid='reply-error-{resolved.Id}']").TextContent, StringComparison.Ordinal);
+        // Assert: the page is the not-found page, and both threads keep their state
+        Assert.NotEmpty(cut.FindAll("[data-testid='review-not-found']"));
+        Assert.Empty(cut.FindAll($"[data-testid='thread-toggle-{resolved.Id}']"));
         var stored = (await Threads.ListAsync(projectId, "REV-1", TestContext.Current.CancellationToken)).ToDictionary(thread => thread.Id);
         Assert.Equal(ReviewThreadState.Open, stored[open.Id].State);
         Assert.Equal(ReviewThreadState.Resolved, stored[resolved.Id].State);
@@ -1484,11 +1483,11 @@ public class ReviewPageTests : PageTestBase
     }
 
     /// <summary>
-    ///     Test that an action sent after the session ended, but before the page learned of it, shows a clear
-    ///     message and stores nothing, instead of failing the page.
+    ///     Test that an action sent after the session ended, but before the page learned of it, stores nothing and
+    ///     leaves the not-found page (the access check finds no user), instead of failing the page.
     /// </summary>
     [Fact]
-    public async Task ReviewPage_StartThread_SessionEndedBeforePageKnows_ShowsClearErrorAndStoresNothing()
+    public async Task ReviewPage_StartThread_SessionEndedBeforePageKnows_ShowsNotFoundAndStoresNothing()
     {
         // Arrange: a selected file with text typed, and then the session ends without the page being told
         var projectId = await CreateReviewAsync(new UploadedFile("a.txt", TestContent.A));
@@ -1500,8 +1499,9 @@ public class ReviewPageTests : PageTestBase
         // Act: the thread is started
         await cut.Find("[data-testid='new-thread-form']").SubmitAsync();
 
-        // Assert: the page shows why nothing was saved, and no thread exists
-        Assert.Contains("no longer signed in", cut.Find("[data-testid='thread-error']").TextContent, StringComparison.Ordinal);
+        // Assert: the page shows the not-found state, and no thread exists
+        Assert.NotEmpty(cut.FindAll("[data-testid='review-not-found']"));
+        Assert.Empty(cut.FindAll("[data-testid='new-thread-form']"));
         Assert.Empty(await Threads.ListAsync(projectId, "REV-1", TestContext.Current.CancellationToken));
     }
 
@@ -1649,5 +1649,172 @@ public class ReviewPageTests : PageTestBase
 
         // Assert: the download is offered
         Assert.NotNull(cut.Find("[data-testid='attestation-download-button']"));
+    }
+
+    /// <summary>
+    ///     The user name of the member whose access the revoke tests withdraw.
+    /// </summary>
+    private const string RevokedUser = "mem";
+
+    /// <summary>
+    ///     Creates a review whose every part (project name, files, comment, reviewer, checklist) carries a text that
+    ///     must never reach a user without access: <c>mem</c> is a member, <c>out</c> is not.
+    /// </summary>
+    /// <returns>The project identity and the identity of the thread on <c>b.txt</c>.</returns>
+    private async Task<(int ProjectId, int ThreadId)> CreateConfidentialReviewAsync()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var member = await Users.CreateAsync(RevokedUser, "Zelda Quill", UserRole.Reviewer, SigningPassword, cancellationToken);
+        await Users.CreateAsync("ann", "Ann", UserRole.Reviewer, SigningPassword, cancellationToken);
+        var projectId = await CreateReviewAsync(
+            new UploadedFile("a.txt", "alpha-confidential\n"u8.ToArray()),
+            new UploadedFile("b.txt", "bravo-confidential\n"u8.ToArray()));
+        await Users.CreateAsync("out", "Out", UserRole.Reviewer, SigningPassword, cancellationToken);
+        var thread = await Threads.StartThreadAsync(
+            projectId, "REV-1", "b.txt", 1, 1, TestActors.Ann, "confidential-thread-comment", cancellationToken);
+        await AddReviewerSlotAsync(projectId, member.Id);
+        var item = DefaultChecklist.Current.Sections.SelectMany(section => section.Items).First();
+        await Checklists.SetAnswerAsync(projectId, "REV-1", item.Id, ChecklistOutcome.Pass, null, TestActors.Ann, cancellationToken);
+        return (projectId, thread.Id);
+    }
+
+    /// <summary>
+    ///     Gives the review a reviewer slot, so that the name of a user is part of what the page shows.
+    /// </summary>
+    /// <param name="projectId">The project identity.</param>
+    /// <param name="userId">The identity of the user who occupies the slot.</param>
+    /// <returns>A task that completes when the slot exists.</returns>
+    private async Task AddReviewerSlotAsync(int projectId, int userId)
+    {
+        await Signing.AddSlotAsync(TestActors.Ann, projectId, "REV-1", userId, null, TestContext.Current.CancellationToken);
+    }
+
+    /// <summary>
+    ///     Asserts that the page shows only the not-found message and nothing of the project, the review, its files,
+    ///     comments, reviewers or checklist.
+    /// </summary>
+    /// <param name="cut">The rendered page.</param>
+    private static void AssertNothingOfTheReviewIsShown(IRenderedComponent<ReviewPage> cut)
+    {
+        Assert.NotEmpty(cut.FindAll("[data-testid='review-not-found']"));
+        Assert.Empty(cut.FindAll("[data-testid='review-fingerprint']"));
+        Assert.Empty(cut.FindAll("[data-testid='selected-file-path']"));
+        foreach (var secret in new[]
+                 {
+                     "Apollo", "First review", "a.txt", "b.txt", "alpha-confidential", "bravo-confidential",
+                     "confidential-thread-comment", "Zelda Quill", "checks answered"
+                 })
+        {
+            Assert.DoesNotContain(secret, cut.Markup, StringComparison.Ordinal);
+        }
+    }
+
+    /// <summary>
+    ///     Test that a user who is no member of the project gets the same page as for a review that does not exist and
+    ///     sees nothing of the review.
+    /// </summary>
+    [Fact]
+    public async Task ReviewPage_Render_NonMember_LooksLikeAMissingReview()
+    {
+        // Arrange: a confidential review, opened by a user who is no member
+        var (projectId, _) = await CreateConfidentialReviewAsync();
+        SignInAs("out", "Out", UserRole.Reviewer);
+
+        // Act
+        var cut = RenderPage(projectId);
+        var missing = RenderPage(999);
+
+        // Assert: the message is the one for a missing project and nothing of the review is shown
+        Assert.Equal(
+            missing.Find("[data-testid='review-not-found']").TextContent.Replace("project 999", "project #"),
+            cut.Find("[data-testid='review-not-found']").TextContent.Replace($"project {projectId}", "project #"));
+        AssertNothingOfTheReviewIsShown(cut);
+    }
+
+    /// <summary>
+    ///     Test that a member who loses the membership while the review is open sees nothing of the review when
+    ///     choosing a file: the file is not read and what was loaded is dropped.
+    /// </summary>
+    [Fact]
+    public async Task ReviewPage_SelectFile_MembershipRevoked_ShowsNotFoundAndNoData()
+    {
+        // Arrange: the member has the review open and sees it
+        var (projectId, _) = await CreateConfidentialReviewAsync();
+        SignInAs(RevokedUser, "Zelda Quill", UserRole.Reviewer);
+        var cut = RenderPage(projectId);
+        Assert.Contains("b.txt", cut.Markup, StringComparison.Ordinal);
+        await RevokeMembershipAsync(projectId, RevokedUser);
+
+        // Act: choose the second file
+        await cut.Find("[data-testid='file-select-1']").ClickAsync();
+
+        // Assert: the page is the not-found page and holds none of the data
+        AssertNothingOfTheReviewIsShown(cut);
+    }
+
+    /// <summary>
+    ///     Test that a member who loses the membership while the review is open sees nothing of the review when
+    ///     choosing a thread of the index.
+    /// </summary>
+    [Fact]
+    public async Task ReviewPage_SelectThread_MembershipRevoked_ShowsNotFoundAndNoData()
+    {
+        // Arrange: the member has the review open and sees the thread in the index
+        var (projectId, threadId) = await CreateConfidentialReviewAsync();
+        SignInAs(RevokedUser, "Zelda Quill", UserRole.Reviewer);
+        var cut = RenderPage(projectId);
+        Assert.NotEmpty(cut.FindAll($"[data-testid='index-row-{threadId}']"));
+        await RevokeMembershipAsync(projectId, RevokedUser);
+
+        // Act: choose the thread
+        await cut.Find($"[data-testid='index-row-{threadId}']").ClickAsync();
+
+        // Assert
+        AssertNothingOfTheReviewIsShown(cut);
+    }
+
+    /// <summary>
+    ///     Test that a view-only action (filtering the thread index) of an open page also re-checks the access, so the
+    ///     data that was loaded disappears at the first interaction after the removal.
+    /// </summary>
+    [Fact]
+    public async Task ReviewPage_FilterIndex_MembershipRevoked_ShowsNotFoundAndNoData()
+    {
+        // Arrange: the member has the review open
+        var (projectId, _) = await CreateConfidentialReviewAsync();
+        SignInAs(RevokedUser, "Zelda Quill", UserRole.Reviewer);
+        var cut = RenderPage(projectId);
+        await RevokeMembershipAsync(projectId, RevokedUser);
+
+        // Act: show all threads
+        await cut.Find("[data-testid='index-filter-all']").ClickAsync();
+
+        // Assert
+        AssertNothingOfTheReviewIsShown(cut);
+    }
+
+    /// <summary>
+    ///     Test that a reply posted after the membership was removed is refused, stores nothing and leaves only the
+    ///     not-found page.
+    /// </summary>
+    [Fact]
+    public async Task ReviewPage_Reply_MembershipRevoked_ShowsNotFoundAndStoresNothing()
+    {
+        // Arrange: the member has the file selected and has typed a reply
+        var (projectId, threadId) = await CreateConfidentialReviewAsync();
+        SignInAs(RevokedUser, "Zelda Quill", UserRole.Reviewer);
+        var cut = RenderPage(projectId);
+        await cut.Find("[data-testid='file-select-1']").ClickAsync();
+        await cut.Find($"[data-testid='reply-text-{threadId}']").InputAsync("late reply");
+        await RevokeMembershipAsync(projectId, RevokedUser);
+
+        // Act: post the reply
+        await cut.Find($"[data-testid='reply-button-{threadId}']").ClickAsync();
+
+        // Assert: nothing is shown, and the thread still has its one comment
+        AssertNothingOfTheReviewIsShown(cut);
+        Assert.DoesNotContain("late reply", cut.Markup, StringComparison.Ordinal);
+        var stored = Assert.Single(await Threads.ListAsync(projectId, "REV-1", TestContext.Current.CancellationToken));
+        Assert.Single(stored.Comments);
     }
 }

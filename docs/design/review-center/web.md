@@ -288,6 +288,39 @@ The page contains no membership rules; every refusal comes from `ProjectService`
 list. The reviewer slots of `ReviewPage` offer only the members of the project, from
 `SigningService.ListCandidatesAsync(actor, projectId)`.
 
+#### Access on an open page
+
+The access above is decided when a page loads. A page that stays open does not load again, so a user whose membership
+was removed meanwhile would keep reading through it: the files, comments, checklist answers, and plans that the page
+loads from the services in its handlers, and the data already in its component state. The pages of a project therefore
+ask again, at the start of every handler of the open circuit, with one shared helper,
+`ProjectViewGuard.GuardViewAsync` (an extension of `IProjectAccess`): it reads the actor from the authentication state
+and returns whether `IProjectAccess.CanViewAsync` allows that actor to see the project; when it does not, it runs a
+callback of the page, which resets the component state (so that no loaded data is kept) and shows the same not-found
+page as for a project the user may not see. Nobody being signed in is treated as no access. The handler then returns
+without calling a service, so nothing is read and nothing is stored.
+
+The guard is the first statement of the handlers that call a service or read data: `ReviewPage` (view file, view
+thread, start thread, reply, resolve or reopen, add, save and remove slot, and sign), `ChecklistPage` (answer, save,
+and the not-applicable switch), `PlanPage` (show plan and create reviews), and `NewReviewPage` (create the review).
+The handlers that only change what is shown (the thread filter, expanding a thread, the diff, head, and baseline views,
+the open section of the checklist, the next unanswered check, the mode and ticks of `PlanPage`, and the source choice
+of `NewReviewPage`) are wrapped at their binding in the Razor file by the page's `GuardedAsync`, so the first
+interaction after a removal also drops the data. `HistoryPage` has no handler: its
+`OnParametersSetAsync`, which asks `ProjectService.GetAsync(actor, id)` before it reads anything, runs again for every
+new address, which is its one check. `ProjectPage` and the administration pages already re-check, as described above.
+Three handlers are left unguarded on purpose because they show no project data: cancelling a comment form,
+copying a thread link, and reading the file names of a browser selection.
+
+The Core read services (`ReviewService.GetFileContentAsync` and the like) keep their signatures and take no actor:
+every page reaches them only after the guard, so a second check inside them would only repeat it, and the services
+that change something already require the actor to see the project. The limits are these. A removal that lands between
+the check and the end of a single handler is not caught; the handler finishes with the access it had. There is no push
+to the browser: what is already in the page stays visible until the user's next interaction, which then drops it. The
+sign-in state of the page ends separately and at once (see *Open pages and the end of a session*); for a project page
+that ended state also reads as no access, so the guard shows the not-found page where an action of the ended session
+was refused with a message before.
+
 #### Open pages and the end of a session
 
 Each protected page opts in to interactive rendering on its own, so each page is a root component of its own live

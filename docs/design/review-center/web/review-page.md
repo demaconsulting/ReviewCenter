@@ -365,10 +365,22 @@ that change something without a service that takes an actor (resolving and reope
 for the same reason. The page
 raises no other errors of its own.
 
+**Access re-check**: Every handler that reads or stores something starts with `GuardAsync`, which asks
+`ProjectViewGuard.GuardViewAsync` whether the signed-in user may still see the project (`ShowNoAccess` is the callback).
+The view-only handlers (thread filter, expanding a thread, the diff, head, and baseline views, and the comment
+buttons) are wrapped at their binding by `GuardedAsync`; cancelling a comment and copying a thread link show no project
+data and are not guarded. When access is lost, `ShowNoAccess` resets the component state exactly as a change of address
+does (review, project name, files, selection, threads, checklist progress, approval, candidates, and the forms), shows
+the same message as for a review that does not exist, and the handler returns without calling a service. An ended
+sign-in state (nobody signed in) counts as no access, so the message replaces the "no longer signed in" message on this
+page.
+
 #### Dependencies
 
 - **SessionGate** (App) — wraps the whole page content, so the page is replaced by a "Session ended" message when the
   sign-in state of the open page ends.
+- **IProjectAccess** (Core) — through `ProjectViewGuard`, asked before every handler whether the user may still see the
+  project.
 - **ReviewService** — reads the review, the head and baseline bytes of a file, and the comparison of a file
   (`GetDiffAsync`).
 - **DiffView** — draws the Diff view; it is a part of this unit.

@@ -51,3 +51,14 @@ tested by `HistoryPage_Render_ExistingReview_LinksBackToTheReview`; the link fro
 **Routes_Render_NobodySignedInOpensHistoryRoute_DoesNotShowEntries**: Nobody is signed in and the history address is
 opened; the page is not rendered and no entry is shown. This scenario is tested by
 `Routes_Render_NobodySignedInOpensHistoryRoute_DoesNotShowEntries`.
+
+**HistoryPage_Render_NonMember_LooksLikeAMissingReview**: A review with an entry is opened by a user who is no member of
+the project. The not-found text equals the text for a project that does not exist (apart from the project number), and
+no table, project name, review title, entry or actor is shown. This scenario is tested by
+`HistoryPage_Render_NonMember_LooksLikeAMissingReview`.
+
+**HistoryPage_Reparameterize_MembershipRevoked_ShowsNotFoundAndNoEntries**: A member has the history open, and the
+membership is removed; the page is given new parameters (the address moves to another position). It loads again,
+shows the not-found message, and none of the entries, the project name or the review title remains. The page has no
+other action, so this is the one point at which an open history page reads. This scenario is tested by
+`HistoryPage_Reparameterize_MembershipRevoked_ShowsNotFoundAndNoEntries`.

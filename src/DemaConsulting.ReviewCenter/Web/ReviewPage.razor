@@ -252,11 +252,11 @@
             <h2>Threads</h2>
             <div class="index-filters" role="group" aria-label="Filter threads" data-testid="thread-summary">
                 <button type="button" class="secondary" aria-pressed="@(IndexFilter is null ? "true" : "false")"
-                        data-testid="index-filter-all" @onclick="() => SetFilter(null)">All (<span data-testid="threads-all-count">@Threads.Count</span>)</button>
+                        data-testid="index-filter-all" @onclick="() => GuardedAsync(() => SetFilter(null))">All (<span data-testid="threads-all-count">@Threads.Count</span>)</button>
                 <button type="button" class="secondary" aria-pressed="@(IndexFilter == ReviewThreadState.Open ? "true" : "false")"
-                        data-testid="index-filter-open" @onclick="() => SetFilter(ReviewThreadState.Open)">Open (<span data-testid="threads-open-count">@Threads.Count(t => t.State == ReviewThreadState.Open)</span>)</button>
+                        data-testid="index-filter-open" @onclick="() => GuardedAsync(() => SetFilter(ReviewThreadState.Open))">Open (<span data-testid="threads-open-count">@Threads.Count(t => t.State == ReviewThreadState.Open)</span>)</button>
                 <button type="button" class="secondary" aria-pressed="@(IndexFilter == ReviewThreadState.Resolved ? "true" : "false")"
-                        data-testid="index-filter-resolved" @onclick="() => SetFilter(ReviewThreadState.Resolved)">Resolved (<span data-testid="threads-resolved-count">@Threads.Count(t => t.State == ReviewThreadState.Resolved)</span>)</button>
+                        data-testid="index-filter-resolved" @onclick="() => GuardedAsync(() => SetFilter(ReviewThreadState.Resolved))">Resolved (<span data-testid="threads-resolved-count">@Threads.Count(t => t.State == ReviewThreadState.Resolved)</span>)</button>
             </div>
             @{
                 var indexRows = ThreadService.BuildIndex(Threads, IndexFilter);
@@ -337,7 +337,7 @@
                         <button type="button" class="secondary" data-testid="thread-expand-@threadId"
                                 aria-expanded="@(expanded ? "true" : "false")"
                                 aria-label="@(expanded ? "Collapse" : "Expand") thread @threadId"
-                                @onclick="() => ToggleThreadExpanded(threadId)">@(expanded ? "Collapse" : "Expand")</button>
+                                @onclick="() => GuardedAsync(() => ToggleThreadExpanded(threadId))">@(expanded ? "Collapse" : "Expand")</button>
                     }
                     @if (expanded)
                     {
@@ -419,7 +419,7 @@
                     @if (inlineComposer)
                     {
                         <button type="button" class="secondary" data-testid="thread-cancel-button" @onclick="CancelComment">Cancel</button>
-                        <button type="button" class="secondary" data-testid="thread-whole-file-button" @onclick="CommentOnWholeFile">Comment on the whole file instead</button>
+                        <button type="button" class="secondary" data-testid="thread-whole-file-button" @onclick="() => GuardedAsync(CommentOnWholeFile)">Comment on the whole file instead</button>
                     }
                 </div>
             </form>;
@@ -437,16 +437,16 @@
                 {
                     <div class="index-filters" role="group" aria-label="Which version of the file to show" data-testid="file-version-toggle">
                         <button type="button" class="secondary" aria-pressed="@(ShowingDiff ? "true" : "false")"
-                                data-testid="view-diff-button" @onclick="ShowDiff">Diff</button>
+                                data-testid="view-diff-button" @onclick="() => GuardedAsync(ShowDiff)">Diff</button>
                         @if (HasHeadVersion)
                         {
                             <button type="button" class="secondary" aria-pressed="@(CurrentView == FileView.Head ? "true" : "false")"
-                                    data-testid="view-head-button" @onclick="ShowHead">Head</button>
+                                    data-testid="view-head-button" @onclick="() => GuardedAsync(ShowHead)">Head</button>
                         }
                         @if (HasBaselineVersion)
                         {
                             <button type="button" class="secondary" aria-pressed="@(BaselineView ? "true" : "false")"
-                                    data-testid="view-baseline-button" @onclick="ShowBaselineAsync">Baseline</button>
+                                    data-testid="view-baseline-button" @onclick="() => GuardedAsync(ShowBaselineAsync)">Baseline</button>
                         }
                     </div>
                 }
@@ -464,11 +464,11 @@
                             <div class="index-filters">
                                 @if (HasHeadVersion)
                                 {
-                                    <button type="button" class="secondary" data-testid="diff-too-large-head" @onclick="ShowHead">Show the Head version</button>
+                                    <button type="button" class="secondary" data-testid="diff-too-large-head" @onclick="() => GuardedAsync(ShowHead)">Show the Head version</button>
                                 }
                                 @if (HasBaselineVersion)
                                 {
-                                    <button type="button" class="secondary" data-testid="diff-too-large-baseline" @onclick="ShowBaselineAsync">Show the Baseline version</button>
+                                    <button type="button" class="secondary" data-testid="diff-too-large-baseline" @onclick="() => GuardedAsync(ShowBaselineAsync)">Show the Baseline version</button>
                                 }
                             </div>
                         </div>
@@ -486,7 +486,7 @@
                                   SelectedEnd="composerRange?.End"
                                   ThreadTemplate="threadCard"
                                   Composer="newThreadForm"
-                                  OnComment="CommentOnDiffLine" />
+                                  OnComment="request => GuardedAsync(() => CommentOnDiffLine(request))" />
                     }
                 }
                 else if (BaselineView)
@@ -533,7 +533,7 @@
                                 <span class="gutter">
                                     <button type="button" class="line-comment" data-testid="line-comment-@number"
                                             aria-label="Comment on line @number" title="Comment on line @number"
-                                            @onclick="() => CommentOnLine(lineNumber)">+</button>
+                                            @onclick="() => GuardedAsync(() => CommentOnLine(lineNumber))">+</button>
                                     <span class="line-no" data-testid="line-no-@number">@number</span>
                                     <span class="line-marker">
                                         @if (startCounts.TryGetValue(number, out var markerCount))

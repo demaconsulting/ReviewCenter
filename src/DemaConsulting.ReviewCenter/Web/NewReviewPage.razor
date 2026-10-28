@@ -58,14 +58,14 @@
                     <div class="option-cards">
                         <label class="option-card">
                             <input type="radio" name="review-source" checked="@(!FromRepository)"
-                                   data-testid="source-upload-radio" @onchange="() => ChooseSource(false)" />
+                                   data-testid="source-upload-radio" @onchange="() => GuardedAsync(() => ChooseSource(false))" />
                             <span class="option-title">Upload files</span>
                             <span class="option-text">Choose files from your computer.</span>
                         </label>
                         <label class="option-card">
                             <input type="radio" name="review-source" checked="@FromRepository"
                                    disabled="@(Repositories.Count == 0)"
-                                   data-testid="source-repository-radio" @onchange="() => ChooseSource(true)" />
+                                   data-testid="source-repository-radio" @onchange="() => GuardedAsync(() => ChooseSource(true))" />
                             <span class="option-title">From a repository</span>
                             <span class="option-text">Compare a revision of a registered git repository.</span>
                         </label>

@@ -98,6 +98,12 @@ public partial class ChecklistPage : ComponentBase
     private AuthenticationStateProvider AuthenticationState { get; set; } = null!;
 
     /// <summary>
+    ///     Gets or sets the project access rules that every action re-checks, supplied by dependency injection.
+    /// </summary>
+    [Inject]
+    private IProjectAccess Access { get; set; } = null!;
+
+    /// <summary>
     ///     Gets the name of the owning project shown in the breadcrumb, or <c>null</c> when it is unknown.
     /// </summary>
     private string? ProjectName { get; set; }
@@ -170,7 +176,59 @@ public partial class ChecklistPage : ComponentBase
     {
         // Clear the previous review before the first await so the loading state is shown, and a stale
         // checklist is never displayed or acted on under the new address
+        ResetState();
         Loaded = false;
+
+        // A project the user may not see is treated like a missing one: nothing of its review is loaded
+        var project = await ProjectService.GetAsync(await AuthenticationState.GetActorOrNullAsync(), ProjectId);
+        ProjectName = project?.Name;
+        Review = project is null ? null : await ReviewService.GetAsync(ProjectId, ReviewId);
+        State = project is null ? null : await ChecklistService.GetAsync(ProjectId, ReviewId);
+
+        // Start where the work is: the first section with unanswered checks
+        OpenSectionId = State?.FirstIncompleteSectionId();
+        Loaded = true;
+    }
+
+    /// <summary>
+    ///     Re-checks that the signed-in user may still view the project, at the start of an action on the open page.
+    /// </summary>
+    /// <returns>
+    ///     <c>true</c> when the action may go on; <c>false</c> when the access is gone, in which case the page has
+    ///     already dropped everything it loaded and shows the not-found state, and the action must stop.
+    /// </returns>
+    private Task<bool> GuardAsync()
+    {
+        return Access.GuardViewAsync(AuthenticationState, ProjectId, ShowNoAccess);
+    }
+
+    /// <summary>
+    ///     Runs an action that only changes what the page shows of the loaded checklist, after the access re-check.
+    /// </summary>
+    /// <param name="action">The action to run while the user may still view the project.</param>
+    /// <returns>A task that completes when the action has run or the page has dropped its data.</returns>
+    private async Task GuardedAsync(Action action)
+    {
+        if (await GuardAsync())
+        {
+            action();
+        }
+    }
+
+    /// <summary>
+    ///     Drops everything loaded and shows the same "does not exist" state as for a non-member.
+    /// </summary>
+    private void ShowNoAccess()
+    {
+        ResetState();
+        Loaded = true;
+    }
+
+    /// <summary>
+    ///     Forgets the review, its checklist and everything typed for it.
+    /// </summary>
+    private void ResetState()
+    {
         Review = null;
         State = null;
         ProjectName = null;
@@ -182,16 +240,6 @@ public partial class ChecklistPage : ComponentBase
         ReasonTexts.Clear();
         SectionErrors.Clear();
         _scrollTarget = null;
-
-        // A project the user may not see is treated like a missing one: nothing of its review is loaded
-        var project = await ProjectService.GetAsync(await AuthenticationState.GetActorOrNullAsync(), ProjectId);
-        ProjectName = project?.Name;
-        Review = project is null ? null : await ReviewService.GetAsync(ProjectId, ReviewId);
-        State = project is null ? null : await ChecklistService.GetAsync(ProjectId, ReviewId);
-
-        // Start where the work is: the first section with unanswered checks
-        OpenSectionId = State?.FirstIncompleteSectionId();
-        Loaded = true;
     }
 
     /// <summary>
@@ -273,6 +321,11 @@ public partial class ChecklistPage : ComponentBase
     /// </remarks>
     private async Task SetApplicableAsync(string sectionId, bool applicable)
     {
+        if (!await GuardAsync())
+        {
+            return;
+        }
+
         SectionErrors.Remove(sectionId);
         if (!applicable)
         {
@@ -297,6 +350,11 @@ public partial class ChecklistPage : ComponentBase
     /// <returns>A task that completes when the section is stored or the problem is shown.</returns>
     private async Task SaveNotApplicableAsync(string sectionId)
     {
+        if (!await GuardAsync())
+        {
+            return;
+        }
+
         if (await SaveSectionAsync(sectionId, applicable: false, ReasonText(sectionId)))
         {
             PendingNotApplicable.Remove(sectionId);
@@ -312,6 +370,11 @@ public partial class ChecklistPage : ComponentBase
     /// <returns>A task that completes when the answer is stored or the choice is noted.</returns>
     private async Task ChooseAsync(string itemId, ChecklistOutcome outcome)
     {
+        if (!await GuardAsync())
+        {
+            return;
+        }
+
         ItemErrors.Remove(itemId);
         if (outcome == ChecklistOutcome.Pass)
         {
@@ -338,6 +401,11 @@ public partial class ChecklistPage : ComponentBase
     /// <returns>A task that completes when the answer is stored or the problem is shown.</returns>
     private async Task SaveAsync(string itemId)
     {
+        if (!await GuardAsync())
+        {
+            return;
+        }
+
         if (ShownOutcome(itemId) is { } outcome)
         {
             await SaveAnswerAsync(itemId, outcome, JustificationText(itemId));

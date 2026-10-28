@@ -163,6 +163,13 @@ A `DomainRuleException` from `ReviewService`, or from the check of the current u
 and its message shown in the page. A selection that breaks an upload limit is shown as an error message. Other
 exceptions are not handled by the pages.
 
+**Access re-check (`NewReviewPage`)**: The creation of the review, and the choice of the source, start with
+`GuardAsync`, which asks `ProjectViewGuard.GuardViewAsync` whether the signed-in user may still see the project. When
+access is lost, `ShowNoAccess` clears the project, the repositories, the form, and the result, and shows the same message
+as for a project that does not exist; no review is created. An ended sign-in state counts as no access, so this message
+replaces the "no longer signed in" message on this page. `ProjectPage` already re-checks as described in the design of
+the subsystem.
+
 #### Dependencies
 
 - **SessionGate** (App) — wraps the whole content of each page, so the page is replaced by a "Session ended" message
@@ -173,7 +180,7 @@ exceptions are not handled by the pages.
   the plan link and for the drop-down.
 - **UserService** — lists the users that can be added as members (`ProjectPage`).
 - **IProjectAccess** (Core) — tells whether the user is a system administrator and whether the user manages the project
-  (`ProjectPage`).
+  (`ProjectPage`), and, through `ProjectViewGuard`, whether the user may still see the project (`NewReviewPage`).
 - **SigningService** — computes whether each review is approved (`ProjectPage`).
 - **ReviewLimits** (Core) — the upload limits.
 - **ASP.NET Core Blazor components** — the component base class, file input, navigation, the authorization

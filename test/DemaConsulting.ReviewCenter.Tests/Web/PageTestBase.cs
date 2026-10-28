@@ -32,6 +32,8 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging.Abstractions;
 
+using TestContext = Xunit.TestContext;
+
 namespace DemaConsulting.ReviewCenter.Tests.Web;
 
 /// <summary>
@@ -271,6 +273,20 @@ public abstract class PageTestBase : BunitContext
     protected void SignOutQuietly()
     {
         _authentication.SignOutQuietly();
+    }
+
+    /// <summary>
+    ///     Removes the membership of a user in a project, as an administrator would while the user still has a page open.
+    /// </summary>
+    /// <param name="projectId">The project identity.</param>
+    /// <param name="username">The user name of the member to remove; the user must exist.</param>
+    /// <returns>A task that completes when the membership is gone.</returns>
+    protected async Task RevokeMembershipAsync(int projectId, string username)
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var user = await UserStore.GetByUsernameAsync(username, cancellationToken)
+                   ?? throw new InvalidOperationException($"The user '{username}' does not exist.");
+        await Store.RemoveMembershipAsync(projectId, user.Id, AuditTestExtensions.Draft(), cancellationToken);
     }
 
     /// <summary>

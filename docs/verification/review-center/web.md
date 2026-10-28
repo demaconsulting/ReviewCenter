@@ -180,6 +180,20 @@ are tested by `ProjectPage_AddMember_ChosenUser_BecomesMemberWithTheRole` and
 `ProjectPage_MemberActions_ToggleRoleAndRemove_ChangeTheMembership`. The review creation form offers only the
 repositories of its project, which is tested by `NewReviewPage_RepositorySelect_OffersOnlyRepositoriesOfThisProject`.
 
+**Access on an open page**: The pages of a project check the view access again at the start of every action, through
+`ProjectViewGuard`. The guard is tested directly by `ProjectViewGuard_GuardView_Member_ReturnsTrueWithoutCallback`,
+`ProjectViewGuard_GuardView_NonMember_ReturnsFalseAndCallsBackOnce`,
+`ProjectViewGuard_GuardView_MembershipRemovedBetweenChecks_SecondCheckReturnsFalse` and
+`ProjectViewGuard_GuardView_NobodySignedIn_ReturnsFalseAndCallsBackOnce`. On the pages, a member opens the page, the
+membership is removed in the store, and an action is triggered; the page then shows the page for a missing project and
+none of the data it had loaded, which is tested by `ReviewPage_SelectFile_MembershipRevoked_ShowsNotFoundAndNoData`,
+`ChecklistPage_Choose_MembershipRevoked_ShowsNotFoundAndNoData`,
+`HistoryPage_Reparameterize_MembershipRevoked_ShowsNotFoundAndNoEntries`,
+`PlanPage_ShowPlan_MembershipRevoked_ShowsNotFoundAndNoPlan` and
+`NewReviewPage_CreateForm_MembershipRevoked_ShowsNotFoundAndCreatesNothing`; the other actions are covered in the
+verification of each page. A revocation that lands inside a single action, after its check, and data that is already in
+the browser until the next action are not covered; the rule is checked per action, not pushed to the browser.
+
 **Audit pages**: The history and audit pages are verified by their unit tests, which render them with the component
 test host. The history page shows only the entries of its review, newest first, which is tested by
 `HistoryPage_Render_ReviewWithEntries_ShowsOnlyItsEntriesNewestFirst`; a visitor who is not signed in does not get

@@ -121,10 +121,19 @@ uniqueness on the set, the head, and the baseline, so two users (or two tabs) wh
 instant can both succeed; the second review gets the identifier suffix `-2`. The page also passes no cancellation token,
 so when a circuit is closed a running read finishes until the git timeout.
 
+**Access re-check**: Showing the plan and creating the reviews start with `GuardAsync`, which asks
+`ProjectViewGuard.GuardViewAsync` whether the signed-in user may still see the project; the mode choice and the ticks
+are wrapped at their binding by `GuardedAsync`. When access is lost, `ShowNoAccess` ends any read or creation in flight
+(the version of the form is advanced, so a late result is ignored), clears the form, the plan, the results, and the
+project and its repositories, and shows the same message as for a project that does not exist. No plan is read and no
+review is created. The text boxes of the form only discard the plan and show no project data, so they are not guarded.
+
 #### Dependencies
 
 - **SessionGate** (App) — wraps the whole page content, so the page is replaced by a "Session ended" message when the
   sign-in state of the open page ends.
+- **IProjectAccess** (Core) — through `ProjectViewGuard`, asked before every handler whether the user may still see the
+  project.
 - **ProjectService** — reads the project for the signed-in user.
 - **RepositoryService** — lists the enabled repositories of the project (names only).
 - **ReviewPlanner** (Core) — makes the plan and creates the reviews.

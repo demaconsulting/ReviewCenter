@@ -156,10 +156,15 @@ submitted; the review is stored with the title, the fingerprint of the files, an
 browser is sent to the review page. This scenario is tested by
 `NewReviewPage_CreateForm_ValidInput_CreatesReviewAndNavigatesToIt`.
 
-**NewReviewPage_CreateForm_SessionEndedBeforePageKnows_ShowsClearErrorAndCreatesNothing**: Files are chosen and a
-title is entered, and the sign-in state ends without the page being told; the form is submitted. An error says that
-the user is no longer signed in, and no review is stored. This scenario is tested by
-`NewReviewPage_CreateForm_SessionEndedBeforePageKnows_ShowsClearErrorAndCreatesNothing`.
+**NewReviewPage_CreateForm_SessionEndedBeforePageKnows_ShowsNotFoundAndCreatesNothing**: Files are chosen and a
+title is entered, and the sign-in state ends without the page being told; the form is submitted. The access check
+finds no signed-in user, so the page for a project that does not exist replaces the form, and no review is stored.
+This scenario is tested by `NewReviewPage_CreateForm_SessionEndedBeforePageKnows_ShowsNotFoundAndCreatesNothing`.
+
+**NewReviewPage_CreateForm_MembershipRevoked_ShowsNotFoundAndCreatesNothing**: A member has the filled-in form open and
+the membership is removed; submitting shows the page for a project that does not exist, without the project name or
+the form, and no review is stored. This scenario is tested by
+`NewReviewPage_CreateForm_MembershipRevoked_ShowsNotFoundAndCreatesNothing`.
 
 **NewReviewPage_CreateForm_NoFiles_ShowsErrorAndCreatesNothing**: The form is submitted without files; an error that
 mentions files is shown and no review is stored. This scenario is tested by

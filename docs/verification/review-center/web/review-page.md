@@ -491,16 +491,40 @@ within the limit of 10 seconds the "Session ended" message appears, and the page
 button, and the typed text are gone. Submitting the stale thread form and sign form stores no thread and no signature.
 This scenario is tested by `ReviewPage_Revalidation_UserDisabled_PageStopsShowingAndAcceptingActions`.
 
-**ReviewPage_StartThread_SessionEndedBeforePageKnows_ShowsClearErrorAndStoresNothing**: A file is selected and text is
-typed, and the sign-in state ends without the page being told; the thread form is submitted. The thread error says
-that the user is no longer signed in, and no thread exists. This scenario is tested by
-`ReviewPage_StartThread_SessionEndedBeforePageKnows_ShowsClearErrorAndStoresNothing`.
+**ReviewPage_StartThread_SessionEndedBeforePageKnows_ShowsNotFoundAndStoresNothing**: A file is selected and text is
+typed, and the sign-in state ends without the page being told; the thread form is submitted. The access check that
+starts the handler finds no signed-in user, so the not-found message replaces the page, the thread form is gone, and
+no thread exists. This scenario is tested by
+`ReviewPage_StartThread_SessionEndedBeforePageKnows_ShowsNotFoundAndStoresNothing`.
 
-**ReviewPage_ResolveAndReopen_SessionEndedBeforePageKnows_ShowsClearErrorAndChangesNothing**: An open thread and a
-resolved thread are shown, and the sign-in state ends without the page being told; resolving the first and reopening
-the second are both attempted. Each thread shows the message that the user is no longer signed in, and both threads
-keep their stored state, so the approval state cannot be changed. This scenario is tested by
-`ReviewPage_ResolveAndReopen_SessionEndedBeforePageKnows_ShowsClearErrorAndChangesNothing`.
+**ReviewPage_ResolveAndReopen_SessionEndedBeforePageKnows_ShowsNotFoundAndChangesNothing**: An open thread and a
+resolved thread are shown, and the sign-in state ends without the page being told; resolving the open thread is
+attempted. The not-found message replaces the page, no thread control remains, and both threads keep their stored
+state, so the approval state cannot be changed. This scenario is tested by
+`ReviewPage_ResolveAndReopen_SessionEndedBeforePageKnows_ShowsNotFoundAndChangesNothing`.
+
+**ReviewPage_Render_NonMember_LooksLikeAMissingReview**: A review with distinctive file content, a comment, a
+reviewer name and a checklist answer is opened by a user who is no member of the project. The not-found text equals the
+text for a project that does not exist (apart from the project number), and none of the project name, review title,
+file names, file content, comment, reviewer name or checklist progress is in the markup. This scenario is tested by
+`ReviewPage_Render_NonMember_LooksLikeAMissingReview`.
+
+**ReviewPage_SelectFile_MembershipRevoked_ShowsNotFoundAndNoData**: A member has the review open, and the membership is
+removed in the store; choosing a file shows the not-found message, and nothing that the page had loaded (names, file
+content, comments, reviewer name, checklist progress) remains in the markup. This scenario is tested by
+`ReviewPage_SelectFile_MembershipRevoked_ShowsNotFoundAndNoData`.
+
+**ReviewPage_SelectThread_MembershipRevoked_ShowsNotFoundAndNoData**: The same arrangement, and a thread of the index is
+chosen; the result is the not-found page without data. This scenario is tested by
+`ReviewPage_SelectThread_MembershipRevoked_ShowsNotFoundAndNoData`.
+
+**ReviewPage_FilterIndex_MembershipRevoked_ShowsNotFoundAndNoData**: The same arrangement, and the thread index filter is
+changed, an action that reads no service; the access check still runs and the result is the not-found page without
+data. This scenario is tested by `ReviewPage_FilterIndex_MembershipRevoked_ShowsNotFoundAndNoData`.
+
+**ReviewPage_Reply_MembershipRevoked_ShowsNotFoundAndStoresNothing**: A member has a file selected and a reply typed,
+and the membership is removed; posting the reply shows the not-found page without data, and the thread still has its one
+comment. This scenario is tested by `ReviewPage_Reply_MembershipRevoked_ShowsNotFoundAndStoresNothing`.
 
 **ReviewPage_Render_ExistingReview_ShowsHistoryLink**: A review is rendered; the page contains the history link
 that points to the history page of the review. This scenario is tested by

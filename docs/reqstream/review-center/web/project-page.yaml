@@ -118,14 +118,16 @@ sections:
         title: >-
           The ProjectPage unit shall show the reason when a review cannot be created, naming the identifier for
           a duplicate identifier, and shall create nothing, including when no files are selected, two selected
-          files have the same name, or the sign-in state of the user has ended.
+          files have the same name, or the sign-in state of the user has ended or the user has lost the access to the
+          project while the form is open (the page then shows the page of a project that does not exist).
         justification: |
           A rejected form must tell users what to correct, and must not leave a partial review.
         tests:
           - NewReviewPage_CreateForm_NoFiles_ShowsErrorAndCreatesNothing
           - NewReviewPage_CreateForm_DuplicateReviewId_ShowsErrorNamingTheId
           - NewReviewPage_CreateForm_DuplicateFileNames_ShowsDuplicatePathError
-          - NewReviewPage_CreateForm_SessionEndedBeforePageKnows_ShowsClearErrorAndCreatesNothing
+          - NewReviewPage_CreateForm_SessionEndedBeforePageKnows_ShowsNotFoundAndCreatesNothing
+          - NewReviewPage_CreateForm_MembershipRevoked_ShowsNotFoundAndCreatesNothing
 
       - id: ReviewCenter-ProjectPage-ReservedId
         title: >-

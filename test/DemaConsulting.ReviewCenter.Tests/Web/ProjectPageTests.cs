@@ -234,11 +234,11 @@ public class ProjectPageTests : PageTestBase
     }
 
     /// <summary>
-    ///     Test that a review submitted after the session ended, but before the page learned of it, shows a clear
-    ///     message and stores nothing.
+    ///     Test that a review submitted after the session ended, but before the page learned of it, stores nothing
+    ///     and leaves the not-found page (the access check finds no user).
     /// </summary>
     [Fact]
-    public async Task NewReviewPage_CreateForm_SessionEndedBeforePageKnows_ShowsClearErrorAndCreatesNothing()
+    public async Task NewReviewPage_CreateForm_SessionEndedBeforePageKnows_ShowsNotFoundAndCreatesNothing()
     {
         // Arrange: a filled-in form, and then the session ends without the page being told
         var project = await Projects.CreateAsync("Apollo", null, TestContext.Current.CancellationToken);
@@ -252,8 +252,38 @@ public class ProjectPageTests : PageTestBase
         // Act: submit the form
         await cut.Find("[data-testid='new-review-form']").SubmitAsync();
 
-        // Assert: the page says why nothing was saved, and no review exists
-        Assert.Contains("no longer signed in", cut.Find("[data-testid='review-error']").TextContent, StringComparison.Ordinal);
+        // Assert: the page shows the not-found state, and no review exists
+        Assert.NotEmpty(cut.FindAll("[data-testid='project-not-found']"));
+        Assert.Empty(cut.FindAll("[data-testid='new-review-form']"));
+        Assert.Empty(await Reviews.ListAsync(project.Id, TestContext.Current.CancellationToken));
+    }
+
+    /// <summary>
+    ///     Test that a member who loses the membership while the new-review form is open gets the not-found page
+    ///     when submitting, and that nothing is created.
+    /// </summary>
+    [Fact]
+    public async Task NewReviewPage_CreateForm_MembershipRevoked_ShowsNotFoundAndCreatesNothing()
+    {
+        // Arrange: a member has a filled-in form open
+        var project = await Projects.CreateAsync("Apollo", null, TestContext.Current.CancellationToken);
+        var member = await Users.CreateAsync("mem", "Mem", UserRole.Reviewer, "correct horse battery", TestContext.Current.CancellationToken);
+        await Store.AddMembershipAsync(member.Id, project.Id, TestContext.Current.CancellationToken);
+        SignInAs("mem", "Mem", UserRole.Reviewer);
+        var cut = RenderPage(project.Id);
+        await cut.Find("[data-testid='review-id-input']").InputAsync("REV-1");
+        await cut.Find("[data-testid='review-title-input']").InputAsync("First review");
+        SelectFiles(cut, ("a.txt", TestContent.A));
+        await cut.WaitForAssertionAsync(() => Assert.NotEmpty(cut.FindAll("[data-testid='selected-file-0']")));
+        await RevokeMembershipAsync(project.Id, "mem");
+
+        // Act: submit the form
+        await cut.Find("[data-testid='new-review-form']").SubmitAsync();
+
+        // Assert: the not-found state, nothing of the project, and no review
+        Assert.NotEmpty(cut.FindAll("[data-testid='project-not-found']"));
+        Assert.Empty(cut.FindAll("[data-testid='new-review-form']"));
+        Assert.DoesNotContain("Apollo", cut.Markup, StringComparison.Ordinal);
         Assert.Empty(await Reviews.ListAsync(project.Id, TestContext.Current.CancellationToken));
     }
 

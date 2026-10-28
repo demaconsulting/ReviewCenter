@@ -98,10 +98,20 @@ was saved. Reload the page to sign in again."), are shown as messages next to th
 the connection. The page raises
 no other errors of its own.
 
+**Access re-check**: Every handler that reads or stores something (answer, save, and the not-applicable switch) starts
+with `GuardAsync`, which asks `ProjectViewGuard.GuardViewAsync` whether the signed-in user may still see the project;
+opening a section and going to the next unanswered check are wrapped at their binding by `GuardedAsync`. When access is
+lost, `ShowNoAccess` resets the component state exactly as a change of address does, shows the same message as for a
+review that does not exist, and the handler returns without calling a service, so no answer is stored and nothing of the
+checklist stays in the page. An ended sign-in state counts as no access, so this message replaces the "no longer signed
+in" message on this page.
+
 #### Dependencies
 
 - **SessionGate** (App) — wraps the whole page content, so the page is replaced by a "Session ended" message when the
   sign-in state of the open page ends.
+- **IProjectAccess** (Core) — through `ProjectViewGuard`, asked before every handler whether the user may still see the
+  project.
 - **ReviewService** — reads the review.
 - **ChecklistService** — reads the checklist and records answers and section decisions.
 - **ProjectService** — reads the project for the signed-in user (nothing is loaded when the user may not see it) and its

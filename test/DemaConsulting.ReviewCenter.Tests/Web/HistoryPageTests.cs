@@ -248,4 +248,70 @@ public class HistoryPageTests : PageTestBase
         Assert.DoesNotContain("secret detail", cut.Markup, StringComparison.Ordinal);
         Assert.Empty(cut.FindAll("[data-testid='history-table']"));
     }
+
+    /// <summary>
+    ///     Asserts that the page shows only the not-found message and nothing of the project, the review or its audit
+    ///     entries.
+    /// </summary>
+    /// <param name="cut">The rendered page.</param>
+    private static void AssertNothingOfTheHistoryIsShown(IRenderedComponent<HistoryPage> cut)
+    {
+        Assert.NotEmpty(cut.FindAll("[data-testid='history-not-found']"));
+        Assert.Empty(cut.FindAll("[data-testid='history-table']"));
+        Assert.Empty(cut.FindAll("[data-testid='history-review-title']"));
+        foreach (var secret in new[] { "Apollo", "First review", "confidential entry", "Ann (ann)" })
+        {
+            Assert.DoesNotContain(secret, cut.Markup, StringComparison.Ordinal);
+        }
+    }
+
+    /// <summary>
+    ///     Test that a user who is no member of the project gets the same page as for a review that does not exist and
+    ///     sees none of the entries.
+    /// </summary>
+    [Fact]
+    public async Task HistoryPage_Render_NonMember_LooksLikeAMissingReview()
+    {
+        // Arrange: a review with an entry, opened by a user who is no member of its project
+        var projectId = await CreateReviewAsync();
+        await RecordAsync(projectId, "REV-1", "review.created", "confidential entry");
+        await Users.CreateAsync("out", "Out", UserRole.Reviewer, "correct horse battery", TestContext.Current.CancellationToken);
+        SignInAs("out", "Out", UserRole.Reviewer);
+
+        // Act
+        var cut = RenderPage(projectId);
+        var missing = RenderPage(999);
+
+        // Assert: the message is the one for a missing project and nothing of the history is shown
+        Assert.Equal(
+            missing.Find("[data-testid='history-not-found']").TextContent.Replace("project 999", "project #"),
+            cut.Find("[data-testid='history-not-found']").TextContent.Replace($"project {projectId}", "project #"));
+        AssertNothingOfTheHistoryIsShown(cut);
+    }
+
+    /// <summary>
+    ///     Test that a member who loses the membership while the history is open gets the not-found page and no
+    ///     entries when the page is parameterized again (to another position).
+    /// </summary>
+    [Fact]
+    public async Task HistoryPage_Reparameterize_MembershipRevoked_ShowsNotFoundAndNoEntries()
+    {
+        // Arrange: a member has the history open and sees the entry
+        var projectId = await CreateReviewAsync();
+        await RecordAsync(projectId, "REV-1", "review.created", "confidential entry");
+        var member = await Users.CreateAsync("mem", "Mem", UserRole.Reviewer, "correct horse battery", TestContext.Current.CancellationToken);
+        await Store.AddMembershipAsync(member.Id, projectId, TestContext.Current.CancellationToken);
+        SignInAs("mem", "Mem", UserRole.Reviewer);
+        var cut = RenderPage(projectId);
+        Assert.Contains("confidential entry", cut.Markup, StringComparison.Ordinal);
+        await RevokeMembershipAsync(projectId, "mem");
+
+        // Act: the position in the address changes, as for the Older link, and the page is given the new parameters
+        Services.GetRequiredService<Microsoft.AspNetCore.Components.NavigationManager>()
+            .NavigateTo($"/projects/{projectId}/reviews/REV-1/history?before=5");
+        cut.Render(parameters => parameters.Add(page => page.ReviewId, "REV-1"));
+
+        // Assert
+        AssertNothingOfTheHistoryIsShown(cut);
+    }
 }
