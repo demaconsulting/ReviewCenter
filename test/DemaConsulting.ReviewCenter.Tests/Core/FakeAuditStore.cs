@@ -28,7 +28,8 @@ namespace DemaConsulting.ReviewCenter.Tests.Core;
 /// <remarks>
 ///     It builds the real hash chain (with <see cref="AuditChain"/>), so the entries it holds verify exactly as
 ///     the stored ones do. Tests can make the next append fail, and can replace a stored entry to simulate
-///     tampering.
+///     tampering. Like the real store, which serializes appends, every access is serialized, so parallel appends
+///     all land in one gap-free chain.
 /// </remarks>
 /// <param name="timeProvider">The clock that stamps the entries.</param>
 internal sealed class FakeAuditStore(TimeProvider timeProvider) : IAuditStore
@@ -39,6 +40,21 @@ internal sealed class FakeAuditStore(TimeProvider timeProvider) : IAuditStore
     private readonly List<AuditEntry> _entries = [];
 
     /// <summary>
+    ///     Serializes every access to the entries and the counters.
+    /// </summary>
+    private readonly object _lock = new();
+
+    /// <summary>
+    ///     The number of read batches requested for verification.
+    /// </summary>
+    private int _readAfterCalls;
+
+    /// <summary>
+    ///     The largest batch size any verification read asked for.
+    /// </summary>
+    private int _largestReadCount;
+
+    /// <summary>
     ///     Gets or sets the exception thrown by the next append, or <c>null</c> for none; it is cleared when thrown.
     /// </summary>
     public Exception? FailNextAppend { get; set; }
@@ -46,43 +62,73 @@ internal sealed class FakeAuditStore(TimeProvider timeProvider) : IAuditStore
     /// <summary>
     ///     Gets a snapshot of the stored entries in sequence order.
     /// </summary>
-    public IReadOnlyList<AuditEntry> Entries => _entries.ToArray();
+    public IReadOnlyList<AuditEntry> Entries
+    {
+        get
+        {
+            lock (_lock)
+            {
+                return _entries.ToArray();
+            }
+        }
+    }
 
     /// <summary>
     ///     Gets the number of read batches requested for verification.
     /// </summary>
-    public int ReadAfterCalls { get; private set; }
+    public int ReadAfterCalls
+    {
+        get
+        {
+            lock (_lock)
+            {
+                return _readAfterCalls;
+            }
+        }
+    }
 
     /// <summary>
     ///     Gets the largest batch size any verification read asked for.
     /// </summary>
-    public int LargestReadCount { get; private set; }
+    public int LargestReadCount
+    {
+        get
+        {
+            lock (_lock)
+            {
+                return _largestReadCount;
+            }
+        }
+    }
 
     /// <inheritdoc />
     public Task<AuditEntry> AppendAsync(AuditDraft draft, CancellationToken cancellationToken = default)
     {
-        if (FailNextAppend is { } failure)
+        lock (_lock)
         {
-            FailNextAppend = null;
-            throw failure;
-        }
+            if (FailNextAppend is { } failure)
+            {
+                FailNextAppend = null;
+                throw failure;
+            }
 
-        var head = _entries.Count == 0 ? null : _entries[^1];
-        var entry = new AuditEntry
-        {
-            Sequence = (head?.Sequence ?? 0) + 1,
-            TimestampUtc = timeProvider.GetUtcNow(),
-            ActorUserId = null,
-            ActorName = AuditText.Clean(draft.ActorName, AuditText.MaxActorNameLength),
-            Action = AuditText.Clean(draft.Action, AuditText.MaxActionLength),
-            ProjectId = draft.ProjectId,
-            ReviewId = draft.ReviewId,
-            Detail = AuditText.Clean(draft.Detail, AuditText.MaxDetailLength),
-            PreviousHash = head?.Hash ?? AuditChain.GenesisHash
-        };
-        var stored = Rehash(entry);
-        _entries.Add(stored);
-        return Task.FromResult(stored);
+            var head = _entries.Count == 0 ? null : _entries[^1];
+            var entry = new AuditEntry
+            {
+                Sequence = (head?.Sequence ?? 0) + 1,
+                TimestampUtc = timeProvider.GetUtcNow(),
+                ActorUserId = null,
+                ActorName = AuditText.Clean(draft.ActorName, AuditText.MaxActorNameLength),
+                Action = AuditText.Clean(draft.Action, AuditText.MaxActionLength),
+                ProjectId = draft.ProjectId,
+                ReviewId = draft.ReviewId,
+                Detail = AuditText.Clean(draft.Detail, AuditText.MaxDetailLength),
+                PreviousHash = head?.Hash ?? AuditChain.GenesisHash
+            };
+            var stored = Rehash(entry);
+            _entries.Add(stored);
+            return Task.FromResult(stored);
+        }
     }
 
     /// <inheritdoc />
@@ -94,7 +140,8 @@ internal sealed class FakeAuditStore(TimeProvider timeProvider) : IAuditStore
         int take,
         CancellationToken cancellationToken = default)
     {
-        var query = _entries.AsEnumerable();
+        // Query a snapshot, so a parallel append cannot change the list while it is enumerated
+        var query = Entries.AsEnumerable();
         if (reviewId is not null)
         {
             query = query.Where(e => e.ProjectId == projectId && e.ReviewId == reviewId);
@@ -130,13 +177,16 @@ internal sealed class FakeAuditStore(TimeProvider timeProvider) : IAuditStore
         int count,
         CancellationToken cancellationToken = default)
     {
-        ReadAfterCalls++;
-        LargestReadCount = Math.Max(LargestReadCount, count);
-        IReadOnlyList<AuditEntry> result = _entries.Where(e => e.Sequence > afterSequence)
-            .OrderBy(e => e.Sequence)
-            .Take(count)
-            .ToList();
-        return Task.FromResult(result);
+        lock (_lock)
+        {
+            _readAfterCalls++;
+            _largestReadCount = Math.Max(_largestReadCount, count);
+            IReadOnlyList<AuditEntry> result = _entries.Where(e => e.Sequence > afterSequence)
+                .OrderBy(e => e.Sequence)
+                .Take(count)
+                .ToList();
+            return Task.FromResult(result);
+        }
     }
 
     /// <summary>
@@ -146,21 +196,24 @@ internal sealed class FakeAuditStore(TimeProvider timeProvider) : IAuditStore
     /// <param name="detail">The new detail text.</param>
     public void TamperDetail(long sequence, string detail)
     {
-        var index = _entries.FindIndex(e => e.Sequence == sequence);
-        var old = _entries[index];
-        _entries[index] = new AuditEntry
+        lock (_lock)
         {
-            Sequence = old.Sequence,
-            TimestampUtc = old.TimestampUtc,
-            ActorUserId = old.ActorUserId,
-            ActorName = old.ActorName,
-            Action = old.Action,
-            ProjectId = old.ProjectId,
-            ReviewId = old.ReviewId,
-            Detail = detail,
-            PreviousHash = old.PreviousHash,
-            Hash = old.Hash
-        };
+            var index = _entries.FindIndex(e => e.Sequence == sequence);
+            var old = _entries[index];
+            _entries[index] = new AuditEntry
+            {
+                Sequence = old.Sequence,
+                TimestampUtc = old.TimestampUtc,
+                ActorUserId = old.ActorUserId,
+                ActorName = old.ActorName,
+                Action = old.Action,
+                ProjectId = old.ProjectId,
+                ReviewId = old.ReviewId,
+                Detail = detail,
+                PreviousHash = old.PreviousHash,
+                Hash = old.Hash
+            };
+        }
     }
 
     /// <summary>

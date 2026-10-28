@@ -442,6 +442,32 @@ public class AuditServiceTests
     }
 
     /// <summary>
+    ///     Test that parallel records all land in one gap-free chain, as with the real store, which serializes
+    ///     appends; the concurrent tests of the services rely on this.
+    /// </summary>
+    [Fact]
+    public async Task AuditService_RecordAsync_ParallelRecords_FormOneIntactChain()
+    {
+        // Arrange
+        var (service, store) = Create();
+        var cancellationToken = TestContext.Current.CancellationToken;
+        const int count = 200;
+
+        // Act
+        await Task.WhenAll(Enumerable.Range(1, count).Select(
+            i => Task.Run(
+                () => service.RecordAsync(AuditDraft.By(TestActors.Ann, "test.event", "event " + i), cancellationToken),
+                cancellationToken)));
+        var result = await service.VerifyAsync(cancellationToken);
+
+        // Assert: every record is kept, with unique contiguous sequences, and the chain verifies
+        Assert.Equal(count, store.Entries.Count);
+        Assert.Equal(Enumerable.Range(1, count).Select(i => (long)i), store.Entries.Select(e => e.Sequence));
+        Assert.True(result.IsIntact);
+        Assert.Equal(count, result.Count);
+    }
+
+    /// <summary>
     ///     Test that a tampered entry in a later batch is found and reported.
     /// </summary>
     [Fact]
