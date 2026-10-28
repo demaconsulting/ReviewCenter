@@ -785,7 +785,7 @@ public class ApiEndpointsTests
     /// </summary>
     /// <param name="app">The running application.</param>
     /// <returns>The project number.</returns>
-    private static async Task<int> ArrangeSignedReviewWithSetIdAsync(WebApplication app)
+    internal static async Task<int> ArrangeSignedReviewWithSetIdAsync(WebApplication app)
     {
         var projectId = await AttestationEndpointTests.CreateReviewAsync(app, signed: true);
         var store = app.Services.GetRequiredService<IReviewStore>();

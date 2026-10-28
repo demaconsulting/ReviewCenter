@@ -56,6 +56,16 @@ internal static class ApiDocument
     public const string DocumentVersion = "1";
 
     /// <summary>
+    ///     The operation id of the evidence index, which a project can open to anonymous callers.
+    /// </summary>
+    public const string EvidenceIndexOperation = "GetEvidenceIndex";
+
+    /// <summary>
+    ///     The operation id of the attestation download, which a project can open to anonymous callers.
+    /// </summary>
+    public const string AttestationOperation = "GetAttestation";
+
+    /// <summary>
     ///     Registers the generator of the OpenAPI document.
     /// </summary>
     /// <param name="services">The service collection. Must not be null.</param>
@@ -104,6 +114,7 @@ internal static class ApiDocument
             Description =
                 "Read projects and reviews, create review drafts, download attestations and read the evidence index "
                 + "with a personal access token (bearer token, or HTTP Basic with the token as the password). "
+                + "A project can open its evidence index and its attestation PDFs to callers without a token. "
                 + "Reviewer slots and signatures can only be changed in the web pages."
         };
 
@@ -130,20 +141,27 @@ internal static class ApiDocument
             }
         };
 
-        // Every operation of the document needs the token, sent in either way
+        // Every operation of the document needs the token, sent in either way; two operations also accept a request
+        // without any credentials (an empty security requirement), which succeeds only when the project allows it
         foreach (var operation in document.Paths.Values.SelectMany(path => path.Operations?.Values.AsEnumerable() ?? []))
         {
-            operation.Security =
-            [
-                new OpenApiSecurityRequirement
+            var security = new List<OpenApiSecurityRequirement>
+            {
+                new()
                 {
                     [new OpenApiSecuritySchemeReference(SecuritySchemeName, document)] = []
                 },
-                new OpenApiSecurityRequirement
+                new()
                 {
                     [new OpenApiSecuritySchemeReference(BasicSchemeName, document)] = []
                 }
-            ];
+            };
+            if (operation.OperationId is EvidenceIndexOperation or AttestationOperation)
+            {
+                security.Add([]);
+            }
+
+            operation.Security = security;
         }
     }
 }

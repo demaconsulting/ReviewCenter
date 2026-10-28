@@ -25,6 +25,7 @@ using System.Text.Encodings.Web;
 using DemaConsulting.ReviewCenter.Core;
 using DemaConsulting.ReviewCenter.Identity;
 using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.Extensions.Options;
 
 namespace DemaConsulting.ReviewCenter.Api;
@@ -58,6 +59,16 @@ internal static class ApiTokenAuthentication
     public const string PolicyName = "Api";
 
     /// <summary>
+    ///     The name of the policy of the evidence index route, which a project can open to anonymous callers.
+    /// </summary>
+    public const string EvidenceIndexPolicyName = "ApiEvidenceIndex";
+
+    /// <summary>
+    ///     The name of the policy of the attestation PDF route, which a project can open to anonymous callers.
+    /// </summary>
+    public const string AttestationPolicyName = "ApiAttestation";
+
+    /// <summary>
     ///     The claim type that tells how the principal was authenticated.
     /// </summary>
     public const string AuthMethodClaimType = "rc_auth";
@@ -79,17 +90,28 @@ internal static class ApiTokenAuthentication
     /// <returns>The same service collection.</returns>
     /// <remarks>
     ///     Call after <c>AddSignIn</c>: the cookie scheme stays the default scheme and the default challenge scheme.
-    ///     <see cref="SignInThrottle"/>, <see cref="PersonalAccessTokenService"/> and <see cref="AuditService"/>
-    ///     must be registered.
+    ///     <see cref="SignInThrottle"/>, <see cref="PersonalAccessTokenService"/>, <see cref="AuditService"/>,
+    ///     <see cref="EvidenceSettingsService"/> and <see cref="TimeProvider"/> must be registered. Besides the
+    ///     <c>Api</c> policy it registers the two policies of the routes that a project can open to callers without a
+    ///     token (see <see cref="AnonymousEvidenceHandler"/>) and the limiter of those callers.
     /// </remarks>
     public static IServiceCollection AddApiTokenAuthentication(this IServiceCollection services)
     {
         ArgumentNullException.ThrowIfNull(services);
 
         services.AddAuthentication().AddScheme<AuthenticationSchemeOptions, ApiTokenHandler>(Scheme, null);
-        services.AddAuthorizationBuilder().AddPolicy(
-            PolicyName,
-            policy => policy.AddAuthenticationSchemes(Scheme).RequireAuthenticatedUser());
+        services.AddSingleton<IAuthorizationHandler, AnonymousEvidenceHandler>();
+        services.AddSingleton<AnonymousRateLimit>();
+        services.AddAuthorizationBuilder()
+            .AddPolicy(PolicyName, policy => policy.AddAuthenticationSchemes(Scheme).RequireAuthenticatedUser())
+            .AddPolicy(
+                EvidenceIndexPolicyName,
+                policy => policy.AddAuthenticationSchemes(Scheme)
+                    .AddRequirements(new AnonymousEvidenceRequirement(settings => settings.AnonymousIndex)))
+            .AddPolicy(
+                AttestationPolicyName,
+                policy => policy.AddAuthenticationSchemes(Scheme)
+                    .AddRequirements(new AnonymousEvidenceRequirement(settings => settings.AnonymousAttestations)));
         return services;
     }
 }

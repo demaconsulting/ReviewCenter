@@ -53,38 +53,68 @@ internal sealed class EvidenceIndexService
     private readonly IProjectAccess _access;
 
     /// <summary>
+    ///     Reads the evidence settings, for a request without a signed-in user.
+    /// </summary>
+    private readonly EvidenceSettingsService _settings;
+
+    /// <summary>
     ///     Initializes a new instance of the <see cref="EvidenceIndexService"/> class.
     /// </summary>
     /// <param name="reviews">The review service. Must not be null.</param>
     /// <param name="signing">The signing service. Must not be null.</param>
     /// <param name="access">The access rules. Must not be null.</param>
+    /// <param name="settings">The evidence settings service. Must not be null.</param>
     /// <exception cref="ArgumentNullException">Thrown when an argument is null.</exception>
-    public EvidenceIndexService(ReviewService reviews, SigningService signing, IProjectAccess access)
+    public EvidenceIndexService(
+        ReviewService reviews,
+        SigningService signing,
+        IProjectAccess access,
+        EvidenceSettingsService settings)
     {
         ArgumentNullException.ThrowIfNull(reviews);
         ArgumentNullException.ThrowIfNull(signing);
         ArgumentNullException.ThrowIfNull(access);
+        ArgumentNullException.ThrowIfNull(settings);
         _reviews = reviews;
         _signing = signing;
         _access = access;
+        _settings = settings;
     }
 
     /// <summary>
     ///     Builds the evidence index of a project.
     /// </summary>
-    /// <param name="actor">The user (or the owner of the token) who asks; must be able to see the project. Must not be null.</param>
+    /// <param name="actor">
+    ///     The user (or the owner of the token) who asks, who must be able to see the project; <c>null</c> for a
+    ///     request without a signed-in user, which is served only when the project allows an anonymous evidence index.
+    /// </param>
     /// <param name="projectId">The project number.</param>
     /// <param name="cancellationToken">A token to cancel the work.</param>
     /// <returns>The entries, one per (id, fingerprint), ordered by id and then fingerprint; empty when none.</returns>
-    /// <exception cref="ArgumentNullException">Thrown when <paramref name="actor"/> is null.</exception>
-    /// <exception cref="DomainRuleException">Thrown with <see cref="DomainRule.ProjectNotFound"/> when the actor may not see the project.</exception>
+    /// <exception cref="DomainRuleException">
+    ///     Thrown with <see cref="DomainRule.ProjectNotFound"/> when the actor may not see the project, or when there
+    ///     is no actor and the project does not exist or does not allow an anonymous evidence index.
+    /// </exception>
     public async Task<IReadOnlyList<EvidenceIndexEntry>> BuildAsync(
-        Actor actor,
+        Actor? actor,
         int projectId,
         CancellationToken cancellationToken = default)
     {
-        ArgumentNullException.ThrowIfNull(actor);
-        await _access.RequireViewAsync(actor, projectId, cancellationToken);
+        if (actor is null)
+        {
+            // Without a signed-in user the project's own switch is the only thing that can allow the read, and a
+            // project that does not allow it answers like one that does not exist
+            var effective = await _settings.GetEffectiveAsync(projectId, cancellationToken);
+            if (effective is not { AnonymousIndex: true })
+            {
+                throw new DomainRuleException(DomainRule.ProjectNotFound, $"Project {projectId} does not exist.");
+            }
+        }
+        else
+        {
+            await _access.RequireViewAsync(actor, projectId, cancellationToken);
+        }
+
         // Only reviews planned from a review set can be listed; their approvals are read in one batch so the users
         // are loaded once, not once per review
         var planned = (await _reviews.ListAsync(projectId, cancellationToken))

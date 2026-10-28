@@ -2,7 +2,7 @@
   "openapi": "3.1.1",
   "info": {
     "title": "ReviewCenter API",
-    "description": "Read projects and reviews, create review drafts, download attestations and read the evidence index with a personal access token (bearer token, or HTTP Basic with the token as the password). Reviewer slots and signatures can only be changed in the web pages.",
+    "description": "Read projects and reviews, create review drafts, download attestations and read the evidence index with a personal access token (bearer token, or HTTP Basic with the token as the password). A project can open its evidence index and its attestation PDFs to callers without a token. Reviewer slots and signatures can only be changed in the web pages.",
     "version": "1"
   },
   "paths": {
@@ -320,7 +320,7 @@
           "ApiEndpoints"
         ],
         "summary": "Downloads the signed attestation of a complete review.",
-        "description": "Returns the signed PDF attestation; the review must be complete (every slot signed).",
+        "description": "Returns the signed PDF attestation; the review must be complete (every slot signed). What the PDF contains follows the evidence settings of the project. Without a token the request is answered only when the project allows anonymous attestation PDFs; otherwise the answer is 401.",
         "operationId": "GetAttestation",
         "parameters": [
           {
@@ -376,6 +376,16 @@
               }
             }
           },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
           "500": {
             "description": "Internal Server Error",
             "content": {
@@ -393,7 +403,8 @@
           },
           {
             "basic": [ ]
-          }
+          },
+          { }
         ]
       }
     },
@@ -403,7 +414,7 @@
           "ApiEndpoints"
         ],
         "summary": "Gets the evidence index of a project, in the format of a ReviewMark index.json.",
-        "description": "Returns the completed reviews of the project that were planned from a review-set, one per review-set id and fingerprint, as {\"reviews\":[{id, fingerprint, date, result, file}]}. The result is always 'pass'; 'file' is the absolute address of the signed attestation. Use it as the evidence-source of a .reviewmark.yaml file, with a personal access token as the Basic password.",
+        "description": "Returns the completed reviews of the project that were planned from a review-set, one per review-set id and fingerprint, as {\"reviews\":[{id, fingerprint, date, result, file}]}. The result is always 'pass'; 'file' is the absolute address of the signed attestation. Use it as the evidence-source of a .reviewmark.yaml file, with a personal access token as the Basic password. Without a token the request is answered only when the project allows an anonymous evidence index; otherwise the answer is 401.",
         "operationId": "GetEvidenceIndex",
         "parameters": [
           {
@@ -447,6 +458,16 @@
                 }
               }
             }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -455,7 +476,8 @@
           },
           {
             "basic": [ ]
-          }
+          },
+          { }
         ]
       }
     }

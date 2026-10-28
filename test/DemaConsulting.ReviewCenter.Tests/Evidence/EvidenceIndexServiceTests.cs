@@ -50,6 +50,39 @@ public class EvidenceIndexServiceTests
     }
 
     /// <summary>
+    ///     Test that a request without an actor is refused as a missing project unless the project allows an
+    ///     anonymous evidence index, and then lists the same entries as a signed-in member.
+    /// </summary>
+    [Fact]
+    public async Task EvidenceIndexService_Build_NoActor_NeedsTheAnonymousIndexSetting()
+    {
+        // Arrange: a complete review
+        var fixture = await AttestationFixture.CreateAsync(signed: false);
+        await AddCompleteAsync(fixture, "set-1", "Core-Logic", TestContent.A);
+        var service = CreateService(fixture);
+        var cancellationToken = TestContext.Current.CancellationToken;
+
+        // Act and assert: refused while the setting is off, and for a project that does not exist
+        var off = await Assert.ThrowsAsync<DomainRuleException>(
+            () => service.BuildAsync(null, fixture.ProjectId, cancellationToken));
+        Assert.Equal(DomainRule.ProjectNotFound, off.Rule);
+        var missing = await Assert.ThrowsAsync<DomainRuleException>(() => service.BuildAsync(null, 9999, cancellationToken));
+        Assert.Equal(DomainRule.ProjectNotFound, missing.Rule);
+
+        // Act: switch the setting on
+        Assert.True(await fixture.Store.UpdateEvidenceSettingsAsync(
+            fixture.ProjectId,
+            EvidenceSettings.Default,
+            EvidenceSettings.Default with { AnonymousIndex = true },
+            AuditDraft.By(TestActors.Ann, EvidenceSettingsService.ChangedAction, "x", fixture.ProjectId),
+            cancellationToken));
+        var on = await service.BuildAsync(null, fixture.ProjectId, cancellationToken);
+
+        // Assert
+        Assert.Equal("Core-Logic", Assert.Single(on).Id);
+    }
+
+    /// <summary>
     ///     Test that a review with a slot that has not signed is not listed.
     /// </summary>
     [Fact]
@@ -240,7 +273,7 @@ public class EvidenceIndexServiceTests
         }
 
         var service = new EvidenceIndexService(
-            TestServices.Reviews(store, clock), signing, new AllowAllProjectAccess(store));
+            TestServices.Reviews(store, clock), signing, new AllowAllProjectAccess(store), TestServices.EvidenceSettings(store));
         var before = userStore.ListCount;
 
         // Act: build the index
@@ -259,7 +292,10 @@ public class EvidenceIndexServiceTests
     private static EvidenceIndexService CreateService(AttestationFixture fixture)
     {
         return new EvidenceIndexService(
-            TestServices.Reviews(fixture.Store, fixture.Clock), fixture.Signing, fixture.Access);
+            TestServices.Reviews(fixture.Store, fixture.Clock),
+            fixture.Signing,
+            fixture.Access,
+            TestServices.EvidenceSettings(fixture.Store));
     }
 
     /// <summary>
