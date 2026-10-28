@@ -80,10 +80,9 @@ enabled system administrator; unless so, the action is not run, nothing is reloa
 with the message "System administrator rights are required." The guard is asked a second time before the reload,
 because the change may have taken the right from the very user who made it; the stored change is then still
 acknowledged, but the list is not shown. `ShowAccessLost` clears `Users`, `Passwords`, and `MessageUserId`, sets
-`AccessLost`, and shows the message, and the page then renders neither the "+ New user" button nor the list, so the names
-and roles of the users, and the passwords typed into the rows, are no longer readable. This
-check is
-kept on every action although the page itself is replaced when the sign-in state ends (see `SessionGate`), because an
+`AccessLost`, and shows the message, and the page then renders neither the "+ New user" button nor the list, so the
+names and roles of the users, and the passwords typed into the rows, are no longer readable. This check is kept on
+every action although the page itself is replaced when the sign-in state ends (see `SessionGate`), because an
 open page can keep its state for up to one revalidation interval after the user was demoted or disabled. When the state
 has already ended, `GetActorAsync` refuses with a rule violation, which `RunAsync` catches and shows through
 `ShowAccessLost` as a message, again without the list.
