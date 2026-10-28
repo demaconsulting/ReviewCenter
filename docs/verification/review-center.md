@@ -93,6 +93,9 @@ loopback TCP ports.
 - A user who is not a member of a project gets the answer for a project that does not exist from every route of the
   project (for a token and for a session), a member and a system administrator are served, the project list holds
   only the projects the user may see, and a token follows the memberships of its owner at once.
+- A project admin or system administrator adds an existing user by the exact user name or creates an account as part of
+  adding it, the created account gets a temporary password that is shown once and must be replaced at the first
+  sign-in, and the last project admin cannot be removed or demoted by a project admin.
 
 ## Test Scenarios
 
@@ -251,7 +254,9 @@ once after the member is removed from the project. These scenarios are tested by
 `ApiProjectAccess_AttestationPage_NonMemberSession_Answers404`, and
 `ApiProjectAccess_Token_OwnerRemovedFromProject_Gets404AtOnce`. The memberships themselves are stored and audited as
 verified by `ReviewStore_AddMembershipAsync_Membership_RoundTripsAndIsListed` and
-`ReviewStore_Membership_Changes_AreAuditedWithTheProject`; the pages that hide a project from a non-member are
+`ReviewStore_Membership_Changes_AreAuditedWithTheProject`; the management of members (the exact user name, the
+temporary password, and the rule of the last project admin) is verified in the `Core`, `Storage`, and `Web` subsystems;
+the pages that hide a project from a non-member are
 verified in the `Web` subsystem.
 
 **Open session ends**: A user is signed in on the real pipeline and the authentication state provider of a new scope

@@ -49,7 +49,8 @@ that does not depend on a project, the system administrator right.
 - *Contract*: Asks the sign-in throttle first. When the throttle refuses, it checks no password, sets no cookie and
   redirects to `/login?error=throttled` (with the safe return URL when it is not `/`); the answer is the same for every
   user name. Otherwise it checks the password through `UserService`. On success it issues the authentication cookie
-  and redirects to the return URL when that is a path of this site, otherwise to `/`. On any failure it redirects to
+  and redirects to the return URL when that is a path of this site, otherwise to `/`; a user whose password is
+  temporary is redirected to `/account` whatever address was asked for. On any failure it redirects to
   `/login?error=1` (with the safe return URL when it is not `/`); the failure is the same for an unknown user, a
   wrong password, a disabled account, and a locked account.
 - *Constraints*: The antiforgery token is required; a request without a valid token is refused with HTTP status 400.
@@ -132,11 +133,15 @@ live connection, so signing in works before any connection exists. The two endpo
 `/login` is answered by the login page, which would otherwise compete with a `POST` endpoint of the same path.
 
 The cookie holds the user name, the display name, and, only for a system administrator, the `SystemAdmin` role claim,
-and never the password or its hash, and never a project role or a membership. It is `HttpOnly`,
+and never the password or its hash, and never a project role or a membership. A user whose account still has a
+temporary password gets the claim `must_change_password` instead of the system administrator role (even when the
+account is a system administrator), so the session cannot reach any protected data until the password is changed. It is
+`HttpOnly`,
 `SameSite=Lax`, and `Secure` whenever the request is https (so it also works over plain http during development); it
 is a session cookie whose ticket slides over the `Auth:SessionHours` window. On every request the cookie is checked
 against the user store through `UserService`: the cookie is rejected, and the user must sign in again, when the user
-no longer exists, is disabled, or has a different system administrator state or display name than the cookie holds.
+no longer exists, is disabled, or has a different system administrator state, temporary password state, or display
+name than the cookie holds.
 Pages are protected by
 authorization attributes of the `Web` subsystem. The cookie handler answers an anonymous request for a protected page
 with a redirect to `/login`, and a signed-in user who lacks the needed role (the system administrator role) with HTTP

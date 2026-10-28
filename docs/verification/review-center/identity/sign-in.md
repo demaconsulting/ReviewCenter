@@ -28,6 +28,9 @@ N/A - standard test environment (temporary SQLite databases are created by the t
   administrator.
 - Signing out ends the session.
 - A session ends when its user is disabled or its system administrator state changes.
+- A user with a temporary password signs in, is redirected to the account page whatever return URL was given, gets no
+  system administrator role (even a system administrator), and has a session that ends once the flag is cleared; the
+  shared rule is current only when the claim is present exactly when the stored user has the flag.
 - The actor is built from the signed-in user, and asking for it without a signed-in user is refused with a message
   that says nothing was saved.
 - The cookie check and the re-check of open pages share one rule, and the interval of the re-check has a default of
@@ -99,6 +102,18 @@ cookie is no longer accepted and the protected page redirects to the login page.
 **SignIn_Session_RoleChangedAfterLogin_IsRejected**: A signed-in system administrator is demoted through the service;
 the old cookie is no longer accepted, so the users page redirects to the login page. This scenario is tested by
 `SignIn_Session_RoleChangedAfterLogin_IsRejected`.
+
+**SignIn_Login_TemporaryPassword_GoesToAccountPageWithoutAdminRoleAndStaleWhenFlagChanges**: A system administrator
+whose must-change-password flag is set signs in with the return URL `/projects`; the redirect goes to `/account`, one
+session cookie is set, the users page is not served, and, after the flag is cleared in the store, the old cookie is
+no longer accepted and the protected page redirects. This scenario is tested by
+`SignIn_Login_TemporaryPassword_GoesToAccountPageWithoutAdminRoleAndStaleWhenFlagChanges`.
+
+**SignIn_IsCurrent_TemporaryPasswordFlag_MustMatchTheClaim**: The shared rule is called for every combination of the
+stored flag and the claim, with and without a stored system administrator state; the principal is current only when
+the claim is present exactly when the stored flag is set (and a flagged system administrator has no role claim), and
+`IsPasswordChangeRequired` reports the claim. This scenario is tested by
+`SignIn_IsCurrent_TemporaryPasswordFlag_MustMatchTheClaim`.
 
 **SignIn_GetActorAsync_SignedInAndAnonymous_ReturnsActorOrThrows**: The actor is requested from an authentication
 state with a signed-in user and from one with nobody; the first gives the user name and display name of the user and

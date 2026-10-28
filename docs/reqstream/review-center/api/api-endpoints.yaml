@@ -57,7 +57,8 @@ sections:
           The ApiEndpoints unit shall answer a request body that is not valid, including one that is not JSON or not
           JSON of the right shape, with a status of 400 (415 for a content type that is not JSON) and a problem document
           that names the field where there is one, and shall answer a domain rule that refuses the request with the
-          status of that rule.
+          status of that rule, including 409 for the removal of the last project administrator, 429 for too many
+          attempts, and 403 for an account that has to change its password.
         justification: |
           A script cannot read a page, so the cause of a refusal must be in the answer. Naming the field tells the
           author which part of the request to fix.
@@ -66,6 +67,7 @@ sections:
           - ApiEndpoints_CreateReview_MalformedJson_Answers400Problem
           - ApiEndpoints_CreateReview_NotJsonContentType_Answers415Problem
           - ApiEndpoints_CreateReview_ServiceRules_AnswerTheirStatus
+          - ApiProblems_StatusOf_MemberRules_MapsToDocumentedStatus
 
       - id: ReviewCenter-ApiEndpoints-Limits
         title: >-

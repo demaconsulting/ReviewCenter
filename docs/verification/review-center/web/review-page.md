@@ -52,6 +52,9 @@ N/A - standard test environment.
   primary or the same user twice shows a message and adds nothing; an unsigned slot can be changed and removed. A
   slot that has a signature, current or out of date, offers neither change nor removal. A user-controlled display
   name is shown as plain text.
+- An assignee of a slot who is no longer a member of the project is marked with "No longer a project member", and the
+  slot shows the hint that such a reviewer cannot sign until added again; assignees who are members, in the same slot
+  or another, get no marker.
 - A user who occupies a slot of a review that cannot be signed sees the blockers instead of the sign form; a user who
   does not occupy the slot sees neither. For a signable review the occupant sees the meaning text and a password
   field of type password.
@@ -439,6 +442,11 @@ is tested by `ReviewPage_AddSlot_InvalidChoices_ShowsErrorAndAddsNothing`.
 **ReviewPage_EditAndRemoveSlot_Unsigned_ChangesAndRemoves**: The primary of an unsigned slot is changed and its
 alternate dropped, and Save shows the change ("None" for the alternate); Remove then removes the slot and the empty
 message returns. This scenario is tested by `ReviewPage_EditAndRemoveSlot_Unsigned_ChangesAndRemoves`.
+
+**ReviewPage_Render_AssigneesNoLongerMembers_ShowsIndicatorOnlyForThem**: A slot has ann as primary and bob as
+alternate, and the page is rendered while both are members: no marker is shown. After bob left the project only the
+alternate carries "No longer a project member"; after ann left too, both do, and the hint of the slot is shown. This
+scenario is tested by `ReviewPage_Render_AssigneesNoLongerMembers_ShowsIndicatorOnlyForThem`.
 
 **ReviewPage_Render_BlockedReview_ShowsBlockersInsteadOfSignForm**: A slot is rendered for a review with unanswered
 checks and an open thread; its primary sees the blockers (naming both) and no sign form, and a user who is not in

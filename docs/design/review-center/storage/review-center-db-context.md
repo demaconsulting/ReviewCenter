@@ -54,7 +54,9 @@ repository registry is the one exception, see `Repositories`).
   case-insensitive collation of SQLite and a unique index, so a user name is unique without regard to case and a
   lookup by user name
   ignores case; `DisplayName` is required, at most 100; `IsSystemAdmin` (false for an ordinary user); `Enabled`;
-  `PasswordHash` is required; `FailedLoginCount`; `LockoutUntil` (null when the user is not locked out); `Created`.
+  `PasswordHash` is required; `FailedLoginCount`; `LockoutUntil` (null when the user is not locked out);
+  `MustChangePassword` (true for an account created with a temporary password until the user changes it; false for
+  every other account); `Created`.
 - **ProjectMemberships** (`ProjectMembership`): key `UserId` plus `ProjectId`, so a user has at most one membership
   per project and the database refuses a second. Both columns are foreign keys, to `Users` and to `Projects`, and a
   membership is deleted with its user or its project. `Role` (the project role, `ProjectAdmin` or `User`) is stored as
@@ -131,7 +133,9 @@ the `PersonalAccessTokens` table and the creator columns of a review (`CreatedBy
 before the personal-access-token slice does not have them and must be deleted and created again. The same holds for the
 `ProjectMemberships` table, the `IsSystemAdmin` column of a user (which replaces the role column), and the `ProjectId`
 of a repository: a database created before the project access slice does not have them and must be deleted and created
-again. The
+again. The same holds for the `MustChangePassword` column of a user (project members management): the schema is created
+with `EnsureCreated` and has no migrations, so a development database created before that column existed does not have
+it and must be deleted and created again. The
 checklist keys are what makes "one answer per check" a rule of the database. The section and
 check identifiers are not related to a table of their own: they name entries inside the snapshot, and the service
 checks them.

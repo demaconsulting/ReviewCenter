@@ -4,21 +4,26 @@
 
 #### Purpose
 
-`LoginPage` is the page at `/login`. Its responsibilities are to show the sign-in form and to say that a sign-in
-failed. It is the only page that does not use a live connection: it is rendered on the server as an ordinary HTML
+`LoginPage` is the page at `/login`. Its responsibilities are to show the sign-in form, to say that a sign-in
+failed, and to say that a password was changed and the user has to sign in again. It is the only page that does not use
+a live connection: it is rendered on the server as an ordinary HTML
 page, and its form is posted to the login endpoint of the `Identity` subsystem (`POST /auth/login`). It is a Razor
 component split into presentation (`LoginPage.razor`) and behavior (`LoginPage.razor.cs`), and it is open to
 anonymous visitors.
 
 #### Data Model
 
-The page holds no state of its own. It reads two values from the query string of the address.
+The page holds no state of its own. It reads three values from the query string of the address.
 
 **ReturnUrl**: the address the visitor wanted before being sent to sign in (the standard `ReturnUrl` query value).
 
 **Error**: the failure flag (`error`); the page shows the "too many attempts" message when it is `throttled` (the
 constant `SignIn.ThrottledError`), the generic failure message when it has any other value, and no message when it is
 absent.
+
+**Changed**: the password-changed flag (`changed`); the page shows the notice "Password changed. Sign in with your new
+password." when it is `1` and nothing otherwise. The account page sends a user there after the replacement of a
+temporary password, because the old session is stale.
 
 **SafeReturnUrl**: derived; the return address reduced to a path of this site with `SignIn.SafeReturnUrl`, otherwise
 `/`. It is written into a hidden field of the form, and the endpoint checks it again.
@@ -29,7 +34,7 @@ because the page has no live connection.
 
 Every interactive element and key value has a stable `data-testid` (see the test identifier rule of the Web
 subsystem): `login-page` (root), `login-form`, `login-username-input`, `login-password-input`, `login-error`,
-`login-throttled`, and `login-button`.
+`login-throttled`, `login-password-changed`, and `login-button`.
 
 #### Key Methods
 

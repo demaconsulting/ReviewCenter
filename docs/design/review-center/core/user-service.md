@@ -14,13 +14,20 @@ account but of its project memberships, which `ProjectAccess` and `ProjectServic
 #### Data Model
 
 **User**: a data class of `Id` (assigned by the store), `Username`, `DisplayName`, `IsSystemAdmin`, `Enabled`,
-`PasswordHash`, `FailedLoginCount`, `LockoutUntil` (`null` when the user is not locked out), and `Created` (UTC).
-`Username`, `DisplayName`, and `Created` are fixed once the user exists; the system administrator flag, the enabled
-flag, the hash, and the lockout state have setters, so the service can change a copy it has read and give it back to
-the store. The password hash is never shown, logged, or put into a message, and the password itself is never stored.
+`PasswordHash`, `FailedLoginCount`, `LockoutUntil` (`null` when the user is not locked out), `MustChangePassword`, and
+`Created` (UTC). `Username`, `DisplayName`, and `Created` are fixed once the user exists; the system administrator flag,
+the enabled flag, the hash, the lockout state, and the must-change-password flag have setters, so the service can change
+a copy it has read and give it back to the store. The password hash is never shown, logged, or put into a message, and
+the password itself is never stored.
+
+**Must change password**: `MustChangePassword` is set on an account that a project administrator created
+(`ProjectService.CreateMemberAccountAsync`) with a generated temporary password, and is cleared when the user changes the
+own password. While it is set the user can sign in but is confined to the password change (see _SignIn_,
+_ProjectAccess_, _PersonalAccessTokenService_, and _SigningService_ for what each refuses); the rules owned by this unit
+are the re-authentication refusal and the password change described below.
 
 **System administrator**: the flag `IsSystemAdmin` replaces the earlier global role. A system administrator runs the
-installation: manages users, creates projects, and decides the members of every project, and may see every project.
+installation: manages users, creates projects, and may manage the members of every project, and may see every project.
 Every other right is held per project through a membership (see `ProjectAccess`); a system administrator who is not a
 member of a project cannot sign its reviews.
 
@@ -34,8 +41,10 @@ author of a record always comes from a signed-in user and cannot be supplied by 
 web framework. It is implemented by `PasswordHasher` in the `Identity` subsystem, and tests of `Core` use a trivial
 fake.
 
-**IUserStore**: the persistence interface of users, with the operations `AddAsync`, `GetByUsernameAsync`,
-`ListAsync`, and `UpdateAsync`. Users have their own interface so that the review store stays about reviews. It is
+**IUserStore**: the persistence interface of users, with the operations `AddAsync`, `AddToProjectAsync` (adds a user and
+the membership of that user in a project, and the audit event built from the stored user, in one atomic step; it raises
+`UserNameTaken` and stores nothing when the name exists), `GetByUsernameAsync`, `ListAsync`, and `UpdateAsync`. Users
+have their own interface so that the review store stays about reviews. It is
 implemented by `UserStore` in the `Storage` subsystem. Every read returns a new `User` object, so a caller can change
 it and pass it to `UpdateAsync` without touching shared state.
 
@@ -66,7 +75,9 @@ semaphore; the unique index of the store covers two requests racing for the same
 (created on first use), so the response time does not show whether a user name exists.
 
 **DomainRule values** added for users: `UserNameInvalid`, `UserNameTaken`, `DisplayNameInvalid`, `PasswordInvalid`,
-`CurrentPasswordIncorrect`, `UserNotFound`, and `LastAdmin`. The values `CommentAuthorInvalid` and
+`CurrentPasswordIncorrect`, `UserNotFound`, and `LastAdmin`. The values `LastProjectAdmin`, `TooManyAttempts`, and
+`PasswordChangeRequired` belong to project member management and are described with the `ProjectService` unit. The
+values `CommentAuthorInvalid` and
 `ChecklistAnsweredByInvalid` no longer exist, because the author is no longer typed text (see the `Core` subsystem).
 
 **ReviewLimits constants** added for users: `MinUsernameLength` (3), `MaxUsernameLength` (50),
@@ -78,11 +89,11 @@ limits the display name stored with a comment, an answer, or a section decision.
 
 **CreateAsync**: Creates an enabled user.
 
-- *Parameters*: `string? username`, `string? displayName`, `bool isSystemAdmin`, `string? password`, the `Actor`, and a
+- _Parameters_: `string? username`, `string? displayName`, `bool isSystemAdmin`, `string? password`, the `Actor`, and a
   cancellation token.
-- *Returns*: `Task<User>` — the stored user with its assigned identity and the creation time from the clock; only the
+- _Returns_: `Task<User>` — the stored user with its assigned identity and the creation time from the clock; only the
   hash of the password is kept.
-- *Postconditions*: Nothing is stored when a rule fails.
+- _Postconditions_: Nothing is stored when a rule fails.
 
 The rules are checked in this order, and the first violation is reported: the user name (`UserNameInvalid`); the
 display name (`DisplayNameInvalid`); the password (`PasswordInvalid`); and then the store, which refuses a name that
@@ -91,10 +102,10 @@ is hashed only after the input is valid.
 
 **AuthenticateAsync**: Checks a user name and password for sign-in.
 
-- *Parameters*: `string? username`, `string? password`, and a cancellation token.
-- *Returns*: `Task<User?>` — the user when the account exists, is not locked out, is enabled, and the password is
+- _Parameters_: `string? username`, `string? password`, and a cancellation token.
+- _Returns_: `Task<User?>` — the user when the account exists, is not locked out, is enabled, and the password is
   right; otherwise `null`.
-- *Postconditions*: A right password resets the failure counter. A wrong password counts as a failure and may start the
+- _Postconditions_: A right password resets the failure counter. A wrong password counts as a failure and may start the
   lockout.
 
 Every failure gives the same `null`: unknown user, wrong password, disabled account, and locked account, so a caller
@@ -105,28 +116,32 @@ other wrong password, and a disabled user with the right password is refused wit
 
 **ReauthenticateAsync**: Checks a user name and password for the re-authentication of a signature.
 
-- *Parameters*, *Returns*, *Postconditions*: as for `AuthenticateAsync`.
+- _Parameters_, _Returns_, _Postconditions_: as for `AuthenticateAsync`.
 
 It is the same check, including the failure counter, the lockout, and the dummy hash, so guessing the password at
 signing time is as limited as at sign-in. It is a separate method only so that its failures are recorded under their
 own action code, `signature.reauth-failed`, and not as `auth.sign-in-failed`. Both methods share one private routine.
+One difference: an account with a temporary password (`MustChangePassword`) is refused even with the right password,
+with the reason `password change pending` recorded (coalesced) under `signature.reauth-failed`, because the temporary
+password proves identity only well enough to reach the password change, and cannot confirm a signature. `AuthenticateAsync`
+still accepts the account, so that the user can sign in and change the password.
 
 **ListAsync**: Lists all users ordered by user name. **GetAsync**: Reads a user by user name, without regard to case;
 `null` when there is none.
 
 **SetEnabledAsync**: Enables or disables a user.
 
-- *Parameters*: `string username`, `bool enabled`, and a cancellation token.
-- *Returns*: `Task`.
-- *Postconditions*: The enabled flag is stored. Disabling stops sign-in; the work already recorded by the user is kept.
+- _Parameters_: `string username`, `bool enabled`, and a cancellation token.
+- _Returns_: `Task`.
+- _Postconditions_: The enabled flag is stored. Disabling stops sign-in; the work already recorded by the user is kept.
 
 Reports `UserNotFound` for an unknown user and `LastAdmin` when the change would disable the last enabled
 system administrator.
 
 **SetSystemAdminAsync**: Gives a user the system administrator right or takes it away.
 
-- *Parameters*: `string username`, `bool isSystemAdmin`, the `Actor`, and a cancellation token.
-- *Postconditions*: The flag is stored with the audit entry `user.admin-changed`, whose detail names the user and the
+- _Parameters_: `string username`, `bool isSystemAdmin`, the `Actor`, and a cancellation token.
+- _Postconditions_: The flag is stored with the audit entry `user.admin-changed`, whose detail names the user and the
   change, for example `user 'ann': system administrator False -> True`.
 
 Reports `UserNotFound` for an unknown user and `LastAdmin` when the change would remove the right from the last
@@ -134,14 +149,17 @@ enabled system administrator.
 
 **ChangeOwnPasswordAsync**: Changes the password of a user who knows the current one.
 
-- *Parameters*: `string username`, `string? currentPassword`, `string? newPassword`, and a cancellation token.
-- *Returns*: `Task`.
-- *Postconditions*: The new hash is stored and the failure counter and lockout are cleared. Nothing is stored when a
+- _Parameters_: `string username`, `string? currentPassword`, `string? newPassword`, and a cancellation token.
+- _Returns_: `Task`.
+- _Postconditions_: The new hash is stored and the failure counter and lockout are cleared. Nothing is stored when a
   rule fails.
 
 The new password is checked first (`PasswordInvalid`); then the user must exist (`UserNotFound`). A locked-out account
 is refused like a wrong password. A wrong current password counts as a failed sign-in, so this operation is not a free
-way to guess passwords, and is reported as `CurrentPasswordIncorrect`. Other sessions of the user are not ended.
+way to guess passwords, and is reported as `CurrentPasswordIncorrect`. While `MustChangePassword` is set, a new password
+equal to the current (temporary) one is refused with `PasswordInvalid`; a successful change clears the flag, so the
+session that carried the must-change-password claim becomes stale and the user signs in again. Other sessions of the
+user are not ended.
 
 **SetPasswordAsync**: Sets the password of a user without the current one (for an administrator). The password is
 checked (`PasswordInvalid`), an unknown user is reported as `UserNotFound`, and the failure counter and lockout of the
@@ -201,8 +219,10 @@ not an error: `AuthenticateAsync` returns
 
 - **SignIn** — checks the password at sign-in and reads the user to validate the cookie of each request.
 - **SigningService** — checks the password again at signing time through `ReauthenticateAsync`.
-- **AccountPage** — changes the password of the signed-in user.
+- **AccountPage** — changes the password of the signed-in user (also the forced change of a temporary password).
 - **UsersPage** — lists, creates, enables, disables, and changes users.
 - **UserCommand** — creates the first system administrator and other users from the command line.
+- **ProjectService** — validates new account input through the internal `ValidateUsername` and `ValidateDisplayName`
+  rules of this unit, so that every way to create a user applies the same rules.
 - **ProjectAccess** — reads users through `IUserStore` to decide access (not through this service).
 - **ServerHost** — registers the service as a singleton.

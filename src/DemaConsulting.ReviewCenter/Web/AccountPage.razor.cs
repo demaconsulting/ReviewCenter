@@ -72,6 +72,12 @@ public partial class AccountPage : ComponentBase
     private PersonalAccessTokenService TokenService { get; set; } = null!;
 
     /// <summary>
+    ///     Gets or sets the navigation manager, supplied by dependency injection.
+    /// </summary>
+    [Inject]
+    private NavigationManager Navigation { get; set; } = null!;
+
+    /// <summary>
     ///     Gets or sets the clock that decides whether a token has expired, supplied by dependency injection.
     /// </summary>
     [Inject]
@@ -158,8 +164,20 @@ public partial class AccountPage : ComponentBase
     /// <returns>A task that completes when the list is loaded.</returns>
     protected override async Task OnInitializedAsync()
     {
-        await LoadTokensAsync();
+        // A temporary password limits the page to the password change; the service refuses tokens for it anyway
+        var state = await AuthenticationState.GetAuthenticationStateAsync();
+        MustChangePassword = SignIn.IsPasswordChangeRequired(state.User);
+        if (!MustChangePassword)
+        {
+            await LoadTokensAsync();
+        }
     }
+
+    /// <summary>
+    ///     Gets a value indicating whether the signed-in user still has to replace a temporary password; the page
+    ///     then shows only the change-password form.
+    /// </summary>
+    private bool MustChangePassword { get; set; }
 
     /// <summary>
     ///     Creates a token from the form and shows its value once.
@@ -351,6 +369,12 @@ public partial class AccountPage : ComponentBase
             var actor = await AuthenticationState.GetActorAsync();
             await UserService.ChangeOwnPasswordAsync(actor.Username, CurrentPassword, NewPassword);
             Message = "Your password was changed.";
+
+            // The old session still describes the temporary password, so the user signs in again with the new one
+            if (MustChangePassword)
+            {
+                Navigation.NavigateTo("/login?changed=1", forceLoad: true);
+            }
         }
         catch (DomainRuleException ex)
         {

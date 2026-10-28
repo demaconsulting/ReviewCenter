@@ -428,7 +428,13 @@ reviews:
       - "src/**/Web/ProjectPage.razor.cs"
       - "src/**/Web/NewReviewPage.razor"
       - "src/**/Web/NewReviewPage.razor.cs"
+      - "src/**/Web/NewMemberPage.razor"
+      - "src/**/Web/NewMemberPage.razor.cs"
+      - "src/**/Web/NewMemberAccountPage.razor"
+      - "src/**/Web/NewMemberAccountPage.razor.cs"
       - "test/**/Web/ProjectPageTests.cs"
+      - "test/**/Web/NewMemberPageTests.cs"
+      - "test/**/Web/NewMemberAccountPageTests.cs"
       - "test/**/Web/NewReviewPageRepositoryTests.cs"
 
   - id: ReviewCenter-Web-PlanPage
@@ -557,7 +563,12 @@ reviews:
       - "docs/verification/review-center/web/audit-page.md"
       - "src/**/Web/AuditPage.razor"
       - "src/**/Web/AuditPage.razor.cs"
+      - "src/**/Web/ProjectAuditPage.razor"
+      - "src/**/Web/ProjectAuditPage.razor.cs"
+      - "src/**/Web/AuditEntryTable.razor"
+      - "src/**/Web/AuditEntryTable.razor.cs"
       - "test/**/Web/AuditPageTests.cs"
+      - "test/**/Web/ProjectAuditPageTests.cs"
 
   - id: ReviewCenter-Web-RepositoriesPage
     title: Review of ReviewCenter RepositoriesPage unit implementation
@@ -628,6 +639,7 @@ reviews:
       - "src/DemaConsulting.ReviewCenter.Core/DomainRuleException.cs"
       - "src/DemaConsulting.ReviewCenter.Core/ReviewLimits.cs"
       - "test/**/Core/ProjectServiceTests.cs"
+      - "test/**/Core/ProjectMemberServiceTests.cs"
       - "test/**/Core/AuditEventTests.cs"
 
   - id: ReviewCenter-Core-ProjectAccess
@@ -646,6 +658,7 @@ reviews:
       - "src/DemaConsulting.ReviewCenter.Core/ProjectMembership.cs"
       - "test/**/Core/ProjectAccessTests.cs"
       - "test/**/Core/ProjectAccessGuardTests.cs"
+      - "test/**/Core/MustChangePasswordTests.cs"
 
   - id: ReviewCenter-Core-ReviewService
     title: Review of ReviewCenter ReviewService unit implementation
@@ -730,6 +743,7 @@ reviews:
       - "src/DemaConsulting.ReviewCenter.Core/IUserStore.cs"
       - "src/DemaConsulting.ReviewCenter.Core/IPasswordHasher.cs"
       - "test/**/Core/UserServiceTests.cs"
+      - "test/**/Core/MustChangePasswordTests.cs"
       - "test/**/Core/AuditEventTests.cs"
 
   - id: ReviewCenter-Core-RecordDigest
@@ -901,6 +915,7 @@ reviews:
       - "src/DemaConsulting.ReviewCenter.Core/PersonalAccessToken.cs"
       - "src/DemaConsulting.ReviewCenter.Core/IPersonalAccessTokenStore.cs"
       - "test/**/Core/PersonalAccessTokenServiceTests.cs"
+      - "test/**/Core/MustChangePasswordTests.cs"
       - "test/**/Core/FakePersonalAccessTokenStore.cs"
 
   # ReviewCenter - Storage
@@ -944,6 +959,8 @@ reviews:
       - "test/**/Storage/ReviewStoreTests.cs"
       - "test/**/Storage/ReviewStoreRepositoryTests.cs"
       - "test/**/Storage/ReviewStoreSigningTests.cs"
+      - "test/**/Storage/ReviewStoreMembershipTests.cs"
+      - "test/**/Storage/ProjectMembersStoreTests.cs"
 
   - id: ReviewCenter-Storage-UserStore
     title: Review of ReviewCenter UserStore unit implementation
@@ -958,6 +975,7 @@ reviews:
       - "docs/verification/review-center/storage/user-store.md"
       - "src/**/Storage/UserStore.cs"
       - "test/**/Storage/UserStoreTests.cs"
+      - "test/**/Storage/ProjectMembersStoreTests.cs"
 
   - id: ReviewCenter-Storage-AuditStore
     title: Review of ReviewCenter AuditStore unit implementation
@@ -973,6 +991,7 @@ reviews:
       - "src/**/Storage/AuditStore.cs"
       - "src/**/Storage/AuditAppender.cs"
       - "test/**/Storage/AuditStoreTests.cs"
+      - "test/**/Storage/ProjectMembersStoreTests.cs"
 
   - id: ReviewCenter-Storage-DatabaseSetup
     title: Review of ReviewCenter DatabaseSetup unit implementation

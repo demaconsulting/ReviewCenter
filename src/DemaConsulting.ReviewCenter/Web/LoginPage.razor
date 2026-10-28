@@ -5,13 +5,21 @@
    The return address travels in a hidden field and is checked again by the endpoint. A failed attempt comes
    back here with "error=1"; the message is the same whatever went wrong, so it never reveals whether a user
    name exists. A client that made too many attempts comes back with "error=throttled" and a message that is
-   the same for every name; any other non-empty value shows the generic message. *@
+   the same for every name; any other non-empty value shows the generic message. After a forced password change the
+   account page sends the user here with "changed=1", which shows a notice to sign in with the new password. *@
 @page "/login"
 
 <PageTitle>Sign in - ReviewCenter</PageTitle>
 
 <main class="page narrow" data-testid="login-page">
     <h1>Sign in</h1>
+
+    @if (PasswordChanged)
+    {
+        <p class="notice" role="status" data-testid="login-password-changed">
+            Password changed. Sign in with your new password.
+        </p>
+    }
 
     <section class="card">
         <form method="post" action="/auth/login" data-testid="login-form">

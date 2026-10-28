@@ -27,15 +27,17 @@ namespace DemaConsulting.ReviewCenter.Web;
 
 /// <summary>
 ///     Code-behind for the project page (<c>ProjectPage.razor</c>): shows one project and lists its reviews with
-///     their approval state. Reviews are created on the separate new review page. A system administrator also
-///     manages the members of the project here.
+///     their approval state. Reviews are created on the separate new review page. An administrator of the project (a
+///     project admin or a system administrator) also manages its members here and opens its audit trail.
 /// </summary>
 /// <remarks>
 ///     The page talks to the domain only through <see cref="ProjectService"/>, <see cref="ReviewService"/>,
-///     <see cref="SigningService"/>, <see cref="RepositoryService"/> and <see cref="UserService"/> (to offer the
-///     users that can be added). A project the user may not see is shown exactly like a project that does not exist.
-///     Each browser connection (circuit) gets its own page instance, so the state here is per-user and needs no
-///     synchronization. The page requires a signed-in user.
+///     <see cref="SigningService"/> and <see cref="RepositoryService"/>. A project the user may not see is shown
+///     exactly like a project that does not exist. Adding a member needs typing an exact user name and happens on
+///     its own page, so no list of users is ever loaded here. Every handler asks the shared guard again before it
+///     reads or changes anything, so a user who lost the right sees nothing stale. Each browser connection
+///     (circuit) gets its own page instance, so the state here is per-user and needs no synchronization. The page
+///     requires a signed-in user.
 /// </remarks>
 public partial class ProjectPage : ComponentBase
 {
@@ -77,13 +79,6 @@ public partial class ProjectPage : ComponentBase
     private RepositoryService RepositoryService { get; set; } = null!;
 
     /// <summary>
-    ///     Gets or sets the user service, supplied by dependency injection; lists the users a system administrator
-    ///     can add as members.
-    /// </summary>
-    [Inject]
-    private UserService UserService { get; set; } = null!;
-
-    /// <summary>
     ///     Gets or sets the access service, supplied by dependency injection; decides what the user may do here.
     /// </summary>
     [Inject]
@@ -121,39 +116,14 @@ public partial class ProjectPage : ComponentBase
     private IReadOnlyList<RepositorySummary> Repositories { get; set; } = [];
 
     /// <summary>
-    ///     Gets a value indicating whether the user is a system administrator.
-    /// </summary>
-    private bool IsSystemAdmin { get; set; }
-
-    /// <summary>
     ///     Gets a value indicating whether the user may manage this project (system administrator or project admin).
     /// </summary>
     private bool CanAdminister { get; set; }
 
     /// <summary>
-    ///     Gets the members of the project; only loaded for a system administrator.
+    ///     Gets the members of the project; only loaded for someone who may administer the project.
     /// </summary>
     private IReadOnlyList<ProjectMember> Members { get; set; } = [];
-
-    /// <summary>
-    ///     Gets the enabled users who are not members yet, for the add-member form.
-    /// </summary>
-    private IReadOnlyList<User> Candidates { get; set; } = [];
-
-    /// <summary>
-    ///     Gets a value indicating whether the add-member form is shown.
-    /// </summary>
-    private bool ShowAddForm { get; set; }
-
-    /// <summary>
-    ///     Gets or sets the user name chosen in the add-member form.
-    /// </summary>
-    private string AddUsername { get; set; } = string.Empty;
-
-    /// <summary>
-    ///     Gets or sets a value indicating whether the member to add becomes a project admin.
-    /// </summary>
-    private bool AddAsProjectAdmin { get; set; }
 
     /// <summary>
     ///     Gets the message of the last rejected member change, or <c>null</c> when there is none.
@@ -182,7 +152,6 @@ public partial class ProjectPage : ComponentBase
     {
         // The router reuses this instance when only the project id changes; drop the previous project's data
         Loaded = false;
-        ShowAddForm = false;
         MemberError = null;
         MemberStatus = null;
         var actor = await AuthenticationState.GetActorOrNullAsync();
@@ -195,7 +164,6 @@ public partial class ProjectPage : ComponentBase
 
         Reviews = await ReviewService.ListAsync(ProjectId);
         Repositories = await RepositoryService.ListEnabledAsync(actor, ProjectId);
-        IsSystemAdmin = await Access.IsSystemAdminAsync(actor);
         CanAdminister = await Access.CanAdministerAsync(actor, ProjectId);
         await LoadMembersAsync(actor);
 
@@ -223,18 +191,17 @@ public partial class ProjectPage : ComponentBase
     }
 
     /// <summary>
-    ///     Re-checks, at the start of a member action on the open page, that the signed-in user may still view the
-    ///     project and is still a system administrator.
+    ///     Re-checks, at the start of a member action on the open page, that the signed-in user may still view and
+    ///     administer the project.
     /// </summary>
     /// <returns>
     ///     <c>true</c> when the action may go on. <c>false</c> when the view is gone (the page has dropped
-    ///     everything and shows the not-found state) or only the system administrator right is gone (the page has
-    ///     dropped the members section, and the project stays visible); the action must stop in both cases.
+    ///     everything and shows the not-found state) or only the administer right is gone (the page has dropped the
+    ///     members section, and the project stays visible); the action must stop in both cases.
     /// </returns>
     /// <remarks>
-    ///     The members and the users that can be added are data only a system administrator may read, so they must
-    ///     not stay rendered once the right is gone. A user who lost the right may still be a project admin, so the
-    ///     link to the repositories is refreshed to what the user may do now.
+    ///     The members are data only an administrator of the project may read, so they must not stay rendered once
+    ///     the right is gone. The check is the shared guard, so it gives the answer a user without the right gets.
     /// </remarks>
     private async Task<bool> GuardMembersAsync()
     {
@@ -244,14 +211,7 @@ public partial class ProjectPage : ComponentBase
             return false;
         }
 
-        if (await Access.GuardSystemAdminAsync(AuthenticationState, ShowMembersLost))
-        {
-            return true;
-        }
-
-        // Only the system administrator right is gone; show what the user may still do on this project
-        CanAdminister = await Access.CanAdministerAsync(await AuthenticationState.GetActorOrNullAsync(), ProjectId);
-        return false;
+        return await Access.GuardAdministerAsync(AuthenticationState, ProjectId, ShowMembersLost);
     }
 
     /// <summary>
@@ -263,66 +223,19 @@ public partial class ProjectPage : ComponentBase
         Reviews = [];
         ApprovedReviews.Clear();
         Repositories = [];
-        CanAdminister = false;
         ShowMembersLost();
         Loaded = true;
     }
 
     /// <summary>
-    ///     Drops what only a system administrator may see: the members, the users that can be added and the forms.
+    ///     Drops what only an administrator of the project may see: the members and the administration buttons.
     /// </summary>
     private void ShowMembersLost()
     {
-        IsSystemAdmin = false;
+        CanAdminister = false;
         Members = [];
-        Candidates = [];
-        ShowAddForm = false;
-        AddUsername = string.Empty;
-        AddAsProjectAdmin = false;
         MemberError = null;
         MemberStatus = null;
-    }
-
-    /// <summary>
-    ///     Shows the add-member form.
-    /// </summary>
-    /// <returns>A task that completes when the form is shown or the page has dropped what it may no longer show.</returns>
-    private async Task OpenAddFormAsync()
-    {
-        if (!await GuardMembersAsync())
-        {
-            return;
-        }
-
-        MemberError = null;
-        MemberStatus = null;
-        AddUsername = Candidates.Count > 0 ? Candidates[0].Username : string.Empty;
-        AddAsProjectAdmin = false;
-        ShowAddForm = true;
-    }
-
-    /// <summary>
-    ///     Hides the add-member form without adding anybody.
-    /// </summary>
-    private void CloseAddForm()
-    {
-        ShowAddForm = false;
-    }
-
-    /// <summary>
-    ///     Adds the user chosen in the form as a member.
-    /// </summary>
-    /// <returns>A task that completes when the member is added or the problem is shown.</returns>
-    private async Task AddMemberAsync()
-    {
-        var username = AddUsername;
-        var role = AddAsProjectAdmin ? ProjectRole.ProjectAdmin : ProjectRole.User;
-        if (await RunMemberChangeAsync(
-                actor => ProjectService.AddMemberAsync(actor, ProjectId, username, role),
-                $"Added '{username}' as {RoleText(role)}."))
-        {
-            ShowAddForm = false;
-        }
     }
 
     /// <summary>
@@ -367,9 +280,10 @@ public partial class ProjectPage : ComponentBase
     /// <param name="success">The message to show when the change is stored.</param>
     /// <returns><c>true</c> when the change was stored.</returns>
     /// <remarks>
-    ///     The change runs only while the user may still view the project and is still a system administrator; when
-    ///     either is gone the page drops what the user may no longer see instead of showing an error next to it.
-    ///     The status is shown only after the lists have been reloaded, so it never stands next to a stale list.
+    ///     The change runs only while the user may still view and administer the project; when either is gone the
+    ///     page drops what the user may no longer see instead of showing an error next to it. The status is shown
+    ///     only after the list has been reloaded, so it never stands next to a stale list. A refusal such as the
+    ///     last-project-admin rule is shown as the error of the section.
     /// </remarks>
     private async Task<bool> RunMemberChangeAsync(Func<Actor, Task> change, string success)
     {
@@ -402,24 +316,13 @@ public partial class ProjectPage : ComponentBase
     }
 
     /// <summary>
-    ///     Loads the member list and the users that can still be added; only a system administrator manages members.
+    ///     Loads the member list; only an administrator of the project manages members.
     /// </summary>
     /// <param name="actor">The signed-in user.</param>
-    /// <returns>A task that completes when the lists are loaded.</returns>
+    /// <returns>A task that completes when the list is loaded.</returns>
     private async Task LoadMembersAsync(Actor actor)
     {
-        if (!IsSystemAdmin)
-        {
-            Members = [];
-            Candidates = [];
-            return;
-        }
-
-        Members = await ProjectService.ListMembersAsync(actor, ProjectId);
-        var memberNames = Members.Select(member => member.Username).ToHashSet(StringComparer.OrdinalIgnoreCase);
-        Candidates = (await UserService.ListAsync())
-            .Where(user => user.Enabled && !memberNames.Contains(user.Username))
-            .ToList();
+        Members = CanAdminister ? await ProjectService.ListMembersAsync(actor, ProjectId) : [];
     }
 
     /// <summary>

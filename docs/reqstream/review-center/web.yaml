@@ -43,7 +43,8 @@ sections:
         title: >-
           The Web subsystem shall serve an About page at /about, and a built-in Help at /help with an index of
           topics and one page per topic at /help/{topic}, each with links to the previous topic, the next topic,
-          and the index, and a friendly message for an unknown topic.
+          and the index, among them the topic /help/project-members for the management of project members, and a
+          friendly message for an unknown topic.
         justification: |
           Users need to learn what the product does, which version they run, and how to work with it without
           leaving the application. One page per topic keeps every link a plain address that can be shared and
@@ -55,10 +56,12 @@ sections:
           - ReviewCenter-HelpPage-Topics
           - ReviewCenter-HelpPage-Navigation
           - ReviewCenter-HelpPage-NotFound
+          - ReviewCenter-HelpPage-MembersTopic
           - ReviewCenter-App-HelpLink
         tests:
           - HelpPage_Render_ListsEveryTopicWithItsPageLink
           - HelpTopicPages_Render_EveryTopicHasAPageWithValidNavigation
+          - HelpMembersPage_Render_ExplainsAddingAccountsAndTheLastAdminRule
           - AboutPage_Render_Anonymous_ShowsVersionCopyrightAndProjectLink
 
       - id: ReviewCenter-Web-Interactive
@@ -105,8 +108,10 @@ sections:
           The Web subsystem shall show a user only the projects the user is a member of, and a system administrator
           every project; shall show a project the user may not see exactly as a project that does not exist, so that
           a user cannot tell a hidden project from a missing one; shall let only a system administrator create
-          projects and manage their members, on the project page, with a role of project admin or member for each
-          member; and shall let only whoever manages a project, a system administrator or a project admin of it,
+          projects, and only whoever administers a project, a system administrator or a project admin of it, manage
+          its members, on the project page and the two pages for a new member, with a role of project admin or
+          member for each member, where a member is added by the exact user name, with no list of users, or as a new
+          account together with its membership; shall let only whoever manages a project
           open its repositories, and offer in a new review only the repositories of that project; and shall keep
           that rule for a page that stays open, by checking the view access again at the start of every action of
           a project page and, once the user has lost it, showing the page for a project that does not exist and
@@ -129,6 +134,8 @@ sections:
           - ReviewCenter-ProjectPage-Show
           - ReviewCenter-ProjectPage-Members
           - ReviewCenter-ProjectPage-MemberChange
+          - ReviewCenter-ProjectPage-AddMember
+          - ReviewCenter-ProjectPage-CreateAccount
           - ReviewCenter-ProjectPage-RepositoriesLink
           - ReviewCenter-ProjectPage-RepositoryForm
           - ReviewCenter-RepositoriesPage-Admin
@@ -142,6 +149,8 @@ sections:
           - ProjectPage_Render_NonMember_LooksLikeAMissingProject
           - ProjectPage_Render_SystemAdmin_ListsMembersWithRolesAndActions
           - ProjectPage_MemberActions_ToggleRoleAndRemove_ChangeTheMembership
+          - NewMemberPage_Submit_ExistingUser_AddsWithRoleAndReturnsToTheProject
+          - NewMemberAccountPage_Submit_ValidNames_CreatesAccountShowsPasswordOnceAndDoneHidesIt
           - RepositoriesPage_Render_MemberOrNonMember_ShowsNotFoundOnly
           - NewReviewPage_RepositorySelect_OffersOnlyRepositoriesOfThisProject
           - ProjectViewGuard_GuardView_Member_ReturnsTrueWithoutCallback
@@ -256,7 +265,10 @@ sections:
           account page and a logout button, or a sign-in link when nobody is signed in, serve a login page at
           /login with a user name and a password field that shows a failed sign-in without revealing its reason,
           serve an account page at /account where a signed-in user changes the own password and chooses the
-          appearance, and serve a users page at /users where a system administrator enables and disables users, makes
+          appearance, and, for a user who signed in with a temporary password, shows a banner and the password change
+          only, with the header of such a session free of navigation tabs and every other page replaced by the account
+          page, and the login page showing a notice to sign in again after the change, and serve a users page at
+          /users where a system administrator enables and disables users, makes
           users system administrators or takes that away, and sets passwords, and reaches the page at /users/new that
           creates users.
         justification: |
@@ -268,10 +280,13 @@ sections:
           - ReviewCenter-App-Header
           - ReviewCenter-App-UsersLink
           - ReviewCenter-App-RouteAuthorization
+          - ReviewCenter-App-TemporaryPassword
           - ReviewCenter-LoginPage-Form
           - ReviewCenter-LoginPage-Error
+          - ReviewCenter-LoginPage-PasswordChanged
           - ReviewCenter-AccountPage-Show
           - ReviewCenter-AccountPage-ChangePassword
+          - ReviewCenter-AccountPage-TemporaryPassword
           - ReviewCenter-UsersPage-List
           - ReviewCenter-UsersPage-Create
           - ReviewCenter-UsersPage-NewPage
@@ -281,6 +296,8 @@ sections:
           - ReviewCenter-UsersPage-AdminCheck
         tests:
           - IdentitySubsystem_SignInJourney_LoginUseAndLogout_WorksEndToEnd
+          - MainLayout_Render_TemporaryPassword_ConfinesUserToAccountPage
+          - AccountPage_ChangePassword_TemporaryPassword_RedirectsToLoginWithNotice
           - WebSubsystem_AllPages_EveryInteractiveElementHasTestId
 
       - id: ReviewCenter-Web-SessionEnd
@@ -345,21 +362,26 @@ sections:
 
       - id: ReviewCenter-Web-AuditPage
         title: >-
-          The Web subsystem shall show system administrators, and nobody else, the whole audit trail on an audit page
+          The Web subsystem shall show system administrators the whole audit trail on an audit page
           that is reached from the header, and let them verify the hash chain and read the entry count and the head
-          hash of an intact chain or the first broken entry.
+          hash of an intact chain or the first broken entry, and shall show whoever administers a project, a system
+          administrator or a project admin of it, and nobody else, the audit trail of that project only on a page
+          that is reached from the project page.
         justification: |
           The whole trail names every user and action. The head hash is what a system administrator records outside
-          the database to detect the later removal of the newest entries.
+          the database to detect the later removal of the newest entries. Project admins answer for their project, so
+          they see its trail, and only that.
         children:
           - ReviewCenter-AuditPage-Display
           - ReviewCenter-AuditPage-ShortHash
           - ReviewCenter-AuditPage-Verify
           - ReviewCenter-AuditPage-Admin
+          - ReviewCenter-AuditPage-ProjectView
           - ReviewCenter-App-AuditLink
         tests:
           - AuditPage_Verify_IntactChain_ShowsCountAndFullHeadHash
           - Routes_Render_ReviewerOpensAuditRoute_ShowsAccessDeniedNotTrail
+          - ProjectAuditPage_Render_ProjectAdmin_ShowsOnlyThisProjectsEvents
 
       - id: ReviewCenter-Web-Repositories
         title: >-

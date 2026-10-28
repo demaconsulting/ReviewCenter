@@ -1,0 +1,83 @@
+@* NewMemberPage: the form that adds an existing user to a project, at "/projects/{id}/members/new". The page holds
+   only the form (a narrow column): the exact user name to add and a "Project admin" choice. Cancel goes back to the
+   project and a successful add returns to it. Only whoever may administer the project (a system administrator or a
+   project admin of it) gets the form; anybody else sees the not-found message of a missing project.
+
+   Presentation only; state and event handling live in NewMemberPage.razor.cs. There is deliberately no list of users
+   to pick from: the user name has to be typed exactly, so nobody can browse the accounts of other projects. When the
+   user name cannot be added the message is the same whether the account does not exist or is not usable, and it
+   points to the page that creates a new account. The data-interactive marker on the root flips to "true" once the
+   live circuit is connected.
+
+   Human factors: (a) one field and one choice; (b) nothing else is on the page, the rare "create a new account"
+   action is a button to its own page; (c) the hints say that the name must be exact and what a project admin may do.
+
+   The page body is inside SessionGate, which replaces it with a "Session ended" message when the user is no longer
+   valid while the page is open. *@
+@page "/projects/{ProjectId:int}/members/new"
+@rendermode InteractiveServer
+@attribute [Authorize]
+
+<PageTitle>Add member - ReviewCenter</PageTitle>
+
+<SessionGate>
+<main class="page narrow" data-testid="new-member-page" data-interactive="@InteractiveMarker">
+    <nav class="breadcrumb">
+        <a href="/projects" data-testid="breadcrumb-projects-link">Projects</a>
+        @if (Project is not null)
+        {
+            <span aria-hidden="true">/</span>
+            <a href="/projects/@ProjectId" data-testid="breadcrumb-project-link">@Project.Name</a>
+            <span aria-hidden="true">/</span>
+            <span aria-current="page">Add member</span>
+        }
+    </nav>
+
+    @if (!Loaded)
+    {
+        <p class="muted" data-testid="new-member-loading">Loading...</p>
+    }
+    else if (Project is null)
+    {
+        <p class="error" role="alert" data-testid="project-not-found">Project @ProjectId does not exist.</p>
+    }
+    else
+    {
+    <h1>Add member</h1>
+    <p class="page-lead">Give an existing user access to this project.</p>
+
+    <section class="card">
+        @if (ErrorMessage is not null)
+        {
+            <p class="error" role="alert" data-testid="new-member-error">@ErrorMessage</p>
+        }
+        <form data-testid="new-member-form" @onsubmit="AddMemberAsync">
+            <div class="field">
+                <label for="new-member-username">User name</label>
+                <input id="new-member-username" type="text" maxlength="@ReviewLimits.MaxUsernameLength"
+                       autocomplete="off"
+                       data-testid="new-member-username-input" @bind="Username" @bind:event="oninput" />
+                <p class="muted hint">Type the exact user name of the account.</p>
+            </div>
+            <div class="field">
+                <label>
+                    <input type="checkbox" data-testid="new-member-admin-checkbox" @bind="AsProjectAdmin" />
+                    Project admin
+                </label>
+                <p class="muted hint">A project admin also manages the members and repositories of this project.</p>
+            </div>
+            <div class="plan-actions">
+                <button type="submit" data-testid="new-member-submit">Add member</button>
+                <a class="action outline" href="/projects/@ProjectId" data-testid="new-member-cancel">Cancel</a>
+            </div>
+        </form>
+    </section>
+
+    <p class="muted hint">The person has no account yet?</p>
+    <p>
+        <a class="action outline" href="/projects/@ProjectId/members/account"
+           data-testid="new-member-create-account-link">Create a new account</a>
+    </p>
+    }
+</main>
+</SessionGate>

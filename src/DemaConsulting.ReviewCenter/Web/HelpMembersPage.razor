@@ -1,0 +1,31 @@
+@* HelpMembersPage: help topic "Managing project members" at "/help/project-members". Static text. *@
+@page "/help/project-members"
+
+<HelpTopicFrame Slug="project-members">
+    <section class="card">
+        <p>A project can be seen only by its members. A <strong>project admin</strong> (and any system administrator)
+            manages the members from the <strong>Members</strong> section of the project page.</p>
+        <h2>Add someone who has an account</h2>
+        <p>Choose <strong>+ Add member</strong>, type the exact user name and choose whether the person is a project
+            admin. There is no list of users to pick from, so ask the person for their user name. If the name cannot
+            be added you get one message whatever the reason (a misspelled name, an account that does not exist or
+            one that is disabled), and repeated failures are recorded in the audit trail and slow you down for a few
+            minutes.</p>
+        <h2>Create an account for someone new</h2>
+        <p>On the <strong>Add member</strong> page choose <strong>Create a new account</strong>. Enter a user name and
+            a display name. The account is created together with the membership, and ReviewCenter shows a temporary
+            password <strong>once</strong>. Give it to the person right away; it cannot be shown again. At the first
+            sign-in the person must choose a new password before doing anything else.</p>
+        <h2>Change a role or remove a member</h2>
+        <p>Use <strong>Make project admin</strong>, <strong>Make member</strong> or <strong>Remove</strong> on a
+            member. A project always keeps at least one project admin: a project admin cannot remove or demote the
+            last one, even themselves. A system administrator can.</p>
+        <h2>Reviewers who are removed</h2>
+        <p>A reviewer slot keeps its reviewer when the person is removed from the project. The review page marks the
+            reviewer as <strong>No longer a project member</strong>, and that reviewer cannot sign until added
+            again.</p>
+        <h2>Project audit trail</h2>
+        <p>The <strong>Audit trail</strong> button of the project page shows everything recorded for this project,
+            including every member change.</p>
+    </section>
+</HelpTopicFrame>

@@ -295,8 +295,14 @@ public sealed class AuditService
     /// <summary>
     ///     Reads one page of the trail, newest first.
     /// </summary>
-    /// <param name="projectId">With <paramref name="reviewId"/>, limits the page to one review; <c>null</c> for the whole trail.</param>
-    /// <param name="reviewId">The review to limit to, or <c>null</c> for the whole trail.</param>
+    /// <param name="projectId">
+    ///     Limits the page to one project (every event of the project, or with <paramref name="reviewId"/> only the
+    ///     events of one review); <c>null</c> for the whole trail. The caller must have checked the right to see the
+    ///     project first.
+    /// </param>
+    /// <param name="reviewId">
+    ///     The review of <paramref name="projectId"/> to limit to, or <c>null</c> for no review limit.
+    /// </param>
     /// <param name="beforeSequence">Start with the entries older than this sequence (the "Older" page), or <c>null</c>.</param>
     /// <param name="afterSequence">Start with the entries newer than this sequence (the "Newer" page), or <c>null</c>.</param>
     /// <param name="cancellationToken">Cancels the operation.</param>

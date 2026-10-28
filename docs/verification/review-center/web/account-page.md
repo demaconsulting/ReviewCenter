@@ -25,6 +25,9 @@ N/A - standard test environment.
 - A valid change changes the password of the signed-in user, shows a confirmation, and empties the fields.
 - A wrong current password, new passwords that do not match, and a new password that breaks the policy are each shown
   as an error and change nothing.
+- A user whose session carries the must-change-password claim sees a banner and the password form, and no tokens card
+  and no appearance card; a normal session shows no banner; replacing the temporary password sends the browser to the
+  sign-in page with the changed notice flag and clears the flag of the stored user.
 - The page shows a card of personal access tokens with the name field, the choices of 30, 90 (selected), and 365 days,
   the list (or a note that it is empty), and a link to the help topic; creating a token shows its value once with a copy
   button and lists the token without the value; an empty name and the twenty-first active token are each shown as an
@@ -92,3 +95,15 @@ was revoked." is shown. This scenario is tested by `AccountPage_RevokeToken_Acti
 **AccountPage_Render_ExpiredToken_ShowsExpiredWithoutRevokeButton**: A 30-day token is created and the clock is moved
 31 days; the page shows the token as Expired without a revoke button. This scenario is tested by
 `AccountPage_Render_ExpiredToken_ShowsExpiredWithoutRevokeButton`.
+
+**AccountPage_Render_TemporaryPassword_ShowsBannerAndOnlyPasswordForm**: A user whose session carries the
+must-change-password claim opens the page; the banner and the password form are shown, and neither the tokens card nor
+the appearance card is. This scenario is tested by
+`AccountPage_Render_TemporaryPassword_ShowsBannerAndOnlyPasswordForm`.
+
+**AccountPage_Render_NormalSession_ShowsNoBanner**: A normal session shows no banner, and the tokens card is there. This
+scenario is tested by `AccountPage_Render_NormalSession_ShowsNoBanner`.
+
+**AccountPage_ChangePassword_TemporaryPassword_RedirectsToLoginWithNotice**: A flagged user fills in the form with the
+current and a new password and submits; the browser is sent to `/login?changed=1` and the stored user no longer has the
+flag. This scenario is tested by `AccountPage_ChangePassword_TemporaryPassword_RedirectsToLoginWithNotice`.

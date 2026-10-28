@@ -27,11 +27,20 @@ protected pages are redirected.
 **AdminRole**: `string` (constant) — `SystemAdmin`; the role name that the pages only a system administrator may use
 require, and the value of the role claim.
 
+**MustChangePasswordClaimType**: `string` (constant) — `must_change_password`; the claim, with the value `true`, that
+marks an account that still has a temporary password.
+
+**AccountPath**: `string` (constant) — `/account`; the page where the user changes the own password, and the only
+project page a user with a temporary password may use.
+
 **ThrottledError**: `string` (constant) — `throttled`; the value of the `error` query of the login page that asks for
 the "too many attempts" message (any other value asks for the generic message).
 
 **Claims**: the principal in the cookie has two claims for every user, the user name (the name claim) and the display
-name, and a third, the role claim with the value `SystemAdmin`, only for a user who is a system administrator. It never
+name, and a third, the role claim with the value `SystemAdmin`, only for a user who is a system administrator and does
+not have to change a temporary password. A user whose account has a temporary password gets the claim
+`must_change_password` instead, and never the role, so the administrator authority is not available until the password
+is changed. It never
 has the password or its hash, and never a project role or a membership. A principal that the `Api` subsystem builds
 from a token has the same claims (the role claim only for a system administrator) and two more (`rc_auth` and
 `rc_token_id`), but it is never signed in with the cookie scheme
@@ -100,7 +109,8 @@ cookie is set, a `auth.sign-in-throttled` entry is recorded (see below), and the
 not reveal which names exist. Otherwise the user name and password are checked with
 `UserService.AuthenticateAsync`. On success `SignInThrottle.Succeeded` gives the attempts back (it is given the
 reservation that `TryBegin` returned, so it only touches the windows that attempt was counted in), the principal (see
-Claims) is signed in with the cookie scheme as a session cookie and the response redirects to the safe return URL. On
+Claims) is signed in with the cookie scheme as a session cookie and the response redirects to the safe return URL, or to
+`AccountPath` when the user has to change a temporary password, whatever address the user asked for. On
 failure the response redirects to `/login?error=1`, adding `&ReturnUrl=` with the escaped safe return URL when it is
 not `/`, so a second attempt still leads to the place the user wanted. The failure is the same for an unknown user, a
 wrong password, a disabled account, and a locked account, so the response does not reveal which user names exist or
@@ -158,14 +168,26 @@ it again because the form value is client-supplied.
 
 - *Parameters*: `ClaimsPrincipal? principal`, `User? user` — the user as stored now, or null when there is none.
 - *Returns*: `bool` — `true` only when both are present, the user is enabled, the presence of the `SystemAdmin` role
-  claim in the principal equals `User.IsSystemAdmin`, and the display name in the principal equals the stored one.
+  claim in the principal equals `User.IsSystemAdmin` and not `User.MustChangePassword`, the presence of the
+  `must_change_password` claim equals `User.MustChangePassword`, and the display name in the principal equals the stored
+  one.
 - *Postconditions*: Pure; nothing is changed.
+
+**IsPasswordChangeRequired**: Tells whether a principal carries the `must_change_password` claim.
+
+- *Parameters*: `ClaimsPrincipal? principal`.
+- *Returns*: `bool` — `true` only when the claim has the value `true`; `false` for null or no claim.
+- *Postconditions*: Pure. It reads only the claim, so the layout can use it without a store call; it is part of
+  `IsCurrent`, so the claim cannot differ from the stored flag for long.
 
 **Principal validation**: On every request that carries the cookie, the cookie is checked against the user store
 (`UserService.GetAsync`) with `IsCurrent`. The cookie is rejected, and removed, when the user no longer exists, is
-disabled, or when the system administrator state or the display name in the cookie differs from the stored one; the
+disabled, or when the system administrator state, the must-change-password state, or the display name in the cookie
+differs from the stored one; the
 user then has to sign in
-again and gets the current values. A changed password does not reject cookies, so it does not end other sessions of the
+again and gets the current values. After the password change that clears the flag the session of the change goes stale
+in this way, so the account page sends the user to the login page and the next sign-in has the normal claims. A
+changed password does not otherwise reject cookies, so it does not end other sessions of the
 user. The periodic check of an open page (see the `RevalidatingAuthenticationStateProvider` design) uses the same
 `IsCurrent`, so the cookie and an open page cannot drift apart.
 
@@ -192,7 +214,8 @@ address is only in the web server log.
 - **AuditService** (Core) — records the sign-in, the sign-out, and the throttled refusals.
 - **SignInThrottle** (Identity) — decides whether an attempt may go on, and takes attempts back after a success.
 - **Actor**, **User**, and **DomainRuleException** (Core) — the type produced for the pages, the user
-  that `IsCurrent` compares with (its `IsSystemAdmin` flag), and the refusal of `GetActorAsync`.
+  that `IsCurrent` compares with (its `IsSystemAdmin` and `MustChangePassword` flags), and the refusal of
+  `GetActorAsync`.
 - **RevalidatingAuthenticationStateProvider** (Identity) — registered by `AddSignIn`; it calls `IsCurrent`.
 - **ASP.NET Core shared framework** — cookie authentication, authorization, antiforgery, and the Blazor
   authentication state; see the ASP.NET Core integration design in the OTS chapter.
@@ -205,7 +228,8 @@ address is only in the web server log.
 - **ApiTokenAuthentication** — reads the client address of a request with `ClientAddress` (an internal static method of
   this unit that the web login also uses), so that the attempts of the API count per address in the same way.
 - **LoginPage** — posts its form to `/auth/login`, uses `SafeReturnUrl`, and uses `ThrottledError` to choose its message.
-- **App** (`MainLayout`) — posts its logout form to `/auth/logout`, and reads the signed-in user for the header.
+- **App** (`MainLayout`) — posts its logout form to `/auth/logout`, reads the signed-in user for the header, and uses
+  `IsPasswordChangeRequired` and `AccountPath` to confine a user with a temporary password.
 - **ReviewPage**, **ChecklistPage**, **AccountPage**, and **UsersPage** — call `GetActorAsync` (the account page to know
   whose password to change); the pages of a project call `GetActorOrNullAsync`. **ProjectsPage**, **ProjectPage**,
   **ReviewPage**, **ChecklistPage**, and **AccountPage**

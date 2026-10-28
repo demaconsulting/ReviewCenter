@@ -65,7 +65,8 @@ the schema. An existing database is not changed, and no migrations are used. A d
 for comment threads existed therefore does not get them and must be deleted and created again; the same holds for a
 database created before the audit trail, which has no `AuditEntries` table, and for a database created before the
 repository registry, which has no `Repositories` table, and for a database created before the project access control,
-which has no `ProjectMemberships` table.
+which has no `ProjectMemberships` table, and for a database created before the project members management, which has no
+`MustChangePassword` column on its users. A development database must be deleted and created again in each case.
 
 #### Error Handling
 

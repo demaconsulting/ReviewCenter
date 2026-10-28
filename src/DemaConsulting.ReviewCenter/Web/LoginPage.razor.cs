@@ -59,4 +59,16 @@ public partial class LoginPage : ComponentBase
     ///     Gets a value indicating whether the previous attempt was refused because there were too many.
     /// </summary>
     private bool Throttled => Error == SignIn.ThrottledError;
+
+    /// <summary>
+    ///     Gets or sets the flag set after a password change, from the <c>changed</c> query value.
+    /// </summary>
+    [SupplyParameterFromQuery(Name = "changed")]
+    private string? Changed { get; set; }
+
+    /// <summary>
+    ///     Gets a value indicating whether the user arrives from a successful password change and has to sign in
+    ///     again with the new password.
+    /// </summary>
+    private bool PasswordChanged => Changed == "1";
 }

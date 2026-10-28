@@ -75,6 +75,13 @@ public sealed class User
     public DateTimeOffset? LockoutUntil { get; set; }
 
     /// <summary>
+    ///     Gets or sets a value indicating whether the password is a temporary one handed out by a project
+    ///     administrator: the user can sign in but must choose a new password before anything else is allowed.
+    ///     Cleared when the user changes the own password.
+    /// </summary>
+    public bool MustChangePassword { get; set; }
+
+    /// <summary>
     ///     Gets the moment the account was created (UTC).
     /// </summary>
     public DateTimeOffset Created { get; init; }

@@ -2,12 +2,18 @@
 
 #### Verification Approach
 
-`ProjectService` is verified with unit tests defined in `ProjectServiceTests.cs` and `ProjectAccessTests.cs`. The tests
-use the real service with fake in-memory stores (`FakeReviewStore`, `FakeUserStore`) and a fixed clock
+`ProjectService` is verified with unit tests defined in `ProjectServiceTests.cs`, `ProjectAccessTests.cs`, and
+`ProjectMemberServiceTests.cs`. The tests use the real service with fake in-memory stores (`FakeReviewStore`,
+`FakeUserStore`, `FakeAuditStore`), the fake password hasher (`FakePasswordHasher`), and a fixed clock
 (`FixedTimeProvider`), so the rules are verified without a database and the creation time is predictable. The project
 rule tests run as a system administrator over the real `ProjectAccess`. The access tests arrange two projects and
-users of every kind, as described for the `ProjectAccess` unit. Failures are checked through the rule carried by the
-`DomainRuleException`. The blank-name test is a theory over several kinds of blank value.
+users of every kind, as described for the `ProjectAccess` unit. The member management tests of
+`ProjectMemberServiceTests.cs` arrange one project with a system administrator, two project administrators (one
+disabled), a plain member, and outsiders, over the real `ProjectAccess` and a `MovableTimeProvider` that lets the
+tests advance the throttle window; the audit entries of failed attempts are read from `FakeAuditStore` through a real
+`AuditService`, and the drafts of the changes from the fake stores. Failures are checked through the rule carried by
+the `DomainRuleException`. The blank-name test is a theory over several kinds of blank value, and the test of the
+actor kinds is a theory over the user names of the arranged world.
 
 #### Test Environment
 
@@ -23,9 +29,21 @@ N/A - standard test environment.
 - A rejected project (blank name, over-long name, or over-long description) is never stored.
 - Projects are listed ordered by name and then identity, and only the projects the actor may see are listed.
 - A project can be read by identity, and an unknown identity or a hidden project gives no project.
-- A system administrator adds, re-roles, and removes members with audit entries that carry the project; other actors
-  are refused; a project administrator lists the members of the own project only.
+- A system administrator and a project administrator of the project add, re-role, and remove members with audit
+  entries that carry the project; a plain member is refused with `ActorNotAllowed` and an actor who cannot see the
+  project gets `ProjectNotFound`; a project administrator lists the members of the own project only.
 - A repeated add, an unknown membership, an unknown user, and an unknown project are refused with the matching rule.
+- A member is added only by the exact user name; an unknown name and a disabled user give one rule and one message,
+  and an unknown name and a non-member give one rule and one message for a removal or role change.
+- After ten failed attempts within ten minutes an actor who is no system administrator is refused with
+  `TooManyAttempts`, other actors are not, the actor may try again when the window has passed, and a system
+  administrator is never refused; every failed attempt is audited with the project and the typed name.
+- The last enabled project administrator cannot be removed or demoted by a project administrator (itself included),
+  a disabled administrator does not count, a system administrator is not blocked, and a refusal changes and audits
+  nothing.
+- An account created for a project is no system administrator, has a random temporary password of sixteen characters
+  that is stored only as a hash and never audited, and must be changed; a taken or invalid name creates no account and
+  no membership.
 
 #### Test Scenarios
 
@@ -72,9 +90,69 @@ and it has no members. This scenario is tested by `ProjectService_CreateAsync_On
 **ProjectService_Members_SystemAdminManages_OthersAreRefused**: A system administrator adds the non-member, promotes
 the new member to project administrator, lists the members (ordered by user name), and removes the member again; the
 audit entries `project.member-added`, `project.member-role-changed`, and `project.member-removed` are recorded in this
-order and carry the project. A project administrator, a plain user, and a non-member are refused each of the three
-changes with `ActorNotAllowed`. This scenario is tested by
+order and carry the project. A plain member is refused each of the three changes with `ActorNotAllowed`, and an
+outsider with `ProjectNotFound`. This scenario is tested by
 `ProjectService_Members_SystemAdminManages_OthersAreRefused`.
+
+**ProjectService_MemberActions_ActorKinds_AreAllowedOrRefused**: A theory over a system administrator, a project
+administrator of the project, a plain member, an outsider, and a project administrator of another project; each of
+the actions add, remove, change role, create account, and list runs on a fresh arrangement. The first two succeed, the
+plain member is refused with `ActorNotAllowed`, and the last two with `ProjectNotFound`; a refusal leaves the
+memberships unchanged and creates no account. This scenario is tested by
+`ProjectService_MemberActions_ActorKinds_AreAllowedOrRefused`.
+
+**ProjectService_AddMemberAsync_UnknownAndDisabledName_AreIndistinguishable**: A name that does not exist and the name
+of a disabled user are refused with the same rule and the same message, which does not repeat the typed name; a
+partial name finds nothing; the exact name in another letter case, with surrounding white space, is added. This
+scenario is tested by `ProjectService_AddMemberAsync_UnknownAndDisabledName_AreIndistinguishable`.
+
+**ProjectService_RemoveAndSetRole_UnknownNameAndNonMember_AreIndistinguishable**: Removing and changing the role of an unknown
+name and a user who is no member of the project are all refused with `MembershipNotFound` and one single message.
+This scenario is tested by `ProjectService_RemoveAndSetRole_UnknownNameAndNonMember_AreIndistinguishable`.
+
+**ProjectService_AddMemberAsync_TooManyFailures_ThrottlesPerActorUntilTheWindowEnds**: A project administrator fails
+ten times; the eleventh add (even of an existing name) and an account creation are refused with `TooManyAttempts`; a
+second project administrator is not refused; a system administrator fails twelve times and is never refused. After
+the clock advances by the throttle window the first actor adds the member. This scenario is tested by
+`ProjectService_AddMemberAsync_TooManyFailures_ThrottlesPerActorUntilTheWindowEnds`.
+
+**ProjectService_AddMemberAsync_FailedAttempts_AreAuditedWithTheProject**: A failure of a project administrator, a
+failure of a system administrator, and then a success; exactly two `project.member-add-failed` entries exist, each
+with the project and the typed name in the detail, and the success writes none. This scenario is tested by
+`ProjectService_AddMemberAsync_FailedAttempts_AreAuditedWithTheProject`.
+
+**ProjectService_RemoveAndDemote_LastProjectAdmin_IsRefusedForAProjectAdmin**: The only enabled project administrator
+removes or demotes themselves and is refused with `LastProjectAdmin` and an explanation; nothing is changed or audited.
+After a second administrator is added, the first demotes themselves, and the second is then refused when removing
+themselves. This scenario is tested by `ProjectService_RemoveAndDemote_LastProjectAdmin_IsRefusedForAProjectAdmin`.
+
+**ProjectService_RemoveMemberAsync_SystemAdminAndDisabledTarget_AreNotBlocked**: A project administrator removes a
+disabled administrator, is refused when removing themselves as the only enabled administrator, and a system
+administrator then removes that last administrator. This scenario is tested by
+`ProjectService_RemoveMemberAsync_SystemAdminAndDisabledTarget_AreNotBlocked`.
+
+**ProjectService_CreateMemberAccountAsync_ProjectAdmin_CreatesNoSystemAdministrator**: A project administrator creates
+an account as a project administrator; the stored user is enabled, is no system administrator, and has the membership
+with the role. This scenario is tested by
+`ProjectService_CreateMemberAccountAsync_ProjectAdmin_CreatesNoSystemAdministrator`.
+
+**ProjectService_CreateMemberAccountAsync_TemporaryPassword_IsRandomHashedAndNeverAudited**: Two accounts are created;
+the passwords have sixteen characters and differ, the stored value is a hash that verifies the password, the must-change
+flag is set, the role is stored, a `project.account-created` entry with the project exists for each, and no audit
+draft contains a password. This scenario is tested by
+`ProjectService_CreateMemberAccountAsync_TemporaryPassword_IsRandomHashedAndNeverAudited`.
+
+**ProjectService_CreateMemberAccountAsync_TakenAndInvalidInput_CreatesNothing**: A taken name (in another letter
+case), an invalid user name, and a blank display name are refused with `UserNameTaken`, `UserNameInvalid`, and
+`DisplayNameInvalid`; no account or membership is created and only the taken name is audited as a failed attempt. This
+scenario is tested by `ProjectService_CreateMemberAccountAsync_TakenAndInvalidInput_CreatesNothing`.
+
+**NewMemberAccount_ToString_DoesNotContainTemporaryPassword**: The text of a new account, also when interpolated into a
+string, and the text of a really created account do not contain the temporary password, and the text still names the
+member. This scenario is tested by `NewMemberAccount_ToString_DoesNotContainTemporaryPassword`.
+
+**ProjectService_Constructor_NullArguments_Throws**: Each required constructor argument set to null throws an
+`ArgumentNullException`. This scenario is tested by `ProjectService_Constructor_NullArguments_Throws`.
 
 **ProjectService_ListMembersAsync_ProjectAdminOwnProjectOnly**: A project administrator lists the members of the own
 project ordered by user name; for another project the answer is `ProjectNotFound`, and a plain member is refused with

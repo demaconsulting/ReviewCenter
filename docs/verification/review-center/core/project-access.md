@@ -28,6 +28,8 @@ N/A - standard test environment.
   administrator, and an administrator who is no system administrator, fail with the actor rule.
 - A removed membership, a lowered project role, and a disabled account change the next answer.
 - An actor that came through a token has the access of its owner.
+- A user with a temporary password has no access to any project, even with a membership or the system administrator
+  right, until the password is changed; the change restores the access.
 
 #### Test Scenarios
 
@@ -63,3 +65,13 @@ This scenario is tested by `ProjectAccess_TokenActor_HasTheMembershipsOfItsOwner
 
 **ProjectAccess_Constructor_NullArguments_Throws**: A null user store and a null project store are rejected with an
 `ArgumentNullException`. This scenario is tested by `ProjectAccess_Constructor_NullArguments_Throws`.
+
+**ProjectAccess_TemporaryPassword_GivesNoAccessAtAll**: An account that is a project administrator and a system
+administrator but has a temporary password (the must-change flag of `User`) is no system administrator, cannot view or
+administer the project, lists no project, and requiring view fails with `ProjectNotFound`. The scenario is defined in
+`MustChangePasswordTests.cs`, which arranges the account over `FakeReviewStore` and `FakeUserStore`, and is tested by
+`ProjectAccess_TemporaryPassword_GivesNoAccessAtAll`.
+
+**UserService_ChangeOwnPasswordAsync_NewPassword_ClearsTheFlagAndGivesAccess**: After the account chose a new password
+the flag is cleared and the account views the project and lists it. This scenario, defined in
+`MustChangePasswordTests.cs`, is tested by `UserService_ChangeOwnPasswordAsync_NewPassword_ClearsTheFlagAndGivesAccess`.

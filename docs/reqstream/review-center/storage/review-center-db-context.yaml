@@ -86,15 +86,18 @@ sections:
       - id: ReviewCenter-DbContext-Users
         title: >-
           The ReviewCenterDbContext class shall map users to a table in which the user name is unique regardless
-          of letter case and the system administrator right is stored as a flag, and shall map the user name of the
+          of letter case and the system administrator right and the must-change-password flag are stored as flags,
+          and shall map the user name of the
           author of a comment, of the person who answered a check, and of the person who set a section next to the
           display name, so that the database refuses a second user whose name differs only in letter case.
         justification: |
           The database is the last line of defense against two users with the same name. The user name beside the
-          display name keeps the record identifiable when the display name changes.
+          display name keeps the record identifiable when the display name changes. The schema is created from the
+          model without migrations, so a database that was created before the flag existed has to be recreated.
         tests:
           - UserStore_AddAsync_UsernameOtherCase_ThrowsUserNameTakenAndLookupIgnoresCase
           - UserStore_AddAsync_User_RoundTripsEveryField
+          - UserStore_AddToProjectAsync_StoresAccountMembershipAndOneEventTogether
 
       - id: ReviewCenter-DbContext-Signatures
         title: >-

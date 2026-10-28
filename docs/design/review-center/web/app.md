@@ -64,7 +64,9 @@ an address that matches no page. Opening `/not-found` itself answers with status
 reads the authentication state of the request once, so it keeps showing the name that was current when the page was
 served until the next navigation or reload, even after the state of an open page has ended. It holds two values, set in
 `OnInitializedAsync`: **Actor**, the signed-in user or `null` when nobody is signed in, and **IsAdmin**, true when the
-user is a system administrator (has the role `SignIn.AdminRole`). A derived value, **ShortVersion**, is the version of
+user is a system administrator (has the role `SignIn.AdminRole`), and **MustChangePassword**, true when the user still
+has a temporary password (the claim `must_change_password`, read with `SignIn.IsPasswordChangeRequired`). A derived
+value, **ShortVersion**, is the version of
 the footer.
 
 The header is a menu bar that spans the full width of the window and has two groups, which wrap onto further lines on a
@@ -72,7 +74,9 @@ narrow screen. The left group is the logo (an inline vector image that is hidden
 product name `ReviewCenter` as the one link to the home page, and the primary navigation. The primary navigation is,
 for a signed-in user, the tab Projects and, only for a system administrator, the tabs Audit and Users (there is no tab
 for repositories, which belong to the projects and are reached from the page of a project); it is
-empty when nobody is signed in. The right group starts with the tab Help, which everyone sees, and then, when nobody is
+empty when nobody is signed in, and also empty for a user who still has a temporary password (such a user has no
+system administrator role in the session either). The right group starts with the tab Help, which everyone sees, and
+then, when nobody is
 signed in, the "Sign in" link to the login page. When a user is signed in it continues with the display name of the
 user, the tab Account, and a logout form that posts to `/auth/logout` with an antiforgery token (signing out changes
 state, so it is a form and not a link). The tabs are navigation links that match by prefix, so the tab of the current
@@ -80,6 +84,12 @@ section (for example Projects on the page of a review) is marked active, with th
 assistive technology reads, and is drawn as the active tab. The pages themselves carry no link to the home page: the
 brand link
 is the only one.
+
+**Confinement of a temporary password**: A user whose password is temporary may use only the account page, the login
+page, the help, and the About page. `OnInitializedAsync` therefore checks the first segment of the requested path
+(compared without regard to case: `account`, `login`, `help`, or `about`) and, for any other page, navigates to
+`SignIn.AccountPath` with a full page load. The claim is enough for this, so no service is called per navigation; the
+data is refused by the `Core` access rules anyway, so the redirect is a convenience and not the protection.
 
 The footer is on every page, and shows `ReviewCenter {version} · © DEMA Consulting · Web-based code review for regulated
 projects` and a link "About" to `/about`. **ShortVersion** is the informational version of the program (the same value
@@ -93,7 +103,8 @@ authorization of the `Identity` subsystem, so a hidden link is a convenience and
 
 **SessionGate component**: A wrapper that each protected page (the pages that need a signed-in user, among them
 `ProjectsPage`, `ProjectPage`, `PlanPage`, `ReviewPage`, `ChecklistPage`, `AccountPage`, `UsersPage`, `HistoryPage`,
-`AuditPage`, and `RepositoriesPage`) puts around its whole content. It has one parameter, the child content, and holds
+`AuditPage`, `ProjectAuditPage`, `NewMemberPage`, `NewMemberAccountPage`, and `RepositoriesPage`) puts around its whole
+content. It has one parameter, the child content, and holds
 no state. It is an authorize view: while a user is signed in it renders the child content and adds no element of its
 own, so the markup and the `data-interactive` marker of the page are unchanged. When the authentication state becomes
 anonymous (see `RevalidatingAuthenticationStateProvider` in the `Identity` subsystem), it re-renders and replaces the
@@ -125,10 +136,11 @@ home page are open to everyone and do not use it.
 **OnInitializedAsync (MainLayout)**: Works out who is signed in.
 
 - *Parameters*: None (the user comes from the authentication state of the request).
-- *Returns*: A task that completes when `Actor` and `IsAdmin` are set.
+- *Returns*: A task that completes when `Actor`, `IsAdmin`, and `MustChangePassword` are set.
 - *Preconditions*: The authentication state provider is available by injection.
 - *Postconditions*: `Actor` is the signed-in user, or `null` when nobody is; `IsAdmin` is true only for a signed-in user
-  who is a system administrator.
+  who is a system administrator without a temporary password; `MustChangePassword` is true for a signed-in user with
+  the claim, and then the request has been redirected to the account page unless its path is open during the change.
 
 **ShortVersion (MainLayout)**: Shortens the version for the footer.
 
@@ -144,7 +156,8 @@ home page are open to everyone and do not use it.
 - *Returns*: The rendered header, the page, and the footer.
 - *Postconditions*: The header always has the home link and the help link. It has the sign-in link when nobody is
   signed in; otherwise the projects link, the display name, the account link, and the logout form, with the
-  audit and users links for a system administrator only. The footer is always present.
+  audit and users links for a system administrator only (a user with a temporary password gets the display name, the
+  account link, and the logout form, and no tabs). The footer is always present.
 
 **Render (SessionGate)**: Guards the content of a protected page.
 
@@ -166,7 +179,8 @@ document ahead of the style sheet, and the Puppet acceptance walk exercises the 
 #### Dependencies
 
 - **HomePage** — found by the router at the root route; `App` does not reference it directly.
-- **SignIn** — `MainLayout` uses `GetActorAsync` to read the signed-in user and the role name of a system administrator.
+- **SignIn** — `MainLayout` uses `GetActorAsync` to read the signed-in user, the role name of a system administrator,
+  and `IsPasswordChangeRequired` and `AccountPath` to confine a user with a temporary password.
 - **Program** — supplies the informational version that the footer shortens.
 - **ASP.NET Core Blazor components** — `Router`, `AuthorizeRouteView`, `AuthorizeView`, `NavLink`, `HeadOutlet`, the
   authentication state (made available to the router by `AddCascadingAuthenticationState` in `ServerHost`), the
@@ -176,4 +190,5 @@ document ahead of the style sheet, and the Puppet acceptance walk exercises the 
 
 - **ServerHost** — maps `App` as the root component of the server with the interactive server render mode.
 - **ProjectsPage**, **ProjectPage**, **PlanPage**, **ReviewPage**, **ChecklistPage**, **AccountPage**, **UsersPage**,
-  **HistoryPage**, **AuditPage**, **RepositoriesPage** — wrap their content in `SessionGate`.
+  **HistoryPage**, **AuditPage**, **ProjectAuditPage**, **NewMemberPage**, **NewMemberAccountPage**,
+  **RepositoriesPage** — wrap their content in `SessionGate`.

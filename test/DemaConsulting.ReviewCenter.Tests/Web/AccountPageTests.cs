@@ -22,6 +22,7 @@ using Bunit;
 using DemaConsulting.ReviewCenter.Core;
 using DemaConsulting.ReviewCenter.Web;
 using Microsoft.AspNetCore.Components;
+using Microsoft.Extensions.DependencyInjection;
 using TestContext = Xunit.TestContext;
 
 namespace DemaConsulting.ReviewCenter.Tests.Web;
@@ -377,6 +378,68 @@ public class AccountPageTests : PageTestBase
         Assert.Contains("20", cut.Find("[data-testid='token-error']").TextContent, StringComparison.Ordinal);
         Assert.Empty(cut.FindAll("[data-testid='new-token-box']"));
         Assert.Equal(ReviewLimits.MaxActiveTokensPerUser, TokenStore.Rows.Count);
+    }
+
+    /// <summary>
+    ///     Test that a user who signed in with a temporary password sees the banner and the password form only:
+    ///     no tokens and no appearance card.
+    /// </summary>
+    [Fact]
+    public async Task AccountPage_Render_TemporaryPassword_ShowsBannerAndOnlyPasswordForm()
+    {
+        // Arrange: a user whose session carries the must-change-password claim
+        await Users.CreateAsync("ann", "Ann", UserRole.Reviewer, OldPassword, TestContext.Current.CancellationToken);
+        SignInAsTemporaryPassword("ann", "Ann");
+
+        // Act: render the page
+        var cut = Render<AccountPage>();
+
+        // Assert: the banner and the form are shown; tokens and appearance are not
+        Assert.NotNull(cut.Find("[data-testid='password-change-required-banner']"));
+        Assert.NotNull(cut.Find("[data-testid='change-password-form']"));
+        Assert.Empty(cut.FindAll("[data-testid='tokens-card']"));
+        Assert.Empty(cut.FindAll("[data-testid='appearance-card']"));
+    }
+
+    /// <summary>
+    ///     Test that a normal session shows no banner.
+    /// </summary>
+    [Fact]
+    public void AccountPage_Render_NormalSession_ShowsNoBanner()
+    {
+        // Arrange: nothing to prepare
+
+        // Act: render the page
+        var cut = Render<AccountPage>();
+
+        // Assert: no banner, and the tokens card is there
+        Assert.Empty(cut.FindAll("[data-testid='password-change-required-banner']"));
+        Assert.NotNull(cut.Find("[data-testid='tokens-card']"));
+    }
+
+    /// <summary>
+    ///     Test that replacing a temporary password sends the user to the sign-in page with a notice.
+    /// </summary>
+    [Fact]
+    public async Task AccountPage_ChangePassword_TemporaryPassword_RedirectsToLoginWithNotice()
+    {
+        // Arrange: a flagged user and a filled-in form
+        await Users.CreateAsync("ann", "Ann", UserRole.Reviewer, OldPassword, TestContext.Current.CancellationToken);
+        var flagged = (await UserStore.GetByUsernameAsync("ann", TestContext.Current.CancellationToken))!;
+        flagged.MustChangePassword = true;
+        await UserStore.UpdateAsync(flagged, null, TestContext.Current.CancellationToken);
+        SignInAsTemporaryPassword("ann", "Ann");
+        var cut = Render<AccountPage>();
+        await FillAsync(cut, OldPassword, NewPassword, NewPassword);
+
+        // Act: submit
+        await cut.Find("[data-testid='change-password-form']").SubmitAsync();
+
+        // Assert: the browser is sent to the login page with the notice flag, and the flag is cleared
+        var navigation = Services.GetRequiredService<NavigationManager>();
+        Assert.EndsWith("/login?changed=1", navigation.Uri, StringComparison.Ordinal);
+        var user = await UserStore.GetByUsernameAsync("ann", TestContext.Current.CancellationToken);
+        Assert.False(user!.MustChangePassword);
     }
 
     /// <summary>

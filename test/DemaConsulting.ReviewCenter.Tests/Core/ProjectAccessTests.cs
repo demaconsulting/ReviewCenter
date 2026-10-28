@@ -182,9 +182,10 @@ public class ProjectAccessTests
         Assert.True(await world.Access.CanAdministerAsync(padm, world.Own, cancellationToken));
 
         // Act: remove the membership, and demote the project administrator to user
-        await world.Store.RemoveMembershipAsync(world.Own, world.Ids["usr"], AuditTestExtensions.Draft(), cancellationToken);
+        await world.Store.RemoveMembershipAsync(
+            world.Own, world.Ids["usr"], AuditTestExtensions.Draft(), false, cancellationToken);
         await world.Store.SetMembershipRoleAsync(
-            world.Own, world.Ids["padm"], ProjectRole.User, AuditTestExtensions.Draft(), cancellationToken);
+            world.Own, world.Ids["padm"], ProjectRole.User, AuditTestExtensions.Draft(), false, cancellationToken);
 
         // Assert
         Assert.False(await world.Access.CanViewAsync(member, world.Own, cancellationToken));
@@ -245,7 +246,7 @@ public class ProjectAccessTests
 
     /// <summary>
     ///     Test that a system administrator adds, re-roles and removes members, that each change is audited with the
-    ///     project, and that nobody else may do it.
+    ///     project, and that a plain member or an outsider may not.
     /// </summary>
     [Fact]
     public async Task ProjectService_Members_SystemAdminManages_OthersAreRefused()
@@ -269,8 +270,12 @@ public class ProjectAccessTests
         Assert.Equal(["project.member-added", "project.member-role-changed", "project.member-removed"], drafts.Select(d => d.Action));
         Assert.All(drafts, d => Assert.Equal(world.Own, d.ProjectId));
 
-        // Act, Assert: a project administrator, a user and an outsider may not manage members
-        foreach (var name in new[] { "padm", "usr", "out" })
+        // Act, Assert: a plain member may not manage members; an outsider is told the project does not exist
+        foreach (var (name, expected) in new[]
+                 {
+                     ("usr", DomainRule.ActorNotAllowed),
+                     ("out", DomainRule.ProjectNotFound)
+                 })
         {
             var actor = new Actor(name, name);
             var add = await Assert.ThrowsAsync<DomainRuleException>(
@@ -279,7 +284,7 @@ public class ProjectAccessTests
                 () => world.Projects.RemoveMemberAsync(actor, world.Own, "usr", cancellationToken));
             var role = await Assert.ThrowsAsync<DomainRuleException>(
                 () => world.Projects.SetMemberRoleAsync(actor, world.Own, "usr", ProjectRole.ProjectAdmin, cancellationToken));
-            Assert.All([add, remove, role], e => Assert.Equal(DomainRule.ActorNotAllowed, e.Rule));
+            Assert.All([add, remove, role], e => Assert.Equal(expected, e.Rule));
         }
     }
 
@@ -397,7 +402,7 @@ public class ProjectAccessTests
         await users.SetEnabledAsync("offadm", false, Actor.CommandLine, cancellationToken);
 
         var access = new ProjectAccess(userStore, store);
-        var projects = new ProjectService(store, userStore, access, clock);
+        var projects = new ProjectService(store, userStore, access, new FakePasswordHasher(), clock);
         var own = await projects.CreateAsync("Own", null, new Actor("root", "Root"), cancellationToken);
         var other = await projects.CreateAsync("Other", null, new Actor("root", "Root"), cancellationToken);
         await store.AddMembershipAsync(ids["padm"], own.Id, ProjectRole.ProjectAdmin, cancellationToken);

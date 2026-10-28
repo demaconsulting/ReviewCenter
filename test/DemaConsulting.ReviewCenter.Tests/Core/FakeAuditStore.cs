@@ -99,6 +99,11 @@ internal sealed class FakeAuditStore(TimeProvider timeProvider) : IAuditStore
         {
             query = query.Where(e => e.ProjectId == projectId && e.ReviewId == reviewId);
         }
+        else if (projectId is { } project)
+        {
+            // Like the real store: a project alone selects every entry of that project (never global entries)
+            query = query.Where(e => e.ProjectId == project);
+        }
 
         if (beforeSequence is { } before)
         {

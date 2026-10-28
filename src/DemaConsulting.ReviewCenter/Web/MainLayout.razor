@@ -5,7 +5,9 @@
    (Projects, and for system administrators Audit and Users); on the right it shows who is signed in (display
    name, an Account link and a Logout button) or a Sign in link when nobody is. Logout is a form that posts to
    /auth/logout with an antiforgery token, because signing out changes state and must not be triggered by a plain
-   link. The footer on every page shows the version, the copyright and a link to the About page. *@
+   link. The footer on every page shows the version, the copyright and a link to the About page. A user who still has a
+   temporary password sees no navigation tabs and is sent to the Account page from every page except Account, Login,
+   Help and About. *@
 @inherits LayoutComponentBase
 @using Microsoft.AspNetCore.Components.Routing
 
@@ -19,7 +21,7 @@
             </svg>
             <span>ReviewCenter</span>
         </a>
-        @if (Actor is not null)
+        @if (Actor is not null && !MustChangePassword)
         {
             <NavLink href="/projects" Match="NavLinkMatch.Prefix" class="nav-tab" data-testid="projects-link">Projects</NavLink>
             @if (IsAdmin)

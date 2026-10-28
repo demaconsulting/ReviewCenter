@@ -637,26 +637,28 @@ public class ProjectPageTests : PageTestBase
     }
 
     /// <summary>
-    ///     Test that opening the add-member form after the system administrator was demoted does not reveal the
-    ///     users that could be added, but drops the members section.
+    ///     Test that changing a role after the system administrator was demoted does not change the role and drops the
+    ///     members section.
     /// </summary>
     [Fact]
-    public async Task ProjectPage_OpenAddForm_SystemAdminDemoted_DropsCandidatesAndForm()
+    public async Task ProjectPage_ToggleRole_SystemAdminDemoted_ChangesNothingAndDropsMembers()
     {
         // Arrange: a system administrator with the page open who also is a plain member, then demoted
         var projectId = await ArrangeSystemAdminAsync(rootIsMember: true);
         var cut = RenderProjectPage(projectId);
         await Users.SetRoleAsync("root", UserRole.Reviewer, TestContext.Current.CancellationToken);
 
-        // Act: open the add-member form
-        await cut.Find("[data-testid='add-member-button']").ClickAsync();
+        // Act: make the member a project admin
+        await cut.Find("[data-testid='member-toggle-role-mbr']").ClickAsync();
 
-        // Assert: no form, no member section, and none of the candidates in the markup
-        Assert.Empty(cut.FindAll("[data-testid='add-member-form']"));
+        // Assert: no member section, no candidates in the markup, and the role is unchanged
         Assert.Empty(cut.FindAll("[data-testid='add-member-button']"));
         Assert.Empty(cut.FindAll("[data-testid='members-list']"));
         Assert.DoesNotContain("zed-candidate", cut.Markup, StringComparison.Ordinal);
-        Assert.DoesNotContain("Zed Candidate", cut.Markup, StringComparison.Ordinal);
+        var member = await UserStore.GetByUsernameAsync("mbr", TestContext.Current.CancellationToken);
+        Assert.Equal(
+            ProjectRole.User,
+            (await Store.GetMembershipAsync(member!.Id, projectId, TestContext.Current.CancellationToken))!.Role);
     }
 
     /// <summary>
@@ -679,6 +681,209 @@ public class ProjectPageTests : PageTestBase
         Assert.Empty(cut.FindAll("[data-testid='members-list']"));
         Assert.Empty(cut.FindAll("[data-testid='member-error']"));
         Assert.DoesNotContain("Zed Member", cut.Markup, StringComparison.Ordinal);
+        var member = await UserStore.GetByUsernameAsync("mbr", TestContext.Current.CancellationToken);
+        Assert.NotNull(await Store.GetMembershipAsync(member!.Id, projectId, TestContext.Current.CancellationToken));
+    }
+
+    /// <summary>
+    ///     Creates a project Apollo with a review, a project administrator <c>pam</c> (signed in), another
+    ///     project administrator <c>pat</c> when asked, a plain member <c>mbr</c> and a user who is no member.
+    /// </summary>
+    /// <param name="secondAdmin">Whether a second project administrator <c>pat</c> exists.</param>
+    /// <returns>The project identity.</returns>
+    private async Task<int> ArrangeProjectAdminAsync(bool secondAdmin)
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        const string password = "correct horse battery";
+        var pam = await Users.CreateAsync("pam", "Pam Admin", UserRole.Reviewer, password, cancellationToken);
+        var member = await Users.CreateAsync("mbr", "Zed Member", UserRole.Reviewer, password, cancellationToken);
+        await Users.CreateAsync("outsider", "Olive Outsider", UserRole.Reviewer, password, cancellationToken);
+        var project = await Projects.CreateAsync("Apollo", null, cancellationToken);
+        await Store.AddMembershipAsync(pam.Id, project.Id, cancellationToken);
+        await Store.AddMembershipAsync(member.Id, project.Id, cancellationToken);
+        await ChangeMemberRoleAsync(project.Id, "pam", ProjectRole.ProjectAdmin);
+        if (secondAdmin)
+        {
+            var pat = await Users.CreateAsync("pat", "Pat Admin", UserRole.Reviewer, password, cancellationToken);
+            await Store.AddMembershipAsync(pat.Id, project.Id, cancellationToken);
+            await ChangeMemberRoleAsync(project.Id, "pat", ProjectRole.ProjectAdmin);
+        }
+
+        await Reviews.CreateDraftAsync(project.Id, "REV-1", "First", [new("a.txt", TestContent.A)], cancellationToken);
+        SignInAs("pam", "Pam Admin", isSystemAdmin: false);
+        return project.Id;
+    }
+
+    /// <summary>
+    ///     Test that a project administrator sees the members with role and remove buttons, the add-member button
+    ///     and the audit trail button, and no list of other users.
+    /// </summary>
+    [Fact]
+    public async Task ProjectPage_Render_ProjectAdmin_ShowsMembersAndButtons()
+    {
+        // Arrange: a project administrator who is signed in
+        var projectId = await ArrangeProjectAdminAsync(secondAdmin: false);
+
+        // Act: render the page
+        var cut = RenderProjectPage(projectId);
+
+        // Assert: members, buttons and the audit link are there; nothing offers other users
+        Assert.Equal("Project admin", cut.Find("[data-testid='member-role-pam']").TextContent);
+        Assert.Equal("Member", cut.Find("[data-testid='member-role-mbr']").TextContent);
+        Assert.NotNull(cut.Find("[data-testid='member-toggle-role-mbr']"));
+        Assert.NotNull(cut.Find("[data-testid='member-remove-mbr']"));
+        Assert.Equal(
+            $"/projects/{projectId}/members/new",
+            cut.Find("[data-testid='add-member-button']").GetAttribute("href"));
+        Assert.Equal(
+            $"/projects/{projectId}/audit",
+            cut.Find("[data-testid='project-audit-link']").GetAttribute("href"));
+        Assert.Empty(cut.FindAll("select"));
+        Assert.DoesNotContain("outsider", cut.Markup, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    ///     Test that a plain member sees the reviews but no members section, no add button and no audit button.
+    /// </summary>
+    [Fact]
+    public async Task ProjectPage_Render_PlainMember_ShowsNoMembersAndNoAuditLink()
+    {
+        // Arrange: a plain member who is signed in
+        var projectId = await ArrangeProjectAdminAsync(secondAdmin: false);
+        SignInAs("mbr", "Zed Member", isSystemAdmin: false);
+
+        // Act: render the page
+        var cut = RenderProjectPage(projectId);
+
+        // Assert: the review is listed, the administration is not
+        Assert.NotEmpty(cut.FindAll("[data-testid='review-link-REV-1']"));
+        Assert.Empty(cut.FindAll("[data-testid='members-list']"));
+        Assert.Empty(cut.FindAll("[data-testid='add-member-button']"));
+        Assert.Empty(cut.FindAll("[data-testid='project-audit-link']"));
+        Assert.DoesNotContain("Pam Admin", cut.Markup, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    ///     Test that a project administrator can make a member a project admin and remove a member.
+    /// </summary>
+    [Fact]
+    public async Task ProjectPage_MemberChange_ProjectAdmin_ChangesRoleAndRemoves()
+    {
+        // Arrange: a project administrator with a plain member
+        var projectId = await ArrangeProjectAdminAsync(secondAdmin: false);
+        var cut = RenderProjectPage(projectId);
+
+        // Act: promote the member, then remove the member
+        await cut.Find("[data-testid='member-toggle-role-mbr']").ClickAsync();
+        var promoted = cut.Find("[data-testid='member-role-mbr']").TextContent;
+        await cut.Find("[data-testid='member-remove-mbr']").ClickAsync();
+
+        // Assert: the role showed as project admin, then the row is gone
+        Assert.Equal("Project admin", promoted);
+        Assert.Empty(cut.FindAll("[data-testid='member-row-mbr']"));
+        Assert.NotEmpty(cut.FindAll("[data-testid='member-row-pam']"));
+    }
+
+    /// <summary>
+    ///     Test that the last project administrator cannot remove or demote themselves: the page explains why
+    ///     and nothing changes.
+    /// </summary>
+    /// <param name="removeInsteadOfDemote">Whether to remove (true) or to demote (false).</param>
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task ProjectPage_MemberChange_LastProjectAdminSelf_ShowsExplanationAndChangesNothing(
+        bool removeInsteadOfDemote)
+    {
+        // Arrange: the only project administrator has the page open
+        var projectId = await ArrangeProjectAdminAsync(secondAdmin: false);
+        var cut = RenderProjectPage(projectId);
+
+        // Act: try to remove or demote themselves
+        await cut.Find($"[data-testid='member-{(removeInsteadOfDemote ? "remove" : "toggle-role")}-pam']").ClickAsync();
+
+        // Assert: the explanation is shown, the row and the role stay
+        Assert.Contains(ProjectService.LastAdminMessage, cut.Find("[data-testid='member-error']").TextContent,
+            StringComparison.Ordinal);
+        Assert.Equal("Project admin", cut.Find("[data-testid='member-role-pam']").TextContent);
+        var pam = await UserStore.GetByUsernameAsync("pam", TestContext.Current.CancellationToken);
+        Assert.Equal(
+            ProjectRole.ProjectAdmin,
+            (await Store.GetMembershipAsync(pam!.Id, projectId, TestContext.Current.CancellationToken))!.Role);
+    }
+
+    /// <summary>
+    ///     Test that with a second project administrator the first one may remove themselves.
+    /// </summary>
+    [Fact]
+    public async Task ProjectPage_MemberChange_SecondAdminExists_AdminMayRemoveSelf()
+    {
+        // Arrange: two project administrators, the first has the page open
+        var projectId = await ArrangeProjectAdminAsync(secondAdmin: true);
+        var cut = RenderProjectPage(projectId);
+
+        // Act: remove themselves
+        await cut.Find("[data-testid='member-remove-pam']").ClickAsync();
+
+        // Assert: the membership is gone, so the page no longer shows the project
+        var pam = await UserStore.GetByUsernameAsync("pam", TestContext.Current.CancellationToken);
+        Assert.Null(await Store.GetMembershipAsync(pam!.Id, projectId, TestContext.Current.CancellationToken));
+        Assert.Empty(cut.FindAll("[data-testid='members-list']"));
+        Assert.DoesNotContain("Zed Member", cut.Markup, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    ///     Test that a project administrator who lost the membership while the page was open gets the not-found
+    ///     state, with no data, from every handler, and changes nothing.
+    /// </summary>
+    /// <param name="action">The testid of the button that is used.</param>
+    [Theory]
+    [InlineData("member-remove-mbr")]
+    [InlineData("member-toggle-role-mbr")]
+    public async Task ProjectPage_MemberChange_ProjectAdminMembershipRevoked_ShowsNotFoundAndChangesNothing(
+        string action)
+    {
+        // Arrange: a project administrator with the page open, then removed from the project by another
+        var projectId = await ArrangeProjectAdminAsync(secondAdmin: true);
+        var cut = RenderProjectPage(projectId);
+        await RevokeMembershipAsync(projectId, "pam");
+
+        // Act: use the button
+        await cut.Find($"[data-testid='{action}']").ClickAsync();
+
+        // Assert: nothing of the project is shown, and the member is unchanged
+        Assert.NotEmpty(cut.FindAll("[data-testid='project-not-found']"));
+        Assert.Empty(cut.FindAll("[data-testid='members-list']"));
+        Assert.Empty(cut.FindAll("[data-testid='reviews-list']"));
+        Assert.Empty(cut.FindAll("[data-testid='member-error']"));
+        Assert.DoesNotContain("Zed Member", cut.Markup, StringComparison.Ordinal);
+        Assert.DoesNotContain("REV-1", cut.Markup, StringComparison.Ordinal);
+        var member = await UserStore.GetByUsernameAsync("mbr", TestContext.Current.CancellationToken);
+        var stored = await Store.GetMembershipAsync(member!.Id, projectId, TestContext.Current.CancellationToken);
+        Assert.Equal(ProjectRole.User, stored!.Role);
+    }
+
+    /// <summary>
+    ///     Test that a project administrator who was demoted to a plain member while the page was open loses the
+    ///     members section and the audit button but still sees the reviews, and changes nothing.
+    /// </summary>
+    [Fact]
+    public async Task ProjectPage_MemberChange_ProjectAdminDemoted_DropsMembersKeepsReviews()
+    {
+        // Arrange: a project administrator with the page open, then demoted by another
+        var projectId = await ArrangeProjectAdminAsync(secondAdmin: true);
+        var cut = RenderProjectPage(projectId);
+        await ChangeMemberRoleAsync(projectId, "pam", ProjectRole.User);
+
+        // Act: remove the member
+        await cut.Find("[data-testid='member-remove-mbr']").ClickAsync();
+
+        // Assert: no members section and no audit button, the review stays, and the member is still there
+        Assert.Empty(cut.FindAll("[data-testid='members-list']"));
+        Assert.Empty(cut.FindAll("[data-testid='add-member-button']"));
+        Assert.Empty(cut.FindAll("[data-testid='project-audit-link']"));
+        Assert.DoesNotContain("Zed Member", cut.Markup, StringComparison.Ordinal);
+        Assert.NotEmpty(cut.FindAll("[data-testid='review-link-REV-1']"));
         var member = await UserStore.GetByUsernameAsync("mbr", TestContext.Current.CancellationToken);
         Assert.NotNull(await Store.GetMembershipAsync(member!.Id, projectId, TestContext.Current.CancellationToken));
     }

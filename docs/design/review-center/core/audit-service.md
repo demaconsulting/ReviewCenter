@@ -63,13 +63,18 @@ the first entry), each `null` for an empty page.
 
 **IAuditStore**: the contract the Storage subsystem implements. It has three operations: `AppendAsync` (one entry in its
 own transaction), `ListAsync` (newest first, optionally of one review, before or after a sequence, with a size limit),
-and `ReadAfterAsync` (ascending batches for verification). There is deliberately **no operation that updates or deletes
+and `ReadAfterAsync` (ascending batches for verification). `ListAsync` is the read behind both the project-level and
+the review-level view; the hash chain is unchanged by the project view (a filtered read of the same chain), and the
+whole chain still verifies. There is deliberately **no operation that updates or deletes
 an entry**.
 
 **Action codes and details**: every recorded event has an action code and a one-line detail. The project and review
 identifiers are stored in their own fields, not in the detail. Details never contain passwords, password hashes,
 tokens, comment text, or justification text; where an entry must identify such a text it carries `sha256` followed by
-the short hash (8 hexadecimal characters) of the trimmed text (see `AuditChain`).
+the short hash (8 hexadecimal characters) of the trimmed text (see `AuditChain`). The typed user name of
+`project.member-add-failed` is attacker-chosen text, cleaned and cut by the audit store like the typed name of a failed
+sign-in; the number of such entries one actor can cause is bounded by the throttle of `ProjectService` (a system
+administrator is not throttled but is a trusted actor).
 
 | Action | Detail |
 | ------ | ------ |
@@ -77,6 +82,8 @@ the short hash (8 hexadecimal characters) of the trimmed text (see `AuditChain`)
 | `project.member-added` | `user 'bob', role ProjectAdmin` (the project identifier is in its own field) |
 | `project.member-role-changed` | `user 'bob', role User` (the new role; the project identifier is in its own field) |
 | `project.member-removed` | `user 'bob'` (the project identifier is in its own field) |
+| `project.account-created` | `user 'bob', role User, temporary password` (never the password; project id is separate) |
+| `project.member-add-failed` | `user name '<typed>'` (failed add or account creation; best-effort; project id apart) |
 | `review.created` | `review 'Title', fingerprint <64 hex>, N file(s)` |
 | `slot.added`, `slot.updated`, `slot.removed` | `slot {id}: primary ada, alternate bob` (`none` for no alternate) |
 | `signature.added` | `slot {slotId}, role {Primary or Alternate}, record digest <64 hex>` |
@@ -98,7 +105,7 @@ the short hash (8 hexadecimal characters) of the trimmed text (see `AuditChain`)
 | `auth.sign-in-failed` | `wrong password`, `account disabled`, or `unknown user, name '<typed>'` |
 | `auth.sign-in-locked` | `account locked` (an attempt on an account that is already locked) |
 | `auth.sign-in-throttled` | `too many attempts, name '<typed>'` (the sign-in throttle refused the attempt) |
-| `signature.reauth-failed` | as for sign-in: `wrong password`, `account disabled`, `account locked`, or unknown user |
+| `signature.reauth-failed` | as for sign-in (wrong password, disabled, locked, unknown), or `password change pending` |
 | `auth.locked-out` | `locked for 5 minutes after 5 failed attempts` |
 | `audit.events-suppressed` | `tracking table full, events of new keys are not recorded` (see below) |
 
@@ -179,9 +186,10 @@ the update of the table happen under the lock; the store is called after the loc
 
 **ListAsync**: Reads one page of the trail, newest first.
 
-- *Parameters*: `int? projectId` and `string? reviewId` (together they limit the page to one review; a `null` review
-  gives the whole trail), `long? beforeSequence` (the Older page), `long? afterSequence` (the Newer page), and a
-  cancellation token.
+- *Parameters*: `int? projectId` and `string? reviewId` (a `null` project gives the whole trail; a project alone gives
+  every event of that project, whether or not it names a review, and never an event without a project; a project with a
+  review gives the events of that review), `long? beforeSequence` (the Older page), `long? afterSequence` (the Newer
+  page), and a cancellation token. The caller must have checked the right to see the project first.
 - *Returns*: An `AuditEntryPage` of at most 50 entries.
 - *Postconditions*: When both positions are given, `beforeSequence` wins. `HasOlder` and `HasNewer` come from one cheap
   look past each end of the page, so a link is shown only when there is something behind it.
@@ -231,7 +239,10 @@ sign-in event can be missing from the trail when the write fails. Null arguments
   through `TryRecordAsync` and `TryRecordCoalescedAsync` (when an `AuditService` was supplied).
 - **SignIn** (Identity) — records sign-in and sign-out through `TryRecordAsync`, and refusals by the throttle through
   `TryRecordCoalescedAsync`.
-- **HistoryPage** and **AuditPage** (Web) — list entries; the audit page also verifies the chain.
+- **HistoryPage**, **AuditPage**, and **ProjectAuditPage** (Web) — list entries (the project audit page lists the
+  events of one project for its administrators); the audit page also verifies the chain.
+- **ProjectService** — records failed member adds through `TryRecordAsync` (when an `AuditService` was supplied).
 - **AuditCommand** (Hosting) — verifies the chain for the `audit verify` verb.
 - **Services that change data** (`ProjectService`, `ReviewService`, `ThreadService`, `ChecklistService`,
-  `SigningService`, `UserService`) — do not call this service for their changes; they pass drafts to their stores.
+  `SigningService`, `UserService`) — do not call this service for their changes; they pass drafts to their stores
+  (the member add that fails is the one event `ProjectService` records through this service).

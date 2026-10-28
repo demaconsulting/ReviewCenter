@@ -406,13 +406,18 @@ sections:
           administrator, answer a request of any other user, in the web pages and in the API, as it answers for a
           project that does not exist, list only the projects the user may see, give the API token of a user exactly
           the access of its owner, and let a change of a membership or of the system administrator right take effect
-          with the next request.
+          with the next request; and let a system administrator or a project admin of a project manage its members,
+          adding an existing user only by the exact user name or creating an account only as part of adding it to the
+          project, with a temporary password that must be replaced at the first sign-in, and never leaving a project
+          without a project admin except by a system administrator.
         tags: [system]
         justification: |
           A project may hold confidential work. Deciding visibility in one place, and answering a user who may not see
           a project exactly as for a project that does not exist, keeps the existence of a project from leaking
           through a page, an API route, or a download. The memberships are read at every request so that taking access
-          away works at once, also for a token that was handed out earlier.
+          away works at once, also for a token that was handed out earlier. The people who run a project must be
+          able to manage its members without a system administrator, but not to browse the users of the installation,
+          and a project must not be left without anybody who can manage it.
         children:
           - ReviewCenter-Core-ProjectAccess
           - ReviewCenter-ProjectAccess-Visibility

@@ -1,0 +1,111 @@
+@* NewMemberAccountPage: creates a local account and adds it to a project in one step, at
+   "/projects/{id}/members/account". Whoever may administer the project (a system administrator or a project admin of
+   it) types a user name, a display name and chooses whether the person becomes a project admin. The application
+   generates a temporary password and shows it once on this page; nobody types or chooses it. The person has to choose
+   a new password at the first sign-in. Anybody else sees the not-found message of a missing project.
+
+   Presentation only; state and event handling live in NewMemberAccountPage.razor.cs. The temporary password lives
+   only in the memory of this page instance until "Done" is used or the page is left; it is never written to a log, an
+   audit entry or the address. The data-interactive marker on the root flips to "true" once the live circuit is
+   connected.
+
+   Human factors: (a) three inputs on one narrow form; (b) the page is reached from the rare "Create a new account"
+   button of the add member page, so the common case (an account that exists) is not burdened by it; (c) the result
+   box says what to do with the password (give it to the person now) and that it cannot be shown again.
+
+   The page body is inside SessionGate, which replaces it with a "Session ended" message when the user is no longer
+   valid while the page is open. *@
+@page "/projects/{ProjectId:int}/members/account"
+@rendermode InteractiveServer
+@attribute [Authorize]
+
+<PageTitle>Create account - ReviewCenter</PageTitle>
+
+<SessionGate>
+<main class="page narrow" data-testid="new-account-page" data-interactive="@InteractiveMarker">
+    <nav class="breadcrumb">
+        <a href="/projects" data-testid="breadcrumb-projects-link">Projects</a>
+        @if (Project is not null)
+        {
+            <span aria-hidden="true">/</span>
+            <a href="/projects/@ProjectId" data-testid="breadcrumb-project-link">@Project.Name</a>
+            <span aria-hidden="true">/</span>
+            <a href="/projects/@ProjectId/members/new" data-testid="breadcrumb-add-member-link">Add member</a>
+            <span aria-hidden="true">/</span>
+            <span aria-current="page">Create account</span>
+        }
+    </nav>
+
+    @if (!Loaded)
+    {
+        <p class="muted" data-testid="new-account-loading">Loading...</p>
+    }
+    else if (Project is null)
+    {
+        <p class="error" role="alert" data-testid="project-not-found">Project @ProjectId does not exist.</p>
+    }
+    else if (Created is not null)
+    {
+    <h1>Account created</h1>
+    <section class="card">
+        <div class="notice" role="status" data-testid="new-account-password-box">
+            <p>
+                <strong>Give this temporary password to @Created.Member.DisplayName now. It is shown only once.
+                They must choose a new password when they first sign in.</strong>
+            </p>
+            <p>User name:
+                <code class="mono" data-testid="new-account-username-value">@Created.Member.Username</code></p>
+            <p>Temporary password:
+                <code class="mono" data-testid="new-account-password-value">@Created.TemporaryPassword</code></p>
+            <p>
+                <button type="button" class="outline small" data-testid="copy-account-password-button"
+                        @onclick="CopyPasswordAsync">Copy</button>
+                <span class="muted" role="status" data-testid="account-password-copy-status">@CopyStatus</span>
+            </p>
+        </div>
+        <div class="plan-actions">
+            <button type="button" data-testid="done-account-button" @onclick="Done">Done</button>
+        </div>
+    </section>
+    }
+    else
+    {
+    <h1>Create account</h1>
+    <p class="page-lead">Create a new account for a person who does not have one, and add it to this project.</p>
+
+    <section class="card">
+        @if (ErrorMessage is not null)
+        {
+            <p class="error" role="alert" data-testid="new-account-error">@ErrorMessage</p>
+        }
+        <form data-testid="new-account-form" @onsubmit="CreateAccountAsync">
+            <div class="field">
+                <label for="new-account-username">User name</label>
+                <input id="new-account-username" type="text" maxlength="@ReviewLimits.MaxUsernameLength"
+                       autocomplete="off"
+                       data-testid="new-account-username-input" @bind="Username" @bind:event="oninput" />
+            </div>
+            <div class="field">
+                <label for="new-account-display-name">Display name</label>
+                <input id="new-account-display-name" type="text" maxlength="@ReviewLimits.MaxDisplayNameLength"
+                       autocomplete="off"
+                       data-testid="new-account-display-name-input" @bind="DisplayName" @bind:event="oninput" />
+            </div>
+            <div class="field">
+                <label>
+                    <input type="checkbox" data-testid="new-account-admin-checkbox" @bind="AsProjectAdmin" />
+                    Project admin
+                </label>
+                <p class="muted hint">A project admin also manages the members and repositories of this project.</p>
+            </div>
+            <p class="muted hint">A temporary password is generated and shown once, after you create the account.</p>
+            <div class="plan-actions">
+                <button type="submit" data-testid="new-account-submit">Create account</button>
+                <a class="action outline" href="/projects/@ProjectId/members/new"
+                   data-testid="new-account-cancel">Cancel</a>
+            </div>
+        </form>
+    </section>
+    }
+</main>
+</SessionGate>

@@ -1,6 +1,6 @@
 package ReviewCenter {
     part def HelpPage {
-        doc /* Built-in help: the index at /help, one page for each help topic at /help/{topic} with a shared frame and links to the previous and next topic, the list of topics that feeds them, a friendly page for an unknown help address, and the Signed attestation topic that says what the signature proves and does not prove, and the API tokens topic that explains personal access tokens, the API, and what a token cannot do. */
+        doc /* Built-in help: the index at /help, one page for each help topic at /help/{topic} with a shared frame and links to the previous and next topic, the list of topics that feeds them, a friendly page for an unknown help address, and the Signed attestation topic that says what the signature proves and does not prove, the Managing project members topic that explains how an administrator of a project adds a member by the exact user name, creates an account with a temporary password, changes a role, and removes a member, and the API tokens topic that explains personal access tokens, the API, and what a token cannot do. */
 
         comment sourceRef /* Source: src/DemaConsulting.ReviewCenter/Web/HelpPage.razor, HelpTopicFrame.razor, HelpNotFoundPage.razor, HelpTopics.cs, and the topic pages Help*Page.razor (screenshots in src/DemaConsulting.ReviewCenter/wwwroot/help/) */
         comment testRef /* Test: test/DemaConsulting.ReviewCenter.Tests/Web/HelpPageTests.cs */

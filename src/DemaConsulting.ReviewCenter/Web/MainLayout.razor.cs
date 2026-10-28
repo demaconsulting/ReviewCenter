@@ -42,6 +42,13 @@ public partial class MainLayout : LayoutComponentBase
     private AuthenticationStateProvider AuthenticationState { get; set; } = null!;
 
     /// <summary>
+    ///     Gets or sets the navigation manager, supplied by dependency injection; used to confine an account with a
+    ///     temporary password to the pages it may use.
+    /// </summary>
+    [Inject]
+    private NavigationManager Navigation { get; set; } = null!;
+
+    /// <summary>
     ///     Gets the signed-in user, or <c>null</c> when nobody is signed in.
     /// </summary>
     private Actor? Actor { get; set; }
@@ -50,6 +57,18 @@ public partial class MainLayout : LayoutComponentBase
     ///     Gets a value indicating whether the signed-in user is an administrator.
     /// </summary>
     private bool IsAdmin { get; set; }
+
+    /// <summary>
+    ///     Gets a value indicating whether the signed-in user still has to change a temporary password; such a user
+    ///     sees no navigation tabs and is sent to the account page from every other page.
+    /// </summary>
+    private bool MustChangePassword { get; set; }
+
+    /// <summary>
+    ///     Gets the first segments of the pages a user with a temporary password may open: the page that changes the
+    ///     password, the sign-in page, and the static explanations.
+    /// </summary>
+    private static readonly string[] PagesOpenDuringPasswordChange = ["account", "login", "help", "about"];
 
     /// <summary>
     ///     Gets the version shown in the footer: the informational version up to the <c>+</c>, then <c>+</c> and the
@@ -79,6 +98,26 @@ public partial class MainLayout : LayoutComponentBase
         {
             Actor = await AuthenticationState.GetActorAsync();
             IsAdmin = state.User.IsInRole(SignIn.AdminRole);
+            MustChangePassword = SignIn.IsPasswordChangeRequired(state.User);
+
+            // One redirect confines the user to the page that replaces the temporary password; the claim is
+            // enough, so no service is called per navigation (the data is refused by the access rules anyway)
+            if (MustChangePassword && !IsOpenDuringPasswordChange(Navigation.ToBaseRelativePath(Navigation.Uri)))
+            {
+                Navigation.NavigateTo(SignIn.AccountPath, forceLoad: true);
+            }
         }
+    }
+
+    /// <summary>
+    ///     Decides whether a page may be opened while the password is still temporary.
+    /// </summary>
+    /// <param name="relativePath">The path relative to the base address, possibly with a query or fragment.</param>
+    /// <returns><c>true</c> when its first segment is one of <see cref="PagesOpenDuringPasswordChange"/>.</returns>
+    private static bool IsOpenDuringPasswordChange(string relativePath)
+    {
+        var end = relativePath.IndexOfAny(['/', '?', '#']);
+        var first = end < 0 ? relativePath : relativePath[..end];
+        return PagesOpenDuringPasswordChange.Contains(first, StringComparer.OrdinalIgnoreCase);
     }
 }

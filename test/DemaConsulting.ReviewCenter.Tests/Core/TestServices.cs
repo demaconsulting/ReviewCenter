@@ -17,7 +17,8 @@ internal static class TestServices
     /// <returns>The service.</returns>
     public static ProjectService Projects(IReviewStore store, TimeProvider clock)
     {
-        return new ProjectService(store, new FakeUserStore(), new AllowAllProjectAccess(store), clock);
+        return new ProjectService(
+            store, new FakeUserStore(), new AllowAllProjectAccess(store), new FakePasswordHasher(), clock);
     }
 
     /// <summary>

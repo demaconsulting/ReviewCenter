@@ -10,16 +10,19 @@ sections:
         title: >-
           The UserStore class shall save a user with its user name, display name, system administrator flag, enabled
           state, password
-          hash, failed sign-in count, lockout end, and creation time, assign its identifier, find it again by user
+          hash, must-change-password flag, failed sign-in count, lockout end, and creation time, assign its
+          identifier, find it again by user
           name, change a saved user, and list all users ordered by user name, with every value coming back as it
           was saved.
         justification: |
           The user record is the basis of every sign-in. The lockout state must survive a restart, or a restart
-          would reset the protection against password guessing.
+          would reset the protection against password guessing, and the flag that confines an account with a
+          temporary password must survive it too, or a restart would lift the confinement.
         tests:
           - UserStore_AddAsync_User_RoundTripsEveryField
           - UserStore_UpdateAsync_ChangedFields_AreStored
           - UserStore_ListAsync_Users_AreOrderedByUsername
+          - UserStore_AddToProjectAsync_StoresAccountMembershipAndOneEventTogether
 
       - id: ReviewCenter-UserStore-Unique
         title: >-
@@ -44,3 +47,17 @@ sections:
         tests:
           - UserStore_AddAsync_AuditInsertFails_RollsBackTheUserAndTheGateIsReleased
           - UserStore_UpdateAsync_WithAndWithoutDraft_RecordsOnlyWithDraft
+
+      - id: ReviewCenter-UserStore-AddToProject
+        title: >-
+          The UserStore class shall store a new user, its membership of a project with a role, and one audit entry
+          that names the project in one transaction, through the process-wide audit gate, shall build the audit
+          entry from the stored user, and shall store none of the three when the user name is taken, the project
+          does not exist, or any part fails, releasing the gate on every path.
+        justification: |
+          A project administrator creates an account only as part of adding it to the project. An account without
+          its membership would be an account nobody manages, and a membership without its account cannot exist, so
+          the three must be stored together or not at all.
+        tests:
+          - UserStore_AddToProjectAsync_StoresAccountMembershipAndOneEventTogether
+          - UserStore_AddToProjectAsync_Failure_StoresNothing

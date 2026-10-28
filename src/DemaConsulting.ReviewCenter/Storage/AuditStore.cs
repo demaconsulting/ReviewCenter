@@ -71,9 +71,16 @@ internal sealed class AuditStore(IDbContextFactory<ReviewCenterDbContext> factor
     {
         await using var context = await factory.CreateDbContextAsync(cancellationToken);
         var query = context.AuditEntries.AsNoTracking().AsQueryable();
+
+        // A review filter is always inside one project; a project filter alone returns every event of that project
+        // (and never an event without a project)
         if (reviewId is not null)
         {
             query = query.Where(a => a.ProjectId == projectId && a.ReviewId == reviewId);
+        }
+        else if (projectId is { } project)
+        {
+            query = query.Where(a => a.ProjectId == project);
         }
 
         if (beforeSequence is { } before)

@@ -45,6 +45,29 @@ public interface IUserStore
     Task<User> AddAsync(User user, Func<User, AuditDraft> audit, CancellationToken cancellationToken = default);
 
     /// <summary>
+    ///     Adds a user and makes the user a member of a project in one atomic step.
+    /// </summary>
+    /// <param name="user">The user to add; <see cref="User.Id"/> is ignored.</param>
+    /// <param name="projectId">The project the new user becomes a member of.</param>
+    /// <param name="role">The role of the new membership.</param>
+    /// <param name="audit">
+    ///     Builds the audit draft from the stored user; saved in the same transaction as the user and the
+    ///     membership. Must not be null.
+    /// </param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <returns>The stored user with its assigned identity.</returns>
+    /// <exception cref="DomainRuleException">
+    ///     Thrown with <see cref="DomainRule.UserNameTaken"/> when the user name exists; neither the user nor the
+    ///     membership is stored then, and nothing is stored when the project does not exist either.
+    /// </exception>
+    Task<User> AddToProjectAsync(
+        User user,
+        int projectId,
+        ProjectRole role,
+        Func<User, AuditDraft> audit,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
     ///     Reads a user by user name.
     /// </summary>
     /// <param name="username">The user name; compared without regard to case.</param>

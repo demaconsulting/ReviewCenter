@@ -134,6 +134,30 @@ public sealed class HelpPageTests : PageTestBase
     }
 
     /// <summary>
+    ///     Test that the project members topic explains adding by exact user name, the one-time temporary password,
+    ///     the last project admin rule and the project audit trail.
+    /// </summary>
+    [Fact]
+    public void HelpMembersPage_Render_ExplainsAddingAccountsAndTheLastAdminRule()
+    {
+        // Act: render the topic page
+        var page = Render<HelpMembersPage>();
+
+        // Assert: the topic names the buttons and the rules
+        var text = page.Markup;
+        Assert.Contains("+ Add member", text, StringComparison.Ordinal);
+        Assert.Contains("exact user name", text, StringComparison.Ordinal);
+        Assert.Contains("temporary", text, StringComparison.Ordinal);
+        Assert.Contains("<strong>once</strong>", text, StringComparison.Ordinal);
+        Assert.Contains("last one", text, StringComparison.Ordinal);
+        Assert.Contains("No longer a project member", text, StringComparison.Ordinal);
+        Assert.Contains("Audit trail", text, StringComparison.Ordinal);
+        Assert.Contains(
+            HelpTopics.All,
+            topic => topic.Href == "/help/project-members");
+    }
+
+    /// <summary>
     ///     Test that the API tokens topic explains the token, how to create and revoke it, that it never signs, the
     ///     curl example, the endpoints, the generic 401 and the throttle, and the Draft state of an API-created review.
     /// </summary>

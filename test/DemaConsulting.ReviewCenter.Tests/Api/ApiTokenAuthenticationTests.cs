@@ -201,6 +201,39 @@ public class ApiTokenAuthenticationTests
     }
 
     /// <summary>
+    ///     Test that a token of an owner who has to change a temporary password is refused with the same generic
+    ///     answer as an unknown token, and works again after the password was changed.
+    /// </summary>
+    [Fact(Timeout = 60000)]
+    public async Task ApiTokenAuthentication_Request_OwnerMustChangePassword_GetsTheGenericAnswerUntilChanged()
+    {
+        // Arrange: a token whose owner is then flagged
+        await using var app = await StartAsync();
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var created = await CreateTokenAsync(app, "ann");
+        var userStore = app.Services.GetRequiredService<IUserStore>();
+        var ann = (await userStore.GetByUsernameAsync("ann", cancellationToken))!;
+        ann.MustChangePassword = true;
+        await userStore.UpdateAsync(ann, null, cancellationToken);
+        using var client = ClientFor(app, created.Value);
+        using var unknown = ClientFor(app, "rcpat_" + new string('A', 43));
+
+        // Act
+        var flagged = await client.GetAsync("/api/projects", cancellationToken);
+        var other = await unknown.GetAsync("/api/projects", cancellationToken);
+        ann.MustChangePassword = false;
+        await userStore.UpdateAsync(ann, null, cancellationToken);
+        var changed = await client.GetAsync("/api/projects", cancellationToken);
+
+        // Assert: refused like any unknown token, then accepted
+        Assert.Equal(HttpStatusCode.Unauthorized, flagged.StatusCode);
+        Assert.Equal(
+            await other.Content.ReadAsStringAsync(cancellationToken),
+            await flagged.Content.ReadAsStringAsync(cancellationToken));
+        Assert.Equal(HttpStatusCode.OK, changed.StatusCode);
+    }
+
+    /// <summary>
     ///     Test that a token stops working when it expires.
     /// </summary>
     [Fact(Timeout = 60000)]

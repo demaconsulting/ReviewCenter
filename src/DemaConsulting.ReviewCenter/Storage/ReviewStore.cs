@@ -133,6 +133,7 @@ internal sealed class ReviewStore(IDbContextFactory<ReviewCenterDbContext> facto
         int projectId,
         int userId,
         AuditDraft audit,
+        bool requireAnotherAdmin,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(audit);
@@ -141,6 +142,13 @@ internal sealed class ReviewStore(IDbContextFactory<ReviewCenterDbContext> facto
             factory,
             async context =>
             {
+                // The check runs in the same serialized transaction as the delete, so two concurrent removals of
+                // two administrators cannot both pass it
+                if (requireAnotherAdmin)
+                {
+                    await EnsureAnotherAdminAsync(context, projectId, userId, cancellationToken);
+                }
+
                 var rows = await context.ProjectMemberships
                     .Where(m => m.ProjectId == projectId && m.UserId == userId)
                     .ExecuteDeleteAsync(cancellationToken);
@@ -155,6 +163,7 @@ internal sealed class ReviewStore(IDbContextFactory<ReviewCenterDbContext> facto
         int userId,
         ProjectRole role,
         AuditDraft audit,
+        bool requireAnotherAdmin,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(audit);
@@ -163,12 +172,63 @@ internal sealed class ReviewStore(IDbContextFactory<ReviewCenterDbContext> facto
             factory,
             async context =>
             {
+                // Only a demotion can remove the last administrator; the check shares the transaction of the update
+                if (requireAnotherAdmin && role != ProjectRole.ProjectAdmin)
+                {
+                    await EnsureAnotherAdminAsync(context, projectId, userId, cancellationToken);
+                }
+
                 var rows = await context.ProjectMemberships
                     .Where(m => m.ProjectId == projectId && m.UserId == userId)
                     .ExecuteUpdateAsync(m => m.SetProperty(x => x.Role, role), cancellationToken);
                 return rows > 0 ? (true, audit) : (false, null);
             },
             cancellationToken);
+    }
+
+    /// <summary>
+    ///     Refuses a change that would take away the last enabled administrator of a project.
+    /// </summary>
+    /// <remarks>
+    ///     Does nothing when the target is not an enabled project administrator (a plain member, a disabled
+    ///     administrator or a non-member does not count as an administrator, so losing it changes nothing). Otherwise
+    ///     at least one OTHER enabled project administrator must exist. Must run inside the audit transaction.
+    /// </remarks>
+    /// <param name="context">The context of the open transaction.</param>
+    /// <param name="projectId">The project identity.</param>
+    /// <param name="userId">The user whose membership is about to be removed or demoted.</param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <returns>A task that completes when the check passed.</returns>
+    /// <exception cref="DomainRuleException">
+    ///     Thrown with <see cref="DomainRule.LastProjectAdmin"/> when no other enabled administrator exists.
+    /// </exception>
+    private static async Task EnsureAnotherAdminAsync(
+        ReviewCenterDbContext context,
+        int projectId,
+        int userId,
+        CancellationToken cancellationToken)
+    {
+        // Is the target an enabled project administrator right now?
+        var targetIsAdmin = await context.ProjectMemberships.AsNoTracking()
+            .Where(m => m.ProjectId == projectId && m.UserId == userId && m.Role == ProjectRole.ProjectAdmin)
+            .Join(context.Users, m => m.UserId, u => u.Id, (m, u) => u.Enabled)
+            .AnyAsync(enabled => enabled, cancellationToken);
+        if (!targetIsAdmin)
+        {
+            return;
+        }
+
+        // Is there any other enabled project administrator?
+        var otherAdmin = await context.ProjectMemberships.AsNoTracking()
+            .Where(m => m.ProjectId == projectId && m.UserId != userId && m.Role == ProjectRole.ProjectAdmin)
+            .Join(context.Users, m => m.UserId, u => u.Id, (m, u) => u.Enabled)
+            .AnyAsync(enabled => enabled, cancellationToken);
+        if (!otherAdmin)
+        {
+            throw new DomainRuleException(
+                DomainRule.LastProjectAdmin,
+                "A project needs at least one project administrator. This is the last one.");
+        }
     }
 
     /// <inheritdoc />

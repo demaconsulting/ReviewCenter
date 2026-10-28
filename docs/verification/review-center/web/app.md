@@ -36,6 +36,8 @@ N/A - standard test environment.
   nobody signed in it shows the link to the login page and no projects link, no name, and no logout button.
 - The header shows the help link to everyone, and for nobody signed in it comes before the sign-in link.
 - The header has exactly one link to the home page.
+- While the session carries the must-change-password claim, the header has no projects and users tabs, and the browser
+  is sent to `/account` from the projects and review pages but not from the account, help, and about pages.
 - The footer shows the product name, the copyright holder, a version that begins with the version of the program and is
   no longer than it, and a link to the About page, also when nobody is signed in.
 - The page frame component `SessionGate` shows its content while somebody is signed in, shows the "Session ended"
@@ -122,6 +124,11 @@ sign-in link, in that order. This scenario is tested by `MainLayout_Render_Nobod
 the footer names the product and the copyright holder, the version text begins with the version of the program and is
 not longer than it, the About link points to `/about`, and there is exactly one link to the home page, to `/`. This
 scenario is tested by `MainLayout_Render_NobodySignedIn_ShowsFooterWithVersionAndAboutLink`.
+
+**MainLayout_Render_TemporaryPassword_ConfinesUserToAccountPage**: A theory over the pages `projects`, `reviews/1`,
+`account`, `help/project-members`, and `about`, with a session that carries the must-change-password claim; `MainLayout`
+is rendered with no projects and no users tab, and the browser is sent to `/account` from the first two pages only. This
+scenario is tested by `MainLayout_Render_TemporaryPassword_ConfinesUserToAccountPage`.
 
 **SessionGate_Render_SignedInUser_ShowsContent**: `SessionGate` is rendered around some content for a signed-in user;
 the content is shown and no session-ended message. This scenario is tested by

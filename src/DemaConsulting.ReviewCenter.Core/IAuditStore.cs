@@ -41,9 +41,12 @@ public interface IAuditStore
     Task<AuditEntry> AppendAsync(AuditDraft draft, CancellationToken cancellationToken = default);
 
     /// <summary>
-    ///     Lists entries newest first, optionally of one review and optionally from one side of a position.
+    ///     Lists entries newest first, optionally of one project, of one review and from one side of a position.
     /// </summary>
-    /// <param name="projectId">Only entries of this project, or <c>null</c> for all. Used together with <paramref name="reviewId"/>.</param>
+    /// <param name="projectId">
+    ///     Only entries of this project (all of them, whether or not they name a review), or <c>null</c> for all
+    ///     entries. Entries that name no project are never returned for a non-null project.
+    /// </param>
     /// <param name="reviewId">Only entries of this review (of <paramref name="projectId"/>), or <c>null</c> for all.</param>
     /// <param name="beforeSequence">Only entries with a lower sequence than this, or <c>null</c>.</param>
     /// <param name="afterSequence">

@@ -1,0 +1,51 @@
+@* ProjectAuditPage: the audit trail of one project for whoever administers it, at "/projects/{id}/audit".
+
+   Presentation only; state and loading live in ProjectAuditPage.razor.cs. The entries recorded for the project
+   (member changes, repositories, reviews and signatures of that project), newest first, 50 per page, with Older /
+   Newer buttons that carry the position in the address. Entries of other projects and entries without a project are
+   never shown here; the whole trail and the button that verifies its hash chain stay on the page for system
+   administrators at "/audit". The entries and the paging are drawn by the shared AuditEntryTable component. All
+   text comes from the audit trail and is rendered as plain text. Every key value carries a stable kebab-case
+   data-testid, and the data-interactive marker on the root flips to "true" once the live circuit is connected.
+
+   Human factors: (a) one table, nothing else; (b) the page is a read-only view, so the only buttons are the paging
+   ones; (c) an empty trail says so instead of showing an empty table.
+
+   The page body is inside SessionGate, which replaces it with a "Session ended" message when the user is no longer
+   valid while the page is open. *@
+@page "/projects/{ProjectId:int}/audit"
+@rendermode InteractiveServer
+@attribute [Authorize]
+
+<PageTitle>Project audit trail - ReviewCenter</PageTitle>
+
+<SessionGate>
+<main class="page" data-testid="project-audit-page" data-interactive="@InteractiveMarker">
+    <nav class="breadcrumb">
+        <a href="/projects" data-testid="breadcrumb-projects-link">Projects</a>
+        @if (Project is not null)
+        {
+            <span aria-hidden="true">/</span>
+            <a href="/projects/@ProjectId" data-testid="breadcrumb-project-link">@Project.Name</a>
+            <span aria-hidden="true">/</span>
+            <span aria-current="page">Audit trail</span>
+        }
+    </nav>
+
+    @if (!Loaded)
+    {
+        <p class="muted" data-testid="project-audit-loading">Loading...</p>
+    }
+    else if (Project is null || Page is null)
+    {
+        <p class="error" role="alert" data-testid="project-not-found">Project @ProjectId does not exist.</p>
+    }
+    else
+    {
+        <h1>Audit trail</h1>
+        <p class="page-lead">A tamper-evident record of what happened in this project, newest first.</p>
+        <AuditEntryTable Page="Page" BasePath="@BasePath"
+                         EmptyText="Nothing has been recorded for this project yet." />
+    }
+</main>
+</SessionGate>

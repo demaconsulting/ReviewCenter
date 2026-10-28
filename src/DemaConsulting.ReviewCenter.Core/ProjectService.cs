@@ -18,26 +18,99 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
+using System.Security.Cryptography;
+
 namespace DemaConsulting.ReviewCenter.Core;
+
+/// <summary>
+///     A project account that was just created, with the temporary password that exists only in this value.
+/// </summary>
+/// <remarks>
+///     The temporary password is shown to the creator once so it can be handed over; it is stored only as a hash and
+///     is never audited. Callers must not keep it longer than needed. The record is immutable.
+/// </remarks>
+/// <param name="Member">The new member.</param>
+/// <param name="TemporaryPassword">
+///     The temporary password in clear text; the account must change it at first sign-in.
+/// </param>
+public sealed record NewMemberAccount(ProjectMember Member, string TemporaryPassword)
+{
+    /// <summary>
+    ///     Describes the account without the temporary password, so the password is never printed by accident.
+    /// </summary>
+    /// <returns>The text with the member and a hidden password.</returns>
+    public override string ToString() =>
+        $"{nameof(NewMemberAccount)} {{ {nameof(Member)} = {Member}, [temporary secret hidden] }}";
+}
 
 /// <summary>
 ///     Creates and reads projects and manages who belongs to them, enforcing the project rules.
 /// </summary>
 /// <remarks>
 ///     The service is the single place where project rules live, so every caller (web pages, the API) gets the
-///     same behavior. Only a system administrator creates projects and changes memberships; reads are filtered by
-///     <see cref="IProjectAccess"/>. It holds no state of its own and is safe for concurrent use as long as the
-///     injected stores are.
+///     same behavior. Only a system administrator creates projects; the members of a project are managed by the
+///     administrators of that project and by system administrators; reads are filtered by
+///     <see cref="IProjectAccess"/>. A member is added by the exact user name only and no operation lists users, so
+///     a project administrator cannot browse the user base; failed adds are counted per actor in memory (at most
+///     <see cref="MaxFailedAttempts"/> in <see cref="ThrottleWindow"/>, system administrators exempt) and audited.
+///     That throttle state is per process and lost on restart. The service is safe for concurrent use as long as
+///     the injected stores are; the last project administrator is protected by the store, atomically.
 /// </remarks>
 public sealed class ProjectService
 {
+    /// <summary>
+    ///     The most failed adds (unknown user, name already taken) an actor may make within
+    ///     <see cref="ThrottleWindow"/>.
+    /// </summary>
+    public const int MaxFailedAttempts = 10;
+
+    /// <summary>
+    ///     The length of the sliding window in which failed adds are counted.
+    /// </summary>
+    public static readonly TimeSpan ThrottleWindow = TimeSpan.FromMinutes(10);
+
+    /// <summary>
+    ///     The action recorded when an attempt to add or create a member fails.
+    /// </summary>
+    public const string MemberAddFailedAction = "project.member-add-failed";
+
+    /// <summary>
+    ///     The message for a user name that cannot be added; one text for a missing and a disabled user.
+    /// </summary>
+    private const string CannotAddMessage =
+        "That user name cannot be added to this project. Check the spelling, or create a new account instead.";
+
+    /// <summary>
+    ///     The message for a user that is not a member; one text for an unknown name and a non-member.
+    /// </summary>
+    private const string NotAMemberMessage = "That user is not a member of this project.";
+
+    /// <summary>
+    ///     The message for removing or demoting the last project administrator.
+    /// </summary>
+    public const string LastAdminMessage =
+        "You cannot remove or demote the last project administrator. Ask a system administrator to do it, " +
+        "or make someone else a project administrator first.";
+
+    /// <summary>
+    ///     The characters a temporary password is drawn from: no digit zero or one, no letters O, I or l, so
+    ///     the password can be read out and typed without mistakes.
+    /// </summary>
+    private const string UnambiguousCharacters = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789";
+
+    /// <summary>
+    ///     The length of a temporary password; above the policy minimum of
+    ///     <see cref="ReviewLimits.MinPasswordLength"/>.
+    /// </summary>
+    private const int TemporaryPasswordLength = 16;
+
     /// <summary>
     ///     The store that persists projects and memberships.
     /// </summary>
     private readonly IReviewStore _store;
 
     /// <summary>
-    ///     The store that reads users.
+    ///     The store that reads and creates users.
     /// </summary>
     private readonly IUserStore _users;
 
@@ -47,28 +120,59 @@ public sealed class ProjectService
     private readonly IProjectAccess _access;
 
     /// <summary>
-    ///     The clock that supplies creation times.
+    ///     Hashes the temporary passwords of created accounts.
+    /// </summary>
+    private readonly IPasswordHasher _hasher;
+
+    /// <summary>
+    ///     The clock that supplies creation times and the throttle window.
     /// </summary>
     private readonly TimeProvider _timeProvider;
+
+    /// <summary>
+    ///     Records the failed attempts; <c>null</c> for none.
+    /// </summary>
+    private readonly AuditService? _audit;
+
+    /// <summary>
+    ///     Guards <see cref="_failures"/>; never held across an await.
+    /// </summary>
+    private readonly object _failuresLock = new();
+
+    /// <summary>
+    ///     The times of the recent failed attempts of each actor, by user name without regard to case.
+    /// </summary>
+    private readonly Dictionary<string, Queue<DateTimeOffset>> _failures = new(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>
     ///     Initializes a new instance of the <see cref="ProjectService"/> class.
     /// </summary>
     /// <param name="store">The store that persists projects and memberships. Must not be null.</param>
-    /// <param name="users">The store that reads users. Must not be null.</param>
+    /// <param name="users">The store that reads and creates users. Must not be null.</param>
     /// <param name="access">The access rules. Must not be null.</param>
+    /// <param name="hasher">Hashes the temporary passwords of created accounts. Must not be null.</param>
     /// <param name="timeProvider">The clock used for creation times; injected so tests control time. Must not be null.</param>
-    /// <exception cref="ArgumentNullException">Thrown when an argument is null.</exception>
-    public ProjectService(IReviewStore store, IUserStore users, IProjectAccess access, TimeProvider timeProvider)
+    /// <param name="audit">Records failed attempts in the audit trail; <c>null</c> for none.</param>
+    /// <exception cref="ArgumentNullException">Thrown when a required argument is null.</exception>
+    public ProjectService(
+        IReviewStore store,
+        IUserStore users,
+        IProjectAccess access,
+        IPasswordHasher hasher,
+        TimeProvider timeProvider,
+        AuditService? audit = null)
     {
         ArgumentNullException.ThrowIfNull(store);
         ArgumentNullException.ThrowIfNull(users);
         ArgumentNullException.ThrowIfNull(access);
+        ArgumentNullException.ThrowIfNull(hasher);
         ArgumentNullException.ThrowIfNull(timeProvider);
         _store = store;
         _users = users;
         _access = access;
+        _hasher = hasher;
         _timeProvider = timeProvider;
+        _audit = audit;
     }
 
     /// <summary>
@@ -197,20 +301,24 @@ public sealed class ProjectService
     }
 
     /// <summary>
-    ///     Adds a user to a project.
+    ///     Adds an existing user to a project, by the exact user name.
     /// </summary>
-    /// <param name="actor">The signed-in user; must be a system administrator.</param>
+    /// <param name="actor">The signed-in user; must administer the project (or be a system administrator).</param>
     /// <param name="projectId">The project identity.</param>
-    /// <param name="username">The user name of the user to add.</param>
+    /// <param name="username">
+    ///     The exact user name of the user to add; leading and trailing white space is removed. There is no search:
+    ///     a name that does not exist and the name of a disabled user are refused with the same message.
+    /// </param>
     /// <param name="role">The role the user gets in the project.</param>
     /// <param name="cancellationToken">Cancels the operation.</param>
-    /// <returns>A task that completes when the membership is stored.</returns>
+    /// <returns>The new member.</returns>
     /// <exception cref="DomainRuleException">
-    ///     Thrown with <see cref="DomainRule.ActorNotAllowed"/> for anyone but a system administrator,
-    ///     <see cref="DomainRule.ProjectNotFound"/>, <see cref="DomainRule.UserNotFound"/> or
-    ///     <see cref="DomainRule.MembershipExists"/>.
+    ///     Thrown with <see cref="DomainRule.ProjectNotFound"/> or <see cref="DomainRule.ActorNotAllowed"/> (see
+    ///     <see cref="IProjectAccess.RequireAdministerAsync"/>), <see cref="DomainRule.TooManyAttempts"/> when the
+    ///     actor failed too often lately, <see cref="DomainRule.UserNotFound"/> (one message for a missing and a
+    ///     disabled user; the failure is counted and audited) or <see cref="DomainRule.MembershipExists"/>.
     /// </exception>
-    public async Task AddMemberAsync(
+    public async Task<ProjectMember> AddMemberAsync(
         Actor actor,
         int projectId,
         string username,
@@ -219,27 +327,120 @@ public sealed class ProjectService
     {
         ArgumentNullException.ThrowIfNull(username);
         ValidateRole(role);
-        await _access.RequireSystemAdminAsync(actor, cancellationToken);
-        await _access.RequireViewAsync(actor, projectId, cancellationToken);
-        var user = await FindUserAsync(username, cancellationToken);
+        await _access.RequireAdministerAsync(actor, projectId, cancellationToken);
+        var exempt = await _access.IsSystemAdminAsync(actor, cancellationToken);
+        EnsureNotThrottled(actor, exempt);
+
+        // Resolve the exact name; the one message hides whether the name exists, is disabled or is only misspelled
+        var typed = username.Trim();
+        var user = await _users.GetByUsernameAsync(typed, cancellationToken);
+        if (user is not { Enabled: true })
+        {
+            await RegisterFailureAsync(actor, projectId, typed, exempt, cancellationToken);
+            throw new DomainRuleException(DomainRule.UserNotFound, CannotAddMessage);
+        }
+
         await _store.AddMembershipAsync(
             new ProjectMembership(user.Id, projectId, role),
             AuditDraft.By(actor, "project.member-added", $"user '{user.Username}', role {role}", projectId),
             cancellationToken);
+        return new ProjectMember(user.Id, user.Username, user.DisplayName, user.Enabled, role);
+    }
+
+    /// <summary>
+    ///     Creates a local account with a temporary password and adds it to a project, in one step.
+    /// </summary>
+    /// <param name="actor">The signed-in user; must administer the project (or be a system administrator).</param>
+    /// <param name="projectId">The project identity.</param>
+    /// <param name="username">The new user name; same rules as for a user created by a system administrator.</param>
+    /// <param name="displayName">The display name; same rules as for a user created by a system administrator.</param>
+    /// <param name="role">The role the new user gets in the project.</param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <returns>The new member and the temporary password, which is returned only here.</returns>
+    /// <remarks>
+    ///     The account can never be a system administrator and can not exist without the membership: the user and
+    ///     the membership are stored in one transaction. The password is generated here (so nobody types or reuses a
+    ///     weak one), is stored only as a hash and is never audited; the account must change it at the first
+    ///     sign-in (<see cref="User.MustChangePassword"/>).
+    /// </remarks>
+    /// <exception cref="DomainRuleException">
+    ///     Thrown with <see cref="DomainRule.ProjectNotFound"/> or <see cref="DomainRule.ActorNotAllowed"/>,
+    ///     <see cref="DomainRule.TooManyAttempts"/>, <see cref="DomainRule.UserNameInvalid"/>,
+    ///     <see cref="DomainRule.DisplayNameInvalid"/> or <see cref="DomainRule.UserNameTaken"/> (counted and audited);
+    ///     nothing is stored then.
+    /// </exception>
+    public async Task<NewMemberAccount> CreateMemberAccountAsync(
+        Actor actor,
+        int projectId,
+        string username,
+        string displayName,
+        ProjectRole role,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(username);
+        ArgumentNullException.ThrowIfNull(displayName);
+        ValidateRole(role);
+        await _access.RequireAdministerAsync(actor, projectId, cancellationToken);
+        var exempt = await _access.IsSystemAdminAsync(actor, cancellationToken);
+        EnsureNotThrottled(actor, exempt);
+
+        // Reject invalid input before any write; the same rules as every other way to create a user
+        var typed = username.Trim();
+        UserService.ValidateUsername(typed);
+        var trimmedDisplayName = UserService.ValidateDisplayName(displayName);
+
+        // The password is drawn from a cryptographic source and only its hash leaves this method
+        var password = NewTemporaryPassword();
+        try
+        {
+            var stored = await _users.AddToProjectAsync(
+                new User
+                {
+                    Username = typed,
+                    DisplayName = trimmedDisplayName,
+                    IsSystemAdmin = false,
+                    Enabled = true,
+                    MustChangePassword = true,
+                    PasswordHash = _hasher.Hash(password),
+                    Created = _timeProvider.GetUtcNow()
+                },
+                projectId,
+                role,
+                created => AuditDraft.By(
+                    actor,
+                    "project.account-created",
+                    $"user '{created.Username}', role {role}, temporary password",
+                    projectId),
+                cancellationToken);
+            return new NewMemberAccount(
+                new ProjectMember(stored.Id, stored.Username, stored.DisplayName, stored.Enabled, role),
+                password);
+        }
+        catch (DomainRuleException ex) when (ex.Rule == DomainRule.UserNameTaken)
+        {
+            // Counted and audited like a failed add; the message does not say more than "not available"
+            await RegisterFailureAsync(actor, projectId, typed, exempt, cancellationToken);
+            throw new DomainRuleException(DomainRule.UserNameTaken, "That user name is not available.");
+        }
     }
 
     /// <summary>
     ///     Removes a user from a project.
     /// </summary>
-    /// <param name="actor">The signed-in user; must be a system administrator.</param>
+    /// <param name="actor">The signed-in user; must administer the project (or be a system administrator).</param>
     /// <param name="projectId">The project identity.</param>
     /// <param name="username">The user name of the member to remove.</param>
     /// <param name="cancellationToken">Cancels the operation.</param>
     /// <returns>A task that completes when the membership is removed.</returns>
+    /// <remarks>
+    ///     A project administrator may not remove the last enabled project administrator (themselves included); a
+    ///     system administrator may. The store makes the check and the removal one atomic step, so two concurrent
+    ///     removals cannot empty the project.
+    /// </remarks>
     /// <exception cref="DomainRuleException">
-    ///     Thrown with <see cref="DomainRule.ActorNotAllowed"/> for anyone but a system administrator,
-    ///     <see cref="DomainRule.ProjectNotFound"/>, <see cref="DomainRule.UserNotFound"/> or
-    ///     <see cref="DomainRule.MembershipNotFound"/>.
+    ///     Thrown with <see cref="DomainRule.ProjectNotFound"/> or <see cref="DomainRule.ActorNotAllowed"/>,
+    ///     <see cref="DomainRule.MembershipNotFound"/> (one message for an unknown name and a non-member) or
+    ///     <see cref="DomainRule.LastProjectAdmin"/>.
     /// </exception>
     public async Task RemoveMemberAsync(
         Actor actor,
@@ -248,35 +449,46 @@ public sealed class ProjectService
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(username);
-        await _access.RequireSystemAdminAsync(actor, cancellationToken);
-        await _access.RequireViewAsync(actor, projectId, cancellationToken);
-        var user = await FindUserAsync(username, cancellationToken);
-        var removed = await _store.RemoveMembershipAsync(
-            projectId,
-            user.Id,
-            AuditDraft.By(actor, "project.member-removed", $"user '{user.Username}'", projectId),
-            cancellationToken);
-        if (!removed)
+        await _access.RequireAdministerAsync(actor, projectId, cancellationToken);
+        var exempt = await _access.IsSystemAdminAsync(actor, cancellationToken);
+        var user = await FindMemberCandidateAsync(username, cancellationToken);
+        try
         {
-            throw NotAMember(user);
+            var removed = await _store.RemoveMembershipAsync(
+                projectId,
+                user.Id,
+                AuditDraft.By(actor, "project.member-removed", $"user '{user.Username}'", projectId),
+                !exempt,
+                cancellationToken);
+            if (!removed)
+            {
+                throw NotAMember();
+            }
+        }
+        catch (DomainRuleException ex) when (ex.Rule == DomainRule.LastProjectAdmin)
+        {
+            throw new DomainRuleException(DomainRule.LastProjectAdmin, LastAdminMessage);
         }
     }
 
     /// <summary>
     ///     Changes the role of a member of a project.
     /// </summary>
-    /// <param name="actor">The signed-in user; must be a system administrator.</param>
+    /// <param name="actor">The signed-in user; must administer the project (or be a system administrator).</param>
     /// <param name="projectId">The project identity.</param>
     /// <param name="username">The user name of the member.</param>
     /// <param name="role">The new role.</param>
     /// <param name="cancellationToken">Cancels the operation.</param>
-    /// <returns>A task that completes when the role is stored.</returns>
+    /// <returns>The member as it is now.</returns>
+    /// <remarks>
+    ///     The last-administrator rule of <see cref="RemoveMemberAsync"/> applies to a demotion too.
+    /// </remarks>
     /// <exception cref="DomainRuleException">
-    ///     Thrown with <see cref="DomainRule.ActorNotAllowed"/> for anyone but a system administrator,
-    ///     <see cref="DomainRule.ProjectNotFound"/>, <see cref="DomainRule.UserNotFound"/> or
-    ///     <see cref="DomainRule.MembershipNotFound"/>.
+    ///     Thrown with <see cref="DomainRule.ProjectNotFound"/> or <see cref="DomainRule.ActorNotAllowed"/>,
+    ///     <see cref="DomainRule.MembershipNotFound"/> (one message for an unknown name and a non-member) or
+    ///     <see cref="DomainRule.LastProjectAdmin"/>.
     /// </exception>
-    public async Task SetMemberRoleAsync(
+    public async Task<ProjectMember> SetMemberRoleAsync(
         Actor actor,
         int projectId,
         string username,
@@ -285,19 +497,29 @@ public sealed class ProjectService
     {
         ArgumentNullException.ThrowIfNull(username);
         ValidateRole(role);
-        await _access.RequireSystemAdminAsync(actor, cancellationToken);
-        await _access.RequireViewAsync(actor, projectId, cancellationToken);
-        var user = await FindUserAsync(username, cancellationToken);
-        var changed = await _store.SetMembershipRoleAsync(
-            projectId,
-            user.Id,
-            role,
-            AuditDraft.By(actor, "project.member-role-changed", $"user '{user.Username}', role {role}", projectId),
-            cancellationToken);
-        if (!changed)
+        await _access.RequireAdministerAsync(actor, projectId, cancellationToken);
+        var exempt = await _access.IsSystemAdminAsync(actor, cancellationToken);
+        var user = await FindMemberCandidateAsync(username, cancellationToken);
+        try
         {
-            throw NotAMember(user);
+            var changed = await _store.SetMembershipRoleAsync(
+                projectId,
+                user.Id,
+                role,
+                AuditDraft.By(actor, "project.member-role-changed", $"user '{user.Username}', role {role}", projectId),
+                !exempt,
+                cancellationToken);
+            if (!changed)
+            {
+                throw NotAMember();
+            }
         }
+        catch (DomainRuleException ex) when (ex.Rule == DomainRule.LastProjectAdmin)
+        {
+            throw new DomainRuleException(DomainRule.LastProjectAdmin, LastAdminMessage);
+        }
+
+        return new ProjectMember(user.Id, user.Username, user.DisplayName, user.Enabled, role);
     }
 
     /// <summary>
@@ -316,21 +538,121 @@ public sealed class ProjectService
     /// <summary>
     ///     Builds the failure for a user that is not a member of the project.
     /// </summary>
-    /// <param name="user">The user.</param>
-    /// <returns>The exception.</returns>
-    private static DomainRuleException NotAMember(User user) =>
-        new(DomainRule.MembershipNotFound, $"The user '{user.Username}' is not a member of the project.");
+    /// <returns>The exception; the same message whether the name exists or not.</returns>
+    private static DomainRuleException NotAMember() => new(DomainRule.MembershipNotFound, NotAMemberMessage);
 
     /// <summary>
-    ///     Reads a user by name.
+    ///     Reads the user behind a name for a change of its membership.
     /// </summary>
     /// <param name="username">The user name.</param>
     /// <param name="cancellationToken">Cancels the operation.</param>
     /// <returns>The user.</returns>
-    /// <exception cref="DomainRuleException">Thrown with <see cref="DomainRule.UserNotFound"/> when there is none.</exception>
-    private async Task<User> FindUserAsync(string username, CancellationToken cancellationToken)
+    /// <exception cref="DomainRuleException">
+    ///     Thrown with <see cref="DomainRule.MembershipNotFound"/> when there is none; the message is that of a
+    ///     non-member, so the name of an unrelated user is never confirmed.
+    /// </exception>
+    private async Task<User> FindMemberCandidateAsync(string username, CancellationToken cancellationToken)
     {
-        return await _users.GetByUsernameAsync(username, cancellationToken)
-               ?? throw new DomainRuleException(DomainRule.UserNotFound, $"The user '{username}' does not exist.");
+        return await _users.GetByUsernameAsync(username.Trim(), cancellationToken) ?? throw NotAMember();
+    }
+
+    /// <summary>
+    ///     Refuses an actor that failed too often lately.
+    /// </summary>
+    /// <param name="actor">The actor.</param>
+    /// <param name="exempt"><c>true</c> for a system administrator, who is never throttled.</param>
+    /// <exception cref="DomainRuleException">
+    ///     Thrown with <see cref="DomainRule.TooManyAttempts"/> over the limit.
+    /// </exception>
+    private void EnsureNotThrottled(Actor actor, bool exempt)
+    {
+        if (exempt)
+        {
+            return;
+        }
+
+        lock (_failuresLock)
+        {
+            if (_failures.TryGetValue(actor.Username, out var times))
+            {
+                Prune(times, _timeProvider.GetUtcNow());
+                if (times.Count >= MaxFailedAttempts)
+                {
+                    throw new DomainRuleException(
+                        DomainRule.TooManyAttempts,
+                        "Too many attempts. Try again in a few minutes.");
+                }
+
+                // An actor without recent failures needs no entry
+                if (times.Count == 0)
+                {
+                    _failures.Remove(actor.Username);
+                }
+            }
+        }
+    }
+
+    /// <summary>
+    ///     Counts a failed attempt against the actor (unless exempt) and records it in the audit trail.
+    /// </summary>
+    /// <param name="actor">The actor.</param>
+    /// <param name="projectId">The project of the attempt.</param>
+    /// <param name="typedName">The user name that was tried; recorded as typed (cleaned by the audit store).</param>
+    /// <param name="exempt"><c>true</c> for a system administrator, whose failures are audited but not counted.</param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <returns>A task that completes when the failure is counted and the record attempted.</returns>
+    private async Task RegisterFailureAsync(
+        Actor actor,
+        int projectId,
+        string typedName,
+        bool exempt,
+        CancellationToken cancellationToken)
+    {
+        if (!exempt)
+        {
+            lock (_failuresLock)
+            {
+                var now = _timeProvider.GetUtcNow();
+                if (!_failures.TryGetValue(actor.Username, out var times))
+                {
+                    times = new Queue<DateTimeOffset>();
+                    _failures[actor.Username] = times;
+                }
+
+                Prune(times, now);
+                times.Enqueue(now);
+            }
+        }
+
+        // Best effort: the refusal itself must not fail because the trail could not be written. The throttle caps
+        // how many entries one actor can cause, so no coalescing is needed
+        if (_audit is not null)
+        {
+            await _audit.TryRecordAsync(
+                AuditDraft.By(actor, MemberAddFailedAction, $"user name '{typedName}'", projectId),
+                cancellationToken);
+        }
+    }
+
+    /// <summary>
+    ///     Removes the attempts that left the sliding window.
+    /// </summary>
+    /// <param name="times">The attempt times, oldest first.</param>
+    /// <param name="now">The current time.</param>
+    private static void Prune(Queue<DateTimeOffset> times, DateTimeOffset now)
+    {
+        while (times.Count > 0 && now - times.Peek() >= ThrottleWindow)
+        {
+            times.Dequeue();
+        }
+    }
+
+    /// <summary>
+    ///     Draws a temporary password from the unambiguous alphabet with a cryptographic random source.
+    /// </summary>
+    /// <returns>The password, <see cref="TemporaryPasswordLength"/> characters.</returns>
+    private static string NewTemporaryPassword()
+    {
+        return new string(RandomNumberGenerator.GetItems<char>(UnambiguousCharacters, TemporaryPasswordLength));
     }
 }

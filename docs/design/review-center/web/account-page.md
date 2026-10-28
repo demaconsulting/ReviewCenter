@@ -6,7 +6,10 @@
 
 `AccountPage` is the page at `/account`. Its responsibilities are to let the signed-in user choose the appearance of the
 interface, let the user change their own password, let the user create, list, and revoke their personal access tokens
-for the API, and report when the page is interactive. It requires a signed-in user. It is a Razor component split into
+for the API, and report when the page is interactive. It requires a signed-in user. When the account still has a
+temporary password (the claim `must_change_password`), it is also the only page the user may use: it then shows a
+banner and only the change-password form (no appearance and no tokens), and after the change it sends the user to the
+login page. It is a Razor component split into
 presentation (`AccountPage.razor`) and behavior (`AccountPage.razor.cs`). The
 page uses the narrow page container, because it holds forms, and its three cards are headed Appearance, Change password,
 and API tokens.
@@ -23,6 +26,11 @@ script in the HTML head of the `App` component, which also applies the stored ch
 `App` design); there `system` follows the device setting `prefers-color-scheme`, and the result is published as the
 `data-theme` attribute and the `color-scheme` style of the root element. All access to the browser storage is guarded,
 so a browser that blocks it simply shows the default.
+
+**MustChangePassword**: whether the signed-in user still has to replace a temporary password, read once from the
+authentication state with `SignIn.IsPasswordChangeRequired` when the page is initialized. When it is true the tokens are
+not loaded, the appearance and tokens cards are not shown, a banner says that the password is temporary, and the label
+of the first password field reads "Temporary password" instead of "Current password".
 
 **CurrentPassword**, **NewPassword**, **ConfirmPassword**: the values typed into the form. The second entry of the new
 password only guards against a typing error, so it is compared on the page; Core does not know it.
@@ -47,7 +55,8 @@ expiry, and otherwise Active.
 Whose password changes is decided by the authentication state, never by a field on the page.
 
 Every interactive element and key value has a stable `data-testid` (see the test identifier rule of the Web
-subsystem): `account-page` (root), `appearance-card`, `theme-system`, `theme-light`, `theme-dark`,
+subsystem): `account-page` (root), `password-change-required-banner` (only with a temporary password), `appearance-card`,
+`theme-system`, `theme-light`, `theme-dark`,
 `change-password-form`, `current-password-input`, `new-password-input`, `confirm-password-input`, `account-error`,
 `account-message`, `change-password-button`, and for the tokens card `tokens-card`, `tokens-help-link`,
 `create-token-form`, `token-name-input`, `token-expiry-{days}`, `create-token-button`, `token-error`, `token-message`,
@@ -71,7 +80,10 @@ subsystem): `account-page` (root), `appearance-card`, `theme-system`, `theme-lig
   is shown, and the error is removed. When the two entries of the new password differ, "The new passwords do not
   match." is shown and nothing is sent to Core. On a rule violation (a new password outside the policy, a wrong current
   password, or a locked account) the message of the violation is shown. The three password fields are emptied in every
-  case, so a password never stays in the page.
+  case, so a password never stays in the page. For a user with a temporary password the service also refuses a new
+  password equal to the temporary one and clears the flag; the page then navigates to `/login?changed=1` with a full
+  page load, because the session of the change still carries the claim and is stale (see `SignIn.IsCurrent`), and the
+  login page shows a notice that the password was changed.
 
 The user name comes from `SignIn.GetActorAsync`, and the change is made by `UserService.ChangeOwnPasswordAsync`.
 
@@ -116,7 +128,9 @@ the authority.
 - **UserService** — changes the password.
 - **PersonalAccessTokenService** — creates, lists, and revokes the tokens.
 - **TimeProvider** — decides whether a token has expired.
-- **SignIn** — `GetActorAsync` supplies the user name from the authentication state.
+- **SignIn** — `GetActorAsync` supplies the user name from the authentication state, and `IsPasswordChangeRequired`
+  tells whether the password is temporary.
+- **NavigationManager** (ASP.NET Core) — sends the user to the login page after the change of a temporary password.
 - **App** — its head script defines `reviewCenter.getTheme`, `reviewCenter.setTheme`, and `reviewCenter.copyText`, and
   applies the stored
   appearance before the first paint.

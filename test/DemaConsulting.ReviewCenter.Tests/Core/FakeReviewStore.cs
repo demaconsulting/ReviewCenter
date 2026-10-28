@@ -155,15 +155,24 @@ internal sealed class FakeReviewStore : IReviewStore
         int projectId,
         int userId,
         AuditDraft audit,
+        bool requireAnotherAdmin,
         CancellationToken cancellationToken = default)
     {
-        var removed = _memberships.RemoveAll(m => m.UserId == userId && m.ProjectId == projectId) > 0;
-        if (removed)
+        var target = _memberships.FirstOrDefault(m => m.UserId == userId && m.ProjectId == projectId);
+        if (target is null)
         {
-            Audits.Add(audit);
+            return Task.FromResult(false);
         }
 
-        return Task.FromResult(removed);
+        // Like the real store: the rule is checked in the same step as the change
+        if (requireAnotherAdmin && target.Role == ProjectRole.ProjectAdmin && IsUserEnabled(userId))
+        {
+            EnsureAnotherAdmin(projectId, userId);
+        }
+
+        _memberships.Remove(target);
+        Audits.Add(audit);
+        return Task.FromResult(true);
     }
 
     /// <inheritdoc />
@@ -172,6 +181,7 @@ internal sealed class FakeReviewStore : IReviewStore
         int userId,
         ProjectRole role,
         AuditDraft audit,
+        bool requireAnotherAdmin,
         CancellationToken cancellationToken = default)
     {
         var index = _memberships.FindIndex(m => m.UserId == userId && m.ProjectId == projectId);
@@ -180,9 +190,50 @@ internal sealed class FakeReviewStore : IReviewStore
             return Task.FromResult(false);
         }
 
+        if (requireAnotherAdmin && role != ProjectRole.ProjectAdmin
+            && _memberships[index].Role == ProjectRole.ProjectAdmin && IsUserEnabled(userId))
+        {
+            EnsureAnotherAdmin(projectId, userId);
+        }
+
         _memberships[index] = _memberships[index] with { Role = role };
         Audits.Add(audit);
         return Task.FromResult(true);
+    }
+
+    /// <summary>
+    ///     Gets or sets the test hook that tells whether a user is enabled; the last-administrator rule counts only
+    ///     enabled administrators, like the real store. By default every user counts as enabled.
+    /// </summary>
+    public Func<int, bool> IsUserEnabled { get; set; } = _ => true;
+
+    /// <summary>
+    ///     Adds a membership without an audit entry; used by <see cref="FakeUserStore"/> when it stores a user and
+    ///     the membership in one step (the one entry is kept by that store).
+    /// </summary>
+    /// <param name="membership">The membership to add.</param>
+    public void AddMembershipWithoutAudit(ProjectMembership membership)
+    {
+        _memberships.Add(membership);
+    }
+
+    /// <summary>
+    ///     Throws when no other enabled project administrator remains in a project.
+    /// </summary>
+    /// <param name="projectId">The project.</param>
+    /// <param name="userId">The administrator that is about to be removed or demoted.</param>
+    /// <exception cref="DomainRuleException">Thrown with <see cref="DomainRule.LastProjectAdmin"/>.</exception>
+    private void EnsureAnotherAdmin(int projectId, int userId)
+    {
+        var others = _memberships.Count(
+            m => m.ProjectId == projectId
+                && m.UserId != userId
+                && m.Role == ProjectRole.ProjectAdmin
+                && IsUserEnabled(m.UserId));
+        if (others == 0)
+        {
+            throw new DomainRuleException(DomainRule.LastProjectAdmin, "This is the last project administrator.");
+        }
     }
 
     /// <inheritdoc />

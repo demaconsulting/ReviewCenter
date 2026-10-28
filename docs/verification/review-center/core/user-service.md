@@ -27,6 +27,9 @@ N/A - standard test environment.
 - The last enabled system administrator cannot be disabled or demoted.
 - A user changes their own password only with the current password; an administrator sets a new password for any
   user, which also ends a lockout.
+- A user with a temporary password signs in but is refused (and audited) at a re-authentication for a signature; the
+  change of the own password must differ from the temporary one and ends the temporary state; a password set by an
+  administrator leaves the state unchanged.
 - A change of a user that does not exist is reported as such.
 - Null arguments are rejected with an `ArgumentNullException`.
 
@@ -148,3 +151,17 @@ disabled account record one `signature.reauth-failed` per minute, which is teste
 and a locked attempt on the same account within one minute are both recorded, because the reason is part of the
 coalescing key, which is tested by `UserService_ReauthenticateAsync_DisabledThenLockedInOneMinute_RecordsBothReasons`.
 These tests are defined in `AuditEventTests.cs`.
+
+**UserService temporary password scenarios**: The temporary password of an account created for a project is modeled
+in `MustChangePasswordTests.cs` by a user whose must-change flag is set, over `FakeUserStore`, `FakeReviewStore`,
+`FakeAuditStore`, and `FakePasswordHasher`. Signing in with the temporary password returns the user with the flag set,
+which is tested by `UserService_AuthenticateAsync_TemporaryPassword_SignsIn`. A re-authentication with the temporary
+password returns no user and records one `signature.reauth-failed` entry whose detail says `password change pending`
+and does not contain the password, which is tested by
+`UserService_ReauthenticateAsync_TemporaryPassword_IsRefusedAndAudited`. Changing the own password to a new one clears
+the flag, after which the new password re-authenticates and the account has access and may list its tokens, which is
+tested by `UserService_ChangeOwnPasswordAsync_NewPassword_ClearsTheFlagAndGivesAccess`. Choosing the temporary password
+again is refused with `PasswordInvalid` and keeps the flag, which is tested by
+`UserService_ChangeOwnPasswordAsync_SameAsTemporary_IsRefusedAndKeepsTheFlag`. A password set by an administrator
+through `SetPasswordAsync` leaves the flag of a flagged account set and of a normal account clear, which is tested by
+`UserService_SetPasswordAsync_ByAdministrator_LeavesTheFlagAlone`.

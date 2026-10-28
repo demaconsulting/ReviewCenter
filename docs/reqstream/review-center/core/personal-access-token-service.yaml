@@ -49,6 +49,18 @@ sections:
           - PersonalAccessTokenService_Create_TwentyActive_RejectsTheTwentyFirst
           - PersonalAccessTokenService_Create_RevokedAndExpiredDoNotCount
 
+      - id: ReviewCenter-PersonalAccessTokenService-TemporaryPassword
+        title: >-
+          The PersonalAccessTokenService unit shall refuse to create, list, or revoke a token for a user whose
+          password is still a temporary one, with a password change required rule, and shall refuse every token of
+          such an owner at authentication with its own failure reason, until the user has chosen a new password.
+        justification: |
+          A temporary password is known to the person who handed it over, so an account that still has it must not
+          be able to create a credential that outlives the password, and a token that existed before the password
+          was reset must not give access to an account that may have changed hands.
+        tests:
+          - PersonalAccessTokenService_TemporaryPassword_RefusesEveryUse
+
       - id: ReviewCenter-PersonalAccessTokenService-Authenticate
         title: >-
           The PersonalAccessTokenService unit shall accept a token value only when its hash equals the stored hash,

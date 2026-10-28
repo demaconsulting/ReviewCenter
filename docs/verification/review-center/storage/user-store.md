@@ -5,7 +5,9 @@
 `UserStore` is verified with unit tests defined in `UserStoreTests.cs`. Each test opens a new SQLite database file
 in a private temporary folder, supplied by the test helper `TestDatabase`, and creates the schema with the real
 `DatabaseSetup`, so the keys, the unique index, and the ordering of the real database are part of what is verified. A
-database substitute is not used. Tests add, read, change, and list users and compare the values read back.
+database substitute is not used. Tests add, read, change, and list users and compare the values read back. The atomic
+creation of an account with its membership and its audit entry is verified in `ProjectMembersStoreTests.cs`, which
+uses the same real database through the helper `TestStore`.
 
 #### Test Environment
 
@@ -20,6 +22,9 @@ N/A - standard test environment (temporary SQLite databases are created by the t
 - A change of the system administrator flag, the enabled flag, the password hash, the failure count, and the lockout time
   is stored.
 - Users are listed ordered by user name.
+- A user added to a project is stored with its must-change-password flag, its membership with the given role, and
+  exactly one audit entry that names the project; a user name that is taken, or a project that does not exist, stores
+  no account, no membership, and no entry, and leaves the gate free for the next change.
 
 #### Test Scenarios
 
@@ -41,6 +46,16 @@ lockout time of a stored user are changed and updated; they are read back as cha
 
 **UserStore_ListAsync_Users_AreOrderedByUsername**: Three users are added out of order; they are listed ordered by
 user name. This scenario is tested by `UserStore_ListAsync_Users_AreOrderedByUsername`.
+
+**UserStore_AddToProjectAsync_StoresAccountMembershipAndOneEventTogether**: A user whose must-change-password flag is
+set is added to a project as project administrator; the user is read back with the flag, the membership has the
+role, and the audit trail holds exactly one `project.account-created` event of the project, built from the stored
+user. This scenario is tested by `UserStore_AddToProjectAsync_StoresAccountMembershipAndOneEventTogether`.
+
+**UserStore_AddToProjectAsync_Failure_StoresNothing**: A user name that is already taken is added to a project, and a
+user is added to a project that does not exist; the first throws `UserNameTaken`, and neither stores an account, a
+membership, or an event, and a later add still succeeds because the gate was released. This scenario is tested by
+`UserStore_AddToProjectAsync_Failure_StoresNothing`.
 
 **Audit drafts**: The store takes an audit draft with the creation of a user and with an update; an update without a
 draft is allowed and is not audited. The tests of this unit build the store with the real `AuditAppender`. The

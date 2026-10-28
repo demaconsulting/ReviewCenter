@@ -49,6 +49,27 @@ public class ApiEndpointsTests
     private const string BaseSha = "2222222222222222222222222222222222222222";
 
     /// <summary>
+    ///     Test that the project member rules map to the statuses the API documents: the last project administrator
+    ///     is a conflict, too many attempts is 429, and a pending password change is forbidden.
+    /// </summary>
+    /// <param name="rule">The rule that failed.</param>
+    /// <param name="status">The expected HTTP status.</param>
+    [Theory]
+    [InlineData(DomainRule.LastProjectAdmin, 409)]
+    [InlineData(DomainRule.TooManyAttempts, 429)]
+    [InlineData(DomainRule.PasswordChangeRequired, 403)]
+    public void ApiProblems_StatusOf_MemberRules_MapsToDocumentedStatus(DomainRule rule, int status)
+    {
+        // Arrange: nothing to prepare
+
+        // Act
+        var actual = ApiProblems.StatusOf(rule);
+
+        // Assert
+        Assert.Equal(status, actual);
+    }
+
+    /// <summary>
     ///     Test that the project list returns every project with its details in camel-case JSON.
     /// </summary>
     [Fact(Timeout = 60000)]

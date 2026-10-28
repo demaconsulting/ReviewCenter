@@ -140,7 +140,8 @@ services (`AttestationService`, `EvidenceIndexService`), so that no route to the
 projects shows only the projects the owner may see.
 
 **Authentication failures**: A refused token is answered in the same way for every reason (malformed, unknown, revoked,
-expired, owner disabled or locked out), so the answer reveals nothing about whether a token ever existed. The reason is
+expired, owner disabled or locked out, owner with a temporary password), so the answer reveals nothing about whether a
+token ever existed. The reason is
 recorded in the audit trail without the value of the token, as an event that is coalesced per client address, so that
 a script with a wrong token does not flood the trail. Attempts are counted by the same in-memory throttle as the web
 sign-in, under a key of their own, so a flood of wrong tokens answers 429 without locking out any user and without
@@ -148,7 +149,8 @@ touching the limits of the web sign-in.
 
 **Errors**: Every failure of the endpoints is `application/problem+json`, so that a program can read the status and the
 message in one way. A broken domain rule is mapped to one status in one place (`ApiProblems.StatusOf`): not found
-rules to 404, conflicts to 409, an unusable or failing git to 503, 502, or 504, a not allowed actor to 403, and every
+rules to 404, conflicts (including the removal of the last project admin) to 409, too many attempts to 429, an unusable
+or failing git to 503, 502, or 504, a not allowed actor and a pending password change to 403, and every
 other rule to 400. A request body that cannot be read, or that has none or both of the sources of a review, is a 400
 that names the field. An unexpected exception is the generic 500 of the host and shows no detail.
 

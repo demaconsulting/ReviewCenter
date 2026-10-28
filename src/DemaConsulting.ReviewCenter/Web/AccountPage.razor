@@ -5,7 +5,9 @@
    to "true" once the live circuit is connected.
 
    The page body is inside SessionGate, which replaces it with a "Session ended" message when the user is no longer
-   valid while the page is open. *@
+   valid while the page is open. A user who still has a temporary password (set by the person who created the
+   account) sees only a banner and the change-password form; after the change the user is sent to the login page to
+   sign in again with the new password. *@
 @page "/account"
 @rendermode InteractiveServer
 @attribute [Authorize]
@@ -16,6 +18,14 @@
 <main class="page narrow" data-testid="account-page" data-interactive="@InteractiveMarker">
     <h1>Account</h1>
 
+    @if (MustChangePassword)
+    {
+        <p class="notice" role="status" data-testid="password-change-required-banner">
+            Your password is temporary. Choose a new password to continue.
+        </p>
+    }
+    else
+    {
     <section class="card" data-testid="appearance-card">
         <h2 id="appearance-heading">Appearance</h2>
         <p class="muted hint">Remembered in this browser only. System follows your device setting.</p>
@@ -40,12 +50,13 @@
             </label>
         </div>
     </section>
+    }
 
     <section class="card">
         <h2>Change password</h2>
         <form data-testid="change-password-form" @onsubmit="ChangePasswordAsync">
             <div class="field">
-                <label for="current-password">Current password</label>
+                <label for="current-password">@(MustChangePassword ? "Temporary password" : "Current password")</label>
                 <input id="current-password" type="password" autocomplete="current-password"
                        data-testid="current-password-input" @bind="CurrentPassword" @bind:event="oninput" />
             </div>
@@ -74,6 +85,8 @@
         </form>
     </section>
 
+    @if (!MustChangePassword)
+    {
     <section class="card" data-testid="tokens-card">
         <h2 id="tokens-heading">API tokens</h2>
         <p class="muted hint">A token lets a script or tool use the ReviewCenter API as you. It can read projects and reviews and create review drafts; it can never sign. The token is shown once, so copy it right away.</p>
@@ -157,5 +170,6 @@
             </ul>
         }
     </section>
+    }
 </main>
 </SessionGate>

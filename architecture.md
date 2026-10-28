@@ -352,6 +352,21 @@ The architecture above is the target design. Only the first slices are implement
   tests (a golden file and an independent fingerprint check) and a user guide section cover it. Reviews created by
   upload, by a manual repository choice or through the API have no review-set id and are not listed; an optional
   review-set id in the API is a possible follow-up.
+- **Implemented, slice 10a (project-based access control)**: a user sees a project only as a member (project role
+  `User` or `ProjectAdmin`) or as a system administrator; a project that is hidden looks like a project that does not
+  exist on every page, on the API and for signing. Only a system administrator creates projects. Access is resolved
+  again on every request, so a change of a membership takes effect with the next call. Development databases created
+  before this slice must be recreated (no migrations).
+- **Implemented, slice 10b (project members)**: a project admin (or a system administrator) manages the members of the
+  project on the project page, with no user list: a member is added by the exact user name (one generic answer for a
+  missing or disabled user, throttled to 10 failures in 10 minutes per actor, failures audited as
+  `project.member-add-failed`), or by creating a local account for the project, which gets a generated temporary
+  password shown once (stored only as a hash, never audited) and the must-change-password flag
+  (`Users.MustChangePassword`): until the user changes the password no project access, token or signature is granted
+  and the cookie is replaced by a restricted one. The rule that a project keeps at least one enabled project admin is
+  enforced inside the store's serializable audit transaction. A project audit trail page (`/projects/{id}/audit`)
+  shows the events of that project only, and the review page marks an assignee who is no longer a member. Development
+  databases created before this slice must be recreated (no migrations; the new `Users.MustChangePassword` column).
 - **Planned and deferred**: Messaging, the review lifecycle beyond
   `Draft`, and the rest of Core and
   Storage. They have no code, requirements,

@@ -222,6 +222,57 @@ public class AppTests : PageTestBase
     }
 
     /// <summary>
+    ///     Test that a user who signed in with a temporary password sees no navigation tabs and is sent to the
+    ///     account page from any other page, but may stay on the account, help and about pages.
+    /// </summary>
+    /// <param name="path">The page the user is on.</param>
+    /// <param name="redirected">Whether the user must be sent to the account page.</param>
+    [Theory]
+    [InlineData("projects", true)]
+    [InlineData("reviews/1", true)]
+    [InlineData("account", false)]
+    [InlineData("help/project-members", false)]
+    [InlineData("about", false)]
+    public void MainLayout_Render_TemporaryPassword_ConfinesUserToAccountPage(string path, bool redirected)
+    {
+        // Arrange: a flagged session on the given page
+        SignInAsTemporaryPassword("bea", "Bea");
+        var navigation = Services.GetRequiredService<NavigationManager>();
+        navigation.NavigateTo("/" + path);
+
+        // Act: render the layout
+        var layout = Render<MainLayout>();
+
+        // Assert: no tabs; the browser is sent to /account only when the page is not one of the open ones
+        Assert.Empty(layout.FindAll("[data-testid='projects-link']"));
+        Assert.Empty(layout.FindAll("[data-testid='users-link']"));
+        Assert.EndsWith(redirected ? "/account" : "/" + path, navigation.Uri, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    ///     Test that the sign-in page shows the notice to sign in with the new password only after a password
+    ///     change.
+    /// </summary>
+    /// <param name="query">The query string of the address.</param>
+    /// <param name="shown">Whether the notice must be shown.</param>
+    [Theory]
+    [InlineData("?changed=1", true)]
+    [InlineData("", false)]
+    [InlineData("?changed=0", false)]
+    public void LoginPage_Render_ChangedQuery_ShowsNoticeOnlyAfterPasswordChange(string query, bool shown)
+    {
+        // Arrange: nobody is signed in, and the address carries the query
+        SignOut();
+        Services.GetRequiredService<NavigationManager>().NavigateTo("/login" + query);
+
+        // Act: render the page
+        var cut = Render<LoginPage>();
+
+        // Assert: the notice is there only for changed=1
+        Assert.Equal(shown ? 1 : 0, cut.FindAll("[data-testid='login-password-changed']").Count);
+    }
+
+    /// <summary>
     ///     Test that every page has a footer with the version and a link to the About page, even when nobody is
     ///     signed in, and that the header has exactly one link to the home page.
     /// </summary>

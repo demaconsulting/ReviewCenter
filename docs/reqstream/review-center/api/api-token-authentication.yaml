@@ -24,7 +24,8 @@ sections:
       - id: ReviewCenter-ApiTokenAuthentication-Refusal
         title: >-
           The ApiTokenAuthentication unit shall answer a request under /api with no token, an unknown or revoked
-          token, or an expired token with status 401 and a Bearer challenge, and shall give the same answer for
+          token, an expired token, or a token whose owner still has to change a temporary password
+          with status 401 and a Bearer challenge, and shall give the same answer for
           every reason that a token is refused, a wrong Basic password included. The challenge shall name the bearer and
           the Basic scheme.
         justification: |
@@ -34,6 +35,7 @@ sections:
           - ApiTokenAuthentication_Request_NoUsableToken_Answers401WithChallenge
           - ApiTokenAuthentication_Request_RefusedTokens_AllGetTheSameGenericAnswer
           - ApiTokenAuthentication_Request_ExpiredToken_Answers401
+          - ApiTokenAuthentication_Request_OwnerMustChangePassword_GetsTheGenericAnswerUntilChanged
           - ApiTokenAuthentication_Request_BasicWithWrongPassword_GetsTheSameGeneric401AndIsThrottledAndAudited
 
       - id: ReviewCenter-ApiTokenAuthentication-Cookie

@@ -27,6 +27,21 @@ sections:
           - AccountPage_ChangePassword_ValidInput_ChangesOwnPasswordAndClearsFields
           - AccountPage_ChangePassword_InvalidInput_ShowsErrorAndChangesNothing
 
+      - id: ReviewCenter-AccountPage-TemporaryPassword
+        title: >-
+          The AccountPage unit shall, for a user whose session carries the must-change-password claim, show a banner
+          that a temporary password is in use and the form for changing the password only, with no card of personal
+          access tokens and no appearance card, and shall, after the password was replaced, send the browser to the
+          sign-in page with the changed notice flag; a normal session shall show no banner.
+        justification: |
+          An account made by a project admin starts with a password that the project admin has seen, so the person
+          must replace it before anything else. The page shows nothing that the person cannot use yet, and the new
+          sign-in proves that the new password works and drops the session that carried the flag.
+        tests:
+          - AccountPage_Render_TemporaryPassword_ShowsBannerAndOnlyPasswordForm
+          - AccountPage_Render_NormalSession_ShowsNoBanner
+          - AccountPage_ChangePassword_TemporaryPassword_RedirectsToLoginWithNotice
+
       - id: ReviewCenter-AccountPage-Appearance
         title: >-
           The AccountPage unit shall let the signed-in user choose between a system, a light, and a dark appearance,

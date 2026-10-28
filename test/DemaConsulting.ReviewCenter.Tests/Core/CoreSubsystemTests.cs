@@ -237,7 +237,8 @@ public class CoreSubsystemTests
             return ViolateRepositoryAsync(rule, users);
         }
 
-        if (rule is DomainRule.MembershipExists or DomainRule.MembershipNotFound)
+        if (rule is DomainRule.MembershipExists or DomainRule.MembershipNotFound or DomainRule.LastProjectAdmin
+            or DomainRule.TooManyAttempts or DomainRule.PasswordChangeRequired)
         {
             return ViolateMembershipAsync(rule, store, projectId);
         }
@@ -262,13 +263,20 @@ public class CoreSubsystemTests
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         var clock = new FixedTimeProvider(_now);
-        var userStore = new FakeUserStore();
+        var userStore = new FakeUserStore(store);
         var userService = new UserService(userStore, new FakePasswordHasher(), clock);
+
+        if (rule is DomainRule.LastProjectAdmin or DomainRule.TooManyAttempts or DomainRule.PasswordChangeRequired)
+        {
+            await ViolateAdministrationAsync(rule, store, userStore, userService, projectId);
+            return;
+        }
 
         // A first user takes the identity the arranged member of the project has, so "mem" is no member
         await userService.CreateAsync("first", "First", UserRole.Reviewer, ValidPassword, cancellationToken);
         await userService.CreateAsync("mem", "Mem", UserRole.Reviewer, ValidPassword, cancellationToken);
-        var service = new ProjectService(store, userStore, new AllowAllProjectAccess(store), clock);
+        var service = new ProjectService(
+            store, userStore, new AllowAllProjectAccess(store), new FakePasswordHasher(), clock);
         var actor = new Actor("root", "Root");
         if (rule == DomainRule.MembershipNotFound)
         {
@@ -278,6 +286,68 @@ public class CoreSubsystemTests
 
         await service.AddMemberAsync(actor, projectId, "mem", ProjectRole.User, cancellationToken);
         await service.AddMemberAsync(actor, projectId, "mem", ProjectRole.User, cancellationToken);
+    }
+
+    /// <summary>
+    ///     Makes a request that breaks one of the rules of project administration: the last project administrator, too
+    ///     many failed attempts, or an account that still has a temporary password.
+    /// </summary>
+    /// <param name="rule">The rule to break.</param>
+    /// <param name="store">The store that holds the project.</param>
+    /// <param name="userStore">The store of the users.</param>
+    /// <param name="userService">The user service.</param>
+    /// <param name="projectId">The identity of the existing project.</param>
+    /// <returns>A task that fails with the rule violation.</returns>
+    private static async Task ViolateAdministrationAsync(
+        DomainRule rule,
+        FakeReviewStore store,
+        FakeUserStore userStore,
+        UserService userService,
+        int projectId)
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var clock = new FixedTimeProvider(_now);
+
+        // A first user takes the identity the arranged member of the project has; then comes a project administrator
+        // who is no system administrator, so the rules are not waived for them
+        await userService.CreateAsync("first", "First", UserRole.Reviewer, ValidPassword, cancellationToken);
+        var padm = await userService.CreateAsync("padm", "Padm", UserRole.Reviewer, ValidPassword, cancellationToken);
+        await store.AddMembershipAsync(padm.Id, projectId, ProjectRole.ProjectAdmin, cancellationToken);
+        var service = new ProjectService(
+            store, userStore, new ProjectAccess(userStore, store), new FakePasswordHasher(), clock);
+        var actor = new Actor("padm", "Padm");
+        switch (rule)
+        {
+            case DomainRule.LastProjectAdmin:
+                await service.RemoveMemberAsync(actor, projectId, "padm", cancellationToken);
+                return;
+            case DomainRule.TooManyAttempts:
+                for (var i = 0; i < ProjectService.MaxFailedAttempts; i++)
+                {
+                    await Assert.ThrowsAsync<DomainRuleException>(
+                        () => service.AddMemberAsync(actor, projectId, "nobody", ProjectRole.User, cancellationToken));
+                }
+
+                await service.AddMemberAsync(actor, projectId, "nobody", ProjectRole.User, cancellationToken);
+                return;
+            default:
+                await userStore.AddAsync(
+                    new User
+                    {
+                        Username = "temp",
+                        DisplayName = "Temp",
+                        Enabled = true,
+                        MustChangePassword = true,
+                        PasswordHash = "hash",
+                        Created = _now
+                    },
+                    created => AuditDraft.By(Actor.CommandLine, "user.created", created.Username),
+                    cancellationToken);
+                var tokens = new PersonalAccessTokenService(
+                    new FakePersonalAccessTokenStore(userStore), userStore, clock);
+                await tokens.ListAsync(new Actor("temp", "Temp"), cancellationToken);
+                return;
+        }
     }
 
     /// <summary>

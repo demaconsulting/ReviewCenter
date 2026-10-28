@@ -845,7 +845,7 @@ public class SigningServiceTests
         var cancellationToken = TestContext.Current.CancellationToken;
         var digest = (await ApprovalAsync(fixture)).Digest;
         await fixture.Store.RemoveMembershipAsync(
-            fixture.ProjectId, fixture.Ids["ann"], AuditTestExtensions.Draft(), cancellationToken);
+            fixture.ProjectId, fixture.Ids["ann"], AuditTestExtensions.Draft(), false, cancellationToken);
 
         // Act: the removed member tries to sign
         var exception = await Assert.ThrowsAsync<DomainRuleException>(() => fixture.Signing.SignAsync(
@@ -854,6 +854,37 @@ public class SigningServiceTests
         // Assert: refused and nothing is signed
         Assert.Equal(DomainRule.ActorNotAllowed, exception.Rule);
         Assert.Empty(await fixture.Store.ListSignaturesAsync(fixture.ProjectId, "rev-1", cancellationToken));
+    }
+
+    /// <summary>
+    ///     Test that the approval status marks an assignee who is no longer a member of the project, for the primary
+    ///     and for the alternate, in the single read and in the batch read, and keeps the slot assigned.
+    /// </summary>
+    [Fact]
+    public async Task SigningService_GetApprovalAsync_AssigneeRemovedFromProject_IsMarkedNotAMember()
+    {
+        // Arrange: a slot with primary ann and alternate bob; the control read shows both as members
+        var (fixture, _) = await CreateReadyAsync();
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var control = (await ApprovalAsync(fixture)).Slots.Single();
+        await fixture.Store.RemoveMembershipAsync(
+            fixture.ProjectId, fixture.Ids["ann"], AuditTestExtensions.Draft(), false, cancellationToken);
+        await fixture.Store.RemoveMembershipAsync(
+            fixture.ProjectId, fixture.Ids["bob"], AuditTestExtensions.Draft(), false, cancellationToken);
+
+        // Act
+        var single = (await ApprovalAsync(fixture)).Slots.Single();
+        var batchResult = await fixture.Signing.GetApprovalsAsync(fixture.ProjectId, ["rev-1"], cancellationToken);
+        var batch = batchResult["rev-1"].Slots.Single();
+
+        // Assert
+        Assert.True(control.Primary.IsMember);
+        Assert.True(control.Alternate!.IsMember);
+        Assert.Equal("ann", single.Primary.Username);
+        Assert.False(single.Primary.IsMember);
+        Assert.False(single.Alternate!.IsMember);
+        Assert.False(batch.Primary.IsMember);
+        Assert.False(batch.Alternate!.IsMember);
     }
 
     /// <summary>

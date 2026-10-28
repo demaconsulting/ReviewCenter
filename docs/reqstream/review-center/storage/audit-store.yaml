@@ -49,14 +49,17 @@ sections:
 
       - id: ReviewCenter-AuditStore-Read
         title: >-
-          The AuditStore unit shall list entries newest first, optionally for one review and before or after a
-          sequence, shall read entries in ascending bounded batches for verification, and shall offer no operation
+          The AuditStore unit shall list entries newest first, optionally for one project, for one review, or both,
+          and before or after a sequence, with the listing of a project returning only the entries of that project,
+          shall read entries in ascending bounded batches for verification, and shall offer no operation
           that updates or deletes an entry.
         justification: |
-          Reading must support paging and streaming verification, and the application must not provide a way to
-          rewrite history.
+          Reading must support paging and streaming verification, the administrators of a project must be able to
+          read the history of their project without seeing that of another, and the application must not provide a
+          way to rewrite history.
         tests:
           - AuditStore_ListAsync_FilterAndCursors_ReturnExpectedEntriesNewestFirst
+          - AuditStore_ListAsync_ProjectOnly_IsIsolatedAndTheChainStillVerifies
           - AuditStore_ReadAfterAsync_Batches_AreAscendingAndBounded
           - AuditStore_PublicSurface_OffersNoUpdateOrDelete
           - AuditStore_Verification_EditedRow_ReportsThatSequence

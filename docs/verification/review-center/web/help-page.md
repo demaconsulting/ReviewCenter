@@ -32,6 +32,9 @@ N/A - standard test environment.
 - The API tokens topic describes how to create a token on the account page, that the value is shown once, the expiry
   choices and the limit, a curl example with the bearer header, the endpoints and the OpenAPI document, that a token
   never signs, that a review made through the API is a Draft marked as created via API, and the 401 and 429 answers.
+- The Project members topic describes the + Add member button and the exact user name, the temporary password that is
+  shown once, the rule of the last project admin, the marker for a person who is no longer a member, and the Audit trail
+  button, and is in the list of topics at `/help/project-members`.
 
 #### Test Scenarios
 
@@ -71,3 +74,9 @@ the use with ReviewMark (HTTP Basic, the token as the password), says that a rev
 the API is a Draft that is marked as created via API, and explains the 401 and 429 answers. No link begins with `#`.
 This
 scenario is tested by `HelpApiTokensPage_Render_ExplainsTokensCurlEndpointsAndErrors`.
+
+**HelpMembersPage_Render_ExplainsAddingAccountsAndTheLastAdminRule**: The Project members page is rendered; the text
+names the + Add member button and the exact user name, says that a temporary password is shown once, that the last
+project admin cannot be removed, that a person who left shows "No longer a project member", and names the Audit trail
+button, and the list of topics holds the address `/help/project-members`. This scenario is tested by
+`HelpMembersPage_Render_ExplainsAddingAccountsAndTheLastAdminRule`.

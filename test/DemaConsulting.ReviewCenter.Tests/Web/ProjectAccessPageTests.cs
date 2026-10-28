@@ -211,35 +211,29 @@ public class ProjectAccessPageTests : PageTestBase
     }
 
     /// <summary>
-    ///     Test that + Add member reveals the form, lists only users who are not members yet, and adds the chosen
-    ///     user with the chosen role.
+    ///     Test that + Add member leads to the page for a new member, which adds a user by the exact user name with
+    ///     the chosen role.
     /// </summary>
     [Fact]
-    public async Task ProjectPage_AddMember_ChosenUser_BecomesMemberWithTheRole()
+    public async Task ProjectPage_AddMember_ButtonLeadsToNewMemberPage_WhichAddsTheNamedUser()
     {
-        // Arrange: Apollo has the member mem; the outsider is a candidate
+        // Arrange: Apollo has the member mem; the outsider is no member yet
         var (_, outsider, apollo, _) = await ArrangeAsync();
         var cut = RenderProject(apollo);
-        Assert.Empty(cut.FindAll("[data-testid='add-member-form']"));
 
-        // Act: open the form
-        await cut.Find("[data-testid='add-member-button']").ClickAsync();
+        // Act, Assert: the button points at the page for a new member
+        Assert.Equal(
+            $"/projects/{apollo}/members/new", cut.Find("[data-testid='add-member-button']").GetAttribute("href"));
 
-        // Assert: ann (the system administrator) and out are offered, mem is not
-        var options = cut.FindAll("[data-testid='add-member-user-select'] option").Select(o => o.GetAttribute("value")).ToList();
-        Assert.Contains("out", options);
-        Assert.DoesNotContain("mem", options);
+        // Act: type the exact name on that page, choose the project admin role and add
+        var page = Render<NewMemberPage>(parameters => parameters.Add(p => p.ProjectId, apollo));
+        await page.Find("[data-testid='new-member-username-input']").InputAsync("out");
+        await page.Find("[data-testid='new-member-admin-checkbox']").ChangeAsync(true);
+        await page.Find("[data-testid='new-member-submit']").ClickAsync();
 
-        // Act: choose out as a project administrator and add
-        await cut.Find("[data-testid='add-member-user-select']").ChangeAsync("out");
-        await cut.Find("[data-testid='add-member-admin-checkbox']").ChangeAsync(true);
-        await cut.Find("[data-testid='add-member-submit']").ClickAsync();
-
-        // Assert: the membership is stored with the role, listed, and the form is closed again
+        // Assert: the membership is stored with the role
         var stored = await Store.GetMembershipAsync(outsider, apollo, TestContext.Current.CancellationToken);
         Assert.Equal(ProjectRole.ProjectAdmin, stored!.Role);
-        Assert.Equal("Project admin", cut.Find("[data-testid='member-role-out']").TextContent);
-        Assert.Empty(cut.FindAll("[data-testid='add-member-form']"));
     }
 
     /// <summary>

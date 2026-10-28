@@ -14,13 +14,17 @@ explain how to use it (`HelpPage` includes the index, a page for each topic, and
 `ProjectsPage`,
 `ProjectPage`, `PlanPage`, `ReviewPage`, and `ChecklistPage`, the pages for projects, the planning of reviews from
 the review-sets of a repository, reviews, and review checklists, where `ProjectsPage` includes `NewProjectPage` and
-`ProjectPage` includes `NewReviewPage`, the pages that hold the creation forms;
-`LoginPage`, `AccountPage`, and `UsersPage`, the pages for signing in, changing one's own password, choosing the
+`ProjectPage` includes `NewReviewPage`, `NewMemberPage`, and `NewMemberAccountPage`, the pages that hold the creation
+and member forms;
+`LoginPage`, `AccountPage`, and `UsersPage`, the pages for signing in, changing one's own password (the only page a
+user with a temporary password may use), choosing the
 appearance and managing one's personal access tokens, and managing users and who is a system administrator
 (`UsersPage` includes `NewUserPage`);
 `HistoryPage` and `AuditPage`, the pages that
 show the history of a review and let a system administrator
-verify the audit trail; and `RepositoriesPage`, the page where whoever manages a project registers the git
+verify the audit trail (`AuditPage` includes `ProjectAuditPage`, the audit view of one project for its administrators,
+and `AuditEntryTable`, the table both audit pages share); and `RepositoriesPage`, the page where whoever manages a
+project registers the git
 repositories of that project that its reviews can be created from (it includes `NewRepositoryPage`). Which projects
 a user sees is decided by project membership: a system administrator sees every project and any other user the
 projects of which the user is a member, and the pages ask the `Core` access service instead of deciding for
@@ -58,23 +62,28 @@ all domain behavior and never access the database.
 - *Type*: HTTP `GET`; there is no live connection, because the page is a plain server-rendered form.
 - *Role*: Provider.
 - *Contract*: Shows a form that posts the user name, the password, and the return address to the login endpoint of the
-  `Identity` subsystem, and a generic failure message when the query value `error` is present.
+  `Identity` subsystem, a generic failure message when the query value `error` is present, and a notice to sign in
+  with the new password when the query value `changed` is `1`.
 - *Constraints*: Open to anonymous visitors.
 
 **Project routes** (`GET /projects`, `GET /projects/new`, `GET /projects/{id}`, `GET /projects/{id}/plan`,
 `GET /projects/{id}/reviews/new`, `GET /projects/{id}/reviews/{reviewId}`,
-`GET /projects/{id}/reviews/{reviewId}/checklist`): The
-pages for projects, planning, reviews, and review checklists.
+`GET /projects/{id}/reviews/{reviewId}/checklist`, `GET /projects/{id}/members/new`,
+`GET /projects/{id}/members/account`): The
+pages for projects, planning, reviews, review checklists, and project members.
 
 - *Type*: HTTP `GET`, followed by a live Blazor connection for interactivity.
 - *Role*: Provider.
 - *Contract*: `/projects` lists the projects the user may see as rows that link to them and, for a system
   administrator only, has a New project button; `/projects/new` holds the form that creates a project and opens it
   (system administrators only); `/projects/{id}` shows a
-  project with its reviews as a list of rows and a New review button and a Plan reviews button, and, to a system
-  administrator only, a Members section that lists the members with their role, switches a role, removes a member,
-  and adds a member with the + Add member button, and, to whoever manages the project, a Repositories button that
-  leads to `/projects/{id}/repositories`;
+  project with its reviews as a list of rows and a New review button and a Plan reviews button, and, to whoever
+  administers the project (a project admin or a system administrator), a Members section that lists the members with
+  their role, switches a role, removes a member, and has a + Add member button, and Repositories and Audit trail
+  buttons that lead to `/projects/{id}/repositories` and `/projects/{id}/audit`;
+  `/projects/{id}/members/new` adds an existing user by the exact user name (no list of users) with an optional
+  project admin role, and has a Create a new account button; `/projects/{id}/members/account` creates a local account
+  for the project from a user name and a display name and shows its temporary password once;
   `/projects/{id}/reviews/new` holds the form that creates a review from selected files or from a git repository
   of the project (the
   review identifier `new` is refused, because it would collide with this route);
@@ -100,8 +109,11 @@ appearance, and manages their personal access tokens.
 - *Contract*: A form with the current password and the new password twice; it reports success or the reason of a
   rejection. An Appearance card offers System, Light, and Dark, which applies at once and is remembered by the
   browser. An API tokens card creates a token from a name and a lifetime of 30, 90, or 365 days and shows its value once
-  with a copy button, lists the tokens with their state, and revokes one.
-- *Constraints*: Requires a signed-in user.
+  with a copy button, lists the tokens with their state, and revokes one. For a user whose password is temporary the
+  page shows a banner and only the password form (labeled with the temporary password), and a successful change leads
+  to `/login?changed=1`.
+- *Constraints*: Requires a signed-in user. A user with a temporary password may open no other page of the
+  application except the login, help, and About pages (the layout redirects to this page).
 
 **Users routes** (`GET /users`, `GET /users/new`): The pages where a system administrator manages users.
 
@@ -184,8 +196,8 @@ server-side markup: it emits the HTML document, the page head outlet, a small in
 appearance before the first paint, the router, and the client script reference. `Routes` (part of the `App` unit)
 matches the requested URL to a page component, with `HomePage` registered at the root route, and renders the not-found
 page (`NotFoundPage`, registered at `/not-found`) inside `MainLayout` for unmatched URLs. The routes that end in `new`
-(`/projects/new`, `/projects/{id}/reviews/new`,
-`/projects/{id}/reviews/new`, `/projects/{id}/repositories/new`, `/users/new`) are matched before the parameterized
+(`/projects/new`, `/projects/{id}/reviews/new`, `/projects/{id}/members/new`, `/projects/{id}/repositories/new`,
+`/users/new`) are matched before the parameterized
 routes of the same shape. Each interactive
 page opts in to interactive server rendering, so only the
 page, not the shell, holds a live connection. `HomePage`, `AboutPage`, `LoginPage`, and the help pages are static
@@ -211,17 +223,18 @@ address), and on the ASP.NET Core Blazor components framework.
 #### Pages and domain access
 
 `ProjectsPage`, `ProjectPage`, `PlanPage`, `ReviewPage`, `ChecklistPage`, `AccountPage`, `UsersPage`, `HistoryPage`,
-`AuditPage`, and `RepositoriesPage`, and the creation pages they include (`NewProjectPage`, `NewReviewPage`,
-`NewRepositoryPage`, and `NewUserPage`), follow the pattern of
+`AuditPage`, and `RepositoriesPage`, and the pages they include (`NewProjectPage`, `NewReviewPage`, `NewMemberPage`,
+`NewMemberAccountPage`, `ProjectAuditPage`, `NewRepositoryPage`, and `NewUserPage`), follow the pattern of
 the interactive pages: a Razor
 presentation file and a code-behind file, interactive server rendering, and the `data-interactive`
 marker. They obtain `ProjectService`, `ReviewService`, and the other Core services they need (`ReviewPage`:
 `ThreadService`, `ChecklistService`, and `SigningService`; `ProjectPage`: also `SigningService`, `RepositoryService`,
-`UserService` for the candidates of a new member, and `IProjectAccess`; `PlanPage`:
+and `IProjectAccess`; `NewMemberPage` and `NewMemberAccountPage`: `ProjectService` and `IProjectAccess`; `PlanPage`:
 `ProjectService`, `RepositoryService`, and `ReviewPlanner`; `ChecklistPage`:
 `ChecklistService`; `AccountPage`: `UserService` and `PersonalAccessTokenService`; `UsersPage`:
 `UserService`; `HistoryPage` and `AuditPage`: `AuditService`, and `AuditPage` also the user store through
-`UserService`; `RepositoriesPage`: `RepositoryService`, `ProjectService`, and `IProjectAccess`; each creation page
+`UserService`; `ProjectAuditPage`: `AuditService`, `ProjectService`, and `IProjectAccess`; `RepositoriesPage`:
+`RepositoryService`, `ProjectService`, and `IProjectAccess`; each other creation page
 the service of its parent page) from the service container and call them
 from their handlers. Each page loads its data when it is created, so a connection that is
 established after the server-rendered snapshot shows current data. A rule violation reported by
@@ -278,15 +291,21 @@ no member that a hidden project exists. Whether the user is a system administrat
 `IProjectAccess`, so `ProjectPage` offers the Repositories button, and `RepositoriesPage` and `NewRepositoryPage`
 serve their content, only for whoever manages the project.
 
-The Members section of `ProjectPage` is shown only to a system administrator. It lists the members of
-`ProjectService.ListMembersAsync` with a badge for the role (Project admin or Member), a Disabled badge for a disabled
-account, a button that switches the role (`SetMemberRoleAsync`), and a Remove button (`RemoveMemberAsync`). The
-"Add member" button reveals an inline form with a drop-down of the enabled users who are not yet members
-(`UserService`), a Project admin checkbox, and a Cancel button (`AddMemberAsync`); a message says that nobody is
-left to add when there is no candidate. A project without members says that only system administrators can see it.
-The page contains no membership rules; every refusal comes from `ProjectService`, and the page shows it next to the
-list. The reviewer slots of `ReviewPage` offer only the members of the project, from
-`SigningService.ListCandidatesAsync(actor, projectId)`.
+The Members section of `ProjectPage` is shown only to whoever administers the project (a system administrator or a
+project admin of it). It lists the members of `ProjectService.ListMembersAsync` with a badge for the role (Project
+admin or Member), a Disabled badge for a disabled account, a button that switches the role (`SetMemberRoleAsync`),
+and a Remove button (`RemoveMemberAsync`). The "+ Add member" button is a link to `NewMemberPage`, which adds an
+existing user by the exact user name (`AddMemberAsync`) and never lists users; every failure shows one generic
+message, and a user who is not a system administrator is throttled after ten failures in ten minutes. Its Create a
+new account button leads to `NewMemberAccountPage`, which creates a local account as part of adding it to the project
+(`CreateMemberAccountAsync`) and shows the temporary password once. The page contains no membership rules; every
+refusal comes from `ProjectService`, and the page shows it next to the list. In particular, removing or demoting the
+last project admin is refused for a project admin (a system administrator is exempt). The reviewer slots of
+`ReviewPage` offer only the members of the project, from `SigningService.ListCandidatesAsync(actor, projectId)`; a
+slot whose assignee is no longer a member shows a "No longer a project member" badge, and that person cannot sign.
+
+A user whose password is temporary has no access to any project (`IProjectAccess` returns nothing for that user), and
+the page frame confines the user to the account page (see the `App` unit).
 
 #### Access on an open page
 
@@ -315,13 +334,16 @@ copying a thread link, and reading the file names of a browser selection.
 
 The pages that show data for administrators only use the two other levels of the same guard, because an error shown
 above data that stays rendered still leaves the data readable. `GuardAdministerAsync` (the user manages the project, a
-system administrator or a project admin of it) guards `RepositoriesPage` (every action and the start of an edit) and
-`NewRepositoryPage` (the creation). `GuardSystemAdminAsync` (the user is an enabled system administrator) guards the
-members section of `ProjectPage`, after the view check, and every action of `UsersPage`. All three call one private
-core that reads the actor and runs the callback when the check fails. When the check fails, the page clears what it had
-loaded and shows what an ordinary member would see: the not-found page of the project for the repositories pages and
-for `ProjectPage` when the project is no longer visible, only the members section dropped for `ProjectPage` when the
-user still sees the project, and no user list for `UsersPage`, which has no project and keeps its message. The same
+system administrator or a project admin of it) guards `RepositoriesPage` (every action and the start of an edit),
+`NewRepositoryPage` (the creation), the members section of `ProjectPage` (after the view check), `NewMemberPage`,
+`NewMemberAccountPage`, and `ProjectAuditPage` (the load and every paging or verification step).
+`GuardSystemAdminAsync` (the user is an enabled system administrator) guards every action of `UsersPage`. All three
+call one private core that reads the actor and runs the callback when the check fails. When the check fails, the page
+clears what it had loaded and shows what an ordinary member would see: the not-found page of the project for the
+repositories pages, the member pages, the project audit page, and for `ProjectPage` when the project is no longer
+visible, only the members section dropped for `ProjectPage` when the user still sees the project, and no user list
+for `UsersPage`, which has no project and keeps its message. `NewMemberAccountPage` also clears the temporary password
+it shows. The same
 clearing happens when the list is read again after an action and the service refuses it because the right was lost in
 between.
 
@@ -339,10 +361,10 @@ was refused with a message before.
 Each protected page opts in to interactive rendering on its own, so each page is a root component of its own live
 connection, while `App`, `Routes`, and `MainLayout` are served as static markup once. Neither the router nor the
 header can react when the authentication state of an open page ends; only a component inside the page can. The
-`SessionGate` component of the `App` unit therefore wraps the content of each of the fourteen protected pages
-(`ProjectsPage`, `NewProjectPage`, `ProjectPage`, `NewReviewPage`, `PlanPage`, `ReviewPage`, `ChecklistPage`,
-`AccountPage`, `UsersPage`, `NewUserPage`, `HistoryPage`,
-`AuditPage`, `RepositoriesPage`, `NewRepositoryPage`). While a user is signed in it
+`SessionGate` component of the `App` unit therefore wraps the content of each of the seventeen protected pages
+(`ProjectsPage`, `NewProjectPage`, `ProjectPage`, `NewReviewPage`, `NewMemberPage`, `NewMemberAccountPage`, `PlanPage`,
+`ReviewPage`, `ChecklistPage`, `AccountPage`, `UsersPage`, `NewUserPage`, `HistoryPage`,
+`AuditPage`, `ProjectAuditPage`, `RepositoriesPage`, `NewRepositoryPage`). While a user is signed in it
 adds no element, so the markup and the `data-interactive` marker of the page do not change. When the state becomes
 anonymous, it removes the page content, and with it every handler, and shows a "Session ended" message with a link to
 the login page that returns to the same page. `HomePage`, `AboutPage`, the help pages, and `LoginPage` are open to
@@ -452,13 +474,19 @@ the limit of active tokens, and who may revoke) are in `PersonalAccessTokenServi
 only in the state of the open page, shown once, and never listed again; the card says so, offers a copy button that uses
 a browser script of `App`, and falls back to a hint to copy it by hand. The list never has a value, only the display
 id. The Help topic `api-tokens` explains how to use a token and links back to the card; the card links to the topic. A
-token authenticates only the `Api` subsystem: the pages, including this one, accept the session cookie only.
+token authenticates only the `Api` subsystem: the pages, including this one, accept the session cookie only. A user
+whose password is temporary cannot create, list, or revoke tokens; the card is not shown to that user.
 
 #### History and audit
 
-`HistoryPage` and `AuditPage` only read. They show the audit entries through `AuditService`, which pages them 50 at a
+`HistoryPage`, `AuditPage`, and `ProjectAuditPage` only read. They show the audit entries through `AuditService`, which
+pages them 50 at a
 time newest first, and the position is carried in the address, so the Older and Newer links are plain anchors. A page
-shows what the trail says; it does not claim more. Only `AuditPage` verifies the chain, and its result text says what
+shows what the trail says; it does not claim more. `AuditPage` and `ProjectAuditPage` share the table component
+`AuditEntryTable`. `ProjectAuditPage` (`/projects/{id}/audit`, reached from the Audit trail button of the project
+page) shows the entries of one project only and is open to whoever administers that project; it re-checks the access
+on load and before every paging step, and for anyone else it shows the not-found text of a project. It has no
+verification button: only `AuditPage` verifies the chain, and its result text says what
 was checked (the chain is intact, or the first entry that no longer fits) and shows the head hash so that an
 administrator can record it elsewhere: the verification alone cannot tell that the newest entries were removed. The
 history link in the title row of the review page is shown to every signed-in user who may see the project, and the
@@ -496,8 +524,12 @@ render every page and check every interactive element and the uniqueness of the 
 
 An open page checks its user at an interval (`Auth:RevalidationSeconds`, 30 seconds by default), not continuously, so a
 user who is disabled, removed, or changed can keep an open page for up to one interval; signing, the user
-administration actions, and the repository actions re-check the stored user on every action. A password change does
+administration actions, the member and project audit actions, and the repository actions re-check the stored user on
+every action. A password change does
 not end other sessions of
-the user. A check that cannot read the user ends the page (fail closed), which loses what was typed on it. The header
+the user, with one exception: the session of a user who had a temporary password goes stale when the password is
+changed, because its claim no longer matches the stored flag, so the user signs in again (the account page leads to
+`/login?changed=1`). A check that cannot read the user ends the page (fail closed), which loses what was typed on it.
+The header
 is not updated until the next navigation or reload. The lockout after failed sign-ins is per user
 name (see the `Identity` subsystem design).

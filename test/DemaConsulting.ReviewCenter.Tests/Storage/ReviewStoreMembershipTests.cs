@@ -130,11 +130,15 @@ public class ReviewStoreMembershipTests
         await db.Store.AddMembershipAsync(ann, apollo, cancellationToken);
 
         // Act
-        var changed = await db.Store.SetMembershipRoleAsync(apollo, ann, ProjectRole.ProjectAdmin, AuditTestExtensions.Draft(), cancellationToken);
-        var changedOther = await db.Store.SetMembershipRoleAsync(apollo, bob, ProjectRole.ProjectAdmin, AuditTestExtensions.Draft(), cancellationToken);
+        var changed = await db.Store.SetMembershipRoleAsync(
+            apollo, ann, ProjectRole.ProjectAdmin, AuditTestExtensions.Draft(), false, cancellationToken);
+        var changedOther = await db.Store.SetMembershipRoleAsync(
+            apollo, bob, ProjectRole.ProjectAdmin, AuditTestExtensions.Draft(), false, cancellationToken);
         var roleAfter = (await db.Store.GetMembershipAsync(ann, apollo, cancellationToken))!.Role;
-        var removed = await db.Store.RemoveMembershipAsync(apollo, ann, AuditTestExtensions.Draft(), cancellationToken);
-        var removedAgain = await db.Store.RemoveMembershipAsync(apollo, ann, AuditTestExtensions.Draft(), cancellationToken);
+        var removed = await db.Store.RemoveMembershipAsync(
+            apollo, ann, AuditTestExtensions.Draft(), false, cancellationToken);
+        var removedAgain = await db.Store.RemoveMembershipAsync(
+            apollo, ann, AuditTestExtensions.Draft(), false, cancellationToken);
 
         // Assert
         Assert.True(changed);
@@ -163,11 +167,24 @@ public class ReviewStoreMembershipTests
             AuditDraft.By(TestActors.Ann, "project.member-added", "x", apollo),
             cancellationToken);
         await db.Store.SetMembershipRoleAsync(
-            apollo, ann, ProjectRole.ProjectAdmin, AuditDraft.By(TestActors.Ann, "project.member-role-changed", "x", apollo), cancellationToken);
+            apollo,
+            ann,
+            ProjectRole.ProjectAdmin,
+            AuditDraft.By(TestActors.Ann, "project.member-role-changed", "x", apollo),
+            false,
+            cancellationToken);
         await db.Store.RemoveMembershipAsync(
-            apollo, ann, AuditDraft.By(TestActors.Ann, "project.member-removed", "x", apollo), cancellationToken);
+            apollo,
+            ann,
+            AuditDraft.By(TestActors.Ann, "project.member-removed", "x", apollo),
+            false,
+            cancellationToken);
         await db.Store.RemoveMembershipAsync(
-            apollo, bob, AuditDraft.By(TestActors.Ann, "project.member-removed", "x", apollo), cancellationToken);
+            apollo,
+            bob,
+            AuditDraft.By(TestActors.Ann, "project.member-removed", "x", apollo),
+            false,
+            cancellationToken);
 
         // Assert: three events, each for the project
         var events = (await db.Audit.ListAsync(null, null, null, null, 100, cancellationToken))

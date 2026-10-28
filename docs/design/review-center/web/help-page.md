@@ -14,8 +14,8 @@ source file:
 - `HelpPage` (`HelpPage.razor`): the index.
 - `HelpTopicFrame` (`HelpTopicFrame.razor`): the common frame of a topic page.
 - The topic pages `HelpGettingStartedPage`, `HelpCreatingReviewPage`, `HelpReadingReviewPage`, `HelpCommentsPage`,
-  `HelpChecklistPage`, `HelpSigningPage`, `HelpAuditPage`, `HelpPlanningPage`, `HelpAttestationPage`, and
-  `HelpApiTokensPage`: the text of one topic each.
+  `HelpChecklistPage`, `HelpSigningPage`, `HelpAuditPage`, `HelpPlanningPage`, `HelpAttestationPage`,
+  `HelpMembersPage`, and `HelpApiTokensPage`: the text of one topic each.
 - `HelpNotFoundPage` (`HelpNotFoundPage.razor`): the catch-all for an unknown address.
 - `HelpTopics` (`HelpTopics.cs`): the list of topics.
 
@@ -58,8 +58,21 @@ the review page names a self-signed certificate from the store as supplied by th
 server. It has one screenshot,
 `signed-attestation-1.png`, of the review page with the download button and the key note.
 
-**API tokens topic** (`HelpApiTokensPage`, slug `api-tokens`, title "Automation and API tokens"): The last topic, after
-Planning reviews. It explains, in static text, what a personal access token is and that it can never sign; how to create
+**Project members topic** (`HelpMembersPage`, slug `project-members`, title "Managing project members"): The topic after
+Planning reviews and before the API tokens. It explains, in static text, that a project is seen only by its members and
+that a project admin or a system administrator manages them from the Members section of the project page; how to add
+someone who has an account (the "+ Add member" button, the exact user name, no list of users, one message for every
+reason a name cannot be added, and that repeated failures are audited and slow the person down); how to create an
+account for someone new (the "Create a new account" button, the temporary password shown once, and that the person must
+choose a new password at the first sign-in); how to change a role or remove a member and that a project always keeps at
+least one project admin (a system administrator is exempt); what the review page shows for a reviewer who was removed
+("No longer a project member", who cannot sign until added again); and the project audit trail button. It has no
+screenshot. The audit trail topic (`HelpAuditPage`) also mentions that an administrator of a project can read the
+entries of that project from the Audit trail button of the project page.
+
+**API tokens topic** (`HelpApiTokensPage`, slug `api-tokens`, title "Automation and API tokens"): The last topic,
+after Managing project members. It explains, in static text, what a personal access token is and that it can never
+sign; how to create
 one on the Account page (the name, the expiry of 30, 90, or 365 days, that the value starting with `rcpat_` is shown
 once,
 the list of tokens, and the limit of 20 active tokens); how to revoke one; how to use one (a `curl` example that sends
@@ -69,7 +82,8 @@ ReviewMark:
 the token as the password of HTTP Basic credentials in an `evidence-source` of the `.reviewmark.yaml` file); that a
 review created through the API is a
 draft flagged as created via the API and still needs people to assign the reviewers and sign in the browser; and what
-goes wrong (the same generic 401 for every refused token, 429 for too many refused attempts, and that a token is for the
+goes wrong (the same generic 401 for every refused token, including one whose owner still has to change a temporary
+password, 429 for too many refused attempts, and that a token is for the
 API only). It has one screenshot, `api-tokens-1.png`, of the token card of the Account page. The Account page links to
 it
 (see the `AccountPage` design).

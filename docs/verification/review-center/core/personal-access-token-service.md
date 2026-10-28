@@ -27,6 +27,8 @@ N/A - standard test environment (no external resource is needed).
 - The last use is written at most once in five minutes, also for a burst of parallel requests.
 - A user revokes only their own tokens, and an actor that came through a token can neither create nor revoke.
 - The creation and the revocation are audited with the display id and without the value.
+- An owner with a temporary password can neither create, list, nor revoke a token, and an existing token of that owner
+  is refused with its own failure reason.
 
 #### Test Scenarios
 
@@ -112,3 +114,9 @@ create and to revoke a token. Both are refused with `ActorNotAllowed`. This scen
 **PersonalAccessTokenService_CreateAndRevoke_RecordAuditEventsWithoutTheValue**: A token is created and revoked. The audit
 trail has `token.created` and `token.revoked` with the display id, and no entry has the value or its hash. This scenario
 is tested by `PersonalAccessTokenService_CreateAndRevoke_RecordAuditEventsWithoutTheValue`.
+
+**PersonalAccessTokenService_TemporaryPassword_RefusesEveryUse**: An owner who had created a token is given a
+temporary password (the must-change flag of `User`, set through `FakeUserStore`). Creating, listing, and revoking are
+each refused with `PasswordChangeRequired`, and authenticating the earlier value fails with
+`OwnerMustChangePassword`. The scenario is defined in `MustChangePasswordTests.cs` and is tested by
+`PersonalAccessTokenService_TemporaryPassword_RefusesEveryUse`.
