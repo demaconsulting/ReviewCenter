@@ -29,7 +29,8 @@ N/A - standard test environment (a temporary database and key folder are created
   for the last project administrator is 409, too many attempts 429, and a required password change 403.
 - A file count, file size or total size beyond the review limits is a 400 problem, a body over the limit of the endpoint
   is a 413, and no review is created in these cases.
-- The attestation of a complete review is a PDF, of a review that is not complete a 409 problem.
+- The attestation of a complete review is a PDF, of a review that is not complete a 409 problem (for a request without a
+  token a 404 problem, as for a review that does not exist).
 - The evidence index of a project is a JSON document with the complete reviews that have a review-set id, each with an
   absolute attestation address built from the request; it is empty when no review can be listed, and a 404 problem for
   an
@@ -123,7 +124,8 @@ This scenario is tested by `ApiEndpoints_GetAttestation_Token_ReturnsPdfOrProble
 
 **ApiEndpoints_GetAttestation_ReviewNotSigned_Answers409Problem**: The attestation of a review nobody signed is
 requested.
-The answer is a 409 problem document. This scenario is tested by
+The answer is a 409 problem document. A signed-in member is told that the review is not complete; an anonymous caller is
+not (see `AnonymousEvidenceAccess_AttestationPdf_IncompleteReview_AnswersLikeMissingReview`). This scenario is tested by
 `ApiEndpoints_GetAttestation_ReviewNotSigned_Answers409Problem`.
 
 **ApiEndpoints_GetEvidenceIndex_CompleteReviewWithSetId_ReturnsEntryWithAbsoluteFileUrl**: A project has a complete

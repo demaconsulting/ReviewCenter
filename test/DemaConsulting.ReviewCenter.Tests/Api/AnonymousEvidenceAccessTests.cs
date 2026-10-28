@@ -194,6 +194,44 @@ public class AnonymousEvidenceAccessTests
     }
 
     /// <summary>
+    ///     Test that an anonymous caller cannot tell a review that is not complete from one that does not exist: both
+    ///     are answered with the same 404 and the same body, nothing is recorded, while a member still gets the 409
+    ///     for the incomplete review and the 404 for the unknown one.
+    /// </summary>
+    [Fact(Timeout = 60000)]
+    public async Task AnonymousEvidenceAccess_AttestationPdf_IncompleteReview_AnswersLikeMissingReview()
+    {
+        // Arrange: a review nobody signed in a project that opens the PDFs, and a member
+        await using var app = await StartAsync();
+        var projectId = await AttestationEndpointTests.CreateReviewAsync(app, signed: false);
+        await SetAsync(app, projectId, s => s with { AnonymousAttestations = true });
+        var member = await CreateTokenAsync(app, "bob");
+        using var anonymous = ClientFor(app, null);
+        using var memberClient = ClientFor(app, member.Value);
+        const string incompleteRoute = "/api/projects/{p}/reviews/REV-1/attestation.pdf";
+        const string missingRoute = "/api/projects/{p}/reviews/NOPE/attestation.pdf";
+
+        // Act
+        var incomplete = await GetAsync(anonymous, incompleteRoute, projectId);
+        var missing = await GetAsync(anonymous, missingRoute, projectId);
+        var memberIncomplete = await GetAsync(memberClient, incompleteRoute, projectId);
+        var memberMissing = await GetAsync(memberClient, missingRoute, projectId);
+        TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
+
+        // Assert: the same 404, body and headers for the anonymous caller; nothing recorded
+        Assert.Equal(HttpStatusCode.NotFound, incomplete.Status);
+        Assert.Equal(missing.Status, incomplete.Status);
+        Assert.Equal(missing.Body, incomplete.Body);
+        Assert.Equal("no-store", incomplete.CacheControl);
+        Assert.Equal(missing.CacheControl, incomplete.CacheControl);
+        Assert.DoesNotContain(await AuditAsync(app), e => e.Action == AttestationService.AuditAction);
+
+        // Assert: a member is still told that the review is not complete
+        Assert.Equal(HttpStatusCode.Conflict, memberIncomplete.Status);
+        Assert.Equal(HttpStatusCode.NotFound, memberMissing.Status);
+    }
+
+    /// <summary>
     ///     Test that with both switches on an anonymous caller is still refused by every other route of the API, and
     ///     that an unknown address is answered like for everyone.
     /// </summary>

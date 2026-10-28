@@ -48,6 +48,8 @@ N/A - standard test environment (a temporary database is created by each test).
 - An anonymous release of an attestation is audited with the actor `anonymous`, and a served response is never cached.
 - A client address is limited to 30 anonymous requests per minute with 429 and `Retry-After`, and a request with a
   token is not limited.
+- An anonymous request for the attestation of a review that is not complete is answered like one for a review that does
+  not exist (404, same body); a member still gets 409.
 - The table of addresses never holds more than 4096 addresses: ended windows are removed first, then the oldest
   ones; a renewed window is not lost to pruning; the limit is exact under parallel requests.
 - Exactly two endpoints use the open policies.
@@ -170,6 +172,12 @@ request from the same client is answered with 401 without a restart. This scenar
 more than the limit allows. The last answer is 429 with `Retry-After` and `Cache-Control: no-store`, and a request with
 a token from the same address is still answered with 200. This scenario is tested by
 `AnonymousEvidenceAccess_TooManyAnonymousRequests_Answers429WithRetryAfter`.
+
+**AnonymousEvidenceAccess_AttestationPdf_IncompleteReview_AnswersLikeMissingReview**: A project opens the attestation
+PDFs and holds a review that nobody signed. An anonymous request for that review and one for a review that does not
+exist are both answered 404 with identical bodies and `Cache-Control: no-store`, and no `attestation.generated` event is
+recorded; a member with a token gets 409 for the incomplete review and 404 for the unknown one. This scenario is tested
+by `AnonymousEvidenceAccess_AttestationPdf_IncompleteReview_AnswersLikeMissingReview`.
 
 **AnonymousRateLimit_TryAcquire_CountsPerAddressAndWindow**: With a movable clock, one address uses up its budget and
 is refused with a wait that is longer than zero and at most the window; another address and an unknown address are

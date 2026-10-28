@@ -147,7 +147,9 @@ internal sealed class AttestationService
     ///     What the PDF contains is decided by the evidence settings of the project, read once at the start; they are
     ///     read again before signing, and a change in between gives <see cref="AttestationStatus.Changed"/>, so a
     ///     document never mixes two settings. A request without an actor is allowed only when the project allows
-    ///     anonymous attestation PDFs; otherwise it gets the answer for a review that does not exist. The caller
+    ///     anonymous attestation PDFs; otherwise it gets the answer for a review that does not exist. An anonymous
+    ///     request for a review that is not complete gets that same answer, so it cannot be used to list review
+    ///     identifiers or their state; a signed-in caller gets <see cref="AttestationStatus.NotApproved"/>. The caller
     ///     (the route) has already decided whether an anonymous request may reach this method.
     /// </remarks>
     /// <param name="projectId">The project number.</param>
@@ -157,7 +159,9 @@ internal sealed class AttestationService
     /// <returns>
     ///     The result: the signed PDF when the review is complete and the key is usable; otherwise why not
     ///     (including <see cref="AttestationStatus.Changed"/> when the review changed while the document was being
-    ///     prepared). Only the success is recorded in the audit trail.
+    ///     prepared, and <see cref="AttestationStatus.NotFound"/> instead of
+    ///     <see cref="AttestationStatus.NotApproved"/> for a request without an actor). Only the success is
+    ///     recorded in the audit trail.
     /// </returns>
     /// <exception cref="ArgumentNullException">Thrown when <paramref name="reviewId"/> is null.</exception>
     public async Task<AttestationResult> GenerateAsync(
@@ -184,9 +188,13 @@ internal sealed class AttestationService
             return new AttestationResult(AttestationStatus.NotFound, null, null, "The review was not found.");
         }
 
+        // An anonymous caller must not learn which review identifiers exist or whether they are complete, so an
+        // incomplete review looks like a missing one; people who are signed in get the informative answer
         if (!approval.IsApproved)
         {
-            return new AttestationResult(AttestationStatus.NotApproved, null, null, "The review is not complete: not every reviewer slot has signed the current record.");
+            return actor is null
+                ? new AttestationResult(AttestationStatus.NotFound, null, null, "The review was not found.")
+                : new AttestationResult(AttestationStatus.NotApproved, null, null, "The review is not complete: not every reviewer slot has signed the current record.");
         }
 
         // Then the key: without a usable key there is nothing to produce, and nothing is recorded

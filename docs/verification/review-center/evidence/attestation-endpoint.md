@@ -19,6 +19,8 @@ N/A - standard test environment (a temporary database and key folder are created
   anonymous attestation PDFs; that setting opens only the API route.
 - A completed review is downloaded as a signed PDF with the right content type, a file name, and no caching, and the
   download is recorded in the audit trail; with the default configuration it is signed by the key that the server created.
+- A signed-in caller who asks for a review that is not complete gets 409 (a request without a token gets the 404 of an
+  unknown review on the API route, see the `Api` subsystem).
 - An unknown review is 404, a review that is not complete is 409, a review that changed during generation is 409, and
   an unusable key is 500 without an audit event.
 - A signed-in user who is not a member of the project gets an empty 404, like a project that does not exist; the

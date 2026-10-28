@@ -48,7 +48,9 @@ author's own text and stay.
   anything else is read or recorded. The evidence settings are taken from the project at this point and used for the
   whole call. The approval is read from `SigningService`; a missing
   review gives `NotFound` and a
-  review that is not complete gives `NotApproved`, in both cases without asking for the key. Then the key is requested;
+  review that is not complete gives `NotApproved`, in both cases without asking for the key. A request without an actor
+  gets `NotFound` ("The review was not found.", the same as for a missing review) for a review that is not complete, so
+  that an anonymous caller cannot list review identifiers or their state; `NotApproved` is for an actor. Then the key is requested;
   a failure gives `KeyUnavailable` and records nothing. The snapshot and the review are read (the first
   snapshot) and the digest of the record is computed again and compared with the approved one, and the slots of the
   approval are compared with the slots and signatures of the snapshot; a difference gives `Changed`. The audit chain is

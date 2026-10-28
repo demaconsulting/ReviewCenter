@@ -866,7 +866,9 @@ the chain is intact, and the head hash). The counts of open and resolved threads
 threads are listed, each with the start of its first comment (at most 300 characters), and a line says how many more
 there are; the full threads are in the review record. The last section describes the signing key and what the
 signature proves. A review that is not Approved has no button; a direct request to its `attestation.pdf` address is
-refused with the message "The review is not complete" (status 409). If the review changes while the PDF is being
+refused with the message "The review is not complete" (status 409). For a caller who is not signed in (the anonymous API
+route, see [Evidence Settings](#evidence-settings)) a review that is not complete is answered 404, like a review that
+does not exist, so that review identifiers cannot be probed; signed-in members still get the 409. If the review changes while the PDF is being
 prepared (for example a reviewer changes an answer), nothing is signed or recorded and the request is also refused
 with status 409 ("The review changed while the attestation was being prepared; try again."); press the button again.
 Every download is recorded in the audit trail as `attestation.generated`. Only members of the project and system
@@ -1222,7 +1224,8 @@ browser.
   attempts.
 - A request that is not valid is answered **400** with the fields at fault; a project, review, or repository that does
   not exist (or that the token's owner cannot see) **404**; a review identifier that is already used, a disabled
-  repository, or an attestation of a review that is not complete **409**; and a git repository that is not reachable
+  repository, or an attestation of a review that is not complete **409** (a request without a token, possible on the
+  anonymous attestation route, gets **404** instead); and a git repository that is not reachable
   **502**, **503**, or **504**.
 - Any other address under `/api` is answered with a JSON **404**, with or without a token, for every standard HTTP
   method (`GET`, `HEAD`, `POST`, `PUT`, `PATCH`, `DELETE`, `OPTIONS`).

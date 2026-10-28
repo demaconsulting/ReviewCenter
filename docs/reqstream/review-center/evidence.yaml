@@ -135,11 +135,13 @@ sections:
           project of the review, and shall answer any other actor as it answers for a project or review that does not
           exist; a request without an actor shall be served only when the project has switched on the anonymous
           evidence index or the anonymous attestation PDFs for that kind of document, and otherwise answered in the
-          same way.
+          same way; such a request for a review that is not complete shall be answered as for a review that does not
+          exist.
         justification: |
           An attestation and an index disclose the content and the approvals of a project. Answering a non-member
           differently from a missing project would also tell the non-member which projects exist. Publishing the
-          evidence without an account is a decision of the project.
+          evidence without an account is a decision of the project. An anonymous caller must not be able to tell a
+          review that is not complete from one that does not exist.
         children:
           - ReviewCenter-AttestationService-Visibility
           - ReviewCenter-AttestationEndpoint-Visibility
@@ -149,6 +151,7 @@ sections:
           - ApiProjectAccess_EveryProjectRoute_MemberAndSystemAdmin_AreNotRefused
           - ApiProjectAccess_AttestationPage_NonMemberSession_Answers404
           - AttestationService_GenerateAsync_AnonymousToggleOff_ReturnsNotFound
+          - AnonymousEvidenceAccess_AttestationPdf_IncompleteReview_AnswersLikeMissingReview
           - EvidenceIndexService_Build_NoActor_NeedsTheAnonymousIndexSetting
 
       - id: ReviewCenter-Evidence-ContentSettings

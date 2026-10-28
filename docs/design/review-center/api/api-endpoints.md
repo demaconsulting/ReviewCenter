@@ -96,7 +96,9 @@ passes the result to the shared `AttestationEndpoint.ToResult`, with a problem 4
 service checks that the owner may view the project before it reads the review, so a project that the owner may not see
 gives the same 404 as a review that does not exist. The
 answer is therefore the same as for the page route (200 with the PDF, 409 for a review that is not complete or that
-changed, 500 for an unusable key), always with `Cache-Control: no-store`, but as a problem description in JSON. What the
+changed, 500 for an unusable key), always with `Cache-Control: no-store`, but as a problem description in JSON. A caller
+without a token (anonymous) is the one exception for a review that is not complete: it gets the same 404 problem as for
+a review that does not exist, so it cannot probe which review identifiers exist or whether they are complete. What the
 PDF contains follows the evidence settings of the project (see `AttestationService`), whoever asks.
 
 **Read the evidence index**: For a caller with a token, answers 404 for a project that does not exist or that the owner

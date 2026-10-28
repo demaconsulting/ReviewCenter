@@ -38,6 +38,8 @@ N/A - standard test environment (everything runs in memory).
 - A request without an actor is `NotFound` while the project does not allow anonymous attestation PDFs and for a
   project that does not exist, and is served, with a PDF that says the request was anonymous, when it does; the audit
   event then names the actor `anonymous`.
+- A request without an actor for a review that is not complete gets `NotFound`, the same answer as for a review that
+  does not exist, while an actor gets `NotApproved`.
 
 The second check is made testable by the internal `AfterRender` step of the service, which the tests use to change the
 review in the moment between the rendering and the check. The short window between the second check and the signing
@@ -137,6 +139,12 @@ actor `anonymous`. This scenario is tested by
 **AttestationService_GenerateAsync_AnonymousUnknownProject_ReturnsNotFound**: A request without an actor is made for a
 project that does not exist while another project allows anonymous PDFs. The status is `NotFound`. This scenario is
 tested by `AttestationService_GenerateAsync_AnonymousUnknownProject_ReturnsNotFound`.
+
+**AttestationService_GenerateAsync_AnonymousIncompleteReview_ReturnsNotFoundLikeMissing**: A project that allows
+anonymous attestation PDFs has a review that is not complete. A request without an actor for it, and one for a review
+that does not exist, both give `NotFound` with the same message ("The review was not found."), nothing is recorded and
+the key provider is not called; a request of a member for the incomplete review still gives `NotApproved`. This scenario
+is tested by `AttestationService_GenerateAsync_AnonymousIncompleteReview_ReturnsNotFoundLikeMissing`.
 
 **AttestationService_GenerateAsync_SettingsChangeWhileRendering_ReturnsChanged**: The settings change in the moment
 between the rendering and the second check. The status is `Changed`, there is no content, and nothing is recorded. This

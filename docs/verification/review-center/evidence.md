@@ -100,7 +100,11 @@ non-member). An anonymous request to the web route is redirected to the login pa
 `AttestationEndpoint_Get_SignedOut_RedirectsToLogin`. A request without an actor is refused like a missing project
 unless the project has switched on the matching anonymous setting, which is tested in the units
 (`AttestationService_GenerateAsync_AnonymousToggleOff_ReturnsNotFound` and
-`EvidenceIndexService_Build_NoActor_NeedsTheAnonymousIndexSetting`) and over HTTP in the `Api` subsystem.
+`EvidenceIndexService_Build_NoActor_NeedsTheAnonymousIndexSetting`) and over HTTP in the `Api` subsystem. A request
+without an actor for a review that is not complete is answered like a review that does not exist
+(`AttestationService_GenerateAsync_AnonymousIncompleteReview_ReturnsNotFoundLikeMissing`, and over HTTP
+`AnonymousEvidenceAccess_AttestationPdf_IncompleteReview_AnswersLikeMissingReview`), while a signed-in caller still gets
+409 (`AttestationEndpoint_Get_ReviewNotSigned_Answers409`).
 
 **Content settings**: The evidence settings of a project decide what a PDF contains. The units verify it: the renderer
 tests print every switch, the Content scope section, and each omission

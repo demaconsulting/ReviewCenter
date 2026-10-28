@@ -31,7 +31,9 @@ from the user name and the display name claim of the signed-in user.
     for a completed review.
   - 404 with an empty body for a review that does not exist and for a project that the signed-in user may not view (a
     non-member): the two cannot be told apart.
-  - 409 with a problem description titled "The review is not complete" for a review that is not approved.
+  - 409 with a problem description titled "The review is not complete" for a review that is not approved (the page
+    route is only reached by a signed-in user; a request without an actor, possible on the API route, gets the 404 of a
+    missing review from the service instead).
   - 409 with a problem description titled "The review changed during generation" when the review changed while the
     attestation was being prepared (nothing was signed or recorded; the user can ask again).
   - 500 with a problem description titled "Attestation signing key unavailable" and the reason, when the key cannot be
@@ -41,7 +43,8 @@ from the user name and the display name claim of the signed-in user.
 
 - *Parameters*: The `AttestationResult`, the request context, and a function that creates the answer for a review that
   does not exist.
-- *Returns*: The answer: the file for a completed review, a 409 problem description for a review that is not complete or
+- *Returns*: The answer: the file for a completed review, a 409 problem description for a review that is not complete
+  (for a signed-in caller; an anonymous caller gets `NotFound` from the service) or
   changed, a 500 problem description for an unusable key, and the answer of the function for a missing review.
 - *Postconditions*: `Cache-Control: no-store` is set on the response in every case. The page route passes an empty 404
   (`Results.NotFound`) and the API passes a JSON problem 404, so the two cannot differ in any other status, header, or
