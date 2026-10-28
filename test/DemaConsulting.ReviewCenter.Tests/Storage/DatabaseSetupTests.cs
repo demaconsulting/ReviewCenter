@@ -244,11 +244,22 @@ public class DatabaseSetupTests
             .BuildServiceProvider();
         var factory = provider.GetRequiredService<IDbContextFactory<ReviewCenterDbContext>>();
 
-        // Act: attempt to create the database
-        var exception = Assert.Throws<InvalidOperationException>(() => DatabaseSetup.EnsureCreated(factory, options));
+        try
+        {
+            // Act: attempt to create the database
+            var exception = Assert.Throws<InvalidOperationException>(() => DatabaseSetup.EnsureCreated(factory, options));
 
-        // Assert: the error names the provider and the folder was never created
-        Assert.Contains("Oracle", exception.Message, StringComparison.Ordinal);
+            // Assert: the error names the provider and the folder was never created
+            Assert.Contains("Oracle", exception.Message, StringComparison.Ordinal);
+            Assert.False(Directory.Exists(folder));
+        }
+        finally
+        {
+            if (Directory.Exists(folder))
+            {
+                Directory.Delete(folder, recursive: true);
+            }
+        }
     }
 
     /// <summary>
