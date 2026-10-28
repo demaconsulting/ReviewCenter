@@ -84,9 +84,19 @@ its open session at the next request. This scenario is tested by
 asks for a verified one and accepted otherwise. This scenario is tested by
 `OidcSignIn_UnverifiedEmail_IsRefusedOnlyWhenRequired`.
 
-**OidcSignIn_TooManyCallbacks_AreThrottled**: After the failures allowed by the throttle, a correct sign-in is refused
-too, creates no account and is recorded as `throttled`. This scenario is tested by
+**OidcSignIn_TooManyCallbacks_AreThrottled**: After the callbacks allowed for one client address by the throttle, a
+correct sign-in is refused too, creates no account and is recorded as `throttled`. This scenario is tested by
 `OidcSignIn_TooManyCallbacks_AreThrottled`.
+
+**OidcSignIn_BadCallbacksBelowAddressLimit_DoNotBlockAnotherPerson**: With a low limit per name and a higher limit per
+address, more bad callbacks than the limit per name come from one address and are refused as before; another browser
+from the same address then signs in correctly, and no `throttled` reason is recorded, because the callback counts the
+address only and has no counter per name. This scenario is tested by
+`OidcSignIn_BadCallbacksBelowAddressLimit_DoNotBlockAnotherPerson`.
+
+**OidcSignIn_SuccessfulCallback_HandsTheAddressSlotBack**: With an address limit of 2 and one refused callback already
+counted, two successful sign-ins in a row from the same address are both accepted, because each accepted callback
+hands its attempt back. This scenario is tested by `OidcSignIn_SuccessfulCallback_HandsTheAddressSlotBack`.
 
 **OidcSignIn_ForeignReturnUrl_IsReplacedByHome**: Absolute, protocol-relative, backslash and `javascript:` return
 addresses are replaced by the home page. This scenario is tested by `OidcSignIn_ForeignReturnUrl_IsReplacedByHome`.
@@ -116,6 +126,15 @@ is off. This scenario is tested by `OidcOptionsValidator_Validate_Disabled_Succe
 message that names it and holds neither its value nor the secret. This scenario is tested by
 `OidcOptionsValidator_Validate_InvalidSetting_FailsNamingTheSettingWithoutValues`.
 
+**OidcOptionsValidator_Validate_MissingClientSecret_FailsNamingTheSetting**: With sign-in on, a client secret that is
+null, empty, white space or a tab fails with a message that names `Identity:Oidc:ClientSecret` and says it is required;
+a public client without a secret is not accepted. This scenario is tested by
+`OidcOptionsValidator_Validate_MissingClientSecret_FailsNamingTheSetting`.
+
+**OidcOptionsValidator_Validate_InvalidClientSecret_FailsWithoutEchoingTheSecret**: A secret that is too long or holds
+a control character fails with a message that names the setting and does not contain the secret. This scenario is
+tested by `OidcOptionsValidator_Validate_InvalidClientSecret_FailsWithoutEchoingTheSecret`.
+
 **OidcOptionsValidator_Validate_ValuePastTheLimit_Fails**: A value one past each length limit is refused. This scenario
 is tested by `OidcOptionsValidator_Validate_ValuePastTheLimit_Fails`.
 
@@ -141,6 +160,13 @@ scenario is tested by `OidcReauth_Success_KeepsTheSession`.
 **OidcReauth_AuthTimeNotInWindow_IsRefusedFailClosed**: An `auth_time` that is too old, in the future or missing is
 refused with `stale-auth-time` or `missing-auth-time`, and no proof is issued. This scenario is tested by
 `OidcReauth_AuthTimeNotInWindow_IsRefusedFailClosed`.
+
+**OidcReauth_AuthTimeOutsideTheRangeOfDates_IsRefusedWithoutError**: An `auth_time` of 9223372036854775807, of
+-9223372036854775808, of -1, and of 253402300800 (one second past the last date that can be represented) is refused
+with `missing-auth-time`, and 253402300799 (representable, but far in the future) with `stale-auth-time`. In each case
+the person returns to the review with `reauth=failed`, exactly one `signature.reauth-failed` entry holds the reason
+class, no proof is issued, signing is refused, and the server raises no error (the account page still answers 200).
+This scenario is tested by `OidcReauth_AuthTimeOutsideTheRangeOfDates_IsRefusedWithoutError`.
 
 **OidcReauth_OtherSubject_IsRefusedAndCreatesNoAccount**: Another person who signs in at the provider gives no proof
 (`subject-mismatch`), creates no account and leaves the session unchanged. This scenario is tested by

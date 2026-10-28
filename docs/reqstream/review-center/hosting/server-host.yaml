@@ -212,7 +212,8 @@ sections:
       - id: ReviewCenter-ServerHost-OidcSettings
         title: >-
           The ServerHost class shall, when the sign-in with an OpenID Connect provider is turned on, check its settings
-          at the start and stop with an error that names the setting that is wrong and never shows its value or the
+          at the start and stop with an error that names the setting that is wrong (a missing client secret included)
+          and never shows its value or the
           client secret, shall do nothing for the provider when it is off, and shall keep the address of the callback
           for itself so that no other route is mapped there.
         justification: |

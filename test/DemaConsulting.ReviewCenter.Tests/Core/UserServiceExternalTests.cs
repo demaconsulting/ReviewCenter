@@ -261,6 +261,82 @@ public class UserServiceExternalTests
     }
 
     /// <summary>
+    ///     Test that when a local account already holds the name derived from the identity itself, the sign-in still
+    ///     creates an account, under a numbered variant of that name, and the local account is not touched.
+    /// </summary>
+    [Fact]
+    public async Task UserService_SignInExternalAsync_IdentityNameTakenByLocalAccount_UsesNumberedVariant()
+    {
+        // Arrange: every derived name is taken, and so are the name from the identity and its first numbered variant
+        var (service, _) = Create();
+        var identityName = IdentityName(Issuer, "sub-1");
+        await service.CreateAsync("olive", "Olive", UserRole.Reviewer, Password, TestContext.Current.CancellationToken);
+        for (var number = 2; number <= 50; number++)
+        {
+            await service.CreateAsync($"olive-{number}", "Olive", UserRole.Reviewer, Password, TestContext.Current.CancellationToken);
+        }
+
+        await service.CreateAsync(identityName, "Local", UserRole.Reviewer, Password, TestContext.Current.CancellationToken);
+        await service.CreateAsync($"{identityName}-2", "Local Two", UserRole.Reviewer, Password, TestContext.Current.CancellationToken);
+
+        // Act
+        var result = await service.SignInExternalAsync(Issuer, "sub-1", "olive", "Olive", TestContext.Current.CancellationToken);
+
+        // Assert: the account is created under the next free variant, within the length bound, and no local one changed
+        Assert.Equal(ExternalSignInRefusal.None, result.Refusal);
+        Assert.True(result.Created);
+        Assert.Equal($"{identityName}-3", result.User!.Username);
+        Assert.True(result.User.IsExternal);
+        Assert.InRange(result.User.Username.Length, ReviewLimits.MinUsernameLength, ReviewLimits.MaxUsernameLength);
+        Assert.All(result.User.Username, character => Assert.True(char.IsAsciiLetterOrDigit(character) || character == '-'));
+        var local = await service.GetAsync(identityName, TestContext.Current.CancellationToken);
+        Assert.False(local!.IsExternal);
+        Assert.Equal("Local", local.DisplayName);
+        var second = await service.SignInExternalAsync(Issuer, "sub-1", "olive", "Olive", TestContext.Current.CancellationToken);
+        Assert.False(second.Created);
+        Assert.Equal(result.User.Id, second.User!.Id);
+    }
+
+    /// <summary>
+    ///     Test that when a local account holds only the name derived from the identity, the numbered variant
+    ///     <c>-2</c> is used.
+    /// </summary>
+    [Fact]
+    public async Task UserService_SignInExternalAsync_OnlyIdentityNameTaken_UsesFirstVariant()
+    {
+        // Arrange
+        var (service, _) = Create();
+        var identityName = IdentityName(Issuer, "sub-1");
+        await service.CreateAsync("olive", "Olive", UserRole.Reviewer, Password, TestContext.Current.CancellationToken);
+        for (var number = 2; number <= 50; number++)
+        {
+            await service.CreateAsync($"olive-{number}", "Olive", UserRole.Reviewer, Password, TestContext.Current.CancellationToken);
+        }
+
+        await service.CreateAsync(identityName, "Local", UserRole.Reviewer, Password, TestContext.Current.CancellationToken);
+
+        // Act
+        var result = await service.SignInExternalAsync(Issuer, "sub-1", "olive", "Olive", TestContext.Current.CancellationToken);
+
+        // Assert
+        Assert.True(result.Created);
+        Assert.Equal($"{identityName}-2", result.User!.Username);
+    }
+
+    /// <summary>
+    ///     Computes the name <see cref="UserService"/> derives from an identity when every name suggested by the
+    ///     provider is taken.
+    /// </summary>
+    /// <param name="issuer">The issuer.</param>
+    /// <param name="subject">The subject.</param>
+    /// <returns>The name: <c>oidc-</c> and the first 12 hexadecimal characters of the hash of the identity.</returns>
+    private static string IdentityName(string issuer, string subject)
+    {
+        var hash = System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes($"{issuer}|{subject}"));
+        return "oidc-" + Convert.ToHexStringLower(hash)[..12];
+    }
+
+    /// <summary>
     ///     Test that no password sign-in, confirmation of a signature, change or set of a password works for an
     ///     account of an identity provider, whatever is typed, and that the account is not locked by the attempts.
     /// </summary>

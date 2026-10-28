@@ -75,6 +75,12 @@ internal sealed class IdpScenario
     public TimeSpan? AuthenticatedAgo { get; set; } = TimeSpan.Zero;
 
     /// <summary>
+    ///     Gets or sets the raw <c>auth_time</c> in seconds since 1970, which replaces <see cref="AuthenticatedAgo"/>
+    ///     when set; for values no real provider would send, such as one outside the range of a date.
+    /// </summary>
+    public long? RawAuthTimeSeconds { get; set; }
+
+    /// <summary>
     ///     Gets or sets an error code the provider returns instead of a code (for example <c>access_denied</c>);
     ///     <c>null</c> for a normal sign-in.
     /// </summary>
@@ -311,7 +317,12 @@ internal sealed class FakeIdentityProvider : IAsyncDisposable
                 .SetDestinations(Destinations.IdentityToken));
         }
 
-        if (scenario.AuthenticatedAgo is { } ago)
+        if (scenario.RawAuthTimeSeconds is { } raw)
+        {
+            identity.AddClaim(new Claim("auth_time", raw.ToString(System.Globalization.CultureInfo.InvariantCulture), ClaimValueTypes.Integer64)
+                .SetDestinations(Destinations.IdentityToken));
+        }
+        else if (scenario.AuthenticatedAgo is { } ago)
         {
             var authTime = DateTimeOffset.UtcNow - ago;
             identity.AddClaim(new Claim("auth_time", authTime.ToUnixTimeSeconds().ToString(), ClaimValueTypes.Integer64)

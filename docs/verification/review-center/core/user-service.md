@@ -188,6 +188,16 @@ scenario is tested by `UserService_SignInExternalAsync_LongDisplayName_IsBounded
 and no other account is used. This scenario is tested by
 `UserService_SignInExternalAsync_AllNamesTaken_UsesNameFromIdentity`.
 
+**UserService_SignInExternalAsync_OnlyIdentityNameTaken_UsesFirstVariant**: With the same names taken, and a local
+account that holds the generated name itself, the new account gets that name with the suffix `-2`. This scenario is
+tested by `UserService_SignInExternalAsync_OnlyIdentityNameTaken_UsesFirstVariant`.
+
+**UserService_SignInExternalAsync_IdentityNameTakenByLocalAccount_UsesNumberedVariant**: With the same names taken, and
+local accounts that hold the generated name and its `-2` variant, the new account is created with the suffix `-3`,
+within the length limit and with only letters, digits, and hyphens; the local accounts are not changed, and the next
+sign-in of the same identity finds the new account. This scenario is tested by
+`UserService_SignInExternalAsync_IdentityNameTakenByLocalAccount_UsesNumberedVariant`.
+
 **UserService_ExternalAccount_EveryPasswordPathIsRefused**: For an external account, `AuthenticateAsync` with an empty
 and with a hash-like password, and `ReauthenticateAsync` give no user, `ChangeOwnPasswordAsync` is refused, and
 `SetPasswordAsync` throws the rule `PasswordInvalid`; the failure count stays 0. This scenario is tested by

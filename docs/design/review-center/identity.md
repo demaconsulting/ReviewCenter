@@ -94,7 +94,7 @@ that does not depend on a project, the system administrator right.
 - *Type*: Configuration (`appsettings.json` and environment variables such as `Identity__Oidc__Enabled`,
   `Identity__Oidc__Authority`, `Identity__Oidc__ClientId`, and `Identity__Oidc__ClientSecret`).
 - *Role*: Consumer.
-- *Contract*: `Enabled` turns the sign-in with a provider on; `Authority`, `ClientId`, an optional `ClientSecret`,
+- *Contract*: `Enabled` turns the sign-in with a provider on; `Authority`, `ClientId`, a required `ClientSecret`,
   `Scopes`, `DisplayName`, `UsernameClaim`, `RequireEmailVerified`, and `ReauthMaxAgeSeconds` describe the provider (see
   the `OidcSignIn` design for the rules and defaults).
 - *Constraints*: While `Enabled` is false nothing else is read, registered, or mapped. When it is true an invalid value

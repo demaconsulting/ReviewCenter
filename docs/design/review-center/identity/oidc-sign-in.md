@@ -36,7 +36,7 @@ environment variable or a secret store. The type prints nothing. The settings ar
 | `Enabled`              | bool   | false                  | Everything below is read only when true                 |
 | `Authority`            | string | empty                  | Required, at most 512 characters, https                 |
 | `ClientId`             | string | empty                  | Required, at most 256 characters, no spaces             |
-| `ClientSecret`         | string | empty                  | Optional (a public client uses PKCE alone), at most 512 |
+| `ClientSecret`         | string | empty                  | Required (confidential client), at most 512             |
 | `Scopes`               | string | `openid profile email` | Must hold `openid`, at most 20 scopes of 128 characters |
 | `DisplayName`          | string | `OpenID Connect`       | Required, at most 50 characters                         |
 | `UsernameClaim`        | string | `preferred_username`   | Required, at most 64 characters, no spaces              |
@@ -82,7 +82,8 @@ answered like any unknown address.
 **Handler events**:
 
 - *Redirect*: for a confirmation only, adds `prompt=login` and `max_age=0` to the request.
-- *Message received*: counts the callback with `SignInThrottle` (client address, the fixed name `oidc`) and refuses it
+- *Message received*: counts the callback with `SignInThrottle.TryBeginAddressOnly` (client address only, no name
+  counter, so one shared address cannot block every person behind it before the address limit) and refuses it
   with the reason `throttled`, without reading it, when the throttle refuses.
 - *Ticket received*: a normal sign-in is handed on to the complete endpoint and gives its throttle slot back. A
   confirmation is answered here, so the claims never replace the session. The stored user of the session cookie is
@@ -96,7 +97,8 @@ answered like any unknown address.
   confirmation, the current time and the `OidcOptions`.
 - *Returns*: `null` when every condition holds, otherwise the first reason class: `not-external`, `other` (no claims,
   or the binding is missing, is for another user or is not numeric), `issuer-mismatch`, `subject-mismatch`,
-  `missing-auth-time` (absent or not a whole number) or `stale-auth-time` (older than `ReauthMaxAgeSeconds`, or more
+  `missing-auth-time` (absent, not a whole number, negative, or outside the range of dates) or `stale-auth-time`
+  (older than `ReauthMaxAgeSeconds`, or more
   than 60 seconds in the future).
 - *Postconditions*: The issuer and the subject must equal the stored ones of the account, not just be valid ones. The
   method reads nothing else and changes nothing, so it fails closed on any doubt.

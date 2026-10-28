@@ -354,6 +354,8 @@ public class ServerHostTests
     [InlineData("ReauthMaxAgeSeconds", "5")]
     [InlineData("ReauthMaxAgeSeconds", "901")]
     [InlineData("ClientSecret", "top-secret-bell-\u0007-character")]
+    [InlineData("ClientSecret", "")]
+    [InlineData("ClientSecret", "   ")]
     public void ServerHost_CreateApplication_InvalidOidcSettings_ThrowsClearErrorWithoutSecret(string name, string value)
     {
         // Arrange: valid enabled settings with one invalid value, and a secret that must stay out of the message
@@ -415,13 +417,15 @@ public class ServerHostTests
         {
             ["Identity:Oidc:Enabled"] = "true",
             ["Identity:Oidc:Authority"] = "https://idp.example.com/realm",
-            ["Identity:Oidc:ClientId"] = "reviewcenter"
+            ["Identity:Oidc:ClientId"] = "reviewcenter",
+            ["Identity:Oidc:ClientSecret"] = "top-secret-value"
         }));
         using var loopback = ServerHost.CreateApplication(context, Options(new Dictionary<string, string?>
         {
             ["Identity:Oidc:Enabled"] = "true",
             ["Identity:Oidc:Authority"] = "http://localhost:8080/realm",
             ["Identity:Oidc:ClientId"] = "reviewcenter",
+            ["Identity:Oidc:ClientSecret"] = "top-secret-value",
             ["Identity:Oidc:ReauthMaxAgeSeconds"] = "900"
         }));
         Assert.NotNull(off);

@@ -425,8 +425,8 @@ public class OidcSignInTests : IClassFixture<IdentityProviderFixture>
     }
 
     /// <summary>
-    ///     Test that the callback is throttled per client address: after the limit of failures a correct sign-in is
-    ///     refused too, without an account.
+    ///     Test that the callback is throttled per client address only: after the address limit of failures a correct
+    ///     sign-in is refused too, without an account.
     /// </summary>
     [Fact]
     public async Task OidcSignIn_TooManyCallbacks_AreThrottled()
@@ -454,6 +454,73 @@ public class OidcSignInTests : IClassFixture<IdentityProviderFixture>
         Assert.Empty(await app.Services.GetRequiredService<UserService>().ListAsync(TestContext.Current.CancellationToken));
         var reasons = (await OidcTestApp.AuditAsync(app, "auth.oidc-sign-in-failed")).Select(entry => entry.Detail);
         Assert.Contains("throttled", reasons);
+    }
+
+    /// <summary>
+    ///     Test that the callback is counted per client address only: more bad callbacks than the per-name limit from
+    ///     one address do not block a legitimate sign-in from that address while it is below the address limit.
+    /// </summary>
+    [Fact]
+    public async Task OidcSignIn_BadCallbacksBelowAddressLimit_DoNotBlockAnotherPerson()
+    {
+        // Arrange: a per-name limit of two and an address limit of ten, and three refusals by the provider
+        _idp.Scenario = new IdpScenario { AuthorizeError = "access_denied" };
+        await using var app = await OidcTestApp.StartAsync(
+            _idp,
+            settings: new Dictionary<string, string?>
+            {
+                ["Identity:Throttle:MaxFailuresPerName"] = "2",
+                ["Identity:Throttle:MaxFailuresPerAddress"] = "10"
+            });
+        using var attacker = new TestBrowser(app);
+        for (var i = 0; i < 3; i++)
+        {
+            await OidcTestApp.SignInAsync(attacker, _idp);
+        }
+
+        _idp.Scenario = new IdpScenario();
+        using var other = new TestBrowser(app);
+
+        // Act: a legitimate sign-in from the same address
+        var landing = await OidcTestApp.SignInAsync(other, _idp);
+
+        // Assert: it works, and the refusals were recorded as failures of the provider, not as throttled
+        Assert.Equal("/", landing.Headers.Location?.OriginalString);
+        Assert.Single(OidcTestApp.SessionCookies(other));
+        var reasons = (await OidcTestApp.AuditAsync(app, "auth.oidc-sign-in-failed")).Select(entry => entry.Detail);
+        Assert.DoesNotContain("throttled", reasons);
+    }
+
+    /// <summary>
+    ///     Test that a successful callback gives its slot back to the address: with an address limit of two, one
+    ///     failure and one success leave room for another success.
+    /// </summary>
+    [Fact]
+    public async Task OidcSignIn_SuccessfulCallback_HandsTheAddressSlotBack()
+    {
+        // Arrange: an address limit of two, one refusal of the provider
+        _idp.Scenario = new IdpScenario { AuthorizeError = "access_denied" };
+        await using var app = await OidcTestApp.StartAsync(
+            _idp,
+            settings: new Dictionary<string, string?>
+            {
+                ["Identity:Throttle:MaxFailuresPerName"] = "2",
+                ["Identity:Throttle:MaxFailuresPerAddress"] = "2"
+            });
+        using var failing = new TestBrowser(app);
+        await OidcTestApp.SignInAsync(failing, _idp);
+        _idp.Scenario = new IdpScenario();
+        using var first = new TestBrowser(app);
+        using var second = new TestBrowser(app);
+
+        // Act: two sign-ins, which would be one too many if the first success kept its slot
+        var firstLanding = await OidcTestApp.SignInAsync(first, _idp);
+        var secondLanding = await OidcTestApp.SignInAsync(second, _idp);
+
+        // Assert
+        Assert.Equal("/", firstLanding.Headers.Location?.OriginalString);
+        Assert.Equal("/", secondLanding.Headers.Location?.OriginalString);
+        Assert.Single(OidcTestApp.SessionCookies(second));
     }
 
     /// <summary>

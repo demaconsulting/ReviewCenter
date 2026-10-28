@@ -89,7 +89,7 @@ public class OidcOptionsTests
     [Fact]
     public void OidcOptionsValidator_Validate_Disabled_SucceedsWhateverTheValues()
     {
-        // Arrange: garbage in every setting
+        // Arrange: garbage in every setting, and no secret
         var options = new OidcOptions { Authority = "garbage", ClientId = "a b", Scopes = "x", ReauthMaxAgeSeconds = 0 };
 
         // Act
@@ -117,6 +117,8 @@ public class OidcOptionsTests
     [InlineData("ClientId", "two words")]
     [InlineData("ClientId", "bell\u0007")]
     [InlineData("ClientSecret", "line\nbreak")]
+    [InlineData("ClientSecret", "")]
+    [InlineData("ClientSecret", "   ")]
     [InlineData("Scopes", "")]
     [InlineData("Scopes", "profile email")]
     [InlineData("Scopes", "openid caf\u00e9")]
@@ -143,6 +145,57 @@ public class OidcOptionsTests
         {
             Assert.DoesNotContain(value, result.FailureMessage, StringComparison.Ordinal);
         }
+    }
+
+    /// <summary>
+    ///     Test that enabled settings without a client secret (never set, empty or only white space) are refused at
+    ///     start-up: the server is a confidential client, so a public client with PKCE alone is not supported.
+    /// </summary>
+    /// <param name="secret">The secret; <c>null</c> to leave the setting at its default.</param>
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData(" ")]
+    [InlineData("\t \t")]
+    public void OidcOptionsValidator_Validate_MissingClientSecret_FailsNamingTheSetting(string? secret)
+    {
+        // Arrange: valid enabled settings, with the secret removed
+        var options = Valid();
+        options.ClientSecret = secret ?? new OidcOptions().ClientSecret;
+
+        // Act
+        var result = Validate(options);
+
+        // Assert: it fails, names the setting and says it is required
+        Assert.True(result.Failed);
+        Assert.Contains("Identity:Oidc:ClientSecret", result.FailureMessage, StringComparison.Ordinal);
+        Assert.Contains("required", result.FailureMessage, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    ///     Test that a secret that is too long or holds a control character is refused without the secret, or any part
+    ///     of it, appearing in the message.
+    /// </summary>
+    /// <param name="tooLong">Whether the secret is too long (otherwise it holds a control character).</param>
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void OidcOptionsValidator_Validate_InvalidClientSecret_FailsWithoutEchoingTheSecret(bool tooLong)
+    {
+        // Arrange: a secret that starts with a recognizable text
+        var options = Valid();
+        options.ClientSecret = tooLong
+            ? Secret + new string('x', OidcOptions.MaxClientSecretLength)
+            : Secret + "\u0007";
+
+        // Act
+        var result = Validate(options);
+
+        // Assert
+        Assert.True(result.Failed);
+        Assert.Contains("Identity:Oidc:ClientSecret", result.FailureMessage, StringComparison.Ordinal);
+        Assert.DoesNotContain(Secret, result.FailureMessage, StringComparison.Ordinal);
+        Assert.DoesNotContain("xxxx", result.FailureMessage, StringComparison.Ordinal);
     }
 
     /// <summary>

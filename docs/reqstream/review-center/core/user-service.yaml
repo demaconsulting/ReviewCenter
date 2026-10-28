@@ -253,14 +253,17 @@ sections:
       - id: ReviewCenter-UserService-UsernameCollision
         title: >-
           The UserService class shall, when the user name made for a new account of a provider is taken, add a number
-          to it, and when no such name is free use a generated name, so that the sign-in does not fail because
-          of a name and never uses the account that holds the name.
+          to it, and when no such name is free use a generated name from the identity, numbered the same way when a
+          local account holds that name too, so that the sign-in does not fail because of a name and never uses the
+          account that holds the name.
         justification: |
-          Two people can have the same name at a provider, and a person can have the name of a local account. Neither
-          may be refused for that, and neither may get another person's account.
+          Two people can have the same name at a provider, and a person can have the name of a local account, even the
+          generated one. Neither may be refused for that, and neither may get another person's account.
         tests:
           - UserService_SignInExternalAsync_MatchesOnlyByIssuerAndSubject
           - UserService_SignInExternalAsync_AllNamesTaken_UsesNameFromIdentity
+          - UserService_SignInExternalAsync_OnlyIdentityNameTaken_UsesFirstVariant
+          - UserService_SignInExternalAsync_IdentityNameTakenByLocalAccount_UsesNumberedVariant
 
       - id: ReviewCenter-UserService-ExternalNoPassword
         title: >-

@@ -109,7 +109,10 @@ internal sealed class OidcOptions
     public string ClientId { get; set; } = string.Empty;
 
     /// <summary>
-    ///     Gets or sets the secret of this server at the provider; empty for a public client that relies on PKCE alone.
+    ///     Gets or sets the secret of this server at the provider. It is required while sign-in with a provider is
+    ///     enabled: the server is a confidential client that proves itself at the token endpoint, so a public client
+    ///     that relies on PKCE alone is not supported. Supply it through an environment variable
+    ///     (<c>Identity__Oidc__ClientSecret</c>) or a secret store rather than a file that is checked in.
     /// </summary>
     public string ClientSecret { get; set; } = string.Empty;
 
@@ -202,7 +205,7 @@ internal sealed class OidcOptionsValidator : IValidateOptions<OidcOptions>
                    options.ClientSecret,
                    $"{section}:ClientSecret",
                    OidcOptions.MaxClientSecretLength,
-                   required: false,
+                   required: true,
                    allowSpace: true)
                ?? CheckScopes(options.Scopes)
                ?? CheckText(

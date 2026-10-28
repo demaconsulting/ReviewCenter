@@ -159,7 +159,10 @@ membership and no password, and gets a display name cleaned of control, separato
 with white space collapsed and cut to 100 characters (the user name when nothing is left). Its user name is made from
 the suggestion of the provider by keeping only letters, digits, dot, underscore, and hyphen, cut to leave room for a
 suffix (`user` when nothing is left). When any account holds the name, `-2`, `-3`, and so on are tried up to 50, and
-then a generated name from a hash of the identity; the account that holds the name is never used. When another
+then a generated name from a hash of the identity (`oidc-` and 12 hexadecimal characters), which is numbered the same
+way (`-2` to `-50`) when a local account already holds it, so that the first sign-in always finds a free name of
+at most 50 characters made of letters, digits, and hyphens; the account that holds the name is never used. When
+another
 process created the same identity first, that account is used. A disabled account is refused as `Disabled`, recorded
 coalesced as `auth.oidc-sign-in-failed`; the caller answers every refusal alike. The method runs under the same
 semaphore as the other changes.

@@ -119,8 +119,9 @@ throttle settings and with explicit valid ones (3, 3, and 86400 seconds); both a
 **ServerHost_CreateApplication_InvalidOidcSettings_ThrowsClearErrorWithoutSecret**: A theory; with
 `Identity:Oidc:Enabled` true and valid settings otherwise (and a secret), the pipeline is built with one invalid value:
 an empty, http, malformed, or query-carrying authority, an empty or space-containing client identifier, scopes without
-`openid`, a display name of 51 characters, a user name claim with a space, an age of 5 or 901 seconds, or a control
-character in the client secret. An `InvalidOperationException` that says "Invalid OpenID Connect sign-in settings" and
+`openid`, a display name of 51 characters, a user name claim with a space, an age of 5 or 901 seconds, an empty or
+white-space client secret, or a control character in the client secret. An `InvalidOperationException` that says
+"Invalid OpenID Connect sign-in settings" and
 names the setting is thrown, and its message never holds the secret. This scenario is tested by
 `ServerHost_CreateApplication_InvalidOidcSettings_ThrowsClearErrorWithoutSecret`.
 

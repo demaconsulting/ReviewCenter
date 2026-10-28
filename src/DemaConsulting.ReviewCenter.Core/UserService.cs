@@ -589,7 +589,8 @@ public sealed class UserService
     ///     account of another provider. A new account is enabled, is not a system administrator, has no project
     ///     membership and no password. When the derived user name is taken by any account, a numeric suffix is
     ///     added (<c>-2</c>, <c>-3</c>, and so on), and after <see cref="MaxUsernameSuffix"/> tries a name derived
-    ///     from the identity itself is used. A later sign-in does not change the stored names. Accepted sign-ins
+    ///     from the identity itself is used, which is numbered the same way when a local account holds it; no
+    ///     existing name is ever taken over. A later sign-in does not change the stored names. Accepted sign-ins
     ///     and refusals of a disabled account are recorded in the audit trail on a best-effort basis; neither
     ///     tokens nor claims are recorded. Runs one at a time with the other changes of users.
     /// </remarks>
@@ -726,10 +727,13 @@ public sealed class UserService
         CancellationToken cancellationToken)
     {
         // The first name that no account has: the derived one, then numbered ones, then one from the identity itself
+        // and, when a local account has even that name, numbered variants of it, so the sign-in always finds a name
         var baseName = DeriveUsername(usernameCandidate);
+        var identityName = "oidc-" + Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes($"{issuer}|{subject}")))[..12];
         var names = new List<string> { baseName };
         names.AddRange(Enumerable.Range(2, MaxUsernameSuffix - 1).Select(number => $"{baseName}-{number}"));
-        names.Add("oidc-" + Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes($"{issuer}|{subject}")))[..12]);
+        names.Add(identityName);
+        names.AddRange(Enumerable.Range(2, MaxUsernameSuffix - 1).Select(number => $"{identityName}-{number}"));
 
         foreach (var name in names)
         {

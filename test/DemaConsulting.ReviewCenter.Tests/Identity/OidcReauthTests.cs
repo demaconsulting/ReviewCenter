@@ -136,6 +136,37 @@ public class OidcReauthTests : IClassFixture<IdentityProviderFixture>
     }
 
     /// <summary>
+    ///     Test that an <c>auth_time</c> that no date can hold (past the largest or below the smallest date, beyond
+    ///     what a whole number holds, or negative) is refused like a missing one: the reason class is recorded, no proof
+    ///     is given and nothing throws, so the person is sent back to the review and not to an error page.
+    /// </summary>
+    /// <param name="seconds">The <c>auth_time</c> the provider sends, in seconds since 1970.</param>
+    /// <param name="reason">The expected reason class.</param>
+    [Theory]
+    [InlineData(long.MaxValue, "missing-auth-time")]
+    [InlineData(long.MinValue, "missing-auth-time")]
+    [InlineData(-1L, "missing-auth-time")]
+    [InlineData(253402300800L, "missing-auth-time")]
+    [InlineData(253402300799L, "stale-auth-time")]
+    public async Task OidcReauth_AuthTimeOutsideTheRangeOfDates_IsRefusedWithoutError(long seconds, string reason)
+    {
+        // Arrange
+        await using var app = await OidcTestApp.StartAsync(_idp);
+        using var browser = new TestBrowser(app);
+        var world = await ArrangeAsync(app, browser);
+        _idp.Scenario = new IdpScenario { RawAuthTimeSeconds = seconds };
+
+        // Act
+        var landing = await OidcTestApp.ReauthAsync(browser, _idp, world.ProjectId, ReviewId, world.SlotId, world.Route);
+
+        // Assert: a normal refusal with its audit entry (AssertRefusedAsync checks the redirect, the single
+        // signature.reauth-failed entry with the reason class, the missing proof and the refused signing)
+        await world.AssertRefusedAsync(landing, reason);
+        using var account = await browser.Client.GetAsync("/account", TestContext.Current.CancellationToken);
+        Assert.Equal(HttpStatusCode.OK, account.StatusCode);
+    }
+
+    /// <summary>
     ///     Test that an identity token with a wrong issuer, audience or nonce gives no proof for a signature: the
     ///     failure is recorded as a failed confirmation with the reason class only, signing stays refused, no account
     ///     is created, the session is unchanged and no token value reaches the log or the audit trail.

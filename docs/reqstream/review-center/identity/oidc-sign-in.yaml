@@ -33,17 +33,22 @@ sections:
           display name, user name claim, whether the e-mail address must be verified, and the age allowed for a
           confirmation of identity) from the Identity:Oidc settings, shall register and map nothing while the sign-in is
           off, and shall stop the server from starting, naming the setting and never its value, when an enabled
-          setting is missing, too long, not https (http is accepted for a loopback address only), without the openid
-          scope, or out of its bounds.
+          setting is missing (the client secret included, which is required and may not be empty or only white
+          space), too long, not https (http is accepted for a loopback address only), without the openid scope, or out
+          of its bounds.
         justification: |
           A wrong address or a missing value must be found when the server starts and not when the first person cannot
           sign in. Plain http to a provider would let somebody on the network read or change the answer, so it is
           accepted only for a development provider on the same machine. Bounding every value keeps a wrong setting from
-          reaching the provider or the page, and never printing a value keeps the secret out of the log.
+          reaching the provider or the page, and never printing a value keeps the secret out of the log. The server is
+          a confidential client that proves itself at the token endpoint with its secret, so a missing secret is a
+          wrong setting too and a public client with a proof key alone is not supported.
         tests:
           - OidcOptionsValidator_Validate_ValidSettings_Succeeds
           - OidcOptionsValidator_Validate_Disabled_SucceedsWhateverTheValues
           - OidcOptionsValidator_Validate_InvalidSetting_FailsNamingTheSettingWithoutValues
+          - OidcOptionsValidator_Validate_MissingClientSecret_FailsNamingTheSetting
+          - OidcOptionsValidator_Validate_InvalidClientSecret_FailsWithoutEchoingTheSecret
           - OidcOptionsValidator_Validate_ValuePastTheLimit_Fails
           - OidcOptionsValidator_Validate_TooManyOrTooLongScopes_Fails
           - OidcOptionsValidator_Validate_ReauthMaxAgeSeconds_MustBeWithinBounds
@@ -92,14 +97,20 @@ sections:
 
       - id: ReviewCenter-OidcSignIn-Throttle
         title: >-
-          The OidcSignIn unit shall count every answer of the provider that arrives at the callback address against the
-          sign-in throttle of the client address, and shall refuse the answer without reading it when the throttle
-          refuses.
+          The OidcSignIn unit shall count every answer of the provider that arrives at the callback address against
+          the address quota of the sign-in throttle of the client address only, without a counter per name, shall hand
+          the attempt back when the answer is accepted, and shall refuse the answer without reading it when the
+          throttle refuses.
         justification: |
           The callback address can be called by anybody, so without a limit it could be used to make the server do the
-          work of checking tokens without end. The same throttle as for the password keeps one rule for every way in.
+          work of checking tokens without end. The address limit of the password sign-in keeps one rule for every way
+          in. The callback carries no user name that can be trusted, so a counter per name would be one counter shared
+          by everybody, and a few bad requests from one shared address (an office or a proxy) would block every person
+          behind it; only the address is counted.
         tests:
           - OidcSignIn_TooManyCallbacks_AreThrottled
+          - OidcSignIn_BadCallbacksBelowAddressLimit_DoNotBlockAnotherPerson
+          - OidcSignIn_SuccessfulCallback_HandsTheAddressSlotBack
 
       - id: ReviewCenter-OidcSignIn-Audit
         title: >-
@@ -140,7 +151,8 @@ sections:
           identity for one signature by sending the browser to the provider with prompt=login and max_age=0, and shall
           issue the confirmation only when the answer has an authentication time that is not older than the allowed
           age and not in the future, the same subject as the account, and the same issuer; and shall in every other
-          case fail closed, issue nothing, and record the reason class.
+          case (an authentication time that is missing, not a whole number, negative or outside the range of dates
+          included) fail closed, issue nothing, and record the reason class.
         justification: |
           A person who is signed in on a shared computer must not be able to sign for somebody else, and a provider
           that does not ask for the password again would make the confirmation a click. Only a login that happened
@@ -149,6 +161,7 @@ sections:
         tests:
           - OidcReauth_FreshSignInOfSamePerson_AllowsExactlyOneSignature
           - OidcReauth_AuthTimeNotInWindow_IsRefusedFailClosed
+          - OidcReauth_AuthTimeOutsideTheRangeOfDates_IsRefusedWithoutError
           - OidcReauth_OtherSubject_IsRefusedAndCreatesNoAccount
           - OidcReauth_ProviderRefuses_ReturnsToReviewWithoutProof
           - OidcReauth_WrongIssuerAudienceOrNonce_IsRefusedFailClosed

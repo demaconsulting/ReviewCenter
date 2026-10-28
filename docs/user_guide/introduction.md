@@ -347,14 +347,18 @@ start when a value is not valid, and the message names the setting but never its
 | `Identity:Oidc:Enabled`              | `true` to turn it on (default `false`)          |
 | `Identity:Oidc:Authority`            | Address of the provider                         |
 | `Identity:Oidc:ClientId`             | The client id of ReviewCenter                   |
-| `Identity:Oidc:ClientSecret`         | The client secret                               |
+| `Identity:Oidc:ClientSecret`         | The client secret (required)                    |
 | `Identity:Oidc:Scopes`               | Scopes (default `openid profile email`)         |
 | `Identity:Oidc:DisplayName`          | Name on the button (default OpenID Connect)     |
 | `Identity:Oidc:UsernameClaim`        | Claim for the user name (`preferred_username`)  |
 | `Identity:Oidc:RequireEmailVerified` | Refuse an e-mail that is not verified (off)     |
 | `Identity:Oidc:ReauthMaxAgeSeconds`  | How recent a login for a signature must be      |
 
-Keep the client secret in the environment or in a secret store, never in a file in a repository. The address of the
+Keep the client secret in the environment or in a secret store, never in a file in a repository (for example the
+environment variable `Identity__Oidc__ClientSecret`). The client secret is **required** when the sign-in is on:
+ReviewCenter is a confidential client, so a public client that relies on PKCE alone is not supported, and the server
+does not start when the secret is missing, empty, or only white space. The message names the setting and never shows
+the value. The address of the
 provider must use `https`; `http` is accepted only for a provider on the same machine (`localhost`) so that it can be
 tried. `ReauthMaxAgeSeconds` is the age that the login at the provider may have when a signature is confirmed (default
 120; 10 to 900).
@@ -385,8 +389,11 @@ cannot sign.
 
 **When it fails.** Every failure at the sign-in page gives one general message (the provider failed or refused, the
 account is disabled, the answer could not be checked), so the page does not tell an attacker which. The cause is
-recorded as a short class in the audit trail (see [Recorded Actions](#recorded-actions)). The callback is limited like
-the password sign-in (see Password Rules and Lockout). A return address that is not on this server is replaced by the
+recorded as a short class in the audit trail (see [Recorded Actions](#recorded-actions)). The callback is limited per
+client address only (by default 20 callbacks in 5 minutes, the address limit of the password sign-in; see Password
+Rules and Lockout); it has no limit per name, so bad callbacks from one shared address cannot lock out other people
+behind it before the address limit is reached, and a callback that succeeds gives its attempt back. A return address
+that is not on this server is replaced by the
 home page.
 
 **What is never logged.** ReviewCenter does not log or store the tokens, the claims, or the client secret of the

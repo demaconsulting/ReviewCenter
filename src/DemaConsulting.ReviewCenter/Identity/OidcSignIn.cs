@@ -45,7 +45,8 @@ namespace DemaConsulting.ReviewCenter.Identity;
 ///     because the handler does not check <c>auth_time</c>, <see cref="VerifyReauth"/> does, together with the
 ///     issuer and the subject, and every doubt refuses (the check fails closed). Only a verified confirmation
 ///     issues a single-use <see cref="ReauthProofStore"/> proof for exactly one user, review and slot, and the
-///     session is left as it was. Callbacks are counted per client address by <see cref="SignInThrottle"/>. Only a
+///     session is left as it was. Callbacks are counted per client address only, with no name counter, by <see cref="SignInThrottle"/>, so bad
+///     callbacks from one shared address cannot lock out another person behind it before the address limit. Only a
 ///     fixed reason class is ever recorded for a failure, never a token, a claim, an error text or the secret, and
 ///     every address a visitor can influence is reduced to a local one by <see cref="SignIn.SafeReturnUrl"/> both
 ///     when the sign-in starts and when it ends. The class is stateless and therefore thread-safe.
@@ -132,11 +133,6 @@ internal static class OidcSignIn
     ///     The key under which the throttle reservation of a callback is kept for the length of the request.
     /// </summary>
     private const string ReservationKey = "ReviewCenter.Oidc.Reservation";
-
-    /// <summary>
-    ///     The name counted by the throttle for every callback; all callbacks of an address share one counter.
-    /// </summary>
-    private const string ThrottleName = "oidc";
 
     /// <summary>
     ///     How far in the future the moment of the provider's sign-in may lie, to absorb a clock that runs fast.
@@ -391,7 +387,7 @@ internal static class OidcSignIn
         handler.Authority = settings.Authority;
         handler.RequireHttpsMetadata = !settings.IsLoopbackHttp();
         handler.ClientId = settings.ClientId;
-        handler.ClientSecret = string.IsNullOrEmpty(settings.ClientSecret) ? null : settings.ClientSecret;
+        handler.ClientSecret = settings.ClientSecret;
         handler.SignInScheme = ExternalCookieScheme;
         handler.CallbackPath = CallbackPath;
 
@@ -458,7 +454,7 @@ internal static class OidcSignIn
     {
         var http = context.HttpContext;
         var throttle = http.RequestServices.GetRequiredService<SignInThrottle>();
-        var reservation = throttle.TryBegin(SignIn.ClientAddress(http), ThrottleName);
+        var reservation = throttle.TryBeginAddressOnly(SignIn.ClientAddress(http));
         if (reservation is null)
         {
             await FailAsync(http, context.Properties, "throttled");
@@ -657,8 +653,11 @@ internal static class OidcSignIn
             return "subject-mismatch";
         }
 
+        // The value must be a whole number of seconds that a date can hold: outside that range converting it to a
+        // date would throw, so it is refused like a missing value and no exception can escape
         var authTime = claims.FindFirstValue("auth_time");
         if (!long.TryParse(authTime, NumberStyles.None, CultureInfo.InvariantCulture, out var seconds)
+            || seconds < DateTimeOffset.MinValue.ToUnixTimeSeconds()
             || seconds > DateTimeOffset.MaxValue.ToUnixTimeSeconds())
         {
             return "missing-auth-time";
