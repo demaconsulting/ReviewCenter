@@ -56,18 +56,17 @@ record.
 A null document raises `ArgumentNullException`. Text that the PDF fonts cannot show becomes question marks (see
 `PdfDocumentWriter`). A review without a checklist is reported as such in the document and is not an error.
 
-**What the digest binds and what the PDF shows**: The record digest (`ReviewCenter record v4`) that the reviewers'
+**What the digest binds and what the PDF shows**: The record digest (`ReviewCenter record v1`) that the reviewers'
 signatures bind to covers: the content fingerprint; the source of the files (repository identity, baseline and head
-commit, selection, review-set, and for every changed file its path, kind, and baseline and head hashes); every checklist
-answer (check identifier, outcome, and justification); the sections that do not apply (identifier and reason); and every
-thread with its comments (anchor, state, time, and for each comment the author, the user name, the text, and the time).
-It does **not** cover items that the PDF also shows: the wording of the checklist items and the titles of the sections
-(only the check identifiers are in the digest), the checklist version, who answered each check and when
-(`Answered by`), the review title, the project name, the repository name, the reviewer slots, and the audit chain head.
-The signature over the PDF covers every byte of the PDF, so these extra items
-are protected by the PDF signature (and, for what the audit event holds, by the audit chain); they are not bound by the
-reviewers' own signatures on the record. Widening the digest to cover them would be a record format change and is a
-known limitation, planned as a follow-up; the digest format is unchanged here.
+commit, selection, review-set, and for every changed file its path, kind, and baseline and head hashes); the checklist
+the review was created with (version, and for every section its identifier and title and for every check its
+identifier and wording); every checklist answer (check identifier, outcome, justification, and who answered, by display
+name and user name); the sections that do not apply (identifier and reason); and every thread with its comments (anchor,
+state, time, and for each comment the author, the user name, the text, and the time).
+It does **not** cover the time an answer was given (`Answered at`), the review title, the project name, the repository
+name, the reviewer slots, and the audit chain head, which the PDF may also show. The signature over the PDF covers
+every byte of the PDF, so these extra items are protected by the PDF signature (and, for what the audit event holds,
+by the audit chain); they are not bound by the reviewers' own signatures on the record.
 
 The wording is the one place where the subsystem can mislead, so it is deliberate. The signature section says that the
 signature proves that the document is unchanged since the signing and that it was signed by the holder of the key in

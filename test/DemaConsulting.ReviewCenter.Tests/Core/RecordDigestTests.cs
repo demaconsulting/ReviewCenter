@@ -207,11 +207,12 @@ public class RecordDigestTests
         // Assert: version line, fingerprint, answers, sections that do not apply, threads
         var expected = string.Join(
             '\n',
-            "ReviewCenter record v4",
+            "ReviewCenter record v1",
             "fingerprint 3:abc",
             "source upload",
+            "checklist -",
             "answers",
-            "answer 6:REQ-01 4:Fail 3:bad",
+            "answer 6:REQ-01 4:Fail 3:bad 3:Ann 3:ann",
             "sections",
             "not-applicable 3:DES 4:none",
             "threads",
@@ -252,10 +253,213 @@ public class RecordDigestTests
         // Act: compute the digest
         var digest = RecordDigest.Compute(record);
 
-        // Assert: the SHA-256 of "ReviewCenter record v4\nfingerprint 3:abc\nsource upload\nanswers\nsections\nthreads",
-        // worked out with an independent tool; the v3 digest of the same record was 0527d1b7...
-        Assert.Equal("244341c991c7ad467cb6f84ea3236bf06cddaada609cabc5ef7a5f3326f7aeb0", digest);
-        Assert.NotEqual("0527d1b7805490ea49b3ace3b00c531b07b44276996e0118c6c654c3f1dd8ef6", digest);
+        // Assert: the SHA-256 of
+        // "ReviewCenter record v1\nfingerprint 3:abc\nsource upload\nchecklist -\nanswers\nsections\nthreads",
+        // worked out with an independent tool (a separate script that builds the text from the documented layout)
+        Assert.Equal("9fee8bc5c8ddc1c908ed605ccb301bfa1be3e0499cc824d787275c7a783543f0", digest);
+    }
+
+    /// <summary>
+    ///     Builds a frozen checklist from sections of (id, title, items of (id, text)), kept in the order given.
+    /// </summary>
+    /// <param name="version">The version label.</param>
+    /// <param name="sections">The sections.</param>
+    /// <returns>The frozen checklist as the store would hold it.</returns>
+    private static ReviewChecklist Checklist(string version, params ChecklistSection[] sections)
+    {
+        var definition = new ChecklistDefinition(version, sections);
+        return new ReviewChecklist
+        {
+            ProjectId = 1,
+            ReviewId = "rev-1",
+            Version = version,
+            Definition = definition.ToJson()
+        };
+    }
+
+    /// <summary>
+    ///     Builds a checklist section.
+    /// </summary>
+    /// <param name="id">The section id.</param>
+    /// <param name="title">The section title.</param>
+    /// <param name="items">The checks as (id, text) pairs.</param>
+    /// <returns>The section.</returns>
+    private static ChecklistSection ChecklistSectionOf(string id, string title, params (string Id, string Text)[] items)
+    {
+        return new ChecklistSection(id, title, "hint", [.. items.Select(i => new ChecklistItem(i.Id, i.Text))]);
+    }
+
+    /// <summary>
+    ///     Builds an upload record with a checklist and one answer.
+    /// </summary>
+    /// <param name="requirementText">The wording of check REQ-01.</param>
+    /// <param name="by">Who answered.</param>
+    /// <param name="username">The user name of the answerer.</param>
+    /// <param name="answeredAt">When the check was answered.</param>
+    /// <returns>The record.</returns>
+    private static ReviewRecord ChecklistRecord(
+        string requirementText = "Is the code correct?",
+        string by = "Ann",
+        string? username = null,
+        DateTimeOffset? answeredAt = null)
+    {
+        var answer = Answer("REQ-01", by: by);
+        var stored = new ChecklistAnswer
+        {
+            ProjectId = answer.ProjectId,
+            ReviewId = answer.ReviewId,
+            ItemId = answer.ItemId,
+            Outcome = answer.Outcome,
+            Justification = answer.Justification,
+            AnsweredBy = by,
+            AnsweredByUsername = username ?? by.ToLowerInvariant(),
+            AnsweredAt = answeredAt ?? _time
+        };
+        var checklist = Checklist(
+            "default-1",
+            ChecklistSectionOf("REQ", "Requirements", ("REQ-01", requirementText), ("REQ-02", "Is it traced?")),
+            ChecklistSectionOf("DES", "Design", ("DES-01", "Is it sound?")));
+        return new ReviewRecord("abc", checklist, [], [stored], [], ReviewSource.Upload);
+    }
+
+    /// <summary>
+    ///     Test that the checklist wording is written sorted by id, and that the digest of a checklist record is the
+    ///     known answer worked out with an independent tool.
+    /// </summary>
+    [Fact]
+    public void RecordDigest_Compute_ChecklistRecord_MatchesDocumentedFormatAndKnownValue()
+    {
+        // Arrange: a record whose checklist sections and checks are defined out of id order
+        var record = ChecklistRecord();
+
+        // Act: build the canonical text and the digest
+        var text = RecordDigest.Canonicalize(record);
+        var digest = RecordDigest.Compute(record);
+
+        // Assert: version, sections and checks sorted by id, then the answer with who answered
+        var expected = string.Join(
+            '\n',
+            "ReviewCenter record v1",
+            "fingerprint 3:abc",
+            "source upload",
+            "checklist 9:default-1",
+            "section 3:DES 6:Design",
+            "item 6:DES-01 12:Is it sound?",
+            "section 3:REQ 12:Requirements",
+            "item 6:REQ-01 20:Is the code correct?",
+            "item 6:REQ-02 13:Is it traced?",
+            "answers",
+            "answer 6:REQ-01 4:Pass - 3:Ann 3:ann",
+            "sections",
+            "threads");
+        Assert.Equal(expected, text);
+        Assert.Equal("5f6e64aa7091e4156ec43493c56d9f0cc2407a24a92efec3012ae02e1f954e43", digest);
+    }
+
+    /// <summary>
+    ///     Test that changing the wording of a question, the title of a section or the checklist version changes the
+    ///     digest, so a signature binds to the questions that were asked.
+    /// </summary>
+    /// <param name="change">The name of the change under test.</param>
+    [Theory]
+    [InlineData("item-wording")]
+    [InlineData("section-title")]
+    [InlineData("version")]
+    [InlineData("item-removed")]
+    [InlineData("checklist-removed")]
+    public void RecordDigest_Compute_ChecklistWordingChange_ChangesDigest(string change)
+    {
+        // Arrange: the baseline record and its digest
+        var before = RecordDigest.Compute(ChecklistRecord());
+
+        // Act: change one thing in the checklist
+        var baseline = ChecklistRecord();
+        var changed = change switch
+        {
+            "item-wording" => ChecklistRecord(requirementText: "Is the code right?"),
+            "section-title" => baseline with
+            {
+                Checklist = Checklist(
+                    "default-1",
+                    ChecklistSectionOf("REQ", "Requirement", ("REQ-01", "Is the code correct?"), ("REQ-02", "Is it traced?")),
+                    ChecklistSectionOf("DES", "Design", ("DES-01", "Is it sound?")))
+            },
+            "version" => baseline with
+            {
+                Checklist = Checklist(
+                    "default-2",
+                    ChecklistSectionOf("REQ", "Requirements", ("REQ-01", "Is the code correct?"), ("REQ-02", "Is it traced?")),
+                    ChecklistSectionOf("DES", "Design", ("DES-01", "Is it sound?")))
+            },
+            "item-removed" => baseline with
+            {
+                Checklist = Checklist(
+                    "default-1",
+                    ChecklistSectionOf("REQ", "Requirements", ("REQ-01", "Is the code correct?")),
+                    ChecklistSectionOf("DES", "Design", ("DES-01", "Is it sound?")))
+            },
+            _ => baseline with { Checklist = null }
+        };
+
+        // Assert: the digest differs
+        Assert.NotEqual(before, RecordDigest.Compute(changed));
+    }
+
+    /// <summary>
+    ///     Test that the order the checklist is defined in does not change the digest.
+    /// </summary>
+    [Fact]
+    public void RecordDigest_Compute_ChecklistDefinitionOrder_SameDigest()
+    {
+        // Arrange: the same checklist with sections and checks in the opposite order
+        var one = ChecklistRecord();
+        var other = one with
+        {
+            Checklist = Checklist(
+                "default-1",
+                ChecklistSectionOf("DES", "Design", ("DES-01", "Is it sound?")),
+                ChecklistSectionOf("REQ", "Requirements", ("REQ-02", "Is it traced?"), ("REQ-01", "Is the code correct?")))
+        };
+
+        // Act, Assert: the digests are equal
+        Assert.Equal(RecordDigest.Compute(one), RecordDigest.Compute(other));
+    }
+
+    /// <summary>
+    ///     Test that who answered a check is covered (display name and user name), so a signature breaks when
+    ///     somebody else answers, while the moment of answering is not covered.
+    /// </summary>
+    [Fact]
+    public void RecordDigest_Compute_AnsweredByChanged_ChangesDigestButAnsweredAtDoesNot()
+    {
+        // Arrange: the baseline and variants that change the display name, the user name and the time
+        var before = RecordDigest.Compute(ChecklistRecord());
+
+        // Act: compute each variant
+        var otherName = RecordDigest.Compute(ChecklistRecord(by: "Bob", username: "ann"));
+        var otherUser = RecordDigest.Compute(ChecklistRecord(by: "Ann", username: "ann2"));
+        var otherTime = RecordDigest.Compute(ChecklistRecord(answeredAt: _time.AddDays(3)));
+
+        // Assert: the person matters, the time does not
+        Assert.NotEqual(before, otherName);
+        Assert.NotEqual(before, otherUser);
+        Assert.Equal(before, otherTime);
+    }
+
+    /// <summary>
+    ///     Test that a stored definition that is not valid JSON is not hidden: the digest refuses it.
+    /// </summary>
+    [Fact]
+    public void RecordDigest_Canonicalize_MalformedChecklistDefinition_Throws()
+    {
+        // Arrange: a record whose frozen checklist holds corrupted text
+        var record = ChecklistRecord() with
+        {
+            Checklist = new ReviewChecklist { ProjectId = 1, ReviewId = "rev-1", Version = "x", Definition = "{not json" }
+        };
+
+        // Act, Assert: reading the definition fails with a JSON error
+        Assert.ThrowsAny<System.Text.Json.JsonException>(() => RecordDigest.Canonicalize(record));
     }
 
     /// <summary>
@@ -286,8 +490,8 @@ public class RecordDigestTests
     ///     digests for both sides worked out with an independent tool.
     /// </summary>
     [Theory]
-    [InlineData(ThreadSide.Head, "4:Head", "9fbaa65dceeba949bcfb6ebbf94570035516a11aed51df672503fee68c08a528")]
-    [InlineData(ThreadSide.Baseline, "8:Baseline", "b3254cedc7e54cac4d5452de47858bb0b64de2f2bc7daa703a58012e632042df")]
+    [InlineData(ThreadSide.Head, "4:Head", "fe1a3eea5aab9f90922ebdea3caa92b637333d4f082eb7a80b44eb1335acc896")]
+    [InlineData(ThreadSide.Baseline, "8:Baseline", "68acc67bebb0c5decad4669037cc3f7618844cf0e59919cb911aef79e525cf0d")]
     public void RecordDigest_Compute_ThreadSide_IsWrittenAndMatchesKnownValue(ThreadSide side, string written, string expectedDigest)
     {
         // Arrange: an upload record with one thread on the given side
@@ -301,9 +505,10 @@ public class RecordDigestTests
         // Assert: the thread line carries the side after the path, and the digest is the known answer
         var expected = string.Join(
             '\n',
-            "ReviewCenter record v4",
+            "ReviewCenter record v1",
             "fingerprint 3:abc",
             "source upload",
+            "checklist -",
             "answers",
             "sections",
             "threads",
@@ -351,9 +556,9 @@ public class RecordDigestTests
         var empty = RecordDigest.Compute(Make(string.Empty));
 
         // Assert: known answers worked out with an independent tool, all different, and the line shape
-        Assert.Equal("1c2c05b15941c7bc7f8c6b63aff356e4efd5123c0ed8d97ffa3ead7635046387", none);
-        Assert.Equal("54b660301c966a5e5fb0e76bbf91860da1e6ea5544b74232fe851762f0721cbc", core);
-        Assert.Equal("6b9383b83e087a9f862b95079e9eb2caccda8b51e04bb4e2484fd0c94a430364", empty);
+        Assert.Equal("b0eae44ae9062359375b7a361857794617e5c28b5a6a2b7ac732ec36549857d8", none);
+        Assert.Equal("27b7ef9d9b7303fc1c55808f00331469c99e8518e66af16a3317d1811e678059", core);
+        Assert.Equal("d44de252d6f0c7d7d878db59fedc2f21d20592d8669050216b5d77487cbf0760", empty);
         Assert.Contains($"source git 7 40:{sha1} 40:{sha2} 4:**/* 4:core\n", RecordDigest.Canonicalize(Make("core")));
         Assert.Contains($"source git 7 40:{sha1} 40:{sha2} 4:**/* -\n", RecordDigest.Canonicalize(Make(null)));
     }
@@ -389,17 +594,18 @@ public class RecordDigestTests
         // Assert: the source block comes after the fingerprint, with the changes sorted by path
         var expected = string.Join(
             '\n',
-            "ReviewCenter record v4",
+            "ReviewCenter record v1",
             "fingerprint 3:abc",
             $"source git 7 40:{sha1} 40:{sha2} 4:**/* -",
             "changes",
             "change 5:a.txt 8:Modified 3:bs1 3:hs1",
             "change 5:b.txt 7:Deleted 3:bs2 -",
+            "checklist -",
             "answers",
             "sections",
             "threads");
         Assert.Equal(expected, text);
-        Assert.Equal("1c2c05b15941c7bc7f8c6b63aff356e4efd5123c0ed8d97ffa3ead7635046387", RecordDigest.Compute(record));
+        Assert.Equal("b0eae44ae9062359375b7a361857794617e5c28b5a6a2b7ac732ec36549857d8", RecordDigest.Compute(record));
     }
 
     /// <summary>
@@ -572,14 +778,14 @@ public class RecordDigestTests
     }
 
     /// <summary>
-    ///     Test that who answered a check, and when, is not covered, and that a section that applies adds nothing.
+    ///     Test that a section that applies adds nothing to the digest.
     /// </summary>
     [Fact]
-    public void RecordDigest_Compute_AnsweredByAndApplicableSection_NotCovered()
+    public void RecordDigest_Compute_ApplicableSection_NotCovered()
     {
-        // Arrange: the same answers given by somebody else, and an extra section that applies
+        // Arrange: the same answers with and without an extra section that applies
         var one = Record(answers: [Answer("REQ-01", by: "Ann")]);
-        var other = Record(answers: [Answer("REQ-01", by: "Bob")], sections: [Section("DES", true, null)]);
+        var other = Record(answers: [Answer("REQ-01", by: "Ann")], sections: [Section("DES", true, null)]);
 
         // Act, Assert: the digests are equal
         Assert.Equal(RecordDigest.Compute(one), RecordDigest.Compute(other));

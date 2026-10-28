@@ -817,13 +817,15 @@ are open"). Each signature records your name, your role in the slot (primary or 
 statement.
 
 **What a signature covers.** A signature is bound to the record as it was when you signed. The record is the content
-fingerprint of the files, every checklist answer with its justification, every section marked as not applicable with its
-reason, and every comment thread with its comments. For a review from a repository it also covers the repository, the
+fingerprint of the files, the wording of every checklist question, every checklist answer with its justification and
+the person who gave it, every section marked as not applicable with its reason, and every comment thread with its
+comments. For a review from a repository it also covers the repository, the
 baseline and head commits, the selection, and every changed file with its change kind and the hashes of its baseline
 and head content, so a signature cannot look current for a different selection or a different change. The
 **Record digest** in the Details section (shortened; the full
-value is its tooltip) identifies that record. Who answered a check, and when, is not part of it. If the record changes
-while you are signing, the signature is refused and you are asked to review it and try again.
+value is its tooltip) identifies that record. The time an answer was given is not part of it, but who gave it is: if
+somebody else answers a check again, even with the same value, the earlier signatures go out of date. If the record
+changes while you are signing, the signature is refused and you are asked to review it and try again.
 
 **Out of date and Approved.** A slot shows "Signed by *name* on *date* UTC" while it has a signature of the current
 record, "Signature out of date" when it has signatures but the record has changed since (for example a new comment or

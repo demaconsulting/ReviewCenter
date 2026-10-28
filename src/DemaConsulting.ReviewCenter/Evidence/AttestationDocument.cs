@@ -38,7 +38,7 @@ namespace DemaConsulting.ReviewCenter.Evidence;
 /// <param name="ReviewSetId">The review set the review was planned from, or <c>null</c>.</param>
 /// <param name="ContentFingerprint">The content fingerprint of the files under review.</param>
 /// <param name="RecordDigest">The digest of the review record that every signature binds to.</param>
-/// <param name="DigestVersion">The version of the digest format, such as <c>ReviewCenter record v4</c>.</param>
+/// <param name="DigestVersion">The version of the digest format, such as <c>ReviewCenter record v1</c>.</param>
 /// <param name="Files">The files under review.</param>
 /// <param name="ChecklistVersion">The version of the checklist, or <c>null</c> when the review has none.</param>
 /// <param name="Sections">The sections of the checklist with their answers.</param>

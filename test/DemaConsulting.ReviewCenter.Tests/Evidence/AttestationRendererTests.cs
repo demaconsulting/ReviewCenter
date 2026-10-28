@@ -85,7 +85,7 @@ public class AttestationRendererTests
             "set-core",
             "fingerprint-1234",
             Digest,
-            "ReviewCenter record v4",
+            "ReviewCenter record v1",
             [
                 new AttestationFile("src/a.txt", "Modified", "0f".PadRight(64, '0'), 120),
                 new AttestationFile("src/b.txt", "Added", "1f".PadRight(64, '1'), 33)
@@ -110,7 +110,7 @@ public class AttestationRendererTests
                     1,
                     "Ann (ann)",
                     "Bob (bob)",
-                    new AttestationSignature("Bob (bob)", "Alternate", new DateTimeOffset(2025, 3, 3, 4, 5, 6, TimeSpan.Zero), "ReviewCenter record v4", Digest, "I reviewed it")),
+                    new AttestationSignature("Bob (bob)", "Alternate", new DateTimeOffset(2025, 3, 3, 4, 5, 6, TimeSpan.Zero), "ReviewCenter record v1", Digest, "I reviewed it")),
                 new AttestationSlot(2, "Cyd (cyd)", null, null)
             ],
             Head,
@@ -393,7 +393,7 @@ public class AttestationRendererTests
         Assert.Contains("2025-03-03 04:05:06 UTC", lines);
         Assert.Contains("I reviewed it", lines);
         Assert.Contains(Digest, string.Concat(lines.Where(l => l.All(Uri.IsHexDigit))));
-        Assert.Contains("(ReviewCenter record v4)", lines);
+        Assert.Contains("(ReviewCenter record v1)", lines);
         Assert.Contains("Slot 2", lines);
         Assert.Contains("none", lines);
     }
