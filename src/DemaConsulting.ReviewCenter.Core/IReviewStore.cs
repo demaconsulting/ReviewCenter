@@ -64,6 +64,77 @@ public interface IReviewStore
     Task<IReadOnlyList<Project>> ListProjectsAsync(CancellationToken cancellationToken = default);
 
     /// <summary>
+    ///     Stores a new project membership.
+    /// </summary>
+    /// <param name="membership">The membership to store. Must not be null.</param>
+    /// <param name="audit">The audit draft of the change, saved in the same transaction. Must not be null.</param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <returns>A task that completes when the membership is stored.</returns>
+    /// <exception cref="DomainRuleException">
+    ///     Thrown with <see cref="DomainRule.MembershipExists"/> when the user already is a member of the project.
+    /// </exception>
+    Task AddMembershipAsync(ProjectMembership membership, AuditDraft audit, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    ///     Removes a project membership.
+    /// </summary>
+    /// <param name="projectId">The project identity.</param>
+    /// <param name="userId">The identity of the user.</param>
+    /// <param name="audit">The audit draft of the change, saved in the same transaction. Must not be null.</param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <returns><c>true</c> when the membership was removed; <c>false</c> (and nothing recorded) when there was none.</returns>
+    Task<bool> RemoveMembershipAsync(
+        int projectId,
+        int userId,
+        AuditDraft audit,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    ///     Changes the role of an existing project membership.
+    /// </summary>
+    /// <param name="projectId">The project identity.</param>
+    /// <param name="userId">The identity of the user.</param>
+    /// <param name="role">The new role.</param>
+    /// <param name="audit">The audit draft of the change, saved in the same transaction. Must not be null.</param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <returns><c>true</c> when the role was changed; <c>false</c> (and nothing recorded) when there is no membership.</returns>
+    Task<bool> SetMembershipRoleAsync(
+        int projectId,
+        int userId,
+        ProjectRole role,
+        AuditDraft audit,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    ///     Reads the membership of a user in a project.
+    /// </summary>
+    /// <param name="userId">The identity of the user.</param>
+    /// <param name="projectId">The project identity.</param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <returns>The membership, or <c>null</c> when the user is not a member.</returns>
+    Task<ProjectMembership?> GetMembershipAsync(int userId, int projectId, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    ///     Lists the memberships of a project.
+    /// </summary>
+    /// <param name="projectId">The project identity.</param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <returns>The memberships of the project, ordered by user identity.</returns>
+    Task<IReadOnlyList<ProjectMembership>> ListMembershipsAsync(
+        int projectId,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    ///     Lists the memberships of a user.
+    /// </summary>
+    /// <param name="userId">The identity of the user.</param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <returns>The memberships of the user, ordered by project identity.</returns>
+    Task<IReadOnlyList<ProjectMembership>> ListMembershipsForUserAsync(
+        int userId,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
     ///     Reports whether a review with the given id exists in a project.
     /// </summary>
     /// <param name="projectId">The project identity.</param>

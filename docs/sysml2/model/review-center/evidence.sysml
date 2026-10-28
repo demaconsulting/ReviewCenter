@@ -1,6 +1,6 @@
 package ReviewCenter {
     part def EvidenceSubsystem {
-        doc /* The signed PDF attestation of a complete review: a plain PDF writer with standard fonts, the layout of the attestation document, a detached CMS signature made with a key of the server (a self-signed key or a certificate from a certificate store, never exported), the selection and description of that key, the service that checks the approval, renders, signs and records the release in the audit trail, the authorized download endpoint, and the service that lists the completed reviews of a project as the evidence index for ReviewMark. */
+        doc /* The signed PDF attestation of a complete review: a plain PDF writer with standard fonts, the layout of the attestation document, a detached CMS signature made with a key of the server (a self-signed key or a certificate from a certificate store, never exported), the selection and description of that key, the service that checks the approval, renders, signs and records the release in the audit trail, the authorized download route of the attestation, and the service that lists the completed reviews of a project, for a user who may see the project, as the evidence index for ReviewMark. */
 
         comment testRef /* Test: test/DemaConsulting.ReviewCenter.Tests/Evidence/EvidenceSubsystemTests.cs */
         comment designRef /* Design: docs/design/review-center/evidence.md */

@@ -1,23 +1,29 @@
 ---
 # Software Unit Requirements for the RepositoriesPage Component
 #
-# The RepositoriesPage component lets administrators register, change, disable, and enable the git repositories that
-# reviews can be created from. The token is write-only on this page. The unit includes the NewRepositoryPage
-# component, the separate page that holds the form that registers a repository.
+# The RepositoriesPage component lets whoever manages a project (a system administrator or a project admin of it)
+# register, change, disable, and enable the git repositories of that project, at /projects/{project}/repositories.
+# Reviews of the project can be created from them. The token is write-only on this page. The unit includes the
+# NewRepositoryPage component, the separate page at /projects/{project}/repositories/new that holds the form that
+# registers a repository. There is no registry of repositories outside the projects. A user who may not manage the
+# project is shown the not-found message of a project that does not exist.
 
 sections:
   - title: RepositoriesPage Unit Requirements
     requirements:
       - id: ReviewCenter-RepositoriesPage-Display
         title: >-
-          The RepositoriesPage component shall list every repository with its name, location, and enabled state, with
-          the user name and a token indicator only where they are set, never showing a token, and shall offer no way
-          to delete a repository.
+          The RepositoriesPage component shall list the repositories of the project, and no other, with their name,
+          location, and enabled state, with the user name and a token indicator only where they are set, never
+          showing a token, and shall offer no way to delete a repository.
         justification: |
-          Administrators need to see what is registered and whether a token is set, but a token shown on a page can
-          be copied, shoulder-surfed, and logged. A repository is retired by disabling it.
+          Whoever manages the project needs to see what is registered for it and whether a token is set, but a token
+          shown on a page can be copied, shoulder-surfed, and logged. A repository is retired by disabling it, and the
+          repositories of other projects are not this project's business.
         tests:
           - RepositoriesPage_Render_Repositories_ShowsTokenStateOnlyAndNoDelete
+          - RepositoriesPage_Render_OtherProjectsRepositories_AreNotListed
+          - RepositoriesPage_Render_ProjectAdmin_ShowsRepositoriesAndActions
 
       - id: ReviewCenter-RepositoriesPage-AddPage
         title: >-
@@ -33,9 +39,9 @@ sections:
 
       - id: ReviewCenter-RepositoriesPage-Create
         title: >-
-          The RepositoriesPage component shall register a repository from a form with a name, a location, an optional
-          user name, and an optional token, empty the token field afterwards, and show a rule violation without
-          creating anything.
+          The RepositoriesPage component shall register a repository in the project from a form with a name, a
+          location, an optional user name, and an optional token, empty the token field afterwards, and show a rule
+          violation without creating anything.
         justification: |
           Registering a repository is how an administrator makes a source reachable. A token must not stay in the form
           after it is saved.
@@ -45,9 +51,9 @@ sections:
 
       - id: ReviewCenter-RepositoriesPage-Edit
         title: >-
-          The RepositoriesPage component shall let an administrator change the name, location, and user name of a
-          repository and keep, replace, or clear its token, never showing the stored token, and let the
-          administrator cancel without any change.
+          The RepositoriesPage component shall let whoever manages the project change the name, location, and user
+          name of a repository and keep, replace, or clear its token, never showing the stored token, and cancel
+          without any change.
         justification: |
           Locations move and tokens expire. The stored token cannot be read back, so keeping, replacing, and
           clearing are the only operations that make sense for it.
@@ -59,7 +65,8 @@ sections:
 
       - id: ReviewCenter-RepositoriesPage-Enable
         title: >-
-          The RepositoriesPage component shall let an administrator disable a repository and enable it again.
+          The RepositoriesPage component shall let whoever manages the project disable a repository and enable it
+          again.
         justification: |
           Disabling stops the use of a repository at once, for example after a token was exposed, and keeps the
           reviews made from it.
@@ -68,14 +75,18 @@ sections:
 
       - id: ReviewCenter-RepositoriesPage-Admin
         title: >-
-          The RepositoriesPage component shall be available only to enabled administrators, shall check on every
-          action that the user is still an enabled administrator, and shall replace the page with a message that the
-          session has ended, or refuse the action with an error and change nothing, when the user no longer is.
+          The RepositoriesPage component shall be available only to a system administrator and to a project admin of
+          the project, shall show anybody else, a plain member or a user who is no member, only the not-found
+          message of a project that does not exist, with no repository and no control, shall check on every action
+          that the user still manages the project, and shall replace the page with a message that the session has
+          ended, or refuse the action with an error and change nothing, when the user no longer does.
         justification: |
-          The registry controls what the server reads and holds secrets. An open page keeps its state for a while
-          after a user is demoted, disabled, or signed out.
+          The repositories control what the server reads and hold secrets. An open page keeps its state for a while
+          after a user is demoted, disabled, or signed out. A refusal that said "not allowed" would show that the
+          project exists, so the page answers as for a missing project.
         tests:
-          - SignIn_RepositoriesPage_ReviewerAndAdmin_OnlyAdminIsAllowed
+          - SignIn_RepositoriesPage_NonMemberAndSystemAdmin_OnlyAdminIsServed
+          - RepositoriesPage_Render_MemberOrNonMember_ShowsNotFoundOnly
           - RepositoriesPage_Action_SignedInAdminLaterDemoted_IsRefusedWithError
           - RepositoriesPage_Revalidation_AdminDemoted_PageShowsSessionEndedAndNoActions
           - RepositoriesPage_Action_SessionEndedBeforePageKnows_ShowsClearErrorAndChangesNothing

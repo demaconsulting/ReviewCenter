@@ -71,6 +71,7 @@ public class ReviewPageDiffTests : PageTestBase
         var cancellationToken = TestContext.Current.CancellationToken;
         var admin = new Actor("adm", "Adm");
         await Users.CreateAsync("adm", "Adm", UserRole.Admin, "correct horse battery", cancellationToken);
+        var project = await Projects.CreateAsync("Apollo", null, cancellationToken);
         var repository = await Repositories.CreateAsync("main-repo", "https://example.com/org/repo.git", null, null, admin, cancellationToken);
         Git.Revisions["main"] = HeadSha;
         Git.Revisions["v1"] = BaseSha;
@@ -80,7 +81,6 @@ public class ReviewPageDiffTests : PageTestBase
         };
         changes.AddRange(extra);
         Git.Script(BaseSha, HeadSha, changes);
-        var project = await Projects.CreateAsync("Apollo", null, cancellationToken);
         await Reviews.CreateFromRepositoryAsync(
             project.Id, "REV-1", "From git", repository.Id, "main", "v1", "src/**", TestActors.Ann, cancellationToken);
         return project.Id;
@@ -361,7 +361,7 @@ public class ReviewPageDiffTests : PageTestBase
         var cancellationToken = TestContext.Current.CancellationToken;
         var projectId = await CreateReviewAsync();
         await Reviews.CreateDraftAsync(projectId, "REV-2", "Upload", [new("a.txt", TestContent.A)], cancellationToken);
-        var repository = (await Repositories.ListEnabledAsync(cancellationToken)).Single();
+        var repository = (await Repositories.ListEnabledAsync(TestActors.Ann, projectId, cancellationToken)).Single();
         Git.Script(null, HeadSha, [("src/new.txt", ChangeKind.Added, null, "new\n")]);
         await Reviews.CreateFromRepositoryAsync(
             projectId, "REV-3", "No baseline", repository.Id, "main", null, "src/**", TestActors.Ann, cancellationToken);

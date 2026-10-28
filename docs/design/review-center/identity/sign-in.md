@@ -24,14 +24,17 @@ protected pages are redirected.
 
 **DisplayNameClaimType**: `string` (constant) — `display_name`; the claim that carries the display name.
 
-**AdminRole**: `string` (constant) — `Admin`; the role name that the user administration page requires.
+**AdminRole**: `string` (constant) — `SystemAdmin`; the role name that the pages only a system administrator may use
+require, and the value of the role claim.
 
 **ThrottledError**: `string` (constant) — `throttled`; the value of the `error` query of the login page that asks for
 the "too many attempts" message (any other value asks for the generic message).
 
-**Claims**: the principal in the cookie has three claims: the user name (the name claim), the display name, and the
-role (the role claim). It never has the password or its hash. A principal that the `Api` subsystem builds from a token
-has the same three claims and two more (`rc_auth` and `rc_token_id`), but it is never signed in with the cookie scheme
+**Claims**: the principal in the cookie has two claims for every user, the user name (the name claim) and the display
+name, and a third, the role claim with the value `SystemAdmin`, only for a user who is a system administrator. It never
+has the password or its hash, and never a project role or a membership. A principal that the `Api` subsystem builds
+from a token has the same claims (the role claim only for a system administrator) and two more (`rc_auth` and
+`rc_token_id`), but it is never signed in with the cookie scheme
 and this unit never accepts it.
 
 **ClientAddress**: `internal static` method; the address of the connection of a request as text (an IPv4 address that is
@@ -70,7 +73,8 @@ An anonymous request for a protected page is redirected to `LoginPath` (the orig
 deep link (`%20`, `%23`, `%3F`, a literal `%2F` or `%25`) and its query come back unchanged; the decoded path would
 turn a literal `%2F` of a file name into a separator. Where the server gives no raw target, each path segment of the
 decoded path is escaped again. The value is reduced with `SafeReturnUrl`, so only a local path is kept, and a request
-for `/` carries no return address. A signed-in user without the needed role does not get a redirect: the access-denied
+for `/` carries no return address. A signed-in user without the needed role (the system administrator role) does not
+get a redirect: the access-denied
 redirect is replaced by HTTP status 403 with a short "Access denied" page that links back to `/projects`. No
 fallback authorization policy is set, so static assets, `/health`,
 `/`, and `/login` stay anonymous and each protected page declares its own requirement. The session length and the
@@ -142,16 +146,25 @@ it again because the form value is client-supplied.
 - *Postconditions*: The result always comes from the authentication state, never from a form value. When the state has
   no authenticated user or lacks a claim, the method throws `DomainRuleException` with the rule `ActorNotAllowed`.
 
+**GetActorOrNullAsync**: Builds the `Actor` of the signed-in user, or nothing.
+
+- *Parameters*: `AuthenticationStateProvider provider`.
+- *Returns*: `Task<Actor?>` — the same actor as `GetActorAsync`, or null when `GetActorAsync` would throw its
+  `ActorNotAllowed` rule.
+- *Postconditions*: Never throws `DomainRuleException`. A page that loads data for a project uses it so that an ended
+  sign-in shows nothing instead of an error; `ProjectAccess` gives no access to a null actor.
+
 **IsCurrent**: The single rule that decides whether a signed-in principal still matches the stored user.
 
 - *Parameters*: `ClaimsPrincipal? principal`, `User? user` — the user as stored now, or null when there is none.
-- *Returns*: `bool` — `true` only when both are present, the user is enabled, and the role and the display name in the
-  principal equal the stored ones.
+- *Returns*: `bool` — `true` only when both are present, the user is enabled, the presence of the `SystemAdmin` role
+  claim in the principal equals `User.IsSystemAdmin`, and the display name in the principal equals the stored one.
 - *Postconditions*: Pure; nothing is changed.
 
 **Principal validation**: On every request that carries the cookie, the cookie is checked against the user store
 (`UserService.GetAsync`) with `IsCurrent`. The cookie is rejected, and removed, when the user no longer exists, is
-disabled, or when the role or the display name in the cookie differs from the stored one; the user then has to sign in
+disabled, or when the system administrator state or the display name in the cookie differs from the stored one; the
+user then has to sign in
 again and gets the current values. A changed password does not reject cookies, so it does not end other sessions of the
 user. The periodic check of an open page (see the `RevalidatingAuthenticationStateProvider` design) uses the same
 `IsCurrent`, so the cookie and an open page cannot drift apart.
@@ -178,8 +191,8 @@ address is only in the web server log.
 - **UserService** (Core) — checks the password and reads the user for the per-request validation.
 - **AuditService** (Core) — records the sign-in, the sign-out, and the throttled refusals.
 - **SignInThrottle** (Identity) — decides whether an attempt may go on, and takes attempts back after a success.
-- **Actor**, **User**, **UserRole**, and **DomainRuleException** (Core) — the type produced for the pages, the user
-  that `IsCurrent` compares with, the role names of the claims, and the refusal of `GetActorAsync`.
+- **Actor**, **User**, and **DomainRuleException** (Core) — the type produced for the pages, the user
+  that `IsCurrent` compares with (its `IsSystemAdmin` flag), and the refusal of `GetActorAsync`.
 - **RevalidatingAuthenticationStateProvider** (Identity) — registered by `AddSignIn`; it calls `IsCurrent`.
 - **ASP.NET Core shared framework** — cookie authentication, authorization, antiforgery, and the Blazor
   authentication state; see the ASP.NET Core integration design in the OTS chapter.
@@ -194,6 +207,8 @@ address is only in the web server log.
 - **LoginPage** — posts its form to `/auth/login`, uses `SafeReturnUrl`, and uses `ThrottledError` to choose its message.
 - **App** (`MainLayout`) — posts its logout form to `/auth/logout`, and reads the signed-in user for the header.
 - **ReviewPage**, **ChecklistPage**, **AccountPage**, and **UsersPage** — call `GetActorAsync` (the account page to know
-  whose password to change). **ProjectsPage**, **ProjectPage**, **ReviewPage**, **ChecklistPage**, and **AccountPage**
-  require a signed-in user, and **UsersPage** requires the role `Admin`, through authorization attributes that this
+  whose password to change); the pages of a project call `GetActorOrNullAsync`. **ProjectsPage**, **ProjectPage**,
+  **ReviewPage**, **ChecklistPage**, and **AccountPage**
+  require a signed-in user, and **UsersPage** requires the role `SystemAdmin`, through authorization attributes that
+  this
   unit's registration makes effective.

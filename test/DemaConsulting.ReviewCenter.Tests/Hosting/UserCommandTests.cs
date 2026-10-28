@@ -46,37 +46,37 @@ public class UserCommandTests
         // Arrange: a new database and a password supplied by the source
         var connectionString = TestDatabase.NewConnectionString();
 
-        // Act: add an administrator
-        var (exitCode, output) = Run(connectionString, () => Password, "--username", "root", "--display-name", "Root User", "--role", "admin");
+        // Act: add a system administrator
+        var (exitCode, output) = Run(connectionString, () => Password, "--username", "root", "--display-name", "Root User", "--system-admin");
 
-        // Assert: success, a report that names the user and role, no password in the output, and the user can sign in
+        // Assert: success, a report that names the user, no password in the output, and the user can sign in
         Assert.Equal(0, exitCode);
-        Assert.Contains("Created user 'root' with the role Admin.", output, StringComparison.Ordinal);
+        Assert.Contains("Created user 'root' (system administrator).", output, StringComparison.Ordinal);
         Assert.DoesNotContain(Password, output, StringComparison.Ordinal);
         await using var app = await TestWebApp.StartAsync(new CapturingLoggerProvider(), connectionString, ["serve", "--silent"]);
         var user = await app.Services.GetRequiredService<UserService>()
             .AuthenticateAsync("root", Password, TestContext.Current.CancellationToken);
         Assert.Equal("Root User", user?.DisplayName);
-        Assert.Equal(UserRole.Admin, user?.Role);
+        Assert.True(user?.IsSystemAdmin);
     }
 
     /// <summary>
-    ///     Test that the role defaults to reviewer.
+    ///     Test that the user is an ordinary user unless the switch is given.
     /// </summary>
     [Fact]
-    public async Task UserCommand_Run_NoRole_CreatesReviewer()
+    public async Task UserCommand_Run_NoSwitch_CreatesOrdinaryUser()
     {
         // Arrange: a new database
         var connectionString = TestDatabase.NewConnectionString();
 
-        // Act: add a user without a role
+        // Act: add a user without the switch
         var (exitCode, _) = Run(connectionString, () => Password, "--username", "ann", "--display-name", "Ann");
 
-        // Assert: the user is a reviewer
+        // Assert: the user is not a system administrator
         Assert.Equal(0, exitCode);
         await using var app = await TestWebApp.StartAsync(new CapturingLoggerProvider(), connectionString, ["serve", "--silent"]);
         var user = await app.Services.GetRequiredService<UserService>().GetAsync("ann", TestContext.Current.CancellationToken);
-        Assert.Equal(UserRole.Reviewer, user?.Role);
+        Assert.False(user?.IsSystemAdmin);
     }
 
     /// <summary>

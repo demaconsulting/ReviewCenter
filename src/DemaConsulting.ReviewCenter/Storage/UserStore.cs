@@ -60,7 +60,7 @@ internal sealed class UserStore(IDbContextFactory<ReviewCenterDbContext> factory
                 {
                     Username = user.Username,
                     DisplayName = user.DisplayName,
-                    Role = user.Role,
+                    IsSystemAdmin = user.IsSystemAdmin,
                     Enabled = user.Enabled,
                     PasswordHash = user.PasswordHash,
                     FailedLoginCount = user.FailedLoginCount,

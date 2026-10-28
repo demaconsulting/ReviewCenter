@@ -20,6 +20,9 @@ N/A - standard test environment (a temporary database and key folder are created
   download is recorded in the audit trail; with the default configuration it is signed by the key that the server created.
 - An unknown review is 404, a review that is not complete is 409, a review that changed during generation is 409, and
   an unusable key is 500 without an audit event.
+- A signed-in user who is not a member of the project gets an empty 404, like a project that does not exist; the
+  tests of this guard are `ApiProjectAccess_AttestationPage_NonMemberSession_Answers404` and the route tests of
+  `ApiProjectAccessTests.cs`, which are described in the `Api` subsystem.
 
 #### Test Scenarios
 

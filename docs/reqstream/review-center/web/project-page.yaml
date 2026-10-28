@@ -1,21 +1,63 @@
 ---
 # Software Unit Requirements for the ProjectPage Unit
 #
-# The ProjectPage unit is the page at /projects/{project} that shows one project with its reviews, and the page at
-# /projects/{project}/reviews/new that holds the form to create a review from uploaded files or from a repository.
+# The ProjectPage unit is the page at /projects/{project} that shows one project with its reviews, and for a system
+# administrator its members, and the page at /projects/{project}/reviews/new that holds the form to create a review
+# from uploaded files or from a repository of the project. A project the user may not see looks like a missing one.
 
 sections:
   - title: ProjectPage Unit Requirements
     requirements:
       - id: ReviewCenter-ProjectPage-Show
         title: >-
-          The ProjectPage unit shall show the name and description of the project, or a not-found message when
-          the project does not exist.
+          The ProjectPage unit shall show the name and description of the project, or the same not-found message
+          when the project does not exist and when the user may not see it, without showing anything of the project.
         justification: |
-          A stored or mistyped link must lead to a clear answer rather than to an error page.
+          A stored or mistyped link must lead to a clear answer rather than to an error page. A project the user is
+          no member of must be indistinguishable from a missing one, so the page does not reveal that the project
+          exists. The same holds for the page of a new review of the project.
         tests:
           - ProjectPage_Render_UnknownProject_ShowsNotFound
           - ProjectPage_Render_ProjectWithoutReviews_ShowsNameAndEmptyMessage
+          - ProjectPage_Render_NonMember_LooksLikeAMissingProject
+
+      - id: ReviewCenter-ProjectPage-Members
+        title: >-
+          The ProjectPage unit shall show a system administrator, and nobody else, a Members section with the
+          members of the project, each with a role badge (Project admin or Member), a button that switches the role,
+          and a Remove button, and a message that says that only system administrators can see the project when it
+          has no members.
+        justification: |
+          Membership decides who sees a project, so a system administrator needs to see it at a glance and to change
+          it on the page of the project. Members and project admins do not manage membership, so they are not shown
+          the section or its buttons.
+        tests:
+          - ProjectPage_Render_SystemAdmin_ListsMembersWithRolesAndActions
+          - ProjectPage_Render_Member_SeesReviewsButNoMembersSection
+
+      - id: ReviewCenter-ProjectPage-MemberChange
+        title: >-
+          The ProjectPage unit shall let a system administrator reveal an inline form with the button + Add member
+          that offers the enabled users who are not members yet and a project admin choice, add the chosen user as a
+          member, switch a member between member and project admin, and remove a member, show the outcome or the
+          reason for a refusal, and list the members again afterwards.
+        justification: |
+          Members are changed rarely, so the form stays hidden until asked for. Showing only users who are not yet
+          members prevents a duplicate, and showing the outcome next to the list tells the administrator what changed.
+        tests:
+          - ProjectPage_AddMember_ChosenUser_BecomesMemberWithTheRole
+          - ProjectPage_MemberActions_ToggleRoleAndRemove_ChangeTheMembership
+
+      - id: ReviewCenter-ProjectPage-RepositoriesLink
+        title: >-
+          The ProjectPage unit shall show a Repositories button that leads to the repositories page of the project to
+          a system administrator and to a project admin of the project only.
+        justification: |
+          Repositories belong to projects, so the project page is where they are reached from. A plain member does
+          not manage them and is not offered a page that would show only a not-found message.
+        tests:
+          - ProjectPage_Render_SystemAdmin_ListsMembersWithRolesAndActions
+          - ProjectPage_Render_Member_SeesReviewsButNoMembersSection
 
       - id: ReviewCenter-ProjectPage-Reviews
         title: >-
@@ -115,25 +157,29 @@ sections:
         title: >-
           The ProjectPage unit shall let the user choose whether the files of a new review are uploaded or come
           from a repository, with upload as the default, shall show only the controls of the chosen source, and
-          shall offer the repository source only when at least one repository is enabled, saying so otherwise.
+          shall offer the repository source only when at least one repository of the project is enabled, saying so
+          otherwise.
         justification: |
-          One form serves both sources without clutter. A repository cannot be chosen when none is registered,
-          and the user is told whom to ask.
+          One form serves both sources without clutter. A repository cannot be chosen when the project has none, and
+          the user is told whom to ask.
         tests:
           - NewReviewPage_SourceChoice_RepositoryChosen_ShowsRepositoryFieldsInsteadOfUpload
           - NewReviewPage_SourceChoice_NoEnabledRepository_DisablesRepositorySourceWithHint
 
       - id: ReviewCenter-ProjectPage-RepositoryForm
         title: >-
-          The ProjectPage unit shall, for the repository source, offer the enabled repositories by name only,
-          never showing a location, user name, or token, a head revision, an optional baseline revision, and a
-          selection that starts as "**/*", and shall create the review from them and show the review page, or
-          list the skipped links and submodules with a link to the review when there are any.
+          The ProjectPage unit shall, for the repository source, offer the enabled repositories of the project by
+          name only, never showing a location, user name, or token, and never a repository of another project, a
+          head revision, an optional baseline revision, and a selection that starts as "**/*", and shall create the
+          review from them and show the review page, or list the skipped links and submodules with a link to the
+          review when there are any.
         justification: |
-          Ordinary users choose from the registry the administrator maintains and must not see how it reaches
-          the repository. The creator is told once which entries were left out.
+          Ordinary users choose from the repositories the administrators of the project maintain and must not see
+          how the server reaches the repository, nor the repositories of projects they may not see. The creator is
+          told once which entries were left out.
         tests:
           - NewReviewPage_RepositorySelect_OffersOnlyEnabledRepositoriesWithoutLocationOrToken
+          - NewReviewPage_RepositorySelect_OffersOnlyRepositoriesOfThisProject
           - NewReviewPage_CreateForm_FromRepository_CreatesReviewWithSourceAndNavigates
           - NewReviewPage_CreateForm_FromRepositoryWithoutBaseline_ReviewsAllFilesAtHead
           - NewReviewPage_CreateForm_SkippedEntries_AreShownBeforeOpeningTheReview
@@ -163,8 +209,8 @@ sections:
 
       - id: ReviewCenter-ProjectPage-PlanLink
         title: >-
-          The ProjectPage unit shall show a link to the plan page of the project when at least one repository is
-          enabled, and a short note that says whom to ask when none is.
+          The ProjectPage unit shall show a link to the plan page of the project when at least one repository of the
+          project is enabled, and a short note that says whom to ask when none is.
         justification: |
           Planning starts from the project page. A user must find the way in, and must be told why it is not
           offered instead of finding no link and guessing.

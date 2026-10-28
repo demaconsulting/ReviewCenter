@@ -1,7 +1,8 @@
 ---
 # Software Unit Requirements for the ProjectService Class
 #
-# The ProjectService class creates, lists, and reads projects and enforces the project rules.
+# The ProjectService class creates, lists, and reads projects, manages the members of a project, and enforces the
+# project rules and the access rules that belong to projects.
 
 sections:
   - title: ProjectService Unit Requirements
@@ -17,6 +18,16 @@ sections:
         tests:
           - ProjectService_CreateAsync_ValidInput_StoresTrimmedProject
           - ProjectService_CreateAsync_NullDescription_StoresEmptyDescription
+
+      - id: ReviewCenter-ProjectService-CreateAdmin
+        title: >-
+          The ProjectService class shall create a project only for a system administrator, shall give the new
+          project no members, and shall store nothing when another actor asks.
+        justification: |
+          A project is a boundary of access, so only the people who run the installation may open one. A new
+          project starts empty so that nobody gains access to it by accident; its members are added on purpose.
+        tests:
+          - ProjectService_CreateAsync_OnlySystemAdmin_NewProjectHasNoMembers
 
       - id: ReviewCenter-ProjectService-Validation
         title: >-
@@ -34,23 +45,51 @@ sections:
 
       - id: ReviewCenter-ProjectService-List
         title: >-
-          The ProjectService class shall list all projects ordered by name and, for projects with the same name,
-          by identifier.
+          The ProjectService class shall list the projects the actor may see, ordered by name and, for projects with
+          the same name, by identifier.
         justification: |
-          Pages that show all projects need a stable, predictable order, and project names are not required to
-          be unique, so the identifier decides between projects with the same name.
+          Pages that show projects need a stable, predictable order, and project names are not required to be
+          unique, so the identifier decides between projects with the same name.
         tests:
           - ProjectService_ListAsync_SeveralProjects_ReturnsOrderedByNameThenId
+          - ProjectService_GetAsync_HiddenProject_ReadsAsMissing
 
       - id: ReviewCenter-ProjectService-Read
         title: >-
-          The ProjectService class shall return a project by its identifier, and nothing when no project has
-          that identifier.
+          The ProjectService class shall return a project by its identifier to an actor who may see it, and
+          nothing when no project has that identifier or the actor may not see it.
         justification: |
-          Pages reached by a stored link must be able to tell a missing project from an existing one, and must
-          not fail when a project is not found.
+          Pages reached by a stored link must be able to tell a missing project from an existing one, and must not
+          fail when a project is not found. A hidden project must read exactly like a missing one, so that its
+          existence does not leak.
         tests:
           - ProjectService_GetAsync_ExistingAndUnknown_ReturnsProjectOrNull
+          - ProjectService_GetAsync_HiddenProject_ReadsAsMissing
+
+      - id: ReviewCenter-ProjectService-Members
+        title: >-
+          The ProjectService class shall let a system administrator add a user to a project with a project role,
+          change the role of a member, and remove a member, shall let a project administrator and a system
+          administrator list the members of the project ordered by user name, and shall refuse every other actor.
+        justification: |
+          Membership decides who may see a project, so changing it is reserved to the people who run the
+          installation. The administrator of a project may see who belongs to it, so that the project can be
+          managed, but not widen or narrow it.
+        tests:
+          - ProjectService_Members_SystemAdminManages_OthersAreRefused
+          - ProjectService_ListMembersAsync_ProjectAdminOwnProjectOnly
+
+      - id: ReviewCenter-ProjectService-MemberRules
+        title: >-
+          The ProjectService class shall refuse, with a domain rule exception that names the rule, to add a user
+          who is already a member, to change or remove a membership that does not exist, to add a user or change
+          a membership of a user that does not exist, and to act on a project that does not exist, and shall
+          change nothing in each case.
+        justification: |
+          A repeated or mistaken request must fail visibly and leave the access rights as they were, and a role
+          outside the defined roles must never be stored.
+        tests:
+          - ProjectService_Members_UnknownDoubledAndMissing_ViolateTheirRules
 
       - id: ReviewCenter-ProjectService-Audit
         title: >-
@@ -61,3 +100,15 @@ sections:
           entry without its project) would make the history untrue.
         tests:
           - ProjectService_CreateAsync_Project_RecordsProjectCreated
+
+      - id: ReviewCenter-ProjectService-MemberAudit
+        title: >-
+          The ProjectService class shall record the adding of a member, the change of the role of a member, and
+          the removal of a member in the audit trail, in the same transaction as the change, naming the actor, the
+          user, and the role, and carrying the identifier of the project.
+        justification: |
+          Who may see a project is the most important fact about its confidentiality, so every change to it must
+          be in the history, found by project, and must be true: no change without its entry and no entry without
+          its change.
+        tests:
+          - ProjectService_Members_SystemAdminManages_OthersAreRefused

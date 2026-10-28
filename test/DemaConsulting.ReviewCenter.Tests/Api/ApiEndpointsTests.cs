@@ -259,9 +259,9 @@ public class ApiEndpointsTests
         await using var app = await StartAsync(configureServices: services => services.AddSingleton<IGitRepositoryProvider>(git));
         var token = await CreateTokenAsync(app);
         await EnsureUserAsync(app, "adm", UserRole.Admin);
-        var repository = await app.Services.GetRequiredService<RepositoryService>().CreateAsync(
-            "main-repo", "https://example.com/org/repo.git", null, null, new Actor("adm", "Adm"), TestContext.Current.CancellationToken);
         var project = await app.Services.GetRequiredService<ProjectService>().CreateAsync("Apollo", null, TestContext.Current.CancellationToken);
+        var repository = await app.Services.GetRequiredService<RepositoryService>().CreateAsync(
+            project.Id, "main-repo", "https://example.com/org/repo.git", null, null, new Actor("adm", "Adm"), TestContext.Current.CancellationToken);
         using var client = ClientFor(app, token.Value);
         var body = new
         {

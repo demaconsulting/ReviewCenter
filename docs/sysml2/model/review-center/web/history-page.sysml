@@ -1,6 +1,6 @@
 package ReviewCenter {
     part def HistoryPage {
-        doc /* Page that shows the audit entries recorded for one review, newest first, 50 to a page, to every signed-in user, with all text rendered as plain text. */
+        doc /* Page that shows the audit entries recorded for one review, newest first, 50 to a page, to every signed-in user who may see the project of the review, with all text rendered as plain text. */
 
         comment sourceRef /* Source: src/DemaConsulting.ReviewCenter/Web/HistoryPage.razor and HistoryPage.razor.cs */
         comment testRef /* Test: test/DemaConsulting.ReviewCenter.Tests/Web/HistoryPageTests.cs */

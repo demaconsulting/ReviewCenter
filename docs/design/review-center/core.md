@@ -11,10 +11,11 @@ that protect them, the content fingerprint that identifies a review's files and 
 hash-chained audit trail of everything that happens. It
 is
 deliberately free of web and database technology so that the rules can be reviewed and tested on their own. It
-It contains sixteen units: `Fingerprint`, the content fingerprint algorithm; `RecordDigest`, the digest of a review
+It contains seventeen units: `Fingerprint`, the content fingerprint algorithm; `RecordDigest`, the digest of a review
 record that a signature binds to; `AuditChain`, the audit entry types, their hash, and the verifier of the chain;
-`AuditService`, the recording, reading, and verification of the audit trail; `ProjectService`, the rules
-for projects; `ReviewService`, the rules for reviews; `ThreadService`, the rules for review comments;
+`AuditService`, the recording, reading, and verification of the audit trail; `ProjectAccess`, the one place that
+decides who can see and administer which project; `ProjectService`, the rules
+for projects and their members; `ReviewService`, the rules for reviews; `ThreadService`, the rules for review comments;
 `ChecklistService`, the rules for the review checklist; `UserService`, the rules for users; `SigningService`, the
 rules for reviewer slots and signatures; `RepositoryService`, the registry of git repositories that reviews can be
 created from, with their credentials; `SelectionMatcher`, the file pattern language that selects the files of a
@@ -24,7 +25,8 @@ repository; `RevisionValidator`, the check that a revision name cannot be taken 
 `PersonalAccessTokenService`, the rules for the personal access tokens that let a script use the API as its owner. The
 domain types (`Project`, `Review`, `ReviewFile`, `ReviewState`, `UploadedFile`, `ReviewThread`, `ThreadSide`,
 `ReviewComment`,
-`ReviewThreadState`, the checklist types, `User`, `UserRole`, `Actor`, the signing types `ReviewerSlot`,
+`ReviewThreadState`, the checklist types, `User`, `Actor`, the access types `ProjectMembership`, `ProjectRole`, and
+`ProjectMember`, the signing types `ReviewerSlot`,
 `ReviewSignature`, `SlotRole`, `ReviewRecord`, and `ReviewApproval`, the audit types `AuditEntry`, `AuditDraft`,
 and `AuditVerificationResult`, and the repository types `SourceRepository`, `RepositorySummary`, `NewRepository`,
 `RepositoryUpdate`, `TokenChange`, and `TokenAction`, and the git contract types `RepositoryAccess`, `GitChange`,
@@ -36,21 +38,28 @@ types (`PersonalAccessToken`, `CreatedPersonalAccessToken`, `TokenFailure`, `Tok
 definition
 (`FileText`), the limits
 (`ReviewLimits`), the rule failure type
-(`DomainRuleException` with the `DomainRule` enumeration), and the interfaces (`IReviewStore`, `IUserStore`,
+(`DomainRuleException` with the `DomainRule` enumeration), and the interfaces (`IProjectAccess`, `IReviewStore`,
+`IUserStore`,
 `IAuditStore`, `IRepositoryStore`, `IPersonalAccessTokenStore`, `ICredentialProtector`, `IGitRepositoryProvider`, `IGitRepository`,
 `IReviewSetParser`, and `IPasswordHasher`) are
 supporting types, documented with the unit that owns them.
 
 ### Interfaces
 
-**ProjectService, ReviewService, ThreadService, ChecklistService, UserService, SigningService, and
+**ProjectAccess, ProjectService, ReviewService, ThreadService, ChecklistService, UserService, SigningService, and
 PersonalAccessTokenService**: The operations
 used by the `Web`, `Identity`, and `Api` subsystems and by the `Hosting` subsystem.
 
-- *Type*: In-process .NET classes.
+- *Type*: In-process .NET classes (`ProjectAccess` through its interface `IProjectAccess`).
 - *Role*: Provider.
-- *Contract*: Create a project; list and read projects; create a draft review from uploaded files, or from the files
-  that changed between an optional baseline revision and a head revision of a registered repository, restricted by a
+- *Contract*: Decide, for an actor and a project, whether the actor can see the project, administer it, or is a member
+  of it, and list the projects an actor can see (`ProjectAccess`); require a right and fail with
+  `DomainRuleException`, where a project the actor may not see fails exactly like a project that does not exist. Create
+  a project (system administrators only; a new project has no members); list and read the projects the actor can see;
+  list the members of a project, and add a member, change the role of a member, or remove a member (system
+  administrators only); create a draft review from uploaded files, or from the files
+  that changed between an optional baseline revision and a head revision of a registered repository of the same
+  project, restricted by a
   selection (the changes are fetched once and frozen in the review; nothing reads the repository again, and a selection
   that matches no change is refused with `NothingToReview`); list and
   read reviews; read the exact head bytes, and the frozen baseline bytes, of one file of a review; start a comment
@@ -59,11 +68,14 @@ used by the `Web`, `Identity`, and `Api` subsystems and by the `Hosting` subsyst
   baseline and the head of one file from the frozen contents (within fixed bounds on the size of the comparison),
   reply to it, resolve and reopen it, and list the threads of a review with their comments; read the frozen
   checklist of a review with its progress, set whether a section applies, and answer a check; create a user, check a
-  user name and password, list and read users, enable and disable a user, set the role of a user, and change a
+  user name and password, list and read users, enable and disable a user, make a user a system administrator or take
+  the right away, and change a
   password. Posting a comment or saving a checklist decision takes the signed-in user (an `Actor`), never free text.
-  Add, change, and remove a reviewer slot of a review, sign a slot with the password entered again, read the
-  approval status of a review (its slots, blockers, record digest, and next step), and list the users that can be
-  chosen for a slot. `RecordDigest` calculates the digest of a record. Every operation that changes data takes
+  Add, change, and remove a reviewer slot of a review (only for members of the project), sign a slot with the password
+  entered again (members only), read the
+  approval status of a review (its slots, blockers, record digest, and next step), and list the enabled members of a
+  project, who can be chosen for a slot. `RecordDigest` calculates the digest of a record. Every operation that changes
+  data takes
   the `Actor` and records the change in the audit trail; `AuditService` lists the trail newest first in pages
   and verifies its hash chain. Create a personal access token for the actor (the value is returned once), list the
   tokens of the actor, revoke one, and authenticate a presented token value into a token and its owner.
@@ -71,7 +83,8 @@ used by the `Web`, `Identity`, and `Api` subsystems and by the `Hosting` subsyst
   immutable: there is no operation to edit or delete one. Rule violations are reported as a
   `DomainRuleException` that carries a `DomainRule` value and a message suitable for display to the user.
 - *Constraints*: The services hold no state that matters between calls and are safe for concurrent use if the stores
-  are; `UserService` serializes the operations that change users within the process.
+  are; `UserService` serializes the operations that change users within the process. `ProjectAccess` reads the user and
+  the memberships from the stores on every call and caches nothing, so a revoked right ends with the next call.
 
 **IReviewStore**: The store interface the subsystem requires for projects and reviews.
 
@@ -81,7 +94,8 @@ used by the `Web`, `Identity`, and `Api` subsystems and by the `Hosting` subsyst
   its first comment; add a comment to a thread of a review; set the state of a thread; list the threads of a review
   with their comments; read the checklist snapshot, the section states, and the answers of a review; set the
   state of a section and the answer to a check; read the whole record of a review in one operation; add, list,
-  update, and remove reviewer slots; and add and list signatures. Every operation that changes data takes an
+  update, and remove reviewer slots; add and list signatures; and add, read, list (of a project, and of a user), change
+  the role of, and remove the memberships of users in projects. Every operation that changes data takes an
   `AuditDraft` (or a function that builds one from the stored entity) that the store appends to the audit trail in the
   same transaction.
 - *Constraints*: A review is added with all its files, and its checklist snapshot, in one operation, and an attempt
@@ -90,7 +104,9 @@ used by the `Web`, `Identity`, and `Api` subsystems and by the `Hosting` subsyst
   added with its first comment in one operation. Setting a section state or an answer replaces the earlier one.
   There is no operation to change or delete a signature. A signature is added only if the digest of the record is
   still the digest it carries, checked inside one transaction, and fails with a `DomainRuleException` for
-  `RecordChanged` otherwise.
+  `RecordChanged` otherwise. A user is a member of a project at most once: adding a second membership fails with a
+  `DomainRuleException` for `MembershipExists`, and a change or removal of a membership that does not exist returns
+  `false`, which the service reports as `MembershipNotFound`.
 
 **IUserStore**: The store interface the subsystem requires for users.
 
@@ -133,22 +149,27 @@ by the `Hosting` subsystem to hand a registered repository to the git source.
 
 - *Type*: In-process .NET class.
 - *Role*: Provider.
-- *Contract*: An administrator registers a repository (name, location, optional user name and token), changes its
-  name, location, user name, or token, and enables or disables it; administrators list all repositories; any
-  signed-in user lists the enabled ones by name. Every change takes the `Actor`, checks again that the actor is an
-  enabled administrator, and is recorded in the audit trail without any secret. The access data needed to read a
-  repository, including the decrypted token, is available only inside the assembly.
-- *Constraints*: The token is write-only: no operation returns it, and the read model has no member for it.
+- *Contract*: A system administrator or the administrator of a project registers a repository for that project (name,
+  location, optional user name and token), changes its
+  name, location, user name, or token, and enables or disables it; they list the repositories of the project; any
+  member lists the enabled ones of the project by name. Every change takes the `Actor`, checks again that the actor
+  administers the project of the repository, and is recorded in the audit trail without any secret. The access data
+  needed to read a
+  repository, including the decrypted token, is available only inside the assembly, and only for a repository of the
+  project asked for.
+- *Constraints*: The token is write-only: no operation returns it, and the read model has no member for it. A
+  repository belongs to exactly one project, and its name is unique within that project only.
 
 **IRepositoryStore**: The store interface the subsystem requires for registered repositories.
 
 - *Type*: In-process .NET interface.
 - *Role*: Consumer (implemented by `RepositoryStore` in the `Storage` subsystem).
-- *Contract*: Add a repository, read one, list all, read the encrypted token of one, and update one with a token
+- *Contract*: Add a repository to a project, read one, list those of a project, read the encrypted token of one, and
+  update one with a token
   action (keep, replace, or clear). Every change takes an `AuditDraft` (or a function that builds one from the stored
   entity) that the store appends to the audit trail in the same transaction.
-- *Constraints*: A name that exists, without regard to case, fails with a `DomainRuleException` for
-  `RepositoryNameTaken`. The store sees only encrypted token text.
+- *Constraints*: A name that exists in the same project, without regard to case, fails with a `DomainRuleException` for
+  `RepositoryNameTaken`; the same name in another project is allowed. The store sees only encrypted token text.
 
 **ICredentialProtector**: The token protection interface the subsystem requires.
 
@@ -182,7 +203,8 @@ a registered repository needs.
 
 - *Type*: In-process .NET class.
 - *Role*: Provider.
-- *Contract*: Plan the reviews for a repository, a head revision, and a baseline choice (none, a given revision, or the
+- *Contract*: Plan the reviews for a repository of a project the actor can see, a head revision, and a baseline choice
+  (none, a given revision, or the
   last signed review of each set): one row for each review-set of the configuration file of the repository, as a full
   review or a change since a baseline, already filed, with nothing to review, or one that cannot be planned, with a
   plain note when
@@ -246,7 +268,7 @@ message and keep the entered values, and there is a single, easily tested path f
 | -------------- | --------------- |
 | `ProjectNameInvalid` | The project name is empty after trimming or is too long |
 | `ProjectDescriptionTooLong` | The project description is too long |
-| `ProjectNotFound` | A review is created in a project that does not exist |
+| `ProjectNotFound` | The project does not exist, or the actor may not see it (the two cannot be told apart) |
 | `ReviewIdInvalid` | The review id is empty, too long, or contains other than letters, digits, `.`, `_`, `-` |
 | `ReviewIdDuplicate` | The review id is already used in that project |
 | `ReviewTitleInvalid` | The review title is empty after trimming or is too long |
@@ -268,20 +290,22 @@ message and keep the entered values, and there is a single, easily tested path f
 | `PasswordInvalid` | The password is shorter than 12 or longer than 128 characters |
 | `CurrentPasswordIncorrect` | The current password given when changing a password is wrong, or the user is locked out |
 | `UserNotFound` | A change names a user that does not exist |
-| `LastAdmin` | A change would disable or demote the last enabled administrator |
+| `LastAdmin` | A change would disable or demote the last enabled system administrator |
+| `MembershipExists` | The user is already a member of the project |
+| `MembershipNotFound` | A change or removal names a user who is not a member of the project |
 | `ReviewNotFound` | A slot or signature names a review that does not exist in the project |
 | `SlotNotFound` | A slot change or signature names a slot that is not part of the review |
-| `SlotUserInvalid` | A reviewer is not an enabled user, primary and alternate are the same, or a user is in two slots |
+| `SlotUserInvalid` | A reviewer is not an enabled project member, primary and alternate are the same, or in two slots |
 | `SlotSigned` | A slot that has any signature is changed or removed |
-| `ActorNotAllowed` | The user is gone or disabled, is not in the slot, or uses an API token to sign or change |
+| `ActorNotAllowed` | The user is gone, disabled, or not a member where needed, is not in the slot, or signs by token |
+| `RepositoryNameTaken` | A repository with that name (without regard to case) exists in the project |
 | `SigningNotAllowed` | The slot is already signed for this record, or a blocker remains (checks, failures, threads) |
 | `ReauthenticationFailed` | The password given with a signature is wrong, or the user is locked out |
 | `RecordChanged` | The record changed after the signer saw it, so the digest differs |
 | `RepositoryNameInvalid` | The name is not 1 to 40 of letters, digits, `.`, `_`, `-`, starting with a letter or digit |
-| `RepositoryNameTaken` | A repository with that name (without regard to case) exists |
 | `RepositoryLocationInvalid` | Location is empty, too long, or not an `https`, local `http`, or `file` URL or path |
 | `RepositoryCredentialInvalid` | Invalid credential, non-`https` location, or token contained in name/user/location |
-| `RepositoryNotFound` | A change or an access names a repository that does not exist |
+| `RepositoryNotFound` | A change or an access names a repository that does not exist, or one of another project |
 | `RepositoryDisabled` | A disabled repository is opened for reading |
 | `RevisionInvalid` | A revision name has a form that could be an option or an expression (see RevisionValidator) |
 | `RevisionNotFound` | The revision does not exist in the repository |
@@ -320,7 +344,8 @@ the database, unless the head hash was recorded elsewhere, and this version has 
 `AuditChain` and `AuditService` units for the encoding, the verification, the action codes, and the known limitations.
 
 The registry of git repositories is a fourth kind of record, and the first that does not describe a review. A
-repository is registered by an administrator with a location and, for a private `https` repository, a user name and an
+repository belongs to exactly one project, and is registered by the administrator of that project (or a system
+administrator) with a location and, for a private `https` repository, a user name and an
 access token. The token is secret, so the subsystem treats it differently from every other field: `RepositoryService`
 encrypts it through `ICredentialProtector` before it reaches the store, the read model has no member that could carry
 it, and only an internal operation of the service decrypts it, at the moment a repository is opened. Its audit entry
@@ -336,3 +361,22 @@ that the `Api` subsystem builds from it carries the identity of the token. The s
 refuse it themselves: `SigningService` rejects an actor that carries a token for every signature and slot operation, so
 the rule "a token can never sign" does not depend on which routes exist. `ReviewService` records that a review was
 created by a token. See the `PersonalAccessTokenService` unit.
+
+Access to projects is decided in one place, `ProjectAccess`, and is based on membership. A user is a system
+administrator (the flag `User.IsSystemAdmin`) or a member of a project with the role `User` or `ProjectAdmin`
+(`ProjectMembership`). A system administrator sees and administers every project, creates projects, and manages the
+members; a project administrator administers the repositories of the own project; a member sees the project and works
+in it (creates reviews, comments, answers the checklist, and takes a reviewer slot). A user outside a project, an
+anonymous actor, the command line actor, a disabled user, and an unknown user get nothing. `ProjectAccess` looks the
+user up by the name of the `Actor` and reads the memberships on every call, with no cache, so a revocation takes
+effect on the next call; an actor that came in with a token has the rights of its owner. A project that an actor may
+not see fails exactly like a project that does not exist (`ProjectNotFound`), so the existence of a project is not
+revealed. The system administrator right is not a membership: it does not let a user be chosen for a slot or sign a
+review.
+
+Enforcement is placed where the actor is known. A service operation that takes an `Actor` (project, review, planner,
+thread, checklist, slot, and repository changes) requires the right itself, whichever page or route called it. An
+operation that takes no actor (reading an approval, or the content of a file) is guarded at the boundary instead:
+every page and API handler first reads the project with `ProjectService.GetAsync(actor, id)`. The `Api` subsystem
+answers a non-member with 404, identical to a missing project, on every project route; the pages show "Project N does
+not exist." for a hidden project, and the attestation route of the web application and the API answer 404.

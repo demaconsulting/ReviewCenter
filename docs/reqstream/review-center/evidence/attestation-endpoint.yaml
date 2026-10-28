@@ -16,6 +16,18 @@ sections:
         tests:
           - AttestationEndpoint_Get_SignedOut_RedirectsToLogin
 
+      - id: ReviewCenter-AttestationEndpoint-Visibility
+        title: >-
+          The AttestationEndpoint class shall answer a signed-in user who may not view the project with an empty 404,
+          the answer for a review that does not exist, and not with the document or a refusal that tells the project
+          exists.
+        justification: |
+          Only the members of a project, and the system administrators, may see what its reviews contain, and a
+          different answer would tell everybody else that the project exists.
+        tests:
+          - ApiProjectAccess_AttestationPage_NonMemberSession_Answers404
+          - ApiProjectAccess_EveryProjectRoute_MemberAndSystemAdmin_AreNotRefused
+
       - id: ReviewCenter-AttestationEndpoint-Download
         title: >-
           The AttestationEndpoint class shall answer a signed-in user's request for a completed review with the signed

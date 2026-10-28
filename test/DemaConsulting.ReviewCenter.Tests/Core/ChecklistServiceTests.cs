@@ -45,11 +45,11 @@ public class ChecklistServiceTests
     private static async Task<(FakeReviewStore Store, ChecklistService Service, int ProjectId)> CreateAsync()
     {
         var store = new FakeReviewStore();
-        var project = await new ProjectService(store, new FixedTimeProvider(_now))
+        var project = await TestServices.Projects(store, new FixedTimeProvider(_now))
             .CreateAsync("Apollo", null, TestContext.Current.CancellationToken);
-        await new ReviewService(store, new FixedTimeProvider(_now)).CreateDraftAsync(
+        await TestServices.Reviews(store, new FixedTimeProvider(_now)).CreateDraftAsync(
             project.Id, "rev-1", "First", [new("a.txt", TestContent.A)], TestContext.Current.CancellationToken);
-        return (store, new ChecklistService(store, new FixedTimeProvider(_now)), project.Id);
+        return (store, TestServices.Checklists(store, new FixedTimeProvider(_now)), project.Id);
     }
 
     /// <summary>
@@ -117,7 +117,7 @@ public class ChecklistServiceTests
     {
         // Arrange: a review whose stored snapshot differs from the default
         var store = new FakeReviewStore();
-        var project = await new ProjectService(store, new FixedTimeProvider(_now))
+        var project = await TestServices.Projects(store, new FixedTimeProvider(_now))
             .CreateAsync("Apollo", null, TestContext.Current.CancellationToken);
         var custom = new ChecklistDefinition(
             "old-1",
@@ -138,7 +138,7 @@ public class ChecklistServiceTests
                 }
             },
             TestContext.Current.CancellationToken);
-        var service = new ChecklistService(store, new FixedTimeProvider(_now));
+        var service = TestServices.Checklists(store, new FixedTimeProvider(_now));
 
         // Act: read the checklist
         var state = await service.GetAsync(project.Id, "rev-old", TestContext.Current.CancellationToken);
@@ -435,14 +435,17 @@ public class ChecklistServiceTests
     }
 
     /// <summary>
-    ///     Test that the constructor refuses a missing store or clock.
+    ///     Test that the constructor refuses a missing store, access or clock.
     /// </summary>
     [Fact]
     public void ChecklistService_Constructor_NullArguments_Throws()
     {
         // Arrange, Act, Assert: each missing dependency is refused
-        Assert.Throws<ArgumentNullException>(() => new ChecklistService(null!, TimeProvider.System));
-        Assert.Throws<ArgumentNullException>(() => new ChecklistService(new FakeReviewStore(), null!));
+        var store = new FakeReviewStore();
+        var access = new AllowAllProjectAccess(store);
+        Assert.Throws<ArgumentNullException>(() => new ChecklistService(null!, access, TimeProvider.System));
+        Assert.Throws<ArgumentNullException>(() => new ChecklistService(store, null!, TimeProvider.System));
+        Assert.Throws<ArgumentNullException>(() => new ChecklistService(store, access, null!));
     }
 }
 

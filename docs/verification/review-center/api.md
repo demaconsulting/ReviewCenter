@@ -39,9 +39,26 @@ provider with a scripted fake.
 - A token can neither sign nor reach a page, and no route under `/api` signs or changes a reviewer slot; the session
   cookie is not accepted by the API.
 - The document of the API is served without a token and equals the copy that is kept in the documentation.
+- Every route of a project answers a user who is not a member of the project, with a bearer token or with Basic
+  credentials, exactly like a project that does not exist (404, the same content type, and the same body apart from
+  the project number); a member and a system administrator are served; the project list holds only the projects of
+  the owner of the token (all of them for a system administrator); and a token follows the memberships of its owner at
+  once.
 
 ### Test Scenarios
 
+**ApiProjectAccess scenarios**: The tests in `ApiProjectAccessTests.cs` run the real application and call every route
+of a project with a token (the list of reviews, a review, the creation of a review, the attestation, and the evidence
+index). `ApiProjectAccess_EveryProjectRoute_NonMemberToken_AnswersLikeAMissingProject` (a theory over the bearer scheme
+and the Basic credentials of ReviewMark) sends each route for a project the owner of the token is no member of and for
+a project that does not exist, and compares the status, the content type, and the body, with the project number
+replaced. `ApiProjectAccess_EveryProjectRoute_MemberAndSystemAdmin_AreNotRefused` shows that a member and a system
+administrator who is no member are served (no 404, 403, or 401) by every route.
+`ApiProjectAccess_ListProjects_ShowsOnlyMemberProjectsExceptToSystemAdmins` shows that the list holds the project of a
+member, none for an outsider, and both projects for a system administrator.
+`ApiProjectAccess_AttestationPage_NonMemberSession_Answers404` shows that the web route of the attestation answers a
+signed-in non-member like a missing project. `ApiProjectAccess_Token_OwnerRemovedFromProject_Gets404AtOnce` shows that
+the token of a member is served, and that the same token gets 404 after the member is removed from the project.
 **ApiSubsystem_TokenJourney_CreateUseRevoke_WorksEndToEnd**: A token is created for a user through the service, and the
 list of projects is requested with it as a bearer token. The answer is 200. The token is revoked through the service,
 and the same request is answered with 401. This scenario is tested by

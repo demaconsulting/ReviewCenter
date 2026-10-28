@@ -4,7 +4,11 @@
 
    Presentation only; state and event handling live in NewReviewPage.razor.cs. Every interactive element carries a
    stable kebab-case data-testid, and the data-interactive marker on the root flips to "true" once the live circuit is
-   connected.
+   connected. Only the repositories of this project are offered, and a project the user may not see looks like a
+   project that does not exist.
+
+   Human factors: (a) the two sources are two cards, so the choice is visible at once; (b) only the fields of the
+   chosen source are shown; (c) with no repository, the upload card stays usable and a hint says who can add one.
 
    The page body is inside SessionGate, which replaces it with a "Session ended" message when the user is no longer
    valid while the page is open. *@
@@ -68,7 +72,7 @@
                     </div>
                     @if (Repositories.Count == 0)
                     {
-                        <p class="muted" data-testid="no-repository-hint">No repository is registered; ask an administrator.</p>
+                        <p class="muted" data-testid="no-repository-hint">This project has no repository; ask a project administrator to add one.</p>
                     }
                 </fieldset>
                 @if (FromRepository)

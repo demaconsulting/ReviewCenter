@@ -129,6 +129,10 @@ public partial class WebSubsystemTests
         await app.Services.GetRequiredService<ReviewService>().CreateDraftAsync(
             project.Id, "rev-1", "First review", [new("a.txt", TestContent.A)], TestContext.Current.CancellationToken);
         var threads = app.Services.GetRequiredService<ThreadService>();
+        var bob = await app.Services.GetRequiredService<UserService>()
+            .CreateAsync("bob", "Bob", UserRole.Reviewer, TestBrowser.Password, TestContext.Current.CancellationToken);
+        await app.Services.GetRequiredService<IReviewStore>()
+            .AddMembershipAsync(bob.Id, project.Id, TestContext.Current.CancellationToken);
         await threads.StartThreadAsync(project.Id, "rev-1", "a.txt", null, null, TestActors.Ann, "Open", TestContext.Current.CancellationToken);
         var resolved = await threads.StartThreadAsync(project.Id, "rev-1", "a.txt", 1, 1, TestActors.Bob, "Done", TestContext.Current.CancellationToken);
         await threads.ResolveAsync(project.Id, "rev-1", resolved.Id, TestContext.Current.CancellationToken);
@@ -210,8 +214,10 @@ public partial class WebSubsystemTests
         var users = app.Services.GetRequiredService<UserService>();
         var ann = (await users.GetAsync("ann", TestContext.Current.CancellationToken))!;
         var bob = await users.CreateAsync("bob", "Bob", UserRole.Reviewer, TestBrowser.Password, TestContext.Current.CancellationToken);
-        var project = await app.Services.GetRequiredService<ProjectService>()
-            .CreateAsync("Apollo", null, TestContext.Current.CancellationToken);
+        var project = await TestWebApp.CreateProjectAsync(app, "Apollo");
+        var store = app.Services.GetRequiredService<IReviewStore>();
+        await store.AddMembershipAsync(ann.Id, project.Id, TestContext.Current.CancellationToken);
+        await store.AddMembershipAsync(bob.Id, project.Id, TestContext.Current.CancellationToken);
         await app.Services.GetRequiredService<ReviewService>().CreateDraftAsync(
             project.Id, "rev-1", "First review", [new("a.txt", TestContent.A)], TestContext.Current.CancellationToken);
         var checklists = app.Services.GetRequiredService<ChecklistService>();
@@ -268,12 +274,11 @@ public partial class WebSubsystemTests
         await using var app = await TestWebApp.StartAsync(logs, "serve", "--silent");
         using var browser = await TestBrowser.SignedInAsync(app, "root", UserRole.Admin);
         var client = browser.Client;
-        var project = await app.Services.GetRequiredService<ProjectService>()
-            .CreateAsync("Apollo", "Moon landing", TestContext.Current.CancellationToken);
+        var project = await TestWebApp.CreateProjectAsync(app, "Apollo", "Moon landing");
         await app.Services.GetRequiredService<ReviewService>().CreateDraftAsync(
             project.Id, "rev-1", "First review", [new("a.txt", TestContent.A)], TestContext.Current.CancellationToken);
         await app.Services.GetRequiredService<RepositoryService>().CreateAsync(
-            "main-repo", "https://example.com/org/repo.git", null, null, new Actor("root", "root"), TestContext.Current.CancellationToken);
+            project.Id, "main-repo", "https://example.com/org/repo.git", null, null, new Actor("root", "root"), TestContext.Current.CancellationToken);
         string[] routes =
         [
             "/",
@@ -285,13 +290,13 @@ public partial class WebSubsystemTests
             "/account",
             "/users",
             "/users/new",
-            "/repositories",
-            "/repositories/new",
             "/projects",
             "/projects/new",
             $"/projects/{project.Id}",
             $"/projects/{project.Id}/reviews/new",
             $"/projects/{project.Id}/plan",
+            $"/projects/{project.Id}/repositories",
+            $"/projects/{project.Id}/repositories/new",
             "/projects/9999/plan",
             "/projects/9999",
             $"/projects/{project.Id}/reviews/rev-1",
@@ -400,8 +405,7 @@ public partial class WebSubsystemTests
         await using var app = await TestWebApp.StartAsync(logs, "serve", "--silent");
         using var browser = await TestBrowser.SignedInAsync(app, "root", UserRole.Admin);
         var client = browser.Client;
-        var project = await app.Services.GetRequiredService<ProjectService>()
-            .CreateAsync("Apollo", "Moon landing", TestContext.Current.CancellationToken);
+        var project = await TestWebApp.CreateProjectAsync(app, "Apollo", "Moon landing");
         await app.Services.GetRequiredService<ReviewService>().CreateDraftAsync(
             project.Id, "rev-1", "First review", [new("a.txt", TestContent.A)], TestContext.Current.CancellationToken);
         var reviews = $"/projects/{project.Id}/reviews/rev-1";
@@ -413,7 +417,8 @@ public partial class WebSubsystemTests
             (reviews, "breadcrumb-projects-link", "projects-link"),
             ($"{reviews}/checklist", "breadcrumb-projects-link", "projects-link"),
             ($"{reviews}/history", "breadcrumb-projects-link", "projects-link"),
-            ("/repositories/new", "breadcrumb-repositories-link", "repositories-link"),
+            ($"/projects/{project.Id}/repositories", "breadcrumb-projects-link", "projects-link"),
+            ($"/projects/{project.Id}/repositories/new", "breadcrumb-projects-link", "projects-link"),
             ("/users/new", "breadcrumb-users-link", "users-link")
         ];
 

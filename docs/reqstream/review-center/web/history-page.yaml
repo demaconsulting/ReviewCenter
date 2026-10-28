@@ -33,9 +33,10 @@ sections:
       - id: ReviewCenter-HistoryPage-Access
         title: >-
           The HistoryPage component shall render all trail text as plain text, and shall show no entries to a visitor
-          who is not signed in.
+          who is not signed in, nor for a project that the user may not see.
         justification: |
-          Names and details come from users and must not inject markup, and the history is for signed-in users.
+          Names and details come from users and must not inject markup, and the history is for signed-in users who
+          may see the project; a hidden project looks like a missing one.
         tests:
           - HistoryPage_Render_MarkupInEntries_IsEscaped
           - Routes_Render_NobodySignedInOpensHistoryRoute_DoesNotShowEntries

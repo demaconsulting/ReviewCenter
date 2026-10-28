@@ -10,7 +10,7 @@ conversions. It contains no queries; those belong to `ReviewStore`.
 
 #### Data Model
 
-The context exposes fourteen sets and maps the Core types directly, without separate persistence classes (the
+The context exposes fifteen sets and maps the Core types directly, without separate persistence classes (the
 repository registry is the one exception, see `Repositories`).
 
 - **Projects** (`Project`): key `Id`, assigned by the database. `Name` is required, at most 100 characters;
@@ -53,8 +53,12 @@ repository registry is the one exception, see `Repositories`).
 - **Users** (`User`): key `Id`, assigned by the database. `Username` is required, at most 50, with the
   case-insensitive collation of SQLite and a unique index, so a user name is unique without regard to case and a
   lookup by user name
-  ignores case; `DisplayName` is required, at most 100; `Role` is stored as text, at most 32; `Enabled`;
+  ignores case; `DisplayName` is required, at most 100; `IsSystemAdmin` (false for an ordinary user); `Enabled`;
   `PasswordHash` is required; `FailedLoginCount`; `LockoutUntil` (null when the user is not locked out); `Created`.
+- **ProjectMemberships** (`ProjectMembership`): key `UserId` plus `ProjectId`, so a user has at most one membership
+  per project and the database refuses a second. Both columns are foreign keys, to `Users` and to `Projects`, and a
+  membership is deleted with its user or its project. `Role` (the project role, `ProjectAdmin` or `User`) is stored as
+  text, at most 32. An index on `ProjectId` serves the list of the members of a project.
 - **PersonalAccessTokens** (`PersonalAccessToken`): key `Id`, assigned by the database. `UserId` relates the token to its
   owner, and a token is deleted with its user (an index on `UserId` serves the list of a user). `Name` is required, at
   most 100; `DisplayId` is required, at most 16 (the stored text has 8 characters; the column is wider); `TokenHash` is
@@ -82,11 +86,14 @@ repository registry is the one exception, see `Repositories`).
   whole review. One index on `ProjectId`, `ReviewId`, and `Sequence` serves the history of one review. The mapping has
   no update path, and the application never updates or deletes a row.
 - **Repositories** (`RepositoryRecord`, an internal row type of the unit `RepositoryStore`, not a Core type, because it
-  alone holds the encrypted token): key `Id`, assigned by the database. `Name` is required, at most 40 characters,
-  with the case-insensitive collation of SQLite and a unique index, so a repository name is unique without regard to
-  case; `Location` is required, at most 500; `Username` at most 200 (null for anonymous access); `EncryptedToken` at
+  alone holds the encrypted token): key `Id`, assigned by the database. `ProjectId` is required and a foreign key to
+  `Projects`, so a repository belongs to exactly one project and the database refuses one for a project that does not
+  exist. `Name` is required, at most 40 characters,
+  with the case-insensitive collation of SQLite; a unique index on `ProjectId` plus `Name` makes a repository name
+  unique within a project without regard to case; `Location` is required, at most 500; `Username` at most 200 (null for
+  anonymous access); `EncryptedToken` at
   most 4000 (null when no token is set; the text is the output of the token protector, never the token); `Enabled`;
-  `CreatedAt` and `UpdatedAt`. There is no relationship to another table, and no delete path.
+  `CreatedAt` and `UpdatedAt`. There is no delete path.
 
 The relationship from a signature to its slot uses the `NoAction` delete behavior, not `Restrict`. SQLite checks a
 `RESTRICT` foreign key immediately, at the statement that deletes the parent row, so deleting a review would fail
@@ -103,9 +110,11 @@ signature (256) - are named constants of
 the unit.
 The
 composite key of a review (project and review identifier) makes the review identifier unique within a project and
-allows the same identifier in two projects. The composite key of a file makes its path unique within a review.
+allows the same identifier in two projects. The composite key of a file makes its path unique within a review, and the
+composite key of a membership makes a user a member of a project at most once.
 These keys are what enforces uniqueness in the database even when two requests race; the only separate unique indexes
-are the one on the user name and the one on the slot and digest of a signature. The state is stored by name, so
+are the one on the user name, the one on the project and name of a repository, and the one on the slot and digest of a
+signature. The state is stored by name, so
 adding states later does not change the meaning of stored rows. The
 tables of threads and comments are new: a database created before they existed does not have them and is not
 altered, so it must be deleted and created again (see the `Storage` design). The same holds for the three
@@ -119,7 +128,10 @@ created again. The same holds for the review columns of a repository review (sou
 and baseline columns on a file): a database created before the review-from-git slice does not have them and must be
 deleted and created again (there are no migrations; the development database is simply recreated). The same holds for
 the `PersonalAccessTokens` table and the creator columns of a review (`CreatedBy`, `CreatedViaApi`): a database created
-before the personal-access-token slice does not have them and must be deleted and created again. The
+before the personal-access-token slice does not have them and must be deleted and created again. The same holds for the
+`ProjectMemberships` table, the `IsSystemAdmin` column of a user (which replaces the role column), and the `ProjectId`
+of a repository: a database created before the project access slice does not have them and must be deleted and created
+again. The
 checklist keys are what makes "one answer per check" a rule of the database. The section and
 check identifiers are not related to a table of their own: they name entries inside the snapshot, and the service
 checks them.
@@ -142,7 +154,8 @@ mapped constraints surface as database update exceptions to `ReviewStore`.
 
 - **Core domain types** — `Project`, `Review`, `ReviewFile`, `ReviewState`, `ReviewThread`, `ReviewComment`,
   `ReviewThreadState`, `ReviewChecklist`, `ChecklistSectionState`, `ChecklistAnswer`, `ChecklistOutcome`, `User`,
-  `UserRole`, `ReviewerSlot`, `ReviewSignature`, `SlotRole`, `AuditEntry`, `PersonalAccessToken`, `AuditText` (the column
+  `ProjectMembership`, `ProjectRole`, `ReviewerSlot`, `ReviewSignature`, `SlotRole`, `AuditEntry`, `PersonalAccessToken`,
+  `AuditText` (the column
   limits), and
   `ReviewLimits`, and `RepositoryService` (the length limits of the repository columns).
 - **Entity Framework Core** — the context base class and the model configuration API.

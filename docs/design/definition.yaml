@@ -50,6 +50,7 @@ input-files:
   - docs/design/review-center/core.md
   - docs/design/review-center/core/fingerprint.md
   - docs/design/review-center/core/project-service.md
+  - docs/design/review-center/core/project-access.md
   - docs/design/review-center/core/review-service.md
   - docs/design/review-center/core/thread-service.md
   - docs/design/review-center/core/checklist-service.md

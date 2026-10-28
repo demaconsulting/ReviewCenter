@@ -5,9 +5,9 @@
 # - Define requirements for the ReviewCenter Core subsystem
 # - The Core subsystem spans the Fingerprint, ProjectService, ReviewService, ThreadService, ChecklistService,
 #   UserService, RecordDigest, SigningService, RepositoryService, SelectionMatcher, RevisionValidator,
-#   ReviewPlanner, and LineDiff units, with the domain types they share (project, review, review file, thread,
-#   comment, checklist, user, role, actor, reviewer slot, signature, upload, limits, repository, rule exception,
-#   and store interfaces)
+#   ReviewPlanner, LineDiff, and ProjectAccess units, with the domain types they share (project, review,
+#   review file, thread, comment, checklist, user, project membership, actor, reviewer slot, signature, upload,
+#   limits, repository, rule exception, and store interfaces)
 # - Subsystem requirements describe the externally visible behavior of the domain model and its rules
 
 sections:
@@ -15,17 +15,53 @@ sections:
     requirements:
       - id: ReviewCenter-Core-Projects
         title: >-
-          The Core subsystem shall create projects from a name and an optional description, and shall list
-          and read them back.
+          The Core subsystem shall create projects from a name and an optional description, only for a system
+          administrator, and shall list and read back the projects that the actor may see.
         justification: |
           Projects group the reviews of one body of work. The rest of the system can only manage reviews once
-          projects can be created and found again.
+          projects can be created and found again, and a project is created only by a system administrator.
         children:
           - ReviewCenter-ProjectService-Create
+          - ReviewCenter-ProjectService-CreateAdmin
           - ReviewCenter-ProjectService-List
           - ReviewCenter-ProjectService-Read
         tests:
           - CoreSubsystem_ProjectAndReviewWorkflow_ValidInput_StoresFingerprintsAndReadsBack
+
+      - id: ReviewCenter-Core-ProjectAccess
+        title: >-
+          The Core subsystem shall give access to a project by membership: a system administrator sees and
+          administers every project and manages the members, a project administrator administers the repositories
+          of the own project, a member sees the own project and works in it, and every other actor, including a
+          disabled, unknown, anonymous, or command line actor, gets the answer for a project that does not exist.
+          It shall decide on the current state of the user and the memberships at every call, treat an actor that
+          came through a token as its owner, limit reviewer slots and signing to members, and audit every change of
+          a membership with the project.
+        justification: |
+          Reviews of different bodies of work must be separated, and the separation must not reveal which projects
+          exist. Deciding in one place, from the current data, keeps the rule the same for every page, route, and
+          service, and makes a revoked right take effect at once.
+        children:
+          - ReviewCenter-ProjectAccess-Visibility
+          - ReviewCenter-ProjectAccess-SystemAdmin
+          - ReviewCenter-ProjectAccess-NoAccount
+          - ReviewCenter-ProjectAccess-NotFound
+          - ReviewCenter-ProjectAccess-Revocation
+          - ReviewCenter-ProjectAccess-TokenOwner
+          - ReviewCenter-ProjectAccess-List
+          - ReviewCenter-ProjectAccess-Dependencies
+          - ReviewCenter-ProjectService-Members
+          - ReviewCenter-ProjectService-MemberRules
+          - ReviewCenter-ProjectService-MemberAudit
+          - ReviewCenter-RepositoryService-Ownership
+          - ReviewCenter-ThreadService-Access
+          - ReviewCenter-ChecklistService-Access
+        tests:
+          - ProjectAccess_Matrix_ActorKinds_GetTheirRights
+          - ProjectAccess_Revocation_TakesEffectOnTheNextCall
+          - ProjectService_Members_SystemAdminManages_OthersAreRefused
+          - ProjectService_GetAsync_HiddenProject_ReadsAsMissing
+          - CoreSubsystem_RuleViolation_IsReportedAsDomainRuleAndStoresNothing
 
       - id: ReviewCenter-Core-Reviews
         title: >-
@@ -143,10 +179,10 @@ sections:
 
       - id: ReviewCenter-Core-Users
         title: >-
-          The Core subsystem shall create users with a user name, a display name, a role, and a password, keeping
-          only a hash of the password, check a sign-in with a lockout after repeated failures, enable and
-          disable users, set roles, change and set passwords, and never leave the system without an enabled
-          administrator.
+          The Core subsystem shall create users with a user name, a display name, a system administrator flag, and a
+          password, keeping only a hash of the password, check a sign-in with a lockout after repeated failures,
+          enable and disable users, set the system administrator flag, change and set passwords, and never leave
+          the system without an enabled system administrator.
         justification: |
           Accountability in a review needs verified users. The rules must hold whichever user interface or store
           is used, and keeping only a hash of the password protects the passwords if the database is copied.
@@ -161,7 +197,7 @@ sections:
           - ReviewCenter-UserService-LastAdmin
           - ReviewCenter-UserService-ChangePassword
           - ReviewCenter-UserService-SetPassword
-          - ReviewCenter-UserService-SetRole
+          - ReviewCenter-UserService-SetSystemAdmin
           - ReviewCenter-UserService-NotFound
         tests:
           - CoreSubsystem_UsersWorkflow_CreateSignInLockoutAndLastAdmin
@@ -216,6 +252,7 @@ sections:
           - ReviewCenter-AuditService-List
           - ReviewCenter-AuditService-Verify
           - ReviewCenter-ProjectService-Audit
+          - ReviewCenter-ProjectService-MemberAudit
           - ReviewCenter-ReviewService-Audit
           - ReviewCenter-ThreadService-Audit
           - ReviewCenter-ChecklistService-Audit
@@ -231,19 +268,22 @@ sections:
 
       - id: ReviewCenter-Core-Repositories
         title: >-
-          The Core subsystem shall keep a registry of git repositories, with a name, a location, an optional user name,
-          and an optional token that is stored only encrypted and is never given back, managed by administrators only,
-          disabled instead of deleted, and report each violation of its rules as a domain rule exception that names
-          the rule, without storing anything.
+          The Core subsystem shall keep a registry of git repositories, each belonging to one project, with a name, a
+          location, an optional user name, and an optional token that is stored only encrypted and is never given
+          back, managed by the administrator of the project or a system administrator only, disabled instead of
+          deleted, and report each violation of its rules as a domain rule exception that names the rule, without
+          storing anything.
         justification: |
           The registry decides what source code the server reads and holds secrets for it. Its rules must hold
-          whichever user interface or store is used, and the token must stay write-only.
+          whichever user interface or store is used, the token must stay write-only, and a project must not be
+          able to use the repositories of another.
         children:
           - ReviewCenter-RepositoryService-Name
           - ReviewCenter-RepositoryService-Location
           - ReviewCenter-RepositoryService-Credentials
           - ReviewCenter-RepositoryService-Token
           - ReviewCenter-RepositoryService-Admin
+          - ReviewCenter-RepositoryService-Ownership
           - ReviewCenter-RepositoryService-Disable
           - ReviewCenter-RepositoryService-Access
         tests:

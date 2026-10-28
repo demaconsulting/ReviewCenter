@@ -33,17 +33,19 @@ The native SQLite library must be loadable on the test platform (it is supplied 
 - A duplicate review identifier is refused and the original review is unchanged.
 - Comment threads, their comments (in posting order), their anchors, and their state, written through the services,
   are still present after the database is closed and opened again, and each comment keeps the user name of its author.
-- Users written through the user service, and a changed password, are still present after the database is closed and
-  opened again; the user signs in with the changed password only.
+- Users written through the user service, including the system administrator flag, and a changed password, are still
+  present after the database is closed and opened again; the user signs in with the changed password only.
 - The checklist snapshot of a review, its answers, and its section decisions, written through the services, are
   still present after the database is closed and opened again.
 - A reviewer slot and the signature made for it, written through the services, are still present after the database
   is closed and opened again, and the signature is still current, so the review is still approved.
 - A review for a project that does not exist is refused, by the services and by the database itself, and the stored
   data is unchanged.
-- A registered repository with its token flag and its disabled state, written through the service, is still present after
-  the database is closed and opened again, and a disabled repository is not offered for selection.
+- A registered repository of a project, with its token flag and its disabled state, written through the service, is
+  still present after the database is closed and opened again, and a disabled repository is not offered for selection.
 - An unsupported provider is refused with an error that names it, and no database is created.
+- Project memberships are stored, kept unique per user and project, audited with the project, and refused for an
+  unknown project; these are verified in the unit tests of `ReviewStore` on the real database.
 - Personal access tokens written through the service, with one of them revoked, are still present after the database is
   closed and opened again: the value of the kept token still authenticates its owner, the revoked token is refused,
   and no
@@ -69,10 +71,10 @@ database is closed and opened again. The anchor, the state "Resolved", and both 
 the user name of its author, are read
 back. This scenario is tested by `StorageSubsystem_ServicesOverDatabase_ReopenedDatabase_KeepsThreadsAndComments`.
 
-**StorageSubsystem_Users_PersistAcrossReopen**: An administrator is created through `UserService` over a new
+**StorageSubsystem_Users_PersistAcrossReopen**: A system administrator is created through `UserService` over a new
 database and its password is changed; the database is closed and opened again. The user signs in in another case of
-the user name with the new password and has the Admin role, and the old password is refused. This scenario is
-tested by `StorageSubsystem_Users_PersistAcrossReopen`.
+the user name with the new password and is still a system administrator, and the old password is refused. This
+scenario is tested by `StorageSubsystem_Users_PersistAcrossReopen`.
 
 **StorageSubsystem_Checklist_PersistsSnapshotAnswersAndSectionsAcrossReopen**: A review is created through the
 services over a new database, one check is answered Fail with a justification, and one section is marked as not
@@ -87,10 +89,11 @@ again: the review is approved, the single slot is signed by the alternate review
 signature is current for the unchanged record. This scenario is tested by
 `StorageSubsystem_Signatures_PersistAcrossReopenAndStayCurrent`.
 
-**StorageSubsystem_Repositories_PersistAcrossReopen**: An administrator is created over a new database and a private
-repository with a user name and a token is registered through `RepositoryService`, then disabled; the database is
-closed and opened again. The repository is listed with its name, user name, the token flag set, and the disabled
-state, and no repository is offered for selection. This scenario is tested by
+**StorageSubsystem_Repositories_PersistAcrossReopen**: A system administrator is created over a new database, a
+project is created, and a private repository with a user name and a token is registered in it through
+`RepositoryService`, then disabled; the database is
+closed and opened again. The repository is listed for the project with its name, user name, the token flag set, and
+the disabled state, and no repository is offered for selection. This scenario is tested by
 `StorageSubsystem_Repositories_PersistAcrossReopen`.
 
 **StorageSubsystem_AccessTokens_PersistAcrossReopen**: A user and two tokens are created through the services over a new
@@ -114,6 +117,13 @@ directly to the store. The service throws a `DomainRuleException` for `ProjectNo
 `DbUpdateException` because of the foreign key, no review and no project exist for the unknown id, and the existing
 project and its review are unchanged. This scenario is tested by
 `StorageSubsystem_ServicesOverDatabase_UnknownProject_IsRefusedAndKeepsData`.
+
+**Project memberships**: The round trip, the uniqueness, the role change and removal, the audit with the project, and
+the refusal of an unknown project are tested by `ReviewStore_AddMembershipAsync_Membership_RoundTripsAndIsListed`,
+`ReviewStore_AddMembershipAsync_SecondMembership_IsRejected`,
+`ReviewStore_SetAndRemoveMembershipAsync_ChangeRoleAndRemove_ReportWhetherFound`,
+`ReviewStore_Membership_Changes_AreAuditedWithTheProject`, and
+`ReviewStore_AddMembershipAsync_UnknownProject_IsRefusedByTheDatabase`, all defined in `ReviewStoreMembershipTests.cs`.
 
 **Audit trail transaction**: Changes are made at the same moment through different stores that share the
 process-wide gate; the sequence numbers are consecutive and the chain is intact. This scenario is tested by

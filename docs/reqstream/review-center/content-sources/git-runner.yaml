@@ -42,7 +42,8 @@ sections:
           secret that crosses the cut is left.
         justification: |
           Git echoes URLs and sometimes headers in its error output. A secret that reaches a message is shown to
-          users and written to logs, and the location of a repository is information for administrators only, so an
+          users and written to logs, and the location of a repository is information for the administrators of its
+          project only, so an
           ordinary user must see which repository failed but never where it is kept.
         tests:
           - GitRunner_Redact_RemovesEverySecretForm

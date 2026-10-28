@@ -5,9 +5,10 @@
 The `ContentSources` subsystem is verified by subsystem tests defined in `ContentSourcesSubsystemTests.cs`. The tests
 use the real `RepositoryService`, `RepositoryStore`, `ReviewCenterDbContext`, `CredentialProtector`, `GitRunner`, and
 `GitSource` together, over a real SQLite database file and a real temporary git repository (created with the installed
-git by the test helper `GitTestSupport`), because the subsystem exists to join these parts: a registration made by an
-administrator, a token that is stored only encrypted, and the reading of a real repository through the access data
-built from the registry. The Data Protection key ring is a real folder. The tests skip themselves when git is not
+git by the test helper `GitTestSupport`), because the subsystem exists to join these parts: a registration made by a
+project administrator or system administrator, a token that is stored only encrypted, and the reading of a real
+repository through the access data
+built from the registration. The Data Protection key ring is a real folder. The tests skip themselves when git is not
 installed. The units are verified in detail by their own unit tests: `GitRunner` (the start of git, redaction, limits,
 and failures, against a real git, a missing git, and a local server that never answers or refuses credentials),
 `GitSource` (clone, fetch, revisions, change lists, and blobs against real repositories), and `CredentialProtector` (the
@@ -23,7 +24,8 @@ git. No network access is needed: repositories are local, and one test starts a 
 ### Acceptance Criteria
 
 - All subsystem tests pass with zero failures (or skip because git is not installed).
-- A repository that an administrator registered with a token is stored with the token only encrypted, and is read through
+- A repository that an administrator of its project registered with a token is stored with the token only encrypted, and
+  is read through
   the real git source: its revision resolves, the change between two commits is listed, and the exact bytes of a file are
   read.
 - A disabled repository is not available for reading.
@@ -36,7 +38,8 @@ git. No network access is needed: repositories are local, and one test starts a 
 
 ### Test Scenarios
 
-**ContentSourcesSubsystem_RegisteredRepository_IsReadThroughTheRealGitSource**: An administrator registers a private
+**ContentSourcesSubsystem_RegisteredRepository_IsReadThroughTheRealGitSource**: An administrator registers, in a
+project, a private
 https repository with a user name and a token and a local repository without credentials, through the service over a
 real database with a persisted key ring. The stored token text is not the token, the access data built for the private
 repository holds the decrypted token while its text form does not show it, and a session of the real git source on the

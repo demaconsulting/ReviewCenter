@@ -64,7 +64,8 @@ folder of the file (not for a `file:` URI) and asks Entity Framework Core to cre
 the schema. An existing database is not changed, and no migrations are used. A database created before the tables
 for comment threads existed therefore does not get them and must be deleted and created again; the same holds for a
 database created before the audit trail, which has no `AuditEntries` table, and for a database created before the
-repository registry, which has no `Repositories` table.
+repository registry, which has no `Repositories` table, and for a database created before the project access control,
+which has no `ProjectMemberships` table.
 
 #### Error Handling
 
@@ -82,6 +83,6 @@ turns them into one start-up error. Null arguments raise `ArgumentNullException`
 
 - **ServerHost** — configures the context factory and calls `EnsureCreated` while building the application, and calls
   `ResolveDataDirectory` to place the git cache and the key ring.
-- **UserCommand** and **AuditCommand** — call `EnsureCreated` before they work, so the first administrator can be
+- **UserCommand** and **AuditCommand** — call `EnsureCreated` before they work, so the first system administrator can be
   created in a new database. `AuditCommand` therefore creates an empty database when none exists at the configured
   location.

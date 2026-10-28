@@ -32,7 +32,9 @@ namespace DemaConsulting.ReviewCenter.Api;
 /// </summary>
 /// <remarks>
 ///     Every endpoint is in one group that requires the <c>Api</c> policy (the token scheme only), so no endpoint can
-///     be left open by mistake. The endpoints call the same Core services as the web pages, so the rules (limits,
+///     be left open by mistake. The token acts as its owner: the owner's project memberships decide what is visible, and
+///     a project the owner may not see is answered with the same 404 as a project that does not exist. The endpoints
+///     call the same Core services as the web pages, so the rules (limits,
 ///     validation, audit trail) are identical. A failed domain rule becomes a problem document through one filter
 ///     (see <see cref="ApiProblems"/>). Nothing here can sign: reviewer slots and signatures are refused for a token
 ///     actor by <see cref="SigningService"/>, and no route for them exists. An unknown address under <c>/api</c> is
@@ -90,7 +92,9 @@ internal static class ApiEndpoints
         group.MapGet("/projects", ListProjectsAsync)
             .WithName("ListProjects")
             .WithSummary("Lists the projects.")
-            .WithDescription("Returns every project, in the order of the project list of the web pages.")
+            .WithDescription(
+                "Returns the projects the owner of the token may see (a system administrator sees all, anybody else "
+                + "only the projects they are a member of), in the order of the project list of the web pages.")
             .Produces<ProjectDto[]>()
             .ProducesProblem(StatusCodes.Status401Unauthorized);
 
@@ -187,16 +191,18 @@ internal static class ApiEndpoints
     }
 
     /// <summary>
-    ///     Lists the projects.
+    ///     Lists the projects the token's owner may see.
     /// </summary>
+    /// <param name="http">The request context; supplies the token actor.</param>
     /// <param name="projects">The project service.</param>
     /// <param name="cancellationToken">Cancels the request.</param>
-    /// <returns>The projects.</returns>
+    /// <returns>The visible projects.</returns>
     private static async Task<Ok<List<ProjectDto>>> ListProjectsAsync(
+        HttpContext http,
         ProjectService projects,
         CancellationToken cancellationToken)
     {
-        var list = await projects.ListAsync(cancellationToken);
+        var list = await projects.ListAsync(ApiProblems.ActorOf(http.User), cancellationToken);
         return TypedResults.Ok(list.Select(p => new ProjectDto(p.Id, p.Name, p.Description, p.Created)).ToList());
     }
 
@@ -204,17 +210,19 @@ internal static class ApiEndpoints
     ///     Lists the reviews of a project.
     /// </summary>
     /// <param name="projectId">The project number.</param>
+    /// <param name="http">The request context; supplies the token actor.</param>
     /// <param name="projects">The project service.</param>
     /// <param name="reviews">The review service.</param>
     /// <param name="cancellationToken">Cancels the request.</param>
-    /// <returns>The reviews, or 404 when the project does not exist.</returns>
+    /// <returns>The reviews, or 404 when the project does not exist or is not visible to the token's owner.</returns>
     private static async Task<IResult> ListReviewsAsync(
         int projectId,
+        HttpContext http,
         ProjectService projects,
         ReviewService reviews,
         CancellationToken cancellationToken)
     {
-        if (await projects.GetAsync(projectId, cancellationToken) is null)
+        if (await projects.GetAsync(ApiProblems.ActorOf(http.User), projectId, cancellationToken) is null)
         {
             return ApiProblems.NotFound("The project does not exist.");
         }
@@ -228,21 +236,30 @@ internal static class ApiEndpoints
     /// </summary>
     /// <param name="projectId">The project number.</param>
     /// <param name="reviewId">The review identifier.</param>
+    /// <param name="http">The request context; supplies the token actor.</param>
+    /// <param name="projects">The project service.</param>
     /// <param name="reviews">The review service.</param>
     /// <param name="signing">The signing service.</param>
     /// <param name="threads">The thread service.</param>
     /// <param name="checklists">The checklist service.</param>
     /// <param name="cancellationToken">Cancels the request.</param>
-    /// <returns>The review, or 404 when it does not exist.</returns>
+    /// <returns>The review, or 404 when it does not exist or its project is not visible to the token's owner.</returns>
     private static async Task<IResult> GetReviewAsync(
         int projectId,
         string reviewId,
+        HttpContext http,
+        ProjectService projects,
         ReviewService reviews,
         SigningService signing,
         ThreadService threads,
         ChecklistService checklists,
         CancellationToken cancellationToken)
     {
+        if (await projects.GetAsync(ApiProblems.ActorOf(http.User), projectId, cancellationToken) is null)
+        {
+            return ApiProblems.NotFound("The project does not exist.");
+        }
+
         var review = await reviews.GetAsync(projectId, reviewId, cancellationToken);
         if (review is null)
         {
@@ -278,6 +295,13 @@ internal static class ApiEndpoints
         ChecklistService checklists,
         CancellationToken cancellationToken)
     {
+        // Whoever may not see the project gets the answer for a missing one, before anything of the body is read
+        var actor = ApiProblems.ActorOf(http.User);
+        if (await projects.GetAsync(actor, projectId, cancellationToken) is null)
+        {
+            return ApiProblems.NotFound("The project does not exist.");
+        }
+
         // The body is read here, not bound by the framework, so that a body that is not JSON of the right shape
         // answers a problem document like every other refusal. The route only matches a JSON content type
         CreateReviewRequest? request;
@@ -303,12 +327,6 @@ internal static class ApiEndpoints
             return Results.ValidationProblem(errors);
         }
 
-        if (await projects.GetAsync(projectId, cancellationToken) is null)
-        {
-            return ApiProblems.NotFound("The project does not exist.");
-        }
-
-        var actor = ApiProblems.ActorOf(http.User);
         Review review;
         IReadOnlyList<SkippedFileDto> skipped = [];
         if (request!.Files is not null)
@@ -382,12 +400,13 @@ internal static class ApiEndpoints
         // The index holds the addresses of signed documents behind a token: never cache any response of it in a
         // shared cache, including the not-found problem
         http.Response.Headers.CacheControl = "no-store";
-        if (await projects.GetAsync(projectId, http.RequestAborted) is null)
+        var actor = ApiProblems.ActorOf(http.User);
+        if (await projects.GetAsync(actor, projectId, http.RequestAborted) is null)
         {
             return ApiProblems.NotFound("The project does not exist.");
         }
 
-        var entries = await index.BuildAsync(projectId, http.RequestAborted);
+        var entries = await index.BuildAsync(actor, projectId, http.RequestAborted);
         return TypedResults.Ok(new EvidenceIndexDto(
             entries.Select(entry => new EvidenceEntryDto(
                 entry.Id,

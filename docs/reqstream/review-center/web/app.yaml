@@ -161,26 +161,27 @@ sections:
 
       - id: ReviewCenter-App-AuditLink
         title: >-
-          The App unit shall show a link to the audit page in the header only while an enabled administrator is
-          signed in.
+          The App unit shall show a link to the audit page in the header only while an enabled system administrator
+          is signed in.
         justification: |
           The link must not invite other users to a page they cannot open.
         tests:
           - MainLayout_Render_SignedInUser_ShowsNameAccountAndLogout
 
-      - id: ReviewCenter-App-RepositoriesLink
+      - id: ReviewCenter-App-NoRepositoriesLink
         title: >-
-          The App unit shall show a link to the repositories page in the header only while an enabled administrator is
-          signed in.
+          The App unit shall show no link to a repositories page in the header, for any user, because the
+          repositories belong to the projects and are reached from the page of a project.
         justification: |
-          The link must not invite other users to a page they cannot open.
+          A header link would lead to a registry outside the projects, which does not exist, and would suggest that
+          repositories are shared between projects.
         tests:
           - MainLayout_Render_SignedInUser_ShowsNameAccountAndLogout
 
       - id: ReviewCenter-App-UsersLink
         title: >-
-          The App unit shall show a link to the users page in the header only while an enabled administrator is
-          signed in.
+          The App unit shall show a link to the users page in the header only while an enabled system administrator
+          is signed in.
         justification: |
           The link must not invite other users to a page they cannot open.
         tests:

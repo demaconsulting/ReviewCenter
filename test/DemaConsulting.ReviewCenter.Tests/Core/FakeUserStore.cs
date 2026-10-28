@@ -151,7 +151,7 @@ internal sealed class FakeUserStore : IUserStore
             Id = id,
             Username = user.Username,
             DisplayName = user.DisplayName,
-            Role = user.Role,
+            IsSystemAdmin = user.IsSystemAdmin,
             Enabled = user.Enabled,
             PasswordHash = user.PasswordHash,
             FailedLoginCount = user.FailedLoginCount,

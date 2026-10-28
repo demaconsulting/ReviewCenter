@@ -48,17 +48,24 @@ public class RepositoryStoreTests
             .BuildServiceProvider();
         var factory = provider.GetRequiredService<IDbContextFactory<ReviewCenterDbContext>>();
         DatabaseSetup.EnsureCreated(factory, options);
+        using (var context = factory.CreateDbContext())
+        {
+            // every repository belongs to a project, so the first project (identity 1) exists
+            context.Projects.Add(new Project { Name = "Project", Created = _created });
+            context.SaveChanges();
+        }
+
         return new RepositoryStore(factory, new AuditAppender(TimeProvider.System));
     }
 
     /// <summary>
-    ///     Builds a new repository for the tests.
+    ///     Builds a new repository in project 1 for the tests.
     /// </summary>
     /// <param name="name">The name.</param>
     /// <param name="token">The encrypted token, or null.</param>
     /// <returns>The repository.</returns>
     private static NewRepository NewRepo(string name, string? token = null) =>
-        new(name, "https://example.com/" + name + ".git", token is null ? null : "svc", token, _created);
+        new(1, name, "https://example.com/" + name + ".git", token is null ? null : "svc", token, _created);
 
     /// <summary>
     ///     Builds an audit draft for a repository change.
@@ -195,7 +202,7 @@ public class RepositoryStoreTests
 
         // Assert: still listed, disabled, and the unknown one is named
         Assert.False(disabled.Enabled);
-        Assert.False((await store.ListAsync(cancellationToken)).Single().Enabled);
+        Assert.False((await store.ListAsync(1, cancellationToken)).Single().Enabled);
         Assert.Equal(DomainRule.RepositoryNotFound, unknown.Rule);
     }
 
@@ -215,12 +222,47 @@ public class RepositoryStoreTests
         }
 
         // Act: list them and read an unknown one
-        var listed = await store.ListAsync(cancellationToken);
+        var listed = await store.ListAsync(1, cancellationToken);
         var missing = await store.GetAsync(999, cancellationToken);
 
         // Assert: alphabetical, and the unknown one is null
         Assert.Equal(["Alpha", "beta", "gamma"], listed.Select(r => r.Name).ToArray());
         Assert.Null(missing);
+    }
+
+    /// <summary>
+    ///     Test that the same name may be used in two projects, that each list holds only its own project's
+    ///     repositories, and that a repository for an unknown project is refused by the database.
+    /// </summary>
+    [Fact]
+    public async Task RepositoryStore_ListAsync_ScopedToProject_AndNamesAreUniquePerProject()
+    {
+        // Arrange: a store with a second project
+        var store = Open(out var provider);
+        using var _ = provider;
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using (var context = await provider.GetRequiredService<IDbContextFactory<ReviewCenterDbContext>>()
+                         .CreateDbContextAsync(cancellationToken))
+        {
+            context.Projects.Add(new Project { Name = "Second", Created = _created });
+            await context.SaveChangesAsync(cancellationToken);
+        }
+
+        // Act: add the same name to both projects, then list each, then add to an unknown project
+        await store.AddAsync(NewRepo("alpha"), r => Draft("repository.created"), cancellationToken);
+        await store.AddAsync(
+            new NewRepository(2, "alpha", "https://example.com/other.git", null, null, _created),
+            r => Draft("repository.created"),
+            cancellationToken);
+        var first = await store.ListAsync(1, cancellationToken);
+        var second = await store.ListAsync(2, cancellationToken);
+        var duplicate = await Assert.ThrowsAsync<DomainRuleException>(() => store.AddAsync(
+            NewRepo("ALPHA"), r => Draft("repository.created"), cancellationToken));
+
+        // Assert: each project lists its own, and the name is unique only within a project
+        Assert.Equal([1], first.Select(r => r.ProjectId).ToArray());
+        Assert.Equal([2], second.Select(r => r.ProjectId).ToArray());
+        Assert.Equal(DomainRule.RepositoryNameTaken, duplicate.Rule);
     }
 
     /// <summary>

@@ -106,9 +106,12 @@ public class ReviewPlannerTests
         var users = new UserService(new FakeUserStore(), new FakePasswordHasher(), clock);
         await users.CreateAsync("adm", "Adm", UserRole.Admin, Password, cancellationToken);
         var ann = await users.CreateAsync("ann", "Ann", UserRole.Reviewer, Password, cancellationToken);
-        var repositories = new RepositoryService(new FakeRepositoryStore(), new FakeCredentialProtector(), users, clock);
+        var store = new FakeReviewStore();
+        var project = await TestServices.Projects(store, clock).CreateAsync("Apollo", null, cancellationToken);
+        await store.AddMembershipAsync(ann.Id, project.Id, cancellationToken);
+        var repositories = TestServices.Repositories(store, clock);
         var repository = await repositories.CreateAsync(
-            "main-repo", "https://example.com/org/repo.git", null, null, _actor, cancellationToken);
+            project.Id, "main-repo", "https://example.com/org/repo.git", null, null, _actor, cancellationToken);
         var git = new FakeGitRepositoryProvider();
         git.Revisions["main"] = H2;
         git.Revisions["v1"] = H1;
@@ -161,20 +164,18 @@ public class ReviewPlannerTests
                 new("empty", "Empty", ["nothing/**"])
             ]
         };
-        var store = new FakeReviewStore();
-        var project = await new ProjectService(store, clock).CreateAsync("Apollo", null, cancellationToken);
-        var reviews = new ReviewService(store, clock, repositories, git);
-        var signing = new SigningService(store, users, clock);
+        var reviews = TestServices.Reviews(store, clock, repositories, git);
+        var signing = TestServices.Signing(store, users, clock);
         return new Fixture(
             store,
             clock,
             reviews,
             signing,
-            new ChecklistService(store, clock),
+            TestServices.Checklists(store, clock),
             repositories,
             git,
             parser,
-            new ReviewPlanner(store, reviews, repositories, git, signing, parser),
+            TestServices.Planner(store, reviews, repositories, git, signing, parser),
             project.Id,
             repository.Id,
             ann.Id);
@@ -190,7 +191,7 @@ public class ReviewPlannerTests
     private static Task<ReviewPlan> PlanAsync(Fixture f, BaselineMode mode = BaselineMode.None, string? baseline = null)
     {
         return f.Planner.PlanAsync(
-            f.ProjectId, f.RepositoryId, "main", mode, baseline, TestContext.Current.CancellationToken);
+            _actor, f.ProjectId, f.RepositoryId, "main", mode, baseline, TestContext.Current.CancellationToken);
     }
 
     /// <summary>
@@ -687,21 +688,21 @@ public class ReviewPlannerTests
         // Arrange: the fixture and a disabled repository
         var f = await CreateAsync();
         var disabled = await f.Repositories.CreateAsync(
-            "off", "https://example.com/org/off.git", null, null, _actor, TestContext.Current.CancellationToken);
+            f.ProjectId, "off", "https://example.com/org/off.git", null, null, _actor, TestContext.Current.CancellationToken);
         await f.Repositories.SetEnabledAsync(disabled.Id, false, _actor, TestContext.Current.CancellationToken);
         var token = TestContext.Current.CancellationToken;
 
         // Act: plan with an unknown head, an invalid head, an unknown project, an unknown repository and a disabled one
         var unknownHead = await Assert.ThrowsAsync<DomainRuleException>(
-            () => f.Planner.PlanAsync(f.ProjectId, f.RepositoryId, "nope", BaselineMode.None, null, token));
+            () => f.Planner.PlanAsync(_actor, f.ProjectId, f.RepositoryId, "nope", BaselineMode.None, null, token));
         var invalidHead = await Assert.ThrowsAsync<DomainRuleException>(
-            () => f.Planner.PlanAsync(f.ProjectId, f.RepositoryId, "--upload-pack=x", BaselineMode.None, null, token));
+            () => f.Planner.PlanAsync(_actor, f.ProjectId, f.RepositoryId, "--upload-pack=x", BaselineMode.None, null, token));
         var noProject = await Assert.ThrowsAsync<DomainRuleException>(
-            () => f.Planner.PlanAsync(999, f.RepositoryId, "main", BaselineMode.None, null, token));
+            () => f.Planner.PlanAsync(_actor, 999, f.RepositoryId, "main", BaselineMode.None, null, token));
         var noRepository = await Assert.ThrowsAsync<DomainRuleException>(
-            () => f.Planner.PlanAsync(f.ProjectId, 999, "main", BaselineMode.None, null, token));
+            () => f.Planner.PlanAsync(_actor, f.ProjectId, 999, "main", BaselineMode.None, null, token));
         var off = await Assert.ThrowsAsync<DomainRuleException>(
-            () => f.Planner.PlanAsync(f.ProjectId, disabled.Id, "main", BaselineMode.None, null, token));
+            () => f.Planner.PlanAsync(_actor, f.ProjectId, disabled.Id, "main", BaselineMode.None, null, token));
 
         // Assert: each has its own rule
         Assert.Equal(DomainRule.RevisionNotFound, unknownHead.Rule);
@@ -1117,13 +1118,15 @@ public class ReviewPlannerTests
     {
         // Arrange: the fixture
         var f = await CreateAsync();
+        var access = new AllowAllProjectAccess(f.Store);
 
         // Act and Assert: each missing argument is refused
-        Assert.Throws<ArgumentNullException>(() => new ReviewPlanner(null!, f.Reviews, f.Repositories, f.Git, f.Signing, f.Parser));
-        Assert.Throws<ArgumentNullException>(() => new ReviewPlanner(f.Store, null!, f.Repositories, f.Git, f.Signing, f.Parser));
-        Assert.Throws<ArgumentNullException>(() => new ReviewPlanner(f.Store, f.Reviews, null!, f.Git, f.Signing, f.Parser));
-        Assert.Throws<ArgumentNullException>(() => new ReviewPlanner(f.Store, f.Reviews, f.Repositories, null!, f.Signing, f.Parser));
-        Assert.Throws<ArgumentNullException>(() => new ReviewPlanner(f.Store, f.Reviews, f.Repositories, f.Git, null!, f.Parser));
-        Assert.Throws<ArgumentNullException>(() => new ReviewPlanner(f.Store, f.Reviews, f.Repositories, f.Git, f.Signing, null!));
+        Assert.Throws<ArgumentNullException>(() => new ReviewPlanner(null!, f.Reviews, f.Repositories, f.Git, f.Signing, f.Parser, access));
+        Assert.Throws<ArgumentNullException>(() => new ReviewPlanner(f.Store, null!, f.Repositories, f.Git, f.Signing, f.Parser, access));
+        Assert.Throws<ArgumentNullException>(() => new ReviewPlanner(f.Store, f.Reviews, null!, f.Git, f.Signing, f.Parser, access));
+        Assert.Throws<ArgumentNullException>(() => new ReviewPlanner(f.Store, f.Reviews, f.Repositories, null!, f.Signing, f.Parser, access));
+        Assert.Throws<ArgumentNullException>(() => new ReviewPlanner(f.Store, f.Reviews, f.Repositories, f.Git, null!, f.Parser, access));
+        Assert.Throws<ArgumentNullException>(() => new ReviewPlanner(f.Store, f.Reviews, f.Repositories, f.Git, f.Signing, null!, access));
+        Assert.Throws<ArgumentNullException>(() => new ReviewPlanner(f.Store, f.Reviews, f.Repositories, f.Git, f.Signing, f.Parser, null!));
     }
 }

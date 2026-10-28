@@ -6,7 +6,7 @@
 # - The Storage subsystem spans the ReviewCenterDbContext, ReviewStore, UserStore, AuditStore, RepositoryStore, and
 #   DatabaseSetup units
 # - Subsystem requirements describe the externally visible behavior of the persistence of users, projects, reviews,
-#   checklists, comment threads, reviewer slots, signatures, the audit trail, and git repositories
+#   checklists, comment threads, reviewer slots, signatures, project memberships, the audit trail, and git repositories
 
 sections:
   - title: Storage Subsystem Requirements
@@ -77,9 +77,9 @@ sections:
 
       - id: ReviewCenter-Storage-Users
         title: >-
-          The Storage subsystem shall keep users, with their roles, enabled states, password hashes, and lockout
-          state, in the database file, so that they are all still there, unchanged, when the database is opened
-          again, and shall keep user names unique regardless of letter case.
+          The Storage subsystem shall keep users, with their system administrator flags, enabled states, password
+          hashes, and lockout state, in the database file, so that they are all still there, unchanged, when the
+          database is opened again, and shall keep user names unique regardless of letter case.
         justification: |
           Users must survive a restart, or nobody could sign in again. The lockout state is kept with the user so
           that a restart does not give an attacker a fresh set of tries.
@@ -147,12 +147,15 @@ sections:
 
       - id: ReviewCenter-Storage-Repositories
         title: >-
-          The Storage subsystem shall keep the registered git repositories, with their locations, user names, enabled
-          states, and encrypted tokens, in the database file, so that they are all still there, unchanged, when the
-          database is opened again, and shall keep repository names unique regardless of letter case.
+          The Storage subsystem shall keep the registered git repositories, each belonging to exactly one project,
+          with their locations, user names, enabled states, and encrypted tokens, in the database file, so that they
+          are all still there, unchanged, when the database is opened again, list the repositories of one project
+          only, and shall keep repository names unique within a project regardless of letter case.
         justification: |
           The registry must survive a restart, or every stored token would have to be entered again. The token is
-          kept only in its encrypted form, so a copy of the database does not reveal it.
+          kept only in its encrypted form, so a copy of the database does not reveal it. A repository belongs to
+          one project, so a list never holds the repositories of another project, and a name that is taken in one
+          project says nothing about the repositories of another.
         children:
           - ReviewCenter-RepositoryStore-Persist
           - ReviewCenter-RepositoryStore-Unique
@@ -161,6 +164,28 @@ sections:
           - ReviewCenter-DbContext-Repositories
         tests:
           - StorageSubsystem_Repositories_PersistAcrossReopen
+          - RepositoryStore_ListAsync_ScopedToProject_AndNamesAreUniquePerProject
+
+      - id: ReviewCenter-Storage-Memberships
+        title: >-
+          The Storage subsystem shall keep the membership of a user in a project, with its role of project
+          administrator or user, in the database file, so that it is still there, unchanged, when the database is
+          opened again, allow a user at most one membership in a project, refuse a membership for a project or a user
+          that does not exist, change the role and remove a membership, report whether it existed, and store each
+          change together with its audit entry, which names the project, in one transaction.
+        justification: |
+          Memberships decide which projects a user may see, so they must outlive the process that created them and
+          must stay true when two requests overlap. A change that is stored without its audit entry, or the other way
+          round, would leave the history of who had access untrue.
+        children:
+          - ReviewCenter-ReviewStore-Memberships
+          - ReviewCenter-DbContext-Memberships
+        tests:
+          - ReviewStore_AddMembershipAsync_Membership_RoundTripsAndIsListed
+          - ReviewStore_AddMembershipAsync_SecondMembership_IsRejected
+          - ReviewStore_SetAndRemoveMembershipAsync_ChangeRoleAndRemove_ReportWhetherFound
+          - ReviewStore_Membership_Changes_AreAuditedWithTheProject
+          - ReviewStore_AddMembershipAsync_UnknownProject_IsRefusedByTheDatabase
 
       - id: ReviewCenter-Storage-RepositoryReviews
         title: >-

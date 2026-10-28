@@ -2,7 +2,7 @@
 
    It is static server-side rendered markup, so it never needs a live connection. The header spans the full width of
    the window. On the left it shows the logo and product name (the link home) followed by the main navigation
-   (Projects, and for administrators Repositories, Audit and Users); on the right it shows who is signed in (display
+   (Projects, and for system administrators Audit and Users); on the right it shows who is signed in (display
    name, an Account link and a Logout button) or a Sign in link when nobody is. Logout is a form that posts to
    /auth/logout with an antiforgery token, because signing out changes state and must not be triggered by a plain
    link. The footer on every page shows the version, the copyright and a link to the About page. *@
@@ -24,7 +24,6 @@
             <NavLink href="/projects" Match="NavLinkMatch.Prefix" class="nav-tab" data-testid="projects-link">Projects</NavLink>
             @if (IsAdmin)
             {
-                <NavLink href="/repositories" Match="NavLinkMatch.Prefix" class="nav-tab" data-testid="repositories-link">Repositories</NavLink>
                 <NavLink href="/audit" Match="NavLinkMatch.Prefix" class="nav-tab" data-testid="audit-link">Audit</NavLink>
                 <NavLink href="/users" Match="NavLinkMatch.Prefix" class="nav-tab" data-testid="users-link">Users</NavLink>
             }

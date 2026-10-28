@@ -5,21 +5,24 @@
 #### Purpose
 
 `UserService` owns the rules for local user accounts: it creates users, checks a user name and password for sign-in,
-enables and disables users, sets roles, changes passwords, and protects accounts against password guessing and against
-losing the last administrator. It is also the home of the supporting types of identity: `User`, `UserRole`, `Actor`,
-and the interfaces `IPasswordHasher` and `IUserStore`, together with the user rules of `DomainRule` and the user
-limits of `ReviewLimits`.
+enables and disables users, sets the system administrator right, changes passwords, and protects accounts against
+password guessing and against losing the last system administrator. It is also the home of the supporting types of
+identity: `User`, `Actor`, and the interfaces `IPasswordHasher` and `IUserStore`, together with the user rules of
+`DomainRule` and the user limits of `ReviewLimits`. What a user may see and do in a project is not a property of the
+account but of its project memberships, which `ProjectAccess` and `ProjectService` own.
 
 #### Data Model
 
-**User**: a data class of `Id` (assigned by the store), `Username`, `DisplayName`, `Role`, `Enabled`, `PasswordHash`,
-`FailedLoginCount`, `LockoutUntil` (`null` when the user is not locked out), and `Created` (UTC). `Username`,
-`DisplayName`, and `Created` are fixed once the user exists; the role, the enabled flag, the hash, and the lockout
-state have setters, so the service can change a copy it has read and give it back to the store. The password hash is
-never shown, logged, or put into a message, and the password itself is never stored.
+**User**: a data class of `Id` (assigned by the store), `Username`, `DisplayName`, `IsSystemAdmin`, `Enabled`,
+`PasswordHash`, `FailedLoginCount`, `LockoutUntil` (`null` when the user is not locked out), and `Created` (UTC).
+`Username`, `DisplayName`, and `Created` are fixed once the user exists; the system administrator flag, the enabled
+flag, the hash, and the lockout state have setters, so the service can change a copy it has read and give it back to
+the store. The password hash is never shown, logged, or put into a message, and the password itself is never stored.
 
-**UserRole**: a closed enumeration with the values `Reviewer` and `Admin`. It is stored by name, so adding a role
-never renumbers stored rows. Any signed-in user can work on projects and reviews; only `Admin` can manage users.
+**System administrator**: the flag `IsSystemAdmin` replaces the earlier global role. A system administrator runs the
+installation: manages users, creates projects, and decides the members of every project, and may see every project.
+Every other right is held per project through a membership (see `ProjectAccess`); a system administrator who is not a
+member of a project cannot sign its reviews.
 
 **Actor**: an immutable record of `Username` and `DisplayName`, and the optional `ApiTokenId` (the display id of the
 personal access token that authenticated the call, null for a call from the web pages or the command line; `ViaApiToken`
@@ -44,20 +47,20 @@ it and pass it to `UpdateAsync` without touching shared state.
 - The display name is trimmed and has 1 to 100 characters.
 - The password has 12 to 128 characters and is taken exactly as given: it is not trimmed and has no composition
   rules (no required digits or symbols). The upper limit keeps the hashing time bounded.
-- The role must be a defined value; anything else is a programming error and throws `ArgumentOutOfRangeException`.
+- The system administrator flag is a plain value, `true` or `false`; there is no role to validate.
 
 **Lockout**: five consecutive wrong passwords lock the account for 5 minutes. When the fifth failure is counted, the
 lock time is set and the counter restarts at 0. While the lock lasts, every attempt is refused without counting, even
 with the right password. A right password resets the counter. The lockout is per user name, not per source address.
 
-**Last administrator**: a change that would leave no enabled administrator is refused: disabling the last enabled
-administrator and demoting the last enabled administrator. Only an enabled administrator counts, so a disabled
-administrator does not satisfy the rule, and a change to anyone else is not checked.
+**Last system administrator**: a change that would leave no enabled system administrator is refused: disabling the
+last enabled system administrator and removing the right from the last enabled system administrator. Only an enabled
+system administrator counts, so a disabled one does not satisfy the rule, and a change to anyone else is not checked.
 
 **Serialization**: the operations that change an existing user, and the sign-in check (which counts failures), run one
-at a time under a semaphore, which makes the last-administrator check and the failure counter free of races. This only
-holds for a single instance, so the service is registered as a singleton. Creating a user is not under the semaphore;
-the unique index of the store covers two requests racing for the same name.
+at a time under a semaphore, which makes the last-system-administrator check and the failure counter free of races.
+This only holds for a single instance, so the service is registered as a singleton. Creating a user is not under the
+semaphore; the unique index of the store covers two requests racing for the same name.
 
 **Dummy hash**: when the user name is unknown, the service still verifies the password against a hash of no account
 (created on first use), so the response time does not show whether a user name exists.
@@ -75,8 +78,8 @@ limits the display name stored with a comment, an answer, or a section decision.
 
 **CreateAsync**: Creates an enabled user.
 
-- *Parameters*: `string? username`, `string? displayName`, `UserRole role`, `string? password`, and a cancellation
-  token.
+- *Parameters*: `string? username`, `string? displayName`, `bool isSystemAdmin`, `string? password`, the `Actor`, and a
+  cancellation token.
 - *Returns*: `Task<User>` — the stored user with its assigned identity and the creation time from the clock; only the
   hash of the password is kept.
 - *Postconditions*: Nothing is stored when a rule fails.
@@ -118,10 +121,16 @@ own action code, `signature.reauth-failed`, and not as `auth.sign-in-failed`. Bo
 - *Postconditions*: The enabled flag is stored. Disabling stops sign-in; the work already recorded by the user is kept.
 
 Reports `UserNotFound` for an unknown user and `LastAdmin` when the change would disable the last enabled
-administrator.
+system administrator.
 
-**SetRoleAsync**: Changes the role of a user. Reports `UserNotFound` for an unknown user and `LastAdmin` when the
-change would demote the last enabled administrator.
+**SetSystemAdminAsync**: Gives a user the system administrator right or takes it away.
+
+- *Parameters*: `string username`, `bool isSystemAdmin`, the `Actor`, and a cancellation token.
+- *Postconditions*: The flag is stored with the audit entry `user.admin-changed`, whose detail names the user and the
+  change, for example `user 'ann': system administrator False -> True`.
+
+Reports `UserNotFound` for an unknown user and `LastAdmin` when the change would remove the right from the last
+enabled system administrator.
 
 **ChangeOwnPasswordAsync**: Changes the password of a user who knows the current one.
 
@@ -138,8 +147,9 @@ way to guess passwords, and is reported as `CurrentPasswordIncorrect`. Other ses
 checked (`PasswordInvalid`), an unknown user is reported as `UserNotFound`, and the failure counter and lockout of the
 user are cleared, so it also ends a lockout. Other sessions of the user are not ended.
 
-**Audit**: The operations that change a user take the `Actor` and record `user.created`, `user.enabled`,
-`user.disabled`, `user.role-changed`, and `user.password-set-by-admin`; changing one's own password records
+**Audit**: The operations that change a user take the `Actor` and record `user.created` (detail `user 'x'`, with
+`, system administrator` added when the right is given), `user.enabled`, `user.disabled`, `user.admin-changed`, and
+`user.password-set-by-admin`; changing one's own password records
 `user.password-changed` with that user as the actor. These drafts are saved by the store in the same transaction as the
 change. The command line passes `Actor.CommandLine`. The constructor takes an optional `AuditService` (the web server
 and the command line supply it): with it, a failed sign-in records `auth.sign-in-failed` (detail `wrong password`,
@@ -166,8 +176,8 @@ recorded.
 #### Error Handling
 
 Rule violations raise `DomainRuleException` with the matching `DomainRule`. A null store, hasher, or clock at
-construction raises `ArgumentNullException`, and so does a null user name where one is required. A role that is not a
-defined value raises `ArgumentOutOfRangeException`. A failed sign-in is not an error: `AuthenticateAsync` returns
+construction raises `ArgumentNullException`, and so does a null user name where one is required. A failed sign-in is
+not an error: `AuthenticateAsync` returns
 `null`. Store failures propagate unchanged. The messages never contain a password or a hash.
 
 #### Known Limitations
@@ -193,5 +203,6 @@ defined value raises `ArgumentOutOfRangeException`. A failed sign-in is not an e
 - **SigningService** — checks the password again at signing time through `ReauthenticateAsync`.
 - **AccountPage** — changes the password of the signed-in user.
 - **UsersPage** — lists, creates, enables, disables, and changes users.
-- **UserCommand** — creates the first administrator and other users from the command line.
+- **UserCommand** — creates the first system administrator and other users from the command line.
+- **ProjectAccess** — reads users through `IUserStore` to decide access (not through this service).
 - **ServerHost** — registers the service as a singleton.

@@ -38,15 +38,29 @@ namespace DemaConsulting.ReviewCenter.Tests.Web;
 public class ReviewPageTests : PageTestBase
 {
     /// <summary>
-    ///     Creates a project with one review holding the given files.
+    ///     Creates a project with one review holding the given files; every user that exists is a member.
     /// </summary>
     /// <param name="files">The files of the review, in the order they should be listed.</param>
     /// <returns>The project id.</returns>
     private async Task<int> CreateReviewAsync(params UploadedFile[] files)
     {
         var project = await Projects.CreateAsync("Apollo", null, TestContext.Current.CancellationToken);
+        await AddMembersAsync(project.Id);
         await Reviews.CreateDraftAsync(project.Id, "REV-1", "First review", files, TestContext.Current.CancellationToken);
         return project.Id;
+    }
+
+    /// <summary>
+    ///     Makes every user of the store a member of the project, so that the users can occupy slots and sign.
+    /// </summary>
+    /// <param name="projectId">The project identity.</param>
+    /// <returns>A task that completes when the memberships exist.</returns>
+    private async Task AddMembersAsync(int projectId)
+    {
+        foreach (var user in await UserStore.ListAsync(TestContext.Current.CancellationToken))
+        {
+            await Store.AddMembershipAsync(user.Id, projectId, TestContext.Current.CancellationToken);
+        }
     }
 
     /// <summary>
@@ -1438,7 +1452,7 @@ public class ReviewPageTests : PageTestBase
         // Arrange: a signable review open for ann, whose session is re-checked every 100 ms
         var (projectId, slotId, _) = await CreateSignableAsync();
         UseRevalidation(TimeSpan.FromMilliseconds(100));
-        SignInAs("ann", "Ann");
+        SignInAs("ann", "Ann", UserRole.Reviewer);
         var cut = RenderPage(projectId);
         await cut.Find("[data-testid='file-select-0']").ClickAsync();
         var threadForm = cut.Find("[data-testid='new-thread-form']");

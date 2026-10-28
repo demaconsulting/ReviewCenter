@@ -209,8 +209,11 @@ public partial class NewReviewPage : ComponentBase
             SkippedEntries = [];
         }
 
-        Project = await ProjectService.GetAsync(ProjectId);
-        Repositories = await RepositoryService.ListEnabledAsync();
+        var actor = await AuthenticationState.GetActorOrNullAsync();
+        Project = await ProjectService.GetAsync(actor, ProjectId);
+        Repositories = actor is not null && Project is not null
+            ? await RepositoryService.ListEnabledAsync(actor, ProjectId)
+            : [];
         Loaded = true;
     }
 

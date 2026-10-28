@@ -23,7 +23,9 @@ N/A - standard test environment (everything runs in memory).
 - A problem of the key or of the signer is reported as an unavailable key, and nothing is recorded.
 - A complete review gives a signed PDF of the review, and its release is recorded with the digest, the chain head, the
   hash of the PDF, and the key; each request records its own event.
-
+- A user who cannot see the project is answered `NotFound`, like a missing review. The unit tests have no case for
+  this guard; it is verified over HTTP by `ApiProjectAccess_EveryProjectRoute_NonMemberToken_AnswersLikeAMissingProject`
+  and `ApiProjectAccess_EveryProjectRoute_MemberAndSystemAdmin_AreNotRefused` in the `Api` subsystem.
 The second check is made testable by the internal `AfterRender` step of the service, which the tests use to change the
 review in the moment between the rendering and the check. The short window between the second check and the signing
 and the audit event is not covered by a test; it contains no read of the review.

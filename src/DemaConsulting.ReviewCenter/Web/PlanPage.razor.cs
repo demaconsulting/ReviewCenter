@@ -429,8 +429,11 @@ public partial class PlanPage : ComponentBase
         Discard();
         var projectId = ProjectId;
 
-        var project = await ProjectService.GetAsync(projectId);
-        var repositories = await RepositoryService.ListEnabledAsync();
+        var actor = await AuthenticationState.GetActorOrNullAsync();
+        var project = await ProjectService.GetAsync(actor, projectId);
+        var repositories = actor is not null && project is not null
+            ? await RepositoryService.ListEnabledAsync(actor, projectId)
+            : [];
         if (_loadedProjectId != projectId)
         {
             // The project changed again while loading; the newer call loads its own data
@@ -521,7 +524,8 @@ public partial class PlanPage : ComponentBase
         var projectId = ProjectId;
         try
         {
-            var plan = await Planner.PlanAsync(projectId, repositoryId, HeadRevision, Mode, BaselineRevision);
+            var actor = await AuthenticationState.GetActorAsync();
+            var plan = await Planner.PlanAsync(actor, projectId, repositoryId, HeadRevision, Mode, BaselineRevision);
             if (version != _version)
             {
                 return;

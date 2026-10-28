@@ -107,8 +107,14 @@ public enum DomainRule
     /// <summary>The referenced user does not exist.</summary>
     UserNotFound,
 
-    /// <summary>The change would leave the system without an enabled administrator.</summary>
+    /// <summary>The change would leave the system without an enabled system administrator.</summary>
     LastAdmin,
+
+    /// <summary>The user already is a member of the project.</summary>
+    MembershipExists,
+
+    /// <summary>The user is not a member of the project.</summary>
+    MembershipNotFound,
 
     /// <summary>The referenced review does not exist.</summary>
     ReviewNotFound,
@@ -117,8 +123,8 @@ public enum DomainRule
     SlotNotFound,
 
     /// <summary>
-    ///     The users chosen for a slot are not valid: a user does not exist or is disabled, the primary and
-    ///     alternate are the same user, or a user is already in another slot of the review.
+    ///     The users chosen for a slot are not valid: a user does not exist, is disabled or is not a member of the
+    ///     project, the primary and alternate are the same user, or a user is already in another slot of the review.
     /// </summary>
     SlotUserInvalid,
 

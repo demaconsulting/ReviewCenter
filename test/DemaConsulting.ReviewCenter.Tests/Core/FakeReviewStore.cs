@@ -48,6 +48,11 @@ internal sealed class FakeReviewStore : IReviewStore
     private readonly List<Project> _projects = [];
 
     /// <summary>
+    ///     The stored project memberships.
+    /// </summary>
+    private readonly List<ProjectMembership> _memberships = [];
+
+    /// <summary>
     ///     The stored reviews, including their file content.
     /// </summary>
     private readonly List<Review> _reviews = [];
@@ -126,6 +131,91 @@ internal sealed class FakeReviewStore : IReviewStore
     public Task<IReadOnlyList<Project>> ListProjectsAsync(CancellationToken cancellationToken = default)
     {
         return Task.FromResult<IReadOnlyList<Project>>(_projects.OrderBy(project => project.Name, StringComparer.Ordinal).ToList());
+    }
+
+    /// <inheritdoc />
+    public Task AddMembershipAsync(
+        ProjectMembership membership,
+        AuditDraft audit,
+        CancellationToken cancellationToken = default)
+    {
+        // Like the real store's unique key: a user is a member of a project at most once
+        if (_memberships.Any(m => m.UserId == membership.UserId && m.ProjectId == membership.ProjectId))
+        {
+            throw new DomainRuleException(DomainRule.MembershipExists, "The user is already a member of the project.");
+        }
+
+        _memberships.Add(membership);
+        Audits.Add(audit);
+        return Task.CompletedTask;
+    }
+
+    /// <inheritdoc />
+    public Task<bool> RemoveMembershipAsync(
+        int projectId,
+        int userId,
+        AuditDraft audit,
+        CancellationToken cancellationToken = default)
+    {
+        var removed = _memberships.RemoveAll(m => m.UserId == userId && m.ProjectId == projectId) > 0;
+        if (removed)
+        {
+            Audits.Add(audit);
+        }
+
+        return Task.FromResult(removed);
+    }
+
+    /// <inheritdoc />
+    public Task<bool> SetMembershipRoleAsync(
+        int projectId,
+        int userId,
+        ProjectRole role,
+        AuditDraft audit,
+        CancellationToken cancellationToken = default)
+    {
+        var index = _memberships.FindIndex(m => m.UserId == userId && m.ProjectId == projectId);
+        if (index < 0)
+        {
+            return Task.FromResult(false);
+        }
+
+        _memberships[index] = _memberships[index] with { Role = role };
+        Audits.Add(audit);
+        return Task.FromResult(true);
+    }
+
+    /// <inheritdoc />
+    public Task<ProjectMembership?> GetMembershipAsync(
+        int userId,
+        int projectId,
+        CancellationToken cancellationToken = default)
+    {
+        return Task.FromResult(_memberships.FirstOrDefault(m => m.UserId == userId && m.ProjectId == projectId));
+    }
+
+    /// <inheritdoc />
+    public Task<IReadOnlyList<ProjectMembership>> ListMembershipsAsync(
+        int projectId,
+        CancellationToken cancellationToken = default)
+    {
+        IReadOnlyList<ProjectMembership> list = _memberships
+            .Where(m => m.ProjectId == projectId)
+            .OrderBy(m => m.UserId)
+            .ToList();
+        return Task.FromResult(list);
+    }
+
+    /// <inheritdoc />
+    public Task<IReadOnlyList<ProjectMembership>> ListMembershipsForUserAsync(
+        int userId,
+        CancellationToken cancellationToken = default)
+    {
+        IReadOnlyList<ProjectMembership> list = _memberships
+            .Where(m => m.UserId == userId)
+            .OrderBy(m => m.ProjectId)
+            .ToList();
+        return Task.FromResult(list);
     }
 
     /// <inheritdoc />

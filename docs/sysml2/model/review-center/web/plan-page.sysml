@@ -1,6 +1,6 @@
 package ReviewCenter {
     part def PlanPage {
-        doc /* Page at /projects/{id}/plan that plans the reviews of a registered git repository: it takes a head revision and a baseline choice (none, an explicit revision, or the last signed review), shows one plain summary, the review-sets that need a review first (ticked by default), the sets that cannot be planned and those already filed only when they exist, and the sets with nothing to review collapsed, and creates the ticked reviews with a result for each. Every failure is explained in plain English with what to do next. */
+        doc /* Page at /projects/{id}/plan that plans the reviews of a git repository of the project (a project the user may not see looks like a missing one): it takes a head revision and a baseline choice (none, an explicit revision, or the last signed review), shows one plain summary, the review-sets that need a review first (ticked by default), the sets that cannot be planned and those already filed only when they exist, and the sets with nothing to review collapsed, and creates the ticked reviews with a result for each. Every failure is explained in plain English with what to do next. */
 
         comment sourceRef /* Source: src/DemaConsulting.ReviewCenter/Web/PlanPage.razor and PlanPage.razor.cs */
         comment testRef /* Test: test/DemaConsulting.ReviewCenter.Tests/Web/PlanPageTests.cs */

@@ -6,7 +6,8 @@
 
 The `Api` subsystem is the way for a script or a pipeline to work with ReviewCenter without a browser. It is a small
 JSON
-interface under `/api` that reads projects and reviews, creates a draft review from uploaded files or from a registered
+interface under `/api` that reads the projects its user may see and their reviews, creates a draft review from
+uploaded files or from a registered
 git repository, downloads the signed attestation of a complete review, and lists the completed reviews of a project as
 the
 evidence index that ReviewMark reads. It holds no domain rule: every endpoint calls
@@ -28,9 +29,10 @@ validate, and revoke them, and `AccountPage` of `Web` is where a user manages th
 - *Role*: Provider.
 - *Contract*: Every route under `/api` requires a token (bearer, or the password of HTTP Basic credentials), except the
   OpenAPI document.
-  - `GET /api/projects` returns the projects.
+  - `GET /api/projects` returns the projects that the owner of the token may see: all of them for a system
+    administrator, and for anybody else only the projects they are a member of.
   - `GET /api/projects/{projectId}/reviews` returns the review summaries of a project, 404 when the project does not
-    exist.
+    exist or the owner of the token may not see it.
   - `GET /api/projects/{projectId}/reviews/{reviewId}` returns the details of one review, with the slots, the counts,
     the
     approval state, and what is still missing.
@@ -39,13 +41,18 @@ validate, and revoke them, and `AccountPage` of `Web` is where a user manages th
   - `GET /api/projects/{projectId}/reviews/{reviewId}/attestation.pdf` returns the signed PDF of a complete review.
   - `GET /api/projects/{projectId}/evidence/index.json` returns `{"reviews":[{id, fingerprint, date, result, file}]}`
     for the completed reviews of a project that were planned from a review-set (the index of a ReviewMark evidence
-    source), 404 when the project does not exist.
+    source), 404 when the project does not exist or the owner of the token may not see it.
+  - Every route that names a project, except the attestation, first asks `ProjectService` whether the owner may see
+    the project, and a project the owner may not see gets the 404 problem, with the same body, as a project that does
+    not exist. The attestation route gets the same effect from `AttestationService`, which checks the project before
+    it reads the review.
   - Any other address under `/api`, with any standard HTTP method (`GET`, `HEAD`, `POST`, `PUT`, `PATCH`, `DELETE`,
     `OPTIONS`), answers a JSON problem 404.
   - A failure is a problem description (`application/problem+json`).
 - *Constraints*: There is no route that signs, changes a reviewer slot, or creates or revokes a token; the actor of
   every
-  call is the owner of the token, acting with the role that the owner has now.
+  call is the owner of the token, acting with the system administrator right and the project memberships that the
+  owner has now.
 
 **Token authentication**: The `ReviewCenterToken` scheme and the `Api` policy.
 
@@ -54,7 +61,8 @@ validate, and revoke them, and `AccountPage` of `Web` is where a user manages th
 - *Contract*: A request is authenticated only by a personal access token in the `Authorization` header, sent as a bearer
   token or as
   the password of HTTP Basic credentials (the user name is ignored). A valid token gives a principal with the
-  user name, display name, and role of the owner and the claims `rc_auth` (value `pat`) and `rc_token_id`. A request
+  user name and display name of the owner, the `SystemAdmin` role claim only when the owner is a system administrator,
+  and the claims `rc_auth` (value `pat`) and `rc_token_id`. A request
   with
   no token, or with a token that is refused, gets 401 with `WWW-Authenticate` headers for `Bearer` and `Basic`, always
   with the
@@ -119,6 +127,18 @@ planned from a review-set, because ReviewMark matches by the review-set id. A re
 has no
 review-set id and is not listed; an optional review-set id in the creation request is a possible follow-up.
 
+**Project visibility is decided at every request**: A project may hold confidential work, so a token sees what its
+owner sees and no more. A token carries no copy of the memberships: the principal holds only the user name and, for a
+system administrator, the `SystemAdmin` claim, and `ProjectService` (through `IProjectAccess`) reads the user and the
+memberships at every call. Taking a user out of a project, or the system administrator right away, therefore works at
+once for a token that was handed out earlier. Every route that names a project, except the attestation, asks
+`ProjectService.GetAsync` before it
+does anything else, including before the body of a creation request is read, and answers a project that the owner may
+not see exactly as a project that does not exist: the same 404 status and the same problem body, for a bearer token and
+for Basic credentials. The attestation and the evidence index also go through guarded
+services (`AttestationService`, `EvidenceIndexService`), so that no route to them skips the check. The list of
+projects shows only the projects the owner may see.
+
 **Authentication failures**: A refused token is answered in the same way for every reason (malformed, unknown, revoked,
 expired, owner disabled or locked out), so the answer reveals nothing about whether a token ever existed. The reason is
 recorded in the audit trail without the value of the token, as an event that is coalesced per client address, so that
@@ -137,5 +157,6 @@ route that does not exist. The snapshot in `docs/api/` and a test that compares 
 interface a visible change in a review. The document needs no token, because tools that generate a client fetch it
 before they have one.
 
-**Known limitations and planned follow-ups**: A token acts with the full read and create rights of its owner; there are
+**Known limitations and planned follow-ups**: A token acts with the full read and create rights of its owner in the
+projects of the owner; there are
 no scopes. There is no paging of the lists. A request to create a review can carry at most 30 MiB.

@@ -2,7 +2,8 @@
 
    Static server-side rendered on purpose: it is plain markup (the product name and tagline), so it needs no live
    connection and no code-behind. Signed-in users also see a "Get started" list of links to the main pages; the
-   administration pages are listed only for an administrator, as in the layout header. *@
+   administration pages are listed only for a system administrator, as in the layout header. Repositories belong to
+   projects, so they are reached from the project page and have no card here. *@
 @page "/"
 @using DemaConsulting.ReviewCenter.Identity
 @using Microsoft.AspNetCore.Components.Authorization
@@ -19,20 +20,16 @@
             <ul class="item-list">
                 <li>
                     <a href="/projects" data-testid="home-card-projects">Projects</a>
-                    <p class="muted">Create a project, then add reviews from a git repository or by uploading files.</p>
+                    <p class="muted">Open a project to see its reviews, add reviews from a git repository or by uploading files.</p>
                 </li>
                 <AuthorizeView Roles="@SignIn.AdminRole" Context="adminView">
-                    <li>
-                        <a href="/repositories" data-testid="home-card-repositories">Repositories</a>
-                        <p class="muted">Register git repositories reviews are created from.</p>
-                    </li>
                     <li>
                         <a href="/audit" data-testid="home-card-audit">Audit</a>
                         <p class="muted">Verify the tamper-evident record of every action.</p>
                     </li>
                     <li>
                         <a href="/users" data-testid="home-card-users">Users</a>
-                        <p class="muted">Add people and manage their roles.</p>
+                        <p class="muted">Add people and make them system administrators.</p>
                     </li>
                 </AuthorizeView>
             </ul>

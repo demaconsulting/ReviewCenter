@@ -52,6 +52,7 @@ public class ReviewPageRepositoryTests : PageTestBase
         var cancellationToken = TestContext.Current.CancellationToken;
         var admin = new Actor("adm", "Adm");
         await Users.CreateAsync("adm", "Adm", UserRole.Admin, "correct horse battery", cancellationToken);
+        var project = await Projects.CreateAsync("Apollo", null, cancellationToken);
         var repository = await Repositories.CreateAsync("main-repo", "https://example.com/org/repo.git", null, null, admin, cancellationToken);
         Git.Revisions["main"] = HeadSha;
         Git.Revisions["v1"] = BaseSha;
@@ -63,7 +64,6 @@ public class ReviewPageRepositoryTests : PageTestBase
                 ("src/mod.txt", ChangeKind.Modified, "before 1\nbefore 2\n", "head 1\nhead 2\nhead 3\n"),
                 ("src/new.txt", ChangeKind.Added, null, "new\n")
             ]);
-        var project = await Projects.CreateAsync("Apollo", null, cancellationToken);
         await Reviews.CreateFromRepositoryAsync(
             project.Id, "REV-1", "From git", repository.Id, "main", "v1", "src/**\ndocs/**", TestActors.Ann, cancellationToken);
         return project.Id;
@@ -137,7 +137,7 @@ public class ReviewPageRepositoryTests : PageTestBase
         // Arrange: a review created from the review-set "core" by the planner
         var projectId = await CreateRepositoryReviewAsync();
         Git.Script(null, HeadSha, [("src/a.cs", ChangeKind.Added, null, "a\n")]);
-        var repositoryId = (await Repositories.ListEnabledAsync(TestContext.Current.CancellationToken)).Single().Id;
+        var repositoryId = (await Repositories.ListEnabledAsync(TestActors.Ann, projectId, TestContext.Current.CancellationToken)).Single().Id;
         var results = await Planner.CreateAsync(
             projectId,
             repositoryId,

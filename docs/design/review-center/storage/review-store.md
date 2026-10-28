@@ -5,7 +5,8 @@
 #### Purpose
 
 `ReviewStore` implements the Core store interface on top of `ReviewCenterDbContext`. Its single responsibility is
-to persist projects, reviews, file content, comment threads, checklists, reviewer slots, and signatures, and to read
+to persist projects, project memberships, reviews, file content, comment threads, checklists, reviewer slots, and
+signatures, and to read
 them back, translating database behavior into the terms of the domain.
 
 #### Data Model
@@ -18,7 +19,8 @@ commits (see the `AuditStore` unit).
 
 #### Key Methods
 
-**Audit transaction of every change**: `AddProjectAsync`, `AddReviewAsync`, `AddThreadAsync`, `AddCommentAsync`,
+**Audit transaction of every change**: `AddProjectAsync`, `AddMembershipAsync`, `RemoveMembershipAsync`,
+`SetMembershipRoleAsync`, `AddReviewAsync`, `AddThreadAsync`, `AddCommentAsync`,
 `SetThreadStateAsync`, `SetChecklistSectionStateAsync`, `SetChecklistAnswerAsync`, `AddSlotAsync`, `UpdateSlotAsync`,
 `RemoveSlotAsync`, and `AddSignatureAsync` take the audit draft of the change (or a function that builds it from the
 stored entity, when the draft names an identity that the database assigns). The change and its audit entry are
@@ -37,6 +39,21 @@ neither be persisted nor collide with an existing project; the returned project 
 `DateTimeOffset`, so the creation time is not used for ordering.
 
 **ReviewExistsAsync**: Reports whether a review with the identifier exists in a project.
+
+**AddMembershipAsync**: Stores the membership of a user in a project with its audit entry (`project.member-added`,
+which carries the project) in one transaction. The key is the user and the project, so a second membership of the same
+pair violates the key and is reported as `MembershipExists` ("The user is already a member of this project."), and
+nothing is stored; a project or user that does not exist is refused by the foreign keys of the database and the failure
+surfaces as the SQLite exception, unchanged.
+
+**RemoveMembershipAsync** and **SetMembershipRoleAsync**: Delete the membership of a user in a project, or replace its
+project role, with one statement each, and return whether a membership was found. The audit entry
+(`project.member-removed` or `project.member-role-changed`, carrying the project) is stored only when a row was
+affected, so a change that has no effect stores no entry.
+
+**GetMembershipAsync**, **ListMembershipsAsync**, and **ListMembershipsForUserAsync**: Read one membership by user and
+project (null when absent), the memberships of a project ordered by user, and the memberships of a user ordered by
+project. The reads use no tracking and no gate.
 
 **AddReviewAsync**: Stores a review, all its files, and its checklist snapshot (when it has one) in one save, which
 is one transaction.
@@ -146,7 +163,8 @@ begun a `Serializable` transaction, a write from a second connection fails with 
 
 A duplicate review identifier is detected from the SQLite primary key and unique constraint error codes (1555 and
 2067) and reported as the domain rule; this is the one provider-specific piece of knowledge in the unit. The same
-detection turns the violation of the unique index on a slot and a digest into `SigningNotAllowed`. `AddSignatureAsync`
+detection turns the violation of the unique index on a slot and a digest into `SigningNotAllowed`, and the violation of
+the key of a membership into `MembershipExists`. `AddSignatureAsync`
 maps its other failures to domain rules: a digest that differs from the digest of the stored record is
 `RecordChanged`, a review that does not exist is `ReviewNotFound`, and a slot that does not exist in the review is
 `SlotNotFound`. In every failure the transaction is rolled back, so nothing is stored. Any other database failure
@@ -163,6 +181,7 @@ refusal to delete a signed slot. Null arguments raise `ArgumentNullException`.
 
 #### Callers
 
-- **ProjectService**, **ReviewService**, **ThreadService**, **ChecklistService**, and **SigningService** — through the
+- **ProjectService**, **ReviewService**, **ThreadService**, **ChecklistService**, **SigningService**, and
+  **ProjectAccess** — through the
   Core interface.
 - **ServerHost** — registers the store as the implementation of the Core interface.

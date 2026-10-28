@@ -59,13 +59,15 @@ internal sealed class FakeRepositoryStore : IRepositoryStore
         Func<SourceRepository, AuditDraft> audit,
         CancellationToken cancellationToken = default)
     {
-        if (_items.Any(item => string.Equals(item.Repository.Name, repository.Name, StringComparison.OrdinalIgnoreCase)))
+        if (_items.Any(item => item.Repository.ProjectId == repository.ProjectId
+            && string.Equals(item.Repository.Name, repository.Name, StringComparison.OrdinalIgnoreCase)))
         {
             throw new DomainRuleException(DomainRule.RepositoryNameTaken, $"The repository name '{repository.Name}' is taken.");
         }
 
         var stored = new SourceRepository(
             _items.Count + 1,
+            repository.ProjectId,
             repository.Name,
             repository.Location,
             repository.Username,
@@ -97,10 +99,11 @@ internal sealed class FakeRepositoryStore : IRepositoryStore
     }
 
     /// <inheritdoc />
-    public Task<IReadOnlyList<SourceRepository>> ListAsync(CancellationToken cancellationToken = default)
+    public Task<IReadOnlyList<SourceRepository>> ListAsync(int projectId, CancellationToken cancellationToken = default)
     {
         IReadOnlyList<SourceRepository> list = _items
             .Select(item => item.Repository)
+            .Where(r => r.ProjectId == projectId)
             .OrderBy(r => r.Name, StringComparer.OrdinalIgnoreCase)
             .ToList();
         return Task.FromResult(list);
@@ -120,6 +123,7 @@ internal sealed class FakeRepositoryStore : IRepositoryStore
         }
 
         if (_items.Any(i => i.Repository.Id != id
+            && i.Repository.ProjectId == _items[index].Repository.ProjectId
             && string.Equals(i.Repository.Name, update.Name, StringComparison.OrdinalIgnoreCase)))
         {
             throw new DomainRuleException(DomainRule.RepositoryNameTaken, $"The repository name '{update.Name}' is taken.");

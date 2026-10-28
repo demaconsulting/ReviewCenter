@@ -50,11 +50,13 @@ public class RepositoryServiceTests
     /// <param name="Store">The fake store.</param>
     /// <param name="Protector">The fake protector.</param>
     /// <param name="Users">The user service.</param>
+    /// <param name="Projects">The store that knows the projects and their members.</param>
     private sealed record Fixture(
         RepositoryService Service,
         FakeRepositoryStore Store,
         FakeCredentialProtector Protector,
-        UserService Users);
+        UserService Users,
+        FakeReviewStore Projects);
 
     /// <summary>
     ///     Creates the fixture.
@@ -63,13 +65,20 @@ public class RepositoryServiceTests
     private static async Task<Fixture> CreateAsync()
     {
         var clock = new MovableTimeProvider(new DateTimeOffset(2025, 3, 4, 5, 6, 7, TimeSpan.Zero));
-        var users = new UserService(new FakeUserStore(), new FakePasswordHasher(), clock);
+        var userStore = new FakeUserStore();
+        var users = new UserService(userStore, new FakePasswordHasher(), clock);
         var cancellationToken = TestContext.Current.CancellationToken;
         await users.CreateAsync("adm", "Adm", UserRole.Admin, Password, cancellationToken);
-        await users.CreateAsync("rev", "Rev", UserRole.Reviewer, Password, cancellationToken);
+        var rev = await users.CreateAsync("rev", "Rev", UserRole.Reviewer, Password, cancellationToken);
+        var padm = await users.CreateAsync("padm", "Padm", UserRole.Reviewer, Password, cancellationToken);
+        var projects = new FakeReviewStore();
+        var project = await projects.AddProjectAsync(new Project { Name = "Apollo", Created = clock.GetUtcNow() }, cancellationToken);
+        await projects.AddMembershipAsync(rev.Id, project.Id, ProjectRole.User, cancellationToken);
+        await projects.AddMembershipAsync(padm.Id, project.Id, ProjectRole.ProjectAdmin, cancellationToken);
         var store = new FakeRepositoryStore();
         var protector = new FakeCredentialProtector();
-        return new Fixture(new RepositoryService(store, protector, users, clock), store, protector, users);
+        var access = new ProjectAccess(userStore, projects);
+        return new Fixture(new RepositoryService(store, protector, access, clock), store, protector, users, projects);
     }
 
     /// <summary>
@@ -342,8 +351,9 @@ public class RepositoryServiceTests
     }
 
     /// <summary>
-    ///     Test that only enabled administrators can use the registry: a reviewer, an unknown user and a disabled
-    ///     administrator are refused for every operation.
+    ///     Test that only enabled system and project administrators can manage repositories: a plain member is
+    ///     refused with the actor rule, and an unknown user, a disabled administrator and a user who is not a member
+    ///     are told that the project does not exist, for every operation.
     /// </summary>
     [Fact]
     public async Task RepositoryService_AdminOnly_RefusesOtherActors()
@@ -354,30 +364,73 @@ public class RepositoryServiceTests
         var created = await f.Service.CreateAsync("repo", "https://example.com/r.git", null, null, _admin, cancellationToken);
         await f.Users.CreateAsync("gone", "Gone", UserRole.Admin, Password, cancellationToken);
         await f.Users.SetEnabledAsync("gone", false, _admin, cancellationToken);
-        var actors = new[] { new Actor("rev", "Rev"), new Actor("nobody", "Nobody"), new Actor("gone", "Gone") };
-
-        foreach (var actor in actors)
+        await f.Users.CreateAsync("out", "Out", UserRole.Reviewer, Password, cancellationToken);
+        var actors = new[]
         {
-            // Act: try every operation
-            var attempts = new Func<Task>[]
+            (new Actor("rev", "Rev"), DomainRule.ActorNotAllowed, DomainRule.ActorNotAllowed),
+            (new Actor("out", "Out"), DomainRule.ProjectNotFound, DomainRule.RepositoryNotFound),
+            (new Actor("nobody", "Nobody"), DomainRule.ProjectNotFound, DomainRule.RepositoryNotFound),
+            (new Actor("gone", "Gone"), DomainRule.ProjectNotFound, DomainRule.RepositoryNotFound)
+        };
+
+        foreach (var (actor, projectRule, repositoryRule) in actors)
+        {
+            // Act: try every operation; one that names the repository cannot tell it from a missing one
+            var attempts = new (Func<Task> Run, DomainRule Rule)[]
             {
-                () => f.Service.CreateAsync("other", "https://example.com/o.git", null, null, actor, cancellationToken),
-                () => f.Service.UpdateAsync(created.Id, "repo", "https://example.com/r.git", null, TokenChange.Keep, actor, cancellationToken),
-                () => f.Service.SetEnabledAsync(created.Id, false, actor, cancellationToken),
-                () => f.Service.ListAsync(actor, cancellationToken)
+                (() => f.Service.CreateAsync("other", "https://example.com/o.git", null, null, actor, cancellationToken), projectRule),
+                (
+                    () => f.Service.UpdateAsync(
+                        created.Id, "repo", "https://example.com/r.git", null, TokenChange.Keep, actor, cancellationToken),
+                    repositoryRule),
+                (() => f.Service.SetEnabledAsync(created.Id, false, actor, cancellationToken), repositoryRule),
+                (() => f.Service.ListAsync(actor, cancellationToken), projectRule)
             };
 
-            // Assert: each is refused with the actor rule
-            foreach (var attempt in attempts)
+            // Assert: each is refused with the expected rule
+            foreach (var (attempt, rule) in attempts)
             {
                 var exception = await Assert.ThrowsAsync<DomainRuleException>(attempt);
-                Assert.Equal(DomainRule.ActorNotAllowed, exception.Rule);
+                Assert.Equal(rule, exception.Rule);
             }
         }
 
         // Assert: nothing changed and only the creation was audited
         Assert.Single(f.Store.Audits);
         Assert.True((await f.Store.GetAsync(created.Id, cancellationToken))!.Enabled);
+    }
+
+    /// <summary>
+    ///     Test that a project administrator manages the repositories of the project and a system administrator
+    ///     manages those of any project, and that a repository belongs to its project only: the same name may be
+    ///     used in two projects, and a repository cannot be reached through another project.
+    /// </summary>
+    [Fact]
+    public async Task RepositoryService_ProjectAdministrator_ManagesOwnProjectOnly()
+    {
+        // Arrange: a fixture with a second project that has no members
+        var f = await CreateAsync();
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var other = await f.Projects.AddProjectAsync(new Project { Name = "Gemini" }, cancellationToken);
+        var padm = new Actor("padm", "Padm");
+
+        // Act: the project administrator registers in the own project, the system administrator in both
+        var own = await f.Service.CreateAsync("repo", "https://example.com/r.git", null, null, padm, cancellationToken);
+        var same = await f.Service.CreateAsync(other.Id, "repo", "https://example.com/g.git", null, null, _admin, cancellationToken);
+        var refused = await Assert.ThrowsAsync<DomainRuleException>(
+            () => f.Service.CreateAsync(other.Id, "x", "https://example.com/x.git", null, null, padm, cancellationToken));
+        var update = await Assert.ThrowsAsync<DomainRuleException>(
+            () => f.Service.UpdateAsync(same.Id, "repo", "https://example.com/y.git", null, TokenChange.Keep, padm, cancellationToken));
+        var mismatch = await Assert.ThrowsAsync<DomainRuleException>(() => f.Service.GetAccessAsync(other.Id, own.Id, cancellationToken));
+
+        // Assert: both are registered with their project, the other project is invisible, and ids do not cross projects
+        Assert.Equal((AuditTestExtensions.DefaultProjectId, "repo"), (own.ProjectId, own.Name));
+        Assert.Equal((other.Id, "repo"), (same.ProjectId, same.Name));
+        Assert.Equal(DomainRule.ProjectNotFound, refused.Rule);
+        Assert.Equal(DomainRule.RepositoryNotFound, update.Rule);
+        Assert.Equal(DomainRule.RepositoryNotFound, mismatch.Rule);
+        Assert.Equal([own.Id], (await f.Service.ListAsync(padm, cancellationToken)).Select(r => r.Id));
+        Assert.Equal([same.Id], (await f.Service.ListAsync(_admin, other.Id, cancellationToken)).Select(r => r.Id));
     }
 
     /// <summary>
@@ -481,7 +534,7 @@ public class RepositoryServiceTests
         await f.Service.SetEnabledAsync(closed.Id, false, _admin, cancellationToken);
 
         // Act: list what an ordinary user may choose and try to get access to both
-        var summaries = await f.Service.ListEnabledAsync(cancellationToken);
+        var summaries = await f.Service.ListEnabledAsync(new Actor("rev", "Rev"), AuditTestExtensions.DefaultProjectId, cancellationToken);
         var access = await f.Service.GetAccessAsync(open.Id, cancellationToken);
         var refused = await Assert.ThrowsAsync<DomainRuleException>(() => f.Service.GetAccessAsync(closed.Id, cancellationToken));
         var all = await f.Service.ListAsync(_admin, cancellationToken);
@@ -970,10 +1023,11 @@ public class RepositoryServiceTests
         var cancellationToken = TestContext.Current.CancellationToken;
 
         // Act and Assert: a null service dependency or argument is refused
-        Assert.Throws<ArgumentNullException>(() => new RepositoryService(null!, f.Protector, f.Users, TimeProvider.System));
-        Assert.Throws<ArgumentNullException>(() => new RepositoryService(f.Store, null!, f.Users, TimeProvider.System));
+        var access = new AllowAllProjectAccess(f.Projects);
+        Assert.Throws<ArgumentNullException>(() => new RepositoryService(null!, f.Protector, access, TimeProvider.System));
+        Assert.Throws<ArgumentNullException>(() => new RepositoryService(f.Store, null!, access, TimeProvider.System));
         Assert.Throws<ArgumentNullException>(() => new RepositoryService(f.Store, f.Protector, null!, TimeProvider.System));
-        Assert.Throws<ArgumentNullException>(() => new RepositoryService(f.Store, f.Protector, f.Users, null!));
+        Assert.Throws<ArgumentNullException>(() => new RepositoryService(f.Store, f.Protector, access, null!));
         await Assert.ThrowsAsync<ArgumentNullException>(() => f.Service.CreateAsync(null!, "x", null, null, _admin, cancellationToken));
         await Assert.ThrowsAsync<ArgumentNullException>(() => f.Service.CreateAsync("x", null!, null, null, _admin, cancellationToken));
         await Assert.ThrowsAsync<ArgumentNullException>(() => f.Service.CreateAsync("x", "y", null, null, null!, cancellationToken));

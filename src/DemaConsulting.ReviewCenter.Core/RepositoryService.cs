@@ -21,14 +21,17 @@
 namespace DemaConsulting.ReviewCenter.Core;
 
 /// <summary>
-///     Registers git repositories and keeps their credentials, enforcing the repository rules.
+///     Registers git repositories of a project and keeps their credentials, enforcing the repository rules.
 /// </summary>
 /// <remarks>
 ///     <para>
-///         The registry is global and administered only by administrators: every method that shows or changes a
-///         registration checks again that the acting user is an enabled administrator, whatever the caller already
-///         checked. Ordinary users can only list the enabled repositories as <see cref="RepositorySummary"/> (name
-///         only). A repository is never deleted, only disabled, so reviews created from it keep their reference.
+///         Every repository belongs to exactly one project, chosen when it is registered and never changed. Every
+///         method that shows or changes a registration asks <see cref="IProjectAccess"/> again whether the acting
+///         user may administer that project (a project administrator of it, or a system administrator), whatever the
+///         caller already checked; a user who may not even see the project gets the same not-found failure as for a
+///         project that does not exist. Ordinary members can only list the enabled repositories of their project as
+///         <see cref="RepositorySummary"/> (name only). A repository is never deleted, only disabled, so reviews
+///         created from it keep their reference. A repository can only be used by reviews of its own project.
 ///     </para>
 ///     <para>
 ///         The token is write-only. It is encrypted before it is stored, it can be kept, replaced or cleared but
@@ -36,8 +39,8 @@ namespace DemaConsulting.ReviewCenter.Core;
 ///         the repository name, the user name and the location (case-sensitive), which do appear there; only
 ///         <see cref="GetAccessAsync"/>, which is internal to Core, decrypts it, for the git layer. Registrations
 ///         are audited (<c>repository.created</c>, <c>repository.updated</c>, <c>repository.disabled</c>,
-///         <c>repository.enabled</c>) with the changed field names, never their secret values. Changes run one at
-///         a time (a semaphore), so the service must be a single instance (a singleton).
+///         <c>repository.enabled</c>) with the project identity and the changed field names, never their secret
+///         values. Changes run one at a time (a semaphore), so the service must be a single instance (a singleton).
 ///     </para>
 /// </remarks>
 public sealed class RepositoryService
@@ -73,9 +76,9 @@ public sealed class RepositoryService
     private readonly ICredentialProtector _protector;
 
     /// <summary>
-    ///     Answers who the acting user is.
+    ///     Decides who may see and administer a project.
     /// </summary>
-    private readonly UserService _users;
+    private readonly IProjectAccess _access;
 
     /// <summary>
     ///     The clock that supplies registration and change times.
@@ -92,31 +95,32 @@ public sealed class RepositoryService
     /// </summary>
     /// <param name="store">The store that persists the registry. Must not be null.</param>
     /// <param name="protector">The token encryption. Must not be null.</param>
-    /// <param name="users">The user service, used to re-check the administrator. Must not be null.</param>
+    /// <param name="access">The access rules, used to re-check the acting user. Must not be null.</param>
     /// <param name="timeProvider">The clock; injected so tests control time. Must not be null.</param>
     /// <exception cref="ArgumentNullException">Thrown when an argument is null.</exception>
     public RepositoryService(
         IRepositoryStore store,
         ICredentialProtector protector,
-        UserService users,
+        IProjectAccess access,
         TimeProvider timeProvider)
     {
         ArgumentNullException.ThrowIfNull(store);
         ArgumentNullException.ThrowIfNull(protector);
-        ArgumentNullException.ThrowIfNull(users);
+        ArgumentNullException.ThrowIfNull(access);
         ArgumentNullException.ThrowIfNull(timeProvider);
         _store = store;
         _protector = protector;
-        _users = users;
+        _access = access;
         _timeProvider = timeProvider;
     }
 
     /// <summary>
-    ///     Registers an enabled repository.
+    ///     Registers an enabled repository in a project.
     /// </summary>
+    /// <param name="projectId">The project the repository belongs to; the actor must administer it.</param>
     /// <param name="name">
     ///     The name: 1 to <see cref="MaxNameLength"/> letters, digits, dot, underscore and hyphen, starting with a
-    ///     letter or digit; unique without regard to case.
+    ///     letter or digit; unique within the project without regard to case.
     /// </param>
     /// <param name="location">
     ///     The location: an <c>https://</c>, <c>http://</c> (only for localhost, 127.0.0.1 or [::1]) or <c>file://</c>
@@ -129,9 +133,10 @@ public sealed class RepositoryService
     /// <returns>The stored registration, which never carries the token.</returns>
     /// <exception cref="ArgumentNullException">Thrown when a required argument is null.</exception>
     /// <exception cref="DomainRuleException">
-    ///     Thrown when the actor is not an administrator or a rule is broken (see <see cref="DomainRule"/>).
+    ///     Thrown when the actor may not administer the project or a rule is broken (see <see cref="DomainRule"/>).
     /// </exception>
     public async Task<SourceRepository> CreateAsync(
+        int projectId,
         string name,
         string location,
         string? username,
@@ -143,7 +148,7 @@ public sealed class RepositoryService
         ArgumentNullException.ThrowIfNull(location);
         ArgumentNullException.ThrowIfNull(actor);
 
-        await EnsureAdminAsync(actor, cancellationToken);
+        await _access.RequireAdministerAsync(actor, projectId, cancellationToken);
         var cleanName = ValidateName(name);
         var cleanLocation = ValidateLocation(location, out var isHttps);
         var cleanUser = ValidateUsername(username);
@@ -156,7 +161,13 @@ public sealed class RepositoryService
         ValidateCredentialCombination(isHttps, cleanUser, cleanToken is not null);
 
         var encrypted = cleanToken is null ? null : _protector.Protect(cleanToken);
-        var entry = new NewRepository(cleanName, cleanLocation, cleanUser, encrypted, _timeProvider.GetUtcNow());
+        var entry = new NewRepository(
+            projectId,
+            cleanName,
+            cleanLocation,
+            cleanUser,
+            encrypted,
+            _timeProvider.GetUtcNow());
         await _gate.WaitAsync(cancellationToken);
         try
         {
@@ -165,7 +176,8 @@ public sealed class RepositoryService
                 stored => AuditDraft.By(
                     actor,
                     "repository.created",
-                    $"repository '{stored.Name}', location '{stored.Location}', user name {(stored.Username is null ? "none" : "set")}, token {(stored.HasToken ? "set" : "none")}"),
+                    $"repository '{stored.Name}', location '{stored.Location}', user name {(stored.Username is null ? "none" : "set")}, token {(stored.HasToken ? "set" : "none")}",
+                    stored.ProjectId),
                 cancellationToken);
         }
         finally
@@ -203,7 +215,7 @@ public sealed class RepositoryService
         ArgumentNullException.ThrowIfNull(token);
         ArgumentNullException.ThrowIfNull(actor);
 
-        await EnsureAdminAsync(actor, cancellationToken);
+        await RequireRepositoryAdminAsync(id, actor, cancellationToken);
         var cleanName = ValidateName(name);
         var cleanLocation = ValidateLocation(location, out var isHttps);
         var cleanUser = ValidateUsername(username);
@@ -260,7 +272,11 @@ public sealed class RepositoryService
             return await _store.UpdateAsync(
                 id,
                 update,
-                AuditDraft.By(actor, "repository.updated", $"repository '{cleanName}': {string.Join(", ", changes)}"),
+                AuditDraft.By(
+                    actor,
+                    "repository.updated",
+                    $"repository '{cleanName}': {string.Join(", ", changes)}",
+                    current.ProjectId),
                 cancellationToken);
         }
         finally
@@ -287,7 +303,7 @@ public sealed class RepositoryService
     {
         ArgumentNullException.ThrowIfNull(actor);
 
-        await EnsureAdminAsync(actor, cancellationToken);
+        await RequireRepositoryAdminAsync(id, actor, cancellationToken);
         await _gate.WaitAsync(cancellationToken);
         try
         {
@@ -307,7 +323,11 @@ public sealed class RepositoryService
             return await _store.UpdateAsync(
                 id,
                 update,
-                AuditDraft.By(actor, enabled ? "repository.enabled" : "repository.disabled", $"repository '{current.Name}'"),
+                AuditDraft.By(
+                    actor,
+                    enabled ? "repository.enabled" : "repository.disabled",
+                    $"repository '{current.Name}'",
+                    current.ProjectId),
                 cancellationToken);
         }
         finally
@@ -317,43 +337,64 @@ public sealed class RepositoryService
     }
 
     /// <summary>
-    ///     Lists every repository, enabled or not, for the administration page.
+    ///     Lists every repository of a project, enabled or not, for the administration page.
     /// </summary>
-    /// <param name="actor">The administrator who asks. Must not be null.</param>
+    /// <param name="actor">The administrator of the project who asks. Must not be null.</param>
+    /// <param name="projectId">The project identity.</param>
     /// <param name="cancellationToken">Cancels the operation.</param>
     /// <returns>The registrations ordered by name; none carries a token.</returns>
     /// <exception cref="ArgumentNullException">Thrown when <paramref name="actor"/> is null.</exception>
-    /// <exception cref="DomainRuleException">Thrown with <see cref="DomainRule.ActorNotAllowed"/> when the actor is not an administrator.</exception>
-    public async Task<IReadOnlyList<SourceRepository>> ListAsync(Actor actor, CancellationToken cancellationToken = default)
+    /// <exception cref="DomainRuleException">
+    ///     Thrown with <see cref="DomainRule.ProjectNotFound"/> or <see cref="DomainRule.ActorNotAllowed"/> when the
+    ///     actor may not administer the project.
+    /// </exception>
+    public async Task<IReadOnlyList<SourceRepository>> ListAsync(
+        Actor actor,
+        int projectId,
+        CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(actor);
 
-        await EnsureAdminAsync(actor, cancellationToken);
-        return await _store.ListAsync(cancellationToken);
+        await _access.RequireAdministerAsync(actor, projectId, cancellationToken);
+        return await _store.ListAsync(projectId, cancellationToken);
     }
 
     /// <summary>
-    ///     Lists the enabled repositories an ordinary user may choose from.
+    ///     Lists the enabled repositories of a project that a member may choose from.
     /// </summary>
+    /// <param name="actor">The signed-in user, who must be able to see the project. Must not be null.</param>
+    /// <param name="projectId">The project identity.</param>
     /// <param name="cancellationToken">Cancels the operation.</param>
     /// <returns>The identity and name of each enabled repository, ordered by name; nothing about location or credentials.</returns>
-    public async Task<IReadOnlyList<RepositorySummary>> ListEnabledAsync(CancellationToken cancellationToken = default)
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="actor"/> is null.</exception>
+    /// <exception cref="DomainRuleException">Thrown with <see cref="DomainRule.ProjectNotFound"/> when the actor may not see the project.</exception>
+    public async Task<IReadOnlyList<RepositorySummary>> ListEnabledAsync(
+        Actor actor,
+        int projectId,
+        CancellationToken cancellationToken = default)
     {
-        var all = await _store.ListAsync(cancellationToken);
+        ArgumentNullException.ThrowIfNull(actor);
+
+        await _access.RequireViewAsync(actor, projectId, cancellationToken);
+        var all = await _store.ListAsync(projectId, cancellationToken);
         return all.Where(r => r.Enabled).Select(r => new RepositorySummary(r.Id, r.Name)).ToList();
     }
 
     /// <summary>
     ///     Reads what the git layer needs to reach an enabled repository, including the decrypted token.
     /// </summary>
+    /// <param name="projectId">The project that wants to use the repository; the repository must belong to it.</param>
     /// <param name="id">The repository identity.</param>
     /// <param name="cancellationToken">Cancels the operation.</param>
     /// <returns>The access data; it must stay in server-side code.</returns>
     /// <exception cref="DomainRuleException">
-    ///     Thrown with <see cref="DomainRule.RepositoryNotFound"/>, <see cref="DomainRule.RepositoryDisabled"/> or
-    ///     <see cref="DomainRule.CredentialsUnreadable"/>.
+    ///     Thrown with <see cref="DomainRule.RepositoryNotFound"/> (also when the repository belongs to another
+    ///     project), <see cref="DomainRule.RepositoryDisabled"/> or <see cref="DomainRule.CredentialsUnreadable"/>.
     /// </exception>
-    internal async Task<RepositoryAccess> GetAccessAsync(int id, CancellationToken cancellationToken = default)
+    internal async Task<RepositoryAccess> GetAccessAsync(
+        int projectId,
+        int id,
+        CancellationToken cancellationToken = default)
     {
         // The gate keeps a concurrent update from changing the registration between the two reads, which could pair
         // the location of one version with the token of another
@@ -361,6 +402,13 @@ public sealed class RepositoryService
         try
         {
             var repository = await GetExistingAsync(id, cancellationToken);
+
+            // A repository belongs to one project only; another project cannot use it, even by guessing the identity
+            if (repository.ProjectId != projectId)
+            {
+                throw new DomainRuleException(DomainRule.RepositoryNotFound, "The repository does not exist.");
+            }
+
             if (!repository.Enabled)
             {
                 throw new DomainRuleException(
@@ -682,20 +730,29 @@ public sealed class RepositoryService
     }
 
     /// <summary>
-    ///     Checks that the acting user is an enabled administrator.
+    ///     Checks that the acting user may administer the project the repository belongs to, and reads the repository.
     /// </summary>
+    /// <param name="id">The repository identity.</param>
     /// <param name="actor">The acting user.</param>
     /// <param name="cancellationToken">Cancels the operation.</param>
-    /// <returns>A task that completes when the actor is known to be allowed.</returns>
-    /// <exception cref="DomainRuleException">Thrown with <see cref="DomainRule.ActorNotAllowed"/> when the actor is not allowed.</exception>
-    private async Task EnsureAdminAsync(Actor actor, CancellationToken cancellationToken)
+    /// <returns>The repository.</returns>
+    /// <exception cref="DomainRuleException">
+    ///     Thrown with <see cref="DomainRule.RepositoryNotFound"/> when there is no such repository or its project is
+    ///     not visible to the actor (the two are not told apart), and with <see cref="DomainRule.ActorNotAllowed"/>
+    ///     when the actor sees the project but does not administer it.
+    /// </exception>
+    private async Task<SourceRepository> RequireRepositoryAdminAsync(
+        int id,
+        Actor actor,
+        CancellationToken cancellationToken)
     {
-        var user = await _users.GetAsync(actor.Username, cancellationToken);
-        if (user is null || !user.Enabled || user.Role != UserRole.Admin)
+        var repository = await _store.GetAsync(id, cancellationToken);
+        if (repository is null || !await _access.CanViewAsync(actor, repository.ProjectId, cancellationToken))
         {
-            throw new DomainRuleException(
-                DomainRule.ActorNotAllowed,
-                "Your account is not allowed to make this change.");
+            throw new DomainRuleException(DomainRule.RepositoryNotFound, "The repository does not exist.");
         }
+
+        await _access.RequireAdministerAsync(actor, repository.ProjectId, cancellationToken);
+        return repository;
     }
 }

@@ -47,9 +47,10 @@ documented with `ServerHost` as a supporting type, `UserCommand`, and `AuditComm
 
 - *Type*: In-process .NET static method.
 - *Role*: Provider.
-- *Contract*: Registers the database settings and context factory, the clock, the stores, the password hasher, the Core
+- *Contract*: Registers the database settings and context factory, the clock, the stores, the password hasher, the
+  project access rules (`ProjectAccess` as the Core `IProjectAccess`), the Core
   services, and the git content source (its settings, the key ring of the Data Protection system, the token protector,
-  and the repository registry) in a service collection built from a configuration. It is shared by the server,
+  and the repository store) in a service collection built from a configuration. It is shared by the server,
   `UserCommand`, and `AuditCommand`.
 - *Constraints*: None.
 
@@ -100,7 +101,8 @@ the server.
 **Storage and Core (consumed)**: `DatabaseSetup`, `ReviewCenterDbContext`, `ReviewStore`, `UserStore`, `AuditStore`,
 `RepositoryStore`, `PersonalAccessTokenStore`, and `AuditAppender` of the
 `Storage` subsystem, and `ProjectService`, `ReviewService`, `ThreadService`, `ChecklistService`, `UserService`,
-`SigningService`, `AuditService`, `RepositoryService`, `PersonalAccessTokenService`, and the store and hasher interfaces
+`SigningService`, `AuditService`, `RepositoryService`, `PersonalAccessTokenService`, and the store, hasher, and
+`IProjectAccess` interfaces
 of the `Core` subsystem, and `PersonalAccessTokenStore` of the `Storage` subsystem.
 
 - *Type*: In-process .NET types.
@@ -165,7 +167,9 @@ of the `Storage` subsystem, registers a `ReviewCenterDbContext` factory configur
 and registers `TimeProvider.System`, `AuditAppender`, `ReviewStore`, `UserStore`, and `AuditStore` as the Core store
 interfaces (the appender is a single instance shared by all three stores, which is what makes the audit gate
 process-wide), `PasswordHasher` as
-the Core hasher interface, and the seven Core services (`ProjectService`, `ReviewService`, `ThreadService`,
+the Core hasher interface, `ProjectAccess` as the Core `IProjectAccess` (a singleton, registered before the services
+that take it, so that every service and the API decide visibility with the same instance), and the seven Core services
+(`ProjectService`, `ReviewService`, `ThreadService`,
 `ChecklistService`, `UserService`, `SigningService`, and `AuditService`) as singletons shared by all browser
 connections. `AuditService` is created with a hook that writes a warning to the log when an event cannot be recorded
 (the failure is never shown to the user), and `UserService` receives it so that failed sign-ins and lockouts are

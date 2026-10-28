@@ -129,19 +129,34 @@ sections:
 
       - id: ReviewCenter-SignIn-AdminOnly
         title: >-
-          The SignIn unit shall allow the user administration page only to a user with the Admin role.
+          The SignIn unit shall allow the user administration page only to a user with the system administrator role.
         justification: |
-          Managing users is limited to administrators, because it controls who may sign in.
+          Managing users is limited to system administrators, because it controls who may sign in.
         tests:
           - SignIn_UsersPage_ReviewerAndAdmin_OnlyAdminIsAllowed
+
+      - id: ReviewCenter-SignIn-AdminClaim
+        title: >-
+          The SignIn unit shall put the system administrator role into the principal of a session only for a user
+          who is a system administrator, and no role for a project, and shall consider the principal current only
+          when it has that role exactly when the stored user is a system administrator.
+        justification: |
+          A project role copied into the cookie would stay true after a member was removed from the project, so
+          memberships are always read from the database when they are needed. The system administrator role is
+          the one claim that pages use for authorization, and comparing its presence with the stored flag ends the
+          session of a user who was promoted or demoted.
+        tests:
+          - SignIn_IsCurrent_StoredUserVersusPrincipal_FollowsTheRule
+          - SignIn_Session_RoleChangedAfterLogin_IsRejected
 
       - id: ReviewCenter-SignIn-SessionValidation
         title: >-
           The SignIn unit shall consider a signed-in user valid only while that user exists, is enabled, and has
-          the same role and display name as at sign-in, using this one rule for every check, and shall reject the
-          session cookie of a user who is not valid.
+          the same system administrator state and display name as at sign-in, using this one rule for every check,
+          and shall reject the session cookie of a user who is not valid.
         justification: |
-          Disabling a user or changing a role must take effect at once, not when the cookie runs out. One rule for
+          Disabling a user or changing the system administrator right must take effect at once, not when the cookie
+          runs out. One rule for
           the cookie and for open pages means a page that is already open cannot be treated more leniently than a
           new request.
         tests:

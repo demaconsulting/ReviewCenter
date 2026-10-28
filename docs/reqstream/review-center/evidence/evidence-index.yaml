@@ -62,3 +62,14 @@ sections:
           - EvidenceIndexService_Build_SameIdAndFingerprint_KeepsLatestCompletion
           - EvidenceIndexService_Build_SameCompletionTime_KeepsLowestReviewId
           - ReviewMarkContract_GoldenIndex_MatchesCommittedFile
+
+      - id: ReviewCenter-EvidenceIndex-Visibility
+        title: >-
+          The EvidenceIndexService class shall build the index only for an actor who may view the project, and shall
+          refuse any other actor as for a project that does not exist.
+        justification: |
+          The index names the review-sets and fingerprints of the project. Showing it to somebody who may not see the
+          project would disclose its work, and a different refusal would tell that the project exists.
+        tests:
+          - ApiProjectAccess_EveryProjectRoute_NonMemberToken_AnswersLikeAMissingProject
+          - ApiProjectAccess_EveryProjectRoute_MemberAndSystemAdmin_AreNotRefused

@@ -90,9 +90,16 @@ public class AuditEventTests
             ids[username] = (await userService.CreateAsync(username, name, UserRole.Reviewer, Password, Actor.CommandLine, TestContext.Current.CancellationToken)).Id;
         }
 
-        var projects = new ProjectService(reviews, clock);
+        var projects = new ProjectService(reviews, users, new AllowAllProjectAccess(reviews), clock);
         var project = await projects.CreateAsync("Apollo", "Moon", TestActors.Ann, TestContext.Current.CancellationToken);
-        var reviewService = new ReviewService(reviews, clock);
+        var auditCount = reviews.Audits.Count;
+        foreach (var userId in ids.Values)
+        {
+            await reviews.AddMembershipAsync(userId, project.Id, TestContext.Current.CancellationToken);
+        }
+
+        // The arranged memberships are not under test: the numbered entries below stay where they were
+        reviews.Audits.RemoveRange(auditCount, reviews.Audits.Count - auditCount); var reviewService = TestServices.Reviews(reviews, clock);
         await reviewService.CreateDraftAsync(
             project.Id,
             "rev-1",
@@ -108,9 +115,9 @@ public class AuditEventTests
             userService,
             projects,
             reviewService,
-            new ThreadService(reviews, clock),
-            new ChecklistService(reviews, clock),
-            new SigningService(reviews, userService, clock),
+            TestServices.Threads(reviews, clock),
+            TestServices.Checklists(reviews, clock),
+            TestServices.Signing(reviews, userService, clock),
             project.Id,
             ids);
     }
@@ -325,8 +332,8 @@ public class AuditEventTests
         fixture.Users.Audits.Clear();
 
         // Act
-        await fixture.UserService.CreateAsync("carl", "Carl", UserRole.Reviewer, Password, admin, TestContext.Current.CancellationToken);
-        await fixture.UserService.SetRoleAsync("carl", UserRole.Admin, admin, TestContext.Current.CancellationToken);
+        await fixture.UserService.CreateAsync("carl", "Carl", false, Password, admin, TestContext.Current.CancellationToken);
+        await fixture.UserService.SetSystemAdminAsync("carl", true, admin, TestContext.Current.CancellationToken);
         await fixture.UserService.SetEnabledAsync("carl", false, admin, TestContext.Current.CancellationToken);
         await fixture.UserService.SetEnabledAsync("carl", true, admin, TestContext.Current.CancellationToken);
         await fixture.UserService.SetPasswordAsync("carl", "a brand new password", admin, TestContext.Current.CancellationToken);
@@ -335,10 +342,10 @@ public class AuditEventTests
         // Assert
         var drafts = fixture.Users.Audits.ToList();
         Assert.Equal(
-            ["user.created", "user.role-changed", "user.disabled", "user.enabled", "user.password-set-by-admin", "user.password-changed"],
+            ["user.created", "user.admin-changed", "user.disabled", "user.enabled", "user.password-set-by-admin", "user.password-changed"],
             drafts.Select(d => d.Action));
-        Assert.Equal("user 'carl', role Reviewer", drafts[0].Detail);
-        Assert.Equal("user 'carl': Reviewer -> Admin", drafts[1].Detail);
+        Assert.Equal("user 'carl'", drafts[0].Detail);
+        Assert.Equal("user 'carl': system administrator False -> True", drafts[1].Detail);
         Assert.Equal("user 'carl'", drafts[2].Detail);
         Assert.Equal("user 'carl'", drafts[3].Detail);
         Assert.Equal("user 'carl'", drafts[4].Detail);

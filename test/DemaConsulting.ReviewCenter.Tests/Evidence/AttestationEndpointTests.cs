@@ -124,6 +124,7 @@ public class AttestationEndpointTests
             services => services.AddSingleton(provider => new AttestationService(
                 provider.GetRequiredService<IReviewStore>(),
                 provider.GetRequiredService<SigningService>(),
+                provider.GetRequiredService<IProjectAccess>(),
                 provider.GetRequiredService<AuditService>(),
                 provider.GetRequiredService<IAttestationKeyProvider>(),
                 provider.GetRequiredService<IAttestationRenderer>(),
@@ -280,12 +281,15 @@ public class AttestationEndpointTests
         var cancellationToken = TestContext.Current.CancellationToken;
         var users = app.Services.GetRequiredService<UserService>();
         var ids = new Dictionary<string, int>();
-        foreach (var (username, name) in new[] { ("ann", "Ann"), ("bob", "Bob") })
+        foreach (var (username, name, admin) in new[] { ("ann", "Ann", true), ("bob", "Bob", false) })
         {
-            ids[username] = (await users.CreateAsync(username, name, UserRole.Reviewer, TestBrowser.Password, cancellationToken)).Id;
+            ids[username] = (await users.CreateAsync(username, name, admin, TestBrowser.Password, cancellationToken)).Id;
         }
 
         var project = await app.Services.GetRequiredService<ProjectService>().CreateAsync("Apollo", null, cancellationToken);
+        var store = app.Services.GetRequiredService<IReviewStore>();
+        await store.AddMembershipAsync(ids["ann"], project.Id, cancellationToken);
+        await store.AddMembershipAsync(ids["bob"], project.Id, cancellationToken);
         await app.Services.GetRequiredService<ReviewService>().CreateDraftAsync(
             project.Id, "REV-1", "First review", [new UploadedFile("a.txt", "one\ntwo\n"u8.ToArray())], cancellationToken);
         var ann = new Actor("ann", "Ann");

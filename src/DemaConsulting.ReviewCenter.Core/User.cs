@@ -21,11 +21,11 @@
 namespace DemaConsulting.ReviewCenter.Core;
 
 /// <summary>
-///     A local user account: who may sign in, with which role, and the state of the sign-in protection.
+///     A local user account: who may sign in, whether the user is a system administrator, and the state of the sign-in protection.
 /// </summary>
 /// <remarks>
 ///     Instances are created by <see cref="UserService"/>, which enforces the rules, and are populated by
-///     the storage layer. The fields that change over the life of an account (role, enabled flag, password
+///     the storage layer. The fields that change over the life of an account (administrator flag, enabled flag, password
 ///     hash and the lockout state) have setters so the service can change a copy it has read and store it
 ///     again. The password hash must never be logged or shown. The type is not thread-safe.
 /// </remarks>
@@ -48,9 +48,11 @@ public sealed class User
     public string DisplayName { get; init; } = string.Empty;
 
     /// <summary>
-    ///     Gets or sets the role of the user.
+    ///     Gets or sets a value indicating whether the user is a system administrator: may manage users, create
+    ///     projects and see every project. Everything else a user may do comes from a
+    ///     <see cref="ProjectMembership"/>.
     /// </summary>
-    public UserRole Role { get; set; }
+    public bool IsSystemAdmin { get; set; }
 
     /// <summary>
     ///     Gets or sets a value indicating whether the user can sign in; a disabled user keeps the work already recorded.

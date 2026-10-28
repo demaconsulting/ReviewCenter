@@ -111,6 +111,18 @@ sections:
           - AuditCommand_Run_IntactTrail_ReportsEntryCountWithExitCodeZero
           - SignIn_Flow_LoginFailureAndLogout_FormAnIntactChain
 
+      - id: ReviewCenter-ServerHost-ProjectAccess
+        title: >-
+          The ServerHost class shall register the project access rules (`IProjectAccess`) once for the whole
+          process, as a singleton shared by the services, the endpoints, and the pages, before the services that use
+          them.
+        justification: |
+          The rules read the stored users and memberships afresh on every call, so one shared instance holds no
+          state that could go stale, and every service decides visibility the same way.
+        tests:
+          - ServerHost_CreateApplication_DatabaseConfigured_CreatesFileAndServesDomainServices
+          - ApiProjectAccess_EveryProjectRoute_NonMemberToken_AnswersLikeAMissingProject
+
       - id: ReviewCenter-ServerHost-RepositoryServices
         title: >-
           The ServerHost class shall register the repository registry, the credential protector, and the git content

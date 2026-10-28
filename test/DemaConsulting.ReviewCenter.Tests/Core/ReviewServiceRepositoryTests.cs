@@ -74,12 +74,14 @@ public class ReviewServiceRepositoryTests
     private static async Task<Fixture> CreateAsync()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
+        var store = new FakeReviewStore();
         var clock = new FixedTimeProvider(_now);
         var users = new UserService(new FakeUserStore(), new FakePasswordHasher(), clock);
         await users.CreateAsync("adm", "Adm", UserRole.Admin, "correct horse battery", cancellationToken);
-        var repositories = new RepositoryService(new FakeRepositoryStore(), new FakeCredentialProtector(), users, clock);
+        var repositories = TestServices.Repositories(store, clock);
+        var project = await TestServices.Projects(store, clock).CreateAsync("Apollo", null, cancellationToken);
         var repository = await repositories.CreateAsync(
-            "main-repo", "https://example.com/org/repo.git", null, null, _actor, cancellationToken);
+            project.Id, "main-repo", "https://example.com/org/repo.git", null, null, _actor, cancellationToken);
         var git = new FakeGitRepositoryProvider();
         git.Revisions["main"] = HeadSha;
         git.Revisions["v1"] = BaseSha;
@@ -91,11 +93,9 @@ public class ReviewServiceRepositoryTests
                 ("src/mod.txt", ChangeKind.Modified, "world\n", "hello\n"),
                 ("src/new.txt", ChangeKind.Added, null, "world\n")
             ]);
-        var store = new FakeReviewStore();
-        var project = await new ProjectService(store, clock).CreateAsync("Apollo", null, cancellationToken);
         return new Fixture(
             store,
-            new ReviewService(store, clock, repositories, git),
+            TestServices.Reviews(store, clock, repositories, git),
             repositories,
             git,
             project.Id,
@@ -558,7 +558,8 @@ public class ReviewServiceRepositoryTests
     public async Task ReviewService_CreateFromRepositoryAsync_WithoutRepositories_Throws()
     {
         // Arrange: a service with only the store and the clock
-        var service = new ReviewService(new FakeReviewStore(), new FixedTimeProvider(_now));
+        var service = new ReviewService(
+            new FakeReviewStore(), new AllowAllProjectAccess(new FakeReviewStore()), new FixedTimeProvider(_now));
 
         // Act, Assert: the call is refused as a programming error
         await Assert.ThrowsAsync<InvalidOperationException>(() => service.CreateFromRepositoryAsync(

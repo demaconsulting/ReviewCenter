@@ -6,8 +6,10 @@
 
 `HistoryPage` is the page at `/projects/{projectId}/reviews/{reviewId}/history`. Its responsibilities are to show the
 audit entries recorded for one review, newest first, 50 to a page, and to report when the page is interactive. It
-requires a signed-in user: an anonymous visitor is sent to the login page. Every signed-in user may read the history of
-a review, as every signed-in user may read the review itself. It changes nothing. It is a Razor component split into
+requires a signed-in user: an anonymous visitor is sent to the login page. A signed-in user may read the history of
+a review of a project the user may see, as the user may read the review itself; for any other project the page loads
+no review and no entries and shows the same message as for a review that does not exist. It changes nothing. It is a
+Razor component split into
 presentation (`HistoryPage.razor`) and behavior (`HistoryPage.razor.cs`).
 
 #### Data Model
@@ -41,8 +43,10 @@ subsystem): `history-page` (root), `breadcrumb-projects-link`, `project-link`, `
 **OnParametersSetAsync**: Loads the review, the project name, and the page of entries whenever the address changes.
 
 - *Postconditions*: The previous page is cleared before the first await, so a stale page is never shown under a new
-  address. The entries are read with `AuditService.ListAsync` for the project and the review; a review that does not
-  exist shows the message "Review '{id}' does not exist in project {n}." and no entries.
+  address. The project is read with `ProjectService.GetAsync(actor, projectId)`, and when the user may not see it
+  nothing of the review is loaded. The entries are read with `AuditService.ListAsync` for the project and the review; a
+  review that does not exist, or of a project the user may not see, shows the message
+  "Review '{id}' does not exist in project {n}." and no entries.
 
 **OnAfterRender**: Marks the page interactive after the first render on a live connection.
 
@@ -61,7 +65,8 @@ returns; it cannot show a text that was never stored, and in particular never an
 - **SessionGate** (App) — wraps the whole page content, so the page is replaced by a "Session ended" message when the
   sign-in state of the open page ends.
 - **AuditService** — reads the page of entries.
-- **ReviewService** and **ProjectService** — read the review and the project name.
+- **ReviewService** and **ProjectService** — read the review, and the project (for the actor) and its name.
+- **AuthenticationStateProvider** (ASP.NET Core) — gives the signed-in user.
 - **ASP.NET Core Blazor components** — the component base class, query parameters, authorization attribute, and the
   interactive server render mode.
 

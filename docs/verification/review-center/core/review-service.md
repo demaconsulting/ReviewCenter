@@ -3,7 +3,9 @@
 #### Verification Approach
 
 `ReviewService` is verified with unit tests defined in `ReviewServiceTests.cs`. The tests use the real service and
-the real `Fingerprint` with a fake in-memory store (`FakeReviewStore`) and a fixed clock, so every rule and every
+the real `Fingerprint` with a fake in-memory store (`FakeReviewStore`), the project-access double
+`AllowAllProjectAccess` (the access rules are verified by the `ProjectAccess` unit), and a fixed clock, so every rule
+and every
 limit can be exercised without a database. Failures are checked through the rule carried by the
 `DomainRuleException`. Limits are tested at the boundary: the limit itself is accepted and one more is rejected.
 The tests that use large content build it in memory. The blank-path, invalid-id, and blank-title tests are
@@ -19,7 +21,8 @@ N/A - standard test environment.
 - A valid request stores a Draft review with the known fingerprint, the hash and size of each file, and the bytes
   unchanged, including binary content and carriage returns.
 - The fingerprint does not depend on file paths or order.
-- Each rule violation is rejected with the matching rule.
+- Each rule violation is rejected with the matching rule; a project that does not exist is refused with the rule that
+  also hides a project the actor may not see, and a repository that is not the project's is refused as not found.
 - Every limit is accepted at its value and rejected above it.
 - A review can be read back with its files, listed, and its file content read; the content of a missing file or
   review is null.
@@ -76,8 +79,8 @@ rejected with `ReviewTitleInvalid`. This scenario is tested by
 `ReviewService_CreateDraftAsync_TitleTooLong_ThrowsReviewTitleInvalid`.
 
 **ReviewService_CreateDraftAsync_UnknownProject_ThrowsProjectNotFound**: A review in a project that does not exist
-is rejected with `ProjectNotFound`. This scenario is tested by
-`ReviewService_CreateDraftAsync_UnknownProject_ThrowsProjectNotFound`.
+is rejected with `ProjectNotFound`, which is also the refusal for a project the actor may not see. This scenario is
+tested by `ReviewService_CreateDraftAsync_UnknownProject_ThrowsProjectNotFound`.
 
 **ReviewService_CreateDraftAsync_NoFiles_ThrowsNoFiles**: A review without files is rejected with `NoFiles`. This
 scenario is tested by `ReviewService_CreateDraftAsync_NoFiles_ThrowsNoFiles`.

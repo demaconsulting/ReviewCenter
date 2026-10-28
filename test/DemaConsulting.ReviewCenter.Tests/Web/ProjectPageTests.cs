@@ -165,6 +165,7 @@ public class ProjectPageTests : PageTestBase
         // Arrange: two reviews, one fully signed by its only slot, one without slots
         var ann = await Users.CreateAsync("ann", "Ann", UserRole.Reviewer, "correct horse battery", TestContext.Current.CancellationToken);
         var project = await Projects.CreateAsync("Apollo", null, TestContext.Current.CancellationToken);
+        await Store.AddMembershipAsync(ann.Id, project.Id, TestContext.Current.CancellationToken);
         await Reviews.CreateDraftAsync(project.Id, "REV-1", "Signed", [new("a.txt", TestContent.A)], TestContext.Current.CancellationToken);
         await Reviews.CreateDraftAsync(project.Id, "REV-2", "Open", [new("a.txt", TestContent.A)], TestContext.Current.CancellationToken);
         foreach (var item in DefaultChecklist.Current.Sections.SelectMany(section => section.Items))

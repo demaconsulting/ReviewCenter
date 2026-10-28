@@ -40,7 +40,10 @@ namespace DemaConsulting.ReviewCenter.Tests.Web;
 /// <remarks>
 ///     Using the real services (not mocks of them) means the pages are tested against the real validation
 ///     rules, so what a test sees is what the operator would see. Pages that need a signed-in user see
-///     <c>ann</c> (display name <c>Ann</c>, role reviewer) unless a test calls <see cref="SignInAs"/>.
+///     <c>ann</c> (display name <c>Ann</c>, a system administrator) unless a test calls
+///     <see cref="SignInAs(string, string, bool)"/>.
+///     The services the pages use enforce the real access rules; the services exposed as properties allow
+///     everything, so that a test can arrange its data.
 /// </remarks>
 public abstract class PageTestBase : BunitContext
 {
@@ -64,32 +67,45 @@ public abstract class PageTestBase : BunitContext
         var clock = new FixedTimeProvider(new DateTimeOffset(2025, 3, 4, 5, 6, 7, TimeSpan.Zero));
         Time = new ManualTimeProvider(new DateTimeOffset(2025, 3, 4, 5, 6, 7, TimeSpan.Zero));
         Services.AddSingleton<TimeProvider>(Time);
-        Projects = new ProjectService(store, clock);
-        Threads = new ThreadService(store, clock);
-        Checklists = new ChecklistService(store, clock);
         AuditStore = new FakeAuditStore(clock);
         Audit = new AuditService(AuditStore);
         var userStore = new FakeUserStore();
+        UserStore = userStore;
         Users = new UserService(userStore, new FakePasswordHasher(), clock, Audit);
         TokenStore = new FakePersonalAccessTokenStore(userStore);
         Tokens = new PersonalAccessTokenService(TokenStore, userStore, Time);
         Services.AddSingleton(Tokens);
         RepositoryStore = new FakeRepositoryStore();
-        Repositories = new RepositoryService(RepositoryStore, new FakeCredentialProtector(), Users, clock);
         Git = new FakeGitRepositoryProvider();
-        Reviews = new ReviewService(store, clock, Repositories, Git);
-        Services.AddSingleton(Audit);
-        Services.AddSingleton(Projects);
-        Services.AddSingleton(Reviews);
-        Services.AddSingleton(Threads);
-        Services.AddSingleton(Checklists);
-        Services.AddSingleton(Users);
-        Services.AddSingleton(Repositories);
-        Signing = new SigningService(store, Users, clock);
-        Services.AddSingleton(Signing);
         SetParser = new FakeReviewSetParser();
-        Planner = new ReviewPlanner(store, Reviews, Repositories, Git, Signing, SetParser);
-        Services.AddSingleton(Planner);
+
+        // The services the pages use enforce the real access rules for the signed-in user. The services a test
+        // uses to arrange data (the properties below) share the stores but allow everything, so that a test does
+        // not have to be a member of a project to prepare it.
+        var allowAll = new AllowAllProjectAccess(store);
+        Projects = new ProjectService(store, userStore, allowAll, clock);
+        Threads = new ThreadService(store, allowAll, clock);
+        Checklists = new ChecklistService(store, allowAll, clock);
+        Repositories = new RepositoryService(RepositoryStore, new FakeCredentialProtector(), allowAll, clock);
+        Reviews = new ReviewService(store, allowAll, clock, Repositories, Git);
+        Signing = new SigningService(store, Users, allowAll, clock);
+        Planner = new ReviewPlanner(store, Reviews, Repositories, Git, Signing, SetParser, allowAll);
+
+        Access = new SignedInUserAccess(new ProjectAccess(userStore, store), userStore, () => _revalidating ? null : _authentication.Current);
+        Services.AddSingleton<IProjectAccess>(Access);
+        var pageProjects = new ProjectService(store, userStore, Access, clock);
+        var pageRepositories = new RepositoryService(RepositoryStore, new FakeCredentialProtector(), Access, clock);
+        var pageReviews = new ReviewService(store, Access, clock, pageRepositories, Git);
+        var pageSigning = new SigningService(store, Users, Access, clock);
+        Services.AddSingleton(Audit);
+        Services.AddSingleton(pageProjects);
+        Services.AddSingleton(pageReviews);
+        Services.AddSingleton(new ThreadService(store, Access, clock));
+        Services.AddSingleton(new ChecklistService(store, Access, clock));
+        Services.AddSingleton(Users);
+        Services.AddSingleton(pageRepositories);
+        Services.AddSingleton(pageSigning);
+        Services.AddSingleton(new ReviewPlanner(store, pageReviews, pageRepositories, Git, pageSigning, SetParser, Access));
         Services.AddSingleton<AuthenticationStateProvider>(_authentication);
 
         // The review page offers the attestation; the default key is an in-memory self-signed key, and a test that
@@ -129,6 +145,16 @@ public abstract class PageTestBase : BunitContext
     ///     Gets the in-memory token store behind the token service, for arranging and inspecting tokens.
     /// </summary>
     internal FakePersonalAccessTokenStore TokenStore { get; }
+
+    /// <summary>
+    ///     Gets the in-memory user store behind the user service.
+    /// </summary>
+    internal FakeUserStore UserStore { get; }
+
+    /// <summary>
+    ///     Gets the real access rules the pages use, for asking what a user may do.
+    /// </summary>
+    internal IProjectAccess Access { get; }
 
     /// <summary>
     ///     Gets the personal access token service the account page uses.
@@ -195,17 +221,32 @@ public abstract class PageTestBase : BunitContext
     /// </summary>
     /// <param name="username">The user name.</param>
     /// <param name="displayName">The display name.</param>
-    /// <param name="role">The role of the user.</param>
-    protected void SignInAs(string username, string displayName, UserRole role = UserRole.Reviewer)
+    /// <param name="isSystemAdmin">Whether the user is a system administrator; the default is <c>true</c>.</param>
+    /// <remarks>
+    ///     The user is created in the store when the first access check needs it and the test has not created it.
+    ///     Tests of the access rules pass <c>false</c> and add a membership or none.
+    /// </remarks>
+    protected void SignInAs(string username, string displayName, bool isSystemAdmin = true)
     {
         if (_revalidating)
         {
             ((ServerAuthenticationStateProvider)Services.GetRequiredService<AuthenticationStateProvider>())
-                .SetAuthenticationState(Task.FromResult(Create(username, displayName, role)));
+                .SetAuthenticationState(Task.FromResult(Create(username, displayName, isSystemAdmin)));
             return;
         }
 
-        _authentication.Change(username, displayName, role);
+        _authentication.Change(username, displayName, isSystemAdmin);
+    }
+
+    /// <summary>
+    ///     Makes the pages see another signed-in user, using the test shorthand <see cref="UserRole"/>.
+    /// </summary>
+    /// <param name="username">The user name.</param>
+    /// <param name="displayName">The display name.</param>
+    /// <param name="role">The role of the user.</param>
+    protected void SignInAs(string username, string displayName, UserRole role)
+    {
+        SignInAs(username, displayName, role == UserRole.Admin);
     }
 
     /// <summary>
@@ -238,7 +279,8 @@ public abstract class PageTestBase : BunitContext
     /// </summary>
     /// <param name="interval">The time between two checks; short so that a test does not have to wait long.</param>
     /// <remarks>
-    ///     Call this before the first render and before <see cref="SignInAs"/>: nobody is signed in until then. The
+    ///     Call this before the first render and before <see cref="SignInAs(string, string, bool)"/>: nobody is
+    ///     signed in until then. The
     ///     provider is created by the container, which also disposes it (and so stops its loop) with the context.
     /// </remarks>
     protected void UseRevalidation(TimeSpan interval)
@@ -254,18 +296,21 @@ public abstract class PageTestBase : BunitContext
     /// </summary>
     /// <param name="username">The user name.</param>
     /// <param name="displayName">The display name.</param>
-    /// <param name="role">The role of the user.</param>
+    /// <param name="isSystemAdmin">Whether the user is a system administrator.</param>
     /// <returns>The state.</returns>
-    private static AuthenticationState Create(string username, string displayName, UserRole role)
+    private static AuthenticationState Create(string username, string displayName, bool isSystemAdmin)
     {
-        var identity = new ClaimsIdentity(
-            [
-                new Claim(ClaimTypes.Name, username),
-                new Claim(SignIn.DisplayNameClaimType, displayName),
-                new Claim(ClaimTypes.Role, role.ToString())
-            ],
-            "Test");
-        return new AuthenticationState(new ClaimsPrincipal(identity));
+        var claims = new List<Claim>
+        {
+            new(ClaimTypes.Name, username),
+            new(SignIn.DisplayNameClaimType, displayName)
+        };
+        if (isSystemAdmin)
+        {
+            claims.Add(new Claim(ClaimTypes.Role, SignIn.AdminRole));
+        }
+
+        return new AuthenticationState(new ClaimsPrincipal(new ClaimsIdentity(claims, "Test")));
     }
 
     /// <summary>
@@ -276,7 +321,23 @@ public abstract class PageTestBase : BunitContext
         /// <summary>
         ///     The current state.
         /// </summary>
-        private AuthenticationState _state = Create("ann", "Ann", UserRole.Reviewer);
+        private AuthenticationState _state = Create("ann", "Ann", true);
+
+        /// <summary>
+        ///     Gets the signed-in user, or <c>null</c> when nobody is signed in.
+        /// </summary>
+        public (string Username, string DisplayName, bool IsSystemAdmin)? Current
+        {
+            get
+            {
+                var user = _state.User;
+                return user.Identity?.IsAuthenticated == true
+                    ? (user.Identity.Name ?? string.Empty,
+                        user.FindFirst(SignIn.DisplayNameClaimType)?.Value ?? string.Empty,
+                        user.IsInRole(SignIn.AdminRole))
+                    : null;
+            }
+        }
 
         /// <inheritdoc />
         public override Task<AuthenticationState> GetAuthenticationStateAsync()
@@ -307,10 +368,10 @@ public abstract class PageTestBase : BunitContext
         /// </summary>
         /// <param name="username">The user name.</param>
         /// <param name="displayName">The display name.</param>
-        /// <param name="role">The role of the user.</param>
-        public void Change(string username, string displayName, UserRole role)
+        /// <param name="isSystemAdmin">Whether the user is a system administrator.</param>
+        public void Change(string username, string displayName, bool isSystemAdmin)
         {
-            _state = Create(username, displayName, role);
+            _state = Create(username, displayName, isSystemAdmin);
             NotifyAuthenticationStateChanged(Task.FromResult(_state));
         }
     }

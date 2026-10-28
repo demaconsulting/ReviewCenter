@@ -516,13 +516,13 @@ public class IntegrationTests
 
         // Act: add the same user twice
         var first = Runner.RunWithEnvironment(
-            out var firstOutput, environment, "dotnet", _dllPath, "user", "add", "--username", "root", "--display-name", "Root", "--role", "Admin");
+            out var firstOutput, environment, "dotnet", _dllPath, "user", "add", "--username", "root", "--display-name", "Root", "--system-admin");
         var second = Runner.RunWithEnvironment(
-            out var secondOutput, environment, "dotnet", _dllPath, "user", "add", "--username", "root", "--display-name", "Root", "--role", "Admin");
+            out var secondOutput, environment, "dotnet", _dllPath, "user", "add", "--username", "root", "--display-name", "Root", "--system-admin");
 
         // Assert: the first succeeds, the second fails, and the password is never printed
         Assert.Equal(0, first);
-        Assert.Contains("Created user 'root' with the role Admin.", firstOutput);
+        Assert.Contains("Created user 'root' (system administrator).", firstOutput);
         Assert.Equal(1, second);
         Assert.Contains("already exists", secondOutput);
         Assert.DoesNotContain(password, firstOutput + secondOutput);

@@ -344,7 +344,7 @@ public class RevalidatingAuthenticationStateProviderTests
             [
                 new Claim(ClaimTypes.Name, username),
                 new Claim(SignIn.DisplayNameClaimType, displayName),
-                new Claim(ClaimTypes.Role, role.ToString())
+                new Claim(ClaimTypes.Role, role == UserRole.Admin ? SignIn.AdminRole : "Reviewer")
             ],
             "Test");
         return new AuthenticationState(new ClaimsPrincipal(identity));

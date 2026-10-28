@@ -48,29 +48,43 @@ internal sealed class EvidenceIndexService
     private readonly SigningService _signing;
 
     /// <summary>
+    ///     Decides who may see which project.
+    /// </summary>
+    private readonly IProjectAccess _access;
+
+    /// <summary>
     ///     Initializes a new instance of the <see cref="EvidenceIndexService"/> class.
     /// </summary>
     /// <param name="reviews">The review service. Must not be null.</param>
     /// <param name="signing">The signing service. Must not be null.</param>
+    /// <param name="access">The access rules. Must not be null.</param>
     /// <exception cref="ArgumentNullException">Thrown when an argument is null.</exception>
-    public EvidenceIndexService(ReviewService reviews, SigningService signing)
+    public EvidenceIndexService(ReviewService reviews, SigningService signing, IProjectAccess access)
     {
         ArgumentNullException.ThrowIfNull(reviews);
         ArgumentNullException.ThrowIfNull(signing);
+        ArgumentNullException.ThrowIfNull(access);
         _reviews = reviews;
         _signing = signing;
+        _access = access;
     }
 
     /// <summary>
     ///     Builds the evidence index of a project.
     /// </summary>
+    /// <param name="actor">The user (or the owner of the token) who asks; must be able to see the project. Must not be null.</param>
     /// <param name="projectId">The project number.</param>
     /// <param name="cancellationToken">A token to cancel the work.</param>
     /// <returns>The entries, one per (id, fingerprint), ordered by id and then fingerprint; empty when none.</returns>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="actor"/> is null.</exception>
+    /// <exception cref="DomainRuleException">Thrown with <see cref="DomainRule.ProjectNotFound"/> when the actor may not see the project.</exception>
     public async Task<IReadOnlyList<EvidenceIndexEntry>> BuildAsync(
+        Actor actor,
         int projectId,
         CancellationToken cancellationToken = default)
     {
+        ArgumentNullException.ThrowIfNull(actor);
+        await _access.RequireViewAsync(actor, projectId, cancellationToken);
         // Only reviews planned from a review set can be listed; their approvals are read in one batch so the users
         // are loaded once, not once per review
         var planned = (await _reviews.ListAsync(projectId, cancellationToken))

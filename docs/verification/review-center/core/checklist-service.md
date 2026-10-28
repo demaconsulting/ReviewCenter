@@ -3,7 +3,9 @@
 #### Verification Approach
 
 `ChecklistService`, the `DefaultChecklist` definition, and the progress rules of `ChecklistState` are verified with
-unit tests defined in `ChecklistServiceTests.cs`. The service is exercised over an in-memory fake store, so each
+unit tests defined in `ChecklistServiceTests.cs`. The service is exercised over an in-memory fake store and the
+project-access double `AllowAllProjectAccess` (the access rules themselves are verified by the `ProjectAccess`
+unit), so each
 test creates its own review and reads the stored result back. The freeze at review creation is verified in
 `ReviewServiceTests.cs`. The real database is covered by the `Storage` subsystem.
 
@@ -100,8 +102,9 @@ refused with an `ArgumentNullException` and nothing is stored. This scenario is 
 the user name of the actor and the UTC time of the clock. This scenario is tested by
 `ChecklistService_SetAnswer_StoresActorAndUtcTime`.
 
-**ChecklistService_Constructor_NullArguments_Throws**: The service is created with a missing argument; the
-constructor throws. This scenario is tested by `ChecklistService_Constructor_NullArguments_Throws`.
+**ChecklistService_Constructor_NullArguments_Throws**: The service is created with a missing store, project access, or
+clock; the constructor throws, so the service cannot exist without the check that the actor may see the project. This
+scenario is tested by `ChecklistService_Constructor_NullArguments_Throws`.
 
 **ChecklistState_Progress_CountsAnsweredPerSectionAndOverall**: Some checks are answered; each section and the
 overall progress show the counts. This scenario is tested by

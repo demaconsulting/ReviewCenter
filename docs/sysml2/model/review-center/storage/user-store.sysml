@@ -1,6 +1,6 @@
 package ReviewCenter {
     part def UserStore {
-        doc /* Database implementation of the Core user store interface that saves, finds, lists, and updates users, with user names unique regardless of case. */
+        doc /* Database implementation of the Core user store interface that saves, finds, lists, and updates users with their system administrator flag, with user names unique regardless of case. */
 
         comment sourceRef /* Source: src/DemaConsulting.ReviewCenter/Storage/UserStore.cs */
         comment testRef /* Test: test/DemaConsulting.ReviewCenter.Tests/Storage/UserStoreTests.cs */

@@ -9,14 +9,16 @@ sections:
     requirements:
       - id: ReviewCenter-PlanPage-Form
         title: >-
-          The PlanPage unit shall show the name of the project and a form with the enabled repositories by name
-          only, never a location, user name, or token, a head revision, and a choice of baseline of None, Explicit
-          revision, or Last reviewed, with Last reviewed as the default and the text box for the baseline revision
-          shown only for Explicit revision, and shall show a not-found message for an unknown project and a plain
-          message that names whom to ask when no repository is registered.
+          The PlanPage unit shall show the name of the project and a form with the enabled repositories of the
+          project by name only, never a location, user name, or token, a head revision, and a choice of baseline of
+          None, Explicit revision, or Last reviewed, with Last reviewed as the default and the text box for the
+          baseline revision shown only for Explicit revision, and shall show a not-found message for a project that
+          does not exist or that the user may not see, and a plain message that names whom to ask when the project
+          has no repository.
         justification: |
           Planning needs three answers: where, which revision, and compared with what. The form asks for exactly
-          these and nothing else, and hides the one field that does not apply.
+          these and nothing else, and hides the one field that does not apply. A project the user may not see looks
+          like a missing one, so the page does not reveal it.
         tests:
           - PlanPage_Render_OneRepository_ShowsFormWithDefaults
           - PlanPage_Render_UnknownProject_ShowsNotFound

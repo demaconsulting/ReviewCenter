@@ -155,6 +155,11 @@ internal sealed class ReviewCenterDbContext : DbContext
     public DbSet<RepositoryRecord> Repositories => Set<RepositoryRecord>();
 
     /// <summary>
+    ///     Gets the table of project memberships.
+    /// </summary>
+    public DbSet<ProjectMembership> ProjectMemberships => Set<ProjectMembership>();
+
+    /// <summary>
     ///     Gets the table of personal access tokens.
     /// </summary>
     public DbSet<PersonalAccessToken> PersonalAccessTokens => Set<PersonalAccessToken>();
@@ -251,7 +256,7 @@ internal sealed class ReviewCenterDbContext : DbContext
                 .UseCollation("NOCASE");
             user.HasIndex(u => u.Username).IsUnique();
             user.Property(u => u.DisplayName).IsRequired().HasMaxLength(ReviewLimits.MaxDisplayNameLength);
-            user.Property(u => u.Role).HasConversion<string>().HasMaxLength(StateColumnLength);
+            user.Property(u => u.IsSystemAdmin);
             user.Property(u => u.PasswordHash).IsRequired();
         });
 
@@ -269,18 +274,32 @@ internal sealed class ReviewCenterDbContext : DbContext
             token.HasOne(t => t.User).WithMany().HasForeignKey(t => t.UserId).OnDelete(DeleteBehavior.Cascade);
         });
 
-        // Repositories: identity assigned by the database; the name is unique without regard to case (NOCASE); the
-        // token is kept only in encrypted form
+        // Repositories: identity assigned by the database; every repository belongs to exactly one project (and goes
+        // with it); the name is unique within the project without regard to case (NOCASE); the token is kept only in
+        // encrypted form
         modelBuilder.Entity<RepositoryRecord>(repository =>
         {
             repository.ToTable("Repositories");
             repository.HasKey(r => r.Id);
             repository.Property(r => r.Name).IsRequired().HasMaxLength(RepositoryService.MaxNameLength)
                 .UseCollation("NOCASE");
-            repository.HasIndex(r => r.Name).IsUnique();
+            repository.HasIndex(r => new { r.ProjectId, r.Name }).IsUnique();
+            repository.HasOne<Project>().WithMany().HasForeignKey(r => r.ProjectId).OnDelete(DeleteBehavior.Cascade);
             repository.Property(r => r.Location).IsRequired().HasMaxLength(RepositoryService.MaxLocationLength);
             repository.Property(r => r.Username).HasMaxLength(RepositoryService.MaxUsernameLength);
             repository.Property(r => r.EncryptedToken).HasMaxLength(EncryptedTokenColumnLength);
+        });
+
+        // Project memberships: one row per user and project (the composite key is the uniqueness guarantee); the role
+        // is stored by name; a membership goes away with its user or its project
+        modelBuilder.Entity<ProjectMembership>(membership =>
+        {
+            membership.ToTable("ProjectMemberships");
+            membership.HasKey(m => new { m.UserId, m.ProjectId });
+            membership.Property(m => m.Role).HasConversion<string>().HasMaxLength(StateColumnLength);
+            membership.HasIndex(m => m.ProjectId);
+            membership.HasOne<User>().WithMany().HasForeignKey(m => m.UserId).OnDelete(DeleteBehavior.Cascade);
+            membership.HasOne<Project>().WithMany().HasForeignKey(m => m.ProjectId).OnDelete(DeleteBehavior.Cascade);
         });
 
         // Comments: identity assigned by the database, so it grows with posting order

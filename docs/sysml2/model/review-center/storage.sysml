@@ -1,6 +1,6 @@
 package ReviewCenter {
     part def StorageSubsystem {
-        doc /* Persistence of users, projects, reviews, review comment threads, and review checklists, reviewer slots, signatures, the registry of git repositories, personal access tokens (by hash only), and the hash-chained audit trail in a relational database through Entity Framework Core, with SQLite as the supported provider. */
+        doc /* Persistence of users (with the system administrator flag), projects, project memberships, reviews, review comment threads, and review checklists, reviewer slots, signatures, the git repositories of the projects, personal access tokens (by hash only), and the hash-chained audit trail in a relational database through Entity Framework Core, with SQLite as the supported provider. */
 
         comment testRef /* Test: test/DemaConsulting.ReviewCenter.Tests/Storage/StorageSubsystemTests.cs */
         comment designRef /* Design: docs/design/review-center/storage.md */

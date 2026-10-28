@@ -177,3 +177,21 @@ sections:
           - ReviewStore_AddProjectAsync_DraftFactoryThrows_StoresNothing
           - ReviewStore_AddProjectAsync_AuditInsertFails_RollsBackTheChange
           - ReviewStore_NoOpChanges_RecordNothing
+
+      - id: ReviewCenter-ReviewStore-Memberships
+        title: >-
+          The ReviewStore class shall store the membership of a user in a project with its role (project administrator
+          or user), read one membership and list the memberships of a project or of a user, change the role and remove
+          a membership reporting whether it was found, refuse a second membership of the same user in the same
+          project as a membership that exists, and store each change together with an audit entry that names the
+          project in one transaction.
+        justification: |
+          Memberships decide which projects a user may see. A second row for the same pair would make the role
+          ambiguous, and a change of access that is stored without its entry, or an entry without its change, would
+          leave the history of who had access untrue. The entry names the project so that the history of one project
+          can be read.
+        tests:
+          - ReviewStore_AddMembershipAsync_Membership_RoundTripsAndIsListed
+          - ReviewStore_AddMembershipAsync_SecondMembership_IsRejected
+          - ReviewStore_SetAndRemoveMembershipAsync_ChangeRoleAndRemove_ReportWhetherFound
+          - ReviewStore_Membership_Changes_AreAuditedWithTheProject

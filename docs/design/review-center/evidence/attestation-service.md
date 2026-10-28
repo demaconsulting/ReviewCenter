@@ -5,13 +5,16 @@
 #### Purpose
 
 `AttestationService` releases the signed attestation of a review. Its single responsibility is the sequence that makes
-the release safe: check that the review is complete, get the key, build the document from the record, sign it, and record
-the release in the audit trail. It makes no decision about what a complete review is (that is `SigningService`) and
+the release safe: check that the actor may see the project and that the review is complete, get the key, build the
+document from the record, sign it, and record
+the release in the audit trail. It makes no decision about what a complete review is (that is `SigningService`), none
+about who may see a project (that is `IProjectAccess`), and
 no decision about how the document looks (that is `AttestationRenderer`).
 
 #### Data Model
 
-The service is stateless and thread-safe. It is created with the review store, the signing service, the audit service,
+The service is stateless and thread-safe. It is created with the review store, the signing service, the project access
+rules, the audit service,
 the key provider, the renderer, the signer, and a clock. The result, `AttestationResult`, holds a status
 (`Ok`, `NotFound`, `NotApproved`, `Changed`, or `KeyUnavailable`), the bytes of the signed PDF and a file name when the
 status is `Ok`, and a message otherwise. Nothing is stored: the document is made for each request. The audit action is
@@ -25,7 +28,9 @@ and the second check so that a test can change the review in that moment; it is 
 - *Parameters*: `int projectId`, `string reviewId`, `Actor actor` — the signed-in user who asks, and a cancellation
   token.
 - *Returns*: `AttestationResult`.
-- *Postconditions*: In this order: the approval is read from `SigningService`; a missing review gives `NotFound` and a
+- *Postconditions*: In this order: `IProjectAccess.CanViewAsync` is asked for the actor and the project, and an actor
+  who may not view the project gets `NotFound` ("The review was not found.", the same as for a missing review), before
+  anything is read or recorded; the approval is read from `SigningService`; a missing review gives `NotFound` and a
   review that is not complete gives `NotApproved`, in both cases without asking for the key. Then the key is requested;
   a failure gives `KeyUnavailable` and records nothing. The snapshot, the review, and the project are read (the first
   snapshot) and the digest of the record is computed again and compared with the approved one, and the slots of the
@@ -73,7 +78,8 @@ modest.
 
 #### Dependencies
 
-- **SigningService**, **AuditService**, **IReviewStore**, **RecordDigest**, **Actor**, **AuditDraft** — Core.
+- **SigningService**, **AuditService**, **IReviewStore**, **IProjectAccess**, **RecordDigest**, **Actor**,
+  **AuditDraft** — Core.
 - **IAttestationKeyProvider**, **IAttestationRenderer**, **IAttestationSigner** — the other units of this subsystem.
 
 #### Callers

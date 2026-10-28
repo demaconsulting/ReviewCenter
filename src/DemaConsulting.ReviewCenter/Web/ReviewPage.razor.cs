@@ -515,8 +515,10 @@ public partial class ReviewPage : ComponentBase, IDisposable
         _scrollTarget = null;
         _pendingUrl = null;
 
-        Review = await ReviewService.GetAsync(ProjectId, ReviewId);
-        ProjectName = (await ProjectService.GetAsync(ProjectId))?.Name;
+        // A project the user may not see is treated like a missing one: nothing of its review is loaded
+        var project = await ProjectService.GetAsync(await AuthenticationState.GetActorOrNullAsync(), ProjectId);
+        ProjectName = project?.Name;
+        Review = project is null ? null : await ReviewService.GetAsync(ProjectId, ReviewId);
         await RefreshAsync();
 
         // Open what the address names (a file, a line of it, or a thread); the address stays as it is
@@ -670,10 +672,23 @@ public partial class ReviewPage : ComponentBase, IDisposable
     /// <returns>A task that completes when everything is loaded.</returns>
     private async Task RefreshAsync()
     {
-        Threads = await ThreadService.ListAsync(ProjectId, ReviewId);
-        Checklist = await ChecklistService.GetAsync(ProjectId, ReviewId);
-        Approval = await SigningService.GetApprovalAsync(ProjectId, ReviewId);
-        Candidates = await SigningService.ListCandidatesAsync();
+        // Nothing is read for a review that is not shown (it does not exist, or its project is not visible)
+        var actor = await AuthenticationState.GetActorOrNullAsync();
+        if (Review is not null)
+        {
+            Threads = await ThreadService.ListAsync(ProjectId, ReviewId);
+            Checklist = await ChecklistService.GetAsync(ProjectId, ReviewId);
+            Approval = await SigningService.GetApprovalAsync(ProjectId, ReviewId);
+            try
+            {
+                Candidates = actor is null ? [] : await SigningService.ListCandidatesAsync(actor, ProjectId);
+            }
+            catch (DomainRuleException)
+            {
+                // The access was withdrawn while the page was open; there is nobody to offer
+                Candidates = [];
+            }
+        }
 
         // Read the user name from the state, not from GetActorAsync: when the sign-in state of an open page has
         // just ended, this reload must not fail; the page is replaced by the session-ended message instead

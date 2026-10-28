@@ -368,7 +368,8 @@ sections:
           Review actions are only trustworthy when they are attributable, which needs a verified identity. A
           local account with a password needs no external service, and one answer for every failure does not
           help someone who is guessing user names. A limit per client address makes guessing slow without
-          depending on whether the account exists. Disabling a user or changing a role must also stop a page that
+          depending on whether the account exists. Disabling a user or changing the system administrator right must
+          also stop a page that
           the user already has open, not only the next request, so open pages re-check the user at a configurable
           interval.
         children:
@@ -385,12 +386,12 @@ sections:
       - id: ReviewCenter-System-Authorization
         title: >-
           The tool shall send a request without a signed-in user for a project, review, checklist, account, or
-          user page to the login page, refuse the user administration page to a user who is not an
+          user page to the login page, refuse the user administration page to a user who is not a system
           administrator, and keep the home page, the login page, and the /health URL open to everyone.
         tags: [system]
         justification: |
           Review data must only be read and changed by identified people, while the health probe and the login
-          page must work without signing in. Only administrators may manage users.
+          page must work without signing in. Only system administrators may manage users.
         children:
           - ReviewCenter-Identity-Authorization
           - ReviewCenter-Hosting-Authentication
@@ -398,17 +399,51 @@ sections:
           - ReviewCenter_ServeVerb_Started_RedirectsAnonymousProjectsRequestToLoginAndCreatesDatabase
           - IdentitySubsystem_SignInJourney_LoginUseAndLogout_WorksEndToEnd
 
+      - id: ReviewCenter-System-ProjectAccess
+        title: >-
+          The tool shall let a user see and use a project, with its reviews, files, comments, signatures, attestation,
+          evidence index, repositories, and history, only when the user is a member of the project or a system
+          administrator, answer a request of any other user, in the web pages and in the API, as it answers for a
+          project that does not exist, list only the projects the user may see, give the API token of a user exactly
+          the access of its owner, and let a change of a membership or of the system administrator right take effect
+          with the next request.
+        tags: [system]
+        justification: |
+          A project may hold confidential work. Deciding visibility in one place, and answering a user who may not see
+          a project exactly as for a project that does not exist, keeps the existence of a project from leaking
+          through a page, an API route, or a download. The memberships are read at every request so that taking access
+          away works at once, also for a token that was handed out earlier.
+        children:
+          - ReviewCenter-Core-ProjectAccess
+          - ReviewCenter-ProjectAccess-Visibility
+          - ReviewCenter-ProjectAccess-SystemAdmin
+          - ReviewCenter-ProjectAccess-NotFound
+          - ReviewCenter-ProjectAccess-Revocation
+          - ReviewCenter-Web-ProjectAccess
+          - ReviewCenter-Api-ProjectAccess
+          - ReviewCenter-Evidence-Visibility
+          - ReviewCenter-Storage-Memberships
+          - ReviewCenter-Hosting-ProjectAccess
+          - ReviewCenter-Identity-AdminClaim
+        tests:
+          - ApiProjectAccess_EveryProjectRoute_NonMemberToken_AnswersLikeAMissingProject
+          - ApiProjectAccess_EveryProjectRoute_MemberAndSystemAdmin_AreNotRefused
+          - ApiProjectAccess_ListProjects_ShowsOnlyMemberProjectsExceptToSystemAdmins
+          - ApiProjectAccess_AttestationPage_NonMemberSession_Answers404
+          - ApiProjectAccess_Token_OwnerRemovedFromProject_Gets404AtOnce
+
       - id: ReviewCenter-System-Users
         title: >-
-          The tool shall let an administrator list the users and create a user with a role of Admin or Reviewer,
-          enable and disable a user, change the role, and set a password, let every user change the own
+          The tool shall let a system administrator list the users and create a user, make a user a system
+          administrator or an ordinary user, enable and disable a user, and set a password, let every user change the
+          own
           password, require a password of 12 to 128 characters, lock a user out for 5 minutes after 5 failed
-          sign-ins in a row, never disable or demote the last enabled administrator, and keep the users, with
+          sign-ins in a row, never disable or demote the last enabled system administrator, and keep the users, with
           only a hash of the password, in the database across restarts.
         tags: [system]
         justification: |
           Users are the accountable parties of a review. A password policy and a lockout make guessing hard,
-          the rule for the last administrator keeps the system manageable, and a password hash means a copy of
+          the rule for the last system administrator keeps the system manageable, and a password hash means a copy of
           the database does not reveal the passwords.
         children:
           - ReviewCenter-Core-Users
@@ -421,13 +456,15 @@ sections:
       - id: ReviewCenter-System-UserAdd
         title: >-
           The tool shall create a user in the database when the user add verb is provided with a user name, a
-          display name, and an optional role (Reviewer by default), taking the password from the
+          display name, and an optional --system-admin switch (an ordinary user by default), taking the password from
+          the
           REVIEWCENTER_PASSWORD environment variable, the first line of redirected standard input, or a prompt,
           never from the command line, and shall report an error with a non-zero exit code when the user cannot
           be created.
         tags: [system]
         justification: |
-          The first administrator must exist before anybody can sign in. A password on the command line would
+          The first system administrator must exist before anybody can sign in or create a project. A password on
+          the command line would
           be visible to other processes and kept in shell history, so it is never accepted there.
         children:
           - ReviewCenter-Program-UserAdd
@@ -504,12 +541,13 @@ sections:
 
       - id: ReviewCenter-System-AuditHistory
         title: >-
-          The tool shall show every signed-in user the audit entries of a review, and shall show administrators
-          alone the whole audit trail, in pages of 50 entries, newest first, with all text shown as plain text.
+          The tool shall show every user who may view a project the audit entries of a review of that project, and
+          shall show system administrators alone the whole audit trail, in pages of 50 entries, newest first, with
+          all text shown as plain text.
         tags: [system]
         justification: |
           Participants and administrators need to see who did what and when. The whole trail names every user and
-          action, so it is limited to administrators.
+          action, so it is limited to system administrators.
         children:
           - ReviewCenter-Web-AuditHistory
           - ReviewCenter-Web-AuditPage
@@ -519,14 +557,14 @@ sections:
 
       - id: ReviewCenter-System-AuditVerify
         title: >-
-          The tool shall verify the hash chain of the audit trail on request, from the audit page for an
+          The tool shall verify the hash chain of the audit trail on request, from the audit page for a system
           administrator and from the command line with the audit verify verb, reporting an intact chain with the
           number of entries (and on the page the head hash) and a broken chain with the first broken entry,
           and shall return exit code 0 for an intact chain and 1 for a broken chain or an unreadable database.
         tags: [system]
         justification: |
           Verification is how tampering is found. The command line lets scripts and scheduled jobs check the
-          trail, and the head hash lets an administrator record the state of the trail outside the database.
+          trail, and the head hash lets a system administrator record the state of the trail outside the database.
         children:
           - ReviewCenter-Program-AuditVerify
           - ReviewCenter-Cli-AuditVerify
@@ -538,14 +576,16 @@ sections:
 
       - id: ReviewCenter-System-GitRepositories
         title: >-
-          The tool shall let administrators, and nobody else, register git repositories by name and location, with an
-          optional user name and token, change them, and disable and enable them, keep them across restarts, and
-          offer only the names of the enabled repositories to other users.
+          The tool shall let a project administrator or a system administrator, and nobody else, register git
+          repositories in a project by name and location, with an optional user name and token, change them, and
+          disable and enable them, keep them across restarts, keep each repository to its one project, and offer only
+          the names of the enabled repositories of a project to the members of that project.
         tags: [system]
         justification: |
-          Reviews are made from source code in git repositories. The registry decides which repositories the server
-          may read, so administrators control it, and a repository is disabled, not deleted, so that the reviews
-          made from it keep their reference.
+          Reviews are made from source code in git repositories. The registrations decide which repositories the
+          server may read, so the administrators of the project control them, a repository belongs to exactly one
+          project so that a project never sees another project's repositories, and a repository is disabled, not
+          deleted, so that the reviews made from it keep their reference.
         children:
           - ReviewCenter-Core-Repositories
           - ReviewCenter-Storage-Repositories
@@ -689,11 +729,13 @@ sections:
       - id: ReviewCenter-System-ApiAccess
         title: >-
           The tool shall offer an HTTP API under /api, described by an OpenAPI document, with which a client that
-          sends a personal access token can list the projects and reviews, read a review, create a review draft from
-          files or from the changes of a repository, download the attestation of a signed review, and read the evidence
+          sends a personal access token can list the projects its owner may see and the reviews of those projects,
+          read a review, create a review draft from files or from the changes of a repository, download the
+          attestation of a signed review, and read the evidence
           index of a project in the form that ReviewMark reads (with a token sent as a bearer token or as the
           password of HTTP Basic credentials), with the same rules as the web pages, but shall not let a token sign a
-          review, arrange the reviewers, or open a web page.
+          review, arrange the reviewers, or open a web page, and shall answer a request for a project that its owner
+          may not see as for a project that does not exist.
         tags: [system]
         justification: |
           Creating a draft for every pull request from a pipeline and filing the attestation of a signed review with
@@ -705,9 +747,11 @@ sections:
           - ReviewCenter-Api-Document
           - ReviewCenter-Api-EvidenceJourney
           - ReviewCenter-Evidence-Index
+          - ReviewCenter-Api-ProjectAccess
           - ReviewCenter-Hosting-ApiServices
         tests:
           - ApiSubsystem_ReviewJourney_CreateDraftReadAndDownloadAttestation_WorksEndToEnd
           - ApiSubsystem_EvidenceJourney_BasicCredentials_ReadIndexAndFollowLink_WorksEndToEnd
           - ApiSubsystem_TokenPrincipal_SigningAndWebPages_AreNotReachable
           - CoreSubsystem_TokenActor_CreatesFlaggedReviewButCannotSign
+          - ApiProjectAccess_EveryProjectRoute_NonMemberToken_AnswersLikeAMissingProject

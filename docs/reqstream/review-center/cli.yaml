@@ -167,12 +167,13 @@ sections:
 
       - id: ReviewCenter-Cli-UserAdd
         title: >-
-          The Cli subsystem shall support the user add verb with the `--username`, `--display-name`, and `--role`
-          options to signal that a user is to be created, default the role to Reviewer, reject a missing user
-          name or display name, a role that is not Admin or Reviewer, options used without the verb, and any
+          The Cli subsystem shall support the user add verb with the `--username` and `--display-name` options and
+          the `--system-admin` switch to signal that a user is to be created, create an ordinary user unless the
+          switch is given, reject a missing user name or display name, options used without the verb, and any
           option that would put the password on the command line.
         justification: |
-          The first administrator has to be created from the command line, so the tool needs a verb for it. A
+          The first system administrator has to be created from the command line, so the tool needs a verb for it.
+          An ordinary user is the safe default, because the right to see every project must be asked for. A
           password option is deliberately missing, because a password on the command line is visible to other
           processes and kept in shell history, and options without the verb would hide a forgotten verb.
         children:

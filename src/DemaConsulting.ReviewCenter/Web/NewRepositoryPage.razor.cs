@@ -29,8 +29,8 @@ namespace DemaConsulting.ReviewCenter.Web;
 ///     Code-behind for the add repository page (<c>NewRepositoryPage.razor</c>): registers a git repository.
 /// </summary>
 /// <remarks>
-///     An attribute on the page limits entry to administrators; the submission also re-checks that the signed-in
-///     user is still an enabled administrator (defense in depth; <see cref="RepositoryService"/> checks again). The
+///     An attribute on the page requires a signed-in user and the page shows the form only to whoever manages the
+///     project; the submission also re-checks that (defense in depth; <see cref="RepositoryService"/> checks again). The
 ///     token is write-only and is emptied as soon as it has been used. A rule violation is shown next to the form
 ///     instead of being thrown. Each browser connection (circuit) gets its own page instance, so the state here is
 ///     per-user and needs no synchronization.
@@ -44,16 +44,28 @@ public partial class NewRepositoryPage : ComponentBase
     private bool _interactive;
 
     /// <summary>
+    ///     Gets or sets the identity of the project the repository is added to, from the page address.
+    /// </summary>
+    [Parameter]
+    public int ProjectId { get; set; }
+
+    /// <summary>
     ///     Gets or sets the service that manages the registry, supplied by dependency injection.
     /// </summary>
     [Inject]
     private RepositoryService RepositoryService { get; set; } = null!;
 
     /// <summary>
-    ///     Gets or sets the service that knows the users, supplied by dependency injection.
+    ///     Gets or sets the service that reads projects, supplied by dependency injection.
     /// </summary>
     [Inject]
-    private UserService UserService { get; set; } = null!;
+    private ProjectService ProjectService { get; set; } = null!;
+
+    /// <summary>
+    ///     Gets or sets the access service, supplied by dependency injection; decides who may manage the project.
+    /// </summary>
+    [Inject]
+    private IProjectAccess Access { get; set; } = null!;
 
     /// <summary>
     ///     Gets or sets the authentication state of the current user, supplied by dependency injection.
@@ -62,10 +74,21 @@ public partial class NewRepositoryPage : ComponentBase
     private AuthenticationStateProvider AuthenticationState { get; set; } = null!;
 
     /// <summary>
-    ///     Gets or sets the navigation manager, supplied by dependency injection; used to return to the registry.
+    ///     Gets or sets the navigation manager, supplied by dependency injection; used to return to the repositories.
     /// </summary>
     [Inject]
     private NavigationManager Navigation { get; set; } = null!;
+
+    /// <summary>
+    ///     Gets the project the repository is added to, or <c>null</c> when it does not exist or the user may not
+    ///     manage it.
+    /// </summary>
+    private Project? Project { get; set; }
+
+    /// <summary>
+    ///     Gets a value indicating whether the project lookup has finished.
+    /// </summary>
+    private bool Loaded { get; set; }
 
     /// <summary>
     ///     Gets or sets the name typed into the form.
@@ -100,6 +123,20 @@ public partial class NewRepositoryPage : ComponentBase
     ///     <c>true</c> before interacting.
     /// </remarks>
     private string InteractiveMarker => _interactive ? "true" : "false";
+
+    /// <summary>
+    ///     Looks up the project whenever the project identity changes; only whoever manages it gets the form.
+    /// </summary>
+    /// <returns>A task that completes when the lookup is done.</returns>
+    protected override async Task OnParametersSetAsync()
+    {
+        Loaded = false;
+        var actor = await AuthenticationState.GetActorOrNullAsync();
+        Project = actor is not null && await Access.CanAdministerAsync(actor, ProjectId)
+            ? await ProjectService.GetAsync(actor, ProjectId)
+            : null;
+        Loaded = true;
+    }
 
     /// <summary>
     ///     Marks the page interactive after it has rendered on a live circuit.
@@ -142,16 +179,15 @@ public partial class NewRepositoryPage : ComponentBase
             return;
         }
 
-        var current = await UserService.GetAsync(actor.Username);
-        if (current is not { Enabled: true, Role: UserRole.Admin })
+        if (!await Access.CanAdministerAsync(actor, ProjectId))
         {
-            ErrorMessage = "Administrator rights are required.";
+            ErrorMessage = "Project administrator rights are required.";
             return;
         }
 
         try
         {
-            await RepositoryService.CreateAsync(NewName, NewLocation, NewUsername, token, actor);
+            await RepositoryService.CreateAsync(ProjectId, NewName, NewLocation, NewUsername, token, actor);
         }
         catch (DomainRuleException ex)
         {
@@ -159,6 +195,6 @@ public partial class NewRepositoryPage : ComponentBase
             return;
         }
 
-        Navigation.NavigateTo("/repositories");
+        Navigation.NavigateTo($"/projects/{ProjectId}/repositories");
     }
 }

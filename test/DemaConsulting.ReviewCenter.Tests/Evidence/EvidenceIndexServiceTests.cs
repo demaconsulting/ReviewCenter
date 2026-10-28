@@ -199,7 +199,8 @@ public class EvidenceIndexServiceTests
     {
         // Arrange: a complete review with a set id in a second project
         var fixture = await AttestationFixture.CreateAsync(signed: false);
-        var other = await new ProjectService(fixture.Store, fixture.Clock).CreateAsync("Gemini", null, TestContext.Current.CancellationToken);
+        var other = await TestServices.Projects(fixture.Store, fixture.Clock).CreateAsync("Gemini", null, TestContext.Current.CancellationToken);
+        await fixture.Store.AddMembershipAsync(await UserIdAsync(fixture, "ann"), other.Id, TestContext.Current.CancellationToken);
         await EvidenceTestSupport.AddReviewAsync(fixture.Store, fixture.Clock, other.Id, "set-1", "Core-Logic", TestContent.A);
         await EvidenceTestSupport.CompleteAsync(
             fixture.Checklists, fixture.Signing, other.Id, "set-1", await UserIdAsync(fixture, "ann"), AttestationFixture.Password);
@@ -228,16 +229,18 @@ public class EvidenceIndexServiceTests
         var userStore = new CountingUserStore(new FakeUserStore());
         var users = new UserService(userStore, new FakePasswordHasher(), clock);
         var ann = await users.CreateAsync("ann", "Ann", UserRole.Reviewer, AttestationFixture.Password, cancellationToken);
-        var signing = new SigningService(store, users, clock);
-        var checklists = new ChecklistService(store, clock);
-        var project = await new ProjectService(store, clock).CreateAsync("Apollo", null, cancellationToken);
+        var signing = TestServices.Signing(store, users, clock);
+        var checklists = TestServices.Checklists(store, clock);
+        var project = await TestServices.Projects(store, clock).CreateAsync("Apollo", null, cancellationToken);
+        await store.AddMembershipAsync(ann.Id, project.Id, cancellationToken);
         foreach (var (id, set) in new[] { ("r-1", "a-set"), ("r-2", "b-set"), ("r-3", "c-set") })
         {
             await EvidenceTestSupport.AddReviewAsync(store, clock, project.Id, id, set, TestContent.A);
             await EvidenceTestSupport.CompleteAsync(checklists, signing, project.Id, id, ann.Id, AttestationFixture.Password);
         }
 
-        var service = new EvidenceIndexService(new ReviewService(store, clock), signing);
+        var service = new EvidenceIndexService(
+            TestServices.Reviews(store, clock), signing, new AllowAllProjectAccess(store));
         var before = userStore.ListCount;
 
         // Act: build the index
@@ -255,7 +258,8 @@ public class EvidenceIndexServiceTests
     /// <returns>The service.</returns>
     private static EvidenceIndexService CreateService(AttestationFixture fixture)
     {
-        return new EvidenceIndexService(new ReviewService(fixture.Store, fixture.Clock), fixture.Signing);
+        return new EvidenceIndexService(
+            TestServices.Reviews(fixture.Store, fixture.Clock), fixture.Signing, fixture.Access);
     }
 
     /// <summary>

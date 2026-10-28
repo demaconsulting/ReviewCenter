@@ -36,7 +36,8 @@ sections:
 
       - id: ReviewCenter-Api-ReviewJourney
         title: >-
-          The Api subsystem shall let a client with a valid token list the projects and the reviews of a project, read
+          The Api subsystem shall let a client with a valid token list the projects the owner of the token may see and
+          the reviews of such a project, read
           one review, create a review draft from uploaded files or from the changes of a repository, mark a review
           that was created this way, download the attestation of a signed review, report an invalid request or a
           refused rule as a problem document that names the cause, refuse a body that is too large or beyond the
@@ -101,3 +102,25 @@ sections:
         tests:
           - ApiDocument_Get_NoToken_DescribesTheApiWithBearerScheme
           - ApiDocument_Get_MatchesCommittedSnapshot
+
+      - id: ReviewCenter-Api-ProjectAccess
+        title: >-
+          The Api subsystem shall answer a request for a project, or for anything in a project, with the owner of the
+          token being neither a member of the project nor a system administrator, with the 404 that it answers for a
+          project that does not exist, with the same body, on every route of a project and for a bearer token as well as
+          for HTTP Basic credentials, list only the projects the owner may see, serve a member and a system
+          administrator, and stop serving a token for a project at once when its owner is removed from it.
+        justification: |
+          A project may hold confidential work, and a script that holds a token must see only what its owner sees. An
+          answer that differed between a project the owner may not see and a project that does not exist would tell
+          the script which projects exist. The token carries no copy of the memberships, so a change of them takes
+          effect with the next request.
+        children:
+          - ReviewCenter-ApiEndpoints-ProjectAccess
+          - ReviewCenter-ApiEndpoints-EvidenceIndex
+          - ReviewCenter-ApiEndpoints-Attestation
+        tests:
+          - ApiProjectAccess_EveryProjectRoute_NonMemberToken_AnswersLikeAMissingProject
+          - ApiProjectAccess_EveryProjectRoute_MemberAndSystemAdmin_AreNotRefused
+          - ApiProjectAccess_ListProjects_ShowsOnlyMemberProjectsExceptToSystemAdmins
+          - ApiProjectAccess_Token_OwnerRemovedFromProject_Gets404AtOnce

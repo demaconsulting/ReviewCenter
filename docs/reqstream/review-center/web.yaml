@@ -7,7 +7,8 @@
 #   ProjectsPage, ProjectPage, PlanPage, ReviewPage, ChecklistPage, LoginPage, AccountPage, UsersPage, AuditPage, and
 #   RepositoriesPage units; the App unit includes the SessionGate
 #   component that replaces an open protected page when the sign-in state of its user ends
-# - Subsystem requirements describe the externally visible behavior of the web user interface
+# - Subsystem requirements describe the externally visible behavior of the web user interface, including what each
+#   kind of user (system administrator, project member, user who is no member) is shown
 # - The subsystem tests run over plain HTTP, so they verify what the server renders: the pages, the read path from
 #   the database, and the initial not-yet-interactive marker. Behavior that needs a live connection (forms,
 #   uploads, the switch of the marker to interactive) is verified by the component tests of the child units.
@@ -76,15 +77,17 @@ sections:
 
       - id: ReviewCenter-Web-Projects
         title: >-
-          The Web subsystem shall serve a projects page at /projects that lists the projects, each linking to its
-          page, and offers a New project button that opens a page at /projects/new holding the creation form; a
-          page for each project at /projects/{project} that shows its reviews; and a link to the projects page in
-          the header of every page for a signed-in user.
+          The Web subsystem shall serve a projects page at /projects that lists the projects the user may see, each
+          linking to its page, and offers a New project button, to a system administrator only, that opens a page at
+          /projects/new holding the creation form; a page for each project at /projects/{project} that shows its
+          reviews; and a link to the projects page in the header of every page for a signed-in user.
         justification: |
           Projects are the entry point to the review features. Pages reached through plain addresses can be
           bookmarked and shared, and the header must lead to them.
         children:
           - ReviewCenter-ProjectsPage-List
+          - ReviewCenter-ProjectsPage-Visibility
+          - ReviewCenter-ProjectsPage-CreateAccess
           - ReviewCenter-ProjectsPage-Create
           - ReviewCenter-ProjectsPage-NewForm
           - ReviewCenter-ProjectsPage-Error
@@ -96,6 +99,38 @@ sections:
           - ReviewCenter-App-FormRoutes
         tests:
           - WebSubsystem_CreatedProjectAndReview_ArePresentedByThePages
+
+      - id: ReviewCenter-Web-ProjectAccess
+        title: >-
+          The Web subsystem shall show a user only the projects the user is a member of, and a system administrator
+          every project; shall show a project the user may not see exactly as a project that does not exist, so that
+          a user cannot tell a hidden project from a missing one; shall let only a system administrator create
+          projects and manage their members, on the project page, with a role of project admin or member for each
+          member; and shall let only whoever manages a project, a system administrator or a project admin of it,
+          open its repositories, and offer in a new review only the repositories of that project.
+        justification: |
+          Reviews of one body of work must not be visible to people who do not work on it, and the answer for a
+          project the user may not see must not reveal that it exists. Membership is the one rule that decides what
+          a user sees, so the pages ask the Core access service instead of deciding for themselves. The subsystem
+          requirement is verified by the page tests of the units, which render the pages for a system administrator,
+          a member, and a user who is no member.
+        children:
+          - ReviewCenter-ProjectsPage-Visibility
+          - ReviewCenter-ProjectsPage-CreateAccess
+          - ReviewCenter-ProjectPage-Show
+          - ReviewCenter-ProjectPage-Members
+          - ReviewCenter-ProjectPage-MemberChange
+          - ReviewCenter-ProjectPage-RepositoriesLink
+          - ReviewCenter-ProjectPage-RepositoryForm
+          - ReviewCenter-RepositoriesPage-Admin
+          - ReviewCenter-PlanPage-Form
+        tests:
+          - ProjectsPage_Render_MemberAndSystemAdmin_ListOnlyWhatEachMaySee
+          - ProjectPage_Render_NonMember_LooksLikeAMissingProject
+          - ProjectPage_Render_SystemAdmin_ListsMembersWithRolesAndActions
+          - ProjectPage_MemberActions_ToggleRoleAndRemove_ChangeTheMembership
+          - RepositoriesPage_Render_MemberOrNonMember_ShowsNotFoundOnly
+          - NewReviewPage_RepositorySelect_OffersOnlyRepositoriesOfThisProject
 
       - id: ReviewCenter-Web-Reviews
         title: >-
@@ -192,8 +227,9 @@ sections:
           account page and a logout button, or a sign-in link when nobody is signed in, serve a login page at
           /login with a user name and a password field that shows a failed sign-in without revealing its reason,
           serve an account page at /account where a signed-in user changes the own password and chooses the
-          appearance, and serve a users page at /users where an administrator enables and disables users, changes
-          roles, and sets passwords, and reaches the page at /users/new that creates users.
+          appearance, and serve a users page at /users where a system administrator enables and disables users, makes
+          users system administrators or takes that away, and sets passwords, and reaches the page at /users/new that
+          creates users.
         justification: |
           Users must be able to sign in, see who they are signed in as, and sign out from every page. Account and
           user management are done in the web interface so that no command line is needed after the first
@@ -211,6 +247,7 @@ sections:
           - ReviewCenter-UsersPage-Create
           - ReviewCenter-UsersPage-NewPage
           - ReviewCenter-UsersPage-Update
+          - ReviewCenter-UsersPage-SystemAdmin
           - ReviewCenter-UsersPage-LastAdmin
           - ReviewCenter-UsersPage-AdminCheck
         tests:
@@ -262,7 +299,8 @@ sections:
 
       - id: ReviewCenter-Web-AuditHistory
         title: >-
-          The Web subsystem shall show every signed-in user the audit entries of a review, newest first, 50 to a
+          The Web subsystem shall show every signed-in user who may see the project of a review the audit entries of
+          the review, newest first, 50 to a
           page, on a history page that is reached from the review, with all text shown as plain text.
         justification: |
           Participants need to see who did what to a review and when, from the review itself.
@@ -277,12 +315,12 @@ sections:
 
       - id: ReviewCenter-Web-AuditPage
         title: >-
-          The Web subsystem shall show administrators, and nobody else, the whole audit trail on an audit page that
-          is reached from the header, and let them verify the hash chain and read the entry count and the head hash
-          of an intact chain or the first broken entry.
+          The Web subsystem shall show system administrators, and nobody else, the whole audit trail on an audit page
+          that is reached from the header, and let them verify the hash chain and read the entry count and the head
+          hash of an intact chain or the first broken entry.
         justification: |
-          The whole trail names every user and action. The head hash is what an administrator records outside the
-          database to detect the later removal of the newest entries.
+          The whole trail names every user and action. The head hash is what a system administrator records outside
+          the database to detect the later removal of the newest entries.
         children:
           - ReviewCenter-AuditPage-Display
           - ReviewCenter-AuditPage-ShortHash
@@ -295,12 +333,16 @@ sections:
 
       - id: ReviewCenter-Web-Repositories
         title: >-
-          The Web subsystem shall let administrators, and nobody else, register, change, disable, and enable git
-          repositories on a repositories page that is reached from the header, and set, replace, or clear the token
-          of a repository without it ever being shown again.
+          The Web subsystem shall let whoever manages a project, a system administrator or a project admin of it,
+          and nobody else, register, change, disable, and enable the git repositories of that project on a
+          repositories page at /projects/{project}/repositories that is reached from the project page, and set,
+          replace, or clear the token of a repository without it ever being shown again, and shall have no
+          registry of repositories outside the projects.
         justification: |
-          The registry controls what source code the server reads and holds secrets for it. A token that can be read
-          back from a page can be copied or leaked, so it is write-only.
+          A repository belongs to one project and controls what source code the server reads for it, and the
+          repository holds secrets. A token that can be read back from a page can be copied or leaked, so it is
+          write-only. A user who may not manage the project is shown the page of a project that does not exist,
+          so the page does not reveal a project to its members or to other users.
         children:
           - ReviewCenter-RepositoriesPage-Display
           - ReviewCenter-RepositoriesPage-Create
@@ -308,15 +350,17 @@ sections:
           - ReviewCenter-RepositoriesPage-Edit
           - ReviewCenter-RepositoriesPage-Enable
           - ReviewCenter-RepositoriesPage-Admin
-          - ReviewCenter-App-RepositoriesLink
+          - ReviewCenter-ProjectPage-RepositoriesLink
+          - ReviewCenter-App-NoRepositoriesLink
         tests:
-          - SignIn_RepositoriesPage_ReviewerAndAdmin_OnlyAdminIsAllowed
+          - SignIn_RepositoriesPage_NonMemberAndSystemAdmin_OnlyAdminIsServed
           - NewRepositoryPage_CreateForm_WithToken_StoresItWriteOnlyAndClearsFields
 
       - id: ReviewCenter-Web-RepositoryReviews
         title: >-
           The Web subsystem shall let a user create a review from a git repository on the project page, choosing among
-          the enabled repositories by name, with a head revision, an optional baseline revision, and a selection, show
+          the enabled repositories of the project by name, with a head revision, an optional baseline revision, and a
+          selection, show
           the reason when it cannot be created, and show on the review page the change kind of each file, the source,
           and for a file of a review with a baseline a choice between the Diff view, the Head version (not for a
           deleted file) and a read-only Baseline version (not for an added file).
@@ -371,8 +415,8 @@ sections:
 
       - id: ReviewCenter-Web-PlanReviews
         title: >-
-          The Web subsystem shall let a user plan the reviews a head revision of a registered repository needs on a
-          plan page that is reached from the project page, showing one plain summary, the sets that need a review
+          The Web subsystem shall let a user plan the reviews a head revision of a repository of the project needs on
+          a plan page that is reached from the project page, showing one plain summary, the sets that need a review
           ticked first and the sets with nothing to review collapsed, creating the ticked reviews with a result per
           review, explaining every failure in plain English, and showing on the review page the review-set a
           planned review belongs to.

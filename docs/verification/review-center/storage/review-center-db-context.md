@@ -3,7 +3,8 @@
 #### Verification Approach
 
 `ReviewCenterDbContext` is verified with the unit tests of `ReviewStoreTests.cs`, `ReviewStoreSigningTests.cs`,
-`UserStoreTests.cs`, `RepositoryStoreTests.cs`, `PersonalAccessTokenStoreTests.cs`, `ReviewStoreRepositoryTests.cs`, and
+`UserStoreTests.cs`, `RepositoryStoreTests.cs`, `PersonalAccessTokenStoreTests.cs`, `ReviewStoreRepositoryTests.cs`,
+`ReviewStoreMembershipTests.cs`, and
 `DatabaseSetupTests.cs`, which
 exercise the context through the units that use it. The context has no behavior that can be reached without a
 database, and its job is to produce the right schema, so the tests run against real SQLite database files in a
@@ -26,12 +27,15 @@ be loadable on the test platform.
 - The tables for the checklist snapshot, section states, and answers are keyed so that a review has one state per
   section and one answer per check.
 - The comments, answers, and section states keep the user name of the person who made them next to the display name.
-- The table for users stores every field of a user, and its unique index on the user name ignores case.
+- The table for users stores every field of a user, including the system administrator flag, and its unique index on
+  the user name ignores case.
 - The tables for reviewer slots and signatures are created; the database refuses a slot for a review that does not
   exist, refuses to remove a slot that has a signature, and refuses a second signature of the same slot with the same
   digest; the role, digest, and meaning of a signature are read back as stored.
-- The table for repositories stores every field of a registration including the encrypted token, and its unique index on
-  the name ignores case.
+- The table for repositories stores every field of a registration including the project and the encrypted token, and
+  its unique index on the project and the name ignores case, so the same name can be used in two projects.
+- The table for project memberships holds one row per user and project, refuses a second row for the same pair, and
+  refuses a row for an unknown project.
 - The source columns of a review and the change kind and baseline columns of a file are created, stored, and read back
   as written, with the baseline content as binary data and no value for an uploaded review.
 - The table for personal access tokens has a unique index on the hash and no column for the value of a token, and a
@@ -116,7 +120,14 @@ This scenario is tested by `ReviewStore_AddSignatureAsync_CurrentDigest_StoresAn
 **Repositories table**: The `Repositories` table is exercised by the tests of `RepositoryStore`: a repository round-trips
 with every field, which is tested by `RepositoryStore_AddAsync_Repository_RoundTripsAndAudits`, the encrypted token is
 stored and read back, which is tested by `RepositoryStore_GetEncryptedTokenAsync_ReturnsStoredText`, and the unique index
-on the name ignores case, which is tested by `RepositoryStore_NameOtherCase_ThrowsRepositoryNameTaken`.
+on the project and the name ignores case, which is tested by `RepositoryStore_NameOtherCase_ThrowsRepositoryNameTaken`
+and `RepositoryStore_ListAsync_ScopedToProject_AndNamesAreUniquePerProject`.
+
+**ProjectMemberships table**: The `ProjectMemberships` table is exercised by the tests of `ReviewStore`: a membership
+round-trips, which is tested by `ReviewStore_AddMembershipAsync_Membership_RoundTripsAndIsListed`, the composite key
+refuses a second membership of a user in a project, which is tested by
+`ReviewStore_AddMembershipAsync_SecondMembership_IsRejected`, and the foreign key refuses a membership for an unknown
+project, which is tested by `ReviewStore_AddMembershipAsync_UnknownProject_IsRefusedByTheDatabase`.
 
 **Audit entries table**: The `AuditEntries` table is mapped by `ReviewCenterDbContext` and is exercised by the tests
 of `AuditStore`, which write, read, and verify entries through the real schema; all scenarios of this unit run over a

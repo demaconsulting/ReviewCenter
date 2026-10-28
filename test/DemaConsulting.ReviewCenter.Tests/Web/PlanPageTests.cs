@@ -45,6 +45,7 @@ public class PlanPageTests : PageTestBase
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         await Users.CreateAsync("adm", "Adm", UserRole.Admin, "correct horse battery", cancellationToken);
+        var project = await Projects.CreateAsync("Apollo", null, cancellationToken);
         var repository = await Repositories.CreateAsync("main-repo", Location, "svc", "hidden-token-42", _admin, cancellationToken);
         Git.Revisions["main"] = H2;
         Git.Revisions["v1"] = H1;
@@ -73,7 +74,6 @@ public class PlanPageTests : PageTestBase
             new("docs", "Documentation", ["docs/**"]),
             new("empty", "Empty", ["nothing/**"])
         ];
-        var project = await Projects.CreateAsync("Apollo", null, cancellationToken);
         return (project.Id, repository.Id);
     }
 
@@ -196,7 +196,7 @@ public class PlanPageTests : PageTestBase
         var cut = RenderPage(project.Id);
 
         // Assert: the message tells what to do, and the form is not there
-        Assert.Equal("No repository is registered; ask an administrator.", TextOf(cut, "plan-no-repository"));
+        Assert.Equal("This project has no repository; ask a project administrator to add one.", TextOf(cut, "plan-no-repository"));
         Assert.False(Has(cut, "plan-form"));
     }
 
@@ -649,6 +649,7 @@ public class PlanPageTests : PageTestBase
         // Arrange: a shown plan for the first project, and a second project
         var (projectId, _) = await ArrangeAsync();
         var second = await Projects.CreateAsync("Gemini", null, TestContext.Current.CancellationToken);
+        await Repositories.CreateAsync(second.Id, "gemini-repo", Location, null, null, _admin, TestContext.Current.CancellationToken);
         var cut = RenderPage(projectId);
         await ShowPlanAsync(cut);
 
@@ -672,6 +673,7 @@ public class PlanPageTests : PageTestBase
         // Arrange: a listing that waits, a plan request in flight, and a second project
         var (projectId, _) = await ArrangeAsync();
         var second = await Projects.CreateAsync("Gemini", null, TestContext.Current.CancellationToken);
+        await Repositories.CreateAsync(second.Id, "gemini-repo", Location, null, null, _admin, TestContext.Current.CancellationToken);
         var gate = new TaskCompletionSource();
         Git.OnNextListChanges = () => gate.Task;
         var cut = RenderPage(projectId);
@@ -705,6 +707,7 @@ public class PlanPageTests : PageTestBase
         // Arrange: a shown plan, a creation that waits, and a second project
         var (projectId, _) = await ArrangeAsync();
         var second = await Projects.CreateAsync("Gemini", null, TestContext.Current.CancellationToken);
+        await Repositories.CreateAsync(second.Id, "gemini-repo", Location, null, null, _admin, TestContext.Current.CancellationToken);
         var cut = RenderPage(projectId);
         await ShowPlanAsync(cut);
         var gate = new TaskCompletionSource();

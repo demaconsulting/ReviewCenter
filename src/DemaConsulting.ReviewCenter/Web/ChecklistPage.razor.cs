@@ -183,9 +183,11 @@ public partial class ChecklistPage : ComponentBase
         SectionErrors.Clear();
         _scrollTarget = null;
 
-        Review = await ReviewService.GetAsync(ProjectId, ReviewId);
-        ProjectName = (await ProjectService.GetAsync(ProjectId))?.Name;
-        State = await ChecklistService.GetAsync(ProjectId, ReviewId);
+        // A project the user may not see is treated like a missing one: nothing of its review is loaded
+        var project = await ProjectService.GetAsync(await AuthenticationState.GetActorOrNullAsync(), ProjectId);
+        ProjectName = project?.Name;
+        Review = project is null ? null : await ReviewService.GetAsync(ProjectId, ReviewId);
+        State = project is null ? null : await ChecklistService.GetAsync(ProjectId, ReviewId);
 
         // Start where the work is: the first section with unanswered checks
         OpenSectionId = State?.FirstIncompleteSectionId();

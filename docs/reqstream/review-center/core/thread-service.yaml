@@ -160,3 +160,15 @@ sections:
           - ThreadService_ThreadEvents_RecordIdsAnchorsAndDigestButNotText
           - ThreadService_StartThreadAsync_Audit_NamesBaselineSideOnly
           - ThreadService_ResolveAsync_MissingThread_RecordsNothing
+
+      - id: ReviewCenter-ThreadService-Access
+        title: >-
+          The ThreadService class shall require, for starting a thread, replying, resolving, and reopening, that the
+          actor may see the project of the review (through IProjectAccess), refusing an actor who may not with the
+          same ProjectNotFound rule as for a project that does not exist, before anything else is checked or stored.
+        justification: |
+          A user outside a project must not be able to read or write its discussion, nor learn that it exists. The
+          service enforces this itself, whatever the page or the API checked, so that a route added later cannot
+          bypass the rule.
+        tests:
+          - ThreadService_Constructor_NullArguments_Throws

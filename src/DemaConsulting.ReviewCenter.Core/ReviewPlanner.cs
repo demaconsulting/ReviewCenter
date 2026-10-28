@@ -107,6 +107,11 @@ public sealed class ReviewPlanner
     private readonly IReviewSetParser _parser;
 
     /// <summary>
+    ///     Decides who may see which project.
+    /// </summary>
+    private readonly IProjectAccess _access;
+
+    /// <summary>
     ///     Initializes a new instance of the <see cref="ReviewPlanner"/> class.
     /// </summary>
     /// <param name="store">The store that lists reviews. Must not be null.</param>
@@ -115,6 +120,7 @@ public sealed class ReviewPlanner
     /// <param name="git">The git access. Must not be null.</param>
     /// <param name="signing">The signing service that decides whether a review is signed. Must not be null.</param>
     /// <param name="parser">The parser of the review configuration. Must not be null.</param>
+    /// <param name="access">The access rules; planning needs a user who can see the project. Must not be null.</param>
     /// <exception cref="ArgumentNullException">Thrown when an argument is null.</exception>
     public ReviewPlanner(
         IReviewStore store,
@@ -122,7 +128,8 @@ public sealed class ReviewPlanner
         RepositoryService repositories,
         IGitRepositoryProvider git,
         SigningService signing,
-        IReviewSetParser parser)
+        IReviewSetParser parser,
+        IProjectAccess access)
     {
         ArgumentNullException.ThrowIfNull(store);
         ArgumentNullException.ThrowIfNull(reviews);
@@ -130,19 +137,22 @@ public sealed class ReviewPlanner
         ArgumentNullException.ThrowIfNull(git);
         ArgumentNullException.ThrowIfNull(signing);
         ArgumentNullException.ThrowIfNull(parser);
+        ArgumentNullException.ThrowIfNull(access);
         _store = store;
         _reviews = reviews;
         _repositories = repositories;
         _git = git;
         _signing = signing;
         _parser = parser;
+        _access = access;
     }
 
     /// <summary>
     ///     Computes the plan for a head revision of a repository.
     /// </summary>
+    /// <param name="actor">The signed-in user who asks; must be able to see the project. Must not be null.</param>
     /// <param name="projectId">The identity of the project the reviews would belong to.</param>
-    /// <param name="repositoryId">The identity of an enabled registered repository.</param>
+    /// <param name="repositoryId">The identity of an enabled registered repository of that project.</param>
     /// <param name="headRevision">The head revision: a branch, tag or commit name (see <see cref="RevisionValidator"/>).</param>
     /// <param name="mode">How baselines are chosen.</param>
     /// <param name="baselineRevision">The baseline revision; required for <see cref="BaselineMode.Explicit"/>, ignored otherwise.</param>
@@ -156,6 +166,7 @@ public sealed class ReviewPlanner
     /// </exception>
     /// <exception cref="ArgumentOutOfRangeException">Thrown when <paramref name="mode"/> is not a defined value.</exception>
     public async Task<ReviewPlan> PlanAsync(
+        Actor actor,
         int projectId,
         int repositoryId,
         string? headRevision,
@@ -163,6 +174,11 @@ public sealed class ReviewPlanner
         string? baselineRevision,
         CancellationToken cancellationToken = default)
     {
+        ArgumentNullException.ThrowIfNull(actor);
+
+        // Whoever may not see the project learns nothing about it, and git is never reached on their behalf
+        await EnsureProjectAsync(actor, projectId, cancellationToken);
+
         // Validate everything that needs no I/O first so a bad request fails fast and cheaply
         if (!Enum.IsDefined(mode))
         {
@@ -171,8 +187,7 @@ public sealed class ReviewPlanner
 
         var head = RevisionValidator.Validate(headRevision?.Trim());
         var explicitRevision = mode == BaselineMode.Explicit ? RevisionValidator.Validate(baselineRevision?.Trim()) : null;
-        await EnsureProjectAsync(projectId, cancellationToken);
-        var access = await _repositories.GetAccessAsync(repositoryId, cancellationToken);
+        var access = await _repositories.GetAccessAsync(projectId, repositoryId, cancellationToken);
 
         // One session, so the repository is fetched once for the whole plan
         await using var session = await _git.OpenAsync(access, cancellationToken);
@@ -284,9 +299,9 @@ public sealed class ReviewPlanner
         }
 
         // The commits come from a page, so they are checked like anything else that reaches git
+        await EnsureProjectAsync(actor, projectId, cancellationToken);
         RequireCommit(headSha);
-        await EnsureProjectAsync(projectId, cancellationToken);
-        var access = await _repositories.GetAccessAsync(repositoryId, cancellationToken);
+        var access = await _repositories.GetAccessAsync(projectId, repositoryId, cancellationToken);
 
         // One session for the batch: one fetch, and every review is made from the commits of the plan
         var results = new List<PlanCreateResult>();
@@ -422,18 +437,16 @@ public sealed class ReviewPlanner
     }
 
     /// <summary>
-    ///     Checks that the project exists.
+    ///     Checks that the actor may see the project.
     /// </summary>
+    /// <param name="actor">The signed-in user.</param>
     /// <param name="projectId">The project identity.</param>
     /// <param name="cancellationToken">Cancels the operation.</param>
-    /// <returns>A task that completes when the project exists.</returns>
+    /// <returns>A task that completes when the actor may see the project.</returns>
     /// <exception cref="DomainRuleException">Thrown with <see cref="DomainRule.ProjectNotFound"/>.</exception>
-    private async Task EnsureProjectAsync(int projectId, CancellationToken cancellationToken)
+    private Task EnsureProjectAsync(Actor actor, int projectId, CancellationToken cancellationToken)
     {
-        if (await _store.GetProjectAsync(projectId, cancellationToken) is null)
-        {
-            throw new DomainRuleException(DomainRule.ProjectNotFound, $"Project {projectId} does not exist.");
-        }
+        return _access.RequireViewAsync(actor, projectId, cancellationToken);
     }
 
     /// <summary>

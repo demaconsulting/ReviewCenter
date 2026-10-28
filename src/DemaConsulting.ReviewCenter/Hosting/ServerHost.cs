@@ -232,6 +232,7 @@ internal static class ServerHost
         services.AddSingleton<IUserStore, UserStore>();
         services.AddSingleton<IPersonalAccessTokenStore, PersonalAccessTokenStore>();
         services.AddSingleton<IPasswordHasher, PasswordHasher>();
+        services.AddSingleton<IProjectAccess, ProjectAccess>();
         services.AddSingleton<ProjectService>();
         services.AddSingleton<ReviewService>();
         services.AddSingleton<ThreadService>();

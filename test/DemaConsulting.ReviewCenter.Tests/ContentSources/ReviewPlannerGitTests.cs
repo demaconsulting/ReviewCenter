@@ -128,20 +128,21 @@ public class ReviewPlannerGitTests
         var users = new UserService(db.Users, new FakePasswordHasher(), clock);
         await users.CreateAsync("adm", "Adm", UserRole.Admin, Password, cancellationToken);
         var ann = await users.CreateAsync("ann", "Ann", UserRole.Reviewer, Password, cancellationToken);
-        var repositories = new RepositoryService(new FakeRepositoryStore(), new FakeCredentialProtector(), users, clock);
+        var project = await TestServices.Projects(db.Store, clock).CreateAsync("Apollo", null, cancellationToken);
+        await db.Store.AddMembershipAsync(ann.Id, project.Id, cancellationToken);
+        var repositories = TestServices.Repositories(db.Store, clock);
         var repository = await repositories.CreateAsync(
-            "origin", "https://example.com/origin.git", null, null, _actor, cancellationToken);
+            project.Id, "origin", "https://example.com/origin.git", null, null, _actor, cancellationToken);
         var options = new GitOptions { CachePath = Path.Combine(root.Path, "cache"), TimeoutSeconds = 60 };
         var provider = new OriginProvider(new GitSource(new GitRunner(options), options), origin);
-        var project = await new ProjectService(db.Store, clock).CreateAsync("Apollo", null, cancellationToken);
-        var reviews = new ReviewService(db.Store, clock, repositories, provider);
-        var signing = new SigningService(db.Store, users, clock);
-        var planner = new ReviewPlanner(db.Store, reviews, repositories, provider, signing, new ReviewMarkConfigParser());
+        var reviews = TestServices.Reviews(db.Store, clock, repositories, provider);
+        var signing = TestServices.Signing(db.Store, users, clock);
+        var planner = TestServices.Planner(db.Store, reviews, repositories, provider, signing, new ReviewMarkConfigParser());
         return new Scenario(
             origin,
             planner,
             signing,
-            new ChecklistService(db.Store, clock),
+            TestServices.Checklists(db.Store, clock),
             db.Store,
             project.Id,
             repository.Id,
@@ -159,7 +160,8 @@ public class ReviewPlannerGitTests
     /// <returns>The plan.</returns>
     private static Task<ReviewPlan> PlanAsync(Scenario s, string head, BaselineMode mode, string? baseline = null)
     {
-        return s.Planner.PlanAsync(s.ProjectId, s.RepositoryId, head, mode, baseline, TestContext.Current.CancellationToken);
+        return s.Planner.PlanAsync(
+            _actor, s.ProjectId, s.RepositoryId, head, mode, baseline, TestContext.Current.CancellationToken);
     }
 
     /// <summary>

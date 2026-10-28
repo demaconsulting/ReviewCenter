@@ -1,30 +1,51 @@
-@* NewRepositoryPage: the form that registers a git repository, at "/repositories/new". The page holds only the form (a
-   narrow column); Cancel goes back to the registry and a successful registration returns to it. Access is limited to
-   the Admin role by the attribute below.
+@* NewRepositoryPage: the form that registers a git repository in a project, at
+   "/projects/{id}/repositories/new". The page holds only the form (a narrow column); Cancel goes back to the
+   repositories of the project and a successful registration returns to them. Only whoever manages the project (a
+   system administrator or a project admin of it) gets the form; anybody else sees the not-found message of a missing
+   project.
 
    Presentation only; state and event handling live in NewRepositoryPage.razor.cs. The token is write-only: it is typed
    into a password field, sent once and never shown again. The data-interactive marker on the root flips to "true"
    once the live circuit is connected.
 
+   Human factors: (a) four fields, two of them only for private repositories; (b) nothing else is on the page;
+   (c) the hints say what a location may be and that the token cannot be shown again.
+
    The page body is inside SessionGate, which replaces it with a "Session ended" message when the user is no longer
    valid while the page is open. *@
-@page "/repositories/new"
-@using DemaConsulting.ReviewCenter.Identity
+@page "/projects/{ProjectId:int}/repositories/new"
 @rendermode InteractiveServer
-@attribute [Authorize(Roles = SignIn.AdminRole)]
+@attribute [Authorize]
 
 <PageTitle>Add repository - ReviewCenter</PageTitle>
 
 <SessionGate>
 <main class="page narrow" data-testid="new-repository-page" data-interactive="@InteractiveMarker">
     <nav class="breadcrumb">
-        <a href="/repositories" data-testid="breadcrumb-repositories-link">Repositories</a>
-        <span aria-hidden="true">/</span>
-        <span aria-current="page">Add repository</span>
+        <a href="/projects" data-testid="breadcrumb-projects-link">Projects</a>
+        @if (Project is not null)
+        {
+            <span aria-hidden="true">/</span>
+            <a href="/projects/@ProjectId" data-testid="breadcrumb-project-link">@Project.Name</a>
+            <span aria-hidden="true">/</span>
+            <a href="/projects/@ProjectId/repositories" data-testid="breadcrumb-repositories-link">Repositories</a>
+            <span aria-hidden="true">/</span>
+            <span aria-current="page">Add repository</span>
+        }
     </nav>
 
+    @if (!Loaded)
+    {
+        <p class="muted" data-testid="new-repository-loading">Loading...</p>
+    }
+    else if (Project is null)
+    {
+        <p class="error" role="alert" data-testid="project-not-found">Project @ProjectId does not exist.</p>
+    }
+    else
+    {
     <h1>Add repository</h1>
-    <p class="page-lead">Register a git repository that reviews can be created from.</p>
+    <p class="page-lead">Register a git repository that reviews of this project can be created from.</p>
 
     <section class="card">
         @if (ErrorMessage is not null)
@@ -60,9 +81,10 @@
             </div>
             <div class="plan-actions">
                 <button type="submit" data-testid="create-repository-button">Add repository</button>
-                <a class="action outline" href="/repositories" data-testid="cancel-new-repository-link">Cancel</a>
+                <a class="action outline" href="/projects/@ProjectId/repositories" data-testid="cancel-new-repository-link">Cancel</a>
             </div>
         </form>
     </section>
+    }
 </main>
 </SessionGate>

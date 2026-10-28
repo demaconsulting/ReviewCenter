@@ -216,21 +216,6 @@ public class UserServiceTests
     }
 
     /// <summary>
-    ///     Test that an undefined role is refused.
-    /// </summary>
-    [Fact]
-    public async Task UserService_CreateAsync_UndefinedRole_Throws()
-    {
-        // Arrange: a service
-        var (service, store, _) = Create();
-
-        // Act, Assert: an undefined role is refused and nothing is stored
-        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(
-            () => service.CreateAsync("ann", "Ann", (UserRole)99, Password, TestContext.Current.CancellationToken));
-        Assert.Empty(await store.ListAsync(TestContext.Current.CancellationToken));
-    }
-
-    /// <summary>
     ///     Test that the right password signs in, in any case of the user name, and a wrong password, an unknown
     ///     user and a missing password do not.
     /// </summary>
@@ -373,7 +358,7 @@ public class UserServiceTests
         Assert.Equal(DomainRule.LastAdmin, disable.Rule);
         Assert.Equal(DomainRule.LastAdmin, demote.Rule);
         Assert.Equal(DomainRule.LastAdmin, lastAgain.Rule);
-        Assert.Equal(UserRole.Reviewer, (await service.GetAsync("root", cancellationToken))!.Role);
+        Assert.False((await service.GetAsync("root", cancellationToken))!.IsSystemAdmin);
     }
 
     /// <summary>
@@ -498,24 +483,33 @@ public class UserServiceTests
     }
 
     /// <summary>
-    ///     Test that a role change is stored, and that an undefined role is refused.
+    ///     Test that a promotion is stored and that the last enabled system administrator cannot be demoted,
+    ///     disabled or locked out of the role.
     /// </summary>
     [Fact]
-    public async Task UserService_SetRoleAsync_ValidAndUndefinedRole_ChangesOrThrows()
+    public async Task UserService_SetSystemAdminAsync_PromoteAndDemote_LastAdminIsKept()
     {
-        // Arrange: a service with an administrator and a reviewer
+        // Arrange: a service with one system administrator and a plain user
         var (service, _, _) = Create();
         var cancellationToken = TestContext.Current.CancellationToken;
-        await service.CreateAsync("root", "Root", UserRole.Admin, Password, cancellationToken);
-        await service.CreateAsync("ann", "Ann", UserRole.Reviewer, Password, cancellationToken);
+        await service.CreateAsync("root", "Root", true, Password, Actor.CommandLine, cancellationToken);
+        await service.CreateAsync("ann", "Ann", false, Password, Actor.CommandLine, cancellationToken);
 
-        // Act: promote the reviewer, and try an undefined role
-        await service.SetRoleAsync("ann", UserRole.Admin, cancellationToken);
-        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(
-            () => service.SetRoleAsync("ann", (UserRole)99, cancellationToken));
+        // Act: the only administrator cannot be demoted or disabled
+        var demote = await Assert.ThrowsAsync<DomainRuleException>(
+            () => service.SetSystemAdminAsync("root", false, Actor.CommandLine, cancellationToken));
+        var disable = await Assert.ThrowsAsync<DomainRuleException>(
+            () => service.SetEnabledAsync("root", false, Actor.CommandLine, cancellationToken));
 
-        // Assert: the promotion is stored
-        Assert.Equal(UserRole.Admin, (await service.GetAsync("ann", cancellationToken))!.Role);
+        // Act: with a second administrator the first can be demoted
+        await service.SetSystemAdminAsync("ann", true, Actor.CommandLine, cancellationToken);
+        await service.SetSystemAdminAsync("root", false, Actor.CommandLine, cancellationToken);
+
+        // Assert
+        Assert.Equal(DomainRule.LastAdmin, demote.Rule);
+        Assert.Equal(DomainRule.LastAdmin, disable.Rule);
+        Assert.True((await service.GetAsync("ann", cancellationToken))!.IsSystemAdmin);
+        Assert.False((await service.GetAsync("root", cancellationToken))!.IsSystemAdmin);
     }
 
     /// <summary>

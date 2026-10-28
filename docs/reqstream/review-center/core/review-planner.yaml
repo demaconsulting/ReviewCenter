@@ -12,14 +12,16 @@ sections:
           The ReviewPlanner shall read the review-sets from the configuration file at the head commit of a repository,
           using one session for the whole plan, and shall return one row per review-set in file order with the files
           added, modified, and deleted within its selection, listing the changes once per distinct baseline and holding
-          only one change list at a time, and shall refuse a plan whose project, repository,
+          only one change list at a time, and shall refuse a plan whose project (one that does not exist or that the
+          actor may not see, with the same refusal), repository (one that is not a repository of the project),
           revision, or configuration file is not valid, with the rule of the problem, while a problem with one
           review-set can only be planned as it stands, so a broken one affects only its own row.
         justification: |
           A repository says in one file which sets of files are reviewed together. Reading that file at the head, once
           and from one fetch, shows the user in one place everything that needs a review, and a broken set must not
           hide the others. A change list can be large, and a plan can span many baselines, so holding only one at a
-          time keeps the memory of a plan bounded.
+          time keeps the memory of a plan bounded. A user who cannot see a project must learn nothing about it, and
+          git must not be reached on their behalf.
         tests:
           - ReviewPlanner_PlanAsync_NoBaseline_ClassifiesSetsWithOneSession
           - ReviewPlanner_PlanAsync_UnusableSets_CannotPlanRows
@@ -78,7 +80,8 @@ sections:
           transaction so that a failing request neither stops nor undoes the others, shall report for every request
           whether it was created, was already filed, or failed with a plain reason, turning an unexpected fault of one
           request into a failed result with a generic reason that carries no exception text, replacing the text of a
-          git access failure with a fixed sentence, and shall refuse a batch that is not valid as a whole.
+          git access failure with a fixed sentence, and shall refuse a batch that is not valid as a whole, including a
+          batch for a project that the actor may not see.
         justification: |
           The pages create many reviews with one click. Creating them through the review service gives every review
           the same rules, frozen content, and audit entry as one created by hand, and reporting the result of each

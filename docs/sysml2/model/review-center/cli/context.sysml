@@ -1,6 +1,6 @@
 package ReviewCenter {
     part def Context {
-        doc /* Command-line argument parser and I/O owner for one tool invocation, including the user add verb and its options. */
+        doc /* Command-line argument parser and I/O owner for one tool invocation, including the user add verb and its --system-admin switch. */
 
         comment sourceRef /* Source: src/DemaConsulting.ReviewCenter/Cli/Context.cs */
         comment testRef /* Test: test/DemaConsulting.ReviewCenter.Tests/Cli/ContextTests.cs */

@@ -1,11 +1,16 @@
 @* UsersPage: user administration for administrators, at "/users".
 
    Presentation only; state and event handling live in UsersPage.razor.cs. A list of all users with, per user,
-   the controls to disable or enable the account, to set the role and to set a new password; a "+ New user"
-   button leads to the separate form page at "/users/new". Access is limited to the Admin role by the attribute
-   below. Every interactive element and every key value carries a stable kebab-case data-testid (row-level ids
-   carry the user id), and the data-interactive marker on the root flips to "true" once the live circuit is
-   connected.
+   the controls to disable or enable the account, to make the user a system administrator (or take that away) and
+   to set a new password; a "+ New user" button leads to the separate form page at "/users/new". Access is limited
+   to system administrators by the attribute below. Which projects a user is a member of is managed on the project
+   page, not here. Every interactive element and every key value carries a stable kebab-case data-testid
+   (row-level ids carry the user id), and the data-interactive marker on the root flips to "true" once the live
+   circuit is connected.
+
+   Human factors: (a) the badges show at a glance who is a system administrator and who is disabled; (b) memberships
+   are deliberately not listed here, so the page stays short; (c) every action is a button next to the row it
+   changes, and the outcome is shown next to the button that was used.
 
    The page body is inside SessionGate, which replaces it with a "Session ended" message when the user is no longer
    valid while the page is open. *@
@@ -22,7 +27,10 @@
         <h1>Users</h1>
         <a class="action" href="/users/new" data-testid="new-user-button">+ New user</a>
     </div>
-    <p class="page-lead">Everyone who can sign in. Administrators manage users, repositories and the audit trail.</p>
+    <p class="page-lead">
+        Everyone who can sign in. System administrators manage users, projects and the audit trail; what everyone
+        else sees is decided by the projects they are members of.
+    </p>
 
     @if (MessageUserId is null)
     {
@@ -46,26 +54,20 @@
                     <strong class="row-title" data-testid="user-username-@userId">@user.Username</strong>
                     <p class="muted" data-testid="user-display-name-@userId">@user.DisplayName</p>
                     <p class="row-badges">
-                        <span class="badge" data-testid="user-role-@userId">@user.Role</span>
+                        @if (user.IsSystemAdmin)
+                        {
+                            <span class="badge" data-testid="user-admin-@userId">System admin</span>
+                        }
                         <span class="badge @(user.Enabled ? "approved" : null)" data-testid="user-enabled-@userId">@(user.Enabled ? "Enabled" : "Disabled")</span>
                     </p>
                 </div>
                 <div class="row-actions">
                     <button type="button" class="outline small" data-testid="user-toggle-enabled-@userId"
                             @onclick="() => ToggleEnabledAsync(user)">@(user.Enabled ? "Disable" : "Enable")</button>
+                    <button type="button" class="outline small" data-testid="user-toggle-admin-@userId"
+                            @onclick="() => ToggleSystemAdminAsync(user)">@(user.IsSystemAdmin ? "Remove system admin" : "Make system admin")</button>
                 </div>
                 <div class="user-controls">
-                    <div class="control-group">
-                        <select aria-label="Role of @username" data-testid="user-role-select-@userId"
-                                @bind:get="RoleChoice(user)" @bind:set="value => RoleChoices[userId] = value">
-                            @foreach (var role in Enum.GetValues<UserRole>())
-                            {
-                                <option value="@role">@role</option>
-                            }
-                        </select>
-                        <button type="button" class="outline small" data-testid="user-set-role-@userId"
-                                @onclick="() => SetRoleAsync(user)">Set role</button>
-                    </div>
                     <div class="control-group grow">
                         <input type="password" autocomplete="new-password" aria-label="New password for @username"
                                placeholder="New password (at least @ReviewLimits.MinPasswordLength characters)"

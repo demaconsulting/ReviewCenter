@@ -297,7 +297,7 @@ public class SignInTests
     [InlineData("/projects/1/reviews/1/checklist")]
     [InlineData("/account")]
     [InlineData("/users")]
-    [InlineData("/repositories")]
+    [InlineData("/projects/1/repositories")]
     public async Task SignIn_ProtectedPage_Anonymous_RedirectsToLogin(string route)
     {
         // Arrange: an application and a visitor who is not signed in
@@ -343,7 +343,7 @@ public class SignInTests
     {
         // Arrange: an application with a reviewer and an administrator, each signed in
         await using var app = await StartAsync();
-        using var reviewer = await TestBrowser.SignedInAsync(app, "rev");
+        using var reviewer = await TestBrowser.SignedInAsync(app, "rev", UserRole.Reviewer);
         using var admin = await TestBrowser.SignedInAsync(app, "adm", UserRole.Admin);
 
         // Act: both request the page
@@ -357,23 +357,26 @@ public class SignInTests
     }
 
     /// <summary>
-    ///     Test that the repository registry page is for administrators only.
+    ///     Test that a project's repository page is for its administrators: a system administrator is served and a
+    ///     user who is no member of the project cannot even tell that the project exists.
     /// </summary>
     [Fact]
-    public async Task SignIn_RepositoriesPage_ReviewerAndAdmin_OnlyAdminIsAllowed()
+    public async Task SignIn_RepositoriesPage_NonMemberAndSystemAdmin_OnlyAdminIsServed()
     {
-        // Arrange: an application with a reviewer and an administrator, each signed in
+        // Arrange: an application with a project, a user outside it and a system administrator, each signed in
         await using var app = await StartAsync();
-        using var reviewer = await TestBrowser.SignedInAsync(app, "rev");
+        using var reviewer = await TestBrowser.SignedInAsync(app, "rev", UserRole.Reviewer);
         using var admin = await TestBrowser.SignedInAsync(app, "adm", UserRole.Admin);
+        var project = await TestWebApp.CreateProjectAsync(app, "Apollo");
+        var route = $"/projects/{project.Id}/repositories";
 
         // Act: both request the page
-        var forReviewer = await reviewer.Client.GetAsync("/repositories", TestContext.Current.CancellationToken);
-        var forAdmin = await admin.Client.GetAsync("/repositories", TestContext.Current.CancellationToken);
+        var forReviewer = await reviewer.Client.GetAsync(route, TestContext.Current.CancellationToken);
+        var forAdmin = await admin.Client.GetAsync(route, TestContext.Current.CancellationToken);
 
-        // Assert: the reviewer is forbidden with an explanation, the administrator is served
-        Assert.Equal(HttpStatusCode.Forbidden, forReviewer.StatusCode);
-        Assert.Contains("Access denied", await forReviewer.Content.ReadAsStringAsync(TestContext.Current.CancellationToken), StringComparison.Ordinal);
+        // Assert: the non-member gets the answer for a missing project, the administrator is served
+        Assert.Contains("does not exist", await forReviewer.Content.ReadAsStringAsync(TestContext.Current.CancellationToken), StringComparison.Ordinal);
+        Assert.DoesNotContain("does not exist", await forAdmin.Content.ReadAsStringAsync(TestContext.Current.CancellationToken), StringComparison.Ordinal);
         Assert.Equal(HttpStatusCode.OK, forAdmin.StatusCode);
     }
 
@@ -406,7 +409,7 @@ public class SignInTests
     {
         // Arrange: a signed-in user
         await using var app = await StartAsync();
-        using var browser = await TestBrowser.SignedInAsync(app, "ann");
+        using var browser = await TestBrowser.SignedInAsync(app, "ann", UserRole.Reviewer);
         Assert.Equal(HttpStatusCode.OK, (await browser.Client.GetAsync("/projects", TestContext.Current.CancellationToken)).StatusCode);
 
         // Act: disable the account, then use the old cookie
@@ -467,22 +470,22 @@ public class SignInTests
     }
 
     /// <summary>
-    ///     Test that the shared rule accepts a principal only when the stored user is enabled and the role and
-    ///     display name are unchanged.
+    ///     Test that the shared rule accepts a principal only when the stored user is enabled and the system
+    ///     administrator claim and display name are unchanged.
     /// </summary>
     [Theory]
-    [InlineData(true, UserRole.Reviewer, "Ann", "Reviewer", "Ann", true)]
-    [InlineData(true, UserRole.Admin, "Ann", "Admin", "Ann", true)]
-    [InlineData(false, UserRole.Reviewer, "Ann", "Reviewer", "Ann", false)]
-    [InlineData(true, UserRole.Admin, "Ann", "Reviewer", "Ann", false)]
-    [InlineData(true, UserRole.Reviewer, "Ann", "Admin", "Ann", false)]
-    [InlineData(true, UserRole.Reviewer, "Ann B.", "Reviewer", "Ann", false)]
+    [InlineData(true, false, "Ann", false, "Ann", true)]
+    [InlineData(true, true, "Ann", true, "Ann", true)]
+    [InlineData(false, false, "Ann", false, "Ann", false)]
+    [InlineData(true, true, "Ann", false, "Ann", false)]
+    [InlineData(true, false, "Ann", true, "Ann", false)]
+    [InlineData(true, false, "Ann B.", false, "Ann", false)]
     public void SignIn_IsCurrent_StoredUserVersusPrincipal_FollowsTheRule(
-        bool enabled, UserRole storedRole, string storedName, string claimRole, string claimName, bool expected)
+        bool enabled, bool storedAdmin, string storedName, bool claimAdmin, string claimName, bool expected)
     {
         // Arrange: a stored user and a principal issued with the given claims
-        var user = new User { Id = 1, Username = "ann", DisplayName = storedName, Role = storedRole, Enabled = enabled };
-        var principal = PrincipalWith(claimRole, claimName);
+        var user = new User { Id = 1, Username = "ann", DisplayName = storedName, IsSystemAdmin = storedAdmin, Enabled = enabled };
+        var principal = PrincipalWith(claimAdmin, claimName);
 
         // Act: apply the rule
         var current = SignIn.IsCurrent(principal, user);
@@ -493,22 +496,19 @@ public class SignInTests
 
     /// <summary>
     ///     Test that the shared rule refuses a missing principal, a missing user, and a principal without the
-    ///     role or display name claim.
+    ///     display name claim.
     /// </summary>
     [Fact]
     public void SignIn_IsCurrent_MissingPrincipalUserOrClaims_ReturnsFalse()
     {
-        // Arrange: a valid stored user, and principals that lack one claim each
-        var user = new User { Id = 1, Username = "ann", DisplayName = "Ann", Role = UserRole.Reviewer, Enabled = true };
-        var noRole = new System.Security.Claims.ClaimsPrincipal(new System.Security.Claims.ClaimsIdentity(
-            [new System.Security.Claims.Claim(SignIn.DisplayNameClaimType, "Ann")], "test"));
+        // Arrange: a valid stored user, and a principal that lacks the display name
+        var user = new User { Id = 1, Username = "ann", DisplayName = "Ann", Enabled = true };
         var noName = new System.Security.Claims.ClaimsPrincipal(new System.Security.Claims.ClaimsIdentity(
-            [new System.Security.Claims.Claim(System.Security.Claims.ClaimTypes.Role, "Reviewer")], "test"));
+            [new System.Security.Claims.Claim(System.Security.Claims.ClaimTypes.Role, SignIn.AdminRole)], "test"));
 
         // Act and assert: each is refused
         Assert.False(SignIn.IsCurrent(null, user));
-        Assert.False(SignIn.IsCurrent(PrincipalWith("Reviewer", "Ann"), null));
-        Assert.False(SignIn.IsCurrent(noRole, user));
+        Assert.False(SignIn.IsCurrent(PrincipalWith(false, "Ann"), null));
         Assert.False(SignIn.IsCurrent(noName, user));
     }
 
@@ -585,20 +585,25 @@ public class SignInTests
     }
 
     /// <summary>
-    ///     Builds a principal with the claims the application issues, for the given role and display name.
+    ///     Builds a principal with the claims the application issues, for the given administrator flag and display
+    ///     name.
     /// </summary>
-    /// <param name="role">The role claim value.</param>
+    /// <param name="admin">Whether the principal carries the system administrator claim.</param>
     /// <param name="displayName">The display name claim value.</param>
     /// <returns>The principal.</returns>
-    private static System.Security.Claims.ClaimsPrincipal PrincipalWith(string role, string displayName)
+    private static System.Security.Claims.ClaimsPrincipal PrincipalWith(bool admin, string displayName)
     {
-        return new System.Security.Claims.ClaimsPrincipal(new System.Security.Claims.ClaimsIdentity(
-            [
-                new System.Security.Claims.Claim(System.Security.Claims.ClaimTypes.Name, "ann"),
-                new System.Security.Claims.Claim(SignIn.DisplayNameClaimType, displayName),
-                new System.Security.Claims.Claim(System.Security.Claims.ClaimTypes.Role, role)
-            ],
-            "test"));
+        List<System.Security.Claims.Claim> claims =
+        [
+            new(System.Security.Claims.ClaimTypes.Name, "ann"),
+            new(SignIn.DisplayNameClaimType, displayName)
+        ];
+        if (admin)
+        {
+            claims.Add(new(System.Security.Claims.ClaimTypes.Role, SignIn.AdminRole));
+        }
+
+        return new System.Security.Claims.ClaimsPrincipal(new System.Security.Claims.ClaimsIdentity(claims, "test"));
     }
 
     /// <summary>

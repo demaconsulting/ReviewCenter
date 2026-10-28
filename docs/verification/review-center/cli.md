@@ -102,10 +102,10 @@ thrown because `--urls` requires the `serve` verb. This scenario is tested by
 `CliSubsystem_UrlsWithoutServe_Context_RejectsArgumentCombination`.
 
 **CliSubsystem_UserAddFlow_ContextAndProgram_ParsesOptionsDocumentsThemAndRejectsMisuse**: Arguments `["user",
-"add", "--username", "ann", "--display-name", "Ann", "--role", "Admin"]` are parsed by `Context.Create`, which
-records the verb and the three options. `Program.Run` with `--help` prints a help text that names `user add` and the
-`REVIEWCENTER_PASSWORD` variable, `user add` without names is rejected, and `--username` without the verb is
-rejected, each with an `ArgumentException`. This scenario is tested by
+"add", "--username", "ann", "--display-name", "Ann", "--system-admin"]` are parsed by `Context.Create`, which
+records the verb, the two options, and the switch. `Program.Run` with `--help` prints a help text that names
+`user add` and the `REVIEWCENTER_PASSWORD` variable, `user add` without names is rejected, and `--username` without
+the verb is rejected, each with an `ArgumentException`. This scenario is tested by
 `CliSubsystem_UserAddFlow_ContextAndProgram_ParsesOptionsDocumentsThemAndRejectsMisuse`.
 
 **Audit verify verb**: The unit tests verify the flow of the `audit verify` verb. `Context.Create` with the arguments

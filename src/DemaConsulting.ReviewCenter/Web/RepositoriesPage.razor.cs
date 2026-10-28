@@ -26,13 +26,15 @@ using Microsoft.AspNetCore.Components.Authorization;
 namespace DemaConsulting.ReviewCenter.Web;
 
 /// <summary>
-///     Code-behind for the repository registry page (<c>RepositoriesPage.razor</c>): lists the registered
-///     repositories, adds them, edits them, and disables or enables them.
+///     Code-behind for the repository page of a project (<c>RepositoriesPage.razor</c>): lists the repositories of
+///     the project, and edits them or disables and enables them. New ones are added on the separate new repository
+///     page.
 /// </summary>
 /// <remarks>
-///     An attribute on the page limits entry to administrators. An open page re-checks its user only every
-///     <see cref="AuthOptions.RevalidationSeconds"/>, so for the time before the next check every action also
-///     re-checks that the signed-in user is still an enabled administrator in the user store (defense in depth;
+///     The page is for whoever may administer the project (a system administrator or a project admin of it); anybody
+///     else sees the not-found state, the same as for a project that does not exist. An open page re-checks its user
+///     only every <see cref="AuthOptions.RevalidationSeconds"/>, so for the time before the next check every action
+///     also re-checks that the signed-in user may still administer the project (defense in depth;
 ///     <see cref="RepositoryService"/> checks again). The page talks to the domain only through
 ///     <see cref="RepositoryService"/>, which owns the rules. The token is write-only: the page never receives a
 ///     stored token (the read model has no member for it), it shows only whether one is set, and the token fields are
@@ -49,22 +51,44 @@ public partial class RepositoriesPage : ComponentBase
     private bool _interactive;
 
     /// <summary>
+    ///     Gets or sets the identity of the project whose repositories are shown, from the page address.
+    /// </summary>
+    [Parameter]
+    public int ProjectId { get; set; }
+
+    /// <summary>
     ///     Gets or sets the service that manages the registry, supplied by dependency injection.
     /// </summary>
     [Inject]
     private RepositoryService RepositoryService { get; set; } = null!;
 
     /// <summary>
-    ///     Gets or sets the service that knows the users, supplied by dependency injection.
+    ///     Gets or sets the service that reads projects, supplied by dependency injection.
     /// </summary>
     [Inject]
-    private UserService UserService { get; set; } = null!;
+    private ProjectService ProjectService { get; set; } = null!;
+
+    /// <summary>
+    ///     Gets or sets the access service, supplied by dependency injection; decides who may manage the project.
+    /// </summary>
+    [Inject]
+    private IProjectAccess Access { get; set; } = null!;
 
     /// <summary>
     ///     Gets or sets the authentication state of the current user, supplied by dependency injection.
     /// </summary>
     [Inject]
     private AuthenticationStateProvider AuthenticationState { get; set; } = null!;
+
+    /// <summary>
+    ///     Gets the project shown, or <c>null</c> when it does not exist or the user may not manage it.
+    /// </summary>
+    private Project? Project { get; set; }
+
+    /// <summary>
+    ///     Gets a value indicating whether the page has finished loading.
+    /// </summary>
+    private bool Loaded { get; set; }
 
     /// <summary>
     ///     Gets the repositories shown in the list.
@@ -126,22 +150,35 @@ public partial class RepositoriesPage : ComponentBase
     private string InteractiveMarker => _interactive ? "true" : "false";
 
     /// <summary>
-    ///     Loads the repository list when the page is created.
+    ///     Loads the project and its repositories whenever the project identity changes.
     /// </summary>
     /// <returns>A task that completes when the list is loaded.</returns>
-    protected override async Task OnInitializedAsync()
+    protected override async Task OnParametersSetAsync()
     {
-        // The page is entered by administrators only; a failure to identify the user shows an empty list
-        // and the first action reports the ended sign-in state
-        try
+        // The page is for whoever may manage the project; anybody else gets the not-found state, the same as for
+        // a project that does not exist
+        Loaded = false;
+        EditingId = null;
+        ErrorMessage = null;
+        StatusMessage = null;
+        Repositories = [];
+        var actor = await AuthenticationState.GetActorOrNullAsync();
+        Project = actor is not null && await Access.CanAdministerAsync(actor, ProjectId)
+            ? await ProjectService.GetAsync(actor, ProjectId)
+            : null;
+        if (actor is not null && Project is not null)
         {
-            var actor = await AuthenticationState.GetActorAsync();
-            Repositories = await RepositoryService.ListAsync(actor);
+            try
+            {
+                Repositories = await RepositoryService.ListAsync(actor, ProjectId);
+            }
+            catch (DomainRuleException ex)
+            {
+                ErrorMessage = ex.Message;
+            }
         }
-        catch (DomainRuleException ex)
-        {
-            ErrorMessage = ex.Message;
-        }
+
+        Loaded = true;
     }
 
     /// <summary>
@@ -247,10 +284,9 @@ public partial class RepositoriesPage : ComponentBase
             return;
         }
 
-        var current = await UserService.GetAsync(actor.Username);
-        if (current is not { Enabled: true, Role: UserRole.Admin })
+        if (!await Access.CanAdministerAsync(actor, ProjectId))
         {
-            ErrorMessage = "Administrator rights are required.";
+            ErrorMessage = "Project administrator rights are required.";
             return;
         }
 
@@ -267,7 +303,7 @@ public partial class RepositoriesPage : ComponentBase
         // Reload so the rows show what is stored, whether or not the change succeeded
         try
         {
-            Repositories = await RepositoryService.ListAsync(actor);
+            Repositories = await RepositoryService.ListAsync(actor, ProjectId);
         }
         catch (DomainRuleException ex)
         {

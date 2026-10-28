@@ -28,7 +28,8 @@ using TestContext = Xunit.TestContext;
 namespace DemaConsulting.ReviewCenter.Tests.Web;
 
 /// <summary>
-///     Unit tests for the <see cref="RepositoriesPage"/> component, rendered in memory with bUnit.
+///     Unit tests for the <see cref="RepositoriesPage"/> and <see cref="NewRepositoryPage"/> components, rendered in
+///     memory with bUnit. The repositories belong to a project; the pages are for whoever manages that project.
 /// </summary>
 public class RepositoriesPageTests : PageTestBase
 {
@@ -53,6 +54,11 @@ public class RepositoriesPageTests : PageTestBase
     private static readonly Actor _admin = new("root", "Root");
 
     /// <summary>
+    ///     The identity of the project the tests work in; set by <see cref="SignInAsNewAdminAsync"/>.
+    /// </summary>
+    private int _projectId;
+
+    /// <summary>
     ///     Test that repositories are listed with location, user name and the token state, and that neither the
     ///     token nor a delete control is ever shown.
     /// </summary>
@@ -61,11 +67,11 @@ public class RepositoriesPageTests : PageTestBase
     {
         // Arrange: a private and a public repository
         await SignInAsNewAdminAsync();
-        var priv = await Repositories.CreateAsync("private", Location, "svc", Secret, _admin, TestContext.Current.CancellationToken);
-        var pub = await Repositories.CreateAsync("public", "https://example.com/open.git", null, null, _admin, TestContext.Current.CancellationToken);
+        var priv = await Repositories.CreateAsync(_projectId, "private", Location, "svc", Secret, _admin, TestContext.Current.CancellationToken);
+        var pub = await Repositories.CreateAsync(_projectId, "public", "https://example.com/open.git", null, null, _admin, TestContext.Current.CancellationToken);
 
         // Act: render the page
-        var cut = Render<RepositoriesPage>();
+        var cut = RenderList();
 
         // Assert: details and state are shown, the token is not, and there is no delete control
         Assert.Equal("private", cut.Find($"[data-testid='repository-name-{priv.Id}']").TextContent);
@@ -78,20 +84,95 @@ public class RepositoriesPageTests : PageTestBase
         Assert.DoesNotContain(Secret, cut.Markup, StringComparison.Ordinal);
         Assert.DoesNotContain("protected:", cut.Markup, StringComparison.Ordinal);
         Assert.DoesNotContain("delete", cut.Markup, StringComparison.OrdinalIgnoreCase);
-        Assert.Equal("/repositories/new", cut.Find("[data-testid='new-repository-button']").GetAttribute("href"));
+        Assert.Equal(
+            $"/projects/{_projectId}/repositories/new", cut.Find("[data-testid='new-repository-button']").GetAttribute("href"));
         Assert.Empty(cut.FindAll("[data-testid='new-repository-form']"));
     }
 
     /// <summary>
-    ///     Test that the add form registers the repository with a write-only token, never puts the token into the
-    ///     markup and returns to the registry.
+    ///     Test that only the repositories of the project are listed.
+    /// </summary>
+    [Fact]
+    public async Task RepositoriesPage_Render_OtherProjectsRepositories_AreNotListed()
+    {
+        // Arrange: a repository in this project and one in another project
+        await SignInAsNewAdminAsync();
+        var other = await Projects.CreateAsync("Other", null, TestContext.Current.CancellationToken);
+        var mine = await Repositories.CreateAsync(_projectId, "mine", Location, null, null, _admin, TestContext.Current.CancellationToken);
+        var theirs = await Repositories.CreateAsync(other.Id, "theirs", Location, null, null, _admin, TestContext.Current.CancellationToken);
+
+        // Act: render the page of this project
+        var cut = RenderList();
+
+        // Assert: only the repository of this project is on the page
+        Assert.NotEmpty(cut.FindAll($"[data-testid='repository-row-{mine.Id}']"));
+        Assert.Empty(cut.FindAll($"[data-testid='repository-row-{theirs.Id}']"));
+    }
+
+    /// <summary>
+    ///     Test that a project admin manages the repositories of the project.
+    /// </summary>
+    [Fact]
+    public async Task RepositoriesPage_Render_ProjectAdmin_ShowsRepositoriesAndActions()
+    {
+        // Arrange: a project admin of the project, signed in as an ordinary user
+        await SignInAsNewAdminAsync();
+        var repo = await Repositories.CreateAsync(_projectId, "alpha", Location, null, null, _admin, TestContext.Current.CancellationToken);
+        var pam = await Users.CreateAsync("pam", "Pam", false, Password, TestContext.Current.CancellationToken);
+        await Store.AddMembershipAsync(pam.Id, _projectId, ProjectRole.ProjectAdmin, TestContext.Current.CancellationToken);
+        SignInAs("pam", "Pam", false);
+
+        // Act: render the page and disable the repository
+        var cut = RenderList();
+        await cut.Find($"[data-testid='repository-toggle-enabled-{repo.Id}']").ClickAsync();
+
+        // Assert: the project admin sees the repositories and may change them
+        Assert.Equal("Disabled", cut.Find($"[data-testid='repository-enabled-{repo.Id}']").TextContent);
+        Assert.NotEmpty(cut.FindAll("[data-testid='new-repository-button']"));
+    }
+
+    /// <summary>
+    ///     Test that a plain member and a user who is not a member see only the not-found message, with no
+    ///     repositories and no controls, the same as for a project that does not exist.
+    /// </summary>
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task RepositoriesPage_Render_MemberOrNonMember_ShowsNotFoundOnly(bool member)
+    {
+        // Arrange: a repository, and an ordinary user who is (or is not) a plain member of the project
+        await SignInAsNewAdminAsync();
+        var repo = await Repositories.CreateAsync(_projectId, "alpha", Location, null, null, _admin, TestContext.Current.CancellationToken);
+        var pat = await Users.CreateAsync("pat", "Pat", false, Password, TestContext.Current.CancellationToken);
+        if (member)
+        {
+            await Store.AddMembershipAsync(pat.Id, _projectId, TestContext.Current.CancellationToken);
+        }
+
+        SignInAs("pat", "Pat", false);
+
+        // Act: render the page and the add page
+        var list = RenderList();
+        var add = RenderNew();
+
+        // Assert: nothing but the not-found message, which is the one of a missing project
+        Assert.NotEmpty(list.FindAll("[data-testid='project-not-found']"));
+        Assert.NotEmpty(add.FindAll("[data-testid='project-not-found']"));
+        Assert.Empty(list.FindAll($"[data-testid='repository-row-{repo.Id}']"));
+        Assert.Empty(list.FindAll("[data-testid='new-repository-button']"));
+        Assert.Empty(add.FindAll("[data-testid='new-repository-form']"));
+    }
+
+    /// <summary>
+    ///     Test that the add form registers the repository in the project with a write-only token, never puts the
+    ///     token into the markup and returns to the repositories of the project.
     /// </summary>
     [Fact]
     public async Task NewRepositoryPage_CreateForm_WithToken_StoresItWriteOnlyAndClearsFields()
     {
         // Arrange: a signed-in administrator and the form filled in
         await SignInAsNewAdminAsync();
-        var cut = Render<NewRepositoryPage>();
+        var cut = RenderNew();
         await cut.Find("[data-testid='new-repository-name-input']").InputAsync("alpha");
         await cut.Find("[data-testid='new-repository-location-input']").InputAsync(Location);
         await cut.Find("[data-testid='new-repository-username-input']").InputAsync("svc");
@@ -101,14 +182,17 @@ public class RepositoriesPageTests : PageTestBase
         // Act: submit
         await cut.Find("[data-testid='new-repository-form']").SubmitAsync();
 
-        // Assert: registered with a token, the token is gone from the page and the browser returned to the registry
-        var created = Assert.Single(await Repositories.ListAsync(_admin, TestContext.Current.CancellationToken));
+        // Assert: registered in the project with a token, the token is gone from the page and the browser returned
+        var created = Assert.Single(await Repositories.ListAsync(_admin, _projectId, TestContext.Current.CancellationToken));
         Assert.True(created.HasToken);
+        Assert.Equal(_projectId, created.ProjectId);
         Assert.Empty(cut.FindAll("[data-testid='repositories-error']"));
         Assert.DoesNotContain(Secret, cut.Markup, StringComparison.Ordinal);
         Assert.Equal(string.Empty, cut.Find("[data-testid='new-repository-token-input']").GetAttribute("value") ?? string.Empty);
-        Assert.EndsWith("/repositories", Services.GetRequiredService<NavigationManager>().Uri, StringComparison.Ordinal);
-        Assert.Equal("/repositories", cut.Find("[data-testid='cancel-new-repository-link']").GetAttribute("href"));
+        Assert.EndsWith(
+            $"/projects/{_projectId}/repositories", Services.GetRequiredService<NavigationManager>().Uri, StringComparison.Ordinal);
+        Assert.Equal(
+            $"/projects/{_projectId}/repositories", cut.Find("[data-testid='cancel-new-repository-link']").GetAttribute("href"));
     }
 
     /// <summary>
@@ -119,16 +203,16 @@ public class RepositoriesPageTests : PageTestBase
     {
         // Arrange: a signed-in administrator and a location with credentials of its own
         await SignInAsNewAdminAsync();
-        var cut = Render<NewRepositoryPage>();
+        var cut = RenderNew();
         await cut.Find("[data-testid='new-repository-name-input']").InputAsync("alpha");
-        await cut.Find("[data-testid='new-repository-location-input']").InputAsync("https://user:pw@example.com/r.git");
+        await cut.Find("[data-testid='new-repository-location-input']").InputAsync("******example.com/r.git");
 
         // Act: submit
         await cut.Find("[data-testid='new-repository-form']").SubmitAsync();
 
         // Assert: the error is shown, nothing was created and the name stays
         Assert.NotEmpty(cut.FindAll("[data-testid='repositories-error']"));
-        Assert.Empty(await Repositories.ListAsync(_admin, TestContext.Current.CancellationToken));
+        Assert.Empty(await Repositories.ListAsync(_admin, _projectId, TestContext.Current.CancellationToken));
         Assert.Equal("alpha", cut.Find("[data-testid='new-repository-name-input']").GetAttribute("value"));
     }
 
@@ -140,9 +224,9 @@ public class RepositoriesPageTests : PageTestBase
     {
         // Arrange: a private repository and its open edit form
         await SignInAsNewAdminAsync();
-        var repo = await Repositories.CreateAsync("private", Location, "svc", Secret, _admin, TestContext.Current.CancellationToken);
+        var repo = await Repositories.CreateAsync(_projectId, "private", Location, "svc", Secret, _admin, TestContext.Current.CancellationToken);
         var before = RepositoryStore.StoredToken(repo.Id);
-        var cut = Render<RepositoriesPage>();
+        var cut = RenderList();
         await cut.Find($"[data-testid='repository-edit-{repo.Id}']").ClickAsync();
 
         // Act: change the user name and save without touching the token action
@@ -167,9 +251,9 @@ public class RepositoriesPageTests : PageTestBase
     {
         // Arrange: a private repository and its open edit form
         await SignInAsNewAdminAsync();
-        var repo = await Repositories.CreateAsync("private", Location, "svc", Secret, _admin, TestContext.Current.CancellationToken);
+        var repo = await Repositories.CreateAsync(_projectId, "private", Location, "svc", Secret, _admin, TestContext.Current.CancellationToken);
         var before = RepositoryStore.StoredToken(repo.Id);
-        var cut = Render<RepositoriesPage>();
+        var cut = RenderList();
         await cut.Find($"[data-testid='repository-edit-{repo.Id}']").ClickAsync();
 
         // Act: choose Replace, type a new token and save
@@ -192,8 +276,8 @@ public class RepositoriesPageTests : PageTestBase
     {
         // Arrange: a private repository and its open edit form
         await SignInAsNewAdminAsync();
-        var repo = await Repositories.CreateAsync("private", Location, "svc", Secret, _admin, TestContext.Current.CancellationToken);
-        var cut = Render<RepositoriesPage>();
+        var repo = await Repositories.CreateAsync(_projectId, "private", Location, "svc", Secret, _admin, TestContext.Current.CancellationToken);
+        var cut = RenderList();
         await cut.Find($"[data-testid='repository-edit-{repo.Id}']").ClickAsync();
 
         // Act: choose Clear and save (an https repository may have a user name without a token)
@@ -213,8 +297,8 @@ public class RepositoriesPageTests : PageTestBase
     {
         // Arrange: a repository and its open edit form with a typed name
         await SignInAsNewAdminAsync();
-        var repo = await Repositories.CreateAsync("alpha", Location, null, null, _admin, TestContext.Current.CancellationToken);
-        var cut = Render<RepositoriesPage>();
+        var repo = await Repositories.CreateAsync(_projectId, "alpha", Location, null, null, _admin, TestContext.Current.CancellationToken);
+        var cut = RenderList();
         await cut.Find($"[data-testid='repository-edit-{repo.Id}']").ClickAsync();
         await cut.Find("[data-testid='edit-repository-name-input']").InputAsync("changed");
 
@@ -234,20 +318,20 @@ public class RepositoriesPageTests : PageTestBase
     {
         // Arrange: a signed-in administrator and a repository
         await SignInAsNewAdminAsync();
-        var repo = await Repositories.CreateAsync("alpha", Location, null, null, _admin, TestContext.Current.CancellationToken);
-        var cut = Render<RepositoriesPage>();
+        var repo = await Repositories.CreateAsync(_projectId, "alpha", Location, null, null, _admin, TestContext.Current.CancellationToken);
+        var cut = RenderList();
 
         // Act: disable, then enable
         await cut.Find($"[data-testid='repository-toggle-enabled-{repo.Id}']").ClickAsync();
         var shownDisabled = cut.Find($"[data-testid='repository-enabled-{repo.Id}']").TextContent;
-        var offered = await Repositories.ListEnabledAsync(TestContext.Current.CancellationToken);
+        var offered = await Repositories.ListEnabledAsync(_admin, _projectId, TestContext.Current.CancellationToken);
         await cut.Find($"[data-testid='repository-toggle-enabled-{repo.Id}']").ClickAsync();
 
         // Assert: the list and the offered summaries follow
         Assert.Equal("Disabled", shownDisabled);
         Assert.Empty(offered);
         Assert.Equal("Enabled", cut.Find($"[data-testid='repository-enabled-{repo.Id}']").TextContent);
-        Assert.Single(await Repositories.ListEnabledAsync(TestContext.Current.CancellationToken));
+        Assert.Single(await Repositories.ListEnabledAsync(_admin, _projectId, TestContext.Current.CancellationToken));
     }
 
     /// <summary>
@@ -260,17 +344,19 @@ public class RepositoriesPageTests : PageTestBase
         // Arrange: two administrators and a repository; one has the page open and is then demoted
         await Users.CreateAsync("root", "Root", UserRole.Admin, Password, TestContext.Current.CancellationToken);
         await Users.CreateAsync("boss", "Boss", UserRole.Admin, Password, TestContext.Current.CancellationToken);
-        var repo = await Repositories.CreateAsync("alpha", Location, null, null, new Actor("boss", "Boss"), TestContext.Current.CancellationToken);
+        var project = await Projects.CreateAsync("Apollo", null, TestContext.Current.CancellationToken);
+        _projectId = project.Id;
+        var repo = await Repositories.CreateAsync(_projectId, "alpha", Location, null, null, new Actor("boss", "Boss"), TestContext.Current.CancellationToken);
         SignInAs("root", "Root", UserRole.Admin);
-        var cut = Render<RepositoriesPage>();
+        var cut = RenderList();
         await Users.SetRoleAsync("root", UserRole.Reviewer, TestContext.Current.CancellationToken);
 
         // Act: try to disable the repository from the page that is still open
         await cut.Find($"[data-testid='repository-toggle-enabled-{repo.Id}']").ClickAsync();
 
         // Assert: refused with an error and nothing changed
-        Assert.Contains("Administrator", cut.Find("[data-testid='repositories-error']").TextContent, StringComparison.Ordinal);
-        Assert.Single(await Repositories.ListEnabledAsync(TestContext.Current.CancellationToken));
+        Assert.Contains("administrator rights", cut.Find("[data-testid='repositories-error']").TextContent, StringComparison.Ordinal);
+        Assert.Single(await Repositories.ListEnabledAsync(_admin, _projectId, TestContext.Current.CancellationToken));
     }
 
     /// <summary>
@@ -283,10 +369,12 @@ public class RepositoriesPageTests : PageTestBase
         // Arrange: two administrators and a repository; one has the page open, re-checked every 100 ms
         await Users.CreateAsync("root", "Root", UserRole.Admin, Password, TestContext.Current.CancellationToken);
         await Users.CreateAsync("boss", "Boss", UserRole.Admin, Password, TestContext.Current.CancellationToken);
-        var repo = await Repositories.CreateAsync("alpha", Location, null, null, new Actor("boss", "Boss"), TestContext.Current.CancellationToken);
+        var project = await Projects.CreateAsync("Apollo", null, TestContext.Current.CancellationToken);
+        _projectId = project.Id;
+        var repo = await Repositories.CreateAsync(_projectId, "alpha", Location, null, null, new Actor("boss", "Boss"), TestContext.Current.CancellationToken);
         UseRevalidation(TimeSpan.FromMilliseconds(100));
         SignInAs("root", "Root", UserRole.Admin);
-        var cut = Render<RepositoriesPage>();
+        var cut = RenderList();
         var toggle = cut.Find($"[data-testid='repository-toggle-enabled-{repo.Id}']");
 
         // Act: root is demoted and the next check ends the session
@@ -299,7 +387,7 @@ public class RepositoriesPageTests : PageTestBase
         // Assert: the page and its actions are gone, and the repository is unchanged
         Assert.Empty(cut.FindAll("[data-testid='repositories-page']"));
         Assert.Empty(cut.FindAll($"[data-testid='repository-toggle-enabled-{repo.Id}']"));
-        Assert.Single(await Repositories.ListEnabledAsync(TestContext.Current.CancellationToken));
+        Assert.Single(await Repositories.ListEnabledAsync(_admin, _projectId, TestContext.Current.CancellationToken));
     }
 
     /// <summary>
@@ -311,8 +399,8 @@ public class RepositoriesPageTests : PageTestBase
     {
         // Arrange: an administrator with the page open, then the session ends without the page being told
         await SignInAsNewAdminAsync();
-        var repo = await Repositories.CreateAsync("alpha", Location, null, null, _admin, TestContext.Current.CancellationToken);
-        var cut = Render<RepositoriesPage>();
+        var repo = await Repositories.CreateAsync(_projectId, "alpha", Location, null, null, _admin, TestContext.Current.CancellationToken);
+        var cut = RenderList();
         SignOutQuietly();
 
         // Act: try to disable the repository
@@ -320,16 +408,36 @@ public class RepositoriesPageTests : PageTestBase
 
         // Assert: a message says why and nothing changed
         Assert.Contains("no longer signed in", cut.Find("[data-testid='repositories-error']").TextContent, StringComparison.Ordinal);
-        Assert.Single(await Repositories.ListEnabledAsync(TestContext.Current.CancellationToken));
+        Assert.Single(await Repositories.ListEnabledAsync(_admin, _projectId, TestContext.Current.CancellationToken));
     }
 
     /// <summary>
-    ///     Creates an enabled administrator in the user store and signs in as that user.
+    ///     Renders the repositories page of the project of the test.
+    /// </summary>
+    /// <returns>The rendered component.</returns>
+    private IRenderedComponent<RepositoriesPage> RenderList()
+    {
+        return Render<RepositoriesPage>(parameters => parameters.Add(page => page.ProjectId, _projectId));
+    }
+
+    /// <summary>
+    ///     Renders the add repository page of the project of the test.
+    /// </summary>
+    /// <returns>The rendered component.</returns>
+    private IRenderedComponent<NewRepositoryPage> RenderNew()
+    {
+        return Render<NewRepositoryPage>(parameters => parameters.Add(page => page.ProjectId, _projectId));
+    }
+
+    /// <summary>
+    ///     Creates an enabled system administrator and a project in the stores and signs in as that user.
     /// </summary>
     /// <returns>A task that completes when the user is created and signed in.</returns>
     private async Task SignInAsNewAdminAsync()
     {
         await Users.CreateAsync("root", "Root", UserRole.Admin, Password, TestContext.Current.CancellationToken);
+        var project = await Projects.CreateAsync("Apollo", null, TestContext.Current.CancellationToken);
+        _projectId = project.Id;
         SignInAs("root", "Root", UserRole.Admin);
     }
 }

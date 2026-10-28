@@ -112,3 +112,16 @@ sections:
           cannot be edited.
         tests:
           - ChecklistService_ChecklistEvents_RecordOutcomeAndDigestButNotJustification
+
+      - id: ReviewCenter-ChecklistService-Access
+        title: >-
+          The ChecklistService class shall require, for answering a check and for changing the applicability of a
+          section, that the actor may see the project of the review (through IProjectAccess), refusing an actor who
+          may not with the same ProjectNotFound rule as for a project that does not exist, before anything else is
+          checked or stored.
+        justification: |
+          A user outside a project must not be able to change its review checklist, nor learn that the project
+          exists. The service enforces this itself, whatever the page or the API checked, so that a route added later
+          cannot bypass the rule.
+        tests:
+          - ChecklistService_Constructor_NullArguments_Throws

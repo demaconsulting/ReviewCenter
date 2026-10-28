@@ -27,14 +27,14 @@ namespace DemaConsulting.ReviewCenter.Web;
 
 /// <summary>
 ///     Code-behind for the user administration page (<c>UsersPage.razor</c>): lists users, creates them,
-///     disables or enables them, sets their role and sets their password.
+///     disables or enables them, makes them system administrators and sets their password.
 /// </summary>
 /// <remarks>
-///     An attribute on the page limits entry to administrators. An open page re-checks its user only every
+///     An attribute on the page limits entry to system administrators. An open page re-checks its user only every
 ///     <see cref="AuthOptions.RevalidationSeconds"/>, so for the time before the next check every
-///     action also re-checks that the signed-in user is still an enabled administrator in the user store,
+///     action also re-checks that the signed-in user is still an enabled system administrator in the user store,
 ///     and is refused with an error otherwise (defense in depth). The page talks to the domain only through
-///     <see cref="UserService"/>, which owns the rules (including the rule that the last enabled administrator
+///     <see cref="UserService"/>, which owns the rules (including the rule that the last enabled system administrator
 ///     cannot be disabled or demoted). A rule violation, like a stored change, is shown next to the control that was
 ///     used instead of being thrown. Passwords are never shown or logged, and a password field is emptied once it has been used. Each
 ///     browser connection (circuit) gets its own page instance, so the state here is per-user and needs no
@@ -64,11 +64,6 @@ public partial class UsersPage : ComponentBase
     ///     Gets the users shown in the list.
     /// </summary>
     private IReadOnlyList<User> Users { get; set; } = [];
-
-    /// <summary>
-    ///     Gets the role chosen in each row but not yet saved, by user identity.
-    /// </summary>
-    private Dictionary<int, UserRole> RoleChoices { get; } = [];
 
     /// <summary>
     ///     Gets the new passwords typed in the rows, by user identity.
@@ -123,16 +118,6 @@ public partial class UsersPage : ComponentBase
     }
 
     /// <summary>
-    ///     Gets the role shown in the role selector of a row: the one chosen, otherwise the stored role.
-    /// </summary>
-    /// <param name="user">The user of the row.</param>
-    /// <returns>The role to show.</returns>
-    private UserRole RoleChoice(User user)
-    {
-        return RoleChoices.GetValueOrDefault(user.Id, user.Role);
-    }
-
-    /// <summary>
     ///     Gets the password text shown in the password field of a row.
     /// </summary>
     /// <param name="userId">The user identity of the row.</param>
@@ -164,15 +149,17 @@ public partial class UsersPage : ComponentBase
     }
 
     /// <summary>
-    ///     Sets the role chosen in the row on the user.
+    ///     Makes the user a system administrator, or takes that away.
     /// </summary>
     /// <param name="user">The user as shown.</param>
     /// <returns>A task that completes when the change is stored or the problem is shown.</returns>
-    private Task SetRoleAsync(User user)
+    private Task ToggleSystemAdminAsync(User user)
     {
-        var role = RoleChoice(user);
-        return RunAsync(user.Id, $"Role of '{user.Username}' is now {role}.",
-            actor => UserService.SetRoleAsync(user.Username, role, actor));
+        var makeAdmin = !user.IsSystemAdmin;
+        return RunAsync(
+            user.Id,
+            makeAdmin ? $"'{user.Username}' is now a system administrator." : $"'{user.Username}' is no longer a system administrator.",
+            actor => UserService.SetSystemAdminAsync(user.Username, makeAdmin, actor));
     }
 
     /// <summary>
@@ -220,9 +207,9 @@ public partial class UsersPage : ComponentBase
         }
 
         var current = await UserService.GetAsync(actor.Username);
-        if (current is not { Enabled: true, Role: UserRole.Admin })
+        if (current is not { Enabled: true, IsSystemAdmin: true })
         {
-            ErrorMessage = "Administrator rights are required.";
+            ErrorMessage = "System administrator rights are required.";
             return;
         }
 
@@ -238,6 +225,5 @@ public partial class UsersPage : ComponentBase
 
         // Reload so the rows show what is stored, whether or not the change succeeded
         Users = await UserService.ListAsync();
-        RoleChoices.Clear();
     }
 }

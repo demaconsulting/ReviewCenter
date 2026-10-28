@@ -391,7 +391,7 @@ public class ProgramTests
             Assert.Contains("user add", output);
             Assert.Contains("--username", output);
             Assert.Contains("--display-name", output);
-            Assert.Contains("--role", output);
+            Assert.Contains("--system-admin", output);
             Assert.Contains("REVIEWCENTER_PASSWORD", output);
         }
         finally

@@ -32,7 +32,7 @@ step.
 - *Returns*: The same builder.
 - *Postconditions*: One route group under `/api` requires the `Api` policy of `ApiTokenAuthentication` and has a filter
   that turns a `DomainRuleException` into a problem result, so no route can be added open by accident. The routes are
-  - `GET /api/projects`,
+  - `GET /api/projects` (the projects that the owner of the token may see),
   - `GET /api/projects/{projectId}/reviews` (the project number must be an integer),
   - `GET /api/projects/{projectId}/reviews/{reviewId}`,
   - `POST /api/projects/{projectId}/reviews`, which requires a JSON body (the OpenAPI description marks the body as
@@ -53,13 +53,16 @@ step.
 
 - *Preconditions*: The request is authenticated as a token.
 - *Postconditions*:
+  - The handler checks the project first: `ProjectService.GetAsync` with the actor of the token answers nothing for a
+    project that does not exist and for a project that the owner may not see, and the answer is then the 404 problem
+    for a missing project, before the body is read.
   - The handler reads the body itself instead of letting the framework bind it, so that a body that is not JSON, is cut
     off, or has the wrong shape (for example `files` as a number) is a 400 problem that names the field `body`, with
     no text of the parser in it. A body over the size limit is not read and is answered 413 by the server.
   - A request with no body, or with both or neither of `files` and `repository`, is a 400 problem that names the
     field (`body` or `source`). A file whose content is not valid Base64 is a 400 that names the position
     (`files[i].contentBase64`) and never echoes the content.
-  - A project that does not exist is a 404.
+  - A project that does not exist, or that the owner may not see, is a 404.
   - With `files`, `ReviewService.CreateDraftAsync` is called; with `repository`,
     `ReviewService.CreateFromRepositoryAsync`
     is called with the repository, the head and baseline revisions, and the selection. Every other rule (the number and
@@ -68,17 +71,21 @@ step.
   - The actor is built from the claims of the token principal, so the review records the user and that the API was used.
   - The answer is 201 with the review and the files that the repository selection skipped.
 
-**Read a review**: Builds the details from the services that own each part: the review from `ReviewService`, the
+**Read a review**: Checks the project first like every route (a project that the owner may not see is a 404 as for a
+missing project), then builds the details from the services that own each part: the review from `ReviewService`, the
 approval, blockers, and next step from `SigningService`, the thread counts from `ThreadService`, and the checklist
 counts from `ChecklistService`. The checklist counts follow the screen, so only the items of applicable sections count.
 
 **Download the attestation**: Asks `AttestationService` for the attestation of the review with the actor of the token
 and
 passes the result to the shared `AttestationEndpoint.ToResult`, with a problem 404 for a review that does not exist. The
+service checks that the owner may view the project before it reads the review, so a project that the owner may not see
+gives the same 404 as a review that does not exist. The
 answer is therefore the same as for the page route (200 with the PDF, 409 for a review that is not complete or that
 changed, 500 for an unusable key), always with `Cache-Control: no-store`, but as a problem description in JSON.
 
-**Read the evidence index**: Answers 404 for a project that does not exist. Otherwise it asks `EvidenceIndexService` for
+**Read the evidence index**: Answers 404 for a project that does not exist or that the owner may not see. Otherwise it
+asks `EvidenceIndexService` (with the actor, which checks the project again) for
 the
 entries of the project and writes them as `{"reviews":[{id, fingerprint, date, result, file}]}`, the document that
 ReviewMark reads as the `index.json` of a `url` evidence source. The result of every entry is `pass`. The `file` of an

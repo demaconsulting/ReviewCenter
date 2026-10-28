@@ -69,7 +69,7 @@ public class HomePageTests : PageTestBase
     public void HomePage_Render_Reviewer_ShowsGetStartedWithProjectsOnly()
     {
         // Arrange: a reviewer is signed in
-        SignInAs("bea", "Bea");
+        SignInAs("bea", "Bea", UserRole.Reviewer);
 
         // Act: render the page
         var cut = Render<HomePage>();
@@ -80,20 +80,20 @@ public class HomePageTests : PageTestBase
     }
 
     /// <summary>
-    ///     Test that a signed-in administrator also sees the repositories, audit and users links.
+    ///     Test that a signed-in system administrator also sees the audit and users links.
     /// </summary>
     [Fact]
     public void HomePage_Render_Admin_ShowsGetStartedWithAdministrationLinks()
     {
-        // Arrange: an administrator is signed in
+        // Arrange: a system administrator is signed in
         SignInAs("root", "Root", UserRole.Admin);
 
         // Act: render the page
         var cut = Render<HomePage>();
 
-        // Assert: all four links, each to its page
-        Assert.Equal(4, cut.FindAll("a").Count);
-        Assert.Equal("/repositories", cut.Find("[data-testid='home-card-repositories']").GetAttribute("href"));
+        // Assert: the three links, each to its page; repositories belong to projects and have no card
+        Assert.Equal(3, cut.FindAll("a").Count);
+        Assert.Empty(cut.FindAll("[data-testid='home-card-repositories']"));
         Assert.Equal("/audit", cut.Find("[data-testid='home-card-audit']").GetAttribute("href"));
         Assert.Equal("/users", cut.Find("[data-testid='home-card-users']").GetAttribute("href"));
     }

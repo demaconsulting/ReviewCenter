@@ -60,6 +60,11 @@ public sealed class SigningService
     private readonly UserService _users;
 
     /// <summary>
+    ///     Decides who may see which project and who belongs to it.
+    /// </summary>
+    private readonly IProjectAccess _access;
+
+    /// <summary>
     ///     The clock that supplies signing times.
     /// </summary>
     private readonly TimeProvider _timeProvider;
@@ -74,15 +79,18 @@ public sealed class SigningService
     /// </summary>
     /// <param name="store">The store that persists slots and signatures. Must not be null.</param>
     /// <param name="users">The user service used to look up users and to re-authenticate signers. Must not be null.</param>
+    /// <param name="access">The access rules; slots belong to project members. Must not be null.</param>
     /// <param name="timeProvider">The clock used for signing times; injected so tests control time. Must not be null.</param>
     /// <exception cref="ArgumentNullException">Thrown when an argument is null.</exception>
-    public SigningService(IReviewStore store, UserService users, TimeProvider timeProvider)
+    public SigningService(IReviewStore store, UserService users, IProjectAccess access, TimeProvider timeProvider)
     {
         ArgumentNullException.ThrowIfNull(store);
         ArgumentNullException.ThrowIfNull(users);
+        ArgumentNullException.ThrowIfNull(access);
         ArgumentNullException.ThrowIfNull(timeProvider);
         _store = store;
         _users = users;
+        _access = access;
         _timeProvider = timeProvider;
     }
 
@@ -207,14 +215,26 @@ public sealed class SigningService
     }
 
     /// <summary>
-    ///     Lists the users that can be chosen for a slot.
+    ///     Lists the users that can be chosen for a slot of a project: its enabled members.
     /// </summary>
+    /// <param name="actor">The signed-in user who asks; must be able to see the project. Must not be null.</param>
+    /// <param name="projectId">The project identity.</param>
     /// <param name="cancellationToken">Cancels the operation.</param>
-    /// <returns>The enabled users ordered by display name and then user name; nothing secret is included.</returns>
-    public async Task<IReadOnlyList<SlotMember>> ListCandidatesAsync(CancellationToken cancellationToken = default)
+    /// <returns>The enabled members ordered by display name and then user name; nothing secret is included.</returns>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="actor"/> is null.</exception>
+    /// <exception cref="DomainRuleException">Thrown with <see cref="DomainRule.ProjectNotFound"/> when the actor may not see the project.</exception>
+    public async Task<IReadOnlyList<SlotMember>> ListCandidatesAsync(
+        Actor actor,
+        int projectId,
+        CancellationToken cancellationToken = default)
     {
+        ArgumentNullException.ThrowIfNull(actor);
+        await _access.RequireViewAsync(actor, projectId, cancellationToken);
+        var memberIds = (await _store.ListMembershipsAsync(projectId, cancellationToken))
+            .Select(membership => membership.UserId)
+            .ToHashSet();
         return (await _users.ListAsync(cancellationToken))
-            .Where(user => user.Enabled)
+            .Where(user => user.Enabled && memberIds.Contains(user.Id))
             .OrderBy(user => user.DisplayName, StringComparer.OrdinalIgnoreCase)
             .ThenBy(user => user.Username, StringComparer.OrdinalIgnoreCase)
             .Select(user => new SlotMember(user.Id, user.Username, user.DisplayName))
@@ -249,10 +269,10 @@ public sealed class SigningService
         await _gate.WaitAsync(cancellationToken);
         try
         {
-            await EnsureActorAsync(actor, cancellationToken);
+            await EnsureActorAsync(actor, projectId, cancellationToken);
             await EnsureReviewAsync(projectId, reviewId, cancellationToken);
             var slots = await _store.ListSlotsAsync(projectId, reviewId, cancellationToken);
-            await ValidateMembersAsync(slots, null, primaryUserId, alternateUserId, cancellationToken);
+            await ValidateMembersAsync(projectId, slots, null, primaryUserId, alternateUserId, cancellationToken);
             var members = await DescribeMembersAsync(primaryUserId, alternateUserId, cancellationToken);
 
             return await _store.AddSlotAsync(
@@ -303,9 +323,9 @@ public sealed class SigningService
         await _gate.WaitAsync(cancellationToken);
         try
         {
-            await EnsureActorAsync(actor, cancellationToken);
+            await EnsureActorAsync(actor, projectId, cancellationToken);
             var slots = await EnsureUnsignedSlotAsync(projectId, reviewId, slotId, cancellationToken);
-            await ValidateMembersAsync(slots, slotId, primaryUserId, alternateUserId, cancellationToken);
+            await ValidateMembersAsync(projectId, slots, slotId, primaryUserId, alternateUserId, cancellationToken);
             var members = await DescribeMembersAsync(primaryUserId, alternateUserId, cancellationToken);
 
             var audit = AuditDraft.By(actor, "slot.updated", $"slot {slotId}: {members}", projectId, reviewId);
@@ -346,7 +366,7 @@ public sealed class SigningService
         await _gate.WaitAsync(cancellationToken);
         try
         {
-            await EnsureActorAsync(actor, cancellationToken);
+            await EnsureActorAsync(actor, projectId, cancellationToken);
             var slots = await EnsureUnsignedSlotAsync(projectId, reviewId, slotId, cancellationToken);
 
             // The entry describes the slot as it was before it goes
@@ -408,8 +428,15 @@ public sealed class SigningService
         await _gate.WaitAsync(cancellationToken);
         try
         {
-            // The signer must be a live account, and must be one of the two people of the slot
-            var user = await EnsureActorAsync(actor, cancellationToken);
+            // The signer must be a live account, a member of the project (an administrator who is not a member
+            // cannot sign), and one of the two people of the slot
+            var user = await EnsureActorAsync(actor, projectId, cancellationToken);
+            if (!await _access.IsMemberAsync(user.Id, projectId, cancellationToken))
+            {
+                throw new DomainRuleException(
+                    DomainRule.ActorNotAllowed,
+                    "Only a member of the project can sign its reviews.");
+            }
             var record = await _store.GetRecordAsync(projectId, reviewId, cancellationToken)
                          ?? throw ReviewNotFound(reviewId);
             var slot = (await _store.ListSlotsAsync(projectId, reviewId, cancellationToken))
@@ -609,14 +636,19 @@ public sealed class SigningService
     }
 
     /// <summary>
-    ///     Checks that the signed-in user still has an enabled account.
+    ///     Checks that the signed-in user still has an enabled account and may see the project.
     /// </summary>
     /// <param name="actor">The signed-in user.</param>
+    /// <param name="projectId">The project identity.</param>
     /// <param name="cancellationToken">Cancels the operation.</param>
     /// <returns>The stored user.</returns>
-    /// <exception cref="DomainRuleException">Thrown with <see cref="DomainRule.ActorNotAllowed"/> when the account is gone or disabled.</exception>
-    private async Task<User> EnsureActorAsync(Actor actor, CancellationToken cancellationToken)
+    /// <exception cref="DomainRuleException">
+    ///     Thrown with <see cref="DomainRule.ProjectNotFound"/> when the actor may not see the project, and with
+    ///     <see cref="DomainRule.ActorNotAllowed"/> when the account is gone or disabled.
+    /// </exception>
+    private async Task<User> EnsureActorAsync(Actor actor, int projectId, CancellationToken cancellationToken)
     {
+        await _access.RequireViewAsync(actor, projectId, cancellationToken);
         var user = await _users.GetAsync(actor.Username, cancellationToken);
         if (user is null || !user.Enabled)
         {
@@ -682,6 +714,7 @@ public sealed class SigningService
     /// <summary>
     ///     Checks the users chosen for a slot.
     /// </summary>
+    /// <param name="projectId">The project the slot belongs to; the chosen users must be members of it.</param>
     /// <param name="slots">The slots of the review now.</param>
     /// <param name="ownSlotId">The slot being changed, which does not count as "another slot"; <c>null</c> for a new slot.</param>
     /// <param name="primaryUserId">The chosen primary reviewer.</param>
@@ -690,21 +723,27 @@ public sealed class SigningService
     /// <returns>A task that completes when the choice is accepted.</returns>
     /// <exception cref="DomainRuleException">Thrown with <see cref="DomainRule.SlotUserInvalid"/> when the choice is not valid.</exception>
     private async Task ValidateMembersAsync(
+        int projectId,
         IReadOnlyList<ReviewerSlot> slots,
         int? ownSlotId,
         int primaryUserId,
         int? alternateUserId,
         CancellationToken cancellationToken)
     {
-        var enabled = (await _users.ListAsync(cancellationToken)).Where(user => user.Enabled).ToDictionary(user => user.Id);
+        var memberIds = (await _store.ListMembershipsAsync(projectId, cancellationToken))
+            .Select(membership => membership.UserId)
+            .ToHashSet();
+        var enabled = (await _users.ListAsync(cancellationToken))
+            .Where(user => user.Enabled && memberIds.Contains(user.Id))
+            .ToDictionary(user => user.Id);
         if (!enabled.ContainsKey(primaryUserId))
         {
-            throw SlotUserInvalid("The primary reviewer must be an existing, enabled user.");
+            throw SlotUserInvalid("The primary reviewer must be an enabled member of the project.");
         }
 
         if (alternateUserId is { } alternate && !enabled.ContainsKey(alternate))
         {
-            throw SlotUserInvalid("The alternate reviewer must be an existing, enabled user.");
+            throw SlotUserInvalid("The alternate reviewer must be an enabled member of the project.");
         }
 
         if (alternateUserId == primaryUserId)

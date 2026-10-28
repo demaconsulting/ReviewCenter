@@ -72,7 +72,7 @@ internal sealed class TestBrowser : IDisposable
     /// <param name="username">The user name.</param>
     /// <param name="role">The role of the user, if it has to be created.</param>
     /// <returns>The signed-in browser; the caller disposes it.</returns>
-    public static async Task<TestBrowser> SignedInAsync(WebApplication app, string username, UserRole role = UserRole.Reviewer)
+    public static async Task<TestBrowser> SignedInAsync(WebApplication app, string username, UserRole role = UserRole.Admin)
     {
         var users = app.Services.GetRequiredService<UserService>();
         if (await users.GetAsync(username, TestContext.Current.CancellationToken) is null)

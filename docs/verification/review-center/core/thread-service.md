@@ -3,7 +3,9 @@
 #### Verification Approach
 
 `ThreadService` is verified with unit tests defined in `ThreadServiceTests.cs`. The tests use the real service and
-the real `FileText` with a fake in-memory store (`FakeReviewStore`) and a fixed clock, so every rule can be
+the real `FileText` with a fake in-memory store (`FakeReviewStore`), the project-access double
+`AllowAllProjectAccess` (the access rules themselves are verified by the `ProjectAccess` unit), and a fixed clock, so
+every rule can be
 exercised without a database. Failures are checked through the rule carried by the `DomainRuleException`, and every
 rejection test also checks that nothing was stored. The line-count tests are theories over texts with Unix and
 Windows line endings, with and without a final line ending. The text tests check the limit itself and
@@ -40,6 +42,8 @@ N/A - standard test environment.
 - The next step names starting a discussion, the number of open threads, or that all threads are resolved.
 - With a checklist, the next step names the unanswered checks first, then the open threads, and says when the
   checklist is complete and all threads are resolved.
+- The service cannot be constructed without a project access, which every change by an actor uses to refuse a
+  project the actor may not see (the rule itself is verified with the `ProjectAccess` unit).
 
 #### Test Scenarios
 
@@ -178,8 +182,9 @@ open threads, and four unanswered checks with one failed check each give the mat
 checks named before the open threads. This scenario is tested by
 `ThreadService_NextStep_WithFailedChecks_NamesThemBeforeThreads`.
 
-**ThreadService_Constructor_NullArguments_Throws**: A null store and a null clock are rejected with
-`ArgumentNullException`. This scenario is tested by `ThreadService_Constructor_NullArguments_Throws`.
+**ThreadService_Constructor_NullArguments_Throws**: A null store, a null project access, and a null clock are rejected
+with `ArgumentNullException`, so the service cannot be built without the check that the actor may see the project.
+This scenario is tested by `ThreadService_Constructor_NullArguments_Throws`.
 
 **ThreadService_ThreadEvents_RecordIdsAnchorsAndDigestButNotText**: A thread is started, replied to, resolved, and
 reopened; the entries `thread.started`, `thread.replied`, `thread.resolved`, and `thread.reopened` carry the thread

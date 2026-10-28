@@ -67,7 +67,7 @@ deterministically.
 
 **PrintHelp**: Writes the usage synopsis, the `serve`, `user add`, and `audit verify` verbs, and the options table
 (including
-`--urls`, `--username`, `--display-name`, and `--role`) to `context`. The help text says that the password of
+`--urls`, `--username`, `--display-name`, and `--system-admin`) to `context`. The help text says that the password of
 `user add` is read from the environment variable `REVIEWCENTER_PASSWORD`, from standard input, or from a prompt, and
 that `audit verify` exits with 0 when the chain is intact and 1 when it is broken.
 

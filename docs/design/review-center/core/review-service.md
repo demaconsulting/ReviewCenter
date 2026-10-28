@@ -51,17 +51,21 @@ constants are in `ReviewLimits`; see `ProjectService`).
 
 **CreateDraftAsync**: Creates a review in the draft state.
 
-- *Parameters*: `int projectId`, `string? id`, `string? title`, `IReadOnlyList<UploadedFile> files`, and a
+- *Parameters*: `int projectId`, `string? id`, `string? title`, `IReadOnlyList<UploadedFile> files`, an `Actor`, and a
   cancellation token.
 - *Returns*: `Task<Review>` — the stored review with its fingerprint and the hash and size of each file.
-- *Preconditions*: `files` is not null.
+- *Preconditions*: `files` and `actor` are not null.
 - *Postconditions*: The review is stored in the `Draft` state with the creation time from the clock; the bytes
   are stored exactly as given, together with a copy of `DefaultChecklist.Current` as the review's checklist, in
   the same transaction. Nothing is stored when a rule fails.
 
-The rules are checked in this order, and the first violation is reported: the identifier (`ReviewIdInvalid`);
+The first check is that the actor may see the project (`IProjectAccess.RequireViewAsync`): a project that does not
+exist and a project the actor may not see are refused alike with `ProjectNotFound`, before the input is examined, so
+a validation message never reveals a hidden project. Any member of the project (and a system administrator) can create
+reviews. The other rules are checked in this order, and the first violation is reported: the identifier
+(`ReviewIdInvalid`);
 the title (`ReviewTitleInvalid`); the files (`NoFiles`, `TooManyFiles`, `PathInvalid`, `DuplicatePath`,
-`FileTooLarge`, `TotalSizeExceeded`); that the project exists (`ProjectNotFound`); and that the identifier is
+`FileTooLarge`, `TotalSizeExceeded`); and that the identifier is
 free in the project (`ReviewIdDuplicate`). Checks that need no I/O come first so that a bad request fails
 cheaply. The hash of each file and the fingerprint are then calculated with `Fingerprint`, and the review is
 handed to the store. The check for a duplicate identifier is repeated by the store's key constraint, which
@@ -76,10 +80,12 @@ covers two requests that pass the check at the same time.
 - *Postconditions*: The review is stored with the frozen copies described below, or nothing is stored.
 
 The service is constructed with an optional `RepositoryService` and `IGitRepositoryProvider`; without them the
-method throws `InvalidOperationException`. The checks that need no I/O come first (identifier, title, the head and
+method throws `InvalidOperationException`. The first check is that the actor may see the project (`ProjectNotFound`,
+as for a draft). The checks that need no I/O come next (identifier, title, the head and
 baseline revision names through `RevisionValidator`, the selection through `SelectionMatcher.Parse` and its
-length limit `ReviewLimits.MaxSelectionLength` of 2000 characters), then the project and the free identifier, then
-`RepositoryService.GetAccessAsync` (which refuses a disabled or unknown repository). Inside one git session the
+length limit `ReviewLimits.MaxSelectionLength` of 2000 characters), then the free identifier, then
+`RepositoryService.GetAccessAsync(projectId, repositoryId)` (which refuses a disabled repository, and an unknown
+repository or one that belongs to another project, with `RepositoryNotFound`). Inside one git session the
 service resolves both revisions to commits, lists the changes between them, keeps those whose path matches the
 selection (a deleted file is matched by its path like any other), and orders them by path. When no change is left it
 throws `NothingToReview` with the message `Nothing to review: no files matching the selection changed between X
@@ -148,6 +154,7 @@ store or clock at construction, raise `ArgumentNullException`. Store failures pr
 #### Dependencies
 
 - **IReviewStore** — checks, stores, and reads reviews (injected).
+- **IProjectAccess** — requires that the actor may see the project before a review is created (injected).
 - **TimeProvider** — supplies the creation time (injected).
 - **Fingerprint** — calculates the file hashes and the review fingerprint.
 - **RepositoryService** and **IGitRepositoryProvider** — resolve the access to a repository and open the git session

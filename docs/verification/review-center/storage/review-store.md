@@ -4,7 +4,8 @@
 
 `ReviewStore` is verified with unit tests defined in `ReviewStoreTests.cs` (projects, reviews, threads, and
 checklists), `ReviewStoreSigningTests.cs` (reviewer slots, the record, and signatures), and
-`ReviewStoreRepositoryTests.cs` (reviews from a repository). The tests use the real
+`ReviewStoreRepositoryTests.cs` (reviews from a repository), and `ReviewStoreMembershipTests.cs` (project
+memberships). The tests use the real
 store over a real
 SQLite database file that each test class instance creates in a private temporary folder and deletes afterward.
 Real SQLite is used because ordering, keys, constraints, transactions, and binary content are the behavior under test.
@@ -51,6 +52,10 @@ be loadable on the test platform.
   database refuses to remove a slot that has a signature.
 - A transaction begun at the `Serializable` level takes the write lock of SQLite at the begin, so a second writer is
   refused while it is open.
+- A project membership is stored and read back by project and by user in a fixed order; a user can be a member of a
+  project only once; changing a role and removing report whether a membership was there; every change that affected a
+  row is audited with the project, and one that found nothing is not; the database refuses a membership for an
+  unknown project.
 
 #### Test Scenarios
 
@@ -224,6 +229,29 @@ stored and read back with the side they were given. This scenario is tested by
 **ReviewStore_AddThreadAsync_Side_IsStoredAsText**: A thread on the baseline side is stored, and a raw query of the
 `Side` column of the `Threads` table returns the text "Baseline". This scenario is tested by
 `ReviewStore_AddThreadAsync_Side_IsStoredAsText`.
+
+**ReviewStore_AddMembershipAsync_Membership_RoundTripsAndIsListed**: Memberships are added for two users in two
+projects, one as project administrator and the others with the default role; each is read back by user and project,
+the project lists its memberships ordered by user, the user lists its memberships ordered by project, and a missing
+membership reads as none. This scenario is tested by `ReviewStore_AddMembershipAsync_Membership_RoundTripsAndIsListed`.
+
+**ReviewStore_AddMembershipAsync_SecondMembership_IsRejected**: A user who is already a member is added again with
+another role; the store throws the rule `MembershipExists` and the role is unchanged. This scenario is tested by
+`ReviewStore_AddMembershipAsync_SecondMembership_IsRejected`.
+
+**ReviewStore_SetAndRemoveMembershipAsync_ChangeRoleAndRemove_ReportWhetherFound**: The role of a member is changed
+and the member is removed; each call answers `true`, the call for a user who is no member answers `false`, a second
+removal answers `false`, and the membership is gone afterward. This scenario is tested by
+`ReviewStore_SetAndRemoveMembershipAsync_ChangeRoleAndRemove_ReportWhetherFound`.
+
+**ReviewStore_Membership_Changes_AreAuditedWithTheProject**: A membership is added, changed, removed, and a
+non-existing one is removed; the audit trail holds exactly three `project.member-` events, each carrying the project
+identity, so the removal that found nothing writes no event. This scenario is tested by
+`ReviewStore_Membership_Changes_AreAuditedWithTheProject`.
+
+**ReviewStore_AddMembershipAsync_UnknownProject_IsRefusedByTheDatabase**: A membership for a project that does not
+exist is added; the database refuses it through the foreign key. This scenario is tested by
+`ReviewStore_AddMembershipAsync_UnknownProject_IsRefusedByTheDatabase`.
 
 **Audit drafts**: Every mutation of the store takes an audit draft, and the tests of this unit pass one through
 the real `AuditAppender`; the helper `TestStore` builds the store and an `AuditStore` over the same database. The

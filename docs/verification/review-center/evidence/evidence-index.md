@@ -28,9 +28,12 @@ running server is a manual check.
 - Of several reviews with the same id and fingerprint, the one that was completed last is listed, and for the same time
   the one with the lowest review id; the order is by id and then by fingerprint.
 - The document of the fixed project is the golden file, has the schema that ReviewMark reads, and loads without one
-  entry
-  overwriting another.
+  entry overwriting another.
 - The fingerprints are the ones that the algorithm of ReviewMark gives for the same files.
+- The index of a project is built for an actor, and a user who cannot see the project is refused like a missing
+  project. The unit tests have no case for this guard; it is verified over HTTP by
+  `ApiProjectAccess_EveryProjectRoute_NonMemberToken_AnswersLikeAMissingProject` and
+  `ApiProjectAccess_EveryProjectRoute_MemberAndSystemAdmin_AreNotRefused` in the `Api` subsystem.
 
 #### Test Scenarios
 
@@ -42,8 +45,7 @@ tested by `EvidenceIndexService_Build_CompleteReviewWithSetId_ListsEntry`.
 index is empty. This scenario is tested by `EvidenceIndexService_Build_IncompleteReview_IsNotListed`.
 
 **EvidenceIndexService_Build_ReviewChangedAfterSignature_IsNotListed**: The record of a signed review changes. The index
-is
-empty. This scenario is tested by `EvidenceIndexService_Build_ReviewChangedAfterSignature_IsNotListed`.
+is empty. This scenario is tested by `EvidenceIndexService_Build_ReviewChangedAfterSignature_IsNotListed`.
 
 **EvidenceIndexService_Build_NoSetId_IsSkipped**: A complete review has no review-set id. The index is empty. This
 scenario is tested by `EvidenceIndexService_Build_NoSetId_IsSkipped`.

@@ -47,8 +47,8 @@ public class CoreSubsystemTests
     {
         // Arrange: both services over one store
         var store = new FakeReviewStore();
-        var projects = new ProjectService(store, new FixedTimeProvider(_now));
-        var reviews = new ReviewService(store, new FixedTimeProvider(_now));
+        var projects = TestServices.Projects(store, new FixedTimeProvider(_now));
+        var reviews = TestServices.Reviews(store, new FixedTimeProvider(_now));
 
         // Act: create a project, create a review of three files in it, then read everything back
         var project = await projects.CreateAsync("Apollo", "Moon landing", TestContext.Current.CancellationToken);
@@ -91,8 +91,8 @@ public class CoreSubsystemTests
     {
         // Arrange: both services over one store, with a project
         var store = new FakeReviewStore();
-        var projects = new ProjectService(store, new FixedTimeProvider(_now));
-        var reviews = new ReviewService(store, new FixedTimeProvider(_now));
+        var projects = TestServices.Projects(store, new FixedTimeProvider(_now));
+        var reviews = TestServices.Reviews(store, new FixedTimeProvider(_now));
         var project = await projects.CreateAsync("Apollo", null, TestContext.Current.CancellationToken);
 
         // Act: create two reviews with the same three contents, the second in reverse order under other names
@@ -174,18 +174,19 @@ public class CoreSubsystemTests
     {
         // Arrange: both services over one store, with one valid project and review
         var store = new FakeReviewStore();
-        var projects = new ProjectService(store, new FixedTimeProvider(_now));
-        var reviews = new ReviewService(store, new FixedTimeProvider(_now));
-        var threads = new ThreadService(store, new FixedTimeProvider(_now));
-        var checklists = new ChecklistService(store, new FixedTimeProvider(_now));
+        var projects = TestServices.Projects(store, new FixedTimeProvider(_now));
+        var reviews = TestServices.Reviews(store, new FixedTimeProvider(_now));
+        var threads = TestServices.Threads(store, new FixedTimeProvider(_now));
+        var checklists = TestServices.Checklists(store, new FixedTimeProvider(_now));
         var users = new UserService(new FakeUserStore(), new FakePasswordHasher(), new FixedTimeProvider(_now));
         var root = await users.CreateAsync("root", "Root", UserRole.Admin, ValidPassword, TestContext.Current.CancellationToken);
         var project = await projects.CreateAsync("Apollo", null, TestContext.Current.CancellationToken);
+        await store.AddMembershipAsync(root.Id, project.Id, TestContext.Current.CancellationToken);
         await reviews.CreateDraftAsync(
             project.Id, "rev-1", "First", [new("a.txt", TestContent.A)], TestContext.Current.CancellationToken);
 
         // Act: break the rule
-        var signing = new SigningService(store, users, new FixedTimeProvider(_now));
+        var signing = TestServices.Signing(store, users, new FixedTimeProvider(_now));
         var exception = await Assert.ThrowsAsync<DomainRuleException>(
             () => ViolateByGroupAsync(rule, signing, checklists, store, root, projects, reviews, threads, users, project.Id));
 
@@ -236,12 +237,47 @@ public class CoreSubsystemTests
             return ViolateRepositoryAsync(rule, users);
         }
 
+        if (rule is DomainRule.MembershipExists or DomainRule.MembershipNotFound)
+        {
+            return ViolateMembershipAsync(rule, store, projectId);
+        }
+
         if (TokenRules.Contains(rule))
         {
             return ViolateTokenAsync(rule);
         }
 
         return ViolateAsync(rule, projects, reviews, threads, checklists, users, projectId);
+    }
+
+    /// <summary>
+    ///     Makes a request that breaks one rule of the project membership.
+    /// </summary>
+    /// <param name="rule">The rule to break; <see cref="DomainRule.MembershipExists"/> or
+    ///     <see cref="DomainRule.MembershipNotFound"/>.</param>
+    /// <param name="store">The store that holds the project.</param>
+    /// <param name="projectId">The identity of the existing project.</param>
+    /// <returns>A task that fails with the rule violation.</returns>
+    private static async Task ViolateMembershipAsync(DomainRule rule, FakeReviewStore store, int projectId)
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var clock = new FixedTimeProvider(_now);
+        var userStore = new FakeUserStore();
+        var userService = new UserService(userStore, new FakePasswordHasher(), clock);
+
+        // A first user takes the identity the arranged member of the project has, so "mem" is no member
+        await userService.CreateAsync("first", "First", UserRole.Reviewer, ValidPassword, cancellationToken);
+        await userService.CreateAsync("mem", "Mem", UserRole.Reviewer, ValidPassword, cancellationToken);
+        var service = new ProjectService(store, userStore, new AllowAllProjectAccess(store), clock);
+        var actor = new Actor("root", "Root");
+        if (rule == DomainRule.MembershipNotFound)
+        {
+            await service.RemoveMemberAsync(actor, projectId, "mem", cancellationToken);
+            return;
+        }
+
+        await service.AddMemberAsync(actor, projectId, "mem", ProjectRole.User, cancellationToken);
+        await service.AddMemberAsync(actor, projectId, "mem", ProjectRole.User, cancellationToken);
     }
 
     /// <summary>
@@ -289,7 +325,10 @@ public class CoreSubsystemTests
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         var protector = new FakeCredentialProtector();
-        var service = new RepositoryService(new FakeRepositoryStore(), protector, users, new FixedTimeProvider(_now));
+        var clock = new FixedTimeProvider(_now);
+        var reviewStore = new FakeReviewStore();
+        var project = await TestServices.Projects(reviewStore, clock).CreateAsync("P", null, cancellationToken);
+        var service = TestServices.Repositories(reviewStore, clock, null, protector);
         var actor = new Actor("root", "Root");
         const string location = "https://example.com/org/repo.git";
         switch (rule)
@@ -325,22 +364,16 @@ public class CoreSubsystemTests
                 return;
             case DomainRule.NothingToReview:
                 // A repository whose only change is outside the selection
-                var clock = new FixedTimeProvider(_now);
-                var reviewStore = new FakeReviewStore();
-                var project = await new ProjectService(reviewStore, clock).CreateAsync("P", null, cancellationToken);
                 var repository = await service.CreateAsync("repo", location, null, null, actor, cancellationToken);
                 var git = new FakeGitRepositoryProvider();
                 git.Revisions["main"] = "h1";
                 git.Script(null, "h1", [("docs/a.md", ChangeKind.Added, null, "x")]);
-                await new ReviewService(reviewStore, clock, service, git).CreateFromRepositoryAsync(
+                await TestServices.Reviews(reviewStore, clock, service, git).CreateFromRepositoryAsync(
                     project.Id, "rev-1", "T", repository.Id, "main", null, "src/**", actor, cancellationToken);
                 return;
             case DomainRule.ReviewSetConfigMissing:
             case DomainRule.ReviewSetConfigInvalid:
                 // A plan for a head that has no configuration, or one the parser rejects
-                var planClock = new FixedTimeProvider(_now);
-                var planStore = new FakeReviewStore();
-                var planProject = await new ProjectService(planStore, planClock).CreateAsync("P", null, cancellationToken);
                 var planRepository = await service.CreateAsync("repo", location, null, null, actor, cancellationToken);
                 var planGit = new FakeGitRepositoryProvider();
                 var headSha = new string('1', 40);
@@ -354,14 +387,14 @@ public class CoreSubsystemTests
                 {
                     Failure = new DomainRuleException(DomainRule.ReviewSetConfigInvalid, "The file is not valid YAML.")
                 };
-                var planner = new ReviewPlanner(
-                    planStore,
-                    new ReviewService(planStore, planClock, service, planGit),
+                var planner = TestServices.Planner(
+                    reviewStore,
+                    TestServices.Reviews(reviewStore, clock, service, planGit),
                     service,
                     planGit,
-                    new SigningService(planStore, users, planClock),
+                    TestServices.Signing(reviewStore, users, clock),
                     parser);
-                await planner.PlanAsync(planProject.Id, planRepository.Id, "main", BaselineMode.None, null, cancellationToken);
+                await planner.PlanAsync(actor, project.Id, planRepository.Id, "main", BaselineMode.None, null, cancellationToken);
                 return;
             default:
                 SelectionMatcher.Parse(string.Empty);
@@ -552,9 +585,9 @@ public class CoreSubsystemTests
     {
         // Arrange: all three services over one store, with a project and a review of one two-line file
         var store = new FakeReviewStore();
-        var projects = new ProjectService(store, new FixedTimeProvider(_now));
-        var reviews = new ReviewService(store, new FixedTimeProvider(_now));
-        var threads = new ThreadService(store, new FixedTimeProvider(_now));
+        var projects = TestServices.Projects(store, new FixedTimeProvider(_now));
+        var reviews = TestServices.Reviews(store, new FixedTimeProvider(_now));
+        var threads = TestServices.Threads(store, new FixedTimeProvider(_now));
         var project = await projects.CreateAsync("Apollo", null, TestContext.Current.CancellationToken);
         await reviews.CreateDraftAsync(
             project.Id,
@@ -594,9 +627,9 @@ public class CoreSubsystemTests
     {
         // Arrange: the services over one store, with a project and a review
         var store = new FakeReviewStore();
-        var projects = new ProjectService(store, new FixedTimeProvider(_now));
-        var reviews = new ReviewService(store, new FixedTimeProvider(_now));
-        var checklists = new ChecklistService(store, new FixedTimeProvider(_now));
+        var projects = TestServices.Projects(store, new FixedTimeProvider(_now));
+        var reviews = TestServices.Reviews(store, new FixedTimeProvider(_now));
+        var checklists = TestServices.Checklists(store, new FixedTimeProvider(_now));
         var project = await projects.CreateAsync("Apollo", null, TestContext.Current.CancellationToken);
         await reviews.CreateDraftAsync(
             project.Id, "rev-1", "First", [new("a.txt", TestContent.A)], TestContext.Current.CancellationToken);
@@ -706,12 +739,13 @@ public class CoreSubsystemTests
         // Arrange: the services over one store, a user with a slot on a review, and an actor that came through a token
         var cancellationToken = TestContext.Current.CancellationToken;
         var store = new FakeReviewStore();
-        var projects = new ProjectService(store, new FixedTimeProvider(_now));
-        var reviews = new ReviewService(store, new FixedTimeProvider(_now));
+        var projects = TestServices.Projects(store, new FixedTimeProvider(_now));
+        var reviews = TestServices.Reviews(store, new FixedTimeProvider(_now));
         var users = new UserService(new FakeUserStore(), new FakePasswordHasher(), new FixedTimeProvider(_now));
-        var signing = new SigningService(store, users, new FixedTimeProvider(_now));
+        var signing = TestServices.Signing(store, users, new FixedTimeProvider(_now));
         var ann = await users.CreateAsync("ann", "Ann", UserRole.Reviewer, ValidPassword, cancellationToken);
         var project = await projects.CreateAsync("Apollo", null, cancellationToken);
+        await store.AddMembershipAsync(ann.Id, project.Id, cancellationToken);
         var viaToken = new Actor("ann", "Ann") { ApiTokenId = "K7M2QX9P" };
 
         // Act: create a review as the token actor, name a reviewer as the person, then try to name and sign as the token actor
@@ -741,15 +775,17 @@ public class CoreSubsystemTests
         // Arrange: the services over one store with two users, a review, and one slot of ann and bob
         var cancellationToken = TestContext.Current.CancellationToken;
         var store = new FakeReviewStore();
-        var projects = new ProjectService(store, new FixedTimeProvider(_now));
-        var reviews = new ReviewService(store, new FixedTimeProvider(_now));
-        var threads = new ThreadService(store, new FixedTimeProvider(_now));
-        var checklists = new ChecklistService(store, new FixedTimeProvider(_now));
+        var projects = TestServices.Projects(store, new FixedTimeProvider(_now));
+        var reviews = TestServices.Reviews(store, new FixedTimeProvider(_now));
+        var threads = TestServices.Threads(store, new FixedTimeProvider(_now));
+        var checklists = TestServices.Checklists(store, new FixedTimeProvider(_now));
         var users = new UserService(new FakeUserStore(), new FakePasswordHasher(), new FixedTimeProvider(_now));
-        var signing = new SigningService(store, users, new FixedTimeProvider(_now));
+        var signing = TestServices.Signing(store, users, new FixedTimeProvider(_now));
         var ann = await users.CreateAsync("ann", "Ann", UserRole.Reviewer, ValidPassword, cancellationToken);
         var bob = await users.CreateAsync("bob", "Bob", UserRole.Reviewer, ValidPassword, cancellationToken);
         var project = await projects.CreateAsync("Apollo", null, cancellationToken);
+        await store.AddMembershipAsync(ann.Id, project.Id, cancellationToken);
+        await store.AddMembershipAsync(bob.Id, project.Id, cancellationToken);
         await reviews.CreateDraftAsync(project.Id, "rev-1", "First", [new("a.txt", TestContent.A)], cancellationToken);
         var annActor = new Actor("ann", "Ann");
         var bobActor = new Actor("bob", "Bob");

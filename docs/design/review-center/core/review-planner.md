@@ -12,7 +12,7 @@ created by hand.
 
 `ReviewPlanner` is a public sealed class that holds no state and is safe for concurrent use. Its dependencies are the
 review store (to list the reviews of a project), `ReviewService`, `RepositoryService`, `IGitRepositoryProvider`,
-`SigningService`, and `IReviewSetParser`; all are given to the constructor and none may be null.
+`SigningService`, `IReviewSetParser`, and `IProjectAccess`; all are given to the constructor and none may be null.
 
 **Types** (in `ReviewPlan.cs`): `BaselineMode` (`None`, `Explicit`, `LastReviewed`); `PlanRowStatus` (`WillCreate`,
 `AlreadyFiled`, `NothingToReview`, `CannotPlan`); `PlanRow` (set id, title, normalized selection, status, baseline
@@ -29,14 +29,18 @@ most five suffixes are tried when a create is refused as a duplicate.
 
 **PlanAsync**: Computes the plan for a head revision. It only reads.
 
-- *Parameters*: `int projectId`, `int repositoryId`, `string? headRevision`, `BaselineMode mode`,
+- *Parameters*: `Actor actor`, `int projectId`, `int repositoryId`, `string? headRevision`, `BaselineMode mode`,
   `string? baselineRevision`, `CancellationToken cancellationToken`.
 - *Returns*: `ReviewPlan` — one row per review-set, in file order.
-- *Preconditions*: The revisions pass `RevisionValidator`; the baseline revision is required for `Explicit` and ignored
-  otherwise; the project exists; the repository is registered and enabled.
+- *Preconditions*: `actor` is not null and may see the project (`IProjectAccess.RequireViewAsync`, which gives
+  `ProjectNotFound` for a project that does not exist and for one that is hidden, before anything else); the revisions
+  pass `RevisionValidator`; the baseline revision is required for `Explicit` and ignored otherwise; the repository is
+  registered, enabled, and belongs to the project.
 - *Postconditions*: Nothing is stored. The repository was fetched once, because one session served the whole plan.
 - *Algorithm*:
-  1. Validate the revisions, check the project, and get the access data from `RepositoryService`; open one session;
+  1. Check that the actor may see the project, validate the revisions, and get the access data from
+     `RepositoryService` (`GetAccessAsync(projectId, repositoryId)`, which refuses a repository of another project as
+     not found); open one session;
      resolve the head and, for `Explicit`, the baseline to commits.
   2. List the head commit as a full listing. It is the change list of every full review and is where the configuration
      is found: the file `.reviewmark.yaml` at the root. A missing file is `ReviewSetConfigMissing`; a file over the limit
@@ -62,11 +66,11 @@ most five suffixes are tried when a create is refused as a duplicate.
 
 **CreateAsync**: Creates the reviews that a user picked from a plan.
 
-- *Parameters*: `int projectId`, `int repositoryId`, `string headSha`, `IReadOnlyList<PlanCreateRequest> requests`,
-  `Actor actor`, `CancellationToken cancellationToken`.
+- *Parameters*: `Actor actor`, `int projectId`, `int repositoryId`, `string headSha`,
+  `IReadOnlyList<PlanCreateRequest> requests`, and `CancellationToken cancellationToken`.
 - *Returns*: one `PlanCreateResult` for every request, in the same order.
 - *Preconditions*: `requests` and `actor` are not null; there are at most `MaxReviewSets` requests; `headSha` is a full
-  commit id; the project and the repository are usable.
+  commit id; the actor may see the project and the repository is usable and belongs to the project.
 - *Postconditions*: Every created review has its review-set id and is stored in its own transaction by
   `ReviewService`, with its own audit entry; the batch is not one transaction.
 - *Algorithm*: Open one session for the batch. For each request, build the id (below) and the title, and call
@@ -116,6 +120,7 @@ repository with hundreds of sets is slow to plan.
 
 - **IReviewStore**, **ReviewService**, **RepositoryService**, **SigningService** — reviews, creation, access data, and
   the signed state.
+- **IProjectAccess** — requires that the actor may see the project before the plan or the batch does any work.
 - **IGitRepositoryProvider** and **IGitRepository** — the session, the commits, the listings, the configuration blob,
   and the ancestor check.
 - **IReviewSetParser** — the review-sets of the configuration.

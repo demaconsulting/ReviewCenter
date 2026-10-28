@@ -61,6 +61,13 @@ change of the display name does not rewrite the record, and the author can still
 same display name. A null actor is a programming error and raises `ArgumentNullException`; there is no rule about the
 author, because the display name of a user was validated when the user was created.
 
+**Access**: every change (`StartThreadAsync`, `ReplyAsync`, `ResolveAsync`, `ReopenAsync`) first requires that the
+actor may see the project (`IProjectAccess.RequireViewAsync`), so a user outside the project, like an anonymous or
+disabled one, gets `ProjectNotFound`, identical to a project that does not exist, before the review or the input is
+looked at. Every member can take part in the discussion; the unsigned-slot and membership rules of signing do not
+apply to comments. Reads (`ListAsync`) take no actor; the boundary guards them (every page and API handler first
+reads the project as the actor).
+
 #### Key Methods
 
 **StartThreadAsync**: Starts a thread with its first comment.
@@ -132,12 +139,13 @@ text, so that a later edit of the text would be noticed without copying the text
 
 #### Error Handling
 
-Rule violations raise `DomainRuleException` with the matching `DomainRule`. A null store or clock at construction,
-or a null actor, raises `ArgumentNullException`. Store failures propagate unchanged.
+Rule violations raise `DomainRuleException` with the matching `DomainRule`. A null store, project access, or clock at
+construction, or a null actor, raises `ArgumentNullException`. Store failures propagate unchanged.
 
 #### Dependencies
 
 - **IReviewStore** — checks the review, reads file content, and stores and reads threads (injected).
+- **IProjectAccess** — requires that the actor may see the project (injected).
 - **TimeProvider** — supplies the creation times (injected).
 
 #### Callers

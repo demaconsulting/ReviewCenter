@@ -17,7 +17,8 @@ N/A - standard test environment.
 #### Acceptance Criteria
 
 - All component tests pass with zero failures.
-- An unknown project shows a not-found message and no form; a project without a registered repository shows a plain
+- An unknown project, or one the user may not see, shows a not-found message and no form; a project without an enabled
+  repository shows a plain
   message and no form; otherwise the form offers the enabled repositories by name only (a single one is preselected),
   never a location, user name, or token, and the baseline choice defaults to Last reviewed, with the baseline text box
   only for Explicit revision.
@@ -42,15 +43,15 @@ N/A - standard test environment.
 
 #### Test Scenarios
 
-**PlanPage_Render_OneRepository_ShowsFormWithDefaults**: One repository is registered; the form has the repository
+**PlanPage_Render_OneRepository_ShowsFormWithDefaults**: One repository of the project is enabled; the form has the repository
 preselected, an empty head, the Last reviewed baseline chosen, and no baseline text box. This scenario is tested by
 `PlanPage_Render_OneRepository_ShowsFormWithDefaults`.
 
 **PlanPage_Render_UnknownProject_ShowsNotFound**: The page is rendered for an unknown project; the message names the
 identity and there is no form. This scenario is tested by `PlanPage_Render_UnknownProject_ShowsNotFound`.
 
-**PlanPage_Render_NoRepository_ShowsPlainMessageInsteadOfForm**: Without a repository the page says "No repository is
-registered; ask an administrator." and shows no form. This scenario is tested by
+**PlanPage_Render_NoRepository_ShowsPlainMessageInsteadOfForm**: Without a repository the page says "This project has no
+repository; ask a project administrator to add one." and shows no form. This scenario is tested by
 `PlanPage_Render_NoRepository_ShowsPlainMessageInsteadOfForm`.
 
 **PlanPage_Render_SeveralRepositories_OffersEnabledOnesWithoutSecrets**: Two enabled repositories and a disabled one

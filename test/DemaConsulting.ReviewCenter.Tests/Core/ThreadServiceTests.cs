@@ -42,9 +42,9 @@ public class ThreadServiceTests
     private static async Task<(FakeReviewStore Store, ThreadService Service, int ProjectId)> CreateAsync()
     {
         var store = new FakeReviewStore();
-        var project = await new ProjectService(store, new FixedTimeProvider(_now))
+        var project = await TestServices.Projects(store, new FixedTimeProvider(_now))
             .CreateAsync("Apollo", null, TestContext.Current.CancellationToken);
-        await new ReviewService(store, new FixedTimeProvider(_now)).CreateDraftAsync(
+        await TestServices.Reviews(store, new FixedTimeProvider(_now)).CreateDraftAsync(
             project.Id,
             "rev-1",
             "First",
@@ -54,7 +54,7 @@ public class ThreadServiceTests
                 new("empty.txt", [])
             ],
             TestContext.Current.CancellationToken);
-        return (store, new ThreadService(store, new FixedTimeProvider(_now)), project.Id);
+        return (store, TestServices.Threads(store, new FixedTimeProvider(_now)), project.Id);
     }
 
     /// <summary>
@@ -66,9 +66,9 @@ public class ThreadServiceTests
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         var clock = new FixedTimeProvider(_now);
-        var users = new UserService(new FakeUserStore(), new FakePasswordHasher(), clock);
-        await users.CreateAsync("adm", "Adm", UserRole.Admin, "correct horse battery", cancellationToken);
-        var repositories = new RepositoryService(new FakeRepositoryStore(), new FakeCredentialProtector(), users, clock);
+        var store = new FakeReviewStore();
+        var project = await TestServices.Projects(store, clock).CreateAsync("Apollo", null, cancellationToken);
+        var repositories = TestServices.Repositories(store, clock);
         var repository = await repositories.CreateAsync(
             "repo", "https://example.com/r.git", null, null, new Actor("adm", "Adm"), cancellationToken);
         var git = new FakeGitRepositoryProvider();
@@ -80,11 +80,9 @@ public class ThreadServiceTests
                 ("gone.txt", ChangeKind.Deleted, "x\ny\n", null),
                 ("mod.txt", ChangeKind.Modified, "a\n", "one\ntwo\n")
             ]);
-        var store = new FakeReviewStore();
-        var project = await new ProjectService(store, clock).CreateAsync("Apollo", null, cancellationToken);
-        await new ReviewService(store, clock, repositories, git).CreateFromRepositoryAsync(
+        await TestServices.Reviews(store, clock, repositories, git).CreateFromRepositoryAsync(
             project.Id, "rev-1", "First", repository.Id, "main", null, "**/*", new Actor("adm", "Adm"), cancellationToken);
-        return (new ThreadService(store, clock), project.Id);
+        return (TestServices.Threads(store, clock), project.Id);
     }
 
     /// <summary>
@@ -117,9 +115,9 @@ public class ThreadServiceTests
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         var clock = new FixedTimeProvider(_now);
-        var users = new UserService(new FakeUserStore(), new FakePasswordHasher(), clock);
-        await users.CreateAsync("adm", "Adm", UserRole.Admin, "correct horse battery", cancellationToken);
-        var repositories = new RepositoryService(new FakeRepositoryStore(), new FakeCredentialProtector(), users, clock);
+        var store = new FakeReviewStore();
+        var project = await TestServices.Projects(store, clock).CreateAsync("Apollo", null, cancellationToken);
+        var repositories = TestServices.Repositories(store, clock);
         var repository = await repositories.CreateAsync(
             "repo", "https://example.com/r.git", null, null, new Actor("adm", "Adm"), cancellationToken);
         var git = new FakeGitRepositoryProvider();
@@ -133,11 +131,9 @@ public class ThreadServiceTests
                 ("mod.txt", ChangeKind.Modified, "a\nb\nc\nd\n", "one\ntwo\n"),
                 ("new.txt", ChangeKind.Added, null, "n1\nn2\nn3\n")
             ]);
-        var store = new FakeReviewStore();
-        var project = await new ProjectService(store, clock).CreateAsync("Apollo", null, cancellationToken);
-        await new ReviewService(store, clock, repositories, git).CreateFromRepositoryAsync(
+        await TestServices.Reviews(store, clock, repositories, git).CreateFromRepositoryAsync(
             project.Id, "rev-1", "First", repository.Id, "main", "v1", "**/*", new Actor("adm", "Adm"), cancellationToken);
-        return (store, new ThreadService(store, clock), project.Id);
+        return (store, TestServices.Threads(store, clock), project.Id);
     }
 
     /// <summary>
@@ -403,11 +399,11 @@ public class ThreadServiceTests
     {
         // Arrange: a review with one file of the given text
         var store = new FakeReviewStore();
-        var project = await new ProjectService(store, new FixedTimeProvider(_now))
+        var project = await TestServices.Projects(store, new FixedTimeProvider(_now))
             .CreateAsync("Apollo", null, TestContext.Current.CancellationToken);
-        await new ReviewService(store, new FixedTimeProvider(_now)).CreateDraftAsync(
+        await TestServices.Reviews(store, new FixedTimeProvider(_now)).CreateDraftAsync(
             project.Id, "rev-1", "First", [new("f.txt", Encoding.UTF8.GetBytes(text))], TestContext.Current.CancellationToken);
-        var service = new ThreadService(store, new FixedTimeProvider(_now));
+        var service = TestServices.Threads(store, new FixedTimeProvider(_now));
 
         // Act: anchor to the last line, then one line beyond it
         var accepted = await service.StartThreadAsync(
@@ -637,7 +633,7 @@ public class ThreadServiceTests
     {
         // Arrange: a thread in review rev-1 and a second review
         var (store, service, projectId) = await CreateAsync();
-        await new ReviewService(store, new FixedTimeProvider(_now)).CreateDraftAsync(
+        await TestServices.Reviews(store, new FixedTimeProvider(_now)).CreateDraftAsync(
             projectId, "rev-2", "Second", [new("a.txt", TestContent.A)], TestContext.Current.CancellationToken);
         var thread = await service.StartThreadAsync(
             projectId, "rev-1", "a.txt", null, null, TestActors.Ann, "First", TestContext.Current.CancellationToken);
@@ -887,7 +883,10 @@ public class ThreadServiceTests
     public void ThreadService_Constructor_NullArguments_Throws()
     {
         // Arrange, Act, Assert: each missing dependency is refused
-        Assert.Throws<ArgumentNullException>(() => new ThreadService(null!, TimeProvider.System));
-        Assert.Throws<ArgumentNullException>(() => new ThreadService(new FakeReviewStore(), null!));
+        var store = new FakeReviewStore();
+        var access = new AllowAllProjectAccess(store);
+        Assert.Throws<ArgumentNullException>(() => new ThreadService(null!, access, TimeProvider.System));
+        Assert.Throws<ArgumentNullException>(() => new ThreadService(store, null!, TimeProvider.System));
+        Assert.Throws<ArgumentNullException>(() => new ThreadService(store, access, null!));
     }
 }

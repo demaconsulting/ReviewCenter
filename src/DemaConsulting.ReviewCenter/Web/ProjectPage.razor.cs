@@ -19,19 +19,23 @@
 // SOFTWARE.
 
 using DemaConsulting.ReviewCenter.Core;
+using DemaConsulting.ReviewCenter.Identity;
 using Microsoft.AspNetCore.Components;
+using Microsoft.AspNetCore.Components.Authorization;
 
 namespace DemaConsulting.ReviewCenter.Web;
 
 /// <summary>
 ///     Code-behind for the project page (<c>ProjectPage.razor</c>): shows one project and lists its reviews with
-///     their approval state. Reviews are created on the separate new review page.
+///     their approval state. Reviews are created on the separate new review page. A system administrator also
+///     manages the members of the project here.
 /// </summary>
 /// <remarks>
 ///     The page talks to the domain only through <see cref="ProjectService"/>, <see cref="ReviewService"/>,
-///     <see cref="SigningService"/> and <see cref="RepositoryService"/>. Each browser connection (circuit) gets its
-///     own page instance, so the state here is per-user and needs no synchronization. The page requires a signed-in
-///     user.
+///     <see cref="SigningService"/>, <see cref="RepositoryService"/> and <see cref="UserService"/> (to offer the
+///     users that can be added). A project the user may not see is shown exactly like a project that does not exist.
+///     Each browser connection (circuit) gets its own page instance, so the state here is per-user and needs no
+///     synchronization. The page requires a signed-in user.
 /// </remarks>
 public partial class ProjectPage : ComponentBase
 {
@@ -73,12 +77,31 @@ public partial class ProjectPage : ComponentBase
     private RepositoryService RepositoryService { get; set; } = null!;
 
     /// <summary>
+    ///     Gets or sets the user service, supplied by dependency injection; lists the users a system administrator
+    ///     can add as members.
+    /// </summary>
+    [Inject]
+    private UserService UserService { get; set; } = null!;
+
+    /// <summary>
+    ///     Gets or sets the access service, supplied by dependency injection; decides what the user may do here.
+    /// </summary>
+    [Inject]
+    private IProjectAccess Access { get; set; } = null!;
+
+    /// <summary>
+    ///     Gets or sets the authentication state of the current user, supplied by dependency injection.
+    /// </summary>
+    [Inject]
+    private AuthenticationStateProvider AuthenticationState { get; set; } = null!;
+
+    /// <summary>
     ///     Gets a value indicating whether the project lookup has finished.
     /// </summary>
     private bool Loaded { get; set; }
 
     /// <summary>
-    ///     Gets the project shown, or <c>null</c> when it does not exist.
+    ///     Gets the project shown, or <c>null</c> when it does not exist or is not visible to the user.
     /// </summary>
     private Project? Project { get; set; }
 
@@ -98,6 +121,51 @@ public partial class ProjectPage : ComponentBase
     private IReadOnlyList<RepositorySummary> Repositories { get; set; } = [];
 
     /// <summary>
+    ///     Gets a value indicating whether the user is a system administrator.
+    /// </summary>
+    private bool IsSystemAdmin { get; set; }
+
+    /// <summary>
+    ///     Gets a value indicating whether the user may manage this project (system administrator or project admin).
+    /// </summary>
+    private bool CanAdminister { get; set; }
+
+    /// <summary>
+    ///     Gets the members of the project; only loaded for a system administrator.
+    /// </summary>
+    private IReadOnlyList<ProjectMember> Members { get; set; } = [];
+
+    /// <summary>
+    ///     Gets the enabled users who are not members yet, for the add-member form.
+    /// </summary>
+    private IReadOnlyList<User> Candidates { get; set; } = [];
+
+    /// <summary>
+    ///     Gets a value indicating whether the add-member form is shown.
+    /// </summary>
+    private bool ShowAddForm { get; set; }
+
+    /// <summary>
+    ///     Gets or sets the user name chosen in the add-member form.
+    /// </summary>
+    private string AddUsername { get; set; } = string.Empty;
+
+    /// <summary>
+    ///     Gets or sets a value indicating whether the member to add becomes a project admin.
+    /// </summary>
+    private bool AddAsProjectAdmin { get; set; }
+
+    /// <summary>
+    ///     Gets the message of the last rejected member change, or <c>null</c> when there is none.
+    /// </summary>
+    private string? MemberError { get; set; }
+
+    /// <summary>
+    ///     Gets the message about the last stored member change, or <c>null</c> when there is none.
+    /// </summary>
+    private string? MemberStatus { get; set; }
+
+    /// <summary>
     ///     Gets the value rendered into the <c>data-interactive</c> attribute.
     /// </summary>
     /// <remarks>
@@ -114,9 +182,27 @@ public partial class ProjectPage : ComponentBase
     {
         // The router reuses this instance when only the project id changes; drop the previous project's data
         Loaded = false;
-        Project = await ProjectService.GetAsync(ProjectId);
-        Reviews = Project is null ? [] : await ReviewService.ListAsync(ProjectId);
-        Repositories = await RepositoryService.ListEnabledAsync();
+        ShowAddForm = false;
+        MemberError = null;
+        MemberStatus = null;
+        var actor = await AuthenticationState.GetActorOrNullAsync();
+        Project = await ProjectService.GetAsync(actor, ProjectId);
+        if (actor is null || Project is null)
+        {
+            Reviews = [];
+            Repositories = [];
+            IsSystemAdmin = false;
+            CanAdminister = false;
+            Members = [];
+            Loaded = true;
+            return;
+        }
+
+        Reviews = await ReviewService.ListAsync(ProjectId);
+        Repositories = await RepositoryService.ListEnabledAsync(actor, ProjectId);
+        IsSystemAdmin = await Access.IsSystemAdminAsync(actor);
+        CanAdminister = await Access.CanAdministerAsync(actor, ProjectId);
+        await LoadMembersAsync(actor);
 
         // One approval lookup per review; the list of reviews of a project is short
         ApprovedReviews.Clear();
@@ -139,6 +225,123 @@ public partial class ProjectPage : ComponentBase
     private bool IsApproved(string reviewId)
     {
         return ApprovedReviews.Contains(reviewId);
+    }
+
+    /// <summary>
+    ///     Shows the add-member form.
+    /// </summary>
+    private void OpenAddForm()
+    {
+        MemberError = null;
+        MemberStatus = null;
+        AddUsername = Candidates.Count > 0 ? Candidates[0].Username : string.Empty;
+        AddAsProjectAdmin = false;
+        ShowAddForm = true;
+    }
+
+    /// <summary>
+    ///     Hides the add-member form without adding anybody.
+    /// </summary>
+    private void CloseAddForm()
+    {
+        ShowAddForm = false;
+    }
+
+    /// <summary>
+    ///     Adds the user chosen in the form as a member.
+    /// </summary>
+    /// <returns>A task that completes when the member is added or the problem is shown.</returns>
+    private async Task AddMemberAsync()
+    {
+        var username = AddUsername;
+        var role = AddAsProjectAdmin ? ProjectRole.ProjectAdmin : ProjectRole.User;
+        if (await RunMemberChangeAsync(
+                actor => ProjectService.AddMemberAsync(actor, ProjectId, username, role),
+                $"Added '{username}' as {RoleText(role)}."))
+        {
+            ShowAddForm = false;
+        }
+    }
+
+    /// <summary>
+    ///     Removes a member from the project.
+    /// </summary>
+    /// <param name="member">The member as shown.</param>
+    /// <returns>A task that completes when the member is removed or the problem is shown.</returns>
+    private Task RemoveMemberAsync(ProjectMember member)
+    {
+        return RunMemberChangeAsync(
+            actor => ProjectService.RemoveMemberAsync(actor, ProjectId, member.Username),
+            $"Removed '{member.Username}' from the project.");
+    }
+
+    /// <summary>
+    ///     Switches a member between project admin and plain member.
+    /// </summary>
+    /// <param name="member">The member as shown.</param>
+    /// <returns>A task that completes when the role is changed or the problem is shown.</returns>
+    private Task ToggleRoleAsync(ProjectMember member)
+    {
+        var role = member.Role == ProjectRole.ProjectAdmin ? ProjectRole.User : ProjectRole.ProjectAdmin;
+        return RunMemberChangeAsync(
+            actor => ProjectService.SetMemberRoleAsync(actor, ProjectId, member.Username, role),
+            $"'{member.Username}' is now {RoleText(role)}.");
+    }
+
+    /// <summary>
+    ///     Gets the words used for a project role.
+    /// </summary>
+    /// <param name="role">The role.</param>
+    /// <returns>The text shown to the user.</returns>
+    private static string RoleText(ProjectRole role)
+    {
+        return role == ProjectRole.ProjectAdmin ? "project admin" : "member";
+    }
+
+    /// <summary>
+    ///     Runs a member change, shows its outcome, and reloads the member list.
+    /// </summary>
+    /// <param name="change">The change; it receives the signed-in user as the actor to audit.</param>
+    /// <param name="success">The message to show when the change is stored.</param>
+    /// <returns><c>true</c> when the change was stored.</returns>
+    private async Task<bool> RunMemberChangeAsync(Func<Actor, Task> change, string success)
+    {
+        MemberError = null;
+        MemberStatus = null;
+        try
+        {
+            var actor = await AuthenticationState.GetActorAsync();
+            await change(actor);
+            MemberStatus = success;
+            await LoadMembersAsync(actor);
+            return true;
+        }
+        catch (DomainRuleException ex)
+        {
+            MemberError = ex.Message;
+            return false;
+        }
+    }
+
+    /// <summary>
+    ///     Loads the member list and the users that can still be added; only a system administrator manages members.
+    /// </summary>
+    /// <param name="actor">The signed-in user.</param>
+    /// <returns>A task that completes when the lists are loaded.</returns>
+    private async Task LoadMembersAsync(Actor actor)
+    {
+        if (!IsSystemAdmin)
+        {
+            Members = [];
+            Candidates = [];
+            return;
+        }
+
+        Members = await ProjectService.ListMembersAsync(actor, ProjectId);
+        var memberNames = Members.Select(member => member.Username).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        Candidates = (await UserService.ListAsync())
+            .Where(user => user.Enabled && !memberNames.Contains(user.Username))
+            .ToList();
     }
 
     /// <summary>

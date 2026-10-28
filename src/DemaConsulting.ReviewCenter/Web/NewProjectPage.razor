@@ -1,17 +1,24 @@
-@* NewProjectPage: the form that creates a project, at "/projects/new". The page holds only the form; Cancel
-   goes back to the project list and a successful creation opens the new project.
+@* NewProjectPage: the form that creates a project, at "/projects/new". Only a system administrator may create a
+   project (the attribute below, and ProjectService again); a new project has no members until the administrator adds
+   them on the project page. The page holds only the form; Cancel goes back to the project list and a successful
+   creation opens the new project, where the next step (members, repositories) is offered.
 
    Presentation only; state and event handling live in NewProjectPage.razor.cs. The data-interactive marker on the
-   root flips to "true" once the live circuit is connected. *@
+   root flips to "true" once the live circuit is connected.
+
+   Human factors: (a) two fields, name and description; (b) nothing else is on the page; (c) the lead text says the
+   project starts without members, so the next step is not a surprise. *@
 @page "/projects/new"
+@using DemaConsulting.ReviewCenter.Identity
 @rendermode InteractiveServer
-@attribute [Authorize]
+@attribute [Authorize(Roles = SignIn.AdminRole)]
 
 <PageTitle>New project - ReviewCenter</PageTitle>
 
 <SessionGate>
 <main class="page narrow" data-testid="new-project-page" data-interactive="@InteractiveMarker">
     <h1>New project</h1>
+    <p class="page-lead">A new project has no members. Add them on the project page after creating it.</p>
 
     <section class="card">
         <form data-testid="new-project-form" @onsubmit="CreateProjectAsync">

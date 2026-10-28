@@ -98,6 +98,115 @@ internal sealed class ReviewStore(IDbContextFactory<ReviewCenterDbContext> facto
     }
 
     /// <inheritdoc />
+    public async Task AddMembershipAsync(
+        ProjectMembership membership,
+        AuditDraft audit,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(membership);
+        ArgumentNullException.ThrowIfNull(audit);
+
+        await appender.ExecuteAsync<bool>(
+            factory,
+            async context =>
+            {
+                context.ProjectMemberships.Add(membership);
+                try
+                {
+                    await context.SaveChangesAsync(cancellationToken);
+                }
+                catch (DbUpdateException ex) when (IsDuplicateKey(ex))
+                {
+                    // The key is (user, project): the user is a member already
+                    throw new DomainRuleException(
+                        DomainRule.MembershipExists,
+                        "The user is already a member of this project.");
+                }
+
+                return (true, audit);
+            },
+            cancellationToken);
+    }
+
+    /// <inheritdoc />
+    public async Task<bool> RemoveMembershipAsync(
+        int projectId,
+        int userId,
+        AuditDraft audit,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(audit);
+
+        return await appender.ExecuteAsync<bool>(
+            factory,
+            async context =>
+            {
+                var rows = await context.ProjectMemberships
+                    .Where(m => m.ProjectId == projectId && m.UserId == userId)
+                    .ExecuteDeleteAsync(cancellationToken);
+                return rows > 0 ? (true, audit) : (false, null);
+            },
+            cancellationToken);
+    }
+
+    /// <inheritdoc />
+    public async Task<bool> SetMembershipRoleAsync(
+        int projectId,
+        int userId,
+        ProjectRole role,
+        AuditDraft audit,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(audit);
+
+        return await appender.ExecuteAsync<bool>(
+            factory,
+            async context =>
+            {
+                var rows = await context.ProjectMemberships
+                    .Where(m => m.ProjectId == projectId && m.UserId == userId)
+                    .ExecuteUpdateAsync(m => m.SetProperty(x => x.Role, role), cancellationToken);
+                return rows > 0 ? (true, audit) : (false, null);
+            },
+            cancellationToken);
+    }
+
+    /// <inheritdoc />
+    public async Task<ProjectMembership?> GetMembershipAsync(
+        int userId,
+        int projectId,
+        CancellationToken cancellationToken = default)
+    {
+        await using var context = await factory.CreateDbContextAsync(cancellationToken);
+        return await context.ProjectMemberships.AsNoTracking()
+            .FirstOrDefaultAsync(m => m.UserId == userId && m.ProjectId == projectId, cancellationToken);
+    }
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<ProjectMembership>> ListMembershipsAsync(
+        int projectId,
+        CancellationToken cancellationToken = default)
+    {
+        await using var context = await factory.CreateDbContextAsync(cancellationToken);
+        return await context.ProjectMemberships.AsNoTracking()
+            .Where(m => m.ProjectId == projectId)
+            .OrderBy(m => m.UserId)
+            .ToListAsync(cancellationToken);
+    }
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<ProjectMembership>> ListMembershipsForUserAsync(
+        int userId,
+        CancellationToken cancellationToken = default)
+    {
+        await using var context = await factory.CreateDbContextAsync(cancellationToken);
+        return await context.ProjectMemberships.AsNoTracking()
+            .Where(m => m.UserId == userId)
+            .OrderBy(m => m.ProjectId)
+            .ToListAsync(cancellationToken);
+    }
+
+    /// <inheritdoc />
     public async Task<bool> ReviewExistsAsync(
         int projectId,
         string reviewId,
