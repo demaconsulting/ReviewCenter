@@ -643,6 +643,7 @@ reviews:
       - "src/DemaConsulting.ReviewCenter.Core/IProjectAccess.cs"
       - "src/DemaConsulting.ReviewCenter.Core/ProjectMembership.cs"
       - "test/**/Core/ProjectAccessTests.cs"
+      - "test/**/Core/ProjectAccessGuardTests.cs"
 
   - id: ReviewCenter-Core-ReviewService
     title: Review of ReviewCenter ReviewService unit implementation

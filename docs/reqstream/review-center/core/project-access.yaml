@@ -53,6 +53,8 @@ sections:
           A member sees the project already, so telling that member that an action is not allowed leaks nothing.
         tests:
           - ProjectAccess_Require_HiddenMissingAndNotAdministrator_FailWithTheRightRule
+          - ReviewOperations_NotAMember_AreRefusedAsAMissingProjectAndChangeNothing
+          - Repositories_OfAnotherProject_CannotBeUsedOrChanged
 
       - id: ReviewCenter-ProjectAccess-Revocation
         title: >-
