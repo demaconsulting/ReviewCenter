@@ -13,7 +13,8 @@ The unit is a static class with one extension method that maps the route
 `GET /projects/{projectId}/reviews/{reviewId}/attestation.pdf` (the project number is an integer), and one internal
 static method, `ToResult`, that turns the outcome of `AttestationService` into the HTTP answer. The route requires an
 authenticated user, like every page except the home page and the login page; a personal access token does not
-authenticate this page route (the API has its own route that uses the same `ToResult`, see `ApiEndpoints`). The actor
+authenticate this page route, and neither does a project's anonymous-attestation setting (that opens only the API route,
+which uses the same `ToResult`, see `ApiEndpoints`). The actor
 passed to the service is built
 from the user name and the display name claim of the signed-in user.
 

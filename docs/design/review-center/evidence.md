@@ -33,18 +33,22 @@ subsystem uses one OTS item, `System.Security.Cryptography.Pkcs`, for the CMS si
   description, "The review is not complete") for a review that is not
   approved and 409 ("The review changed during generation") for a review that changed while the document was being
   prepared, and 500 (a problem description, "Attestation signing key unavailable", with the reason) when the key cannot
-  be used. A visitor who is not signed in is redirected to the sign-in page by the authentication scheme.
+  be used. A visitor who is not signed in is redirected to the sign-in page by the authentication scheme; anonymous
+  access, when a project allows it, exists only on the API route of the `Api` subsystem, never on this page route.
 - *Constraints*: The attestation is made for every request and is stored nowhere; every successful request adds an
   `attestation.generated` event to the audit trail. The route includes the project number because reviews are
-  addressed by project everywhere else in the system.
+  addressed by project everywhere else in the system. What the document contains follows the evidence settings of the
+  project (see Design).
 
 **EvidenceIndexService**: The evidence index of a project.
 
 - *Type*: In-process .NET class.
 - *Role*: Provider, to `ApiEndpoints` of the `Api` subsystem, which serves it as `GET
   /api/projects/{projectId}/evidence/index.json`.
-- *Contract*: `BuildAsync` takes the actor and the project, refuses an actor who may not view the project as for a
-  project that does not exist, and returns one entry (the review-set id, the content fingerprint, the UTC day of the
+- *Contract*: `BuildAsync` takes the actor (or `null` for a request without a signed-in user) and the project. It
+  refuses an actor who may not view the project, and a request without an actor for a project that does not exist or
+  that does not allow an anonymous evidence index, as for a project that does not exist. It returns one entry (the
+  review-set id, the content fingerprint, the UTC day of the
   latest
   signature,
   and the review it stands for) for each review-set id and fingerprint of the complete reviews of the project that have
@@ -72,13 +76,15 @@ subsystem uses one OTS item, `System.Security.Cryptography.Pkcs`, for the CMS si
 - *Constraints*: An unknown provider, a missing or malformed thumbprint, or a key that does not meet the rule stops the
   server at start-up with an error that names the setting.
 
-**Core services (consumed)**: `SigningService`, `AuditService`, `IReviewStore`, and `IProjectAccess`.
+**Core services (consumed)**: `SigningService`, `AuditService`, `IReviewStore`, `IProjectAccess`, and
+`EvidenceSettingsService`.
 
 - *Type*: In-process .NET classes and interfaces.
 - *Role*: Consumer.
 - *Contract*: The approval decision and the record digest, the audit trail (the head of the chain, and the recording of
-  the release), the review with its files, checklist, threads, and signatures, and the decision which actor may view
-  which project.
+  the release), the review with its files, checklist, threads, and signatures, the decision which actor may view
+  which project, and the evidence settings of a project (`EvidenceSettings`: which parts the PDF contains and whether
+  the index and the PDFs may be read without signing in).
 - *Constraints*: None.
 
 ### Design
@@ -145,23 +151,44 @@ server does not start. Because the key is obtained at start-up, a
 configuration that cannot work fails at once, with an error that names the setting; the price is that a server whose key
 is in a hardware module that is not present does not start.
 
-**Release of an attestation**: `AttestationService` first asks `IProjectAccess` whether the actor may view the project,
-and answers an actor who may not exactly as for a review that does not exist, so that the answer does not tell a
+**Release of an attestation**: `AttestationService` first reads the project and decides whether the asker may read its
+attestations: an actor must be allowed by `IProjectAccess` to view the project, and a request without an actor (an
+anonymous request from the API) is allowed only when the project switch `AnonymousAttestations` is on. Whoever is not
+allowed gets exactly the answer for a review that does not exist, so that the answer does not tell a
 non-member whether the project or the review exists. Then it asks `SigningService` for the approval, so a missing
 review is
 reported as not found and a review that is not complete is refused without the key being touched. Then it gets the key
 (a key problem is reported, and nothing is recorded), reads the review, checks again that the record digest is the one
-that was approved, verifies the audit chain to get its head, renders the document, reads the review again and
-checks that it is still complete and unchanged (otherwise the attestation is refused and nothing is recorded), and
+that was approved, verifies the audit chain to get its head, renders the document, reads the review and the project
+settings again and
+checks that it is still complete and unchanged and that the settings are the ones that were rendered (otherwise the
+attestation is refused and nothing is recorded), and
 signs it. Last, it records the
 release in the audit trail with the record digest, the chain head that is printed in the document, the SHA-256 hash of
-the PDF, and the key. The event is written strictly: if the trail cannot be written, nothing is released. The event
+the PDF, and the key; the actor of the event is the user, or `anonymous` for a request without an actor. The event is
+written strictly: if the trail cannot be written, nothing is released. The event
 follows the signing, so the chain head in the document precedes its own event. The head is found by verifying the chain,
 which reads every entry on every request; this is intentional integrity evidence and is acceptable because an
 attestation is rare. A change that happens between the second check and the audit event is not seen; that window is
 tiny and the event states the digest that was attested. The user interface offers the download only
 for an approved review, but the endpoint decides again, so the rule does not depend on the page. The document prints
 every checklist comment in full; the only caps are on the list of resolved threads (see `AttestationRenderer`).
+
+**Evidence settings and the content of a PDF**: Each project has evidence settings (see `EvidenceSettings` in `Core`).
+Five switches decide what every attestation PDF of the project contains: discussion threads, reviewer names, the
+wording of the checklist, the file list with hashes, and the git context (repository name and revisions); all are on by
+default. They apply to **every** PDF of the project, not only to anonymous ones, so a project that keeps names out of
+its PDFs keeps them out for its members too. `AttestationService` reads the settings once at the start and builds the
+document from them: with the reviewer names switch off every person field of the document is already replaced
+(`Reviewer 1 (primary)`, `Reviewer 1 (alternate)` for the members of a slot, `Participant N` in the order of first
+mention for everybody else, and a fixed label for who asked), and `AttestationRenderer` leaves out the parts that the
+other switches turn off. The settings are read again, with the review, before the document is signed; a difference gives
+`Changed`, so a document never mixes two settings. Every PDF carries a **Content scope** section that states, from the
+settings that were in effect at the time of generation, what the document leaves out, so a reader cannot take a
+reduced document for a complete one. The signature is made after the redaction and covers the redacted bytes, so it
+stays valid. The record digest, which the reviewers signed, still covers the complete record, whatever the PDF shows.
+Two switches are not about content: an anonymous evidence index and anonymous attestation PDFs say whether the two API
+routes may be read without a token (see the `Api` subsystem).
 
 **The evidence index**: ReviewMark checks in a pipeline that every review-set has a current review, and it can read that
 evidence from a URL as an `index.json` file. `EvidenceIndexService` makes that file from the approvals of ReviewCenter,
@@ -181,13 +208,15 @@ SHA-256 hashes of the files); a contract test checks it against an independent i
 from the changes since a baseline holds only the changed files, so its fingerprint differs from the one that ReviewMark
 computes for the whole review-set, and ReviewMark shows it as stale. The index discloses the review-sets and
 fingerprints of a project, so `BuildAsync` refuses an actor who may not view the project with the rule of a missing
-project.
+project, and refuses a request without an actor unless the project allows an anonymous evidence index (with the same
+rule, so a project that does not allow it looks like a project that does not exist).
 
 **Known limitations and planned follow-ups**: These are not implemented, and the subsystem has no requirement and no
 dependency for them. A provider for Azure Key Vault would keep the key in the vault and sign through the Azure SDK; the
 design leaves a place for it, because the key type that the signer uses is an RSA or ECDSA object that need not hold the
 key itself. A timestamp authority (RFC 3161) would add a trusted time to the signature as an unsigned attribute of the
-CMS signature. The attestation of a review can also be downloaded through the JSON API with a personal access token (see
+CMS signature. The attestation of a review can also be downloaded through the JSON API with a personal access token, or
+without one when the project allows it (see
 the `Api` subsystem). The PDF
 is generated for every request and is not stored; the audit event holds its hash, so a copy can be checked against the
 trail. Tests of the certificate store provider use a temporary certificate in the store of the current user and skip

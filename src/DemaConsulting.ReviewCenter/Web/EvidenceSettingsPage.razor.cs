@@ -131,7 +131,7 @@ public partial class EvidenceSettingsPage : ComponentBase
     /// <summary>
     ///     Gets a value indicating whether anonymous readers would get PDFs that still carry comments or names.
     /// </summary>
-    private bool AnonymousPdfsShowPeopleOrComments =>
+    private bool AnonymousPdfShowsPeopleOrComments =>
         Draft.AnonymousAttestations && (Draft.IncludeThreads || Draft.IncludeReviewerNames);
 
     /// <summary>

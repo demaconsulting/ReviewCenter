@@ -44,8 +44,26 @@ provider with a scripted fake.
   the project number); a member and a system administrator are served; the project list holds only the projects of
   the owner of the token (all of them for a system administrator); and a token follows the memberships of its owner at
   once.
+- A project that has switched on the anonymous evidence index or the anonymous attestation PDFs serves that route, and
+  no other, to a request without credentials; a project that has not (the default), or does not exist, answers it with
+  the same 401 as a missing token; a request with a wrong token is never served as anonymous; an anonymous release is
+  audited as `anonymous`; and the document of the API marks exactly those two routes as callable without credentials.
 
 ### Test Scenarios
+
+**Anonymous access scenarios**: The tests in `AnonymousEvidenceAccessTests.cs` run the real application and set the
+evidence settings of a project through the real service. They show that the answer without credentials depends only on
+the switch of the route and the project (`AnonymousEvidenceAccess_SwitchOff_Anonymous_AnswersLikeAMissingProject`,
+`AnonymousEvidenceAccess_Matrix_ServesOnlyWhoMay`, `AnonymousEvidenceAccess_OneSwitchOn_DoesNotOpenTheOtherRoute`,
+`AnonymousEvidenceAccess_SwitchOn_OpensOnlyItsOwnProject`, and `AnonymousEvidenceAccess_SwitchTurnedOff_RefusesAtOnce`),
+that an anonymous caller reads the index and downloads a signed PDF that is audited as `anonymous`
+(`AnonymousEvidenceAccess_BothOn_ServesIndexEntryAndSignedPdfAndAuditsAnonymous`), that every other route and the page
+route of the attestation stay closed (`AnonymousEvidenceAccess_BothOn_OtherRoutes_StayClosed`,
+`AnonymousEvidenceAccess_BothOn_AttestationPageRoute_StillNeedsSignIn`, and
+`AnonymousEvidenceAccess_Endpoints_OnlyTheTwoRoutesUseTheOpenPolicies`), and that the limit by address answers 429 with
+`Retry-After` (`AnonymousEvidenceAccess_TooManyAnonymousRequests_Answers429WithRetryAfter` and
+`AnonymousRateLimit_TryAcquire_CountsPerAddressAndWindow`). The details are in the `ApiTokenAuthentication` verification.
+The two operations in the document are verified by `ApiDocument_Get_NoToken_DescribesTheApiWithBearerScheme`.
 
 **ApiProjectAccess scenarios**: The tests in `ApiProjectAccessTests.cs` run the real application and call every route
 of a project with a token (the list of reviews, a review, the creation of a review, the attestation, and the evidence

@@ -701,6 +701,10 @@ sections:
           - ReviewCenter-Evidence-Key
           - ReviewCenter-Evidence-Honesty
           - ReviewCenter-Evidence-Release
+          - ReviewCenter-Evidence-ContentSettings
+          - ReviewCenter-Core-EvidenceSettings
+          - ReviewCenter-Storage-EvidenceSettings
+          - ReviewCenter-Web-EvidenceSettings
           - ReviewCenter-Hosting-AttestationServices
           - ReviewCenter-Hosting-AttestationKeyFailure
           - ReviewCenter-Web-Attestation
@@ -740,7 +744,8 @@ sections:
           index of a project in the form that ReviewMark reads (with a token sent as a bearer token or as the
           password of HTTP Basic credentials), with the same rules as the web pages, but shall not let a token sign a
           review, arrange the reviewers, or open a web page, and shall answer a request for a project that its owner
-          may not see as for a project that does not exist.
+          may not see as for a project that does not exist. A project may open its evidence index and its attestation
+          PDFs, and nothing else, to a client without a token.
         tags: [system]
         justification: |
           Creating a draft for every pull request from a pipeline and filing the attestation of a signed review with
@@ -753,6 +758,7 @@ sections:
           - ReviewCenter-Api-EvidenceJourney
           - ReviewCenter-Evidence-Index
           - ReviewCenter-Api-ProjectAccess
+          - ReviewCenter-Api-AnonymousEvidence
           - ReviewCenter-Hosting-ApiServices
         tests:
           - ApiSubsystem_ReviewJourney_CreateDraftReadAndDownloadAttestation_WorksEndToEnd

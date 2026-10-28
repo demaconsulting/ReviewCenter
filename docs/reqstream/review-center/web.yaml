@@ -43,8 +43,9 @@ sections:
         title: >-
           The Web subsystem shall serve an About page at /about, and a built-in Help at /help with an index of
           topics and one page per topic at /help/{topic}, each with links to the previous topic, the next topic,
-          and the index, among them the topic /help/project-members for the management of project members, and a
-          friendly message for an unknown topic.
+          and the index, among them the topic /help/project-members for the management of project members and the
+          topic /help/evidence-settings for the evidence settings of a project, and a friendly message for an
+          unknown topic.
         justification: |
           Users need to learn what the product does, which version they run, and how to work with it without
           leaving the application. One page per topic keeps every link a plain address that can be shared and
@@ -57,11 +58,13 @@ sections:
           - ReviewCenter-HelpPage-Navigation
           - ReviewCenter-HelpPage-NotFound
           - ReviewCenter-HelpPage-MembersTopic
+          - ReviewCenter-HelpPage-EvidenceSettingsTopic
           - ReviewCenter-App-HelpLink
         tests:
           - HelpPage_Render_ListsEveryTopicWithItsPageLink
           - HelpTopicPages_Render_EveryTopicHasAPageWithValidNavigation
           - HelpMembersPage_Render_ExplainsAddingAccountsAndTheLastAdminRule
+          - HelpEvidenceSettingsPage_Render_ExplainsAnonymousAccessContentSwitchesAndScope
           - AboutPage_Render_Anonymous_ShowsVersionCopyrightAndProjectLink
 
       - id: ReviewCenter-Web-Interactive
@@ -526,3 +529,33 @@ sections:
           - AccountPage_CreateToken_ValidInput_ShowsValueOnceAndListsToken
           - AccountPage_RevokeToken_ActiveToken_MarksRevokedAndRemovesButton
           - HelpApiTokensPage_Render_ExplainsTokensCurlEndpointsAndErrors
+
+      - id: ReviewCenter-Web-EvidenceSettings
+        title: >-
+          The Web subsystem shall let only whoever administers a project (a system administrator or a project admin of
+          it) open the evidence settings page of the project from an Evidence settings button on the project page, and
+          show anybody else the page of a project that does not exist; shall show there the switches for anonymous
+          access to the evidence index and the attestation PDFs and for the content of the PDFs, with the defaults,
+          the regulatory warnings, the summary of what is left out and the exposure warning shown as the switches are
+          changed; shall save the switches together, record the change in the audit trail of the project, and refuse a
+          save over a change made by someone else or after the right was lost; and shall explain the settings in a
+          help topic.
+        justification: |
+          Opening evidence to anonymous readers and reducing what a PDF contains are decisions with regulatory
+          consequences, so they belong to the people who answer for the project, are shown with their consequences
+          before they are saved, and are accountable afterwards. The behavior needs a live connection, so it is
+          verified by the component tests of the units.
+        children:
+          - ReviewCenter-ProjectPage-EvidenceSettingsLink
+          - ReviewCenter-ProjectPage-EvidenceSettingsAccess
+          - ReviewCenter-ProjectPage-EvidenceSettingsSwitches
+          - ReviewCenter-ProjectPage-EvidenceSettingsWarnings
+          - ReviewCenter-ProjectPage-EvidenceSettingsSave
+          - ReviewCenter-ProjectPage-EvidenceSettingsConflict
+          - ReviewCenter-ProjectPage-EvidenceSettingsRightLost
+          - ReviewCenter-HelpPage-EvidenceSettingsTopic
+        tests:
+          - EvidenceSettingsPage_Render_Administrator_ShowsDefaultsWithoutWarnings
+          - EvidenceSettingsPage_Render_NoAdministerRight_ShowsNotFoundAndNoSwitches
+          - EvidenceSettingsPage_Save_Change_StoresConfirmsAndAudits
+          - HelpEvidenceSettingsPage_Render_ExplainsAnonymousAccessContentSwitchesAndScope

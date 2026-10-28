@@ -2,13 +2,18 @@
 
 #### Verification Approach
 
-`ProjectPage`, `NewReviewPage`, `NewMemberPage`, and `NewMemberAccountPage` are verified with component tests defined
+`ProjectPage`, `NewReviewPage`, `NewMemberPage`, `NewMemberAccountPage`, and `EvidenceSettingsPage` are verified with
+component tests defined
 in `ProjectPageTests.cs`, which holds the tests of the first two pages and the member changes of the project page,
 `NewReviewPageRepositoryTests.cs`, `ProjectAccessPageTests.cs` (what a member, a non-member,
-and a system administrator see and do), `NewMemberPageTests.cs`, and `NewMemberAccountPageTests.cs`, which use the
+and a system administrator see and do), `NewMemberPageTests.cs`, `NewMemberAccountPageTests.cs`, and
+`EvidenceSettingsPageTests.cs`, which use the
 bUnit test context
 to render the real components over real Core services and an in-memory fake store (`FakeReviewStore`, `FakeUserStore`
-connected to it, and `FakeAuditStore`, with `FakePasswordHasher` for the passwords of the created accounts). File
+connected to it, and `FakeAuditStore`, with `FakePasswordHasher` for the passwords of the created accounts). The
+evidence settings page runs over the real `EvidenceSettingsService` with the real access rules, so who gets the page and
+what a save does are the product's; a second service that allows everything (`PageTestBase.SettingsService`) only
+arranges stored settings. The audit entry of a save is read back from the fake store. File
 selection is simulated the
 way a browser does it, by setting the files of the file input in the test context. Tests locate elements by their
 `data-testid` attributes (the page units share the helper `PageTestBase`) and wait for the asynchronous file
@@ -68,6 +73,26 @@ N/A - standard test environment.
 - Skipped links and submodules are shown to the creator before the review is opened.
 - The project page links to the plan page of the project when a repository is enabled, and otherwise says whom to
   ask.
+- The project page shows the Evidence settings button, which leads to `/projects/{id}/evidence-settings`, to a project
+  admin and a system administrator and to nobody else.
+- The evidence settings page shows whoever administers the project the seven switches with a description each, from the
+  stored settings or, when none are stored, the defaults (the two anonymous switches off, the five content switches on),
+  no warning, no summary, a Save settings button, and a Back to project button that leads to the project; a plain
+  member, a user who is no member, and a missing project get the not-found message and no switches.
+- Turning a content switch off shows its own warning, which mentions the regulatory regime and the quality or
+  compliance lead, and a summary that names the omitted section, before anything is saved; turning it on again removes
+  both. The warnings of the five switches differ. While an anonymous switch is on, an exposure warning is shown, and a
+  stronger sentence names the review discussion and the reviewer names that anonymous PDFs would still carry, as far as
+  those switches are on; with nothing anonymous the warning is gone.
+- Saving stores all the switches, confirms with "Evidence settings saved.", stays on the page, and records one audit
+  entry of the project, `project.evidence-settings-changed`, with the changed keys, their old and new values, and the
+  user; saving unchanged settings says that there is nothing to save and records nothing.
+- A save over settings that someone else changed in the meantime stores nothing, shows the message that they were changed
+  by someone else, and shows the stored settings.
+- A save after the membership was revoked, after a demotion to plain member, or after the sign-in state ended stores
+  nothing, records nothing, and shows the not-found message and none of the settings or messages; reusing the page for
+  another project drops the choices and the project.
+- The interactive marker of the evidence settings page is `true` after it has rendered on a live connection.
 
 #### Test Scenarios
 
@@ -352,3 +377,76 @@ total-size error is shown and no selection is kept. This scenario is tested by
 
 **ProjectPage_AfterRender_Interactive_SetsMarker**: The project page is rendered; its root element has
 `data-interactive` equal to `true`. This scenario is tested by `ProjectPage_AfterRender_Interactive_SetsMarker`.
+
+**Evidence settings** are verified in `EvidenceSettingsPageTests.cs`, with the real `EvidenceSettingsService` and the
+real access rules behind the page.
+
+**ProjectPage_Render_ProjectAdmin_ShowsMembersAndButtons** and
+**ProjectPage_Render_PlainMember_ShowsNoMembersAndNoAuditLink**: The project page of a project admin has the Evidence
+settings button with the address `/projects/{id}/evidence-settings`; the page of a plain member has none. These scenarios
+are tested by `ProjectPage_Render_ProjectAdmin_ShowsMembersAndButtons` and
+`ProjectPage_Render_PlainMember_ShowsNoMembersAndNoAuditLink`.
+
+**EvidenceSettingsPage_Render_Administrator_ShowsDefaultsWithoutWarnings**: A project admin and a system administrator
+open the page of a project without stored settings; the two anonymous switches are off, the five content switches are
+on, there is no summary, no exposure warning, and no warning notice, the Save settings button is there, and the Back to
+project button leads to the project. This scenario is tested by
+`EvidenceSettingsPage_Render_Administrator_ShowsDefaultsWithoutWarnings`.
+
+**EvidenceSettingsPage_Render_EverySwitchHasADescription**: The seven rows each have a hint, and the one of the index
+says that it is useless to ReviewMark without the PDFs, and mentions credentials. This scenario is tested by
+`EvidenceSettingsPage_Render_EverySwitchHasADescription`.
+
+**EvidenceSettingsPage_Render_NoAdministerRight_ShowsNotFoundAndNoSwitches**: A plain member, a user who is no member,
+and a project admin who asks for a project that does not exist get the not-found message and no form, and the page does
+not contain the project name. This scenario is tested by
+`EvidenceSettingsPage_Render_NoAdministerRight_ShowsNotFoundAndNoSwitches`.
+
+**EvidenceSettingsPage_Render_StoredSettings_AreShown**: The settings of the project were stored with the index on and
+the file list off; the page shows exactly those, and the other switches keep their defaults. This scenario is tested by
+`EvidenceSettingsPage_Render_StoredSettings_AreShown`.
+
+**EvidenceSettingsPage_Switch_ContentOff_ShowsItsWarningAndTheBanner**: For each of the five content switches, turning
+it off shows its own warning, which names the regulatory regime and the quality or compliance lead, as the only warning
+notice of the row, and a summary that names its section; turning it on again removes both. This scenario is tested by
+`EvidenceSettingsPage_Switch_ContentOff_ShowsItsWarningAndTheBanner`.
+
+**EvidenceSettingsPage_Switch_AllContentOff_WarningsAreTailoredAndBannerListsAll**: With all five content switches off,
+the reviewer names warning has the exact text "Omitting reviewer names may not satisfy your regulatory regime. Confirm
+with your quality or compliance lead.", the five warnings differ from each other, and the summary lists all five
+sections. This scenario is tested by `EvidenceSettingsPage_Switch_AllContentOff_WarningsAreTailoredAndBannerListsAll`.
+
+**EvidenceSettingsPage_Switch_AnonymousOn_ShowsExposureWarningAndPeopleLine**: Turning the index on shows the exposure
+warning and no sentence about people; turning the anonymous PDFs on adds the sentence that names the review discussion
+and the reviewer names; turning the reviewer names off keeps only the discussion; turning the threads off removes the
+sentence and keeps the general warning; turning both anonymous switches off removes the warning. This scenario is tested
+by `EvidenceSettingsPage_Switch_AnonymousOn_ShowsExposureWarningAndPeopleLine`.
+
+**EvidenceSettingsPage_Save_Change_StoresConfirmsAndAudits**: The anonymous PDFs are turned on and the reviewer names
+off, and Save settings is pressed; the stored settings have exactly those two changes, the page says "Evidence settings
+saved." and shows no error, and one audit entry of the project with the action `project.evidence-settings-changed`, the
+user name, and the detail "AnonymousAttestations off->on; IncludeReviewerNames on->off" exists. This scenario is tested
+by `EvidenceSettingsPage_Save_Change_StoresConfirmsAndAudits`.
+
+**EvidenceSettingsPage_Save_NoChange_SaysNothingToSaveAndRecordsNothing**: Save settings is pressed with no change; the
+page says that there is nothing to save and no audit entry exists. This scenario is tested by
+`EvidenceSettingsPage_Save_NoChange_SaysNothingToSaveAndRecordsNothing`.
+
+**EvidenceSettingsPage_Save_ChangedByOthers_ShowsMessageAndTheCurrentSettings**: Another administrator turns the index
+on while the page is open; the first administrator turns the file list off and saves; the page shows the message that
+someone else changed the settings, shows the index on and the file list on, the stored file list setting is unchanged,
+and only the audit entry of the other administrator exists. This scenario is tested by
+`EvidenceSettingsPage_Save_ChangedByOthers_ShowsMessageAndTheCurrentSettings`.
+
+**EvidenceSettingsPage_Save_RightLostWhileOpen_StoresNothingAndDropsThePage**: With the page open and a switch changed,
+the membership is revoked, the user is demoted to plain member, or the sign-in state is ended without the page knowing;
+Save settings is pressed; the page shows the not-found message and no form, error, or status, does not contain the
+project name, the stored settings are unchanged, and no audit entry exists. This scenario is tested by
+`EvidenceSettingsPage_Save_RightLostWhileOpen_StoresNothingAndDropsThePage`.
+
+**EvidenceSettingsPage_Load_OtherProject_DropsTheChoicesAndTheProject**: With a switch changed for the first project, the
+page is given the identity of a second project that the user does not administer; it shows the not-found message and
+neither project name. This scenario is tested by `EvidenceSettingsPage_Load_OtherProject_DropsTheChoicesAndTheProject`.
+
+**EvidenceSettingsPage_AfterRender_Interactive_SetsMarker**: The evidence settings page is rendered; its root element has
+`data-interactive` equal to `true`. This scenario is tested by `EvidenceSettingsPage_AfterRender_Interactive_SetsMarker`.

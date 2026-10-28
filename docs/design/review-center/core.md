@@ -11,11 +11,13 @@ that protect them, the content fingerprint that identifies a review's files and 
 hash-chained audit trail of everything that happens. It
 is
 deliberately free of web and database technology so that the rules can be reviewed and tested on their own. It
-It contains seventeen units: `Fingerprint`, the content fingerprint algorithm; `RecordDigest`, the digest of a review
+It contains eighteen units: `Fingerprint`, the content fingerprint algorithm; `RecordDigest`, the digest of a review
 record that a signature binds to; `AuditChain`, the audit entry types, their hash, and the verifier of the chain;
 `AuditService`, the recording, reading, and verification of the audit trail; `ProjectAccess`, the one place that
 decides who can see and administer which project; `ProjectService`, the rules
-for projects and their members; `ReviewService`, the rules for reviews; `ThreadService`, the rules for review comments;
+for projects and their members; `EvidenceSettingsService`, the rules for the per-project evidence settings (anonymous
+access to the evidence and the content of the attestation PDFs); `ReviewService`, the rules for reviews;
+`ThreadService`, the rules for review comments;
 `ChecklistService`, the rules for the review checklist; `UserService`, the rules for users; `SigningService`, the
 rules for reviewer slots and signatures; `RepositoryService`, the registry of git repositories that reviews can be
 created from, with their credentials; `SelectionMatcher`, the file pattern language that selects the files of a
@@ -23,7 +25,8 @@ repository; `RevisionValidator`, the check that a revision name cannot be taken 
 `LineDiff`, the comparison of the lines of two versions of a file and its division into shown and collapsed regions;
 `ReviewPlanner`, the planning of the reviews that a head revision needs from the review-sets of the repository; and
 `PersonalAccessTokenService`, the rules for the personal access tokens that let a script use the API as its owner. The
-domain types (`Project`, `Review`, `ReviewFile`, `ReviewState`, `UploadedFile`, `ReviewThread`, `ThreadSide`,
+domain types (`Project`, `EvidenceSettings`, `EvidenceSettingChange`, `Review`, `ReviewFile`, `ReviewState`,
+`UploadedFile`, `ReviewThread`, `ThreadSide`,
 `ReviewComment`,
 `ReviewThreadState`, the checklist types, `User`, `Actor`, the access types `ProjectMembership`, `ProjectRole`, and
 `ProjectMember`, the signing types `ReviewerSlot`,
@@ -46,7 +49,8 @@ supporting types, documented with the unit that owns them.
 
 ### Interfaces
 
-**ProjectAccess, ProjectService, ReviewService, ThreadService, ChecklistService, UserService, SigningService, and
+**ProjectAccess, ProjectService, EvidenceSettingsService, ReviewService, ThreadService, ChecklistService, UserService,
+SigningService, and
 PersonalAccessTokenService**: The operations
 used by the `Web`, `Identity`, and `Api` subsystems and by the `Hosting` subsystem.
 
@@ -59,7 +63,10 @@ used by the `Web`, `Identity`, and `Api` subsystems and by the `Hosting` subsyst
   list the members of a project, and add an existing user as a member by the exact user name, create a local account
   as a member of the project (with a generated temporary password, returned once), change the role of a member, or
   remove a member (system administrators and the project admins of that project; removing or demoting the last project
-  admin is refused for a project admin; a failed add is throttled and audited); create a draft review from uploaded
+  admin is refused for a project admin; a failed add is throttled and audited); read and change the evidence settings of
+  a project (system administrators and the project admins of that project only; a change names the settings it started
+  from and is refused with `RecordChanged` when another change came first, and is audited with its changed keys), and
+  read them without an actor for the services that apply them; create a draft review from uploaded
   files, or from the files
   that changed between an optional baseline revision and a head revision of a registered repository of the same
   project, restricted by a
@@ -101,7 +108,9 @@ used by the `Web`, `Identity`, and `Api` subsystems and by the `Hosting` subsyst
   state of a section and the answer to a check; read the whole record of a review in one operation; add, list,
   update, and remove reviewer slots; add and list signatures; and add, read, list (of a project, and of a user), change
   the role of, and remove the memberships of users in projects (removing or demoting can require that another project
-  admin remains, checked inside the transaction). Every operation that changes data takes an
+  admin remains, checked inside the transaction); and change the evidence settings of a project by compare-and-set
+  (`UpdateEvidenceSettingsAsync`: the new settings are stored only if the stored ones still equal the expected ones,
+  and the project and its settings are read with every project). Every operation that changes data takes an
   `AuditDraft` (or a function that builds one from the stored entity) that the store appends to the audit trail in the
   same transaction.
 - *Constraints*: A review is added with all its files, and its checklist snapshot, in one operation, and an attempt
@@ -112,7 +121,9 @@ used by the `Web`, `Identity`, and `Api` subsystems and by the `Hosting` subsyst
   still the digest it carries, checked inside one transaction, and fails with a `DomainRuleException` for
   `RecordChanged` otherwise. A user is a member of a project at most once: adding a second membership fails with a
   `DomainRuleException` for `MembershipExists`, and a change or removal of a membership that does not exist returns
-  `false`, which the service reports as `MembershipNotFound`.
+  `false`, which the service reports as `MembershipNotFound`. A change of the evidence settings whose expected settings
+  are no longer stored, or of a project that does not exist, returns `false` and stores nothing, which the service
+  reports as `RecordChanged`.
 
 **IUserStore**: The store interface the subsystem requires for users.
 

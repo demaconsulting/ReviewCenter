@@ -98,3 +98,21 @@ sections:
         tests:
           - HelpMembersPage_Render_ExplainsAddingAccountsAndTheLastAdminRule
           - HelpTopicPages_Render_EveryTopicHasAPageWithValidNavigation
+
+      - id: ReviewCenter-HelpPage-EvidenceSettingsTopic
+        title: >-
+          The HelpPage unit shall serve a topic, Evidence settings, at /help/evidence-settings, that explains that only
+          a project admin or a system administrator can change the evidence settings of a project from the Evidence
+          settings button, what the two anonymous switches (the evidence index and the attestation PDFs) do, that they
+          are off by default and independent, that the index alone is of no use to ReviewMark without the PDFs and that
+          anyone who reaches the server can then read what was opened, what the five PDF content
+          switches (review discussion threads, reviewer names, checklist wording, file list and hashes, git context)
+          leave out, the regulatory warning, the Content scope section of every PDF, and that every change is recorded
+          in the audit trail, with two screenshots of the settings page.
+        justification: |
+          The settings open the evidence to anonymous readers and can reduce what a PDF proves, so the person who
+          changes them must be able to read what each switch costs before turning it. The consequences are explained
+          in one place, with pictures of the page the person sees.
+        tests:
+          - HelpEvidenceSettingsPage_Render_ExplainsAnonymousAccessContentSwitchesAndScope
+          - HelpTopicPages_Render_EveryTopicHasAPageWithValidNavigation

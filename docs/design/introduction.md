@@ -85,7 +85,8 @@ The ReviewCenter system is divided as follows:
 - **Core** (subsystem): the domain model and rules for projects, reviews, review comments, review checklists,
   users, personal access tokens, reviewer signatures, the hash-chained audit trail, and the registry of git
   repositories, free of web and database technology; contains the Fingerprint, RecordDigest, AuditChain, AuditService,
-  ProjectService, ReviewService, ThreadService, ChecklistService, UserService, PersonalAccessTokenService,
+  ProjectService, EvidenceSettingsService, ReviewService, ThreadService, ChecklistService, UserService,
+  PersonalAccessTokenService,
   SigningService, RepositoryService, SelectionMatcher, RevisionValidator, ReviewPlanner, and LineDiff units
 - **Storage** (subsystem): persistence of projects, reviews, comment threads, checklists, users, personal access
   tokens, reviewer slots, signatures, the audit trail, and the registered repositories in a database

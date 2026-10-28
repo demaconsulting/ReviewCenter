@@ -4,7 +4,7 @@
 
 `ReviewCenterDbContext` is verified with the unit tests of `ReviewStoreTests.cs`, `ReviewStoreSigningTests.cs`,
 `UserStoreTests.cs`, `RepositoryStoreTests.cs`, `PersonalAccessTokenStoreTests.cs`, `ReviewStoreRepositoryTests.cs`,
-`ReviewStoreMembershipTests.cs`, and
+`ReviewStoreMembershipTests.cs`, `EvidenceSettingsStoreTests.cs`, and
 `DatabaseSetupTests.cs`, which
 exercise the context through the units that use it. The context has no behavior that can be reached without a
 database, and its job is to produce the right schema, so the tests run against real SQLite database files in a
@@ -36,6 +36,8 @@ be loadable on the test platform.
   its unique index on the project and the name ignores case, so the same name can be used in two projects.
 - The table for project memberships holds one row per user and project, refuses a second row for the same pair, and
   refuses a row for an unknown project.
+- The seven evidence settings columns of a project are created with the default settings as their defaults, so a new
+  project reads back with the defaults, and a changed setting is stored and read back from its own column.
 - The source columns of a review and the change kind and baseline columns of a file are created, stored, and read back
   as written, with the baseline content as binary data and no value for an uploaded review.
 - The table for personal access tokens has a unique index on the hash and no column for the value of a token, and a
@@ -128,6 +130,12 @@ round-trips, which is tested by `ReviewStore_AddMembershipAsync_Membership_Round
 refuses a second membership of a user in a project, which is tested by
 `ReviewStore_AddMembershipAsync_SecondMembership_IsRejected`, and the foreign key refuses a membership for an unknown
 project, which is tested by `ReviewStore_AddMembershipAsync_UnknownProject_IsRefusedByTheDatabase`.
+
+**Evidence settings columns**: The seven boolean columns of the `Projects` table are exercised by the tests of
+`ReviewStore` in `EvidenceSettingsStoreTests.cs`: a new project reads back with the default settings, which is tested by
+`ReviewStore_AddProjectAsync_NewProject_HasDefaultEvidenceSettings`, and a changed setting is stored in its own columns
+and read back with the project, while the other projects keep the defaults, which is tested by
+`ReviewStore_UpdateEvidenceSettingsAsync_Change_IsPersistedAndAudited`.
 
 **Audit entries table**: The `AuditEntries` table is mapped by `ReviewCenterDbContext` and is exercised by the tests
 of `AuditStore`, which write, read, and verify entries through the real schema; all scenarios of this unit run over a

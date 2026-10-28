@@ -17,12 +17,15 @@ review the repository, the baseline and head commits, and the review-set), the c
 its version, the files (path, status, SHA-256, and size), the checklist sections with their items, answers, and
 comments, the count of open threads and the summaries of the resolved ones, the reviewer slots with their signatures
 (signer, role, time, the digest signed, and its meaning), the head of the audit chain with its length and whether it is
-intact, the version of the tool, the time of the creation, the user who asked for it, and the description of the key
-(`AttestationKeyInfo`). The output is the
+intact, the version of the tool, the time of the creation, who asked for it (a name, a label, or a statement that the
+request was anonymous), the description of the key
+(`AttestationKeyInfo`), the evidence settings that were in effect (`Content`), and whether the request was anonymous.
+The person fields of the input are already the final text: `AttestationService` replaces names with labels when the
+settings keep names out, so the renderer never sees a name that it has to hide. The output is the
 bytes of a PDF. Two public constants hold the standing statements: `SelfSignedNotice` ("SELF-SIGNED KEY - NOT AN
 ORGANIZATION KEY. Dev/test only; do not rely on it as organizational evidence.") and `ProvesStatement`. The document has
-these sections in order: the review, the files, the checklist, the threads, the sign-offs, the audit anchor, and the
-signature.
+these sections in order: the review, the content scope, the files, the checklist, the threads, the sign-offs, the audit
+anchor, and the signature. The files and the threads are left out when their switch is off.
 
 #### Key Methods
 
@@ -35,7 +38,26 @@ signature.
   same bytes. A large review continues on further pages. Checklist comments are printed in full and are never cut: a
   comment is the reviewer's own words and part of the signed evidence, and a long one is wrapped and runs over pages.
   The only caps are on the list of resolved threads, listed below. The counts of open and resolved threads are always
-  exact.
+  exact. The content switches of the document apply to every PDF:
+  - *Discussion threads* off: the threads section (the counts and the list of resolved threads) is left out.
+  - *Files* off: the list of files with their status, hashes, and sizes is left out. The number of files is still
+    printed in the content scope, and the content fingerprint, which covers them, stays in the review section.
+  - *Checklist wording* off: a section is printed by its identifier instead of its title and a check by identifier and
+    outcome without its text, with a line that says so; the justifications and comments (the reviewers' own words) stay.
+  - *Git context* off: for a review of a repository, the repository name, the head and baseline revisions are replaced
+    by one line that says the git context is omitted; the line "Files uploaded to ReviewCenter" of an uploaded review is
+    not git context and stays.
+  - *Reviewer names* off: nothing is hidden by the renderer, because the labels are already in the input; the switch is
+    only reported in the content scope.
+
+**Content scope**: Every PDF has a section "Content scope", right after the review section, that prints the settings as
+they were when the document was generated (so a reader can see what a project's own setting was on that day), says
+whether the request was made without signing in, states for each of the five switches whether its part is included or
+omitted, adds the number of files when the file list is omitted, and names in one sentence what is left out of the
+document (`EvidenceSettings.OmittedSections`) or states that nothing is. It also states that the record digest covers
+the complete record, including what the document leaves out. The section is printed also when nothing is left out, so a
+reader never has to guess whether a part is missing on purpose. The wording is built from the settings, not from the
+data, so a document with an omitted section and one without can never read the same.
 
 **Caps**: Each remaining cap is stated here, because anything cut is a place where the document says less than the
 record.
@@ -48,7 +70,8 @@ record.
   of a resolved thread, and ends a cut summary with an ellipsis; the renderer prints the summary as it receives it. It
   is an overview of a thread that was closed, and the complete thread is in the review record.
 - *Nothing else is cut*: not the checklist comments (justifications), the checklist item text, the file paths, the names,
-  or the signatures. A line that is wider than the page is wrapped by the writer (a single word wider than a line is
+  or the signatures, unless the evidence settings of the project turn that part off, in which case the content scope
+  says so. A line that is wider than the page is wrapped by the writer (a single word wider than a line is
   broken where the line is full), not clipped; runs of spaces in a text are shown as one space.
 
 #### Error Handling
@@ -83,6 +106,8 @@ for document signatures; the key is still used.
 - **PdfDocumentWriter** — lays the content out.
 - **AttestationKeyInfo** — the description of the key that will sign (subject, issuer, thumbprint, whether it is
   self-signed, and whether it is for code signing only).
+- **EvidenceSettings** — Core; the five content switches and the description of what is left out (`IsReduced` and
+  `OmittedSections`).
 
 #### Callers
 

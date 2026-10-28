@@ -38,8 +38,8 @@ N/A - standard test environment.
 
 **RecordDigest_Canonicalize_SmallRecord_MatchesDocumentedFormat**: A record with one answer, one section that does not
 apply, one section that does, and one thread with one comment gives exactly the canonical text of the design, with
-the length-prefixed strings, the version line, who answered, and only the section that does not apply. This scenario is tested by
-`RecordDigest_Canonicalize_SmallRecord_MatchesDocumentedFormat`.
+the length-prefixed strings, the version line, who answered, and only the section that does not apply. This scenario is
+tested by `RecordDigest_Canonicalize_SmallRecord_MatchesDocumentedFormat`.
 
 **RecordDigest_Compute_SameRecord_IsStableSha256OfCanonicalText**: Two equal records give the same digest, which is
 64 lowercase hexadecimal characters and equals the SHA-256 of the UTF-8 bytes of the canonical text. This scenario is

@@ -12,7 +12,8 @@ sections:
         title: >-
           The ApiEndpoints unit shall return, to a client with a valid token, the list of projects the owner of the
           token may see, the review summaries of such a project, and the details of one review as JSON, answer 404
-          for a project or a review that does not exist, and answer 401 to a request without a valid token.
+          for a project or a review that does not exist, and answer 401 to a request without a valid token (these
+          routes are never open to a request without credentials).
         justification: |
           A script that files and follows reviews needs to find them, and an unknown project or review must be told
           from an empty list. A script sees what its owner sees and no more.
@@ -29,7 +30,9 @@ sections:
           the project, one review, the creation of a review, the attestation, and the evidence index), that the owner
           of the token may see the project, and shall answer an owner who may not with the 404 problem document, and the
           same body, that it answers for a project that does not exist, for a bearer token and for HTTP Basic
-          credentials, and shall list only the projects the owner may see.
+          credentials, and shall list only the projects the owner may see. This applies to a request that carries a
+          token; a request without credentials to the two open routes is decided by the setting of the project (see
+          OpenRoutes).
         justification: |
           Every route that names a project is a way to find out whether the project exists. Checking first, and
           answering with the body of a missing project, closes all of them, and checking before the body of a
@@ -86,26 +89,35 @@ sections:
       - id: ReviewCenter-ApiEndpoints-Attestation
         title: >-
           The ApiEndpoints unit shall return the signed attestation PDF of a review whose reviewer slots have all
-          signed, with the same release rules and audit record as the download from the web pages, and shall answer
-          with a problem document, status 409, for a review that is not signed.
+          signed, with the same release rules and audit record as the download from the web pages, to a client with a
+          valid token or, when the project allows it, to a client without a token, and shall answer
+          with a problem document, status 409, for a review that is not signed, and status 401 to a request without a
+          valid token when the project does not allow anonymous attestation PDFs.
         justification: |
           Fetching the attestation after the sign-off lets a pipeline file it with a release. Using the same
-          mapping as the page keeps what is released, and what is recorded, the same.
+          mapping as the page keeps what is released, and what is recorded, the same. A project that publishes its
+          attestations lets a caller without an account fetch them, and one that does not publish them answers a
+          caller without a token as before.
         tests:
           - ApiEndpoints_GetAttestation_Token_ReturnsPdfOrProblem
           - ApiEndpoints_GetAttestation_ReviewNotSigned_Answers409Problem
+          - AnonymousEvidenceAccess_BothOn_ServesIndexEntryAndSignedPdfAndAuditsAnonymous
+          - AnonymousEvidenceAccess_SwitchOff_Anonymous_AnswersLikeAMissingProject
 
       - id: ReviewCenter-ApiEndpoints-EvidenceIndex
         title: >-
-          The ApiEndpoints unit shall return, to a client with a valid token, the evidence index of a project at
-          GET /projects/{projectId}/evidence/index.json as a JSON object with a reviews list in the format that
+          The ApiEndpoints unit shall return the evidence index of a project at
+          GET /projects/{projectId}/evidence/index.json, to a client with a valid token or, when the project allows it,
+          to a client without a token, as a JSON object with a reviews list in the format that
           ReviewMark reads, with the absolute address of the attestation of each entry built from the scheme, host and
           path base of the request, with a response that no cache keeps, answer 404 with a problem document for a
-          project that does not exist, and answer 401 to a request without a valid token.
+          project that does not exist, and answer 401 to a request without a valid token when the project does not
+          allow an anonymous evidence index.
         justification: |
           ReviewMark takes the evidence of a review from an index. The file address in it must be one that the client
           can open, whatever address it used to reach the server, a cached index would show a review that has since
-          changed, and an unknown project must be told from a project without evidence.
+          changed, and an unknown project must be told from a project without evidence. A project that publishes its
+          index lets a pipeline without an account read it.
         tests:
           - ApiEndpoints_GetEvidenceIndex_CompleteReviewWithSetId_ReturnsEntryWithAbsoluteFileUrl
           - ApiEndpoints_GetEvidenceIndex_NoListableReview_ReturnsEmptyList
@@ -113,6 +125,7 @@ sections:
           - ApiEndpoints_GetEvidenceIndex_SchemeHostPathBaseAndId_BuildsAbsoluteUrl
           - ApiEndpoints_GetEvidenceIndex_OtherHost_BuildsUrlFromRequestHost
           - ApiEndpoints_Request_NoToken_Answers401
+          - AnonymousEvidenceAccess_BothOn_ServesIndexEntryAndSignedPdfAndAuditsAnonymous
 
       - id: ReviewCenter-ApiEndpoints-Errors
         title: >-
@@ -133,3 +146,30 @@ sections:
           way to give one.
         tests:
           - ApiEndpoints_Routes_NoSigningOrSlotRoutes
+
+      - id: ReviewCenter-ApiEndpoints-OpenRoutes
+        title: >-
+          The ApiEndpoints unit shall put exactly two routes, the evidence index and the attestation PDF, behind a
+          policy
+          that a request without credentials can satisfy, and every other route under /api behind the policy that
+          needs a valid token, so that no third route is open to a caller without a token (except the OpenAPI document
+          and the answer for an address that does not exist), and shall refuse a request without credentials to any
+          other route of a project with 401 even when the project has switched both routes on.
+        justification: |
+          The exception to "an API needs a token" must stay as small as its documentation says. A test that
+          enumerates the routes makes a new route that is open by mistake fail, instead of leaving it to review.
+        tests:
+          - AnonymousEvidenceAccess_Endpoints_OnlyTheTwoRoutesUseTheOpenPolicies
+          - AnonymousEvidenceAccess_BothOn_OtherRoutes_StayClosed
+
+      - id: ReviewCenter-ApiEndpoints-AnonymousLimit
+        title: >-
+          The ApiEndpoints unit shall answer a request without credentials to the evidence index route or the
+          attestation PDF route from a client address that is over its limit with status 429, a problem document, a
+          Retry-After header, and a response that no cache keeps, and shall not apply that limit to a request with a
+          valid token.
+        justification: |
+          A caller without an account must be slowed down by address, and has to be told when to come back, but a
+          script that holds a token is counted by the throttle of tokens and must not be refused by this limit.
+        tests:
+          - AnonymousEvidenceAccess_TooManyAnonymousRequests_Answers429WithRetryAfter

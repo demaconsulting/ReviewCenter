@@ -11,8 +11,9 @@ without a visible change in review.
 
 #### Data Model
 
-The unit is a static class with two extension methods and three constants: the address of the document
-(`/api/openapi.json`), the names of the security schemes (`bearer` and `basic`), and the document version (`1`). It
+The unit is a static class with two extension methods and five constants: the address of the document
+(`/api/openapi.json`), the names of the security schemes (`bearer` and `basic`), the document version (`1`), and the
+operation ids of the two operations that a project can open (`GetEvidenceIndex` and `GetAttestation`). It
 holds no state.
 
 The committed snapshot `docs/api/openapi.json` is a file of the repository and not part of the program. The test that
@@ -51,7 +52,10 @@ command.
   "ReviewCenter API", the version `1`, a description, no server list (an address would come from the request host and
   differ between machines), the HTTP bearer security scheme `bearer` with the format `rcpat`, the HTTP Basic scheme
   `basic` (the token is the
-  password), and the security requirements of every operation: bearer or basic, either one.
+  password), and the security requirements of every operation: bearer or basic, either one. The two operations that a
+  project can open (`GetEvidenceIndex` and `GetAttestation`, named by constants of the class) get a third alternative,
+  an empty security requirement (`{}`, which OpenAPI defines as "no credentials"), so a client generator can
+  see that a call without a token is possible and that it succeeds only when the project allows it.
 
 **MapApiDocument**: Serves the document.
 

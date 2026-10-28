@@ -30,6 +30,9 @@ a project checklist, and sign the review with their password. Every action is re
 - ✍️ **Re-authenticated Signatures** - Reviewers sign again with their password, bound to the exact record reviewed
 - 🔗 **Tamper-Evident Audit Trail** - Every change is chained by SHA-256 hashes and can be verified at any time
 - 📄 **Signed PDF Attestation** - Approved reviews download as a digitally signed PDF that any reader can verify
+- ⚙️ **Evidence Settings** - Per project, project administrators choose what the attestation PDFs contain (a PDF with
+  less carries a Content scope section that says what was left out) and may open the evidence index and the PDFs to
+  anonymous readers; both are off by default, warn about regulatory impact and exposure, and every change is audited
 - 🔐 **Local Accounts** - Sign-in lockout and throttling, and password changes
 - 🛡️ **Project-Based Access Control** - System administrators, project administrators, and project members; project
   administrators manage their own members; a project you are not a member of looks like a project that does not exist
@@ -86,6 +89,7 @@ The [User Guide][link-guide] describes everything in detail, including:
 - [Planning Reviews][link-guide-planning]: create the reviews of all review-sets of a repository in one go
 - [Review Signatures][link-guide-signatures]: reviewer slots, signing, and approval
 - [Signed Attestation][link-guide-attestation]: the PDF, its signing key, and what the signature proves
+- [Evidence Settings][link-guide-evidence-settings]: anonymous access to the evidence and what the PDFs contain
 - [Audit Trail][link-guide-audit]: the hash chain, verification, and its limits
 - [Database][link-guide-database]: data location and database settings
 - [Repositories and Credentials][link-guide-repositories]: git access and token protection
@@ -134,6 +138,7 @@ By contributing to this project, you agree that your contributions will be licen
 [link-guide-planning]: https://github.com/demaconsulting/ReviewCenter/blob/main/docs/user_guide/introduction.md#planning-reviews
 [link-guide-signatures]: https://github.com/demaconsulting/ReviewCenter/blob/main/docs/user_guide/introduction.md#review-signatures
 [link-guide-attestation]: https://github.com/demaconsulting/ReviewCenter/blob/main/docs/user_guide/introduction.md#signed-attestation
+[link-guide-evidence-settings]: https://github.com/demaconsulting/ReviewCenter/blob/main/docs/user_guide/introduction.md#evidence-settings
 [link-guide-audit]: https://github.com/demaconsulting/ReviewCenter/blob/main/docs/user_guide/introduction.md#audit-trail
 [link-guide-database]: https://github.com/demaconsulting/ReviewCenter/blob/main/docs/user_guide/introduction.md#database
 [link-guide-repositories]: https://github.com/demaconsulting/ReviewCenter/blob/main/docs/user_guide/introduction.md#repositories-and-credentials

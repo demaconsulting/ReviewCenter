@@ -84,6 +84,7 @@ administrator is not throttled but is a trusted actor).
 | `project.member-removed` | `user 'bob'` (the project identifier is in its own field) |
 | `project.account-created` | `user 'bob', role User, temporary password` (never the password; project id is separate) |
 | `project.member-add-failed` | `user name '<typed>'` (failed add or account creation; best-effort; project id apart) |
+| `project.evidence-settings-changed` | `AnonymousIndex off->on; IncludeThreads on->off` (changed keys; project apart) |
 | `review.created` | `review 'Title', fingerprint <64 hex>, N file(s)` |
 | `slot.added`, `slot.updated`, `slot.removed` | `slot {id}: primary ada, alternate bob` (`none` for no alternate) |
 | `signature.added` | `slot {slotId}, role {Primary or Alternate}, record digest <64 hex>` |

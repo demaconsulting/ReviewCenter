@@ -15,12 +15,19 @@ N/A - standard test environment (everything runs in memory).
 #### Acceptance Criteria
 
 - All tests pass with zero failures.
-- The document shows the review, its fingerprint, files, checklist, threads, sign-offs, audit head, and tool version.
+- The document shows the review, its fingerprint, files, checklist, threads, sign-offs, audit head, and tool version, as
+  far as the evidence settings include them (see the criteria for the Content scope below).
 - A checklist comment is printed in full, however long, and runs over pages without loss; only the list of resolved
   threads is capped (100), with exact counts and a line that says how many are left out.
 - A self-signed key gets the notice; an organization key gets its subject and issuer and no notice.
 - The statement of what the signature proves and does not prove is in the document.
 - The result is deterministic, grows over pages, and handles characters beyond WinAnsi and a missing document.
+- A Content scope section follows the review section in every PDF: it says that nothing is left out with the default
+  settings, names each omitted part otherwise, states whether the request was anonymous, and says that the record digest
+  covers the complete record.
+- A switch that is off removes its part (the threads, the files, the checklist wording, the git context), and with all
+  of them off the parts that are always included (the checklist outcomes, the sign-offs, the fingerprint, the file
+  count, the audit head, and the key statement) remain.
 
 #### Test Scenarios
 
@@ -110,3 +117,34 @@ none. This scenario is tested by `AttestationRenderer_Render_NoChecklist_SaysSo`
 
 **AttestationRenderer_Render_NullDocument_Throws**: A missing document is rendered. `ArgumentNullException` is raised.
 This scenario is tested by `AttestationRenderer_Render_NullDocument_Throws`.
+
+**AttestationRenderer_Render_DefaultSettings_ContentScopeSaysNothingIsLeftOut**: A document with the default settings is
+rendered. The Content scope section follows the review section, shows each switch, says that nothing is left out, and
+says that the record digest covers the complete record. This scenario is tested by
+`AttestationRenderer_Render_DefaultSettings_ContentScopeSaysNothingIsLeftOut`.
+
+**AttestationRenderer_Render_AnonymousRequest_ContentScopeSaysSo**: A document for a request without signing in is
+rendered. The Content scope section says that the request was made without signing in. This scenario is tested by
+`AttestationRenderer_Render_AnonymousRequest_ContentScopeSaysSo`.
+
+**AttestationRenderer_Render_ThreadsOff_OmitsThreadsAndSaysSo**: A document with the threads turned off is rendered. The
+thread section and the thread text are missing, and the Content scope section names the omission. This scenario is
+tested by `AttestationRenderer_Render_ThreadsOff_OmitsThreadsAndSaysSo`.
+
+**AttestationRenderer_Render_FilesOff_OmitsFileListButKeepsFingerprint**: A document with the files turned off is
+rendered. The list of files is missing, the Content scope section gives the number of files, and the content fingerprint
+is still printed. This scenario is tested by `AttestationRenderer_Render_FilesOff_OmitsFileListButKeepsFingerprint`.
+
+**AttestationRenderer_Render_ChecklistWordingOff_PrintsIdsOutcomesAndJustificationsOnly**: A document with the
+checklist wording turned off is rendered. The identifiers, outcomes, and justifications are printed, and the question
+text and the section title are not. This scenario is tested by
+`AttestationRenderer_Render_ChecklistWordingOff_PrintsIdsOutcomesAndJustificationsOnly`.
+
+**AttestationRenderer_Render_GitContextOff_OmitsRepositoryAndRevisions**: A review of a repository is rendered with the
+git context turned off. The repository and the revisions are missing, the fingerprint and the review set stay, and an
+uploaded review is not affected. This scenario is tested by
+`AttestationRenderer_Render_GitContextOff_OmitsRepositoryAndRevisions`.
+
+**AttestationRenderer_Render_EverythingOff_KeepsTheAlwaysIncludedParts**: A document with every switch off is rendered.
+The parts that are always included are still printed, and every omitted part is named in the Content scope section. This
+scenario is tested by `AttestationRenderer_Render_EverythingOff_KeepsTheAlwaysIncludedParts`.

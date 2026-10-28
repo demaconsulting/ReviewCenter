@@ -52,6 +52,7 @@ flowchart TD
     subgraph Core
         Fingerprint
         ProjectService
+        EvidenceSettingsService
         ReviewService
         ThreadService
         ChecklistService
@@ -111,6 +112,7 @@ flowchart TD
     ServerHost --> PasswordHasher
     ServerHost --> SignIn
     ServerHost --> ProjectService
+    ServerHost --> EvidenceSettingsService
     ServerHost --> ReviewService
     ServerHost --> ThreadService
     ServerHost --> ChecklistService

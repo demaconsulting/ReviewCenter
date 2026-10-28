@@ -43,7 +43,7 @@ public sealed record EvidenceSettingChange(string Key, bool Old, bool New);
 /// <param name="AnonymousIndex">Anyone may read the evidence index of the project without signing in.</param>
 /// <param name="AnonymousAttestations">Anyone may download the attestation PDFs of the project without signing in.</param>
 /// <param name="IncludeThreads">The PDF includes the review discussion threads and their comments.</param>
-/// <param name="IncludeReviewerNames">The PDF names the people (reviewers, answerers, commenters, the requester).</param>
+/// <param name="IncludeReviewerNames">The PDF names the people (reviewers, answerers, people who commented).</param>
 /// <param name="IncludeChecklistWording">The PDF includes the wording of the checklist questions and section titles.</param>
 /// <param name="IncludeFiles">The PDF includes the list of files with their hashes.</param>
 /// <param name="IncludeGitContext">The PDF includes the repository name and the baseline and head revisions.</param>

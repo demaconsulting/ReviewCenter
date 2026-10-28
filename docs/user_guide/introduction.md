@@ -153,6 +153,9 @@ The server provides these routes:
 - `/projects/{id}/members/account` - the form that creates a local account and adds it to the project (project and
   system administrators).
 - `/projects/{id}/audit` - the audit trail of the project (project and system administrators).
+- `/projects/{id}/evidence-settings` - the evidence settings of the project: anonymous access to the evidence index
+  and the attestation PDFs, and what the PDFs contain (project and system administrators); see
+  [Evidence Settings](#evidence-settings).
 - `/projects/{id}/repositories` - the git repositories of the project (project and system administrators).
 - `/projects/{id}/repositories/new` - the form that adds a repository to the project (project and system
   administrators).
@@ -163,12 +166,17 @@ The server provides these routes:
 - `/projects/{id}/reviews/{reviewId}/history` - the history of a review.
 - `/projects/{id}/reviews/{reviewId}/attestation.pdf` - the signed PDF attestation of an approved review; see
   [Signed Attestation](#signed-attestation).
+- `/api/...` - the JSON API; see [Automation and API Tokens](#automation-and-api-tokens). Two of its routes, the
+  evidence index and the attestation PDF of a project, can be opened to callers without a token by the evidence
+  settings of the project; every other route needs a token.
 - `/health` - a health check that answers with status 200 and the text `Healthy` while the server is running (open
   to everyone).
 
 Every page except `/`, `/login`, `/help`, `/about`, and `/health` needs a signed-in user; see
 [Users and Sign-in](#users-and-sign-in). A project, and everything below `/projects/{id}`, is visible only to its
-members and to system administrators; see [Access and Visibility](#access-and-visibility).
+members and to system administrators; see [Access and Visibility](#access-and-visibility). The only addresses that a
+project can open to visitors who are not signed in are the two API routes named above; see
+[Evidence Settings](#evidence-settings).
 
 ### The Page Frame
 
@@ -201,6 +209,8 @@ Each topic is a page of its own with links to the previous and the next topic:
 - **Planning reviews** (`/help/planning-reviews`): create the reviews of the review-sets of a repository in one go.
 - **Automation and API tokens** (`/help/api-tokens`): use a personal access token to read reviews and create drafts
   from a script, or to feed ReviewMark with the evidence index.
+- **Evidence settings** (`/help/evidence-settings`): open the evidence index and the PDFs to anonymous readers and
+  choose what the PDFs contain.
 
 The topics are summaries; this guide has the details. An address below `/help` that is not a topic shows a short
 message that the topic does not exist, with a link back to the index.
@@ -386,8 +396,8 @@ ReviewCenter controls access by project. There are three roles:
 
 - **System administrator**: a flag on a local user account. A system administrator creates projects, manages users and
   project membership, reads the audit trail, and can see and manage every project.
-- **Project administrator**: a member of one project who also manages the members and the git repositories of that
-  project.
+- **Project administrator**: a member of one project who also manages the members, the git repositories, and the
+  evidence settings of that project.
 - **Member**: a user who belongs to a project (a project member, role "Member" on the project page). A member works on
   the reviews of that project.
 
@@ -408,6 +418,7 @@ database accounts only.
 | Create projects                                      | no     | no            | yes          |
 | Manage users; read the audit page                    | no     | no            | yes          |
 | Read the audit trail of the project                  | no     | yes           | yes          |
+| Change evidence settings of a project                | no     | yes           | yes          |
 
 **Hidden means missing.** A project you cannot see looks exactly like a project that does not exist. The project
 pages say "Project N does not exist.", and the API and the PDF routes answer **404**, never 403, so a refused request
@@ -424,8 +435,10 @@ reviews only in the projects the owner can see, and the API lists only those pro
 [Automation and API Tokens](#automation-and-api-tokens)). A token never signs, so a token user can never sign a
 review.
 
-**Evidence.** The signed attestation PDF of a review and the evidence index of a project are visible only to project
-members and system administrators.
+**Evidence.** By default the signed attestation PDF of a review and the evidence index of a project are visible only to
+project members and system administrators. A project administrator or a system administrator can open the evidence
+index, the attestation PDFs, or both of one project to readers who are not signed in; see
+[Evidence Settings](#evidence-settings). Nothing else becomes visible to them.
 
 This release lets a project administrator manage the members of that project (see
 [Managing Project Members](#managing-project-members)); a system administrator manages the members of every project.
@@ -857,7 +870,22 @@ refused with the message "The review is not complete" (status 409). If the revie
 prepared (for example a reviewer changes an answer), nothing is signed or recorded and the request is also refused
 with status 409 ("The review changed while the attestation was being prepared; try again."); press the button again.
 Every download is recorded in the audit trail as `attestation.generated`. Only members of the project and system
-administrators can download the PDF; for anyone else the address answers 404, as for a project that does not exist.
+administrators can download the PDF; for anyone else the address answers 404, as for a project that does not exist. The
+one exception is the API route of the PDF in a project whose administrators turned on **Anonymous attestation PDFs**
+(see [Evidence Settings](#evidence-settings)): anyone can then download it without signing in, and the download is
+recorded as `attestation.generated` by `anonymous`.
+
+**What the PDF contains follows the evidence settings of the project.** Every attestation PDF of a project, whoever
+downloads it, honors the five content switches of the project: the review discussion threads, the reviewer names, the
+checklist wording, the file list with hashes, and the git context. A section that a switch turns off is left out, and
+the names are replaced by neutral labels such as *Reviewer 1 (primary)* and *Participant 1*. A PDF **always** has a
+**Content scope** section, right after the review section, that states which sections were left out and the settings
+that were in effect when the PDF was made, so a reader always knows what the PDF does not show. These parts are always
+included, whatever the settings: the review and project identifiers, the content fingerprint, the checklist outcomes,
+the sign-offs, the record digest, and the note about the signing key. The record digest always covers the full record,
+including what was left out of the PDF, and the digital signature is made after the content is chosen, so it is valid
+for the reduced PDF too. Names that someone typed into a comment or another free-text field are not removed. Leaving
+content out can make the document unsuitable for your regulatory regime; see [Evidence Settings](#evidence-settings).
 
 ### What a Verifier Sees
 
@@ -943,6 +971,95 @@ signing key unavailable"). A signed-out request to the address is sent to the si
 - Signing with a key in Azure Key Vault and with an RFC 3161 time stamp authority are planned, not implemented.
 - The server does not check the trust chain or the revocation of the certificate; the reader does.
 - The PDF uses the standard PDF fonts (Windows-1252 characters), so any other character is shown as a question mark.
+- What the PDF contains follows the evidence settings of the project (see
+  [Evidence Settings](#evidence-settings)); a PDF made with content switches off is a reduced document, and its
+  **Content scope** section says so.
+
+## Evidence Settings
+
+**Where you are.** The **Evidence settings** page of one project, at `/projects/{id}/evidence-settings`. Open it with
+the **Evidence settings** button on the project page. The button is shown, and the page opens, only for a project
+administrator of the project and for a system administrator. Everybody else sees the button missing, and the address
+answers as a project that does not exist.
+
+**What you can do.** Choose who may read the evidence of the project without signing in, and what its attestation PDFs
+contain. All choices are saved together with the one **Save settings** button; **Back to project** leaves the page
+without saving. The warnings and the summary notice at the top follow your choices at once, before you save.
+
+### Anonymous Access
+
+Both switches are **off by default**, so by default everything needs a sign-in or a personal access token. They are
+independent of each other.
+
+| Switch                         | When on, anyone who can reach the server can...                       |
+| ------------------------------ | --------------------------------------------------------------------- |
+| **Anonymous evidence index**   | read `/api/projects/{id}/evidence/index.json`                         |
+| **Anonymous attestation PDFs** | download `/api/projects/{id}/reviews/{reviewId}/attestation.pdf`      |
+
+Both work without signing in.
+
+- The evidence index alone is useless to ReviewMark unless anonymous attestation PDFs are on too, or the client has
+  credentials: ReviewMark needs the PDFs that the index points to.
+- Only these two `GET` routes can ever be anonymous. Every other route under `/api` needs a token, and no web page is
+  open to visitors who are not signed in.
+- A request that sends no `Authorization` header is anonymous. A request with a wrong or expired token is refused, not
+  treated as anonymous.
+- With a switch off, the route behaves as before: a request without a token is answered 401, and a signed-in caller who
+  is not a member of the project is answered 404. A project that does not exist and a project with the switch off are
+  answered alike, so nothing tells a stranger which projects exist.
+- Answers have `Cache-Control: no-store`.
+- Requests without a token are limited to 30 a minute for each client address, and a caller over the limit is answered
+  429 with a `Retry-After` header. Behind a reverse proxy the proxy settings described in Secure Cookie Behind a Reverse
+  Proxy are needed, or all clients share one address and one limit.
+- An anonymous download is recorded in the audit trail as `attestation.generated` with the actor `anonymous`.
+
+**Exposure warning.** While an anonymous switch is on, the page shows a warning that anyone who can reach the server can
+read what you opened. It is stronger when the PDFs still contain review discussion threads or reviewer names: anonymous
+readers then see the comments and the names of your people. Turn those content switches off, or keep the switches off,
+if that is not acceptable.
+
+### What the PDFs Contain
+
+Five content switches apply to **every** attestation PDF of the project, for signed-in and anonymous readers alike.
+All are **on by default**, so a PDF is complete unless a project administrator reduces it.
+
+| Switch                        | When off, the PDF...                                                      |
+| ----------------------------- | ------------------------------------------------------------------------- |
+| **Review discussion threads** | leaves out the comment threads                                            |
+| **Reviewer names**            | shows neutral labels (*Reviewer 1 (primary)*, *Participant 1*) for people |
+| **Checklist wording**         | shows the checklist outcomes only, without questions and section titles   |
+| **File list and hashes**      | leaves out the files and their hashes (the fingerprint still covers them) |
+| **Git context**               | leaves out the repository and the baseline and head revisions             |
+
+Always included, whatever the settings: the review and project identifiers, the content fingerprint, the checklist
+outcomes, the sign-offs and signatures, the record digest, and the note about the signing key. Names that somebody
+typed into a comment or another free-text field are not removed; only the name fields of the PDF are.
+
+**Regulatory warnings.** Under every content switch that is off, the page shows a warning that is specific to it, for
+example "Omitting reviewer names may not satisfy your regulatory regime. Confirm with your quality or compliance lead."
+When anything is left out, a summary notice at the top of the page lists everything that is left out of the PDFs. ReviewCenter
+cannot know your regulatory regime; the decision to reduce a PDF is yours.
+
+**Content scope.** Every attestation PDF has a **Content scope** section, also when nothing is left out. It states
+whether the request was anonymous, the state of each switch (*Included* or *Omitted*), and which parts were left out of
+the document. It also says that the record digest covers the complete record, including what the PDF leaves out.
+
+### Saving, Conflicts, and the Audit Event
+
+**What happened.** After **Save settings** the page says "Evidence settings saved." When you changed nothing, it says
+"Nothing to save: the settings are unchanged." and records nothing.
+
+- If somebody else changed the settings while your page was open, nothing is saved: the page shows a message and the
+  current settings, and you decide again.
+- If you lose the right to administer the project while the page is open, nothing is saved and the page closes as a
+  project that does not exist.
+- Every change is recorded in the audit trail as `project.evidence-settings-changed` with the project. The detail lists
+  each setting that changed, with the old and the new state (for example
+  `AnonymousAttestations off->on; IncludeReviewerNames on->off`). The entries are on the audit page of the project,
+  `/projects/{id}/audit` (see [The Audit Trail of a Project](#the-audit-trail-of-a-project-project-administrators)).
+
+Changing a setting does not change reviews, signatures, or the record digest. It changes what the next PDF contains and
+who can read the index and the PDFs.
 
 ## Automation and API Tokens
 
@@ -995,12 +1112,19 @@ status, and for a request that is not valid a list of the fields at fault.
 | GET    | `/api/projects/{p}/reviews`                     | List the reviews of project `{p}`                |
 | GET    | `/api/projects/{p}/reviews/{r}`                 | One review: slots, approval, progress, next step |
 | POST   | `/api/projects/{p}/reviews`                     | Create a draft review (201 with the review)      |
-| GET    | `/api/projects/{p}/reviews/{r}/attestation.pdf` | The signed attestation PDF of an approved review |
-| GET    | `/api/projects/{p}/evidence/index.json`         | The evidence index of project `{p}` (ReviewMark) |
+| GET    | `/api/projects/{p}/reviews/{r}/attestation.pdf` | Signed attestation PDF (token or anonymous)      |
+| GET    | `/api/projects/{p}/evidence/index.json`         | Evidence index (token or anonymous)              |
 | GET    | `/api/openapi.json`                             | The OpenAPI document; open, no token needed      |
 
 In the addresses `{p}` is the project number and `{r}` the review identifier. A project that the token's owner cannot
 see is answered 404, as if it did not exist, never 403.
+
+Two routes are an exception to the rule that every route needs a token: the evidence index and the attestation PDF.
+A project administrator can open each of them to callers without a token in the evidence settings of the project (see
+[Evidence Settings](#evidence-settings)). Both are off by default, and then a request without a token is answered 401 as
+for every other route. When one is on, a request that sends no `Authorization` header is answered for that project, with
+`Cache-Control: no-store`, and at most 30 such requests a minute are accepted from one client address (more are answered
+429).
 
 The OpenAPI document describes every endpoint, the request and answer shapes, and the bearer and Basic schemes, so a
 client can be generated from it. A snapshot of it is kept in the repository as `docs/api/openapi.json`.
@@ -1027,6 +1151,14 @@ the two variables as HTTP Basic credentials, and only when both are set and not 
 text (it is ignored) and keep the token in the password. Use a token of a user who can read the project; it is read-only
 in this use.
 
+**Anonymous option.** A project administrator can instead let ReviewMark read the evidence without any credentials.
+The evidence settings of the project (see [Evidence Settings](#evidence-settings)) have two independent switches,
+**Anonymous evidence index** and **Anonymous attestation PDFs**, both off by default. ReviewMark reads the index, and
+the PDFs that the index names are the evidence, so the index alone is useless to ReviewMark unless anonymous
+attestation PDFs are on too, or the client has credentials. For a pipeline without credentials turn both on and leave
+out the `credentials` of the `evidence-source`. Think first about who can reach the server: both switches open the
+data to everyone who can, and the PDFs follow the content switches of the project.
+
 The answer is a JSON object with a `reviews` list. Each entry has:
 
 - `id`: the identifier of the review-set that the review was planned from;
@@ -1050,8 +1182,8 @@ Limits to know about:
 - There are no `fail` entries. A review with a failed answer cannot be completed, so it is simply missing.
 - A review made from the **changes since a baseline** holds only the changed files, so its fingerprint is not the one
   ReviewMark computes for the whole review-set, and ReviewMark reports it as stale.
-- ReviewMark only prints the `file` address. Following it needs a token (it is an API address) and records an
-  `attestation.generated` event in the audit trail.
+- ReviewMark only prints the `file` address. Following it needs a token (it is an API address) unless the project allows
+  anonymous attestation PDFs, and records an `attestation.generated` event in the audit trail.
 - The host of `file` is the `Host` of the request. Behind a reverse proxy, the proxy must keep the `Host` header,
   and `ASPNETCORE_FORWARDEDHEADERS_ENABLED=true` must be set so that the scheme is `https` (see Secure Cookie Behind a
   Reverse Proxy).
@@ -1130,8 +1262,9 @@ the number of entries and the **head hash**, or the first entry at which the cha
 ### The Audit Trail of a Project (Project Administrators)
 
 A project administrator (and a system administrator) sees an **Audit trail** button on the project page. It opens
-`/projects/{id}/audit`, a read-only list of the entries recorded for that project only: its reviews, members, and
-account creations, and nothing of other projects, sign-ins, or user administration. The list is newest first, 50 at a
+`/projects/{id}/audit`, a read-only list of the entries recorded for that project only: its reviews, members, evidence
+settings, and account creations, and nothing of other projects, sign-ins, or user administration. The list is newest
+first, 50 at a
 time, with **Older** and **Newer** buttons. It has no **Verify chain** button; verification covers the whole trail
 and stays with the system administrator. Ordinary members do not get the button, and the page looks like a missing
 project to them.
@@ -1184,6 +1317,7 @@ head hash is a manual step, and it is most useful after important events such as
 | Auditing  | `audit.events-suppressed` (events of new keys were not recorded; the table was full) |
 | Signing   | `signature.reauth-failed` (a wrong password when a signature was entered)            |
 | Evidence  | `attestation.generated` (a signed attestation PDF was downloaded)                    |
+| Evidence  | `project.evidence-settings-changed` (the evidence settings of a project were saved)  |
 | Tokens    | `token.created`, `token.revoked`                                                     |
 | Tokens    | `token.use-failed`, `token.use-throttled` (a refused or throttled use of a token)    |
 
@@ -1244,14 +1378,19 @@ release: the tables are created only when the database is new. **A database file
 user accounts, reviewer signatures, or the audit trail existed, does not have the tables and columns that are
 needed, and the pages cannot work with it: delete the file (or point `Database:ConnectionString` at a new one) and
 start again, then create the first system administrator.** Do this only with development data. The repository registry and
-the reviews from a repository add tables and columns, and the record digest of a review from a repository is calculated
-in a new format (version 4) that includes the review-set and the side of every line comment, so a development
+the reviews from a repository add tables and columns, and the record digest of a review is calculated in the
+format `ReviewCenter record v1` that includes the review-set and the side of every line comment, so a development
 database created before them must be recreated in the same way. The personal access tokens add a table, and every
 review has new columns that tell who created it and whether it was created with an API token, so a development database
 created before them must be recreated as well. Project-based access control adds the project memberships, replaces the
 role of a user with a system administrator flag, and ties every repository to one project, so a development database
 created before it must be recreated too. Project member management adds the must-change-password flag of a user
-(`Users.MustChangePassword`), so a development database created before it must be recreated as well.
+(`Users.MustChangePassword`), so a development database created before it must be recreated as well. The evidence
+settings add seven columns to the projects (`EvidenceAnonymousIndex`, `EvidenceAnonymousAttestations`,
+`EvidenceIncludeThreads`, `EvidenceIncludeReviewerNames`, `EvidenceIncludeChecklistWording`, `EvidenceIncludeFiles`,
+and `EvidenceIncludeGitContext`), and the record digest is now labeled `ReviewCenter record v1`, a format private to
+ReviewCenter that also covers the wording of the checklist questions and who answered them. There is no migration:
+recreate development databases created before them.
 
 ## Repositories and Credentials
 

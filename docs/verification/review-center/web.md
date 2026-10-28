@@ -73,6 +73,11 @@ N/A - standard test environment (temporary SQLite databases are created by the t
   a live connection, so it is verified at unit level by the component tests of `ProjectPage`, `AuditPage`,
   `AccountPage`, `LoginPage`, `App`, and `HelpPage` (see the children of the requirements
   `ReviewCenter-Web-ProjectAccess`, `ReviewCenter-Web-SignIn`, and `ReviewCenter-Web-AuditPage` in `web.yaml`).
+- The evidence settings page (who gets it, the switches and their defaults, the warnings, the save with its audit
+  entry, a change by someone else, and a lost right) and the help topic on the evidence settings need a live connection,
+  so they are verified at unit level by the component tests of `ProjectPage` (`EvidenceSettingsPageTests.cs`) and
+  `HelpPage` (see the children of the requirement `ReviewCenter-Web-EvidenceSettings` in `web.yaml`). What the stored
+  settings do to the API and the PDFs is verified in the `Api` and `Evidence` subsystems.
 
 ### Test Scenarios
 
@@ -250,6 +255,16 @@ revocation are verified by the `AccountPage` unit tests, which render the page w
 `AccountPage_RevokeToken_ActiveToken_MarksRevokedAndRemovesButton` trace the subsystem requirement, and the help topic is
 verified by `HelpApiTokensPage_Render_ExplainsTokensCurlEndpointsAndErrors`. The end-to-end journey from the card
 to a call of the API is verified in the `Api` subsystem.
+
+**Evidence settings page and help**: The page, its defaults, warnings, save, audit entry, conflict, and lost right are
+verified by the `EvidenceSettingsPageTests` unit tests, which render the page with the component test host and the real
+`EvidenceSettingsService` over a fake store: `EvidenceSettingsPage_Render_Administrator_ShowsDefaultsWithoutWarnings`,
+`EvidenceSettingsPage_Render_NoAdministerRight_ShowsNotFoundAndNoSwitches`, and
+`EvidenceSettingsPage_Save_Change_StoresConfirmsAndAudits` trace the subsystem requirement, and the help topic is
+verified by `HelpEvidenceSettingsPage_Render_ExplainsAnonymousAccessContentSwitchesAndScope`. The button on the project
+page is verified by `ProjectPage_Render_ProjectAdmin_ShowsMembersAndButtons` and
+`ProjectPage_Render_PlainMember_ShowsNoMembersAndNoAuditLink`. The effect of the settings on the API and the PDFs is
+verified in the `Api` and `Evidence` subsystems.
 
 **Temporary password**: A user who signed in with a temporary password is confined to the account page. The layout
 shows no navigation tabs and sends the browser to `/account` from every page except the account, help, and about pages,

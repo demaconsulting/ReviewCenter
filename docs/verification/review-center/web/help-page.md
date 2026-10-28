@@ -35,6 +35,11 @@ N/A - standard test environment.
 - The Project members topic describes the + Add member button and the exact user name, the temporary password that is
   shown once, the rule of the last project admin, the marker for a person who is no longer a member, and the Audit trail
   button, and is in the list of topics at `/help/project-members`.
+- The Evidence settings topic has the heading "Evidence settings", shows its two screenshots from `/help/` with
+  alternative text, and describes who can change the settings (a project admin or a system administrator), the two
+  anonymous switches (independent, with the use for ReviewMark), the warning to think before turning them on, the five
+  content switches, the regulatory warning, the Content scope section, and the audit trail, and contains no link that
+  begins with `#`.
 
 #### Test Scenarios
 
@@ -80,3 +85,13 @@ names the + Add member button and the exact user name, says that a temporary pas
 project admin cannot be removed, that a person who left shows "No longer a project member", and names the Audit trail
 button, and the list of topics holds the address `/help/project-members`. This scenario is tested by
 `HelpMembersPage_Render_ExplainsAddingAccountsAndTheLastAdminRule`.
+
+**HelpEvidenceSettingsPage_Render_ExplainsAnonymousAccessContentSwitchesAndScope**: The Evidence settings page is
+rendered; the heading is "Evidence settings", the two screenshots `/help/evidence-settings-1.png` and
+`/help/evidence-settings-2.png` are shown in this order, each with alternative text, and the text names the project
+admin and the system administrator, the switches Anonymous evidence index and Anonymous attestation PDFs, says that they
+are independent, names ReviewMark, and contains "Think before you turn them on". It names the five content switches
+by their titles, mentions the regulatory warning, the Content scope section, and the audit trail, and no link begins
+with `#`. This scenario is tested by `HelpEvidenceSettingsPage_Render_ExplainsAnonymousAccessContentSwitchesAndScope`.
+The list of topics holds the topic at `/help/evidence-settings`, which
+`HelpTopicPages_Render_EveryTopicHasAPageWithValidNavigation` checks.

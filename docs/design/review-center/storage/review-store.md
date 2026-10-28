@@ -20,7 +20,7 @@ commits (see the `AuditStore` unit).
 #### Key Methods
 
 **Audit transaction of every change**: `AddProjectAsync`, `AddMembershipAsync`, `RemoveMembershipAsync`,
-`SetMembershipRoleAsync`, `AddReviewAsync`, `AddThreadAsync`, `AddCommentAsync`,
+`SetMembershipRoleAsync`, `UpdateEvidenceSettingsAsync`, `AddReviewAsync`, `AddThreadAsync`, `AddCommentAsync`,
 `SetThreadStateAsync`, `SetChecklistSectionStateAsync`, `SetChecklistAnswerAsync`, `AddSlotAsync`, `UpdateSlotAsync`,
 `RemoveSlotAsync`, and `AddSignatureAsync` take the audit draft of the change (or a function that builds it from the
 stored entity, when the draft names an identity that the database assigns). The change and its audit entry are
@@ -31,12 +31,30 @@ are of the change itself.
 
 **AddProjectAsync**: Stores a project and returns it with the identity assigned by the database. The unit copies the
 name, description, and creation time into a new entity, so an identity supplied by the caller is ignored and can
-neither be persisted nor collide with an existing project; the returned project is the stored entity.
+neither be persisted nor collide with an existing project; the returned project is the stored entity. The evidence
+settings of the project are copied too, and a project that was not given others has the defaults
+(`EvidenceSettings.Default`).
 
-**GetProjectAsync**: Reads one project by identity; null when absent.
+**GetProjectAsync**: Reads one project by identity, with its evidence settings; null when absent.
 
-**ListProjectsAsync**: Lists all projects ordered by name and then identity. SQLite cannot order by a
-`DateTimeOffset`, so the creation time is not used for ordering.
+**ListProjectsAsync**: Lists all projects ordered by name and then identity, with their evidence settings. SQLite cannot
+order by a `DateTimeOffset`, so the creation time is not used for ordering.
+
+**UpdateEvidenceSettingsAsync**: Changes the seven evidence settings of one project if they still hold the values the
+caller started from (compare-and-set).
+
+- *Parameters*: the project identity, the `expected` settings, the `updated` settings, and the audit draft of the change.
+- *Returns*: `Task<bool>` — `true` when the settings were changed; `false` when the project does not exist or its
+  settings are no longer `expected`.
+- *Preconditions*: `expected`, `updated`, and the audit draft are not null (`ArgumentNullException` otherwise).
+- *Postconditions*: Either the new settings and the audit entry (`project.evidence-settings-changed`, carrying the
+  project) are stored in the same serialized transaction, or nothing is.
+
+The comparison is part of one update statement, `UPDATE ... WHERE Id = projectId AND` every one of the seven columns
+equals the expected value, so the check and the change are one atomic step and two administrators who save at the same
+time cannot both succeed: the second finds no matching row and gets `false`, with no change and no entry. Only the
+columns of that project are written. The service turns the `false` of a project that was changed meanwhile into
+`RecordChanged`; a project that does not exist is refused earlier by the access check.
 
 **ReviewExistsAsync**: Reports whether a review with the identifier exists in a project.
 
@@ -187,7 +205,8 @@ refusal to delete a signed slot. Null arguments raise `ArgumentNullException`.
 
 #### Callers
 
-- **ProjectService**, **ReviewService**, **ThreadService**, **ChecklistService**, **SigningService**, and
+- **EvidenceSettingsService**, **ProjectService**, **ReviewService**, **ThreadService**, **ChecklistService**,
+  **SigningService**, and
   **ProjectAccess** — through the
   Core interface.
 - **ServerHost** — registers the store as the implementation of the Core interface.
