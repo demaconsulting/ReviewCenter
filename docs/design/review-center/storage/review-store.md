@@ -53,8 +53,9 @@ caller started from (compare-and-set).
 The comparison is part of one update statement, `UPDATE ... WHERE Id = projectId AND` every one of the seven columns
 equals the expected value, so the check and the change are one atomic step and two administrators who save at the same
 time cannot both succeed: the second finds no matching row and gets `false`, with no change and no entry. Only the
-columns of that project are written. The service turns the `false` of a project that was changed meanwhile into
-`RecordChanged`; a project that does not exist is refused earlier by the access check.
+columns of that project are written. The store also returns `false` when no project has the identity (no row
+matches). The service turns the `false` of a project that was changed meanwhile into `RecordChanged`; a project that
+does not exist is refused earlier by the access check with `ProjectNotFound` and never reaches the store.
 
 **ReviewExistsAsync**: Reports whether a review with the identifier exists in a project.
 

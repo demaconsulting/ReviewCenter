@@ -122,8 +122,9 @@ used by the `Web`, `Identity`, and `Api` subsystems and by the `Hosting` subsyst
   `RecordChanged` otherwise. A user is a member of a project at most once: adding a second membership fails with a
   `DomainRuleException` for `MembershipExists`, and a change or removal of a membership that does not exist returns
   `false`, which the service reports as `MembershipNotFound`. A change of the evidence settings whose expected settings
-  are no longer stored, or of a project that does not exist, returns `false` and stores nothing, which the service
-  reports as `RecordChanged`.
+  are no longer stored, or of a project that does not exist, returns `false` and stores nothing. The
+  `EvidenceSettingsService` refuses an unknown project with `ProjectNotFound` before it calls the store, so for it the
+  `false` means that the expected settings were changed meanwhile, and it reports that as `RecordChanged`.
 
 **IUserStore**: The store interface the subsystem requires for users.
 

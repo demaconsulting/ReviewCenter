@@ -78,8 +78,9 @@ it for a decision about access applies the rules of its own kind of request.
 The service first compares `updated` with `expected` (`ChangesFrom`). With no difference it returns `false` without
 touching the store and records nothing, so a save that changes nothing leaves no entry. Otherwise it builds the audit
 draft and calls `UpdateEvidenceSettingsAsync`, whose compare-and-set is atomic with the update; when the store reports
-`false` the service raises `RecordChanged` with `ChangedByOthersMessage`. A caller reports that rule as a conflict (the
-API as HTTP 409) and shows the current settings.
+`false` the service raises `RecordChanged` with `ChangedByOthersMessage`. An unknown project never reaches the store:
+the access check before it already raised `ProjectNotFound`, so the store's `false` means a stale `expected`. A caller
+reports that rule as a conflict (the API as HTTP 409) and shows the current settings.
 
 **Audit**: The change is recorded as the single event `project.evidence-settings-changed`, built from the actor, the
 project identity (the entry carries the project and no review), and the detail, which lists each changed key with its
