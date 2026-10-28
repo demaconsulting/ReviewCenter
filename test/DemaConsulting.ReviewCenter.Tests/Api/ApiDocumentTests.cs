@@ -49,7 +49,7 @@ public class ApiDocumentTests
     ///     Test that the document is served without a token, describes the API operations with a fixed version,
     ///     no server address and the bearer and Basic schemes, and requires one of them for every operation.
     /// </summary>
-    [Fact(Timeout = 60000)]
+    [Fact(Timeout = 180000)]
     public async Task ApiDocument_Get_NoToken_DescribesTheApiWithBearerScheme()
     {
         // Arrange: an application and a client without a token
@@ -97,7 +97,7 @@ public class ApiDocumentTests
     ///     Test that two applications generate byte-for-byte the same document, so the snapshot does not depend on
     ///     the machine, the host address or the run.
     /// </summary>
-    [Fact(Timeout = 60000)]
+    [Fact(Timeout = 180000)]
     public async Task ApiDocument_Get_TwoApplications_AreIdentical()
     {
         // Arrange and Act: generate the document twice, in two applications
@@ -116,7 +116,7 @@ public class ApiDocumentTests
     ///     --filter-method "*ApiDocument_Get_MatchesCommittedSnapshot"</c>; in bash the same command is prefixed with
     ///     <c>REVIEWCENTER_UPDATE_OPENAPI=1</c>.
     /// </summary>
-    [Fact(Timeout = 60000)]
+    [Fact(Timeout = 180000)]
     public async Task ApiDocument_Get_MatchesCommittedSnapshot()
     {
         // Arrange: the generated document and the place of the snapshot

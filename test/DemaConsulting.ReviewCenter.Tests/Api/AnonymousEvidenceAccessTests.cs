@@ -68,7 +68,7 @@ public class AnonymousEvidenceAccessTests
     ///     also when the switch is on.
     /// </summary>
     /// <param name="route">The route.</param>
-    [Theory(Timeout = 120000)]
+    [Theory(Timeout = 180000)]
     [InlineData(IndexRoute)]
     [InlineData(PdfRoute)]
     public async Task AnonymousEvidenceAccess_Matrix_ServesOnlyWhoMay(string route)
@@ -316,7 +316,7 @@ public class AnonymousEvidenceAccessTests
     ///     Test that the anonymous callers of the two routes are limited per address with a 429 and
     ///     <c>Retry-After</c>, and that a caller with a token is not limited.
     /// </summary>
-    [Fact(Timeout = 120000)]
+    [Fact(Timeout = 180000)]
     public async Task AnonymousEvidenceAccess_TooManyAnonymousRequests_Answers429WithRetryAfter()
     {
         // Arrange

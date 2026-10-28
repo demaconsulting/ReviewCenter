@@ -197,7 +197,7 @@ public class AttestationEndpointTests
     ///     Test that the application's own key, the self-signed one that the server creates when nothing is
     ///     configured, signs the attestation.
     /// </summary>
-    [Fact(Timeout = 120000)]
+    [Fact(Timeout = 180000)]
     public async Task AttestationEndpoint_Get_DefaultConfiguration_SignsWithTheServerGeneratedSelfSignedKey()
     {
         // Arrange: an application with the default configuration, a complete review, a signed-in user

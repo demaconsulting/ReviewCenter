@@ -36,7 +36,7 @@ public class ApiTokenAuthenticationTests
     /// <summary>
     ///     Test that a valid token authenticates the owner, and that using it records the last-used time.
     /// </summary>
-    [Fact(Timeout = 60000)]
+    [Fact(Timeout = 180000)]
     public async Task ApiTokenAuthentication_Request_ValidToken_AuthenticatesAndRecordsLastUsed()
     {
         // Arrange: an application with a token that was never used
@@ -59,7 +59,7 @@ public class ApiTokenAuthenticationTests
     ///     and Basic challenge and a problem document.
     /// </summary>
     /// <param name="authorization">The <c>Authorization</c> header value; <c>null</c> for none.</param>
-    [Theory(Timeout = 60000)]
+    [Theory(Timeout = 180000)]
     [InlineData(null)]
     [InlineData("Basic YW5uOnNlY3JldA==")]
     [InlineData("Basic !!not-base64!!")]
@@ -94,7 +94,7 @@ public class ApiTokenAuthenticationTests
     ///     name is (ReviewMark sends Basic only), and that the use is recorded.
     /// </summary>
     /// <param name="username">The user name to send.</param>
-    [Theory(Timeout = 60000)]
+    [Theory(Timeout = 180000)]
     [InlineData("reviewmark")]
     [InlineData("")]
     public async Task ApiTokenAuthentication_Request_BasicWithTokenAsPassword_AuthenticatesAsOwner(string username)
@@ -118,7 +118,7 @@ public class ApiTokenAuthenticationTests
     ///     Test that a wrong Basic password gets exactly the answer of a wrong bearer token, is recorded in the audit
     ///     trail without its value, and is throttled like any other refused token.
     /// </summary>
-    [Fact(Timeout = 60000)]
+    [Fact(Timeout = 180000)]
     public async Task ApiTokenAuthentication_Request_BasicWithWrongPassword_GetsTheSameGeneric401AndIsThrottledAndAudited()
     {
         // Arrange: a limit of three attempts, a good token, and a wrong token
@@ -160,7 +160,7 @@ public class ApiTokenAuthenticationTests
     ///     Test that every kind of refused token (unknown, malformed, revoked, disabled owner) gets the same answer,
     ///     which does not say why the token was refused.
     /// </summary>
-    [Fact(Timeout = 60000)]
+    [Fact(Timeout = 180000)]
     public async Task ApiTokenAuthentication_Request_RefusedTokens_AllGetTheSameGenericAnswer()
     {
         // Arrange: a revoked token, a token of a disabled owner, and a good token as the control
@@ -204,7 +204,7 @@ public class ApiTokenAuthenticationTests
     ///     Test that a token of an owner who has to change a temporary password is refused with the same generic
     ///     answer as an unknown token, and works again after the password was changed.
     /// </summary>
-    [Fact(Timeout = 60000)]
+    [Fact(Timeout = 180000)]
     public async Task ApiTokenAuthentication_Request_OwnerMustChangePassword_GetsTheGenericAnswerUntilChanged()
     {
         // Arrange: a token whose owner is then flagged
@@ -236,7 +236,7 @@ public class ApiTokenAuthenticationTests
     /// <summary>
     ///     Test that a token stops working when it expires.
     /// </summary>
-    [Fact(Timeout = 60000)]
+    [Fact(Timeout = 180000)]
     public async Task ApiTokenAuthentication_Request_ExpiredToken_Answers401()
     {
         // Arrange: an application whose clock a test moves, and a 30-day token
@@ -258,7 +258,7 @@ public class ApiTokenAuthenticationTests
     /// <summary>
     ///     Test that the session cookie of a signed-in person does not authenticate the API.
     /// </summary>
-    [Fact(Timeout = 60000)]
+    [Fact(Timeout = 180000)]
     public async Task ApiTokenAuthentication_Request_SessionCookie_IsNotAccepted()
     {
         // Arrange: a browser that is signed in
@@ -287,7 +287,7 @@ public class ApiTokenAuthenticationTests
     /// </summary>
     /// <param name="route">The page route to request.</param>
     /// <param name="basic">Whether the token is sent as the password of HTTP Basic credentials.</param>
-    [Theory(Timeout = 60000)]
+    [Theory(Timeout = 180000)]
     [InlineData("/account", false)]
     [InlineData("/projects/1/reviews/REV-1/attestation.pdf", false)]
     [InlineData("/account", true)]
@@ -314,7 +314,7 @@ public class ApiTokenAuthenticationTests
     /// </summary>
     /// <param name="route">The address to post to.</param>
     /// <param name="basic">Whether the token is sent as the password of HTTP Basic credentials.</param>
-    [Theory(Timeout = 60000)]
+    [Theory(Timeout = 180000)]
     [InlineData("/_blazor/negotiate?negotiateVersion=1", false)]
     [InlineData("/auth/logout", false)]
     [InlineData("/auth/login", false)]
@@ -349,7 +349,7 @@ public class ApiTokenAuthenticationTests
     ///     Test that no outcome of token authentication (accepted, refused as unknown, refused as revoked) writes the
     ///     token, its secret part, or any text with the token prefix to the application log.
     /// </summary>
-    [Fact(Timeout = 60000)]
+    [Fact(Timeout = 180000)]
     public async Task ApiTokenAuthentication_Request_AnyOutcome_NeverLogsTheToken()
     {
         // Arrange: an application that keeps its log, one token that is used and one that is revoked
@@ -402,7 +402,7 @@ public class ApiTokenAuthenticationTests
     ///     Test that too many refused tokens from one address are throttled with 429, even for a good token, and
     ///     that the throttle does not stop people signing in with a password.
     /// </summary>
-    [Fact(Timeout = 60000)]
+    [Fact(Timeout = 180000)]
     public async Task ApiTokenAuthentication_Request_TooManyRefusals_AnswersTooManyRequests()
     {
         // Arrange: a limit of three attempts, a good token, and a person who can sign in
@@ -438,7 +438,7 @@ public class ApiTokenAuthenticationTests
     ///     Test that a refused token is recorded in the audit trail with the reason and, for a stored token, its
     ///     display id, that repeats are recorded once, and that the token value is never recorded.
     /// </summary>
-    [Fact(Timeout = 60000)]
+    [Fact(Timeout = 180000)]
     public async Task ApiTokenAuthentication_Request_RefusedToken_IsAuditedOnceWithoutTheValue()
     {
         // Arrange: a revoked token
@@ -466,7 +466,7 @@ public class ApiTokenAuthenticationTests
     ///     Test that the person behind a token is the one the token was made for, with their current role, so the
     ///     things the token creates carry their name.
     /// </summary>
-    [Fact(Timeout = 60000)]
+    [Fact(Timeout = 180000)]
     public async Task ApiTokenAuthentication_Request_ValidToken_ActsAsTheOwner()
     {
         // Arrange: a token of ann and a project

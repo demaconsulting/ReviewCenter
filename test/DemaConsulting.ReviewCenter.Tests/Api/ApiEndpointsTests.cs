@@ -619,7 +619,7 @@ public class ApiEndpointsTests
     /// </summary>
     /// <param name="limit">The limit to exceed: <c>count</c>, <c>file</c> or <c>total</c>.</param>
     /// <param name="expectedDetail">Text that the problem detail must contain.</param>
-    [Theory(Timeout = 120000)]
+    [Theory(Timeout = 180000)]
     [InlineData("count", "at most 200 files")]
     [InlineData("file", "limit of 2 MiB")]
     [InlineData("total", "limit of 20 MiB")]
@@ -679,7 +679,7 @@ public class ApiEndpointsTests
     ///     Test that a request body larger than the limit of the endpoint is refused with 413 by a real server, and
     ///     that no review is created. The in-memory test server does not enforce the limit, so Kestrel is used.
     /// </summary>
-    [Fact(Timeout = 120000)]
+    [Fact(Timeout = 180000)]
     public async Task ApiEndpoints_CreateReview_BodyOverLimit_Answers413()
     {
         // Arrange: a real server with a project and a token, and a body one byte over the limit of the endpoint

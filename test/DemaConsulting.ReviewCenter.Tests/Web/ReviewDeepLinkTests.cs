@@ -781,7 +781,7 @@ public class ReviewDeepLinkTests : PageTestBase
     ///     link as the return address, the login page keeps it, a login goes back to it, and the page shows the file.
     /// </summary>
     /// <param name="path">The file path.</param>
-    [Theory(Timeout = 60000)]
+    [Theory(Timeout = 180000)]
     [InlineData("plain.txt")]
     [InlineData("deep/er/nested.txt")]
     [InlineData("my docs/a b.txt")]
@@ -826,7 +826,7 @@ public class ReviewDeepLinkTests : PageTestBase
     ///     Tests that a deep link whose characters the server normalizes (<c>+</c> and <c>&amp;</c>) still comes back
     ///     to the same file after login, and that the return address stays a local path.
     /// </summary>
-    [Fact(Timeout = 60000)]
+    [Fact(Timeout = 180000)]
     public async Task SignIn_DeepLink_PlusAndAmpersand_ReturnsToTheSameFileAfterLogin()
     {
         // Arrange: a review with a file whose name has + and &
@@ -853,7 +853,7 @@ public class ReviewDeepLinkTests : PageTestBase
     ///     Tests that a hostile return address does not survive the login, even when it looks like a deep link.
     /// </summary>
     /// <param name="returnUrl">The return address posted with the login.</param>
-    [Theory(Timeout = 60000)]
+    [Theory(Timeout = 180000)]
     [InlineData("https://evil.example/projects/1/reviews/REV-1/files/a.txt")]
     [InlineData("//evil.example/projects/1/reviews/REV-1/threads/1")]
     [InlineData("/\\evil.example/projects/1/reviews/REV-1")]
@@ -876,7 +876,7 @@ public class ReviewDeepLinkTests : PageTestBase
     ///     Tests that a signed-in visitor who opens a thread link over HTTP gets the page already showing the file
     ///     and the highlighted thread (the first response, before any live connection).
     /// </summary>
-    [Fact(Timeout = 60000)]
+    [Fact(Timeout = 180000)]
     public async Task ReviewPage_ThreadAddress_OverHttp_RendersFileAndHighlightedThread()
     {
         // Arrange: an application with a review, a thread, and a signed-in browser

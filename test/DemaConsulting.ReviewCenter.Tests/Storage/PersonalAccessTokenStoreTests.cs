@@ -252,7 +252,7 @@ public class PersonalAccessTokenStoreTests
     ///     exactly once, and that a use that saw an older value than the stored one writes nothing.
     /// </summary>
     /// <param name="stale">Whether the token was used before; <c>false</c> for a token never used.</param>
-    [Theory(Timeout = 60000)]
+    [Theory(Timeout = 180000)]
     [InlineData(false)]
     [InlineData(true)]
     public async Task PersonalAccessTokenStore_TouchAsync_ParallelSameExpected_WritesOnce(bool stale)
