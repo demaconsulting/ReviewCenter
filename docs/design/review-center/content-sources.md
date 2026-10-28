@@ -8,7 +8,7 @@ The `ContentSources` subsystem reads content from outside the system. At present
 a review can be created from the files of a repository revision (the `ReviewService` of `Core` does that), and it
 protects the access tokens that private
 repositories need. It implements two contracts that the `Core` subsystem defines and holds no domain rule of its own: the
-registry of repositories, their names, and who may change them belong to `Core` and `Storage`. It contains four units:
+repositories of each project, their names, and who may change them belong to `Core` and `Storage`. It contains four units:
 `GitRunner`, which runs the git command-line tool safely and reports its result; `GitSource`, which keeps a local
 mirror of each registered repository and answers the questions of the Core git contract; `ReviewSetParser` (the class
 `ReviewMarkConfigParser`), which reads the review-sets out of the ReviewMark configuration file of a repository; and
@@ -79,13 +79,16 @@ only the Core interfaces.
 
 ### Design
 
-**Data flow**: An administrator registers a repository on `RepositoriesPage`; `RepositoryService` validates the input,
+**Data flow**: An administrator of a project (a project administrator, or a system administrator) registers a repository
+with that project on `RepositoriesPage`; `RepositoryService` checks that the user may administer the project, validates
+the input,
 has `CredentialProtector` encrypt the token, and hands the registration to `RepositoryStore`, which stores it with its
 audit entry. When a repository is read, `RepositoryService.GetAccessAsync` loads the registration, checks that it is
 enabled, decrypts the token, and returns the access data. `GitSource.OpenAsync` takes the per-repository lock, makes the
 mirror current through `GitRunner` (a clone the first time, a fetch afterwards), and returns a session. The session
 answers its questions from the local mirror only, using `GitRunner` again, and releases the lock when it is disposed.
-Nothing in `ContentSources` reads the database: the registry reaches it only through the access data.
+Nothing in `ContentSources` reads the database or decides who may use a repository: the registration of a project
+reaches it only through the access data, and the project check is made before.
 
 **Running git without trusting its surroundings**: Repository content and server answers are untrusted input, and git
 is a large program with many ways to run other programs. `GitRunner` therefore never uses a shell: the arguments are
@@ -120,8 +123,8 @@ keeps only its last few kilobytes. A blob is read only after its size was read a
 gave. The change list is capped in the same way.
 
 **The mirror cache**: Each registered repository has one bare mirror folder under the cache path, named by the identity
-of the registration, `repo-{id}`, so a name chosen by an administrator never becomes a path. A mirror is made with a
-clone into a temporary folder that is moved into place only when it is complete, so a failed clone leaves nothing
+of the registration, `repo-{id}`, so a name chosen by a project administrator never becomes a path. A mirror is made
+with a clone into a temporary folder that is moved into place only when it is complete, so a failed clone leaves nothing
 behind, and it is kept current with a fetch that prunes deleted branches and forces updated ones. When the location of
 the registration no longer equals the one stored in the mirror, the mirror is deleted and cloned again, so a changed
 location can never serve the content of the old one. A semaphore for each repository serializes the sessions on it: the
@@ -141,7 +144,8 @@ value protected for another purpose cannot be unprotected as a token. The keys o
 a
 folder (`DataProtection:KeysPath`, by default a `keys` folder beside the database), which `Hosting` creates and checks
 when the server starts. Three facts about that folder matter for operations. First, **losing or replacing the key ring
-makes every stored token unreadable**: the repositories stay registered, and an administrator must enter each token
+makes every stored token unreadable**: the repositories stay registered, and an administrator of each project must
+enter each token
 again; reading such a repository fails with an error that says so. Second, **the keys are not encrypted at rest**: anyone
 who can read the folder and the database can decrypt the tokens, so the folder must be protected with file permissions
 (the server restricts it to its owner on systems that support it), and it must be backed up together with the database.

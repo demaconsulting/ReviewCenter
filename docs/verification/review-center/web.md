@@ -43,10 +43,10 @@ N/A - standard test environment (temporary SQLite databases are created by the t
   by the component tests of `SessionGate`, `ReviewPage`, `UsersPage`, and `RepositoriesPage` (see the children of the requirement
   `ReviewCenter-Web-SessionEnd` in `web.yaml`), together with the `Identity` subsystem test of the provider that ends
   the state.
-- A user with the Admin role who opens `/repositories` is shown the page of the registry; a reviewer is refused.
+- A system administrator who opens `/projects/{id}/repositories` is shown the repositories of that project; a user who
+  is no member of it receives the same not-found page as for a project that does not exist.
 - Every interactive element of every page has a `data-testid`, no identifier repeats within a page, and the breadcrumb links
-  have their own identifiers (`breadcrumb-projects-link`, `breadcrumb-repositories-link`, `breadcrumb-users-link`),
-  distinct from the header tabs.
+  have their own identifiers (`breadcrumb-projects-link`, `breadcrumb-users-link`), distinct from the header tabs.
 - The creation of a review from a repository (source choice, repository form, refusals, and skipped entries) and the
   display of the change kinds, the source, and the Diff / Head / Baseline views need a live connection, so they are
   verified at unit level by the component tests of `ProjectPage` and `ReviewPage` (see the children of the requirement
@@ -58,7 +58,7 @@ N/A - standard test environment (temporary SQLite databases are created by the t
 - The plan page and the planning links need a live connection for the form and the creation, so they are verified at
   unit level by the component tests of `PlanPage`, `ProjectPage`, and `ReviewPage` (see the children of the requirement
   `ReviewCenter-Web-PlanReviews` in `web.yaml`); the subsystem test requests the plan route of a project that has a
-  registered repository.
+  repository.
 - Links to files, lines and threads (the routes, the highlight, the replacement of the address, the thread links, the
   messages for addresses that name nothing, and the return to a link after signing in over HTTP) are verified by the
   component tests of `ReviewPage` in `ReviewDeepLinkTests.cs`, which render the real router, and by the tests of
@@ -138,36 +138,79 @@ through `SigningService` with the digest read from the service; the review page 
 and the review page shows "Signature out of date". This scenario is tested by
 `WebSubsystem_SignedReview_ApprovalIsPresentedAndGoesOutOfDateWhenRecordChanges`.
 
-**WebSubsystem_AllPages_EveryInteractiveElementHasTestId**: A user with the Admin role is signed in, and every route
+**WebSubsystem_AllPages_EveryInteractiveElementHasTestId**: A system administrator is signed in, and every route
 (home, login, about, the help index, a help topic, an unknown help topic, account, users, the new user page,
-repositories, the new repository page, projects, the new project page, a project, the new review page of a project,
-the plan page of a project that has a registered repository, the
+projects, the new project page, a project, the new review page of a project, the plan page of a project that has a
+repository, the repositories page and the new repository page of the project, the
 plan page and the project page of a missing project, a review, a missing review, a checklist) is
 requested over the in-memory server; every link, button, visible input, select, and text area in each response has a
 `data-testid` in kebab-case. This scenario is tested by
 `WebSubsystem_AllPages_EveryInteractiveElementHasTestId`.
 
-**WebSubsystem_AllPages_TestIdsAreUniqueAndBreadcrumbsDistinct**: A user with the Admin role is signed in and the project
-page, the new review page, the plan page, the review page, its checklist page, its history page, the new repository
-page, and the new user page are requested. In each response no `data-testid` value occurs twice, the breadcrumb link
-has its prefixed identifier (`breadcrumb-projects-link`, `breadcrumb-repositories-link`, or
+**WebSubsystem_AllPages_TestIdsAreUniqueAndBreadcrumbsDistinct**: A system administrator is signed in and the project
+page, the new review page, the plan page, the review page, its checklist page, its history page, the repositories page
+and the new repository page of the project, and the new user page are requested. In each response no `data-testid`
+value occurs twice, the breadcrumb link has its prefixed identifier (`breadcrumb-projects-link` or
 `breadcrumb-users-link`), and the
 header tab of the same name occurs exactly once. This scenario is tested by
 `WebSubsystem_AllPages_TestIdsAreUniqueAndBreadcrumbsDistinct`.
 
-**Repositories page**: The page of the repository registry is verified by its unit tests, which render it with the
-component test host. It lists repositories with the token state only and no delete control, which is tested by
-`RepositoriesPage_Render_Repositories_ShowsTokenStateOnlyAndNoDelete`, and it stores a token without ever showing it,
-which is tested by `NewRepositoryPage_CreateForm_WithToken_StoresItWriteOnlyAndClearsFields`. A reviewer who requests the
-route is refused and an administrator receives the page, which is tested by
-`SignIn_RepositoriesPage_ReviewerAndAdmin_OnlyAdminIsAllowed` in the `Identity` subsystem tests.
+**Repositories page**: The page of the repositories of a project is verified by its unit tests, which render it with
+the component test host. It lists only the repositories of its project with the token state only and no delete
+control, which is tested by `RepositoriesPage_Render_Repositories_ShowsTokenStateOnlyAndNoDelete` and
+`RepositoriesPage_Render_OtherProjectsRepositories_AreNotListed`, and it stores a token without ever showing it, which
+is tested by `NewRepositoryPage_CreateForm_WithToken_StoresItWriteOnlyAndClearsFields`. A member who is no project
+administrator, and a non-member, receive only the not-found message, which is tested by
+`RepositoriesPage_Render_MemberOrNonMember_ShowsNotFoundOnly`; a non-member gets a not-found page body and a system
+administrator receives the page, which is tested by `SignIn_RepositoriesPage_NonMemberAndSystemAdmin_OnlyAdminIsServed`
+in the `Identity` subsystem tests.
+
+**Project access**: Which projects a user sees, and who may administer them, is verified by the unit tests of
+`ProjectAccessPageTests`, which render the pages with the component test host over the real services. The projects list
+shows each user only the projects the user may see, which is tested by
+`ProjectsPage_Render_MemberAndSystemAdmin_ListOnlyWhatEachMaySee`, and explains an empty list without a create button,
+which is tested by `ProjectsPage_Render_UserWithoutMembership_ExplainsTheEmptyListAndOffersNoCreateButton`. A member who
+is no system administrator is refused when creating a project, which is tested by
+`NewProjectPage_CreateForm_MemberWhoIsNoSystemAdmin_IsRefusedAndCreatesNothing`. A non-member sees the project as a
+missing one, which is tested by `ProjectPage_Render_NonMember_LooksLikeAMissingProject`, a member sees the reviews but
+no Members section, which is tested by `ProjectPage_Render_Member_SeesReviewsButNoMembersSection`, and a system
+administrator sees the members with their roles and actions, which is tested by
+`ProjectPage_Render_SystemAdmin_ListsMembersWithRolesAndActions`. Adding, removing, and changing the role of a member
+are tested by `ProjectPage_AddMember_ChosenUser_BecomesMemberWithTheRole` and
+`ProjectPage_MemberActions_ToggleRoleAndRemove_ChangeTheMembership`. The review creation form offers only the
+repositories of its project, which is tested by `NewReviewPage_RepositorySelect_OffersOnlyRepositoriesOfThisProject`.
+
+**Access on an open page**: The pages of a project check the view access again at the start of every action, through
+`ProjectViewGuard`. The guard is tested directly by `ProjectViewGuard_GuardView_Member_ReturnsTrueWithoutCallback`,
+`ProjectViewGuard_GuardView_NonMember_ReturnsFalseAndCallsBackOnce`,
+`ProjectViewGuard_GuardView_MembershipRemovedBetweenChecks_SecondCheckReturnsFalse` and
+`ProjectViewGuard_GuardView_NobodySignedIn_ReturnsFalseAndCallsBackOnce`. The administer and system administrator
+levels of the same guard are tested by `ProjectViewGuard_GuardAdminister_ProjectAdmin_ReturnsTrueWithoutCallback`,
+`ProjectViewGuard_GuardAdminister_PlainMember_ReturnsFalseAndCallsBackOnce`,
+`ProjectViewGuard_GuardAdminister_AdminDemotedBetweenChecks_SecondCheckReturnsFalse`,
+`ProjectViewGuard_GuardAdminister_NobodySignedIn_ReturnsFalseAndCallsBackOnce`,
+`ProjectViewGuard_GuardSystemAdmin_SystemAdmin_ReturnsTrueWithoutCallback`,
+`ProjectViewGuard_GuardSystemAdmin_DemotedOrDisabled_ReturnsFalseAndCallsBackOnce` and
+`ProjectViewGuard_GuardSystemAdmin_NobodySignedIn_ReturnsFalseAndCallsBackOnce`. On the pages, a member opens the page,
+the
+membership is removed in the store, and an action is triggered; the page then shows the page for a missing project and
+none of the data it had loaded, which is tested by `ReviewPage_SelectFile_MembershipRevoked_ShowsNotFoundAndNoData`,
+`ChecklistPage_Choose_MembershipRevoked_ShowsNotFoundAndNoData`,
+`HistoryPage_Reparameterize_MembershipRevoked_ShowsNotFoundAndNoEntries`,
+`PlanPage_ShowPlan_MembershipRevoked_ShowsNotFoundAndNoPlan` and
+`NewReviewPage_CreateForm_MembershipRevoked_ShowsNotFoundAndCreatesNothing`; the other actions are covered in the
+verification of each page. The pages that show data for administrators only clear it in the same way: the repositories
+pages, the members section of the project page, and the users page. A revocation that lands inside a single action,
+after its check, and data that is already in
+the browser until the next action are not covered; the rule is checked per action, not pushed to the browser.
 
 **Audit pages**: The history and audit pages are verified by their unit tests, which render them with the component
 test host. The history page shows only the entries of its review, newest first, which is tested by
 `HistoryPage_Render_ReviewWithEntries_ShowsOnlyItsEntriesNewestFirst`; a visitor who is not signed in does not get
 the entries, which is tested by `Routes_Render_NobodySignedInOpensHistoryRoute_DoesNotShowEntries`. The audit page
 shows the entry count and the full head hash of an intact chain, which is tested by
-`AuditPage_Verify_IntactChain_ShowsCountAndFullHeadHash`, and a reviewer who opens the audit route gets an access
+`AuditPage_Verify_IntactChain_ShowsCountAndFullHeadHash`, and a user who is no system administrator and opens the
+audit route gets an access
 denied message and no entries, which is tested by `Routes_Render_ReviewerOpensAuditRoute_ShowsAccessDeniedNotTrail`.
 The subsystem test of all pages does not include the two new routes; their `data-testid` attributes are checked in
 the unit tests.

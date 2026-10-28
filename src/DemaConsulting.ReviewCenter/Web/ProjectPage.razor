@@ -1,10 +1,20 @@
 @* ProjectPage: one project with its reviews, at "/projects/{id}". The reviews are the whole page: a list of rows (id,
    title, state and approval badges, creation date), each row a link to the review, with a "+ New review" button
-   that leads to the separate creation page at "/projects/{id}/reviews/new" and a "Plan reviews" button.
+   that leads to the separate creation page at "/projects/{id}/reviews/new" and a "Plan reviews" button. Whoever
+   may administer the project (a system administrator or a project admin) also gets a "Repositories" button to the
+   repository page of the project. A system administrator additionally sees a Members section below the reviews:
+   the members with a role button and a Remove button, and a "+ Add member" button that reveals an inline form
+   (members are rarely changed, so the form is hidden until asked for). A project the user may not see looks exactly
+   like a project that does not exist.
 
    Presentation only; state lives in ProjectPage.razor.cs. Every interactive element and every key value carries a
-   stable kebab-case data-testid (row-level ids carry the review id), and the data-interactive marker on the root
-   flips to "true" once the live circuit is connected.
+   stable kebab-case data-testid (row-level ids carry the review id or the user name), and the data-interactive
+   marker on the root flips to "true" once the live circuit is connected.
+
+   Human factors: (a) the reviews, the reason for the visit, come first and the next steps are the buttons beside
+   the heading; (b) the Members section is only for system administrators and rare member changes sit behind
+   "+ Add member", so nobody else sees them; (c) an action that is not possible is replaced by a sentence that
+   says why (no repository yet, no members yet).
 
    The page body is inside SessionGate, which replaces it with a "Session ended" message when the user is no longer
    valid while the page is open. *@
@@ -38,6 +48,10 @@
         <div class="page-heading">
             <h1 data-testid="project-name">@Project.Name</h1>
             <div class="heading-actions">
+                @if (CanAdminister)
+                {
+                    <a class="action outline" href="/projects/@ProjectId/repositories" data-testid="repositories-link">Repositories</a>
+                }
                 @if (Repositories.Count > 0)
                 {
                     <a class="action outline" href="/projects/@ProjectId/plan" data-testid="plan-reviews-link">Plan reviews</a>
@@ -51,7 +65,11 @@
         }
         @if (Repositories.Count == 0)
         {
-            <p class="muted hint" data-testid="plan-reviews-unavailable">Planning reviews needs a registered repository; ask an administrator.</p>
+            <p class="muted hint" data-testid="plan-reviews-unavailable">
+                @(CanAdminister
+                    ? "Planning reviews needs a repository; add one with the Repositories button."
+                    : "Planning reviews needs a repository; ask a project administrator to add one.")
+            </p>
         }
 
         <h2 class="section-title">Reviews</h2>
@@ -77,6 +95,97 @@
                     </li>
                 }
             </ul>
+        }
+
+        @if (IsSystemAdmin)
+        {
+            <h2 class="section-title">Members</h2>
+            @if (MemberError is not null)
+            {
+                <p class="error" role="alert" data-testid="member-error">@MemberError</p>
+            }
+            @if (MemberStatus is not null)
+            {
+                <p class="notice" role="status" data-testid="member-status">@MemberStatus</p>
+            }
+            @if (Members.Count == 0)
+            {
+                <p class="muted" data-testid="members-empty">
+                    This project has no members, so only system administrators can see it. Use + Add member.
+                </p>
+            }
+            else
+            {
+                <ul class="row-list" data-testid="members-list">
+                    @foreach (var member in Members)
+                    {
+                        var current = member;
+                        <li class="row-card static-row" data-testid="member-row-@current.Username">
+                            <div class="row-main">
+                                <strong class="row-title" data-testid="member-name-@current.Username">@current.Username</strong>
+                                <p class="muted">@current.DisplayName</p>
+                                <p class="row-badges">
+                                    <span class="badge" data-testid="member-role-@current.Username">@(current.Role == ProjectRole.ProjectAdmin ? "Project admin" : "Member")</span>
+                                    @if (!current.Enabled)
+                                    {
+                                        <span class="badge">Disabled</span>
+                                    }
+                                </p>
+                            </div>
+                            <div class="row-actions">
+                                <button type="button" class="outline small" data-testid="member-toggle-role-@current.Username"
+                                        @onclick="() => ToggleRoleAsync(current)">@(current.Role == ProjectRole.ProjectAdmin ? "Make member" : "Make project admin")</button>
+                                <button type="button" class="outline small" data-testid="member-remove-@current.Username"
+                                        @onclick="() => RemoveMemberAsync(current)">Remove</button>
+                            </div>
+                        </li>
+                    }
+                </ul>
+            }
+
+            @if (ShowAddForm)
+            {
+                <section class="card" data-testid="add-member-form">
+                    @if (Candidates.Count == 0)
+                    {
+                        <p class="muted" data-testid="add-member-none">
+                            Every enabled user is already a member. Create users on the Users page first.
+                        </p>
+                    }
+                    else
+                    {
+                        <div class="field">
+                            <label for="add-member-user">User</label>
+                            <select id="add-member-user" data-testid="add-member-user-select" @bind="AddUsername">
+                                @foreach (var candidate in Candidates)
+                                {
+                                    <option value="@candidate.Username">@candidate.Username (@candidate.DisplayName)</option>
+                                }
+                            </select>
+                        </div>
+                        <div class="field">
+                            <label>
+                                <input type="checkbox" data-testid="add-member-admin-checkbox" @bind="AddAsProjectAdmin" />
+                                Project admin
+                            </label>
+                            <p class="muted hint">A project admin also manages the repositories of this project.</p>
+                        </div>
+                    }
+                    <div class="plan-actions">
+                        @if (Candidates.Count > 0)
+                        {
+                            <button type="button" data-testid="add-member-submit" @onclick="AddMemberAsync">Add member</button>
+                        }
+                        <button type="button" class="outline" data-testid="add-member-cancel" @onclick="CloseAddForm">Cancel</button>
+                    </div>
+                </section>
+            }
+            else
+            {
+                <p>
+                    <button type="button" class="outline" data-testid="add-member-button" @onclick="OpenAddFormAsync">+ Add member</button>
+                </p>
+            }
         }
     }
 </main>

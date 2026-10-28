@@ -165,6 +165,7 @@ public class ProjectPageTests : PageTestBase
         // Arrange: two reviews, one fully signed by its only slot, one without slots
         var ann = await Users.CreateAsync("ann", "Ann", UserRole.Reviewer, "correct horse battery", TestContext.Current.CancellationToken);
         var project = await Projects.CreateAsync("Apollo", null, TestContext.Current.CancellationToken);
+        await Store.AddMembershipAsync(ann.Id, project.Id, TestContext.Current.CancellationToken);
         await Reviews.CreateDraftAsync(project.Id, "REV-1", "Signed", [new("a.txt", TestContent.A)], TestContext.Current.CancellationToken);
         await Reviews.CreateDraftAsync(project.Id, "REV-2", "Open", [new("a.txt", TestContent.A)], TestContext.Current.CancellationToken);
         foreach (var item in DefaultChecklist.Current.Sections.SelectMany(section => section.Items))
@@ -233,11 +234,11 @@ public class ProjectPageTests : PageTestBase
     }
 
     /// <summary>
-    ///     Test that a review submitted after the session ended, but before the page learned of it, shows a clear
-    ///     message and stores nothing.
+    ///     Test that a review submitted after the session ended, but before the page learned of it, stores nothing
+    ///     and leaves the not-found page (the access check finds no user).
     /// </summary>
     [Fact]
-    public async Task NewReviewPage_CreateForm_SessionEndedBeforePageKnows_ShowsClearErrorAndCreatesNothing()
+    public async Task NewReviewPage_CreateForm_SessionEndedBeforePageKnows_ShowsNotFoundAndCreatesNothing()
     {
         // Arrange: a filled-in form, and then the session ends without the page being told
         var project = await Projects.CreateAsync("Apollo", null, TestContext.Current.CancellationToken);
@@ -251,8 +252,38 @@ public class ProjectPageTests : PageTestBase
         // Act: submit the form
         await cut.Find("[data-testid='new-review-form']").SubmitAsync();
 
-        // Assert: the page says why nothing was saved, and no review exists
-        Assert.Contains("no longer signed in", cut.Find("[data-testid='review-error']").TextContent, StringComparison.Ordinal);
+        // Assert: the page shows the not-found state, and no review exists
+        Assert.NotEmpty(cut.FindAll("[data-testid='project-not-found']"));
+        Assert.Empty(cut.FindAll("[data-testid='new-review-form']"));
+        Assert.Empty(await Reviews.ListAsync(project.Id, TestContext.Current.CancellationToken));
+    }
+
+    /// <summary>
+    ///     Test that a member who loses the membership while the new-review form is open gets the not-found page
+    ///     when submitting, and that nothing is created.
+    /// </summary>
+    [Fact]
+    public async Task NewReviewPage_CreateForm_MembershipRevoked_ShowsNotFoundAndCreatesNothing()
+    {
+        // Arrange: a member has a filled-in form open
+        var project = await Projects.CreateAsync("Apollo", null, TestContext.Current.CancellationToken);
+        var member = await Users.CreateAsync("mem", "Mem", UserRole.Reviewer, "correct horse battery", TestContext.Current.CancellationToken);
+        await Store.AddMembershipAsync(member.Id, project.Id, TestContext.Current.CancellationToken);
+        SignInAs("mem", "Mem", UserRole.Reviewer);
+        var cut = RenderPage(project.Id);
+        await cut.Find("[data-testid='review-id-input']").InputAsync("REV-1");
+        await cut.Find("[data-testid='review-title-input']").InputAsync("First review");
+        SelectFiles(cut, ("a.txt", TestContent.A));
+        await cut.WaitForAssertionAsync(() => Assert.NotEmpty(cut.FindAll("[data-testid='selected-file-0']")));
+        await RevokeMembershipAsync(project.Id, "mem");
+
+        // Act: submit the form
+        await cut.Find("[data-testid='new-review-form']").SubmitAsync();
+
+        // Assert: the not-found state, nothing of the project, and no review
+        Assert.NotEmpty(cut.FindAll("[data-testid='project-not-found']"));
+        Assert.Empty(cut.FindAll("[data-testid='new-review-form']"));
+        Assert.DoesNotContain("Apollo", cut.Markup, StringComparison.Ordinal);
         Assert.Empty(await Reviews.ListAsync(project.Id, TestContext.Current.CancellationToken));
     }
 
@@ -519,6 +550,137 @@ public class ProjectPageTests : PageTestBase
         Assert.Equal(string.Empty, cut.Find("[data-testid='review-id-input']").GetAttribute("value") ?? string.Empty);
         Assert.Equal(string.Empty, cut.Find("[data-testid='review-title-input']").GetAttribute("value") ?? string.Empty);
         Assert.Empty(cut.FindAll("[data-testid='selected-file-0']"));
+    }
+
+    /// <summary>
+    ///     Creates two system administrators (<c>root</c> and <c>boss</c>), the project Apollo with a review and a
+    ///     member, and an enabled user who is no member yet, and signs in as <c>root</c>.
+    /// </summary>
+    /// <param name="rootIsMember">Whether <c>root</c> also is a plain member of the project.</param>
+    /// <returns>The project identity; the member is <c>mbr</c> and the candidate is <c>zed-candidate</c>.</returns>
+    private async Task<int> ArrangeSystemAdminAsync(bool rootIsMember)
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        const string password = "correct horse battery";
+        var root = await Users.CreateAsync("root", "Root", UserRole.Admin, password, cancellationToken);
+        await Users.CreateAsync("boss", "Boss", UserRole.Admin, password, cancellationToken);
+        var member = await Users.CreateAsync("mbr", "Zed Member", UserRole.Reviewer, password, cancellationToken);
+        await Users.CreateAsync("zed-candidate", "Zed Candidate", UserRole.Reviewer, password, cancellationToken);
+        var project = await Projects.CreateAsync("Apollo", null, cancellationToken);
+        await Store.AddMembershipAsync(member.Id, project.Id, cancellationToken);
+        if (rootIsMember)
+        {
+            await Store.AddMembershipAsync(root.Id, project.Id, cancellationToken);
+        }
+
+        await Reviews.CreateDraftAsync(project.Id, "REV-1", "First", [new("a.txt", TestContent.A)], cancellationToken);
+        SignInAs("root", "Root", UserRole.Admin);
+        return project.Id;
+    }
+
+    /// <summary>
+    ///     Test that a system administrator who was demoted, but still is a member, loses the members section and
+    ///     the repository link when the next member action runs, while the reviews of the project stay.
+    /// </summary>
+    [Fact]
+    public async Task ProjectPage_MemberChange_SystemAdminDemotedButStillMember_DropsMembersSectionKeepsReviews()
+    {
+        // Arrange: a system administrator with the page open who also is a plain member, then demoted
+        var projectId = await ArrangeSystemAdminAsync(rootIsMember: true);
+        var cut = RenderProjectPage(projectId);
+        Assert.NotEmpty(cut.FindAll("[data-testid='member-row-mbr']"));
+        await Users.SetRoleAsync("root", UserRole.Reviewer, TestContext.Current.CancellationToken);
+
+        // Act: remove a member from the page that is still open
+        await cut.Find("[data-testid='member-remove-mbr']").ClickAsync();
+
+        // Assert: no members section and nothing in it, no error, the reviews stay, and the membership is stored
+        Assert.Empty(cut.FindAll("[data-testid='members-list']"));
+        Assert.Empty(cut.FindAll("[data-testid^='member-row-']"));
+        Assert.Empty(cut.FindAll("[data-testid='members-empty']"));
+        Assert.Empty(cut.FindAll("[data-testid='add-member-button']"));
+        Assert.Empty(cut.FindAll("[data-testid='member-error']"));
+        Assert.Empty(cut.FindAll("[data-testid='member-status']"));
+        Assert.Empty(cut.FindAll("[data-testid='repositories-link']"));
+        Assert.DoesNotContain("Zed Member", cut.Markup, StringComparison.Ordinal);
+        Assert.NotEmpty(cut.FindAll("[data-testid='review-link-REV-1']"));
+        var member = await UserStore.GetByUsernameAsync("mbr", TestContext.Current.CancellationToken);
+        Assert.NotNull(await Store.GetMembershipAsync(member!.Id, projectId, TestContext.Current.CancellationToken));
+    }
+
+    /// <summary>
+    ///     Test that a system administrator who was demoted and is no member gets the not-found state, with no
+    ///     reviews and no members, when the next member action runs.
+    /// </summary>
+    [Fact]
+    public async Task ProjectPage_MemberChange_SystemAdminDemotedAndNotMember_ShowsNotFoundAndNoData()
+    {
+        // Arrange: a system administrator with the page open who is no member, then demoted
+        var projectId = await ArrangeSystemAdminAsync(rootIsMember: false);
+        var cut = RenderProjectPage(projectId);
+        await Users.SetRoleAsync("root", UserRole.Reviewer, TestContext.Current.CancellationToken);
+
+        // Act: remove a member from the page that is still open
+        await cut.Find("[data-testid='member-remove-mbr']").ClickAsync();
+
+        // Assert: the state of a non-member, with nothing of the project, and the membership is stored
+        Assert.NotEmpty(cut.FindAll("[data-testid='project-not-found']"));
+        Assert.Empty(cut.FindAll("[data-testid='reviews-list']"));
+        Assert.Empty(cut.FindAll("[data-testid^='review-row-']"));
+        Assert.Empty(cut.FindAll("[data-testid='members-list']"));
+        Assert.Empty(cut.FindAll("[data-testid='project-name']"));
+        Assert.DoesNotContain("Zed Member", cut.Markup, StringComparison.Ordinal);
+        Assert.DoesNotContain("REV-1", cut.Markup, StringComparison.Ordinal);
+        Assert.DoesNotContain("Apollo", cut.Markup, StringComparison.Ordinal);
+        var member = await UserStore.GetByUsernameAsync("mbr", TestContext.Current.CancellationToken);
+        Assert.NotNull(await Store.GetMembershipAsync(member!.Id, projectId, TestContext.Current.CancellationToken));
+    }
+
+    /// <summary>
+    ///     Test that opening the add-member form after the system administrator was demoted does not reveal the
+    ///     users that could be added, but drops the members section.
+    /// </summary>
+    [Fact]
+    public async Task ProjectPage_OpenAddForm_SystemAdminDemoted_DropsCandidatesAndForm()
+    {
+        // Arrange: a system administrator with the page open who also is a plain member, then demoted
+        var projectId = await ArrangeSystemAdminAsync(rootIsMember: true);
+        var cut = RenderProjectPage(projectId);
+        await Users.SetRoleAsync("root", UserRole.Reviewer, TestContext.Current.CancellationToken);
+
+        // Act: open the add-member form
+        await cut.Find("[data-testid='add-member-button']").ClickAsync();
+
+        // Assert: no form, no member section, and none of the candidates in the markup
+        Assert.Empty(cut.FindAll("[data-testid='add-member-form']"));
+        Assert.Empty(cut.FindAll("[data-testid='add-member-button']"));
+        Assert.Empty(cut.FindAll("[data-testid='members-list']"));
+        Assert.DoesNotContain("zed-candidate", cut.Markup, StringComparison.Ordinal);
+        Assert.DoesNotContain("Zed Candidate", cut.Markup, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    ///     Test that a member action sent after the session ended, but before the page learned of it, shows the
+    ///     not-found state and changes nothing.
+    /// </summary>
+    [Fact]
+    public async Task ProjectPage_MemberChange_SessionEndedBeforePageKnows_ShowsNotFoundAndChangesNothing()
+    {
+        // Arrange: a system administrator with the page open, then the session ends without the page being told
+        var projectId = await ArrangeSystemAdminAsync(rootIsMember: false);
+        var cut = RenderProjectPage(projectId);
+        SignOutQuietly();
+
+        // Act: remove a member
+        await cut.Find("[data-testid='member-remove-mbr']").ClickAsync();
+
+        // Assert: the state of a non-member, with no members on the page, and the membership is stored
+        Assert.NotEmpty(cut.FindAll("[data-testid='project-not-found']"));
+        Assert.Empty(cut.FindAll("[data-testid='members-list']"));
+        Assert.Empty(cut.FindAll("[data-testid='member-error']"));
+        Assert.DoesNotContain("Zed Member", cut.Markup, StringComparison.Ordinal);
+        var member = await UserStore.GetByUsernameAsync("mbr", TestContext.Current.CancellationToken);
+        Assert.NotNull(await Store.GetMembershipAsync(member!.Id, projectId, TestContext.Current.CancellationToken));
     }
 
     /// <summary>

@@ -5,7 +5,7 @@
 The `Core` subsystem is verified by subsystem tests defined in `CoreSubsystemTests.cs`. The tests use the real
 `ProjectService`, `ReviewService`, `ThreadService`, `ChecklistService`, `UserService`, `SigningService`,
 `RepositoryService`, `PersonalAccessTokenService`, `SelectionMatcher`, `RevisionValidator`, `Fingerprint`,
-`RecordDigest`, and `ReviewPlanner`
+`RecordDigest`, `ReviewPlanner`, and `ProjectAccess`
 together, with
 a fixed clock (a clock the test can move for the lockout and the expiry of a token) and fakes for the stores
 (`FakeReviewStore`,
@@ -17,7 +17,7 @@ database; the real database is verified in the `Storage` subsystem, the real has
 real token protector and git in the `ContentSources` subsystem.
 The tests show that the units cooperate as the
 design describes: the services create, store, and read back what the fingerprint algorithm and the rules require.
-The rules and the algorithm themselves are verified in detail by the unit tests of the sixteen units.
+The rules and the algorithm themselves are verified in detail by the unit tests of the seventeen units.
 
 ### Test Environment
 
@@ -30,23 +30,29 @@ N/A - standard test environment.
   the known answer for the files, every file keeps its own size and SHA-256 hash, and file bytes are returned
   exactly.
 - The same file contents give the same fingerprint when submitted in another order or under other names.
-- Every domain rule (all fifty-two values of `DomainRule`) is reported as a domain rule exception that names it, and
+- Every domain rule (all fifty-four values of `DomainRule`) is reported as a domain rule exception that names it, and
   nothing is stored. The four rules that only a real git can raise (`RevisionNotFound`, `GitUnavailable`,
   `GitAccessFailed`, and `GitTimeout`) are exercised in the `ContentSources` subsystem tests instead.
 - A thread started on a file, with replies, resolved and reopened, is read back with its comments in posting order.
 - A new review has the whole default checklist; an answer and a section that does not apply are recorded, and the
   progress follows them.
 - A user is created and signs in regardless of the case of the user name; repeated failures lock the account and the
-  lockout ends on time; a changed password replaces the old one; and the last enabled administrator cannot be
-  demoted.
+  lockout ends on time; a changed password replaces the old one; and the last enabled system administrator cannot
+  be demoted.
+- Access follows the membership of a project: a system administrator sees and administers every project, a member
+  sees the own project, and anyone else, including a disabled, unknown, anonymous, or command line actor, gets the
+  same answer as for a missing project; only a system administrator creates projects and manages members, every
+  membership change is audited with the project, and reviewer slots and signing are limited to members (see the
+  unit tests of `ProjectAccess`, `ProjectService`, `SigningService`, and `UserService`).
 - A review with a reviewer slot, answered completely and without open threads, is signed with the password; the
   signature makes the review approved, a later change of the record makes it out of date and not approved, and the
   slot can be signed again.
 - Every change made through the services is recorded in the audit trail with the person, the action, and a detail
   that never holds a password or a token; recorded entries verify as an intact chain.
-- A repository registry that only administrators can change: names, locations, and credentials are validated, tokens are
-  stored encrypted and are never part of a listed registration, and every change is audited without a secret (see the
-  unit tests of `RepositoryService`).
+- A repository registry that only the administrator of the project (or a system administrator) can change: names,
+  locations, and credentials are validated, tokens are stored encrypted and are never part of a listed registration,
+  every repository belongs to one project, and every change is audited without a secret (see the unit tests of
+  `RepositoryService`).
 - A review created from a repository freezes its source and the content of every changed file; a selection with no
   changed file is refused with `NothingToReview` and stores nothing; the fingerprint covers the files at the head;
   the record digest differs when the source, the selection, or any change differs; and a later change of the
@@ -83,7 +89,8 @@ anchor on a missing file or beyond the end of the file, or a reply to a thread t
 checklist answer for a missing checklist, for a check that is not in the checklist, or a failed
 check without a justification; a user with an invalid or taken user name, a blank display name, or a too short
 password, a wrong current password, a change of a user that does not exist, or disabling the last enabled
-administrator; a slot for a missing review, a slot with an unknown reviewer or one that does not exist, a change of a
+system administrator; a member added twice or a change of a user who is not a member; a slot for a missing review,
+a slot with an unknown reviewer or one that does not exist or is not a member, a change of a
 signed slot, a signing by a user who is not in the slot, a signing that is blocked, a wrong password at a signing, or
 a signing of a record that changed; a token with an invalid name, an invalid lifetime, or beyond the limit of 20 active
 tokens, and an actor that came through a token that signs or names a reviewer; a repository with an invalid name,
@@ -107,7 +114,8 @@ trimmed justification, the progress is 1 of 53 (the failed check counts as answe
 the total), and the checklist is not complete. This scenario is tested by
 `CoreSubsystem_Checklist_FrozenAtCreationAnswerAndProgress`.
 
-**CoreSubsystem_UsersWorkflow_CreateSignInLockoutAndLastAdmin**: An administrator and a reviewer are created, and the
+**CoreSubsystem_UsersWorkflow_CreateSignInLockoutAndLastAdmin**: A system administrator and a reviewer are created,
+and the
 reviewer signs in with the user name in another case. Five wrong passwords then lock the account, so that the right
 password is refused; after five minutes on the movable clock the right password signs in again. The password is
 changed with the current one and the new one works. Demoting the only administrator is refused with `LastAdmin`.
@@ -134,7 +142,8 @@ or signs, even with the right password and digest, and the slot stays unsigned. 
 **Audit trail of the services**: The unit tests of `AuditService` and `UserService` verify the subsystem requirement
 for the audit trail. A draft recorded through `AuditService` is stored and the chain verifies, which is tested by
 `AuditService_RecordAsync_Draft_StoresEntryThatVerifies`, and the administration events of `UserService` (creation,
-enabling, disabling, role change, and password changes) are recorded with the acting person and without a password,
+enabling, disabling, system administrator change, and password changes) are recorded with the acting person and
+without a password,
 which is tested by `UserService_AdministrationEvents_AreRecordedWithoutPasswords`. The domain services are tested
 against a fake store that holds the entries in memory; the transaction that stores a change with its entry is verified
 in the `Storage` subsystem.

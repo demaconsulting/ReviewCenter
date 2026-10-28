@@ -3,11 +3,15 @@
 #### Verification Approach
 
 `SigningService` is verified with unit tests defined in `SigningServiceTests.cs`. The service depends on a review
-store and on `UserService`; the tests use the in-memory fake store (`FakeReviewStore`), the real `UserService` over the
+store, on `UserService`, and on `IProjectAccess`; the tests use the in-memory fake store (`FakeReviewStore`), the real
+`UserService` over the
 in-memory user store and a trivial password hasher (`FakePasswordHasher`), so that the re-authentication goes through
 the real login path and its lockout without the cost of the real hasher, and a clock the test can move
 (`MovableTimeProvider`). The real services for threads and checklists are used to change the record. The real store is
-verified by its own unit and by the `Storage` subsystem; the digest is verified by the `RecordDigest` unit. The rules
+verified by its own unit and by the `Storage` subsystem; the digest is verified by the `RecordDigest` unit. The project
+access is the test double `AllowAllProjectAccess`, which treats every actor as a system administrator but decides
+membership from the memberships stored in the fake store; the access rules themselves are verified by the
+`ProjectAccess` unit. The rules
 are checked through the `DomainRuleException` that names the broken rule, and through the state of the fake store, so
 that a refused request is shown to store nothing.
 
@@ -18,14 +22,16 @@ N/A - standard test environment.
 #### Acceptance Criteria
 
 - All unit tests pass with zero failures.
-- Any signed-in user adds slots, which are numbered in creation order; a slot has a primary and an optional alternate
-  reviewer, and a review may have no slot.
-- The reviewers of a slot must be enabled users, must differ, and must not sit in another slot of the review.
+- Any member of the project adds slots, which are numbered in creation order; a slot has a primary and an optional
+  alternate reviewer, and a review may have no slot.
+- The reviewers of a slot must be enabled members of the project (a system administrator who is not a member is
+  refused), must differ, and must not sit in another slot of the review.
 - A change of slots by an unknown or disabled user, or for a missing review or slot, is refused.
 - A slot with a signature, current or out of date, cannot be changed or removed; an unsigned one can.
 - The primary or the alternate reviewer signs with the password entered again, and the signature records the slot, the
   user, the role, the time, the digest, and the meaning text.
-- Nobody else can sign a slot, and a disabled user cannot sign.
+- Nobody else can sign a slot, a disabled user cannot sign, and a reviewer who has been removed from the project
+  cannot sign.
 - A wrong, empty, or missing password gives `ReauthenticationFailed`, and repeated failures lock the account as at
   sign-in.
 - Signing is refused with the blockers named while a check is unanswered, a check of an applicable section is answered
@@ -35,7 +41,7 @@ N/A - standard test environment.
 - A signature goes out of date when the record changes, the slot can be signed again, and the earlier signature is
   kept.
 - A review is approved only when it has at least one slot and every slot has a current signature.
-- The candidates for a slot are the enabled users.
+- The candidates for a slot are the enabled members of the project.
 - An actor that came through a personal access token cannot sign, and cannot add, change, or remove a slot; the refusal
   is `ActorNotAllowed` and comes before every other check, so that a request with everything right and one with
   everything wrong give the same answer.
@@ -148,8 +154,17 @@ the status of a review equals the single read, and the user list was read once. 
 identifiers is read in one batch over a user store that counts list reads. The result is empty and the user list was
 never read. This scenario is tested by `SigningService_GetApprovalsAsync_NoReviews_ReturnsEmptyWithoutReadingUsers`.
 
-**SigningService_ListCandidatesAsync_ReturnsEnabledUsersOnly**: With one user disabled, the candidates are the other
-enabled users. This scenario is tested by `SigningService_ListCandidatesAsync_ReturnsEnabledUsersOnly`.
+**SigningService_ListCandidatesAsync_ReturnsEnabledMembersOnly**: With one member disabled and one user who is not a
+member of the project, the candidates are the other enabled members. This scenario is tested by
+`SigningService_ListCandidatesAsync_ReturnsEnabledMembersOnly`.
+
+**SigningService_AddSlotAsync_NonMember_ThrowsSlotUserInvalid**: A user who is not a member of the project, even a
+system administrator, is refused as primary and as alternate with `SlotUserInvalid`, and no slot is stored. This
+scenario is tested by `SigningService_AddSlotAsync_NonMember_ThrowsSlotUserInvalid`.
+
+**SigningService_SignAsync_NotAMember_IsRefused**: The primary reviewer of a ready slot is removed from the project and
+then tries to sign; the signing is refused with `ActorNotAllowed` and nothing is signed. This scenario is tested by
+`SigningService_SignAsync_NotAMember_IsRefused`.
 
 **SigningService_SignAsync_ApiTokenActor_IsRefusedBeforeAnyCheck**: A review that can be signed is prepared, and the
 primary reviewer's identity arrives through a token. Signing with the right password, slot, and digest, and signing with
@@ -161,7 +176,8 @@ shows that nothing else is checked first, and the slot stays unsigned. This scen
 removes a slot; each is refused with `ActorNotAllowed` and the existing slot is unchanged. This scenario is tested by
 `SigningService_AddUpdateRemoveSlot_ApiTokenActor_IsRefused`.
 
-**SigningService_Constructor_NullArguments_Throw**: A null store, user service, or clock is rejected with an
+**SigningService_Constructor_NullArguments_Throw**: A null store, user service, project access, or clock is rejected
+with an
 `ArgumentNullException`. This scenario is tested by `SigningService_Constructor_NullArguments_Throw`.
 
 **SigningService_SlotAndSignatureEvents_AreRecordedWithMembersAndDigest**: A slot is added, changed, and signed; the

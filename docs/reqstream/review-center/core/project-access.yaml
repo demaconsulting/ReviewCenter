@@ -1,0 +1,98 @@
+---
+# Software Unit Requirements for the ProjectAccess Class
+#
+# The ProjectAccess class is the single place that decides who may see and who may administer a project. It reads
+# the user and the memberships fresh on every call, so taking rights away works at once.
+
+sections:
+  - title: ProjectAccess Unit Requirements
+    requirements:
+      - id: ReviewCenter-ProjectAccess-Visibility
+        title: >-
+          The ProjectAccess class shall let a user see only the projects the user is a member of, and administer
+          only the projects the user is a project administrator of, and shall let neither a non-member nor a
+          project the user does not belong to be seen or administered.
+        justification: |
+          Reviews of one body of work must not be readable by people who have nothing to do with it. One rule in
+          one place keeps every page, route, and service in agreement about who may see what.
+        tests:
+          - ProjectAccess_Matrix_ActorKinds_GetTheirRights
+
+      - id: ReviewCenter-ProjectAccess-SystemAdmin
+        title: >-
+          The ProjectAccess class shall let an enabled system administrator see and administer every project that
+          exists, and no project that does not exist.
+        justification: |
+          A system administrator manages the whole installation and must be able to reach every project, for
+          example to add its first members. A project that does not exist has nothing to see, whoever asks.
+        tests:
+          - ProjectAccess_Matrix_ActorKinds_GetTheirRights
+          - ProjectAccess_Matrix_AnonymousCommandLineAndMissingProject_GetNothing
+
+      - id: ReviewCenter-ProjectAccess-NoAccount
+        title: >-
+          The ProjectAccess class shall give no access at all to a missing actor, to the command line, to a user
+          name that no user has, and to a disabled user, even when that user has a membership or the system
+          administrator right.
+        justification: |
+          Access follows a live account. An actor that is not an enabled user, including the command line which
+          acts outside any project, must see nothing and be treated like a stranger.
+        tests:
+          - ProjectAccess_Matrix_ActorKinds_GetTheirRights
+          - ProjectAccess_Matrix_AnonymousCommandLineAndMissingProject_GetNothing
+
+      - id: ReviewCenter-ProjectAccess-NotFound
+        title: >-
+          The ProjectAccess class shall refuse, when it is asked to require access, a project that is not visible
+          to the actor with the same project not found failure and the same message as a project that does not
+          exist, shall refuse a project administrator action by a member who is no project administrator with the
+          actor not allowed failure, and shall refuse a system administrator action by anyone else with the actor
+          not allowed failure.
+        justification: |
+          A different answer for a hidden project and a missing one would let anybody probe which projects exist.
+          A member sees the project already, so telling that member that an action is not allowed leaks nothing.
+        tests:
+          - ProjectAccess_Require_HiddenMissingAndNotAdministrator_FailWithTheRightRule
+          - ReviewOperations_NotAMember_AreRefusedAsAMissingProjectAndChangeNothing
+          - Repositories_OfAnotherProject_CannotBeUsedOrChanged
+
+      - id: ReviewCenter-ProjectAccess-Revocation
+        title: >-
+          The ProjectAccess class shall look the user and the membership up again on every call and keep nothing
+          between calls, so that a removed membership, a lowered project role, and a disabled account change the
+          next answer.
+        justification: |
+          Taking rights away must work at once, not after a cache expires or a session ends, because it is done
+          exactly when somebody must no longer have them.
+        tests:
+          - ProjectAccess_Revocation_TakesEffectOnTheNextCall
+
+      - id: ReviewCenter-ProjectAccess-TokenOwner
+        title: >-
+          The ProjectAccess class shall give an actor that came through a personal access token exactly the access
+          of the owner of the token, found by the user name the actor carries, and no more.
+        justification: |
+          A script acting for a user must neither see more than the user nor keep seeing what the user has lost,
+          and inheriting the memberships through the user name needs no separate list of rights for tokens.
+        tests:
+          - ProjectAccess_TokenActor_HasTheMembershipsOfItsOwner
+
+      - id: ReviewCenter-ProjectAccess-List
+        title: >-
+          The ProjectAccess class shall list the projects an actor may see, which are all projects for an enabled
+          system administrator, the projects of the memberships for an enabled user, and none for any other actor.
+        justification: |
+          The project list is the first page of the application, and a list that showed a hidden project would
+          disclose its existence and name.
+        tests:
+          - ProjectAccess_ListVisibleProjectsAsync_EachKind_SeesOnlyItsProjects
+          - ProjectAccess_Matrix_AnonymousCommandLineAndMissingProject_GetNothing
+
+      - id: ReviewCenter-ProjectAccess-Dependencies
+        title: >-
+          The ProjectAccess class shall refuse to be created without the user store or the project store it reads.
+        justification: |
+          An access decision made without its data could only guess, so a missing dependency must fail when the
+          service is created and not when the first user is judged.
+        tests:
+          - ProjectAccess_Constructor_NullArguments_Throws

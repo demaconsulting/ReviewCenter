@@ -8,7 +8,8 @@ sections:
     requirements:
       - id: ReviewCenter-UserStore-Persist
         title: >-
-          The UserStore class shall save a user with its user name, display name, role, enabled state, password
+          The UserStore class shall save a user with its user name, display name, system administrator flag, enabled
+          state, password
           hash, failed sign-in count, lockout end, and creation time, assign its identifier, find it again by user
           name, change a saved user, and list all users ordered by user name, with every value coming back as it
           was saved.

@@ -26,7 +26,7 @@ namespace DemaConsulting.ReviewCenter.Core;
 /// <remarks>
 ///     The service is the single place where user rules live: the user name and display name rules, the
 ///     password policy (12 to 128 characters, no composition rules, not trimmed), the lockout (5 consecutive
-///     failures lock the account for 5 minutes) and the guarantee that at least one enabled administrator
+///     failures lock the account for 5 minutes) and the guarantee that at least one enabled system administrator
 ///     remains. <see cref="AuthenticateAsync"/> and <see cref="ReauthenticateAsync"/> answer every failure with
 ///     the same <c>null</c> (unknown user, wrong password, disabled and locked out), so a caller cannot tell the
 ///     cases apart; the audit trail does tell them apart (see <see cref="AuthenticateAsync"/>). Operations that
@@ -115,7 +115,7 @@ public sealed class UserService
     ///     The display name; leading and trailing white space is removed. Must not be empty and must not exceed
     ///     <see cref="ReviewLimits.MaxDisplayNameLength"/> characters.
     /// </param>
-    /// <param name="role">The role of the user.</param>
+    /// <param name="isSystemAdmin"><c>true</c> to make the user a system administrator.</param>
     /// <param name="password">
     ///     The initial password: <see cref="ReviewLimits.MinPasswordLength"/> to
     ///     <see cref="ReviewLimits.MaxPasswordLength"/> characters, taken as it is (not trimmed).
@@ -124,12 +124,11 @@ public sealed class UserService
     /// <param name="cancellationToken">Cancels the operation.</param>
     /// <returns>The stored user; only the hash of the password is kept.</returns>
     /// <exception cref="ArgumentNullException">Thrown when <paramref name="actor"/> is null.</exception>
-    /// <exception cref="ArgumentOutOfRangeException">Thrown when <paramref name="role"/> is not a defined value.</exception>
     /// <exception cref="DomainRuleException">Thrown when a rule is violated (see <see cref="DomainRule"/>); nothing is stored then.</exception>
     public async Task<User> CreateAsync(
         string? username,
         string? displayName,
-        UserRole role,
+        bool isSystemAdmin,
         string? password,
         Actor actor,
         CancellationToken cancellationToken = default)
@@ -140,10 +139,6 @@ public sealed class UserService
         ValidateUsername(username);
         var trimmedDisplayName = ValidateDisplayName(displayName);
         ValidatePassword(password);
-        if (!Enum.IsDefined(role))
-        {
-            throw new ArgumentOutOfRangeException(nameof(role), role, "The role is not a known value.");
-        }
 
         // The store enforces the unique user name, which also covers two requests racing; the audit entry never
         // carries the password or its hash
@@ -152,12 +147,15 @@ public sealed class UserService
             {
                 Username = username!,
                 DisplayName = trimmedDisplayName,
-                Role = role,
+                IsSystemAdmin = isSystemAdmin,
                 Enabled = true,
                 PasswordHash = _hasher.Hash(password!),
                 Created = _timeProvider.GetUtcNow()
             },
-            stored => AuditDraft.By(actor, "user.created", $"user '{stored.Username}', role {stored.Role}"),
+            stored => AuditDraft.By(
+                actor,
+                "user.created",
+                $"user '{stored.Username}'{(stored.IsSystemAdmin ? ", system administrator" : string.Empty)}"),
             cancellationToken);
     }
 
@@ -344,45 +342,43 @@ public sealed class UserService
     }
 
     /// <summary>
-    ///     Changes the role of a user.
+    ///     Makes a user a system administrator or takes that right away.
     /// </summary>
     /// <param name="username">The user name; compared without regard to case.</param>
-    /// <param name="role">The new role.</param>
+    /// <param name="isSystemAdmin"><c>true</c> to make the user a system administrator; <c>false</c> to demote.</param>
     /// <param name="actor">The administrator who makes the change; recorded in the audit trail. Must not be null.</param>
     /// <param name="cancellationToken">Cancels the operation.</param>
     /// <returns>A task that completes when the change is stored.</returns>
     /// <exception cref="ArgumentNullException">Thrown when <paramref name="actor"/> is null.</exception>
-    /// <exception cref="ArgumentOutOfRangeException">Thrown when <paramref name="role"/> is not a defined value.</exception>
     /// <exception cref="DomainRuleException">
     ///     Thrown with <see cref="DomainRule.UserNotFound"/> when there is no such user, or with
-    ///     <see cref="DomainRule.LastAdmin"/> when the change would demote the last enabled administrator.
+    ///     <see cref="DomainRule.LastAdmin"/> when the change would demote the last enabled system administrator.
     /// </exception>
-    public async Task SetRoleAsync(
+    public async Task SetSystemAdminAsync(
         string username,
-        UserRole role,
+        bool isSystemAdmin,
         Actor actor,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(actor);
-        if (!Enum.IsDefined(role))
-        {
-            throw new ArgumentOutOfRangeException(nameof(role), role, "The role is not a known value.");
-        }
 
         await _gate.WaitAsync(cancellationToken);
         try
         {
             var user = await LoadAsync(username, cancellationToken);
-            if (role != UserRole.Admin)
+            if (!isSystemAdmin)
             {
                 await EnsureNotLastAdminAsync(user, cancellationToken);
             }
 
-            var previous = user.Role;
-            user.Role = role;
+            var previous = user.IsSystemAdmin;
+            user.IsSystemAdmin = isSystemAdmin;
             await _store.UpdateAsync(
                 user,
-                AuditDraft.By(actor, "user.role-changed", $"user '{user.Username}': {previous} -> {role}"),
+                AuditDraft.By(
+                    actor,
+                    "user.admin-changed",
+                    $"user '{user.Username}': system administrator {previous} -> {isSystemAdmin}"),
                 cancellationToken);
         }
         finally
@@ -510,19 +506,19 @@ public sealed class UserService
     /// <exception cref="DomainRuleException">Thrown with <see cref="DomainRule.LastAdmin"/> when the user is the only enabled administrator.</exception>
     private async Task EnsureNotLastAdminAsync(User user, CancellationToken cancellationToken)
     {
-        // Only an enabled administrator counts; anyone else can be changed freely
-        if (user.Role != UserRole.Admin || !user.Enabled)
+        // Only an enabled system administrator counts; anyone else can be changed freely
+        if (!user.IsSystemAdmin || !user.Enabled)
         {
             return;
         }
 
         var others = (await _store.ListAsync(cancellationToken))
-            .Count(other => other.Id != user.Id && other.Role == UserRole.Admin && other.Enabled);
+            .Count(other => other.Id != user.Id && other.IsSystemAdmin && other.Enabled);
         if (others == 0)
         {
             throw new DomainRuleException(
                 DomainRule.LastAdmin,
-                "At least one enabled administrator must remain.");
+                "At least one enabled system administrator must remain.");
         }
     }
 

@@ -511,4 +511,90 @@ public class ChecklistPageTests : PageTestBase
                 $"A <{element.LocalName}> has no kebab-case data-testid (found '{testId}').");
         }
     }
+
+    /// <summary>
+    ///     Asserts that the page shows only the not-found message and nothing of the project, the review or its
+    ///     checklist.
+    /// </summary>
+    /// <param name="cut">The rendered page.</param>
+    private static void AssertNothingOfTheChecklistIsShown(IRenderedComponent<ChecklistPage> cut)
+    {
+        Assert.NotEmpty(cut.FindAll("[data-testid='checklist-not-found']"));
+        Assert.Empty(cut.FindAll("[data-testid='checklist-status']"));
+        Assert.Empty(cut.FindAll("[data-testid='checklist-progress']"));
+        foreach (var secret in new[] { "Apollo", "First review", "REQ-01", "checks answered", "Answered by" })
+        {
+            Assert.DoesNotContain(secret, cut.Markup, StringComparison.Ordinal);
+        }
+    }
+
+    /// <summary>
+    ///     Test that a user who is no member of the project gets the same page as for a review that does not exist and
+    ///     sees nothing of the checklist.
+    /// </summary>
+    [Fact]
+    public async Task ChecklistPage_Render_NonMember_LooksLikeAMissingReview()
+    {
+        // Arrange: a review, opened by a user who is no member of its project
+        var projectId = await CreateReviewAsync();
+        await Users.CreateAsync("out", "Out", UserRole.Reviewer, "correct horse battery", TestContext.Current.CancellationToken);
+        SignInAs("out", "Out", UserRole.Reviewer);
+
+        // Act
+        var cut = RenderPage(projectId);
+        var missing = RenderPage(999);
+
+        // Assert: the message is the one for a missing project and nothing of the checklist is shown
+        Assert.Equal(
+            missing.Find("[data-testid='checklist-not-found']").TextContent.Replace("project 999", "project #"),
+            cut.Find("[data-testid='checklist-not-found']").TextContent.Replace($"project {projectId}", "project #"));
+        AssertNothingOfTheChecklistIsShown(cut);
+    }
+
+    /// <summary>
+    ///     Test that a member who loses the membership while the checklist is open gets the not-found page at the next
+    ///     answer, which is not stored, and that nothing of the checklist stays in the page.
+    /// </summary>
+    [Fact]
+    public async Task ChecklistPage_Choose_MembershipRevoked_ShowsNotFoundAndNoData()
+    {
+        // Arrange: a member has the checklist open and sees it
+        var projectId = await CreateReviewAsync();
+        var member = await Users.CreateAsync("mem", "Mem", UserRole.Reviewer, "correct horse battery", TestContext.Current.CancellationToken);
+        await Store.AddMembershipAsync(member.Id, projectId, TestContext.Current.CancellationToken);
+        SignInAs("mem", "Mem", UserRole.Reviewer);
+        var cut = RenderPage(projectId);
+        Assert.NotEmpty(cut.FindAll("[data-testid='checklist-status']"));
+        await RevokeMembershipAsync(projectId, "mem");
+
+        // Act: pass the first check
+        await cut.Find("[data-testid='check-pass-req-01']").ClickAsync();
+
+        // Assert: the not-found page, no data, and no answer stored
+        AssertNothingOfTheChecklistIsShown(cut);
+        var state = await Checklists.GetAsync(projectId, "REV-1", TestContext.Current.CancellationToken);
+        Assert.Null(state!.AnswerFor("REQ-01"));
+    }
+
+    /// <summary>
+    ///     Test that opening or closing a section of an open page also re-checks the access, so the data that was
+    ///     loaded disappears at the first interaction after the removal.
+    /// </summary>
+    [Fact]
+    public async Task ChecklistPage_ToggleSection_MembershipRevoked_ShowsNotFoundAndNoData()
+    {
+        // Arrange: a member has the checklist open
+        var projectId = await CreateReviewAsync();
+        var member = await Users.CreateAsync("mem", "Mem", UserRole.Reviewer, "correct horse battery", TestContext.Current.CancellationToken);
+        await Store.AddMembershipAsync(member.Id, projectId, TestContext.Current.CancellationToken);
+        SignInAs("mem", "Mem", UserRole.Reviewer);
+        var cut = RenderPage(projectId);
+        await RevokeMembershipAsync(projectId, "mem");
+
+        // Act: open the second section
+        await cut.Find("[data-testid='section-des-toggle']").ClickAsync();
+
+        // Assert
+        AssertNothingOfTheChecklistIsShown(cut);
+    }
 }

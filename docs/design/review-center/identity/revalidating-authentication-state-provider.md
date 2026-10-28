@@ -6,7 +6,8 @@
 
 `RevalidatingAuthenticationStateProvider` keeps the sign-in of an open interactive page honest. Its single
 responsibility is to re-check, at a fixed interval, that the user of an open page (a Blazor circuit, the live
-connection of one browser tab) still exists, is enabled, and has the same role and display name as at sign-in, and to
+connection of one browser tab) still exists, is enabled, and has the same system administrator state and display name as
+at sign-in, and to
 end the sign-in state of that page when this is no longer so. The cookie is only checked when a request is made, but an
 open interactive page makes none, so without this unit a user who is disabled, removed, or changed while a page is open
 would keep that page.
@@ -26,7 +27,8 @@ concurrent reads.
 takes it from `AuthOptions.RevalidationSeconds` (default 30, validated to be at least 5 at start-up); an internal
 constructor takes it directly so tests can use a very short interval.
 
-**State**: the authentication state itself (a `ClaimsPrincipal` with the name, display-name, and role claims of
+**State**: the authentication state itself (a `ClaimsPrincipal` with the name and display-name claims, and the
+`SystemAdmin` role claim for a system administrator, of
 the cookie) is held by the framework base class. The framework sets it from the cookie principal of the request when the
 circuit starts, and raises its state-changed event, which starts the loop. The unit adds no state of its own and is
 safe to touch from the thread-pool thread on which the loop continues, because it reads only the singleton service and
@@ -46,7 +48,8 @@ listen to the state (see `SessionGate` in the `App` unit) react to it.
 
 - *Parameters*: `AuthenticationState state` — the state to check; `CancellationToken cancellationToken` — cancelled
   when the circuit is closed.
-- *Returns*: `Task<bool>` — `true` when the user exists, is enabled, and has the same role and display name as in the
+- *Returns*: `Task<bool>` — `true` when the user exists, is enabled, and has the same system administrator state and
+  display name as in the
   state; `false` when not, when the state has no user name, and when the user could not be read.
 - *Preconditions*: `state` is not null.
 - *Postconditions*: Nothing is changed in the store or in the state; the framework acts on the result.

@@ -5,7 +5,7 @@
 #### Purpose
 
 `UserCommand` is the `user add` verb. Its single responsibility is to create a user in the configured database from the
-command line, which is how the first administrator is created before anyone can sign in to the web server.
+command line, which is how the first system administrator is created before anyone can sign in to the web server.
 
 #### Data Model
 
@@ -20,7 +20,7 @@ and in the shell history. It is read from the first of these that applies:
 1. the `REVIEWCENTER_PASSWORD` environment variable, when it is set and not empty (for scripts and containers);
 2. the first line of standard input, when standard input is redirected (for a pipe);
 3. an interactive prompt that does not echo the typed characters, asked twice ("Password" and "Repeat password"),
-   because a typo in the only password of the first administrator would lock the operator out.
+   because a typo in the only password of the first system administrator would lock the operator out.
 
 The password is used as it is, so the line read from standard input is not trimmed. Neither the password nor its hash
 is printed or logged.
@@ -29,13 +29,15 @@ is printed or logged.
 
 **Run**: Creates the user described by the command-line context.
 
-- *Parameters*: `Context context` — carries the user name, the display name, and the role (`Reviewer` unless
-  `--role Admin` was given) and receives the results and errors; `Func<string?>? passwordSource` — supplies the
+- *Parameters*: `Context context` — carries the user name, the display name, and the system administrator switch (an
+  ordinary user unless `--system-admin` was given) and receives the results and errors; `Func<string?>? passwordSource`
+  — supplies the
   password, `null` for the real sources above (tests pass a fixed value); `Action<ConfigurationManager>? configure` —
   adjusts the configuration before the services are built (tests use it to select a temporary database).
 - *Returns*: `void`.
 - *Preconditions*: `context` is not null.
-- *Postconditions*: The user exists and a line "Created user '{name}' with the role {role}." is written; otherwise an
+- *Postconditions*: The user exists and a line "Created user '{name}' (system administrator)." or, for an ordinary
+  user, "Created user '{name}'." is written; otherwise an
   error has been reported through `Context.WriteError`, which makes the exit code 1.
 
 The password is read first, so that a missing one is reported before the database is touched. The command then builds
@@ -61,7 +63,8 @@ system error, or an access error). The two entries of the interactive prompt tha
 
 #### Dependencies
 
-- **Context** — supplies the user name, display name, and role, and receives the results and errors.
+- **Context** — supplies the user name, display name, and system administrator switch, and receives the results and
+  errors.
 - **ServerHost** — `AddServices` registers the persistence and the Core services for the command.
 - **DatabaseSetup** — creates the database when needed.
 - **UserService** — creates the user.

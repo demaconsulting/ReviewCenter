@@ -4,12 +4,15 @@
 
 #### Purpose
 
-`PlanPage` is the page at `/projects/{id}/plan`. Its responsibility is to show which review-sets of a registered git
-repository need a review at a head revision, and to create the reviews the user ticks. It is built so that a user can
+`PlanPage` is the page at `/projects/{id}/plan`. Its responsibility is to show which review-sets of a git
+repository of the project need a review at a head revision, and to create the reviews the user ticks. It is built so
+that a user can
 see at once what matters and what to do next: one plain summary sentence, then the sets that need a review (ticked by
 default), then the rest in groups that are shown only when they are not empty, with the sets that have nothing to
 review collapsed behind a count. It contains no planning rule: the baseline choice, the classification of the sets, the
-identifiers, and the creation are in `ReviewPlanner`. It requires a signed-in user. It is a Razor component split into
+identifiers, and the creation are in `ReviewPlanner`. It requires a signed-in user, and a project the user may not see
+looks like a project that does not exist (the not-found message, no form, no repository). It is a Razor component
+split into
 presentation (`PlanPage.razor`) and behavior (`PlanPage.razor.cs`).
 
 #### Data Model
@@ -18,8 +21,10 @@ The page instance is created per browser connection, so its state is per user.
 
 **ProjectId**: `int` — the route parameter.
 
-**Loaded**, **Project**, **Repositories**: whether loading finished, the project (`null` when it does not exist), and
-the enabled repositories (`RepositorySummary` values, which carry no location and no token). A single enabled
+**Loaded**, **Project**, **Repositories**: whether loading finished, the project (`null` when it does not exist or the
+user may not see it), and
+the enabled repositories of the project (`RepositorySummary` values, which carry no location and no token). A single
+enabled
 repository is preselected.
 
 **RepositoryIdText**, **HeadRevision**, **BaselineRevision**, **Mode**: the form values. The mode is one of `None`,
@@ -65,13 +70,16 @@ since the last signed review of each set, the default).
 
 #### Key Methods
 
-**OnParametersSetAsync**: Loads the project and the enabled repositories when the project identity changes. When the
+**OnParametersSetAsync**: Loads the project, for the signed-in user, and the enabled repositories of the project when
+the project identity changes. When the
 router reuses the component for another project, it first discards the form values, the plan, the results, and the error.
-A project that does not exist leaves `Project` null and the page shows a message; when no repository is enabled the page
-shows a plain message ("No repository is registered; ask an administrator.") instead of the form.
+A project that does not exist, or that the user may not see, leaves `Project` null and the page shows the same message;
+when the project has no enabled repository the page
+shows a plain message ("This project has no repository; ask a project administrator to add one.") instead of the form.
 
 **LoadPlanAsync**: Checks the form (a repository, a head revision, and for the explicit mode a baseline revision), each
-with a message that says what is missing, and then calls `ReviewPlanner.PlanAsync`. On success every row that needs a
+with a message that says what is missing, and then calls `ReviewPlanner.PlanAsync` on behalf of the signed-in user. On
+success every row that needs a
 review is ticked. The button shows "Reading repository..." while git is read, and every form control is disabled while
 the page is busy (reading or creating), so the inputs cannot change under a request that is still running and a late
 answer cannot replace the plan of other inputs.
@@ -113,12 +121,21 @@ uniqueness on the set, the head, and the baseline, so two users (or two tabs) wh
 instant can both succeed; the second review gets the identifier suffix `-2`. The page also passes no cancellation token,
 so when a circuit is closed a running read finishes until the git timeout.
 
+**Access re-check**: Showing the plan and creating the reviews start with `GuardAsync`, which asks
+`ProjectViewGuard.GuardViewAsync` whether the signed-in user may still see the project; the mode choice and the ticks
+are wrapped at their binding by `GuardedAsync`. When access is lost, `ShowNoAccess` ends any read or creation in flight
+(the version of the form is advanced, so a late result is ignored), clears the form, the plan, the results, and the
+project and its repositories, and shows the same message as for a project that does not exist. No plan is read and no
+review is created. The text boxes of the form only discard the plan and show no project data, so they are not guarded.
+
 #### Dependencies
 
 - **SessionGate** (App) — wraps the whole page content, so the page is replaced by a "Session ended" message when the
   sign-in state of the open page ends.
-- **ProjectService** — reads the project.
-- **RepositoryService** — lists the enabled repositories (names only).
+- **IProjectAccess** (Core) — through `ProjectViewGuard`, asked before every handler whether the user may still see the
+  project.
+- **ProjectService** — reads the project for the signed-in user.
+- **RepositoryService** — lists the enabled repositories of the project (names only).
 - **ReviewPlanner** (Core) — makes the plan and creates the reviews.
 - **SignIn** — `GetActorAsync` supplies the signed-in user.
 - **ASP.NET Core Blazor components** — the component base class, the authorization attribute, and the interactive

@@ -523,7 +523,7 @@ public class CliSubsystemTests
             Console.SetOut(outWriter);
 
             // Act: parse the verb, print the help, and parse two misuses
-            using var context = Context.Create(["user", "add", "--username", "ann", "--display-name", "Ann", "--role", "Admin"]);
+            using var context = Context.Create(["user", "add", "--username", "ann", "--display-name", "Ann", "--system-admin"]);
             using var help = Context.Create(["--help"]);
             Program.Run(help);
             var noName = Record.Exception(() => Context.Create(["user", "add"]));
@@ -533,7 +533,7 @@ public class CliSubsystemTests
             Assert.True(context.UserAdd);
             Assert.Equal("ann", context.Username);
             Assert.Equal("Ann", context.DisplayName);
-            Assert.Equal(DemaConsulting.ReviewCenter.Core.UserRole.Admin, context.Role);
+            Assert.True(context.SystemAdmin);
             var output = outWriter.ToString();
             Assert.Contains("user add", output);
             Assert.Contains("REVIEWCENTER_PASSWORD", output);

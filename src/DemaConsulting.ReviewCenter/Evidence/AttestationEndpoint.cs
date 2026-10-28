@@ -28,8 +28,10 @@ namespace DemaConsulting.ReviewCenter.Evidence;
 ///     The download endpoint of the signed PDF attestation of a completed review.
 /// </summary>
 /// <remarks>
-///     <c>GET /projects/{projectId}/reviews/{reviewId}/attestation.pdf</c> is authorized like viewing the review: any
-///     signed-in user may download it, and anybody else is sent to the sign-in page by the authentication scheme.
+///     <c>GET /projects/{projectId}/reviews/{reviewId}/attestation.pdf</c> is authorized like viewing the review: a
+///     system administrator or a member of the project may download it, and anybody else is sent to the sign-in page by
+///     the authentication scheme (when not signed in) or gets the same 404 as for a review that does not exist (when
+///     not allowed to see the project; see <see cref="AttestationService.GenerateAsync"/>).
 ///     It answers 200 with the PDF, 404 when the review does not exist, 409 when the review is not complete or changed
 ///     while the attestation was being prepared, and 500
 ///     (a problem document that names the setting to correct) when the signing key is not usable.

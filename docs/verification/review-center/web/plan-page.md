@@ -17,7 +17,8 @@ N/A - standard test environment.
 #### Acceptance Criteria
 
 - All component tests pass with zero failures.
-- An unknown project shows a not-found message and no form; a project without a registered repository shows a plain
+- An unknown project, or one the user may not see, shows a not-found message and no form; a project without an enabled
+  repository shows a plain
   message and no form; otherwise the form offers the enabled repositories by name only (a single one is preselected),
   never a location, user name, or token, and the baseline choice defaults to Last reviewed, with the baseline text box
   only for Explicit revision.
@@ -42,15 +43,15 @@ N/A - standard test environment.
 
 #### Test Scenarios
 
-**PlanPage_Render_OneRepository_ShowsFormWithDefaults**: One repository is registered; the form has the repository
+**PlanPage_Render_OneRepository_ShowsFormWithDefaults**: One repository of the project is enabled; the form has the repository
 preselected, an empty head, the Last reviewed baseline chosen, and no baseline text box. This scenario is tested by
 `PlanPage_Render_OneRepository_ShowsFormWithDefaults`.
 
 **PlanPage_Render_UnknownProject_ShowsNotFound**: The page is rendered for an unknown project; the message names the
 identity and there is no form. This scenario is tested by `PlanPage_Render_UnknownProject_ShowsNotFound`.
 
-**PlanPage_Render_NoRepository_ShowsPlainMessageInsteadOfForm**: Without a repository the page says "No repository is
-registered; ask an administrator." and shows no form. This scenario is tested by
+**PlanPage_Render_NoRepository_ShowsPlainMessageInsteadOfForm**: Without a repository the page says "This project has no
+repository; ask a project administrator to add one." and shows no form. This scenario is tested by
 `PlanPage_Render_NoRepository_ShowsPlainMessageInsteadOfForm`.
 
 **PlanPage_Render_SeveralRepositories_OffersEnabledOnesWithoutSecrets**: Two enabled repositories and a disabled one
@@ -165,3 +166,16 @@ nothing is created. This scenario is tested by `PlanPage_Create_WholeBatchRefuse
 
 **PlanPage_AfterRender_Interactive_SetsMarker**: After the first render the root element reports `true`. This scenario is
 tested by `PlanPage_AfterRender_Interactive_SetsMarker`.
+
+**PlanPage_Render_NonMember_LooksLikeAMissingProject**: A project with a repository is opened by a user who is no
+member. The not-found text equals the text for a project that does not exist (apart from the project number), and no
+form, plan, project name, repository name or set title is shown. This scenario is tested by
+`PlanPage_Render_NonMember_LooksLikeAMissingProject`.
+
+**PlanPage_ShowPlan_MembershipRevoked_ShowsNotFoundAndNoPlan**: A member has the form open and the membership is
+removed; asking for the plan shows the not-found message, and nothing of the project, the repository or a plan is in
+the markup. This scenario is tested by `PlanPage_ShowPlan_MembershipRevoked_ShowsNotFoundAndNoPlan`.
+
+**PlanPage_CreateReviews_MembershipRevoked_CreatesNothing**: A member has a plan shown and the membership is removed;
+pressing the create button shows the not-found message without the plan, and no review exists. This scenario is tested
+by `PlanPage_CreateReviews_MembershipRevoked_CreatesNothing`.

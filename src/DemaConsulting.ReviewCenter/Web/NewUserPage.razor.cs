@@ -29,8 +29,8 @@ namespace DemaConsulting.ReviewCenter.Web;
 ///     Code-behind for the new user page (<c>NewUserPage.razor</c>): creates a user.
 /// </summary>
 /// <remarks>
-///     An attribute on the page limits entry to administrators; the submission also re-checks that the signed-in
-///     user is still an enabled administrator (defense in depth; <see cref="UserService"/> checks the rules). A rule
+///     An attribute on the page limits entry to system administrators; the submission also re-checks that the signed-in
+///     user is still an enabled system administrator (defense in depth; <see cref="UserService"/> checks the rules). A rule
 ///     violation is shown next to the form instead of being thrown. The password is never shown or logged and is
 ///     emptied as soon as it has been used. Each browser connection (circuit) gets its own page instance, so the
 ///     state here is per-user and needs no synchronization.
@@ -72,9 +72,9 @@ public partial class NewUserPage : ComponentBase
     private string NewDisplayName { get; set; } = string.Empty;
 
     /// <summary>
-    ///     Gets or sets the role chosen in the form.
+    ///     Gets or sets whether the new user is a system administrator.
     /// </summary>
-    private UserRole NewRole { get; set; } = UserRole.Reviewer;
+    private bool NewSystemAdmin { get; set; }
 
     /// <summary>
     ///     Gets or sets the initial password typed into the form.
@@ -137,15 +137,15 @@ public partial class NewUserPage : ComponentBase
         }
 
         var current = await UserService.GetAsync(actor.Username);
-        if (current is not { Enabled: true, Role: UserRole.Admin })
+        if (current is not { Enabled: true, IsSystemAdmin: true })
         {
-            ErrorMessage = "Administrator rights are required.";
+            ErrorMessage = "System administrator rights are required.";
             return;
         }
 
         try
         {
-            await UserService.CreateAsync(NewUsername, NewDisplayName, NewRole, password, actor);
+            await UserService.CreateAsync(NewUsername, NewDisplayName, NewSystemAdmin, password, actor);
         }
         catch (DomainRuleException ex)
         {

@@ -46,8 +46,7 @@ supplied via `--depth`.
 
 **DisplayName**: `string?` — The display name supplied via `--display-name`; set whenever `UserAdd` is `true`.
 
-**Role**: `UserRole` — The role supplied via `--role` (`Admin` or `Reviewer`, without regard to case);
-`Reviewer` when the option was not supplied.
+**SystemAdmin**: `bool` — `true` when the switch `--system-admin` was supplied; `false` (an ordinary user) when not.
 
 **ExitCode**: `int` (derived) — Returns 1 if `_hasErrors` is true; returns 0 otherwise.
 
@@ -66,7 +65,7 @@ calling `OpenLogFile` if `--log` was present. The parser treats `serve` as a ver
 `Serve`, and `--urls` as an option whose value must parse as an absolute http or https URL.
 It treats `user` as a verb that must be followed by the action `add`, which sets `UserAdd`, and `audit` as a verb that
 must be followed by the action `verify`, which sets `AuditVerify`; `--username` and
-`--display-name` take a text value and `--role` takes the name of a role (numbers are not accepted).
+`--display-name` take a text value and `--system-admin` is a switch without a value.
 After all arguments are consumed, the parser rejects a `--urls` value given without `serve`, rejects the user options
 given without `user add`, and rejects `user add` without both `--username` and `--display-name`.
 The password is not an argument: it is never read from the command line (see `UserCommand`).
@@ -104,9 +103,8 @@ missing, when the value is not an absolute http or https URL
 ("--urls requires an absolute http or https URL but was '{value}'"), and when `--urls` is
 supplied without the `serve` verb ("--urls requires the serve verb"). For `user` it throws `ArgumentException` when
 the action is missing or is not `add` ("user requires the add action"), for `--username` and `--display-name` when the
-value is missing, for `--role` when the value is missing or is not `Admin` or `Reviewer`
-("--role requires Admin or Reviewer but was '{value}'"), when a user option is supplied without `user add`
-("--username, --display-name and --role require the user add verb"), and when `user add` lacks a name
+value is missing, when a user option is supplied without `user add`
+("--username, --display-name and --system-admin require the user add verb"), and when `user add` lacks a name
 ("user add requires --username and --display-name"). For `audit` it throws `ArgumentException` when the action is
 missing or is not `verify` ("audit requires the verify action"). It throws
 `InvalidOperationException` ("Failed to open log file '{path}': {detail}") when the `--log`
@@ -119,8 +117,7 @@ available.
 
 #### Dependencies
 
-- **.NET BCL** — `Console`, `StreamWriter`, `Path`, and `Uri`.
-- **UserRole** (Core) — the type of the `Role` property; no other tool units are used.
+- **.NET BCL** — `Console`, `StreamWriter`, `Path`, and `Uri`; no other tool units are used.
 
 #### Callers
 
@@ -128,5 +125,5 @@ available.
 - **Validation** — receives `Context` from `Program` and calls `WriteLine` and `WriteError`.
 - **ServerHost** — reads `Urls` and `Silent`, and calls `WriteError` when the server cannot
   start.
-- **UserCommand** — reads `Username`, `DisplayName`, and `Role`, and calls `WriteLine` and `WriteError`.
+- **UserCommand** — reads `Username`, `DisplayName`, and `SystemAdmin`, and calls `WriteLine` and `WriteError`.
 - **AuditCommand** — calls `WriteLine` for an intact chain and `WriteError` for a broken chain or a read failure.

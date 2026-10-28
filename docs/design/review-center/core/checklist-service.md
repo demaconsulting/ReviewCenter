@@ -68,7 +68,11 @@ decision, as for a comment author (see `ThreadService`). A null actor is a progr
 `ArgumentNullException`; there is no rule about the name, because the display name of a user was validated when the
 user was created.
 
-#### Key Methods
+**Access**: every change (`SetAnswerAsync`, `SetSectionApplicabilityAsync`) first requires that the actor may see the
+project (`IProjectAccess.RequireViewAsync`), so a user outside the project, like an anonymous or disabled one, gets
+`ProjectNotFound`, identical to a project that does not exist, before the review or the input is looked at. Every
+member of the project can answer. Reads (`GetAsync`) take no actor; the boundary guards them (every page and API
+handler first reads the project as the actor).
 
 **GetAsync**: Reads the checklist of a review.
 
@@ -105,12 +109,13 @@ the `AuditService` unit for the detail formats.
 
 #### Error Handling
 
-Rule violations raise `DomainRuleException` with the matching `DomainRule`. A null store or clock at construction,
-or a null actor, raises `ArgumentNullException`. Store failures propagate unchanged.
+Rule violations raise `DomainRuleException` with the matching `DomainRule`. A null store, project access, or clock at
+construction, or a null actor, raises `ArgumentNullException`. Store failures propagate unchanged.
 
 #### Dependencies
 
 - **IReviewStore** — reads the frozen checklist, section states and answers, and saves the changes (injected).
+- **IProjectAccess** — requires that the actor may see the project (injected).
 - **TimeProvider** — supplies the answer times (injected).
 
 #### Callers

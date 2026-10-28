@@ -53,7 +53,7 @@ internal static class UserCommand
     /// </summary>
     /// <param name="context">
     ///     The parsed command line with <see cref="Context.Username"/>, <see cref="Context.DisplayName"/> and
-    ///     <see cref="Context.Role"/>; results and errors are reported through it. Must not be null.
+    ///     <see cref="Context.SystemAdmin"/>; results and errors are reported through it. Must not be null.
     /// </param>
     /// <param name="passwordSource">
     ///     Supplies the password; <c>null</c> (the default) selects the real sources (environment variable,
@@ -106,10 +106,13 @@ internal static class UserCommand
                 host.Services.GetRequiredService<IOptions<DatabaseOptions>>().Value);
 
             var user = host.Services.GetRequiredService<UserService>()
-                .CreateAsync(context.Username, context.DisplayName, context.Role, password, Actor.CommandLine)
+                .CreateAsync(context.Username, context.DisplayName, context.SystemAdmin, password, Actor.CommandLine)
                 .GetAwaiter()
                 .GetResult();
-            context.WriteLine($"Created user '{user.Username}' with the role {user.Role}.");
+            context.WriteLine(
+                user.IsSystemAdmin
+                    ? $"Created user '{user.Username}' (system administrator)."
+                    : $"Created user '{user.Username}'.");
         }
         catch (DomainRuleException ex)
         {

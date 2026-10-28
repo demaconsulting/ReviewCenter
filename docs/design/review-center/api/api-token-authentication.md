@@ -19,8 +19,9 @@ the claim `rc_auth` with the value `pat`, and the claim `rc_token_id`) and the e
 
 `ApiTokenHandler` is the authentication handler of the scheme. A new instance serves each request. It holds the three
 services it uses (`PersonalAccessTokenService`, `SignInThrottle`, and `AuditService`) and no state of its own; the
-marker that a request was throttled is an item of the request. The principal it builds has the claims name, display
-name, and role of the owner (the same claim types as the cookie principal), `rc_auth`, and `rc_token_id` (the display id
+marker that a request was throttled is an item of the request. The principal it builds has the claims name and display
+name of the owner, the `SystemAdmin` role claim only when the owner is a system administrator (the same claim types
+as the cookie principal), `rc_auth`, and `rc_token_id` (the display id
 of the token, which is not secret).
 
 #### Key Methods

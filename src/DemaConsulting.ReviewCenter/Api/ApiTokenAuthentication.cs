@@ -307,20 +307,26 @@ internal sealed class ApiTokenHandler : AuthenticationHandler<AuthenticationSche
     /// </summary>
     /// <param name="validation">The accepted validation; carries the owner and the token.</param>
     /// <returns>
-    ///     A principal with the same name, display name and role claims as the cookie principal (so every
+    ///     A principal with the same name, display name and administrator-role claims as the cookie principal (so every
     ///     claims-based rule applies unchanged), marked as token-authenticated with the token's display id.
     /// </returns>
     private ClaimsPrincipal BuildPrincipal(TokenValidation validation)
     {
         var user = validation.User!;
+        var claims = new List<Claim>
+        {
+            new(ClaimTypes.Name, user.Username),
+            new(SignIn.DisplayNameClaimType, user.DisplayName),
+            new(ApiTokenAuthentication.AuthMethodClaimType, ApiTokenAuthentication.TokenAuthMethod),
+            new(ApiTokenAuthentication.TokenIdClaimType, validation.Token!.DisplayId)
+        };
+        if (user.IsSystemAdmin)
+        {
+            claims.Add(new Claim(ClaimTypes.Role, SignIn.AdminRole));
+        }
+
         var identity = new ClaimsIdentity(
-            [
-                new Claim(ClaimTypes.Name, user.Username),
-                new Claim(SignIn.DisplayNameClaimType, user.DisplayName),
-                new Claim(ClaimTypes.Role, user.Role.ToString()),
-                new Claim(ApiTokenAuthentication.AuthMethodClaimType, ApiTokenAuthentication.TokenAuthMethod),
-                new Claim(ApiTokenAuthentication.TokenIdClaimType, validation.Token!.DisplayId)
-            ],
+            claims,
             Scheme.Name,
             ClaimTypes.Name,
             ClaimTypes.Role);

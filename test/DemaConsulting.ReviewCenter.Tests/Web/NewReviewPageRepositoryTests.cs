@@ -61,6 +61,7 @@ public class NewReviewPageRepositoryTests : PageTestBase
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         await Users.CreateAsync("adm", "Adm", UserRole.Admin, "correct horse battery", cancellationToken);
+        var project = await Projects.CreateAsync("Apollo", null, cancellationToken);
         var repository = await Repositories.CreateAsync("main-repo", Location, "svc", "hidden-token-42", _admin, cancellationToken);
         Git.Revisions["main"] = HeadSha;
         Git.Revisions["v1"] = BaseSha;
@@ -72,7 +73,6 @@ public class NewReviewPageRepositoryTests : PageTestBase
                 ("src/mod.txt", ChangeKind.Modified, "world\n", "hello\n"),
                 ("src/new.txt", ChangeKind.Added, null, "world\n")
             ]);
-        var project = await Projects.CreateAsync("Apollo", null, cancellationToken);
         return (project.Id, repository.Id);
     }
 

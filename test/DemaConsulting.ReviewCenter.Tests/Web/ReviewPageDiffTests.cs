@@ -71,6 +71,7 @@ public class ReviewPageDiffTests : PageTestBase
         var cancellationToken = TestContext.Current.CancellationToken;
         var admin = new Actor("adm", "Adm");
         await Users.CreateAsync("adm", "Adm", UserRole.Admin, "correct horse battery", cancellationToken);
+        var project = await Projects.CreateAsync("Apollo", null, cancellationToken);
         var repository = await Repositories.CreateAsync("main-repo", "https://example.com/org/repo.git", null, null, admin, cancellationToken);
         Git.Revisions["main"] = HeadSha;
         Git.Revisions["v1"] = BaseSha;
@@ -80,7 +81,6 @@ public class ReviewPageDiffTests : PageTestBase
         };
         changes.AddRange(extra);
         Git.Script(BaseSha, HeadSha, changes);
-        var project = await Projects.CreateAsync("Apollo", null, cancellationToken);
         await Reviews.CreateFromRepositoryAsync(
             project.Id, "REV-1", "From git", repository.Id, "main", "v1", "src/**", TestActors.Ann, cancellationToken);
         return project.Id;
@@ -361,7 +361,7 @@ public class ReviewPageDiffTests : PageTestBase
         var cancellationToken = TestContext.Current.CancellationToken;
         var projectId = await CreateReviewAsync();
         await Reviews.CreateDraftAsync(projectId, "REV-2", "Upload", [new("a.txt", TestContent.A)], cancellationToken);
-        var repository = (await Repositories.ListEnabledAsync(cancellationToken)).Single();
+        var repository = (await Repositories.ListEnabledAsync(TestActors.Ann, projectId, cancellationToken)).Single();
         Git.Script(null, HeadSha, [("src/new.txt", ChangeKind.Added, null, "new\n")]);
         await Reviews.CreateFromRepositoryAsync(
             projectId, "REV-3", "No baseline", repository.Id, "main", null, "src/**", TestActors.Ann, cancellationToken);
@@ -992,5 +992,33 @@ public class ReviewPageDiffTests : PageTestBase
         Assert.Equal("Keep me", cut.Find("[data-testid='thread-text-input']").GetAttribute("value"));
         Assert.Equal(string.Empty, cut.Find("[data-testid='thread-start-line-input']").GetAttribute("value") ?? string.Empty);
         Assert.Equal("Comment on the whole file.", cut.Find("[data-testid='thread-target']").TextContent);
+    }
+
+    /// <summary>
+    ///     Test that expanding a collapsed run of the diff re-checks the access: the lines of the loaded diff that were
+    ///     never shown are not revealed to a member whose membership was removed while the page was open.
+    /// </summary>
+    [Fact]
+    public async Task ReviewPage_DiffView_RevealRun_MembershipRevoked_RevealsNothingAndShowsNotFound()
+    {
+        // Arrange: a member has the diff open, with the first unchanged run (line l1) still collapsed
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var projectId = await CreateReviewAsync();
+        var member = await Users.CreateAsync("mem", "Mem", UserRole.Reviewer, "correct horse battery", cancellationToken);
+        await Store.AddMembershipAsync(member.Id, projectId, cancellationToken);
+        SignInAs("mem", "Mem", UserRole.Reviewer);
+        var cut = RenderPage(projectId);
+        await SelectFileAsync(cut, ModPath);
+        Assert.NotEmpty(cut.FindAll("[data-testid='diff-gap-0']"));
+        Assert.Empty(cut.FindAll("[data-testid='diff-row-0']"));
+        await RevokeMembershipAsync(projectId, "mem");
+
+        // Act: expand the run
+        await cut.Find("[data-testid='diff-gap-0']").ClickAsync();
+
+        // Assert: the page is the not-found page and the hidden lines were not revealed
+        Assert.NotEmpty(cut.FindAll("[data-testid='review-not-found']"));
+        Assert.Empty(cut.FindAll("[data-testid='diff-content']"));
+        Assert.Empty(cut.FindAll("[data-testid='diff-text-0']"));
     }
 }

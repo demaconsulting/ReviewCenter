@@ -24,6 +24,7 @@ using DemaConsulting.ReviewCenter.Core;
 using DemaConsulting.ReviewCenter.Evidence;
 using DemaConsulting.ReviewCenter.Hosting;
 using DemaConsulting.ReviewCenter.Storage;
+using DemaConsulting.ReviewCenter.Tests.Core;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.Configuration;
@@ -142,8 +143,7 @@ public class ServerHostTests
             // Act: start the pipeline against that database and create a project through the registered service
             await using (var app = await TestWebApp.StartAsync(logs, $"Data Source={file};Pooling=False", ["serve", "--silent"]))
             {
-                var project = await app.Services.GetRequiredService<ProjectService>()
-                    .CreateAsync("Apollo", null, TestContext.Current.CancellationToken);
+                var project = await TestWebApp.CreateProjectAsync(app, "Apollo");
 
                 // Assert: the database file exists and the project was stored in it
                 Assert.True(File.Exists(file));
@@ -169,15 +169,14 @@ public class ServerHostTests
         int projectId;
         await using (var first = await TestWebApp.StartAsync(logs, connectionString, ["serve", "--silent"]))
         {
-            var project = await first.Services.GetRequiredService<ProjectService>()
-                .CreateAsync("Apollo", null, TestContext.Current.CancellationToken);
+            var project = await TestWebApp.CreateProjectAsync(first, "Apollo");
             projectId = project.Id;
         }
 
         // Act: start a second instance on the same database
         await using var second = await TestWebApp.StartAsync(logs, connectionString, ["serve", "--silent"]);
         var found = await second.Services.GetRequiredService<ProjectService>()
-            .GetAsync(projectId, TestContext.Current.CancellationToken);
+            .GetAsync(TestActors.Ann, projectId, TestContext.Current.CancellationToken);
 
         // Assert: the project is still there
         Assert.Equal("Apollo", found?.Name);

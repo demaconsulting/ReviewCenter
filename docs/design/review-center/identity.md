@@ -16,8 +16,10 @@ rule that decides whether a signed-in user is still valid, and the conversion be
 `SignInThrottle`, the in-memory limit on sign-in attempts per client address and user name, with its options type
 `SignInThrottleOptions`; and `RevalidatingAuthenticationStateProvider`, which applies that rule to every open
 interactive page at a fixed interval. The types of the subsystem are internal to the application.
-The rules about accounts (the password policy, the lockout, the last administrator) are not here: they belong to
-`UserService` in the `Core` subsystem.
+The rules about accounts (the password policy, the lockout, the last system administrator) are not here: they belong to
+`UserService` in the `Core` subsystem. The rules about which project a user may see are not here either: they belong to
+`ProjectAccess` in the `Core` subsystem, which reads the memberships at every call. The cookie holds only the one right
+that does not depend on a project, the system administrator right.
 
 ### Interfaces
 
@@ -90,8 +92,8 @@ open interactive page (circuit).
 - *Type*: In-process .NET class derived from the revalidating state provider of the ASP.NET Core server framework.
 - *Role*: Provider.
 - *Contract*: After each interval, re-reads the signed-in user and keeps the sign-in state only while the user exists,
-  is enabled, and has the same role and display name; otherwise the state becomes anonymous and the components that
-  listen to it (`SessionGate`) react. A user that cannot be read counts as not valid (fail closed).
+  is enabled, and has the same system administrator state and display name; otherwise the state becomes anonymous and
+  the components that listen to it (`SessionGate`) react. A user that cannot be read counts as not valid (fail closed).
 - *Constraints*: The first check happens one interval after the state is set; scoped, one instance per circuit.
 
 **SignIn.GetActorAsync**: Used by the pages of the `Web` subsystem.
@@ -101,6 +103,15 @@ open interactive page (circuit).
 - *Contract*: Returns the `Actor` (user name and display name) of the signed-in user.
 - *Constraints*: Throws `DomainRuleException` with the rule `ActorNotAllowed` and the message "You are no longer signed
   in, so nothing was saved. Reload the page to sign in again." when nobody is signed in.
+
+**SignIn.GetActorOrNullAsync**: Used by the pages of the `Web` subsystem that must still render for an anonymous or
+changed session.
+
+- *Type*: In-process .NET extension method on the authentication state provider.
+- *Role*: Provider.
+- *Contract*: Returns the `Actor` of the signed-in user, or null when nobody is signed in.
+- *Constraints*: Never throws `DomainRuleException`; the caller decides what a missing actor means (project access
+  gives no access to a null actor).
 
 **UserService (consumed)**: The `Core` service that checks passwords and reads users.
 
@@ -120,13 +131,17 @@ lockout, and issues the authentication cookie. A cookie can only be set on an HT
 live connection, so signing in works before any connection exists. The two endpoints have their own paths because
 `/login` is answered by the login page, which would otherwise compete with a `POST` endpoint of the same path.
 
-The cookie holds the user name, the display name, and the role, and never the password or its hash. It is `HttpOnly`,
+The cookie holds the user name, the display name, and, only for a system administrator, the `SystemAdmin` role claim,
+and never the password or its hash, and never a project role or a membership. It is `HttpOnly`,
 `SameSite=Lax`, and `Secure` whenever the request is https (so it also works over plain http during development); it
 is a session cookie whose ticket slides over the `Auth:SessionHours` window. On every request the cookie is checked
 against the user store through `UserService`: the cookie is rejected, and the user must sign in again, when the user
-no longer exists, is disabled, or has a different role or display name than the cookie holds. Pages are protected by
+no longer exists, is disabled, or has a different system administrator state or display name than the cookie holds.
+Pages are protected by
 authorization attributes of the `Web` subsystem. The cookie handler answers an anonymous request for a protected page
-with a redirect to `/login`, and a signed-in user who lacks the needed role with HTTP status 403.
+with a redirect to `/login`, and a signed-in user who lacks the needed role (the system administrator role) with HTTP
+status 403. What a user may see in a project is decided by `ProjectAccess` from the memberships at every call, so
+the cookie does not need to change when a membership does.
 
 Passwords are hashed with the framework hasher (PBKDF2 with a random salt and an iteration count stored inside the
 hash). The adapter exists because `Core` has no reference to the web framework: it defines the two-method

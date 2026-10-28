@@ -37,6 +37,11 @@ public sealed class ReviewService
     private readonly IReviewStore _store;
 
     /// <summary>
+    ///     Decides who may see which project.
+    /// </summary>
+    private readonly IProjectAccess _access;
+
+    /// <summary>
     ///     The clock that supplies creation times.
     /// </summary>
     private readonly TimeProvider _timeProvider;
@@ -55,19 +60,23 @@ public sealed class ReviewService
     ///     Initializes a new instance of the <see cref="ReviewService"/> class.
     /// </summary>
     /// <param name="store">The store that persists reviews. Must not be null.</param>
+    /// <param name="access">The access rules; creating a review needs a member of the project. Must not be null.</param>
     /// <param name="timeProvider">The clock used for creation times; injected so tests control time. Must not be null.</param>
     /// <param name="repositories">The repository registry; needed only by <see cref="CreateFromRepositoryAsync"/>.</param>
     /// <param name="git">The git access; needed only by <see cref="CreateFromRepositoryAsync"/>.</param>
-    /// <exception cref="ArgumentNullException">Thrown when <paramref name="store"/> or <paramref name="timeProvider"/> is null.</exception>
+    /// <exception cref="ArgumentNullException">Thrown when a required argument is null.</exception>
     public ReviewService(
         IReviewStore store,
+        IProjectAccess access,
         TimeProvider timeProvider,
         RepositoryService? repositories = null,
         IGitRepositoryProvider? git = null)
     {
         ArgumentNullException.ThrowIfNull(store);
+        ArgumentNullException.ThrowIfNull(access);
         ArgumentNullException.ThrowIfNull(timeProvider);
         _store = store;
+        _access = access;
         _timeProvider = timeProvider;
         _repositories = repositories;
         _git = git;
@@ -111,14 +120,17 @@ public sealed class ReviewService
         ArgumentNullException.ThrowIfNull(files);
         ArgumentNullException.ThrowIfNull(actor);
 
+        // Whoever may not see the project learns nothing about it, not even from a validation message
+        await _access.RequireViewAsync(actor, projectId, cancellationToken);
+
         // Validate everything that needs no I/O first so a bad request fails fast and cheaply
         ValidateId(id);
         var trimmedTitle = ValidateTitle(title);
         ValidateFiles(files);
 
-        // The project must exist, and the id must be free within it. The store backs the id check up
+        // The id must be free within the project. The store backs the id check up
         // with a uniqueness constraint, which covers two requests racing past this check
-        await EnsureProjectAndFreeIdAsync(projectId, id!, cancellationToken);
+        await EnsureFreeIdAsync(projectId, id!, cancellationToken);
 
         // Keep the bytes verbatim and record the size and hash of each file alongside them
         var reviewFiles = files
@@ -212,6 +224,8 @@ public sealed class ReviewService
             throw new InvalidOperationException("This service was created without access to repositories.");
         }
 
+        await _access.RequireViewAsync(actor, projectId, cancellationToken);
+
         // Validate everything that needs no I/O first so a bad request fails fast and cheaply
         ValidateId(id);
         var trimmedTitle = ValidateTitle(title);
@@ -219,8 +233,8 @@ public sealed class ReviewService
         var baseline = string.IsNullOrWhiteSpace(baselineRevision) ? null : RevisionValidator.Validate(baselineRevision.Trim());
         var (patterns, selectionText) = ParseSelection(selection);
 
-        await EnsureProjectAndFreeIdAsync(projectId, id!, cancellationToken);
-        var access = await _repositories.GetAccessAsync(repositoryId, cancellationToken);
+        await EnsureFreeIdAsync(projectId, id!, cancellationToken);
+        var access = await _repositories.GetAccessAsync(projectId, repositoryId, cancellationToken);
 
         // The session resolves both revisions; everything after that is shared with the planner
         await using var session = await _git.OpenAsync(access, cancellationToken);
@@ -507,20 +521,15 @@ public sealed class ReviewService
     }
 
     /// <summary>
-    ///     Checks that the project exists and the review id is still free in it.
+    ///     Checks that the review id is still free in the project (the caller has checked the project).
     /// </summary>
     /// <param name="projectId">The project identity.</param>
     /// <param name="id">The review identifier.</param>
     /// <param name="cancellationToken">Cancels the operation.</param>
     /// <returns>A task that completes when both checks pass.</returns>
-    /// <exception cref="DomainRuleException">Thrown with <see cref="DomainRule.ProjectNotFound"/> or <see cref="DomainRule.ReviewIdDuplicate"/>.</exception>
-    private async Task EnsureProjectAndFreeIdAsync(int projectId, string id, CancellationToken cancellationToken)
+    /// <exception cref="DomainRuleException">Thrown with <see cref="DomainRule.ReviewIdDuplicate"/>.</exception>
+    private async Task EnsureFreeIdAsync(int projectId, string id, CancellationToken cancellationToken)
     {
-        if (await _store.GetProjectAsync(projectId, cancellationToken) is null)
-        {
-            throw new DomainRuleException(DomainRule.ProjectNotFound, $"Project {projectId} does not exist.");
-        }
-
         if (await _store.ReviewExistsAsync(projectId, id, cancellationToken))
         {
             throw new DomainRuleException(

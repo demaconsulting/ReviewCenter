@@ -3,7 +3,8 @@
 #### Verification Approach
 
 `ProjectPage` and `NewReviewPage` are verified with component tests defined in `ProjectPageTests.cs`, which holds the
-tests of both pages, and `NewReviewPageRepositoryTests.cs`, which use the bUnit test context
+tests of both pages, `NewReviewPageRepositoryTests.cs`, and `ProjectAccessPageTests.cs` (what a member, a non-member,
+and a system administrator see and do), which use the bUnit test context
 to render the real components over real Core services and an in-memory fake store. File selection is simulated the
 way a browser does it, by setting the files of the file input in the test context. Tests locate elements by their
 `data-testid` attributes (the page units share the helper `PageTestBase`) and wait for the asynchronous file
@@ -17,9 +18,20 @@ N/A - standard test environment.
 #### Acceptance Criteria
 
 - All component tests pass with zero failures.
-- An unknown project shows a not-found message and no form; a known project shows its name and description and
+- An unknown project shows a not-found message and no form, and so does a project the user is no member of (the same
+  message, `project-not-found`, and nothing of the project, on the project page and on the page for a new review); a
+  known project shows its name and description and
   its reviews as rows with link, title, state, and an Approved or In review badge, or an empty message. A review
   whose every slot has a current signature is Approved; a review without slots or with an unsigned slot is In review.
+- A member who is no administrator sees the reviews and the New review button, but no Members section, no add member
+  button, and no Repositories button.
+- A system administrator sees the Members section with each member, the role badge, a button that switches the role,
+  and a Remove button, and says so when the project has no members; the + Add member button reveals an inline form that
+  offers only users who are not members yet, and adds the chosen user with the chosen role; the role button and Remove
+  change the membership. The Repositories button is shown to whoever manages the project.
+- A system administrator who lost the flag after the page was opened changes nothing when acting, and the members, the
+  candidates, and the add form are dropped, while the reviews stay for a user who still is a member; a user who also
+  has no membership is shown the not-found message and none of the project.
 - Selected files are listed with names and sizes, and a new selection replaces the previous one; reusing the form
   page for another project shows that project and discards the previous form values and selection.
 - A valid form creates the review with the exact bytes and the correct fingerprint and opens the review page.
@@ -28,7 +40,8 @@ N/A - standard test environment.
   size limit) are shown as errors that keep the entered values and create nothing.
 - The interactive marker of the project page is `true` after the page has rendered on a live connection.
 - The form offers "Upload files" by default and "From a repository", which shows the repository fields instead of
-  the file input with the default selection `**/*`; the repository choice lists only enabled repositories by name
+  the file input with the default selection `**/*`; the repository choice lists only enabled repositories of the project
+  by name
   (never a location, user name, or token) and is disabled with a hint when none is enabled.
 - A valid repository form creates the review with its source and opens it; without a baseline every file at the head
   is reviewed; a selection with no changed file shows the nothing-to-review message, a revision that does not exist
@@ -52,6 +65,11 @@ choosing the repository source shows the repository, head, baseline, and selecti
 repository exist; only the enabled one is offered, by name, and the page contains neither location, user name, nor
 token. This scenario is tested by
 `NewReviewPage_RepositorySelect_OffersOnlyEnabledRepositoriesWithoutLocationOrToken`.
+
+**NewReviewPage_RepositorySelect_OffersOnlyRepositoriesOfThisProject**: A repository exists in each of two projects; the
+form of the first project, with the repository source chosen, offers the choice prompt and the repository of that
+project only, and the markup does not contain the repository of the other. This scenario is tested by
+`NewReviewPage_RepositorySelect_OffersOnlyRepositoriesOfThisProject`.
 
 **NewReviewPage_SourceChoice_NoEnabledRepository_DisablesRepositorySourceWithHint**: With no enabled repository the
 repository choice is disabled and a hint says why. This scenario is tested by
@@ -88,6 +106,51 @@ tested by `ProjectPage_Render_PlanLink_ShownOnlyWithEnabledRepository`.
 not-found message names the identity and no form is shown. This scenario is tested by
 `ProjectPage_Render_UnknownProject_ShowsNotFound`.
 
+**ProjectPage_Render_NonMember_LooksLikeAMissingProject**: A project with a review exists, and a user who is no member
+and no system administrator is signed in. The project page shows the same not-found message as for a missing project
+and neither the name of the project nor its review, and the page for a new review shows the not-found message and no
+form. This scenario is tested by `ProjectPage_Render_NonMember_LooksLikeAMissingProject`.
+
+**ProjectPage_Render_Member_SeesReviewsButNoMembersSection**: A member who is no administrator opens the page of the
+project; the review is listed and the New review button is shown, but there is no members list, no add member button,
+and no Repositories button. This scenario is tested by `ProjectPage_Render_Member_SeesReviewsButNoMembersSection`.
+
+**ProjectPage_Render_SystemAdmin_ListsMembersWithRolesAndActions**: A project has a member and a project administrator,
+and another has no members. For the system administrator the first lists "Member" and "Project admin" badges, the
+buttons "Make project admin" and "Make member", and a Remove button, and has the Repositories button; the second says
+that it has no members. This scenario is tested by `ProjectPage_Render_SystemAdmin_ListsMembersWithRolesAndActions`.
+
+**ProjectPage_AddMember_ChosenUser_BecomesMemberWithTheRole**: The system administrator opens the add member form,
+which is not on the page before; the drop-down offers the user who is no member and not the member; the user is chosen
+as a project administrator and added; the membership is stored with that role, the row shows "Project admin", and the
+form is closed. This scenario is tested by `ProjectPage_AddMember_ChosenUser_BecomesMemberWithTheRole`.
+
+**ProjectPage_MemberActions_ToggleRoleAndRemove_ChangeTheMembership**: The role button of a member is pressed; the
+stored role becomes project administrator and the button reads "Make member". Remove is then pressed; the membership is
+gone, the row is gone, and the empty message is shown. This scenario is tested by
+`ProjectPage_MemberActions_ToggleRoleAndRemove_ChangeTheMembership`.
+
+**ProjectPage_MemberChange_SystemAdminDemotedButStillMember_DropsMembersSectionKeepsReviews**: A system administrator
+who also is a plain member of the project has the page open with the Members section, and a second administrator
+exists; the first loses the flag and presses Remove on a member. Nothing is removed, no error is shown, the Members
+section and the member rows are gone, and the reviews are still listed. This scenario is tested by
+`ProjectPage_MemberChange_SystemAdminDemotedButStillMember_DropsMembersSectionKeepsReviews`.
+
+**ProjectPage_MemberChange_SystemAdminDemotedAndNotMember_ShowsNotFoundAndNoData**: The same arrangement for an
+administrator who is no member of the project. After the demotion, Remove shows only the not-found message, with no
+member, review, or project name on the page, and the membership of the member is unchanged. This scenario is tested by
+`ProjectPage_MemberChange_SystemAdminDemotedAndNotMember_ShowsNotFoundAndNoData`.
+
+**ProjectPage_OpenAddForm_SystemAdminDemoted_DropsCandidatesAndForm**: A system administrator who is a plain member
+is demoted while the page is open, and the + Add member button is pressed. No form and no Members section are
+rendered, and no candidate user is in the markup. This scenario is tested by
+`ProjectPage_OpenAddForm_SystemAdminDemoted_DropsCandidatesAndForm`.
+
+**ProjectPage_MemberChange_SessionEndedBeforePageKnows_ShowsNotFoundAndChangesNothing**: The sign-in state ends without
+the page being told, and Remove is pressed. The page shows the not-found message and no members, and the membership is
+unchanged. This scenario is tested by
+`ProjectPage_MemberChange_SessionEndedBeforePageKnows_ShowsNotFoundAndChangesNothing`.
+
 **ProjectPage_Render_ProjectWithoutReviews_ShowsNameAndEmptyMessage**: The page is rendered for a project without
 reviews; the name, the description, the empty message, and the New review button, which links to the review creation
 page of the project, are shown. This scenario is tested by
@@ -117,10 +180,15 @@ submitted; the review is stored with the title, the fingerprint of the files, an
 browser is sent to the review page. This scenario is tested by
 `NewReviewPage_CreateForm_ValidInput_CreatesReviewAndNavigatesToIt`.
 
-**NewReviewPage_CreateForm_SessionEndedBeforePageKnows_ShowsClearErrorAndCreatesNothing**: Files are chosen and a
-title is entered, and the sign-in state ends without the page being told; the form is submitted. An error says that
-the user is no longer signed in, and no review is stored. This scenario is tested by
-`NewReviewPage_CreateForm_SessionEndedBeforePageKnows_ShowsClearErrorAndCreatesNothing`.
+**NewReviewPage_CreateForm_SessionEndedBeforePageKnows_ShowsNotFoundAndCreatesNothing**: Files are chosen and a
+title is entered, and the sign-in state ends without the page being told; the form is submitted. The access check
+finds no signed-in user, so the page for a project that does not exist replaces the form, and no review is stored.
+This scenario is tested by `NewReviewPage_CreateForm_SessionEndedBeforePageKnows_ShowsNotFoundAndCreatesNothing`.
+
+**NewReviewPage_CreateForm_MembershipRevoked_ShowsNotFoundAndCreatesNothing**: A member has the filled-in form open and
+the membership is removed; submitting shows the page for a project that does not exist, without the project name or
+the form, and no review is stored. This scenario is tested by
+`NewReviewPage_CreateForm_MembershipRevoked_ShowsNotFoundAndCreatesNothing`.
 
 **NewReviewPage_CreateForm_NoFiles_ShowsErrorAndCreatesNothing**: The form is submitted without files; an error that
 mentions files is shown and no review is stored. This scenario is tested by

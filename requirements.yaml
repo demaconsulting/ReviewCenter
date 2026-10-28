@@ -61,6 +61,7 @@ includes:
   - docs/reqstream/review-center/core.yaml
   - docs/reqstream/review-center/core/fingerprint.yaml
   - docs/reqstream/review-center/core/project-service.yaml
+  - docs/reqstream/review-center/core/project-access.yaml
   - docs/reqstream/review-center/core/review-service.yaml
   - docs/reqstream/review-center/core/thread-service.yaml
   - docs/reqstream/review-center/core/checklist-service.yaml

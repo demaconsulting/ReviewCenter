@@ -42,6 +42,8 @@ Acceptance Criteria).
   whose byte range covers everything except the signature value, that holds the review, and that carries the notice
   about the self-signed key; the download is in the audit trail.
 - A review that is not complete is not offered on the page, and the download is refused with 409.
+- The attestation download and the evidence index answer a user who is not a member of the project exactly like a
+  project that does not exist (404), and a member and a system administrator are served.
 - The evidence index that the application serves equals a committed file, has the shape that ReviewMark reads, and
   carries
   a fingerprint that equals the one that the algorithm of ReviewMark computes from the same files.
@@ -82,6 +84,16 @@ stale
 for another. These scenarios are tested by `ReviewMarkContract_Index_HasTheSchemaReviewMarkReads`,
 `ReviewMarkContract_IndexFingerprint_EqualsReviewMarkAlgorithm`, and
 `ReviewMarkContract_Index_FollowsReviewMarkSemantics`.
+
+**Visibility**: The attestation and the evidence index are guarded by the project rules of `Core`
+(`AttestationService` answers `NotFound` and `EvidenceIndexService.BuildAsync` refuses the project for a user who
+cannot see it). The units were not given a non-member case of their own; the guard is verified over HTTP, through the
+real application, by the tests of the `Api` subsystem: `ApiProjectAccess_EveryProjectRoute_NonMemberToken_AnswersLikeAMissingProject`
+(the attestation and the evidence index route, with a bearer token and with Basic credentials),
+`ApiProjectAccess_EveryProjectRoute_MemberAndSystemAdmin_AreNotRefused` (a member and a system administrator are served),
+and `ApiProjectAccess_AttestationPage_NonMemberSession_Answers404` (the web route answers an empty 404 for a signed-in
+non-member). An anonymous request to the web route is redirected to the login page, which is tested by
+`AttestationEndpoint_Get_SignedOut_RedirectsToLogin`.
 
 **Units**: The file structure and the layout are verified in the unit tests of `PdfDocumentWriter`; the content and the
 statements of the document in the unit tests of `AttestationRenderer`; the signature, its structure, and its resistance

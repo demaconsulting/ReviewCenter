@@ -24,10 +24,10 @@ N/A - standard test environment (temporary SQLite databases are created by the t
 - An anonymous request for a deep link (escaped characters and query included) is redirected to the login page with
   the address as requested, and signing in leads back to the same page.
 - The login and logout posts need an antiforgery token.
-- Every page except the home, login, and health routes needs a signed-in user, and the users page needs an
+- Every page except the home, login, and health routes needs a signed-in user, and the users page needs a system
   administrator.
 - Signing out ends the session.
-- A session ends when its user is disabled or its role changes.
+- A session ends when its user is disabled or its system administrator state changes.
 - The actor is built from the signed-in user, and asking for it without a signed-in user is refused with a message
   that says nothing was saved.
 - The cookie check and the re-check of open pages share one rule, and the interval of the re-check has a default of
@@ -78,9 +78,16 @@ return URL. This scenario is tested by `SignIn_ProtectedPage_Anonymous_Redirects
 **SignIn_PublicPage_Anonymous_IsServed**: A theory over the home, login, and health routes; an anonymous request is
 answered with status 200. This scenario is tested by `SignIn_PublicPage_Anonymous_IsServed`.
 
-**SignIn_UsersPage_ReviewerAndAdmin_OnlyAdminIsAllowed**: The users page is requested by a signed-in reviewer and by
-a signed-in administrator; the reviewer gets status 403 and the administrator status 200. This scenario is tested by
-`SignIn_UsersPage_ReviewerAndAdmin_OnlyAdminIsAllowed`.
+**SignIn_UsersPage_ReviewerAndAdmin_OnlyAdminIsAllowed**: The users page is requested by a signed-in ordinary user and
+by a signed-in system administrator; the ordinary user gets status 403 with an access-denied explanation and the system
+administrator status 200. The role claim therefore opens the page only for a system administrator. This scenario is
+tested by `SignIn_UsersPage_ReviewerAndAdmin_OnlyAdminIsAllowed`.
+
+**SignIn_RepositoriesPage_NonMemberAndSystemAdmin_OnlyAdminIsServed**: The repositories page of a project is
+requested by a signed-in user who is not a member of the project and by a system administrator; the non-member gets
+the answer for a project that does not exist, and the system administrator is served with status 200. The page
+therefore takes no decision from the cookie alone: the project rule of `Core` decides. This scenario is tested by
+`SignIn_RepositoriesPage_NonMemberAndSystemAdmin_OnlyAdminIsServed`.
 
 **SignIn_Logout_SignedInUser_EndsTheSession**: A signed-in user signs out; the response redirects to the home page,
 and a protected page is refused again. This scenario is tested by `SignIn_Logout_SignedInUser_EndsTheSession`.
@@ -89,8 +96,8 @@ and a protected page is refused again. This scenario is tested by `SignIn_Logout
 cookie is no longer accepted and the protected page redirects to the login page. This scenario is tested by
 `SignIn_Session_UserDisabledAfterLogin_IsRejected`.
 
-**SignIn_Session_RoleChangedAfterLogin_IsRejected**: A signed-in administrator is demoted through the service; the
-old cookie is no longer accepted, so the users page redirects to the login page. This scenario is tested by
+**SignIn_Session_RoleChangedAfterLogin_IsRejected**: A signed-in system administrator is demoted through the service;
+the old cookie is no longer accepted, so the users page redirects to the login page. This scenario is tested by
 `SignIn_Session_RoleChangedAfterLogin_IsRejected`.
 
 **SignIn_GetActorAsync_SignedInAndAnonymous_ReturnsActorOrThrows**: The actor is requested from an authentication
@@ -100,11 +107,13 @@ that the page must be reloaded. This scenario is tested by
 `SignIn_GetActorAsync_SignedInAndAnonymous_ReturnsActorOrThrows`.
 
 **SignIn_IsCurrent_StoredUserVersusPrincipal_FollowsTheRule**: The shared rule is called with a stored user and a
-principal; an enabled user with the same role and display name is current, and a disabled user, another role, or
+principal; an enabled user whose system administrator state (the presence of the `SystemAdmin` role claim) and display
+name equal the stored ones is current, and a disabled user, another system administrator state, or
 another display name is not. This scenario is tested by `SignIn_IsCurrent_StoredUserVersusPrincipal_FollowsTheRule`.
 
 **SignIn_IsCurrent_MissingPrincipalUserOrClaims_ReturnsFalse**: The shared rule is called with a missing principal, a
-missing stored user, and a principal without the role claim or without the user name claim; each is not current. This
+missing stored user, and a principal without the user name claim or without the display name claim; each is not
+current. This
 scenario is tested by `SignIn_IsCurrent_MissingPrincipalUserOrClaims_ReturnsFalse`.
 
 **AuthOptions_RevalidationSeconds_Default_IsThirtyWithMinimumFive**: The default of the re-check interval of open pages

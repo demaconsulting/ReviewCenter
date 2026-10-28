@@ -37,7 +37,7 @@ public class ProjectServiceTests
     /// </summary>
     /// <param name="store">The store to use.</param>
     /// <returns>The service.</returns>
-    private static ProjectService CreateService(FakeReviewStore store) => new(store, new FixedTimeProvider(_now));
+    private static ProjectService CreateService(FakeReviewStore store) => TestServices.Projects(store, new FixedTimeProvider(_now));
 
     /// <summary>
     ///     Test that a valid project is stored with trimmed text and the clock's creation time.

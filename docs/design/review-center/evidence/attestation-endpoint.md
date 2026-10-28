@@ -28,7 +28,8 @@ from the user name and the display name claim of the signed-in user.
   - A visitor who is not signed in is redirected to `/login` by the authentication scheme.
   - 200 with the PDF as a file download (`application/pdf`, and the file name from `AttestationService.FileNameFor`)
     for a completed review.
-  - 404 for a review that does not exist.
+  - 404 with an empty body for a review that does not exist and for a project that the signed-in user may not view (a
+    non-member): the two cannot be told apart.
   - 409 with a problem description titled "The review is not complete" for a review that is not approved.
   - 409 with a problem description titled "The review changed during generation" when the review changed while the
     attestation was being prepared (nothing was signed or recorded; the user can ask again).

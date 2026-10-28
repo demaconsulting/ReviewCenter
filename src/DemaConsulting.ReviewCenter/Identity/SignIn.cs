@@ -80,9 +80,9 @@ internal static class SignIn
     public const string DisplayNameClaimType = "display_name";
 
     /// <summary>
-    ///     The role name that is required for the user administration page.
+    ///     The role name that is required for the pages only a system administrator may use.
     /// </summary>
-    public const string AdminRole = nameof(UserRole.Admin);
+    public const string AdminRole = "SystemAdmin";
 
     /// <summary>
     ///     Registers cookie authentication and authorization.
@@ -366,18 +366,46 @@ internal static class SignIn
     }
 
     /// <summary>
+    ///     Gets the signed-in user as an <see cref="Actor"/>, or <c>null</c> when nobody is signed in.
+    /// </summary>
+    /// <param name="provider">The authentication state provider of the page. Must not be null.</param>
+    /// <returns>The actor, or <c>null</c>; a page that loads data uses it so that an ended sign-in shows nothing.</returns>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="provider"/> is null.</exception>
+    public static async Task<Actor?> GetActorOrNullAsync(this AuthenticationStateProvider provider)
+    {
+        try
+        {
+            return await provider.GetActorAsync();
+        }
+        catch (DomainRuleException)
+        {
+            return null;
+        }
+    }
+
+    /// <summary>
     ///     Builds the principal that is stored in the authentication cookie.
     /// </summary>
     /// <param name="user">The authenticated user.</param>
-    /// <returns>A principal with the user name, display name and role; never the password or its hash.</returns>
+    /// <returns>
+    ///     A principal with the user name and display name, and the system administrator role when the user has it;
+    ///     never the password or its hash. Project roles are not in the cookie: they are read when needed, so a
+    ///     change of membership takes effect at once.
+    /// </returns>
     private static ClaimsPrincipal BuildPrincipal(User user)
     {
+        var claims = new List<Claim>
+        {
+            new(ClaimTypes.Name, user.Username),
+            new(DisplayNameClaimType, user.DisplayName)
+        };
+        if (user.IsSystemAdmin)
+        {
+            claims.Add(new Claim(ClaimTypes.Role, AdminRole));
+        }
+
         var identity = new ClaimsIdentity(
-            [
-                new Claim(ClaimTypes.Name, user.Username),
-                new Claim(DisplayNameClaimType, user.DisplayName),
-                new Claim(ClaimTypes.Role, user.Role.ToString())
-            ],
+            claims,
             CookieAuthenticationDefaults.AuthenticationScheme,
             ClaimTypes.Name,
             ClaimTypes.Role);
@@ -414,19 +442,19 @@ internal static class SignIn
     /// <param name="principal">The signed-in principal; may be null.</param>
     /// <param name="user">The user as stored now, or <c>null</c> when there is no such user.</param>
     /// <returns>
-    ///     <c>true</c> only when both are present, the user is enabled, and the role and display name in the
-    ///     principal are equal to the stored ones; otherwise <c>false</c>.
+    ///     <c>true</c> only when both are present, the user is enabled, and the system administrator role and display
+    ///     name in the principal are equal to the stored ones; otherwise <c>false</c>.
     /// </returns>
     /// <remarks>
     ///     This is the single rule behind both the cookie check on each request and the periodic check of an open
-    ///     page, so the two cannot drift apart. A changed role or display name counts as not current so that
-    ///     the user signs in again and gets the current values. The method is pure and thread-safe.
+    ///     page, so the two cannot drift apart. A changed administrator flag or display name counts as not current so
+    ///     that the user signs in again and gets the current values. The method is pure and thread-safe.
     /// </remarks>
     internal static bool IsCurrent(ClaimsPrincipal? principal, User? user)
     {
         return principal is not null
             && user is { Enabled: true }
-            && principal.FindFirstValue(ClaimTypes.Role) == user.Role.ToString()
+            && principal.FindAll(ClaimTypes.Role).Any(claim => claim.Value == AdminRole) == user.IsSystemAdmin
             && principal.FindFirstValue(DisplayNameClaimType) == user.DisplayName;
     }
 }

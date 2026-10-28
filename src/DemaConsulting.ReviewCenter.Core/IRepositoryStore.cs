@@ -25,7 +25,7 @@ namespace DemaConsulting.ReviewCenter.Core;
 /// </summary>
 /// <remarks>
 ///     Every method that changes data takes an audit draft and saves it in the same transaction as the change.
-///     The store enforces only what it must (a unique name, compared without regard to case); every other rule
+///     The store enforces only what it must (a name that is unique within its project, compared without regard to case); every other rule
 ///     lives in <see cref="RepositoryService"/>. Tokens arrive already encrypted and are never returned in a
 ///     <see cref="SourceRepository"/>; <see cref="GetEncryptedTokenAsync"/> is the only way to read one back.
 /// </remarks>
@@ -38,7 +38,7 @@ public interface IRepositoryStore
     /// <param name="audit">Builds the audit draft from the stored repository; saved in the same transaction. Must not be null.</param>
     /// <param name="cancellationToken">Cancels the operation.</param>
     /// <returns>The stored repository with its assigned identity.</returns>
-    /// <exception cref="DomainRuleException">Thrown with <see cref="DomainRule.RepositoryNameTaken"/> when the name exists.</exception>
+    /// <exception cref="DomainRuleException">Thrown with <see cref="DomainRule.RepositoryNameTaken"/> when the project already has a repository of that name.</exception>
     Task<SourceRepository> AddAsync(
         NewRepository repository,
         Func<SourceRepository, AuditDraft> audit,
@@ -61,11 +61,12 @@ public interface IRepositoryStore
     Task<string?> GetEncryptedTokenAsync(int id, CancellationToken cancellationToken = default);
 
     /// <summary>
-    ///     Lists all repositories.
+    ///     Lists the repositories of one project.
     /// </summary>
+    /// <param name="projectId">The project identity.</param>
     /// <param name="cancellationToken">Cancels the operation.</param>
-    /// <returns>All repositories ordered by name.</returns>
-    Task<IReadOnlyList<SourceRepository>> ListAsync(CancellationToken cancellationToken = default);
+    /// <returns>The repositories of the project ordered by name.</returns>
+    Task<IReadOnlyList<SourceRepository>> ListAsync(int projectId, CancellationToken cancellationToken = default);
 
     /// <summary>
     ///     Stores the new state of an existing repository.

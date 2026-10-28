@@ -26,13 +26,15 @@ using Microsoft.AspNetCore.Components.Authorization;
 namespace DemaConsulting.ReviewCenter.Web;
 
 /// <summary>
-///     Code-behind for the repository registry page (<c>RepositoriesPage.razor</c>): lists the registered
-///     repositories, adds them, edits them, and disables or enables them.
+///     Code-behind for the repository page of a project (<c>RepositoriesPage.razor</c>): lists the repositories of
+///     the project, and edits them or disables and enables them. New ones are added on the separate new repository
+///     page.
 /// </summary>
 /// <remarks>
-///     An attribute on the page limits entry to administrators. An open page re-checks its user only every
-///     <see cref="AuthOptions.RevalidationSeconds"/>, so for the time before the next check every action also
-///     re-checks that the signed-in user is still an enabled administrator in the user store (defense in depth;
+///     The page is for whoever may administer the project (a system administrator or a project admin of it); anybody
+///     else sees the not-found state, the same as for a project that does not exist. An open page re-checks its user
+///     only every <see cref="AuthOptions.RevalidationSeconds"/>, so for the time before the next check every action
+///     also re-checks that the signed-in user may still administer the project (defense in depth;
 ///     <see cref="RepositoryService"/> checks again). The page talks to the domain only through
 ///     <see cref="RepositoryService"/>, which owns the rules. The token is write-only: the page never receives a
 ///     stored token (the read model has no member for it), it shows only whether one is set, and the token fields are
@@ -49,22 +51,44 @@ public partial class RepositoriesPage : ComponentBase
     private bool _interactive;
 
     /// <summary>
+    ///     Gets or sets the identity of the project whose repositories are shown, from the page address.
+    /// </summary>
+    [Parameter]
+    public int ProjectId { get; set; }
+
+    /// <summary>
     ///     Gets or sets the service that manages the registry, supplied by dependency injection.
     /// </summary>
     [Inject]
     private RepositoryService RepositoryService { get; set; } = null!;
 
     /// <summary>
-    ///     Gets or sets the service that knows the users, supplied by dependency injection.
+    ///     Gets or sets the service that reads projects, supplied by dependency injection.
     /// </summary>
     [Inject]
-    private UserService UserService { get; set; } = null!;
+    private ProjectService ProjectService { get; set; } = null!;
+
+    /// <summary>
+    ///     Gets or sets the access service, supplied by dependency injection; decides who may manage the project.
+    /// </summary>
+    [Inject]
+    private IProjectAccess Access { get; set; } = null!;
 
     /// <summary>
     ///     Gets or sets the authentication state of the current user, supplied by dependency injection.
     /// </summary>
     [Inject]
     private AuthenticationStateProvider AuthenticationState { get; set; } = null!;
+
+    /// <summary>
+    ///     Gets the project shown, or <c>null</c> when it does not exist or the user may not manage it.
+    /// </summary>
+    private Project? Project { get; set; }
+
+    /// <summary>
+    ///     Gets a value indicating whether the page has finished loading.
+    /// </summary>
+    private bool Loaded { get; set; }
 
     /// <summary>
     ///     Gets the repositories shown in the list.
@@ -126,22 +150,37 @@ public partial class RepositoriesPage : ComponentBase
     private string InteractiveMarker => _interactive ? "true" : "false";
 
     /// <summary>
-    ///     Loads the repository list when the page is created.
+    ///     Loads the project and its repositories whenever the project identity changes.
     /// </summary>
     /// <returns>A task that completes when the list is loaded.</returns>
-    protected override async Task OnInitializedAsync()
+    protected override async Task OnParametersSetAsync()
     {
-        // The page is entered by administrators only; a failure to identify the user shows an empty list
-        // and the first action reports the ended sign-in state
-        try
+        // The page is for whoever may manage the project; anybody else gets the not-found state, the same as for
+        // a project that does not exist
+        Loaded = false;
+        EditingId = null;
+        ErrorMessage = null;
+        StatusMessage = null;
+        Repositories = [];
+        var actor = await AuthenticationState.GetActorOrNullAsync();
+        Project = actor is not null && await Access.CanAdministerAsync(actor, ProjectId)
+            ? await ProjectService.GetAsync(actor, ProjectId)
+            : null;
+        if (actor is not null && Project is not null)
         {
-            var actor = await AuthenticationState.GetActorAsync();
-            Repositories = await RepositoryService.ListAsync(actor);
+            try
+            {
+                Repositories = await RepositoryService.ListAsync(actor, ProjectId);
+            }
+            catch (DomainRuleException)
+            {
+                // The right was lost between the check and the read; an ordinary member may not read the list, so
+                // show the same state as for one instead of an error next to a page without its data
+                ShowNoAccess();
+            }
         }
-        catch (DomainRuleException ex)
-        {
-            ErrorMessage = ex.Message;
-        }
+
+        Loaded = true;
     }
 
     /// <summary>
@@ -159,11 +198,56 @@ public partial class RepositoriesPage : ComponentBase
     }
 
     /// <summary>
+    ///     Re-checks that the signed-in user may still administer the project, at the start of an action on the open
+    ///     page.
+    /// </summary>
+    /// <returns>
+    ///     <c>true</c> when the action may go on; <c>false</c> when the right is gone, in which case the page has
+    ///     already dropped everything it loaded and shows the not-found state, and the action must stop.
+    /// </returns>
+    private Task<bool> GuardAsync()
+    {
+        return Access.GuardAdministerAsync(AuthenticationState, ProjectId, ShowNoAccess);
+    }
+
+    /// <summary>
+    ///     Drops everything loaded or typed and shows the same "does not exist" state as for a non-member.
+    /// </summary>
+    /// <remarks>
+    ///     An ordinary member may not read the locations, user names and token state of the repositories, so none of
+    ///     it, and no edit form, stays rendered once the right to administer the project is gone.
+    /// </remarks>
+    private void ShowNoAccess()
+    {
+        Project = null;
+        Repositories = [];
+        EditingId = null;
+        EditName = string.Empty;
+        EditLocation = string.Empty;
+        EditUsername = string.Empty;
+        EditTokenAction = TokenAction.Keep;
+        EditToken = string.Empty;
+        ErrorMessage = null;
+        StatusMessage = null;
+        MessageRepositoryId = null;
+        Loaded = true;
+    }
+
+    /// <summary>
     ///     Opens the edit form for a repository, with the stored values and the token kept.
     /// </summary>
     /// <param name="repository">The repository as shown.</param>
-    private void StartEdit(SourceRepository repository)
+    /// <returns>A task that completes when the form is open or the page has dropped its data.</returns>
+    /// <remarks>
+    ///     The stored values are copied into the form, so the right to administer is asked first.
+    /// </remarks>
+    private async Task StartEditAsync(SourceRepository repository)
     {
+        if (!await GuardAsync())
+        {
+            return;
+        }
+
         EditingId = repository.Id;
         EditName = repository.Name;
         EditLocation = repository.Location;
@@ -223,9 +307,10 @@ public partial class RepositoriesPage : ComponentBase
     /// <param name="action">The change to run; it receives the verified administrator as the actor to audit.</param>
     /// <returns>A task that completes when the change is stored or the problem is shown.</returns>
     /// <remarks>
-    ///     The change is refused, without reloading, unless the signed-in user is still an enabled
-    ///     administrator in the user store, and also when the sign-in state has already ended (the message then
-    ///     says so).
+    ///     The change is refused, without reloading, unless the signed-in user may still administer the project.
+    ///     When the right is gone (the user was demoted or removed, or the sign-in state has ended) the page drops
+    ///     everything it loaded and shows the not-found state of a non-member instead of an error next to data
+    ///     that user may no longer read. The same happens when the reload after the change is refused.
     /// </remarks>
     private async Task RunAsync(int? repositoryId, string success, Func<Actor, Task> action)
     {
@@ -234,23 +319,22 @@ public partial class RepositoriesPage : ComponentBase
         ErrorMessage = null;
         StatusMessage = null;
 
-        // Defense in depth: an open page re-checks its user only every revalidation interval, so ask the store
-        // who the user is now. An ended sign-in state is shown as a message, not raised as a fault
+        // Defense in depth: an open page re-checks its user only every revalidation interval, so ask who the user
+        // is now; when the right is gone the page drops its data and the change does not run
+        if (!await GuardAsync())
+        {
+            return;
+        }
+
+        // The sign-in state can only end between the two reads; it counts as the right being gone
         Actor actor;
         try
         {
             actor = await AuthenticationState.GetActorAsync();
         }
-        catch (DomainRuleException ex)
+        catch (DomainRuleException)
         {
-            ErrorMessage = ex.Message;
-            return;
-        }
-
-        var current = await UserService.GetAsync(actor.Username);
-        if (current is not { Enabled: true, Role: UserRole.Admin })
-        {
-            ErrorMessage = "Administrator rights are required.";
+            ShowNoAccess();
             return;
         }
 
@@ -267,11 +351,12 @@ public partial class RepositoriesPage : ComponentBase
         // Reload so the rows show what is stored, whether or not the change succeeded
         try
         {
-            Repositories = await RepositoryService.ListAsync(actor);
+            Repositories = await RepositoryService.ListAsync(actor, ProjectId);
         }
-        catch (DomainRuleException ex)
+        catch (DomainRuleException)
         {
-            ErrorMessage = ex.Message;
+            // The list is refused only when the right to administer is gone; drop the old rows and the outcome
+            ShowNoAccess();
         }
     }
 }

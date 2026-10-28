@@ -327,6 +327,8 @@ reviews:
       - "docs/design/review-center/web.md"
       - "docs/verification/review-center/web.md"
       - "test/**/Web/WebSubsystemTests.cs"
+      - "src/**/Web/ProjectViewGuard.cs"
+      - "test/**/Web/ProjectViewGuardTests.cs"
       - "test/**/TestWebApp.cs"
 
   - id: ReviewCenter-Web-App
@@ -591,6 +593,8 @@ reviews:
       - "test/**/Core/FakeAuditStore.cs"
       - "test/**/Core/FakeRepositoryStore.cs"
       - "test/**/Core/AuditTestExtensions.cs"
+      - "test/**/Core/AllowAllProjectAccess.cs"
+      - "test/**/Core/TestServices.cs"
       - "test/**/Core/TestContent.cs"
 
   - id: ReviewCenter-Core-Fingerprint
@@ -625,6 +629,23 @@ reviews:
       - "src/DemaConsulting.ReviewCenter.Core/ReviewLimits.cs"
       - "test/**/Core/ProjectServiceTests.cs"
       - "test/**/Core/AuditEventTests.cs"
+
+  - id: ReviewCenter-Core-ProjectAccess
+    title: Review of ReviewCenter ProjectAccess unit implementation
+    context:
+      - docs/design/review-center.md
+      - docs/reqstream/review-center.yaml
+      - docs/design/review-center/core.md
+      - docs/reqstream/review-center/core.yaml
+    paths:
+      - "docs/reqstream/review-center/core/project-access.yaml"
+      - "docs/design/review-center/core/project-access.md"
+      - "docs/verification/review-center/core/project-access.md"
+      - "src/DemaConsulting.ReviewCenter.Core/ProjectAccess.cs"
+      - "src/DemaConsulting.ReviewCenter.Core/IProjectAccess.cs"
+      - "src/DemaConsulting.ReviewCenter.Core/ProjectMembership.cs"
+      - "test/**/Core/ProjectAccessTests.cs"
+      - "test/**/Core/ProjectAccessGuardTests.cs"
 
   - id: ReviewCenter-Core-ReviewService
     title: Review of ReviewCenter ReviewService unit implementation
@@ -705,7 +726,6 @@ reviews:
       - "docs/verification/review-center/core/user-service.md"
       - "src/DemaConsulting.ReviewCenter.Core/UserService.cs"
       - "src/DemaConsulting.ReviewCenter.Core/User.cs"
-      - "src/DemaConsulting.ReviewCenter.Core/UserRole.cs"
       - "src/DemaConsulting.ReviewCenter.Core/Actor.cs"
       - "src/DemaConsulting.ReviewCenter.Core/IUserStore.cs"
       - "src/DemaConsulting.ReviewCenter.Core/IPasswordHasher.cs"

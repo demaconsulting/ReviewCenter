@@ -81,15 +81,13 @@ public class ReviewFromGitTests
         var cancellationToken = TestContext.Current.CancellationToken;
         var clock = TimeProvider.System;
         using var db = new TestStore();
-        var users = new UserService(new FakeUserStore(), new FakePasswordHasher(), clock);
-        await users.CreateAsync("adm", "Adm", UserRole.Admin, "correct horse battery", cancellationToken);
-        var repositories = new RepositoryService(new FakeRepositoryStore(), new FakeCredentialProtector(), users, clock);
+        var project = await TestServices.Projects(db.Store, clock).CreateAsync("Apollo", null, cancellationToken);
+        var repositories = TestServices.Repositories(db.Store, clock);
         var repository = await repositories.CreateAsync(
-            "origin", "https://example.com/origin.git", null, null, _actor, cancellationToken);
+            project.Id, "origin", "https://example.com/origin.git", null, null, _actor, cancellationToken);
         var options = new GitOptions { CachePath = Path.Combine(root.Path, "cache"), TimeoutSeconds = 60 };
         var provider = new OriginProvider(new GitSource(new GitRunner(options), options), origin);
-        var project = await new ProjectService(db.Store, clock).CreateAsync("Apollo", null, cancellationToken);
-        var service = new ReviewService(db.Store, clock, repositories, provider);
+        var service = TestServices.Reviews(db.Store, clock, repositories, provider);
 
         // Act: create the review from the tag to the branch, record its digest, then commit more in the origin
         var result = await service.CreateFromRepositoryAsync(

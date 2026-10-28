@@ -17,13 +17,15 @@ N/A - standard test environment (temporary SQLite databases are created by the t
 - A user is stored with every field, and its identity is assigned by the database; a supplied identity is ignored.
 - A user name that differs from an existing one only in case is refused with the rule `UserNameTaken`, and a lookup
   by user name ignores case; an unknown user name gives no user.
-- A change of the role, the enabled flag, the password hash, the failure count, and the lockout time is stored.
+- A change of the system administrator flag, the enabled flag, the password hash, the failure count, and the lockout time
+  is stored.
 - Users are listed ordered by user name.
 
 #### Test Scenarios
 
 **UserStore_AddAsync_User_RoundTripsEveryField**: A user with every field set and a supplied identity is added; the
-identity is the database's, and the user name, display name, role, enabled flag, password hash, failure count,
+identity is the database's, and the user name, display name, system administrator flag, enabled flag, password hash,
+failure count,
 lockout time, and creation time are read back unchanged. This scenario is tested by
 `UserStore_AddAsync_User_RoundTripsEveryField`.
 
@@ -32,7 +34,8 @@ throws the rule `UserNameTaken`, a lookup of "aNN" finds the original, a lookup 
 only one user is stored. This scenario is tested by
 `UserStore_AddAsync_UsernameOtherCase_ThrowsUserNameTakenAndLookupIgnoresCase`.
 
-**UserStore_UpdateAsync_ChangedFields_AreStored**: The role, enabled flag, password hash, failure count, and
+**UserStore_UpdateAsync_ChangedFields_AreStored**: The system administrator flag, enabled flag, password hash, failure
+count, and
 lockout time of a stored user are changed and updated; they are read back as changed. This scenario is tested by
 `UserStore_UpdateAsync_ChangedFields_AreStored`.
 

@@ -63,7 +63,7 @@ public class UserStoreTests
             Id = 9001, // supplied identities must be ignored; the store assigns its own
             Username = username,
             DisplayName = "Display " + username,
-            Role = UserRole.Admin,
+            IsSystemAdmin = true,
             Enabled = true,
             PasswordHash = "hash",
             FailedLoginCount = 2,
@@ -90,7 +90,7 @@ public class UserStoreTests
         Assert.NotNull(read);
         Assert.NotEqual(9001, added.Id);
         Assert.Equal(added.Id, read.Id);
-        Assert.Equal(("Ann", "Display Ann", UserRole.Admin, true), (read.Username, read.DisplayName, read.Role, read.Enabled));
+        Assert.Equal(("Ann", "Display Ann", true, true), (read.Username, read.DisplayName, read.IsSystemAdmin, read.Enabled));
         Assert.Equal(("hash", 2, _created.AddMinutes(5), _created), (read.PasswordHash, read.FailedLoginCount, read.LockoutUntil, read.Created));
     }
 
@@ -131,7 +131,7 @@ public class UserStoreTests
         var user = (await store.GetByUsernameAsync("ann", TestContext.Current.CancellationToken))!;
 
         // Act: change the fields and read the user again
-        user.Role = UserRole.Reviewer;
+        user.IsSystemAdmin = false;
         user.Enabled = false;
         user.PasswordHash = "other";
         user.FailedLoginCount = 0;
@@ -140,7 +140,7 @@ public class UserStoreTests
         var read = (await store.GetByUsernameAsync("ann", TestContext.Current.CancellationToken))!;
 
         // Assert: all changes are stored
-        Assert.Equal((UserRole.Reviewer, false, "other", 0), (read.Role, read.Enabled, read.PasswordHash, read.FailedLoginCount));
+        Assert.Equal((false, false, "other", 0), (read.IsSystemAdmin, read.Enabled, read.PasswordHash, read.FailedLoginCount));
         Assert.Null(read.LockoutUntil);
     }
 

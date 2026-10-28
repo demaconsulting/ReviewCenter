@@ -132,8 +132,9 @@ sections:
 
       - id: ReviewCenter-ContentSources-DisabledRepository
         title: >-
-          The ContentSources subsystem shall not give access to a repository that is disabled in the registry.
+          The ContentSources subsystem shall not give access to a repository that is disabled in its registration.
         justification: |
-          Disabling a repository is how an administrator stops its use, for example after a token was exposed.
+          Disabling a repository is how an administrator of its project stops its use, for example after a token was
+          exposed.
         tests:
           - ContentSourcesSubsystem_DisabledRepository_IsNotAvailableForReading

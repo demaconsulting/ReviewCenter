@@ -22,14 +22,17 @@ a project checklist, and sign the review with their password. Every action is re
 ## Features
 
 - 🔍 **File-Set Reviews** - Review uploaded files or the changes between two revisions of a git repository
-- 🌿 **Git Sources** - Register repositories with encrypted access tokens and plan reviews from `.reviewmark.yaml`
+- 🌿 **Git Sources** - Register each project's repositories with encrypted access tokens and plan reviews from
+  `.reviewmark.yaml`
 - 💬 **Threaded Comments** - Discuss a whole file or a line range, reply, resolve, and share a link to any thread
 - ✅ **Review Checklist** - Every review gets a 14-section checklist answered Pass, Fail, or N/A
 - 👥 **Primary and Alternate Reviewers** - Any number of reviewer slots, each signed by the primary or the alternate
 - ✍️ **Re-authenticated Signatures** - Reviewers sign again with their password, bound to the exact record reviewed
 - 🔗 **Tamper-Evident Audit Trail** - Every change is chained by SHA-256 hashes and can be verified at any time
 - 📄 **Signed PDF Attestation** - Approved reviews download as a digitally signed PDF that any reader can verify
-- 🔐 **Local Accounts** - Admin and Reviewer roles, sign-in lockout and throttling, and password changes
+- 🔐 **Local Accounts** - Sign-in lockout and throttling, and password changes
+- 🛡️ **Project-Based Access Control** - System administrators, project administrators, and project members; a project
+  you are not a member of looks like a project that does not exist
 - 🔑 **API Tokens** - Personal access tokens for automation, with a REST API, an OpenAPI document, and an evidence index
   for ReviewMark
 - 🌗 **Light and Dark Theme** - Follows the system setting, or choose a theme in your account
@@ -64,20 +67,21 @@ The examples use `reviewcenter`, the command name of the published executable (w
 
 ```bash
 # Create the first administrator (the password is read from REVIEWCENTER_PASSWORD, from standard input, or prompted)
-reviewcenter user add --username admin --display-name "Ada Admin" --role Admin
+reviewcenter user add --username admin --display-name "Ada Admin" --system-admin
 
 # Run the web server (default http://localhost:5000, or choose an address with --urls)
 reviewcenter serve
 ```
 
-Open `http://localhost:5000` in a browser, sign in as the administrator, and create a project. The built-in **Help** in
-the page header guides you through creating and signing a review.
+Open `http://localhost:5000` in a browser, sign in as the system administrator, create a project, and add its members.
+The built-in **Help** in the page header guides you through creating and signing a review.
 
 ## Documentation
 
 The [User Guide][link-guide] describes everything in detail, including:
 
-- [Users and Sign-in][link-guide-users]: accounts, roles, lockout, and the sign-in throttle
+- [Users and Sign-in][link-guide-users]: accounts, system administrators, lockout, and the sign-in throttle
+- [Access and Visibility][link-guide-access]: roles, project membership, and who can see and do what
 - [Projects and Reviews][link-guide-projects]: uploads, reviews from a git repository, and review-sets
 - [Planning Reviews][link-guide-planning]: create the reviews of all review-sets of a repository in one go
 - [Review Signatures][link-guide-signatures]: reviewer slots, signing, and approval
@@ -125,6 +129,7 @@ By contributing to this project, you agree that your contributions will be licen
 [link-guide]: https://github.com/demaconsulting/ReviewCenter/blob/main/docs/user_guide/introduction.md
 [link-guide-installation]: https://github.com/demaconsulting/ReviewCenter/blob/main/docs/user_guide/introduction.md#installation
 [link-guide-users]: https://github.com/demaconsulting/ReviewCenter/blob/main/docs/user_guide/introduction.md#users-and-sign-in
+[link-guide-access]: https://github.com/demaconsulting/ReviewCenter/blob/main/docs/user_guide/introduction.md#access-and-visibility
 [link-guide-projects]: https://github.com/demaconsulting/ReviewCenter/blob/main/docs/user_guide/introduction.md#projects-and-reviews
 [link-guide-planning]: https://github.com/demaconsulting/ReviewCenter/blob/main/docs/user_guide/introduction.md#planning-reviews
 [link-guide-signatures]: https://github.com/demaconsulting/ReviewCenter/blob/main/docs/user_guide/introduction.md#review-signatures

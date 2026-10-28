@@ -54,8 +54,10 @@ internal static class ApiProblems
                 or DomainRule.SlotNotFound
                 or DomainRule.RepositoryNotFound
                 or DomainRule.RevisionNotFound
+                or DomainRule.MembershipNotFound
                 or DomainRule.TokenNotFound => StatusCodes.Status404NotFound,
             DomainRule.ReviewIdDuplicate
+                or DomainRule.MembershipExists
                 or DomainRule.RepositoryDisabled
                 or DomainRule.RecordChanged => StatusCodes.Status409Conflict,
             DomainRule.GitUnavailable => StatusCodes.Status503ServiceUnavailable,

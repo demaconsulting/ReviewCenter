@@ -29,7 +29,8 @@ namespace DemaConsulting.ReviewCenter.Core;
 ///     The record is immutable and thread-safe.
 /// </remarks>
 /// <param name="Id">The identity assigned by the store.</param>
-/// <param name="Name">The unique name of the repository (without regard to case).</param>
+/// <param name="ProjectId">The identity of the one project the repository belongs to.</param>
+/// <param name="Name">The name of the repository, unique within its project (without regard to case).</param>
 /// <param name="Location">The location git reads from: an https, http or file URL or an absolute local path.</param>
 /// <param name="Username">The user name sent to the server, or <c>null</c> when the repository is read anonymously.</param>
 /// <param name="HasToken">Whether a token is stored; the token itself is never exposed.</param>
@@ -38,6 +39,7 @@ namespace DemaConsulting.ReviewCenter.Core;
 /// <param name="UpdatedAt">The moment the registration last changed (UTC).</param>
 public sealed record SourceRepository(
     int Id,
+    int ProjectId,
     string Name,
     string Location,
     string? Username,
@@ -58,12 +60,14 @@ public sealed record RepositorySummary(int Id, string Name);
 ///     The fields of a repository that are stored when it is registered. The token, when there is one, is already
 ///     encrypted.
 /// </summary>
+/// <param name="ProjectId">The identity of the project the repository belongs to; it never changes afterwards.</param>
 /// <param name="Name">The validated name.</param>
 /// <param name="Location">The validated location.</param>
 /// <param name="Username">The user name, or <c>null</c>.</param>
 /// <param name="EncryptedToken">The encrypted token, or <c>null</c> when there is none.</param>
 /// <param name="CreatedAt">The registration time (UTC).</param>
 public sealed record NewRepository(
+    int ProjectId,
     string Name,
     string Location,
     string? Username,

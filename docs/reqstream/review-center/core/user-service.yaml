@@ -3,7 +3,7 @@
 #
 # The UserService class creates users and checks their sign-in: it enforces the user name, display name, and password
 # rules, keeps only a password hash, authenticates with a lockout after repeated failures, enables and disables users,
-# sets roles, changes passwords, and protects the last enabled administrator.
+# sets the system administrator right, changes passwords, and protects the last enabled system administrator.
 
 sections:
   - title: UserService Unit Requirements
@@ -45,14 +45,13 @@ sections:
 
       - id: ReviewCenter-UserService-Create
         title: >-
-          The UserService class shall create an enabled user with the given role, storing a hash of the password
-          and never the password itself, and shall reject a role that is not defined.
+          The UserService class shall create an enabled user, a system administrator only when it is asked to,
+          storing a hash of the password and never the password itself.
         justification: |
-          A copy of the database must not reveal the passwords, and a role outside the defined ones would give
-          unintended rights.
+          A copy of the database must not reveal the passwords, and the system administrator right must never be
+          given by default, because it reaches every project.
         tests:
           - UserService_CreateAsync_StoresHashNotPassword
-          - UserService_CreateAsync_UndefinedRole_Throws
           - UserService_Constructor_NullArguments_Throws
 
       - id: ReviewCenter-UserService-Authenticate
@@ -93,14 +92,15 @@ sections:
 
       - id: ReviewCenter-UserService-LastAdmin
         title: >-
-          The UserService class shall refuse to disable or demote the last enabled administrator, while allowing
-          it when another enabled administrator remains.
+          The UserService class shall refuse to disable or demote the last enabled system administrator, while
+          allowing it when another enabled system administrator remains.
         justification: |
-          Without an enabled administrator nobody could manage users, and the only way out would be to edit the
-          database.
+          Without an enabled system administrator nobody could create projects or manage users and members, and
+          the only way out would be to edit the database.
         tests:
           - UserService_SetEnabledAsync_SetRoleAsync_LastAdmin_IsProtected
           - UserService_SetEnabledAsync_OtherAdminDisabled_StillProtectsLastEnabledAdmin
+          - UserService_SetSystemAdminAsync_PromoteAndDemote_LastAdminIsKept
 
       - id: ReviewCenter-UserService-ChangePassword
         title: >-
@@ -124,14 +124,16 @@ sections:
         tests:
           - UserService_SetPasswordAsync_NewPassword_WorksAndEndsLockout
 
-      - id: ReviewCenter-UserService-SetRole
+      - id: ReviewCenter-UserService-SetSystemAdmin
         title: >-
-          The UserService class shall change the role of a user to a defined role and shall reject a role that is
-          not defined.
+          The UserService class shall give a user the system administrator right and take it away again, by user
+          name, and shall report the user that does not exist as a user not found rule violation.
         justification: |
-          Roles decide what a user may do, so a change must only ever lead to a role the system knows.
+          The system administrator right reaches every project and every user, so it is the one right that
+          changes who may do what everywhere, and it must be changed on purpose, for a known user.
         tests:
-          - UserService_SetRoleAsync_ValidAndUndefinedRole_ChangesOrThrows
+          - UserService_SetSystemAdminAsync_PromoteAndDemote_LastAdminIsKept
+          - UserService_Changes_UnknownUser_ThrowUserNotFound
 
       - id: ReviewCenter-UserService-NotFound
         title: >-
@@ -144,10 +146,10 @@ sections:
 
       - id: ReviewCenter-UserService-Audit
         title: >-
-          The UserService class shall record creating a user, enabling, disabling, changing a role, setting a
-          password as an administrator, and changing one's own password in the audit trail, in the same transaction
-          as the change, naming the actor (the command line for a user created from it), and never recording a
-          password.
+          The UserService class shall record creating a user, enabling, disabling, changing the system
+          administrator right, setting a password as an administrator, and changing one's own password in the
+          audit trail, in the same transaction as the change, naming the actor (the command line for a user
+          created from it), and never recording a password.
         justification: |
           Changes of accounts and rights are what an auditor looks for first, and a password in a history that
           cannot be edited could never be removed.

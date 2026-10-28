@@ -88,6 +88,12 @@ public partial class NewReviewPage : ComponentBase
     private AuthenticationStateProvider AuthenticationState { get; set; } = null!;
 
     /// <summary>
+    ///     Gets or sets the project access rules that every action re-checks, supplied by dependency injection.
+    /// </summary>
+    [Inject]
+    private IProjectAccess Access { get; set; } = null!;
+
+    /// <summary>
     ///     Gets or sets the navigation manager, supplied by dependency injection; used to open the new review.
     /// </summary>
     [Inject]
@@ -209,8 +215,11 @@ public partial class NewReviewPage : ComponentBase
             SkippedEntries = [];
         }
 
-        Project = await ProjectService.GetAsync(ProjectId);
-        Repositories = await RepositoryService.ListEnabledAsync();
+        var actor = await AuthenticationState.GetActorOrNullAsync();
+        Project = await ProjectService.GetAsync(actor, ProjectId);
+        Repositories = actor is not null && Project is not null
+            ? await RepositoryService.ListEnabledAsync(actor, ProjectId)
+            : [];
         Loaded = true;
     }
 
@@ -315,6 +324,11 @@ public partial class NewReviewPage : ComponentBase
     /// </remarks>
     private async Task CreateReviewAsync()
     {
+        if (!await GuardAsync())
+        {
+            return;
+        }
+
         // A rejected selection already explained itself; do not replace that reason with "no files"
         if (SelectionRejected && !FromRepository)
         {
@@ -391,6 +405,54 @@ public partial class NewReviewPage : ComponentBase
         {
             Busy = false;
         }
+    }
+
+    /// <summary>
+    ///     Re-checks that the signed-in user may still view the project, at the start of an action on the open page.
+    /// </summary>
+    /// <returns>
+    ///     <c>true</c> when the action may go on; <c>false</c> when the access is gone, in which case the page has
+    ///     already dropped the project and its repositories and shows the not-found state, and the action must stop.
+    /// </returns>
+    private Task<bool> GuardAsync()
+    {
+        return Access.GuardViewAsync(AuthenticationState, ProjectId, ShowNoAccess);
+    }
+
+    /// <summary>
+    ///     Runs an action that only changes what the page shows of the loaded repositories, after the access re-check.
+    /// </summary>
+    /// <param name="action">The action to run while the user may still view the project.</param>
+    /// <returns>A task that completes when the action has run or the page has dropped its data.</returns>
+    private async Task GuardedAsync(Action action)
+    {
+        if (await GuardAsync())
+        {
+            action();
+        }
+    }
+
+    /// <summary>
+    ///     Drops the project, its repositories and the form, and shows the same "does not exist" state as for a
+    ///     non-member.
+    /// </summary>
+    private void ShowNoAccess()
+    {
+        Project = null;
+        Repositories = [];
+        ReviewId = string.Empty;
+        ReviewTitle = string.Empty;
+        SelectedFiles = [];
+        ErrorMessage = null;
+        SelectionRejected = false;
+        FromRepository = false;
+        RepositoryIdText = string.Empty;
+        HeadRevision = string.Empty;
+        BaselineRevision = string.Empty;
+        Selection = DefaultSelection;
+        CreatedReview = null;
+        SkippedEntries = [];
+        Loaded = true;
     }
 
     /// <summary>

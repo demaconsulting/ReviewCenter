@@ -1,6 +1,6 @@
 package ReviewCenter {
     part def RepositoryStore {
-        doc /* Database implementation of the repository store contract: persists repository registrations with the encrypted access token, enforces a unique name that ignores case, and records each change together with its audit entry in one transaction. */
+        doc /* Database implementation of the repository store contract: persists repository registrations of a project with the encrypted access token, lists the repositories of one project, enforces a name that is unique within a project and ignores case, and records each change together with its audit entry in one transaction. */
 
         comment sourceRef /* Source: src/DemaConsulting.ReviewCenter/Storage/RepositoryStore.cs and RepositoryRecord.cs */
         comment testRef /* Test: test/DemaConsulting.ReviewCenter.Tests/Storage/RepositoryStoreTests.cs */

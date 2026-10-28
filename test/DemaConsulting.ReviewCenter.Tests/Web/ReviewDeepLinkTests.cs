@@ -87,6 +87,7 @@ public class ReviewDeepLinkTests : PageTestBase
         var cancellationToken = TestContext.Current.CancellationToken;
         var admin = new Actor("adm", "Adm");
         await Users.CreateAsync("adm", "Adm", UserRole.Admin, "correct horse battery", cancellationToken);
+        var project = await Projects.CreateAsync("Apollo", null, cancellationToken);
         var repository = await Repositories.CreateAsync("main-repo", "https://example.com/org/repo.git", null, null, admin, cancellationToken);
         Git.Revisions["main"] = HeadSha;
         Git.Revisions["v1"] = BaseSha;
@@ -98,7 +99,6 @@ public class ReviewDeepLinkTests : PageTestBase
             .. extra
         ];
         Git.Script(BaseSha, HeadSha, changes);
-        var project = await Projects.CreateAsync("Apollo", null, cancellationToken);
         await Reviews.CreateFromRepositoryAsync(
             project.Id, "REV-1", "From git", repository.Id, "main", "v1", "src/**", TestActors.Ann, cancellationToken);
         return project.Id;
@@ -794,15 +794,13 @@ public class ReviewDeepLinkTests : PageTestBase
     {
         // Arrange: an application with a review that has the file, a user, and a visitor who is not signed in
         await using var app = await TestWebApp.StartAsync(new CapturingLoggerProvider(), "serve", "--silent");
-        var project = await app.Services.GetRequiredService<ProjectService>().CreateAsync("Apollo", null, TestContext.Current.CancellationToken);
+        var project = await TestWebApp.CreateProjectAsync(app, "Apollo");
         await app.Services.GetRequiredService<ReviewService>().CreateDraftAsync(
             project.Id,
             "REV-1",
             "Uploaded",
             [new UploadedFile(path, Encoding.UTF8.GetBytes("one\ntwo\nthree\n"))],
             TestContext.Current.CancellationToken);
-        await app.Services.GetRequiredService<UserService>().CreateAsync(
-            "ann", "Ann", UserRole.Reviewer, TestBrowser.Password, TestContext.Current.CancellationToken);
         using var browser = new TestBrowser(app);
         var deepLink = ReviewLinks.ForFile(project.Id, "REV-1", path, 2);
 
@@ -834,11 +832,9 @@ public class ReviewDeepLinkTests : PageTestBase
         // Arrange: a review with a file whose name has + and &
         const string path = "a+b&c=d.txt";
         await using var app = await TestWebApp.StartAsync(new CapturingLoggerProvider(), "serve", "--silent");
-        var project = await app.Services.GetRequiredService<ProjectService>().CreateAsync("Apollo", null, TestContext.Current.CancellationToken);
+        var project = await TestWebApp.CreateProjectAsync(app, "Apollo");
         await app.Services.GetRequiredService<ReviewService>().CreateDraftAsync(
             project.Id, "REV-1", "Uploaded", [new UploadedFile(path, "one\ntwo\n"u8.ToArray())], TestContext.Current.CancellationToken);
-        await app.Services.GetRequiredService<UserService>().CreateAsync(
-            "ann", "Ann", UserRole.Reviewer, TestBrowser.Password, TestContext.Current.CancellationToken);
         using var browser = new TestBrowser(app);
 
         // Act: request the link signed out, log in with the offered return address, open where it leads
@@ -885,7 +881,7 @@ public class ReviewDeepLinkTests : PageTestBase
     {
         // Arrange: an application with a review, a thread, and a signed-in browser
         await using var app = await TestWebApp.StartAsync(new CapturingLoggerProvider(), "serve", "--silent");
-        var project = await app.Services.GetRequiredService<ProjectService>().CreateAsync("Apollo", null, TestContext.Current.CancellationToken);
+        var project = await TestWebApp.CreateProjectAsync(app, "Apollo");
         await app.Services.GetRequiredService<ReviewService>().CreateDraftAsync(
             project.Id,
             "REV-1",

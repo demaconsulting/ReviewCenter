@@ -10,12 +10,12 @@ sections:
     requirements:
       - id: ReviewCenter-ApiEndpoints-Read
         title: >-
-          The ApiEndpoints unit shall return, to a client with a valid token, the list of projects, the review
-          summaries of a project, and the details of one review as JSON, answer 404 for a project or a review that
-          does not exist, and answer 401 to a request without a valid token.
+          The ApiEndpoints unit shall return, to a client with a valid token, the list of projects the owner of the
+          token may see, the review summaries of such a project, and the details of one review as JSON, answer 404
+          for a project or a review that does not exist, and answer 401 to a request without a valid token.
         justification: |
           A script that files and follows reviews needs to find them, and an unknown project or review must be told
-          from an empty list.
+          from an empty list. A script sees what its owner sees and no more.
         tests:
           - ApiEndpoints_ListProjects_Token_ReturnsProjects
           - ApiEndpoints_ListReviews_Project_ReturnsSummariesOrNotFound
@@ -23,10 +23,27 @@ sections:
           - ApiEndpoints_Request_NoToken_Answers401
           - ApiEndpoints_CreateReview_NoTokenOddBody_Answers401
 
+      - id: ReviewCenter-ApiEndpoints-ProjectAccess
+        title: >-
+          The ApiEndpoints unit shall check, before anything else, on every route that names a project (the reviews of
+          the project, one review, the creation of a review, the attestation, and the evidence index), that the owner
+          of the token may see the project, and shall answer an owner who may not with the 404 problem document, and the
+          same body, that it answers for a project that does not exist, for a bearer token and for HTTP Basic
+          credentials, and shall list only the projects the owner may see.
+        justification: |
+          Every route that names a project is a way to find out whether the project exists. Checking first, and
+          answering with the body of a missing project, closes all of them, and checking before the body of a
+          creation is read keeps a non-member from learning anything from the validation of a request.
+        tests:
+          - ApiProjectAccess_EveryProjectRoute_NonMemberToken_AnswersLikeAMissingProject
+          - ApiProjectAccess_EveryProjectRoute_MemberAndSystemAdmin_AreNotRefused
+          - ApiProjectAccess_ListProjects_ShowsOnlyMemberProjectsExceptToSystemAdmins
+          - ApiProjectAccess_Token_OwnerRemovedFromProject_Gets404AtOnce
+
       - id: ReviewCenter-ApiEndpoints-Create
         title: >-
           The ApiEndpoints unit shall create a review draft from files that are sent in the request, or from the
-          changes of a repository that is registered with the server, with the same rules as the web pages, mark the
+          changes of a repository that is registered with the project, with the same rules as the web pages, mark the
           review as created through the API, and answer with the review and the files that were skipped.
         justification: |
           Creating a draft for every pull request from a pipeline is the main use of the API. The same rules keep

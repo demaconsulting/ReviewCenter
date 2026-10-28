@@ -52,7 +52,7 @@ public class StorageSubsystemTests
         DatabaseSetup.EnsureCreated(factory, options);
         var store = new ReviewStore(factory, new AuditAppender(TimeProvider.System));
         var time = new FixedTimeProvider(_now);
-        return (provider, new ProjectService(store, time), new ReviewService(store, time), store);
+        return (provider, TestServices.Projects(store, time), TestServices.Reviews(store, time), store);
     }
 
     /// <summary>
@@ -116,7 +116,7 @@ public class StorageSubsystemTests
             projectId = project.Id;
             await first.Reviews.CreateDraftAsync(
                 projectId, "rev-1", "First", [new("a.txt", TestContent.A)], TestContext.Current.CancellationToken);
-            var threads = new ThreadService(first.Store, new FixedTimeProvider(_now));
+            var threads = TestServices.Threads(first.Store, new FixedTimeProvider(_now));
             var thread = await threads.StartThreadAsync(
                 projectId, "rev-1", "a.txt", 1, 1, TestActors.Ann, "First", TestContext.Current.CancellationToken);
             await threads.ReplyAsync(projectId, "rev-1", thread.Id, TestActors.Bob, "Second", TestContext.Current.CancellationToken);
@@ -128,7 +128,7 @@ public class StorageSubsystemTests
         using (second.Provider)
         {
             var listed = Assert.Single(
-                await new ThreadService(second.Store, new FixedTimeProvider(_now)).ListAsync(projectId, "rev-1", TestContext.Current.CancellationToken));
+                await TestServices.Threads(second.Store, new FixedTimeProvider(_now)).ListAsync(projectId, "rev-1", TestContext.Current.CancellationToken));
 
             // Assert: anchor, state and both comments survived, in posting order
             Assert.Equal((1, 1), (listed.StartLine, listed.EndLine));
@@ -158,7 +158,7 @@ public class StorageSubsystemTests
             projectId = project.Id;
             await first.Reviews.CreateDraftAsync(
                 projectId, "rev-1", "First", [new("a.txt", TestContent.A)], TestContext.Current.CancellationToken);
-            var checklists = new ChecklistService(first.Store, new FixedTimeProvider(_now));
+            var checklists = TestServices.Checklists(first.Store, new FixedTimeProvider(_now));
             await checklists.SetAnswerAsync(
                 projectId, "rev-1", "REQ-01", ChecklistOutcome.Fail, "Broken", TestActors.Ann, TestContext.Current.CancellationToken);
             await checklists.SetSectionApplicabilityAsync(
@@ -169,7 +169,7 @@ public class StorageSubsystemTests
         var second = Open(options);
         using (second.Provider)
         {
-            var state = await new ChecklistService(second.Store, new FixedTimeProvider(_now))
+            var state = await TestServices.Checklists(second.Store, new FixedTimeProvider(_now))
                 .GetAsync(projectId, "rev-1", TestContext.Current.CancellationToken);
 
             // Assert: the snapshot, the answer and the applicability survived
@@ -210,7 +210,7 @@ public class StorageSubsystemTests
             var oldPassword = await users.AuthenticateAsync("root", "correct horse battery", TestContext.Current.CancellationToken);
 
             // Assert: the user, with its role, survived and only the changed password works
-            Assert.Equal(("Root", UserRole.Admin), (signedIn?.Username, signedIn?.Role));
+            Assert.Equal(("Root", true), (signedIn?.Username, signedIn?.IsSystemAdmin));
             Assert.Null(oldPassword);
         }
     }
@@ -270,16 +270,19 @@ public class StorageSubsystemTests
         var options = new DatabaseOptions { ConnectionString = TestDatabase.NewConnectionString() };
         var admin = new Actor("root", "Root");
         int id;
+        int projectId;
 
         // Act: register a private repository, disable it, then close the database
         var first = Open(options);
         using (first.Provider)
         {
             var users = NewUserService(first.Provider);
-            await users.CreateAsync("root", "Root", UserRole.Admin, "correct horse battery", TestContext.Current.CancellationToken);
-            var service = NewRepositoryService(first.Provider, users);
+            await users.CreateAsync("root", "Root", true, "correct horse battery", TestContext.Current.CancellationToken);
+            var project = await first.Projects.CreateAsync("Apollo", null, TestContext.Current.CancellationToken);
+            projectId = project.Id;
+            var service = NewRepositoryService(first.Provider, first.Store);
             var created = await service.CreateAsync(
-                "private", "https://example.com/r.git", "svc", "tkn-Persist", admin, TestContext.Current.CancellationToken);
+                projectId, "private", "https://example.com/r.git", "svc", "tkn-Persist", admin, TestContext.Current.CancellationToken);
             id = created.Id;
             await service.SetEnabledAsync(id, false, admin, TestContext.Current.CancellationToken);
         }
@@ -288,12 +291,12 @@ public class StorageSubsystemTests
         var second = Open(options);
         using (second.Provider)
         {
-            var service = NewRepositoryService(second.Provider, NewUserService(second.Provider));
-            var listed = Assert.Single(await service.ListAsync(admin, TestContext.Current.CancellationToken));
-            var offered = await service.ListEnabledAsync(TestContext.Current.CancellationToken);
+            var service = NewRepositoryService(second.Provider, second.Store);
+            var listed = Assert.Single(await service.ListAsync(admin, projectId, TestContext.Current.CancellationToken));
+            var offered = await service.ListEnabledAsync(admin, projectId, TestContext.Current.CancellationToken);
 
-            // Assert: the registration, the token flag and the disabled state survived; nothing is offered to users
-            Assert.Equal(("private", "svc", true, false), (listed.Name, listed.Username, listed.HasToken, listed.Enabled));
+            // Assert: the registration, the token flag, the project and the disabled state survived; nothing is offered
+            Assert.Equal(("private", "svc", true, false, projectId), (listed.Name, listed.Username, listed.HasToken, listed.Enabled, listed.ProjectId));
             Assert.Empty(offered);
         }
     }
@@ -302,16 +305,15 @@ public class StorageSubsystemTests
     ///     Creates the repository service over the real database, with a fake token protector.
     /// </summary>
     /// <param name="provider">The provider that owns the database factory.</param>
-    /// <param name="users">The user service that re-checks the administrator.</param>
+    /// <param name="store">The review store that knows the projects.</param>
     /// <returns>The service.</returns>
-    private static RepositoryService NewRepositoryService(ServiceProvider provider, UserService users)
+    private static RepositoryService NewRepositoryService(ServiceProvider provider, ReviewStore store)
     {
         var factory = provider.GetRequiredService<IDbContextFactory<ReviewCenterDbContext>>();
-        return new RepositoryService(
-            new RepositoryStore(factory, new AuditAppender(TimeProvider.System)),
-            new FakeCredentialProtector(),
-            users,
-            new FixedTimeProvider(_now));
+        return TestServices.Repositories(
+            store,
+            new FixedTimeProvider(_now),
+            new RepositoryStore(factory, new AuditAppender(TimeProvider.System)));
     }
 
     /// <summary>
@@ -330,20 +332,22 @@ public class StorageSubsystemTests
         using (first.Provider)
         {
             var users = NewUserService(first.Provider);
-            var ann = await users.CreateAsync("ann", "Ann", UserRole.Reviewer, "correct horse battery", TestContext.Current.CancellationToken);
-            var bob = await users.CreateAsync("bob", "Bob", UserRole.Reviewer, "correct horse battery", TestContext.Current.CancellationToken);
+            var ann = await users.CreateAsync("ann", "Ann", false, "correct horse battery", TestContext.Current.CancellationToken);
+            var bob = await users.CreateAsync("bob", "Bob", false, "correct horse battery", TestContext.Current.CancellationToken);
             var project = await first.Projects.CreateAsync("Apollo", null, TestContext.Current.CancellationToken);
             projectId = project.Id;
+            await first.Store.AddMembershipAsync(ann.Id, projectId, TestContext.Current.CancellationToken);
+            await first.Store.AddMembershipAsync(bob.Id, projectId, TestContext.Current.CancellationToken);
             await first.Reviews.CreateDraftAsync(
                 projectId, "rev-1", "First", [new("a.txt", TestContent.A)], TestContext.Current.CancellationToken);
-            var checklists = new ChecklistService(first.Store, new FixedTimeProvider(_now));
+            var checklists = TestServices.Checklists(first.Store, new FixedTimeProvider(_now));
             foreach (var item in DefaultChecklist.Current.Sections.SelectMany(section => section.Items))
             {
                 await checklists.SetAnswerAsync(
                     projectId, "rev-1", item.Id, ChecklistOutcome.Pass, null, TestActors.Ann, TestContext.Current.CancellationToken);
             }
 
-            var signing = new SigningService(first.Store, users, new FixedTimeProvider(_now));
+            var signing = TestServices.Signing(first.Store, users, new FixedTimeProvider(_now));
             var slot = await signing.AddSlotAsync(
                 TestActors.Ann, projectId, "rev-1", ann.Id, bob.Id, TestContext.Current.CancellationToken);
             var approval = await signing.GetApprovalAsync(projectId, "rev-1", TestContext.Current.CancellationToken);
@@ -355,7 +359,7 @@ public class StorageSubsystemTests
         var second = Open(options);
         using (second.Provider)
         {
-            var signing = new SigningService(second.Store, NewUserService(second.Provider), new FixedTimeProvider(_now));
+            var signing = TestServices.Signing(second.Store, NewUserService(second.Provider), new FixedTimeProvider(_now));
             var approval = await signing.GetApprovalAsync(projectId, "rev-1", TestContext.Current.CancellationToken);
 
             // Assert: the signature survived, belongs to the alternate, and is still current for the same record

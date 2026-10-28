@@ -81,9 +81,12 @@ internal static class ApiTestSupport
     /// </summary>
     /// <param name="app">The application.</param>
     /// <param name="username">The user name.</param>
-    /// <param name="role">The role of the user, if it has to be created.</param>
+    /// <param name="role">
+    ///     The role of the user, if it has to be created; the default is a system administrator, like the default actor
+    ///     <c>ann</c>, so that a test can create projects and see all of them without being a member.
+    /// </param>
     /// <returns>A task that completes when the user exists.</returns>
-    public static async Task EnsureUserAsync(WebApplication app, string username, UserRole role = UserRole.Reviewer)
+    public static async Task EnsureUserAsync(WebApplication app, string username, UserRole role = UserRole.Admin)
     {
         var users = app.Services.GetRequiredService<UserService>();
         if (await users.GetAsync(username, TestContext.Current.CancellationToken) is null)

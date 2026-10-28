@@ -22,8 +22,11 @@ N/A - standard test environment.
   the same logger providers.
 - The database is created for a configured location, the stored data is served again by a second host on the
   same database (to a signed-in user), and an unsupported database provider ends the run with exit code 1.
-- The repository registry and the git source are registered, and a stored token stays readable after a restart because
-  the key ring is persisted; the behavior is verified in the unit tests of `ServerHost`.
+- The repository store, the project access rules, and the git source are registered, and a stored token stays readable
+  after a restart because
+  the key ring is persisted; the behavior is verified in the unit tests of `ServerHost`. The project access rules have
+  no registration test of their own: every project-scoped route of the `Api` subsystem reaches them, which
+  `ApiProjectAccess_EveryProjectRoute_NonMemberToken_AnswersLikeAMissingProject` shows.
 - The routes of the `Api` subsystem and the personal access token service are registered, and an unknown address under
   `/api` is answered with a JSON problem document; the behavior is verified in the unit tests of `ServerHost`.
 
@@ -53,7 +56,7 @@ is tested by
 and no unhandled exception escapes. This scenario is tested by
 `HostingSubsystem_Startup_UnsupportedDatabaseProvider_FailsWithExitCodeOne`.
 
-**Repository services and the key ring**: The registration of the repository registry, the git source, and the token
+**Repository services and the key ring**: The registration of the repository store, the git source, and the token
 protector, the default folders beside the database, the persistence of the key ring so that a token stays readable after
 a restart, and the clear error for a key ring folder that cannot be written are verified by the unit tests of
 `ServerHost`: `ServerHost_AddServices_Configured_RegistersRepositoryServicesWithDefaultFolders`,

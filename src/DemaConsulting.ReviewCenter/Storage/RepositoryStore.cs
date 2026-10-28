@@ -57,6 +57,7 @@ internal sealed class RepositoryStore(IDbContextFactory<ReviewCenterDbContext> f
             {
                 var record = new RepositoryRecord
                 {
+                    ProjectId = repository.ProjectId,
                     Name = repository.Name,
                     Location = repository.Location,
                     Username = repository.Username,
@@ -93,10 +94,13 @@ internal sealed class RepositoryStore(IDbContextFactory<ReviewCenterDbContext> f
     }
 
     /// <inheritdoc />
-    public async Task<IReadOnlyList<SourceRepository>> ListAsync(CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<SourceRepository>> ListAsync(
+        int projectId,
+        CancellationToken cancellationToken = default)
     {
         await using var context = await factory.CreateDbContextAsync(cancellationToken);
         var records = await context.Repositories.AsNoTracking()
+            .Where(r => r.ProjectId == projectId)
             .OrderBy(r => r.Name)
             .ThenBy(r => r.Id)
             .ToListAsync(cancellationToken);
@@ -150,6 +154,7 @@ internal sealed class RepositoryStore(IDbContextFactory<ReviewCenterDbContext> f
     private static SourceRepository ToModel(RepositoryRecord record) =>
         new(
             record.Id,
+            record.ProjectId,
             record.Name,
             record.Location,
             record.Username,

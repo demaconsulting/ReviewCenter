@@ -12,7 +12,7 @@
           "ApiEndpoints"
         ],
         "summary": "Lists the projects.",
-        "description": "Returns every project, in the order of the project list of the web pages.",
+        "description": "Returns the projects the owner of the token may see (a system administrator sees all, anybody else only the projects they are a member of), in the order of the project list of the web pages.",
         "operationId": "ListProjects",
         "responses": {
           "200": {

@@ -24,17 +24,21 @@ sections:
       - id: ReviewCenter-SigningService-SlotUsers
         title: >-
           The SigningService class shall require that the primary reviewer and the alternate of a slot are
-          existing, enabled users, that they are different users, and that no user is in two slots of one review,
-          and shall offer only enabled users, without their passwords, as candidates.
+          existing, enabled users who are members of the project of the review, even when a user is a system
+          administrator, that they are different users, and that no user is in two slots of one review, and shall
+          offer only the enabled members of the project, without their passwords, as candidates to an actor who may
+          see the project.
         justification: |
-          A signature must come from a known, active person. One person holding two slots would let a single
-          reviewer fill every place that is meant to bring independent reviewers.
+          A signature must come from a known, active person who belongs to the project, because only the members
+          are meant to review its work. One person holding two slots would let a single reviewer fill every place
+          that is meant to bring independent reviewers.
         tests:
           - SigningService_AddSlotAsync_SameUserTwice_ThrowsSlotUserInvalid
           - SigningService_AddSlotAsync_UserInOtherSlot_ThrowsSlotUserInvalid
           - SigningService_AddSlotAsync_UnknownOrDisabledUser_ThrowsSlotUserInvalid
+          - SigningService_AddSlotAsync_NonMember_ThrowsSlotUserInvalid
           - SigningService_UpdateSlotAsync_KeepOwnUsers_Succeeds
-          - SigningService_ListCandidatesAsync_ReturnsEnabledUsersOnly
+          - SigningService_ListCandidatesAsync_ReturnsEnabledMembersOnly
 
       - id: ReviewCenter-SigningService-SlotEdit
         title: >-
@@ -52,16 +56,19 @@ sections:
       - id: ReviewCenter-SigningService-Actor
         title: >-
           The SigningService class shall allow a slot to be added, changed, removed, or signed only for a
-          signed-in user that still exists and is enabled, and shall allow a slot to be signed only by its
-          primary reviewer or its alternate.
+          signed-in user that still exists and is enabled, shall allow a slot to be signed only by its primary
+          reviewer or its alternate who is still a member of the project, and shall refuse a system administrator who
+          is not a member the right to sign.
         justification: |
           The page shows who is signed in, but the rules must hold even if the page or a browser session is out of
-          date. A user who has been disabled since signing in must not be able to change or approve a review, and
-          a signature is only meaningful when the signer is the person the slot names.
+          date. A user who has been disabled or removed from the project since signing in must not be able to
+          change or approve a review, and a signature is only meaningful when the signer is the person the slot
+          names and belongs to the project.
         tests:
           - SigningService_AddSlotAsync_ActorDisabledOrUnknown_ThrowsActorNotAllowed
           - SigningService_SignAsync_ActorDisabled_ThrowsActorNotAllowed
           - SigningService_SignAsync_NotInSlot_ThrowsActorNotAllowed
+          - SigningService_SignAsync_NotAMember_IsRefused
 
       - id: ReviewCenter-SigningService-Blockers
         title: >-

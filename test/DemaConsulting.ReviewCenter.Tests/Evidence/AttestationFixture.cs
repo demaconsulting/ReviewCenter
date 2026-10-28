@@ -50,9 +50,15 @@ internal sealed class AttestationFixture
         AuditStore = new FakeAuditStore(Clock);
         Audit = new AuditService(AuditStore);
         Users = new UserService(new FakeUserStore(), new FakePasswordHasher(), Clock);
-        Signing = new SigningService(Store, Users, Clock);
-        Checklists = new ChecklistService(Store, Clock);
+        Access = new AllowAllProjectAccess(Store);
+        Signing = TestServices.Signing(Store, Users, Clock);
+        Checklists = TestServices.Checklists(Store, Clock);
     }
+
+    /// <summary>
+    ///     Gets the access service, which lets every actor see every project.
+    /// </summary>
+    public AllowAllProjectAccess Access { get; }
 
     /// <summary>
     ///     Gets the review store.
@@ -120,9 +126,14 @@ internal sealed class AttestationFixture
         }
 
         fixture.CydUserId = ids["cyd"];
-        var project = await new ProjectService(fixture.Store, fixture.Clock).CreateAsync("Apollo", null, cancellationToken);
+        var project = await TestServices.Projects(fixture.Store, fixture.Clock).CreateAsync("Apollo", null, cancellationToken);
         fixture.ProjectId = project.Id;
-        await new ReviewService(fixture.Store, fixture.Clock).CreateDraftAsync(
+        foreach (var id in ids.Values)
+        {
+            await fixture.Store.AddMembershipAsync(id, project.Id, cancellationToken);
+        }
+
+        await TestServices.Reviews(fixture.Store, fixture.Clock).CreateDraftAsync(
             project.Id, ReviewId, "First", [new("a.txt", TestContent.A)], cancellationToken);
         await fixture.AnswerAllAsync(ChecklistOutcome.Pass);
         var slot = await fixture.Signing.AddSlotAsync(new Actor("cyd", "Cyd"), project.Id, ReviewId, ids["ann"], ids["bob"], cancellationToken);
@@ -172,7 +183,8 @@ internal sealed class AttestationFixture
         IAttestationSigner? signer = null,
         Func<CancellationToken, Task>? afterRender = null)
     {
-        return new AttestationService(Store, Signing, Audit, keys, new AttestationRenderer(), signer ?? new AttestationSigner(), Clock)
+        return new AttestationService(
+            Store, Signing, Access, Audit, keys, new AttestationRenderer(), signer ?? new AttestationSigner(), Clock)
         {
             AfterRender = afterRender
         };

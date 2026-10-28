@@ -227,18 +227,18 @@ public class PuppetEndToEndTests
             Assert.Equal(0, (await Run("click", "login-button")).Code);
             Assert.Equal(0, (await Run("wait", "current-user")).Code);
 
-            Assert.Equal(0, (await Run("goto", "/repositories/new")).Code);
-            Assert.Equal(0, (await Run("wait", "css=[data-testid=new-repository-page][data-interactive=true]")).Code);
-            Assert.Equal(0, (await Run("fill", "new-repository-name-input", "puppet-repository")).Code);
-            Assert.Equal(0, (await Run("fill", "new-repository-location-input", repository)).Code);
-            Assert.Equal(0, (await Run("click", "create-repository-button")).Code);
-            Assert.Equal(0, (await Run("wait", "repository-row-1")).Code);
-
             Assert.Equal(0, (await Run("goto", "/projects/new")).Code);
             Assert.Equal(0, (await Run("wait", "css=[data-testid=new-project-page][data-interactive=true]")).Code);
             Assert.Equal(0, (await Run("fill", "project-name-input", "Puppet Project")).Code);
             Assert.Equal(0, (await Run("click", "create-project-button")).Code);
             Assert.Equal(0, (await Run("wait", "project-name")).Code);
+
+            Assert.Equal(0, (await Run("goto", "/projects/1/repositories/new")).Code);
+            Assert.Equal(0, (await Run("wait", "css=[data-testid=new-repository-page][data-interactive=true]")).Code);
+            Assert.Equal(0, (await Run("fill", "new-repository-name-input", "puppet-repository")).Code);
+            Assert.Equal(0, (await Run("fill", "new-repository-location-input", repository)).Code);
+            Assert.Equal(0, (await Run("click", "create-repository-button")).Code);
+            Assert.Equal(0, (await Run("wait", "repository-row-1")).Code);
 
             Assert.Equal(0, (await Run("goto", "/projects/1/reviews/new")).Code);
             Assert.Equal(0, (await Run("wait", "css=[data-testid=new-review-page][data-interactive=true]")).Code);
@@ -434,7 +434,7 @@ public class PuppetEndToEndTests
                 };
                 add.Environment["Database__ConnectionString"] = info.Environment["Database__ConnectionString"];
                 add.Environment["REVIEWCENTER_PASSWORD"] = UserPassword;
-                foreach (var argument in new[] { dll, "user", "add", "--username", UserName, "--display-name", "Puppet Admin", "--role", "Admin" })
+                foreach (var argument in new[] { dll, "user", "add", "--username", UserName, "--display-name", "Puppet Admin", "--system-admin" })
                 {
                     add.ArgumentList.Add(argument);
                 }

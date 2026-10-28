@@ -6,14 +6,22 @@
 
 The `ProjectPage` unit consists of two pages. `ProjectPage` is the page at `/projects/{id}`: its responsibilities are
 to show one project and its reviews as clickable rows, each with its state and approval status, to lead to the page
-that creates a review, to lead to the plan page, and to report when it is interactive. `NewReviewPage` is the page
-at `/projects/{id}/reviews/new`: it holds only the form that creates a review, either from files selected in the
-browser (enforcing the upload limits while the files are read) or from the changes in a registered git repository.
-Both require a signed-in user. Each is a Razor component split into presentation (`ProjectPage.razor`,
+that creates a review, to lead to the plan page and, for whoever manages the project, to the repositories page, to let
+a system administrator manage the members of the project, and to report when it is interactive. `NewReviewPage` is the
+page at `/projects/{id}/reviews/new`: it holds only the form that creates a review, either from files selected in the
+browser (enforcing the upload limits while the files are read) or from the changes in a git repository of the
+project.
+Both require a signed-in user, and both show only the message "Project N does not exist." for a project that does
+not exist and, in just the same way, for a project the user may not see (the project is read with
+`ProjectService.GetAsync(actor, id)`, which returns nothing for it), so a user who is no member cannot tell a hidden
+project from a missing one; the response is a normal page with HTTP status 200. Each is a Razor component split into
+presentation (`ProjectPage.razor`,
 `NewReviewPage.razor`) and behavior (`ProjectPage.razor.cs`, `NewReviewPage.razor.cs`). Next to the heading,
-`ProjectPage` shows a "+ New review" button that leads to the form page, and an outline "Plan reviews" link to the
-plan page (`/projects/{id}/plan`) when at least one repository is enabled; when none is, a short note says to ask an
-administrator.
+`ProjectPage` shows a "+ New review" button that leads to the form page, an outline "Plan reviews" link to the
+plan page (`/projects/{id}/plan`) when at least one repository of the project is enabled, and a "Repositories" button
+to `/projects/{id}/repositories` for a system administrator and a project admin of the project; when the project has
+no enabled repository, a short note says to add one with the Repositories button (to whoever manages the project) or
+to ask a project administrator (to anybody else).
 
 Because `/projects/{id}/reviews/new` is the address of the form, the review identifier `new` (in any letter case) is
 reserved: `NewReviewPage` refuses it, so a review that could never be opened is never created.
@@ -24,16 +32,25 @@ The page instances are created per browser connection, so their state is per use
 
 **ProjectId**: `int` — the route parameter of both pages.
 
-**Loaded**, **Project**: whether loading finished and the project (`null` when it does not exist), on both pages.
+**Loaded**, **Project**: whether loading finished and the project (`null` when it does not exist or the user may not
+see it), on both pages.
 
 **Reviews** (`ProjectPage`): the reviews of the project.
 
 **ApprovedReviews** (`ProjectPage`): the identifiers of the reviews that are approved (at least one reviewer slot,
 and every slot has a current signature), filled while loading.
 
-**Repositories**: the enabled repositories (`RepositorySummary` values from `RepositoryService.ListEnabledAsync`,
-which carry no location and no token). `ProjectPage` uses them to decide whether to show the plan link;
+**Repositories**: the enabled repositories of this project (`RepositorySummary` values from
+`RepositoryService.ListEnabledAsync(actor, projectId)`, which carry no location and no token, and none of another
+project). `ProjectPage` uses them to decide whether to show the plan link;
 `NewReviewPage` offers them for the repository source.
+
+**IsSystemAdmin**, **CanAdminister** (`ProjectPage`): whether the user is a system administrator and whether the user
+manages the project (a system administrator or a project admin), from `IProjectAccess`. **Members** (`ProjectPage`):
+the `ProjectMember` list from `ProjectService.ListMembersAsync`, loaded for a system administrator only.
+**Candidates**: the enabled users that are not members yet, from `UserService`, for the drop-down of the add form.
+**ShowAddForm**, **AddUsername**, **AddAsProjectAdmin**: whether the inline add form is open and what was chosen in it.
+**MemberError**, **MemberStatus**: the refusal or the outcome of the last membership change.
 
 The remaining state belongs to `NewReviewPage`.
 
@@ -54,8 +71,14 @@ Test identifiers of `ProjectPage`: `project-page` (root), `breadcrumb-projects-l
 `project-name`, `project-description`, `new-review-button` (the link that leads to the form page), `reviews-list`,
 `reviews-empty`, `review-row-{id}`, `review-link-{id}`, `review-title-{id}`, `review-state-{id}`,
 `review-approval-{id}`, `review-created-{id}`, `plan-reviews-link` (the link to the plan page, shown when at least
-one repository is enabled), and `plan-reviews-unavailable` (the note shown when none is). Each review is one row of
-`reviews-list`: the identifier is the link, followed by the title, the state and approval badges, and the creation
+one repository of the project is enabled), `plan-reviews-unavailable` (the note shown when none is),
+`repositories-link` (the Repositories button, shown to whoever manages the project), and, for a system administrator
+only, the Members section: `member-error`, `member-status`, `members-empty`, `members-list`, and per member (by user
+name) `member-row-{username}`, `member-name-{username}`, `member-role-{username}`, `member-toggle-role-{username}`,
+and `member-remove-{username}`, then `add-member-button` and the form it reveals, `add-member-form`,
+`add-member-user-select`, `add-member-admin-checkbox`, `add-member-submit`, `add-member-cancel`, and
+`add-member-none` (shown instead of the drop-down when every enabled user is a member already). Each review is one row
+of `reviews-list`: the identifier is the link, followed by the title, the state and approval badges, and the creation
 date.
 
 Test identifiers of `NewReviewPage`: `new-review-page` (root), `breadcrumb-projects-link`, `project-link`, `project-loading`,
@@ -74,13 +97,35 @@ selection (a text area with one pattern per line, `!` to exclude).
 
 #### Key Methods
 
-**OnParametersSetAsync** (`ProjectPage`): Loads the project and its reviews, then asks
+**OnParametersSetAsync** (`ProjectPage`): Loads the project for the actor with `ProjectService.GetAsync(actor, id)`.
+When the project does not exist or the user may not see it, `Project` is null, nothing else is loaded, and the page
+shows the same message for both. Otherwise it loads the reviews, the enabled repositories of the project, whether the
+user is a system administrator and whether the user manages the project, and, for a system administrator, the members
+and the candidates, then asks
 `SigningService.GetApprovalAsync` once for each review to learn whether it is approved (N+1 lookups, accepted because
-the list of reviews of a project is short); a project that does not exist leaves `Project` null and the page shows a
-message. Each review row shows, next to its state, a badge that reads "Approved" when the review is in
+the list of reviews of a project is short). Each review row shows, next to its state, a badge that reads "Approved" when
+the review is in
 `ApprovedReviews` and "In review" otherwise; a review without slots is therefore In review.
 
-**OnParametersSetAsync** (`NewReviewPage`): Loads the project and the enabled repositories. When the project
+**AddMemberAsync**, **RemoveMemberAsync**, **ToggleRoleAsync** (`ProjectPage`): Add the chosen user with the role of
+the checkbox (`ProjectService.AddMemberAsync`), remove a member (`RemoveMemberAsync`), and switch a member between
+`ProjectRole.User` and `ProjectRole.ProjectAdmin` (`SetMemberRoleAsync`). Each goes through one shared step
+(`RunMemberChangeAsync`) that first runs `GuardMembersAsync`, then asks for the current user, runs the change, shows the
+outcome in `member-status` (only after the members were reloaded) or the message of a `DomainRuleException` in
+`member-error` (only when the guard, asked again, still allows it), and reloads the members and the candidates. The
+page holds no membership rule. **OpenAddFormAsync** (guarded in the same way) and **CloseAddForm** show and hide the
+inline form of the + Add member button.
+
+**GuardMembersAsync** (`ProjectPage`): Asks `ProjectViewGuard.GuardViewAsync` whether the user still sees the project;
+when not, `ShowNoAccess` drops the project, the reviews, the approved set, the repositories, and the member state, and
+the page shows the not-found message. Then it asks `ProjectViewGuard.GuardSystemAdminAsync` whether the user is still a
+system administrator; when not, `ShowMembersLost` clears `IsSystemAdmin`, the members, the candidates, the add form, and
+the member messages, `CanAdminister` is read again, and the reviews stay, because the user may still be a member. The
+action is then not run. Members and candidates are for system administrators only, so an error shown above them
+would not be enough.
+
+**OnParametersSetAsync** (`NewReviewPage`): Loads the project (for the actor, so a project the user may not see shows
+the not-found message and no form) and the enabled repositories of the project. When the project
 identity differs from the one already loaded (the router reuses the component), it first discards the previous
 project's form values, selected files, and error, so files chosen for one project can never be submitted into
 another.
@@ -128,14 +173,25 @@ A `DomainRuleException` from `ReviewService`, or from the check of the current u
 and its message shown in the page. A selection that breaks an upload limit is shown as an error message. Other
 exceptions are not handled by the pages.
 
+**Access re-check (`NewReviewPage`)**: The creation of the review, and the choice of the source, start with
+`GuardAsync`, which asks `ProjectViewGuard.GuardViewAsync` whether the signed-in user may still see the project. When
+access is lost, `ShowNoAccess` clears the project, the repositories, the form, and the result, and shows the same message
+as for a project that does not exist; no review is created. An ended sign-in state counts as no access, so this message
+replaces the "no longer signed in" message on this page. `ProjectPage` already re-checks as described in the design of
+the subsystem.
+
 #### Dependencies
 
 - **SessionGate** (App) — wraps the whole content of each page, so the page is replaced by a "Session ended" message
   when the sign-in state of the open page ends.
-- **ProjectService** — reads the project.
+- **ProjectService** — reads the project for the actor, and lists, adds, removes, and changes the members.
 - **ReviewService** — lists reviews (`ProjectPage`) and creates them (`NewReviewPage`).
-- **RepositoryService** — lists the enabled repositories (names only, never a location or token), for the plan link
-  and for the drop-down.
+- **RepositoryService** — lists the enabled repositories of the project (names only, never a location or token), for
+  the plan link and for the drop-down.
+- **UserService** — lists the users that can be added as members (`ProjectPage`).
+- **IProjectAccess** (Core) — tells whether the user is a system administrator and whether the user manages the project
+  (`ProjectPage`), and, through `ProjectViewGuard`, whether the user may still see the project (both pages) and is still
+  a system administrator (the members section of `ProjectPage`).
 - **SigningService** — computes whether each review is approved (`ProjectPage`).
 - **ReviewLimits** (Core) — the upload limits.
 - **ASP.NET Core Blazor components** — the component base class, file input, navigation, the authorization

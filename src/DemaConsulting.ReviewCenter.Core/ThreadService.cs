@@ -42,6 +42,11 @@ public sealed class ThreadService
     private readonly IReviewStore _store;
 
     /// <summary>
+    ///     Decides who may see which project; every change needs a user who can see it.
+    /// </summary>
+    private readonly IProjectAccess _access;
+
+    /// <summary>
     ///     The clock that supplies creation times.
     /// </summary>
     private readonly TimeProvider _timeProvider;
@@ -50,13 +55,16 @@ public sealed class ThreadService
     ///     Initializes a new instance of the <see cref="ThreadService"/> class.
     /// </summary>
     /// <param name="store">The store that persists threads. Must not be null.</param>
+    /// <param name="access">The access rules. Must not be null.</param>
     /// <param name="timeProvider">The clock used for creation times; injected so tests control time. Must not be null.</param>
     /// <exception cref="ArgumentNullException">Thrown when an argument is null.</exception>
-    public ThreadService(IReviewStore store, TimeProvider timeProvider)
+    public ThreadService(IReviewStore store, IProjectAccess access, TimeProvider timeProvider)
     {
         ArgumentNullException.ThrowIfNull(store);
+        ArgumentNullException.ThrowIfNull(access);
         ArgumentNullException.ThrowIfNull(timeProvider);
         _store = store;
+        _access = access;
         _timeProvider = timeProvider;
     }
 
@@ -137,6 +145,7 @@ public sealed class ThreadService
     {
         // Validate everything that needs no I/O first so a bad request fails fast and cheaply
         ArgumentNullException.ThrowIfNull(actor);
+        await _access.RequireViewAsync(actor, projectId, cancellationToken);
         if (!Enum.IsDefined(side))
         {
             throw new ArgumentOutOfRangeException(nameof(side), side, "The side is not a known value.");
@@ -259,6 +268,7 @@ public sealed class ThreadService
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(actor);
+        await _access.RequireViewAsync(actor, projectId, cancellationToken);
         var comment = new ReviewComment
         {
             Author = actor.DisplayName,
@@ -450,6 +460,7 @@ public sealed class ThreadService
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(actor);
+        await _access.RequireViewAsync(actor, projectId, cancellationToken);
 
         // The store saves the entry only when the thread exists, so a refused call leaves no trace
         var action = state == ReviewThreadState.Resolved ? "thread.resolved" : "thread.reopened";

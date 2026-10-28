@@ -20,11 +20,11 @@ N/A - standard test environment.
   case.
 - A display name is trimmed and has 1 to 100 characters.
 - A password has 12 to 128 characters, is not trimmed, and is stored only as a hash.
-- A role that is not defined is refused.
+- A user is created as a system administrator only when asked to; no role has to be validated.
 - Signing in succeeds only for an existing, enabled, unlocked user with the right password, in any case of the user
   name; every other case gives no user.
 - Five failures in a row lock the account for five minutes, and a success resets the count.
-- The last enabled administrator cannot be disabled or demoted.
+- The last enabled system administrator cannot be disabled or demoted.
 - A user changes their own password only with the current password; an administrator sets a new password for any
   user, which also ends a lockout.
 - A change of a user that does not exist is reported as such.
@@ -59,9 +59,6 @@ password of 12 spaces is accepted and is not trimmed. This scenario is tested by
 **UserService_CreateAsync_StoresHashNotPassword**: A user is created; the stored record holds the hash and the
 password appears nowhere in it. This scenario is tested by `UserService_CreateAsync_StoresHashNotPassword`.
 
-**UserService_CreateAsync_UndefinedRole_Throws**: A user is created with a role value that is not defined; an
-`ArgumentOutOfRangeException` is thrown. This scenario is tested by `UserService_CreateAsync_UndefinedRole_Throws`.
-
 **UserService_AuthenticateAsync_RightWrongAndUnknown_OnlyRightSucceeds**: The right password succeeds, also with
 the user name in another case; a wrong password, an unknown user, and a null password give no user. This scenario is
 tested by `UserService_AuthenticateAsync_RightWrongAndUnknown_OnlyRightSucceeds`.
@@ -79,13 +76,19 @@ is refused; at 4 minutes 59 seconds it is still refused, and at five minutes it 
 failures do not lock the account, and the failure count is 0 after the success. This scenario is tested by
 `UserService_AuthenticateAsync_SuccessBetweenFailures_ResetsCounter`.
 
-**UserService_SetEnabledAsync_SetRoleAsync_LastAdmin_IsProtected**: The only administrator cannot be disabled or
-demoted; both throw the rule `LastAdmin`. With a second administrator, the first can be demoted, and the second is
-then protected in turn. This scenario is tested by `UserService_SetEnabledAsync_SetRoleAsync_LastAdmin_IsProtected`.
+**UserService_SetEnabledAsync_SetRoleAsync_LastAdmin_IsProtected**: The only system administrator cannot be disabled
+or demoted; both throw the rule `LastAdmin`. With a second system administrator, the first can be demoted, and the
+second is then protected in turn. This scenario is tested by
+`UserService_SetEnabledAsync_SetRoleAsync_LastAdmin_IsProtected`.
 
-**UserService_SetEnabledAsync_OtherAdminDisabled_StillProtectsLastEnabledAdmin**: With a second administrator who
-is already disabled, the only enabled administrator still cannot be disabled or demoted. This scenario is tested by
-`UserService_SetEnabledAsync_OtherAdminDisabled_StillProtectsLastEnabledAdmin`.
+**UserService_SetEnabledAsync_OtherAdminDisabled_StillProtectsLastEnabledAdmin**: With a second system administrator
+who is already disabled, the only enabled system administrator still cannot be disabled or demoted. This scenario is
+tested by `UserService_SetEnabledAsync_OtherAdminDisabled_StillProtectsLastEnabledAdmin`.
+
+**UserService_SetSystemAdminAsync_PromoteAndDemote_LastAdminIsKept**: With one system administrator and a plain user,
+demoting and disabling the administrator both throw the rule `LastAdmin`; after the plain user is promoted with
+`SetSystemAdminAsync`, the first administrator can be demoted, and the flags read back as stored. This scenario is
+tested by `UserService_SetSystemAdminAsync_PromoteAndDemote_LastAdminIsKept`.
 
 **UserService_ChangeOwnPasswordAsync_NeedsCurrentPasswordAndPolicy**: A change with a wrong current password throws
 the rule `CurrentPasswordIncorrect`, one with a too short new password throws `PasswordInvalid`, and a valid change
@@ -100,21 +103,18 @@ while the account is locked. This scenario is tested by
 signs in with it at once, and the old password no longer works. This scenario is tested by
 `UserService_SetPasswordAsync_NewPassword_WorksAndEndsLockout`.
 
-**UserService_Changes_UnknownUser_ThrowUserNotFound**: Enabling, setting a role, setting a password, and changing a
-password for a user that does not exist each throw the rule `UserNotFound`. This scenario is tested by
-`UserService_Changes_UnknownUser_ThrowUserNotFound`.
-
-**UserService_SetRoleAsync_ValidAndUndefinedRole_ChangesOrThrows**: A defined role is stored; an undefined role
-throws an `ArgumentOutOfRangeException`. This scenario is tested by
-`UserService_SetRoleAsync_ValidAndUndefinedRole_ChangesOrThrows`.
+**UserService_Changes_UnknownUser_ThrowUserNotFound**: Enabling, changing the system administrator right, setting a
+password, and changing a password for a user that does not exist each throw the rule `UserNotFound`. This scenario is
+tested by `UserService_Changes_UnknownUser_ThrowUserNotFound`.
 
 **UserService_Constructor_NullArguments_Throws**: The constructor is called with a null store, hasher, or time
 provider; an `ArgumentNullException` is thrown for each. This scenario is tested by
 `UserService_Constructor_NullArguments_Throws`.
 
 **UserService_AdministrationEvents_AreRecordedWithoutPasswords**: A user is created, disabled, enabled, given
-another role, given a password by an administrator, and changes the own password; the entries `user.created`,
-`user.disabled`, `user.enabled`, `user.role-changed`, `user.password-set-by-admin`, and `user.password-changed` are
+the system administrator right, given a password by an administrator, and changes the own password; the entries
+`user.created`, `user.disabled`, `user.enabled`, `user.admin-changed` (detail
+`user 'carl': system administrator False -> True`), `user.password-set-by-admin`, and `user.password-changed` are
 recorded and none contains a password. This scenario is tested by
 `UserService_AdministrationEvents_AreRecordedWithoutPasswords`. A user created from the command line is recorded
 with the actor `(command line)`, which is tested by `UserService_CreateAsync_CommandLineActor_IsRecordedAsCommandLine`.

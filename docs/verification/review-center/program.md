@@ -80,7 +80,7 @@ from `["--help"]`; the output contains "serve", "--urls", and the default addres
 `Program_Run_WithHelpFlag_ListsServeVerbAndUrlsOption`.
 
 **Program_Run_WithHelpFlag_ListsUserAddVerbAndOptions**: `Program.Run` is called with a context from `["--help"]`;
-the output contains "user add", "--username", "--display-name", "--role", and the password variable
+the output contains "user add", "--username", "--display-name", "--system-admin", and the password variable
 `REVIEWCENTER_PASSWORD`. This scenario is tested by `Program_Run_WithHelpFlag_ListsUserAddVerbAndOptions`.
 
 **Program_Run_Help_DocumentsAuditVerify**: `Program.Run` is called with a context from `["--help"]`; the output names

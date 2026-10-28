@@ -33,9 +33,13 @@ N/A - standard test environment.
   1 and 3600 are accepted.
 - An unsupported database provider and an unusable database location are reported as the error "Failed to prepare
   the database", and `RunAsync` returns exit code 1 for each.
-- The repository registry, the git source, and the token protector are registered as shared instances; the git cache and
+- The repository store, the git source, and the token protector are registered as shared instances; the git cache and
   the Data Protection key ring are placed beside the database unless configured; the key ring is persisted, so a token
   encrypted before a restart is readable after it.
+- The project access rules (`IProjectAccess`) are registered as one shared instance. No unit test resolves the
+  registration alone; it is shown by the real pipeline serving the domain services
+  (`ServerHost_CreateApplication_DatabaseConfigured_CreatesFileAndServesDomainServices`) and by the API refusing a
+  non-member (`ApiProjectAccess_EveryProjectRoute_NonMemberToken_AnswersLikeAMissingProject`).
 - A key ring folder that cannot be written stops the start of the server with an error that names the
   `DataProtection:KeysPath` setting and the folder.
 - The personal access token service is one shared instance, the routes under `/api` are mapped, the OpenAPI document is

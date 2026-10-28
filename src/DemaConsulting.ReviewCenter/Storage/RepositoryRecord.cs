@@ -36,7 +36,12 @@ internal sealed class RepositoryRecord
     public int Id { get; set; }
 
     /// <summary>
-    ///     Gets or sets the unique name, compared without regard to case.
+    ///     Gets or sets the identity of the project the repository belongs to.
+    /// </summary>
+    public int ProjectId { get; set; }
+
+    /// <summary>
+    ///     Gets or sets the name, unique within the project and compared without regard to case.
     /// </summary>
     public string Name { get; set; } = string.Empty;
 

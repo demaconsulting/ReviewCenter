@@ -201,7 +201,7 @@ public class AppTests : PageTestBase
     public void MainLayout_Render_SignedInUser_ShowsNameAccountAndLogout()
     {
         // Arrange: a reviewer is signed in
-        SignInAs("bea", "Bea");
+        SignInAs("bea", "Bea", UserRole.Reviewer);
 
         // Act: render the layout, then again as an administrator
         var reviewer = Render<MainLayout>();
@@ -215,10 +215,9 @@ public class AppTests : PageTestBase
         Assert.NotNull(reviewer.Find("[data-testid='logout-button']"));
         Assert.Empty(reviewer.FindAll("[data-testid='users-link']"));
         Assert.Empty(reviewer.FindAll("[data-testid='audit-link']"));
-        Assert.Empty(reviewer.FindAll("[data-testid='repositories-link']"));
         Assert.Empty(reviewer.FindAll("[data-testid='signin-link']"));
         Assert.NotNull(admin.Find("[data-testid='users-link']"));
-        Assert.Equal("/repositories", admin.Find("[data-testid='repositories-link']").GetAttribute("href"));
+        Assert.Empty(admin.FindAll("[data-testid='repositories-link']"));
         Assert.Equal("/audit", admin.Find("[data-testid='audit-link']").GetAttribute("href"));
     }
 
@@ -336,7 +335,7 @@ public class AppTests : PageTestBase
     public async Task Routes_Render_ReviewerOpensUsersRoute_ShowsAccessDeniedNotUserList()
     {
         // Arrange: a reviewer is signed in, one user exists, and the router is at /users
-        SignInAs("ann", "Ann");
+        SignInAs("ann", "Ann", UserRole.Reviewer);
         await Users.CreateAsync("root", "Root User", UserRole.Admin, "correct horse battery", TestContext.Current.CancellationToken);
         Services.GetRequiredService<NavigationManager>().NavigateTo("/users");
 

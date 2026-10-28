@@ -250,7 +250,7 @@ uses `PathHelpers` to construct safe temporary file paths.
 the silent option from `Context`, configures structured logging, registers the sign-in of the `Identity` subsystem,
 maps the `/health` endpoint, maps the user interface defined by the `Web` subsystem, and connects the pages to the
 database. `UserCommand` creates a user from the command line with the same configuration and registration, which is
-how the first administrator is created. `AuditCommand` verifies the hash chain of the audit trail with the same
+how the first system administrator is created. `AuditCommand` verifies the hash chain of the audit trail with the same
 configuration and registration and reports the result as the exit code.
 The `Web` subsystem is a Blazor Server user interface: `App` is the HTML shell and router,
 `HomePage` is the landing page served at the root URL, `AboutPage` and `HelpPage` describe the product and explain how
@@ -260,7 +260,7 @@ checklists, `LoginPage`,
 `AccountPage`, and `UsersPage` are the pages for signing in, changing one's own password and creating personal access
 tokens, and managing users, and
 `HistoryPage` and `AuditPage` show the audit trail of a review and of the whole system, and `RepositoriesPage` lets an
-administrator register git repositories. A browser
+administrator of a project register git repositories with it. A browser
 connects to the server,
 receives a server-rendered page, and then upgrades to a live connection over which user
 actions are handled on the server.
@@ -270,7 +270,9 @@ authorization, checks a password through `UserService`, signs the user in and ou
 in; `SignInThrottle` limits the failed sign-in attempts per client address and typed name, in memory;
 `RevalidatingAuthenticationStateProvider` re-checks the user of every open page at a fixed interval with the same rule
 as the cookie check and ends the sign-in state of the page when the user is no longer valid; `PasswordHasher` hashes and
-verifies passwords with the password hasher of the ASP.NET Core shared framework.
+verifies passwords with the password hasher of the ASP.NET Core shared framework. The cookie carries the user name, the
+display name, and, only for a system administrator, the role claim `SystemAdmin`; it never carries a project role,
+because which projects a user may see is decided by the `Core` rule `ProjectAccess` at every request.
 
 The `Core` subsystem holds the domain: projects, reviews of uploaded files or of the changes in a git repository,
 users, the rules that
@@ -278,7 +280,8 @@ protect them, the content fingerprint of a review, the digest of a review record
 hash-chained audit trail. It
 depends on no other subsystem and on
 no library beyond the .NET runtime, and it defines the store interfaces and the password hasher interface that the
-`Storage` and `Identity` subsystems implement. The `Storage` subsystem keeps projects, reviews, users, and the audit
+`Storage` and `Identity` subsystems implement. The `Storage` subsystem keeps projects, project memberships, reviews,
+users, and the audit
 trail
 in a
 database through
@@ -289,14 +292,17 @@ services reach it through the Core store interfaces, which `ReviewStore`, `UserS
 The `ContentSources` subsystem reads content from outside the system. Its units run the git command-line tool
 (`GitRunner`), maintain a local mirror of each registered repository and answer the questions the Core contract asks
 (`GitSource`), and encrypt the access tokens of private repositories with the Data Protection system
-(`CredentialProtector`). It implements Core interfaces and nothing depends on it but `ServerHost`. The registry of
-repositories belongs to `Core` (`RepositoryService`, with `SelectionMatcher` and `RevisionValidator`) and `Storage`
-(`RepositoryStore`); only administrators can change it. A review can be created from a repository: the server reads
+(`CredentialProtector`). It implements Core interfaces and nothing depends on it but `ServerHost`. The repositories of
+each project belong to `Core` (`RepositoryService`, with `SelectionMatcher` and `RevisionValidator`) and `Storage`
+(`RepositoryStore`); only the administrators of the project can change them. A review can be created from a
+repository: the server reads
 the changed files between an optional baseline and a head revision through `GitSource`, filtered by a selection, and
 freezes them in the review.
 
 The `Evidence` subsystem turns a complete review into evidence that can be kept outside the system: a signed PDF
-attestation. `AttestationEndpoint` serves the download to a signed-in user; `AttestationService` checks that the review
+attestation. `AttestationEndpoint` serves the download to a signed-in user who may see the project (anyone else gets an
+empty 404, as for a project that does not exist); `AttestationService` checks that the user may view the project and
+that the review
 is approved, builds the document description from the record, has `AttestationRenderer` lay it out (with
 `PdfDocumentWriter` as the PDF writer), has `AttestationSigner` add a detached CMS signature that covers the document
 with the key from `AttestationKeyProvider`, and records the generation in the audit trail. The key is a self-signed key
@@ -306,7 +312,7 @@ are (the sign-offs of the record do that) and carries no trusted time. Nothing i
 is asked for. `ServerHost` wires it and checks the key at the start, and `ReviewPage` offers the download.
 `EvidenceIndexService` also lists the completed reviews of a project that were planned from a review-set, in the form of
 the
-`index.json` that ReviewMark reads as an evidence source; `ApiEndpoints` serves it.
+`index.json` that ReviewMark reads as an evidence source, for a user who may see the project; `ApiEndpoints` serves it.
 
 The `Api` subsystem lets scripts and pipelines work with the same data without a browser. Every request under `/api`
 is authenticated by `ApiTokenAuthentication`, an authentication scheme that accepts only a personal access token in
@@ -317,18 +323,26 @@ anywhere else. `PersonalAccessTokenService` (in `Core`) creates, lists, revokes,
 and sees the value once. `ApiEndpoints` maps the endpoints, which read projects and reviews, create a draft review
 from uploaded files or from a repository, download the attestation of a complete review, and read the evidence index of
 a project; every one of them calls
-the same Core services as the pages and acts as the owner of the token. Reviewer slots and signatures cannot be
+the same Core services as the pages and acts as the owner of the token. Every route of a project first asks
+`ProjectService.GetAsync` with the owner of the token, so a project that the owner may not see answers 404 with the
+same body as a project that does not exist, and the list of projects holds only the visible ones; a token never grants
+more than its owner has, and it follows a change of the memberships of its owner at once. Reviewer slots and
+signatures cannot be
 changed through the API: there is no route for them, and `SigningService` refuses an actor that came in with a token
 as a second line of defense. `ApiDocument` serves the OpenAPI description of the API at `/api/openapi.json`, which
 `Microsoft.AspNetCore.OpenApi` generates and a test compares with the snapshot `docs/api/openapi.json`.
 
 The system is a single process with one database; there is no separate service tier. Users are local accounts
-with a user name, a display name, a role (Reviewer or Admin), and a password that is stored only as a hash. A user
+with a user name, a display name, a system administrator flag, and a password that is stored only as a hash. A user
 signs in on the login page and stays signed in through a cookie; every page except the home page and the login page
-requires a signed-in user, and the users page, the repositories page, and the audit page require the Admin role. The
-first administrator is created with the
-`user add` verb. A review can be created (in the Draft state) from uploaded files or from a registered git repository; a
-review from a repository covers the files that changed between a baseline and a head revision that match a selection,
+requires a signed-in user, and the users page, the new project page, and the audit page require a system
+administrator. Project access is by membership: a user sees a project only as a member (with the project role `User`
+or `ProjectAdmin`), a system administrator sees every project, and a project that a user may not see does not exist for
+that user. The repositories of a project are registered by its administrators (project administrators and system
+administrators) on the repositories page of the project, and a system administrator manages the members on the project
+page. The first system administrator is created with the `user add --system-admin` verb. A review can be created (in
+the Draft state) from uploaded files or from a registered git repository; a review from a repository covers the files
+that changed between a baseline and a head revision that match a selection,
 with their baseline and head content frozen, and its record digest binds to the repository, both commits, the
 selection, and every change. Review comments are implemented
 (threads anchored to a file or line range, with replies, resolve, and reopen), and every review has a checklist of
@@ -350,7 +364,8 @@ identified by the signatures in the record, and there is no time stamp authority
 Everything that changes data, and every sign-in, sign-out, failed sign-in, and lockout, is recorded in an append-only
 audit trail. Each entry carries the hash of the entry before it, so the entries form a hash chain. The change and its
 entry are stored in one transaction, so a change without an entry (or the reverse) cannot occur through the application.
-Anyone who is signed in can read the history of a review; an administrator can read the whole trail and verify the
+Anyone who is signed in can read the history of a review of a project that the user may see; a system administrator can
+read the whole trail and verify the
 chain on the audit page or with the `audit verify` verb. The chain detects an edit, a deletion, an insertion, or a
 reordering of entries in the middle of the history. It does not detect the removal of the newest entries, or a complete
 rewrite of the chain by someone with write access to the database, unless the head hash, which the audit page and the
@@ -371,8 +386,9 @@ replaced by a "Session ended" message, while the page header keeps the old name 
 password change does not end other sessions of the user; and a database that was created
 before the identity slice, before the signature slice (it has no reviewer slot and signature tables), before the
 audit trail (it has no audit table), before the repository registry (it has no `Repositories` table), before reviews
-from a repository (its reviews have no source columns), or before personal access tokens (it has no token table and
-its reviews have no creator columns) must be
+from a repository (its reviews have no source columns), before personal access tokens (it has no token table and
+its reviews have no creator columns), or before project access control (it has no `ProjectMemberships` table, its
+users have no system administrator flag, and its repositories have no project) must be
 deleted and created again, because there are no migrations.
 The limitations of the audit trail are also deliberate: the throttle and the coalescing of repeated failure entries
 (one entry per key and minute, with a count of the suppressed repeats) are kept in memory, so they are per process and
@@ -392,15 +408,17 @@ retention, or archiving of the trail.
 - *Type*: CLI.
 - *Role*: Consumer (the host environment invokes the system with command-line arguments).
 - *Contract*: Accepts the `serve` verb, the `user add` verb with the options `--username <name>`,
-  `--display-name <name>`, and `--role <Admin|Reviewer>`, the `audit verify` verb, and the arguments `-v`/`--version`,
+  `--display-name <name>`, and the switch `--system-admin`, the `audit verify` verb, and the arguments `-v`/`--version`,
   `-?`/`-h`/`--help`,
   `--silent`, `--validate`, `--results <file>`, `--result <file>` (legacy alias for
   `--results`), `--depth <n>`, `--log <file>`, and `--urls <url>`. Returns exit code 0 for
   success and 1 for failures.
 - *Constraints*: Unknown arguments cause exit code 1 and an error message on stderr.
   `--urls` is only valid together with `serve`, and its value must be an absolute http or
-  https URL. `--username`, `--display-name`, and `--role` are only valid together with `user add`, which
-  requires `--username` and `--display-name`; the role is `Reviewer` unless given. `audit` must be followed by
+  https URL. `--username`, `--display-name`, and `--system-admin` are only valid together with `user add`, which
+  requires `--username` and `--display-name`; the user is an ordinary user unless `--system-admin` is given (the first
+  user must be a system administrator, because only a system administrator can create projects and users). `audit` must
+  be followed by
   `verify`. `audit verify` reads the database of the `Database` settings, verifies the hash chain of the audit trail,
   prints `Audit chain intact: N entries` and exits with 0 when it is intact, and prints
   `Audit chain BROKEN at entry N` on standard error and exits with 1 when it is not; an unreadable database is also
@@ -425,15 +443,20 @@ is running.
   sign-in throttle refuses the attempt, with a "too many attempts" message that is the same for known and unknown
   user names); `POST /auth/logout`
   ends the session and redirects to `/`. Both posts require the antiforgery token of the form. `GET /account`
-  returns the page where the signed-in user changes their password, and `GET /users` the page where an administrator
-  manages users. `GET /projects` returns the projects page, `GET /projects/{id}` the page of one project,
+  returns the page where the signed-in user changes their password, and `GET /users` the page where a system
+  administrator
+  manages users. `GET /projects` returns the projects page (it lists the projects that the user may see),
+  `GET /projects/{id}` the page of one project,
   and `GET /projects/{id}/reviews/{reviewId}` the page of one review, and
   `GET /projects/{id}/reviews/{reviewId}/history` the history of one review; these pages show a "does not exist"
-  message when the project or review is unknown. `GET /repositories` returns the page where an administrator registers
-  git repositories (administrators only). `GET /audit` returns the whole audit trail with the button that
-  verifies its hash chain (administrators only). `GET /projects/{projectId}/reviews/{reviewId}/attestation.pdf` returns
-  the signed PDF attestation of a complete review as a download (HTTP status 200 with `application/pdf`; 404 when the
-  review does not exist, 409 when it is not complete, 500 when the signing key cannot be used; a signed-out request is
+  message when the project or review is unknown, and the same message when the user may not see the project.
+  `GET /projects/{id}/repositories` returns the page where an administrator of the project registers
+  git repositories. `GET /audit` returns the whole audit trail with the button that
+  verifies its hash chain (system administrators only). `GET /projects/{projectId}/reviews/{reviewId}/attestation.pdf`
+  returns
+  the signed PDF attestation of a complete review as a download (HTTP status 200 with `application/pdf`; an empty 404
+  when the review does not exist or the user may not see the project, 409 when it is not complete, 500 when the signing
+  key cannot be used; a signed-out request is
   redirected to `/login`).
   Any other page request returns HTTP status 404 with the not-found page of the user interface, an HTML document with
   the
@@ -445,7 +468,8 @@ is running.
   not performed by the server itself. Authentication of the pages is by cookie: the routes `/`, `/login`, and `/health`
   and the
   static assets are open to anonymous visitors, every other page requires a signed-in user (an anonymous request is
-  redirected to `/login` with the wanted address), and `/users`, `/repositories`, and `/audit` require the Admin role
+  redirected to `/login` with the wanted address), and `/users`, `/projects/new`, and `/audit` require the system
+  administrator role
   (another user gets HTTP status
   403). The cookie is HTTP-only, belongs to the session of the browser, and expires after a sliding period of
   `Auth:SessionHours` hours (default 8). The cookie is marked secure when the request is HTTPS, so behind a proxy that
@@ -478,17 +502,19 @@ is running.
   (200 with `application/pdf`). `GET /api/openapi.json` returns the OpenAPI description of these endpoints and needs no
   token. Errors are `application/problem+json` documents: 400 for a rejected request (with the field that is wrong), 401
   for a missing or refused token (always the same answer, with `WWW-Authenticate` headers for `Bearer` and `Basic`),
-  403 for an action that is not allowed, 404 for an unknown project, review, or address, 409 for a conflict or an
+  403 for an action that is not allowed, 404 for an unknown project, review, or address (a project that the owner of the
+  token may not see answers exactly like an unknown project), 409 for a conflict or an
   attestation of a review that is not complete, 429 when too many tokens were refused from one address, and 5xx for
   repository or key failures.
-- *Constraints*: A token acts with the current role of its owner and stops working when it expires, is revoked, or its
+- *Constraints*: A token acts with the current memberships and system administrator flag of its owner, read again at
+  every request, and stops working when it expires, is revoked, or its
   owner is disabled or locked out. A token cannot sign, change reviewer slots, or reach any page, and a session cookie
   cannot reach the API. The token is only a bearer secret: the server must not be exposed to untrusted networks
   without TLS, because it is sent in every request. A request is counted by the sign-in throttle with the client
   address (the same limits and the same forwarded-headers caveat as the sign-in). The limit of one request body is
   30 MiB.
 
-**Database**: The persistent store of projects, reviews, and users.
+**Database**: The persistent store of projects, memberships, reviews, and users.
 
 - *Type*: File (SQLite) or database connection.
 - *Role*: Consumer (the server reads and writes it).
@@ -506,13 +532,14 @@ is running.
   created before the identity slice (it has no users and no user name columns), before the signature slice (it
   has no reviewer slot and signature tables), before the audit trail (it has no audit table), before the repository
   registry (it has no `Repositories` table), before reviews from a repository (its reviews and files lack the
-  source and change columns), or before personal access tokens (it has no token table and its reviews lack the
-  creator columns) must be deleted and
+  source and change columns), before personal access tokens (it has no token table and its reviews lack the
+  creator columns), or before project access control (it has no `ProjectMemberships` table, its users lack the system
+  administrator flag, and its repositories lack the project) must be deleted and
   created again. The audit table is append-only for the application, but anyone with write access to the database file
   can still change it; the hash chain makes such a change detectable only in the way the design of `AuditChain`
   describes.
 
-**Git repositories and the key ring**: The sources and the secrets of the repository registry.
+**Git repositories and the key ring**: The sources and the secrets of the git repositories of the projects.
 
 - *Type*: Git command-line tool, file system, and configuration.
 - *Role*: Consumer (the server runs git and reads and writes the folders).
@@ -656,7 +683,8 @@ and the endpoint returns the signed bytes. A request under `/api` takes another 
 scheme of `ApiTokenAuthentication` reads the token (a bearer token, or the password of HTTP Basic credentials),
 counts the attempt with `SignInThrottle`, asks `PersonalAccessTokenService` to validate the token (a hash lookup in
 `PersonalAccessTokenStore`, then the checks of
-expiry, revocation, and the owner), and on success builds a principal with the owner's name and role and a token
+expiry, revocation, and the owner), and on success builds a principal with the owner's name and, for a system
+administrator, the `SystemAdmin` role, and a token
 claim; a refusal is audited through `AuditService` without the value and answered with a generic 401. `ApiEndpoints`
 then calls the same services as the pages (`ProjectService`, `ReviewService`, `SigningService` for the approval,
 `ThreadService` and `ChecklistService` for the counts, `AttestationService`, and `EvidenceIndexService` for the evidence
@@ -687,8 +715,8 @@ result or the reason of a failure is reported through `Context`.
   created at start-up and not migrated (see the Storage subsystem design); a database created before the identity
   slice or before the signature slice must be deleted and created again.
 - Authentication: passwords are stored only as salted hashes and never logged or shown; five consecutive wrong
-  passwords lock a user name for 5 minutes (per user name, not per source); the last enabled administrator cannot be
-  disabled or demoted. A signature asks for the password again through the same check, so wrong passwords at a
+  passwords lock a user name for 5 minutes (per user name, not per source); the last enabled system administrator
+  cannot be disabled or demoted. A signature asks for the password again through the same check, so wrong passwords at a
   signature count toward the same lockout.
 - Signatures: a signature is bound to the digest of the review record and is never changed or removed; the approval
   of a review is computed from the record and the signatures each time and is never stored.

@@ -33,12 +33,14 @@ N/A - standard test environment (a temporary database and key folder are created
   unknown project.
 - An unknown address under `/api` is a JSON 404 for every standard HTTP method (`GET`, `HEAD`, `POST`, `PUT`, `PATCH`,
   `DELETE`, `OPTIONS`), and there is no route that signs or changes a slot.
+- A route of a project answers a non-member like a missing project, and the project list holds only the projects the
+  owner of the token may see; these are verified over HTTP by `ApiProjectAccessTests.cs` (see the `Api` subsystem).
 
 #### Test Scenarios
 
-**ApiEndpoints_ListProjects_Token_ReturnsProjects**: Two projects are listed with a token. The answer is 200
-`application/json` with a list whose items have camel-case names, the identity, the description, and the creation time.
-This scenario is tested by
+**ApiEndpoints_ListProjects_Token_ReturnsProjects**: Two projects are listed with the token of a system
+administrator. The answer is 200 `application/json` with a list whose items have camel-case names, the identity,
+the description, and the creation time. This scenario is tested by
 `ApiEndpoints_ListProjects_Token_ReturnsProjects`.
 
 **ApiEndpoints_ListReviews_Project_ReturnsSummariesOrNotFound**: The reviews of a project and of a project that does not

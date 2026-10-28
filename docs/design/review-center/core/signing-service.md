@@ -44,11 +44,14 @@ setting the record back restores it, because the signatures were never touched.
 
 **Rules for slots**:
 
-- The primary reviewer must be an enabled user. The alternate reviewer is optional; when given it must be an enabled
-  user and a different one.
+- The primary reviewer must be an enabled user who is a member of the project. The alternate reviewer is optional;
+  when given it must be an enabled member of the project and a different user (`SlotUserInvalid`: "The primary/alternate
+  reviewer must be an enabled member of the project."). The system administrator right does not make a user a
+  candidate; only a membership does.
 - A user occupies at most one slot of a review, as primary or as alternate. Otherwise one person could fill a review
   with their own approvals.
-- Any signed-in user can add, change, and remove slots. A slot that has any signature, current or out of date, can
+- Any member of the project can add, change, and remove slots; the actor must be able to see the project
+  (`ProjectNotFound` otherwise) and have an enabled account. A slot that has any signature, current or out of date, can
   no longer be changed or removed, because a signature must always point to a slot that still describes who signed.
   A change of reviewers after a signature is therefore a new slot.
 
@@ -65,7 +68,9 @@ is one.
 **Signing** takes the actor (the signed-in user, never a form value), the slot, the digest the signer was looking at
 (`expectedDigest`), and the password. It checks, in this order, and stops at the first failure:
 
-1. The actor has an existing, enabled account (`ActorNotAllowed`).
+1. The actor can see the project (`ProjectNotFound`), has an existing, enabled account (`ActorNotAllowed`), and is a
+   member of the project (`ActorNotAllowed`: "Only a member of the project can sign its reviews."). A system
+   administrator who is not a member cannot sign.
 2. The review and the slot exist (`ReviewNotFound`, `SlotNotFound`).
 3. The actor is the primary or the alternate reviewer of the slot (`ActorNotAllowed`: "You are not a reviewer of this
    slot."). The role is taken from the seat.
@@ -118,8 +123,10 @@ changes or deletes a signature. `UpdateSlotAsync` and `RemoveSlotAsync` return `
 
 **ListCandidatesAsync**: Lists the users that can be chosen for a slot.
 
-- *Returns*: `Task<IReadOnlyList<SlotMember>>` — the enabled users ordered by display name and then user name;
-  nothing secret is included.
+- *Parameters*: the actor, the project identity, and a cancellation token.
+- *Preconditions*: The actor may see the project (`ProjectNotFound` otherwise).
+- *Returns*: `Task<IReadOnlyList<SlotMember>>` — the enabled members of the project ordered by display name and then
+  user name; nothing secret is included.
 
 **AddSlotAsync**: Adds a slot.
 
@@ -172,7 +179,8 @@ never contain a password or a hash. An infrastructure failure of the store passe
 #### Dependencies
 
 - **IReviewStore** — reads the record, the slots, and the signatures, and stores slots and signatures.
-- **UserService** — looks up users, lists them for the candidates, and re-authenticates the signer
+- **IProjectAccess** — requires that the actor may see the project and that the signer and the reviewers are members.
+- **UserService** — looks up users, describes the reviewers, and re-authenticates the signer
   (`ReauthenticateAsync`).
 - **RecordDigest** — calculates the digest of the record.
 - **ThreadService** — `NextStep` words the next step when signing is blocked.

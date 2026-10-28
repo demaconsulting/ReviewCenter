@@ -24,7 +24,8 @@ The page instance is created per browser connection, so its state is per user.
 
 **ProjectId**, **ReviewId**: the route parameters.
 
-**Loaded**, **Review**, **ProjectName**: whether loading finished, the review (`null` when it does not exist), and
+**Loaded**, **Review**, **ProjectName**: whether loading finished, the review (`null` when it does not exist or its
+project is not visible to the user), and
 the name of the owning project shown in the breadcrumb.
 
 **State**: the `ChecklistState` of the review (`null` when the review has no checklist); it is read again after each
@@ -90,19 +91,31 @@ appears when this page is next loaded or changed; nothing is pushed.
 
 #### Error Handling
 
-A review that does not exist, and a review without a checklist, are shown as messages on the page. Checklist rule
+A review that does not exist or whose project the user may not see (the same message), and a review without a
+checklist, are shown as messages on the page. Checklist rule
 violations, and the refusal of an action whose sign-in state has already ended ("You are no longer signed in, so nothing
 was saved. Reload the page to sign in again."), are shown as messages next to the control that caused them and never end
 the connection. The page raises
 no other errors of its own.
 
+**Access re-check**: Every handler that reads or stores something (answer, save, and the not-applicable switch) starts
+with `GuardAsync`, which asks `ProjectViewGuard.GuardViewAsync` whether the signed-in user may still see the project;
+opening a section and going to the next unanswered check are wrapped at their binding by `GuardedAsync`. When access is
+lost, `ShowNoAccess` resets the component state exactly as a change of address does, shows the same message as for a
+review that does not exist, and the handler returns without calling a service, so no answer is stored and nothing of the
+checklist stays in the page. An ended sign-in state counts as no access, so this message replaces the "no longer signed
+in" message on this page.
+
 #### Dependencies
 
 - **SessionGate** (App) — wraps the whole page content, so the page is replaced by a "Session ended" message when the
   sign-in state of the open page ends.
+- **IProjectAccess** (Core) — through `ProjectViewGuard`, asked before every handler whether the user may still see the
+  project.
 - **ReviewService** — reads the review.
 - **ChecklistService** — reads the checklist and records answers and section decisions.
-- **ProjectService** — reads the name of the owning project for the breadcrumb.
+- **ProjectService** — reads the project for the signed-in user (nothing is loaded when the user may not see it) and its
+  name for the breadcrumb.
 - **SignIn** — `GetActorAsync` supplies the signed-in user from the authentication state.
 - **ASP.NET Core Blazor components** — the component base class, events, JavaScript interop, and the interactive
   server render mode.

@@ -47,7 +47,7 @@ public partial class AuditPage : ComponentBase
     /// <summary>
     ///     The message shown when the signed-in user is not (or no longer) an enabled administrator.
     /// </summary>
-    private const string AdminRequired = "Administrator rights are required.";
+    private const string AdminRequired = "System administrator rights are required.";
 
     /// <summary>
     ///     Backing field for <see cref="InteractiveMarker"/>; flips to <c>true</c> after the first render
@@ -189,7 +189,7 @@ public partial class AuditPage : ComponentBase
         }
 
         var current = await UserService.GetAsync(actor.Username);
-        if (current is not { Enabled: true, Role: UserRole.Admin })
+        if (current is not { Enabled: true, IsSystemAdmin: true })
         {
             ErrorMessage = AdminRequired;
             return false;

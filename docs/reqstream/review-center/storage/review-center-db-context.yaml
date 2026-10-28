@@ -2,7 +2,7 @@
 # Software Unit Requirements for the ReviewCenterDbContext Class
 #
 # The ReviewCenterDbContext class is the Entity Framework Core model that maps projects, reviews, review
-# files, threads, comments, checklists, users, reviewer slots, and signatures to database tables.
+# files, threads, comments, checklists, users, memberships, reviewer slots, and signatures to database tables.
 
 sections:
   - title: ReviewCenterDbContext Unit Requirements
@@ -86,13 +86,12 @@ sections:
       - id: ReviewCenter-DbContext-Users
         title: >-
           The ReviewCenterDbContext class shall map users to a table in which the user name is unique regardless
-          of letter case and the role is stored by its name, and shall map the user name of the author of a
-          comment, of the person who answered a check, and of the person who set a section next to the display
-          name, so that the database refuses a second user whose name differs only in letter case.
+          of letter case and the system administrator right is stored as a flag, and shall map the user name of the
+          author of a comment, of the person who answered a check, and of the person who set a section next to the
+          display name, so that the database refuses a second user whose name differs only in letter case.
         justification: |
-          The database is the last line of defense against two users with the same name, and a role stored by
-          name stays readable and stays valid if the list of roles is reordered. The user name beside the display
-          name keeps the record identifiable when the display name changes.
+          The database is the last line of defense against two users with the same name. The user name beside the
+          display name keeps the record identifiable when the display name changes.
         tests:
           - UserStore_AddAsync_UsernameOtherCase_ThrowsUserNameTakenAndLookupIgnoresCase
           - UserStore_AddAsync_User_RoundTripsEveryField
@@ -130,14 +129,32 @@ sections:
       - id: ReviewCenter-DbContext-Repositories
         title: >-
           The ReviewCenterDbContext class shall map the registered repositories to a table with an identity assigned
-          by the database and a name that is unique regardless of letter case, and shall keep the token only in its
-          encrypted form, so that the database refuses a second repository whose name differs only in letter case.
+          by the database and a required project, with a name that is unique within the project regardless of letter
+          case, and shall keep the token only in its encrypted form, so that the database refuses a second repository
+          in the same project whose name differs only in letter case, allows the same name in two projects, and
+          refuses a repository for a project that does not exist.
         justification: |
-          The database is the last defense against two repositories with the same name, and a token stored only in
-          encrypted form is not readable in a copy of the database.
+          The database is the last defense against two repositories with the same name in a project, and a token
+          stored only in encrypted form is not readable in a copy of the database. A name that is unique within the
+          project, not across all projects, tells nobody that another project has a repository of that name.
         tests:
           - RepositoryStore_AddAsync_Repository_RoundTripsAndAudits
           - RepositoryStore_NameOtherCase_ThrowsRepositoryNameTaken
+          - RepositoryStore_ListAsync_ScopedToProject_AndNamesAreUniquePerProject
+
+      - id: ReviewCenter-DbContext-Memberships
+        title: >-
+          The ReviewCenterDbContext class shall map the memberships to a table keyed by the user and the project, so
+          that the database refuses a second membership of a user in a project, with the role stored by its name, and
+          with relationships to the user and to the project, so that the database refuses a membership for a project
+          or a user that does not exist and removes the memberships of a project or a user that is removed.
+        justification: |
+          The key is the last defense against two roles for one user in one project when two requests overlap, and
+          the relationships keep a membership from pointing at nothing. A role stored by name stays readable and stays
+          valid if the list of roles is reordered.
+        tests:
+          - ReviewStore_AddMembershipAsync_SecondMembership_IsRejected
+          - ReviewStore_AddMembershipAsync_UnknownProject_IsRefusedByTheDatabase
 
       - id: ReviewCenter-DbContext-Tokens
         title: >-

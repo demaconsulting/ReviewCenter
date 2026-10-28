@@ -60,10 +60,11 @@ sections:
         title: >-
           The Identity subsystem shall send a request without a signed-in user to the login page for every page
           except the home page and the login page, and shall refuse the user administration page to a user who
-          is not an administrator.
+          is not a system administrator.
         justification: |
-          Review data must only be reached by identified users, and managing users is limited to
-          administrators. Closing pages by default means a new page cannot be left open by mistake.
+          Review data must only be reached by identified users, and managing users is limited to system
+          administrators. Closing pages by default means a new page cannot be left open by mistake. Which projects
+          a signed-in user may see is decided by the project access rules of the Core subsystem, not here.
         children:
           - ReviewCenter-SignIn-Protected
           - ReviewCenter-SignIn-ReturnDeepLink
@@ -71,12 +72,29 @@ sections:
         tests:
           - IdentitySubsystem_SignInJourney_LoginUseAndLogout_WorksEndToEnd
 
+      - id: ReviewCenter-Identity-AdminClaim
+        title: >-
+          The Identity subsystem shall give the session of a user the system administrator role only when the user is
+          a system administrator, and no project role at all, so that the memberships of a user are always read
+          from the database when needed and a change of them takes effect at once.
+        justification: |
+          A role that is copied into the cookie stays true until the cookie ends. Only the system administrator
+          role is kept there, and the session ends when it no longer matches the account, while project roles are
+          never copied, so removing a member from a project cannot be missed by a session that is already open.
+        children:
+          - ReviewCenter-SignIn-AdminClaim
+        tests:
+          - SignIn_IsCurrent_StoredUserVersusPrincipal_FollowsTheRule
+          - SignIn_Session_RoleChangedAfterLogin_IsRejected
+
       - id: ReviewCenter-Identity-Session
         title: >-
           The Identity subsystem shall check on every request that the user of the session cookie still exists, is
-          enabled, and has the same role as at sign-in, and shall treat the session as ended when that is not so.
+          enabled, and has the same system administrator state as at sign-in, and shall treat the session as ended
+          when that is not so.
         justification: |
-          Disabling a user or changing the role must take effect at once, not when the session cookie runs out.
+          Disabling a user or changing the system administrator right must take effect at once, not when the
+          session cookie runs out.
         children:
           - ReviewCenter-SignIn-SessionValidation
         tests:
@@ -98,14 +116,14 @@ sections:
       - id: ReviewCenter-Identity-CircuitSession
         title: >-
           The Identity subsystem shall check, at an interval set in Auth:RevalidationSeconds (30 seconds by
-          default), that the user of every open interactive page still exists, is enabled, and has the same role
-          and display name as at sign-in, using the same rule as for the session cookie, and shall end the
+          default), that the user of every open interactive page still exists, is enabled, and has the same system
+          administrator state as at sign-in, using the same rule as for the session cookie, and shall end the
           sign-in state of that page when the user is not valid or cannot be read.
         justification: |
           A page that stays open makes no request, so the check of the session cookie never reaches it. Without
-          a periodic check a user who was disabled, removed, or given another role would keep seeing and changing
-          review data until the page is reloaded. The check fails closed, so a user who cannot be verified does
-          not keep a page. The interval is the longest time such a user can keep an open page.
+          a periodic check a user who was disabled, removed, or demoted from system administrator would keep seeing
+          and changing review data until the page is reloaded. The check fails closed, so a user who cannot be
+          verified does not keep a page. The interval is the longest time such a user can keep an open page.
         children:
           - ReviewCenter-RevalidatingAuthenticationStateProvider-Revalidate
           - ReviewCenter-RevalidatingAuthenticationStateProvider-FailClosed

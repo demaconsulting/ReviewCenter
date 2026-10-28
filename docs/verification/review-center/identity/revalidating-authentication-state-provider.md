@@ -20,8 +20,9 @@ N/A - standard test environment. The loop tests use real timers with short inter
 #### Acceptance Criteria
 
 - All unit tests pass with zero failures.
-- A user that exists, is enabled, and has the same role and display name is still valid.
-- A user that is disabled, removed, has another role, or has another display name is not valid, as is a state without a
+- A user that exists, is enabled, and has the same system administrator state and display name is still valid.
+- A user that is disabled, removed, has another system administrator state, or has another display name is not valid,
+  as is a state without a
   user name.
 - A user that cannot be read is not valid (fail closed), and the loop makes the state anonymous.
 - A cancelled read is reported as a cancellation that carries the token, not as a failed check.
@@ -31,8 +32,9 @@ N/A - standard test environment. The loop tests use real timers with short inter
 
 #### Test Scenarios
 
-**RevalidatingAuthenticationStateProvider_IsCurrentAsync_EnabledUserSameRole_ReturnsTrue**: An enabled reviewer is
-stored and the state is signed in as that reviewer with the same display name; the check answers `true`. This scenario
+**RevalidatingAuthenticationStateProvider_IsCurrentAsync_EnabledUserSameRole_ReturnsTrue**: An enabled user is
+stored and the state is signed in as that user with the same display name and system administrator state; the check
+answers `true`. This scenario
 is tested by `RevalidatingAuthenticationStateProvider_IsCurrentAsync_EnabledUserSameRole_ReturnsTrue`.
 
 **RevalidatingAuthenticationStateProvider_IsCurrentAsync_UserDisabled_ReturnsFalse**: The stored user is disabled after
@@ -43,8 +45,9 @@ the state was created; the check answers `false`. This scenario is tested by
 name in the state; the check answers `false`. This scenario is tested by
 `RevalidatingAuthenticationStateProvider_IsCurrentAsync_UserDeleted_ReturnsFalse`.
 
-**RevalidatingAuthenticationStateProvider_IsCurrentAsync_RoleChanged_ReturnsFalse**: A theory over an administrator who
-was demoted and a reviewer who was promoted; the check answers `false` in both cases. This scenario is tested by
+**RevalidatingAuthenticationStateProvider_IsCurrentAsync_RoleChanged_ReturnsFalse**: A theory over a system
+administrator who was demoted and an ordinary user who was promoted; the check answers `false` in both cases, because
+the presence of the `SystemAdmin` role claim no longer equals the stored flag. This scenario is tested by
 `RevalidatingAuthenticationStateProvider_IsCurrentAsync_RoleChanged_ReturnsFalse`.
 
 **RevalidatingAuthenticationStateProvider_IsCurrentAsync_DisplayNameChanged_ReturnsFalse**: The stored display name

@@ -18,6 +18,8 @@ words:
   - pyhanko
   - hanko
   - appsettings
+  - offadm
+  - padm
   - Blazor
   - TOTP
   - wwwroot

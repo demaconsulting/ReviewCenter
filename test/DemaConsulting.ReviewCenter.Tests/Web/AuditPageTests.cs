@@ -144,14 +144,14 @@ public class AuditPageTests : PageTestBase
     {
         // Arrange: a reviewer is signed in and the trail has an entry
         await Users.CreateAsync("ann", "Ann", UserRole.Reviewer, Password, TestContext.Current.CancellationToken);
-        SignInAs("ann", "Ann");
+        SignInAs("ann", "Ann", UserRole.Reviewer);
         await RecordAsync(2);
 
         // Act
         var cut = Render<AuditPage>();
 
         // Assert
-        Assert.Contains("Administrator rights are required", cut.Find("[data-testid='audit-error']").TextContent, StringComparison.Ordinal);
+        Assert.Contains("System administrator rights are required", cut.Find("[data-testid='audit-error']").TextContent, StringComparison.Ordinal);
         Assert.Empty(cut.FindAll("[data-testid='audit-table']"));
         Assert.DoesNotContain("entry 1", cut.Markup, StringComparison.Ordinal);
     }
@@ -268,7 +268,7 @@ public class AuditPageTests : PageTestBase
         await cut.Find("[data-testid='audit-verify']").ClickAsync();
 
         // Assert
-        Assert.Contains("Administrator rights are required", cut.Find("[data-testid='audit-error']").TextContent, StringComparison.Ordinal);
+        Assert.Contains("System administrator rights are required", cut.Find("[data-testid='audit-error']").TextContent, StringComparison.Ordinal);
         Assert.Empty(cut.FindAll("[data-testid='audit-result']"));
         Assert.Empty(cut.FindAll("[data-testid='audit-table']"));
         Assert.Empty(cut.FindAll("[data-testid='audit-row']"));
@@ -335,7 +335,7 @@ public class AuditPageTests : PageTestBase
     public async Task Routes_Render_ReviewerOpensAuditRoute_ShowsAccessDeniedNotTrail()
     {
         // Arrange
-        SignInAs("ann", "Ann");
+        SignInAs("ann", "Ann", UserRole.Reviewer);
         await RecordAsync(1);
         Services.GetRequiredService<NavigationManager>().NavigateTo("/audit");
 

@@ -149,7 +149,7 @@ public class AuditStoreTests
         // Arrange: one known user
         using var db = new TestStore();
         var user = await db.Users.AddAsync(
-            new User { Username = "ann", DisplayName = "Ann", Role = UserRole.Reviewer, Enabled = true, PasswordHash = "h", Created = _created },
+            new User { Username = "ann", DisplayName = "Ann", Enabled = true, PasswordHash = "h", Created = _created },
             TestContext.Current.CancellationToken);
         var before = DateTimeOffset.UtcNow;
 
@@ -220,7 +220,7 @@ public class AuditStoreTests
         var users = Enumerable.Range(1, 10)
             .Select(i => Task.Run(
                 () => db.Users.AddAsync(
-                    new User { Username = "user" + i, DisplayName = "U", Role = UserRole.Reviewer, Enabled = true, PasswordHash = "h", Created = _created },
+                    new User { Username = "user" + i, DisplayName = "U", Enabled = true, PasswordHash = "h", Created = _created },
                     u => AuditDraft.By(TestActors.Ann, "user.created", "user " + u.Username),
                     cancellationToken),
                 cancellationToken));
@@ -362,7 +362,7 @@ public class AuditStoreTests
         // Act
         await Assert.ThrowsAnyAsync<Exception>(
             () => db.Users.AddAsync(
-                new User { Username = "ann", DisplayName = "Ann", Role = UserRole.Reviewer, Enabled = true, PasswordHash = "h", Created = _created },
+                new User { Username = "ann", DisplayName = "Ann", Enabled = true, PasswordHash = "h", Created = _created },
                 u => AuditDraft.By(TestActors.Ann, "user.created", "user 'ann'"),
                 TestContext.Current.CancellationToken));
         Execute(db, "DROP TRIGGER refuse_audit");
@@ -415,7 +415,7 @@ public class AuditStoreTests
         // Arrange
         using var db = new TestStore();
         var user = await db.Users.AddAsync(
-            new User { Username = "ann", DisplayName = "Ann", Role = UserRole.Reviewer, Enabled = true, PasswordHash = "h", Created = _created },
+            new User { Username = "ann", DisplayName = "Ann", Enabled = true, PasswordHash = "h", Created = _created },
             u => AuditDraft.By(TestActors.Ann, "user.created", "user 'ann'"),
             TestContext.Current.CancellationToken);
 

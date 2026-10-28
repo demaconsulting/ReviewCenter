@@ -104,8 +104,7 @@ public class HostingSubsystemTests
         var logs = new CapturingLoggerProvider();
         await using (var first = await TestWebApp.StartAsync(logs, connectionString, ["serve", "--silent"]))
         {
-            await first.Services.GetRequiredService<ProjectService>()
-                .CreateAsync("Apollo", "Moon landing", TestContext.Current.CancellationToken);
+            await TestWebApp.CreateProjectAsync(first, "Apollo", "Moon landing");
         }
 
         // Act: start a second host on the same database, sign in as a new user and request the projects page

@@ -12,20 +12,23 @@ rendered on the server as plain markup and uses no live connection. It is a Razo
 #### Data Model
 
 The page holds no state. It is built from two nested authorize views of the Blazor authorization components. The outer
-one shows the "Get started" section to any signed-in user; the inner one, restricted to the administrator role named
-by `SignIn.AdminRole`, adds the links that only an administrator can use. The section is a `card` and its entries are
+one shows the "Get started" section to any signed-in user; the inner one, restricted to the system administrator role
+named by `SignIn.AdminRole`, adds the links that only a system administrator can use. The section is a `card` and its
+entries are
 an `item-list`, each entry being a link followed by a one-line description in the `muted` style; the tagline uses the
 `muted` style too.
 
 The entries are:
 
 - **Projects**: for every signed-in user; links to `/projects`.
-- **Repositories**: for an administrator; links to `/repositories`.
-- **Audit**: for an administrator; links to `/audit`.
-- **Users**: for an administrator; links to `/users`.
+- **Audit**: for a system administrator; links to `/audit`.
+- **Users**: for a system administrator; links to `/users`.
+
+There is no entry for repositories: they belong to the projects and are reached from the page of a project. A system
+administrator sees three entries and any other user one.
 
 The markup gives each element a stable `data-testid` so that tests and tooling can find it: `home-page` (root
-element), `home-get-started` (the section), and `home-card-projects`, `home-card-repositories`, `home-card-audit`,
+element), `home-get-started` (the section), and `home-card-projects`, `home-card-audit`,
 and `home-card-users` (the links). There is no `data-interactive` marker, because the page has no live connection. The
 page has no link to the home page itself; the brand link in the header of every page (see `App`) serves that purpose.
 
@@ -35,13 +38,14 @@ N/A - the unit has no handlers; the links are followed by the browser.
 
 #### Error Handling
 
-N/A - the unit contains no error-producing logic. The administrator links are a convenience that mirrors the header; the
+N/A - the unit contains no error-producing logic. The system administrator links are a convenience that mirrors the
+header; the
 access rules are enforced by the target pages and the authorization of the `Identity` subsystem, so a hidden link is
 not a protection.
 
 #### Dependencies
 
-- **SignIn** — `SignIn.AdminRole` names the role that sees the administration links.
+- **SignIn** — `SignIn.AdminRole` names the role that sees the system administration links.
 - **ASP.NET Core Blazor components** — page routing, page title support, and the authorize view that reads the
   authentication state.
 

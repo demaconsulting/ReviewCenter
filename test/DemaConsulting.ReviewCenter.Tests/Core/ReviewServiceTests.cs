@@ -39,9 +39,9 @@ public class ReviewServiceTests
     private static async Task<(FakeReviewStore Store, ReviewService Service, int ProjectId)> CreateWithProjectAsync()
     {
         var store = new FakeReviewStore();
-        var project = await new ProjectService(store, new FixedTimeProvider(_now))
+        var project = await TestServices.Projects(store, new FixedTimeProvider(_now))
             .CreateAsync("Apollo", null, TestContext.Current.CancellationToken);
-        return (store, new ReviewService(store, new FixedTimeProvider(_now)), project.Id);
+        return (store, TestServices.Reviews(store, new FixedTimeProvider(_now)), project.Id);
     }
 
     /// <summary>
@@ -313,7 +313,7 @@ public class ReviewServiceTests
     {
         // Arrange: two projects, the first already having REV-1
         var (store, service, firstProjectId) = await CreateWithProjectAsync();
-        var second = await new ProjectService(store, new FixedTimeProvider(_now))
+        var second = await TestServices.Projects(store, new FixedTimeProvider(_now))
             .CreateAsync("Gemini", null, TestContext.Current.CancellationToken);
         await service.CreateDraftAsync(firstProjectId, "REV-1", "First", One("a.txt", TestContent.A), TestContext.Current.CancellationToken);
 
@@ -417,7 +417,7 @@ public class ReviewServiceTests
     public async Task ReviewService_CreateDraftAsync_UnknownProject_ThrowsProjectNotFound()
     {
         // Arrange: a service over a store with no projects
-        var service = new ReviewService(new FakeReviewStore(), new FixedTimeProvider(_now));
+        var service = TestServices.Reviews(new FakeReviewStore(), new FixedTimeProvider(_now));
 
         // Act: create a review in project 42
         var exception = await Assert.ThrowsAsync<DomainRuleException>(

@@ -41,7 +41,8 @@ route and query values of a deep link. **HighlightLine**, **HighlightSide**, **D
 named and the message for an address that names nothing; all three are cleared whenever the reader chooses a file.
 
 **Loaded**, **Review**, **ProjectName**: whether loading finished, the review with its file metadata (`null` when
-it does not exist), and the name of the owning project shown in the breadcrumb (the project identity is shown
+it does not exist, or when the project of the review is not visible to the user, in which case nothing of the review is
+loaded), and the name of the owning project shown in the breadcrumb (the project identity is shown
 when the project cannot be found).
 
 **SelectedPath**: the path of the file whose content is shown; `null` when none is selected.
@@ -68,8 +69,10 @@ strip; the answers are made on `ChecklistPage`.
 
 **Approval**: the `ReviewApproval` of the review from `SigningService.GetApprovalAsync`: whether it is approved, the
 record digest, the slots with their signature state, the blockers that prevent signing, and the next-step sentence.
-It is `null` until loaded. **Candidates**: the enabled users that can be chosen for a slot (`SlotMember` values from
-`SigningService.ListCandidatesAsync`, so no password hash ever reaches the page). **CurrentUsername**: the user name
+It is `null` until loaded. **Candidates**: the members of the project that can be chosen for a slot (`SlotMember` values
+from
+`SigningService.ListCandidatesAsync(actor, projectId)`, so a user who is no member is never offered, and no password
+hash ever reaches the page). **CurrentUsername**: the user name
 of the signed-in user, from the authentication state, used to tell which slots the user occupies.
 
 **AttestationKeys**: the `IAttestationKeyProvider` of the `Evidence` subsystem, injected so that the page can ask for the
@@ -203,8 +206,10 @@ Head view); a binary file shows the binary notice.
 
 `DiffView` has the parameters `Result`, `OnlyLineEndingsDiffer`, `Threads`, `FocusedThreadId`, `SelectedSide`,
 `SelectedStart`, `SelectedEnd`, `ThreadTemplate` (how the page draws a thread, so the reply, resolve and reopen
-controls are the ones of the thread list), `Composer` (the new-thread form, drawn under the selected row), and the
-event `OnComment`, which carries a `DiffCommentRequest(Side, Line, Extend)`. The control of a left cell asks for the
+controls are the ones of the thread list), `Composer` (the new-thread form, drawn under the selected row), `CanReveal`
+(a check that the page runs before a collapsed run is expanded, so a user who lost the access is not shown loaded
+lines), and the event `OnComment`, which carries a `DiffCommentRequest(Side, Line, Extend)`. The control of a left
+cell asks for the
 Baseline side and its baseline line number (a removed line, or the baseline copy of an unchanged line); the control
 of a right cell asks for the Head side and its head line number. The control is a button in the gutter of every cell
 that is revealed by the stylesheet when the row is hovered, has keyboard focus inside it (`:focus-within`), or is the
@@ -351,7 +356,8 @@ the page loads and after each change.
 
 #### Error Handling
 
-A review that does not exist is shown as a message on the page. A file that has disappeared from the store since
+A review that does not exist, or whose project the user may not see, is shown as the same message on the page. A file
+that has disappeared from the store since
 the page loaded is shown as empty text rather than failing the connection. Comment, slot, and signing rule violations
 are shown as messages next to the control that caused them and never end the connection. An action that meets an
 authentication state that has already ended (the user was disabled, removed, or changed since the page was opened,
@@ -361,10 +367,24 @@ that change something without a service that takes an actor (resolving and reope
 for the same reason. The page
 raises no other errors of its own.
 
+**Access re-check**: Every handler that reads or stores something starts with `GuardAsync`, which asks
+`ProjectViewGuard.GuardViewAsync` whether the signed-in user may still see the project (`ShowNoAccess` is the callback).
+The view-only handlers (thread filter, expanding a thread, the diff, head, and baseline views, and the comment
+buttons) are wrapped at their binding by `GuardedAsync`, and expanding a collapsed run of the diff asks the same check
+through the `CanReveal` parameter of `DiffView` before it shows lines that were loaded but not yet displayed;
+cancelling a comment and copying a thread link show no project
+data and are not guarded. When access is lost, `ShowNoAccess` resets the component state exactly as a change of address
+does (review, project name, files, selection, threads, checklist progress, approval, candidates, and the forms), shows
+the same message as for a review that does not exist, and the handler returns without calling a service. An ended
+sign-in state (nobody signed in) counts as no access, so the message replaces the "no longer signed in" message on this
+page.
+
 #### Dependencies
 
 - **SessionGate** (App) — wraps the whole page content, so the page is replaced by a "Session ended" message when the
   sign-in state of the open page ends.
+- **IProjectAccess** (Core) — through `ProjectViewGuard`, asked before every handler whether the user may still see the
+  project.
 - **ReviewService** — reads the review, the head and baseline bytes of a file, and the comparison of a file
   (`GetDiffAsync`).
 - **DiffView** — draws the Diff view; it is a part of this unit.
@@ -376,7 +396,8 @@ raises no other errors of its own.
   fill a slot, adds, changes, and removes slots, and signs; it holds every signing rule.
 - **FileText** — decides whether a file is text and splits it into lines.
 - **SignIn** — `GetActorAsync` supplies the signed-in user from the authentication state.
-- **ProjectService** — reads the name of the owning project for the breadcrumb.
+- **ProjectService** — reads the project for the signed-in user (nothing is loaded when the user may not see it) and its
+  name for the breadcrumb.
 - **ASP.NET Core Blazor components** — the component base class, events, JavaScript interop, `NavigationManager` (to
   make a thread address absolute), the router, and the interactive server render mode.
 - **App** — defines the scroll, address replacement and clipboard copy functions that the page calls.

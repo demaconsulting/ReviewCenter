@@ -386,7 +386,7 @@ public class PersonalAccessTokenServiceTests
         Assert.Equal("ann", ann.User!.Username);
         Assert.True(bob.Succeeded);
         Assert.Equal("bob", bob.User!.Username);
-        Assert.Equal(UserRole.Admin, bob.User.Role);
+        Assert.True(bob.User.IsSystemAdmin);
         Assert.False(unknown.Succeeded);
         Assert.Equal(TokenFailure.Unknown, unknown.Failure);
         Assert.Null(unknown.User);

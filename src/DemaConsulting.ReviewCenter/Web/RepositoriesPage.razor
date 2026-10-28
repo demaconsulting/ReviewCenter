@@ -1,31 +1,59 @@
-@* RepositoriesPage: registry of git repositories for administrators, at "/repositories".
+@* RepositoriesPage: the git repositories of one project, at "/projects/{id}/repositories", for whoever manages the
+   project (a system administrator or a project admin of it); anybody else gets the same not-found message as for a
+   project that does not exist.
 
-   Presentation only; state and event handling live in RepositoriesPage.razor.cs. A list of all repositories with,
-   per repository, its location, user name, whether a token is set ("token set" or "no token", never the token),
-   the controls to disable or enable it and to edit it; a "+ Add repository" button leads to the separate form page
-   at "/repositories/new". Access is
-   limited to the Admin role by the attribute below. The token is write-only: it is typed into a password field,
-   sent once and never shown again; an edit keeps, replaces or clears the stored token. A repository is never
+   Presentation only; state and event handling live in RepositoriesPage.razor.cs. A list of the repositories of the
+   project with, per repository, its location, user name, whether a token is set ("token set" or "no token", never
+   the token), the controls to disable or enable it and to edit it; a "+ Add repository" button leads to the
+   separate form page at "/projects/{id}/repositories/new". The token is write-only: it is typed into a password
+   field, sent once and never shown again; an edit keeps, replaces or clears the stored token. A repository is never
    deleted, only disabled. Every interactive element and every key value carries a stable kebab-case data-testid
    (row-level ids carry the repository id), and the data-interactive marker on the root flips to "true" once the
    live circuit is connected.
 
+   Human factors: (a) name, location and whether a token is set are on the row; (b) only this project's repositories
+   are listed, and the rare edit form opens inside the row; (c) the empty state says to use + Add repository, and
+   a project member who may not manage it never gets here (the Repositories button on the project page is hidden).
+
    The page body is inside SessionGate, which replaces it with a "Session ended" message when the user is no longer
    valid while the page is open. *@
-@page "/repositories"
-@using DemaConsulting.ReviewCenter.Identity
+@page "/projects/{ProjectId:int}/repositories"
 @rendermode InteractiveServer
-@attribute [Authorize(Roles = SignIn.AdminRole)]
+@attribute [Authorize]
 
 <PageTitle>Repositories - ReviewCenter</PageTitle>
 
 <SessionGate>
 <main class="page" data-testid="repositories-page" data-interactive="@InteractiveMarker">
+    <nav class="breadcrumb">
+        <a href="/projects" data-testid="breadcrumb-projects-link">Projects</a>
+        @if (Project is not null)
+        {
+            <span aria-hidden="true">/</span>
+            <a href="/projects/@ProjectId" data-testid="breadcrumb-project-link">@Project.Name</a>
+            <span aria-hidden="true">/</span>
+            <span aria-current="page">Repositories</span>
+        }
+    </nav>
+
+    @if (!Loaded)
+    {
+        <p class="muted" data-testid="repositories-loading">Loading...</p>
+    }
+    else if (Project is null)
+    {
+        <p class="error" role="alert" data-testid="project-not-found">Project @ProjectId does not exist.</p>
+    }
+    else
+    {
     <div class="page-heading">
         <h1>Repositories</h1>
-        <a class="action" href="/repositories/new" data-testid="new-repository-button">+ Add repository</a>
+        <a class="action" href="/projects/@ProjectId/repositories/new" data-testid="new-repository-button">+ Add repository</a>
     </div>
-    <p class="page-lead">Git repositories that reviews can be created from. A repository can be disabled but not removed.</p>
+    <p class="page-lead">
+        Git repositories that reviews of this project can be created from. A repository can be disabled but not
+        removed.
+    </p>
 
     @if (MessageRepositoryId is null)
     {
@@ -69,7 +97,7 @@
                         <button type="button" class="outline small" data-testid="repository-toggle-enabled-@repositoryId"
                                 @onclick="() => ToggleEnabledAsync(repository)">@(repository.Enabled ? "Disable" : "Enable")</button>
                         <button type="button" class="outline small" data-testid="repository-edit-@repositoryId"
-                                @onclick="() => StartEdit(repository)">Edit</button>
+                                @onclick="() => StartEditAsync(repository)">Edit</button>
                     </div>
                     @if (EditingId == repositoryId)
                     {
@@ -130,6 +158,7 @@
                 </li>
             }
         </ul>
+    }
     }
 </main>
 </SessionGate>

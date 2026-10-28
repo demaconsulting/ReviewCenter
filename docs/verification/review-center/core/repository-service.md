@@ -3,7 +3,8 @@
 #### Verification Approach
 
 `RepositoryService` is verified with tests defined in `RepositoryServiceTests.cs`. The service is created with the real
-`UserService`, the fake stores (`FakeUserStore` and `FakeRepositoryStore`), a trivial token protector
+`UserService` and the real `ProjectAccess` over the fake stores (`FakeUserStore`, `FakeReviewStore`, and
+`FakeRepositoryStore`), a trivial token protector
 (`FakeCredentialProtector`, which can be set to fail as after a lost key ring), a trivial password hasher, and a fixed
 clock, because the rules of the registry are what is verified here; the real database is verified in the `Storage`
 subsystem and the real encryption in the `ContentSources` subsystem. The fake store records the audit drafts that the
@@ -22,7 +23,11 @@ N/A - standard test environment.
   a text form.
 - Every allowed location form registers; a name, a location, or a credential that breaks a rule is refused with the
   matching rule, and nothing is stored.
-- Only enabled administrators can use the registry; the other actors are refused for every operation.
+- Only administrators of the project (project administrators of it, and system administrators) can use the registry of
+  the project; a plain member is refused with `ActorNotAllowed`, and a user who cannot see the project, an unknown
+  user, and a disabled user are refused like a missing project or repository.
+- A repository belongs to one project: the same name may be used in two projects, a project administrator cannot reach
+  another project, and the git layer cannot open a repository through another project.
 - Every change is audited with the changed field names and no secret; a change that changes nothing makes no entry.
 - A disabled repository is not offered to users and cannot be opened by the git layer.
 - A token that cannot be decrypted is reported by repository name and without the stored text.
@@ -51,8 +56,10 @@ scenario is tested by `RepositoryService_CreateAsync_InvalidName_ThrowsRepositor
 
 **RepositoryService_CreateAsync_NameLimitsAndDuplicate_AreEnforced**: A name of 40 characters is accepted and one of 41
 is
-refused; a name that differs only in case from an existing one is refused with `RepositoryNameTaken`. This scenario is
-tested by `RepositoryService_CreateAsync_NameLimitsAndDuplicate_AreEnforced`.
+refused; a name that differs only in case from an existing one in the same project is refused with
+`RepositoryNameTaken`. This scenario is
+tested by `RepositoryService_CreateAsync_NameLimitsAndDuplicate_AreEnforced`. That the same name is accepted in a
+second project is part of `RepositoryService_ProjectAdministrator_ManagesOwnProjectOnly`.
 
 **RepositoryService_CreateAsync_InvalidLocation_ThrowsRepositoryLocationInvalid**: Locations that are empty, too long,
 start with `-`, hold control characters or white space, carry user information or a query string or fragment, lack a
@@ -141,9 +148,18 @@ nothing changes. This scenario is tested by
 cannot be compared and does not block a rename, and clearing the token while renaming to its old text is allowed. This
 scenario is tested by `RepositoryService_UpdateAsync_KeepUnreadableOrClearedToken_DoesNotCompare`.
 
-**RepositoryService_AdminOnly_RefusesOtherActors**: A reviewer, an unknown user, and a disabled administrator are refused
-with `ActorNotAllowed` for every operation that needs an administrator. This scenario is tested by
+**RepositoryService_AdminOnly_RefusesOtherActors**: A plain member, a user who is no member, an unknown user, and a
+disabled system administrator try every operation. The plain member gets `ActorNotAllowed` for each; the others get
+`ProjectNotFound` (create, list) or `RepositoryNotFound` (update, enable, disable), so nothing shows that the
+repository exists; nothing changes and only the creation was audited. This scenario is tested by
 `RepositoryService_AdminOnly_RefusesOtherActors`.
+
+**RepositoryService_ProjectAdministrator_ManagesOwnProjectOnly**: A project administrator registers a repository in the
+own project; a system administrator registers one with the same name in a second project; the project administrator
+cannot register in, change a repository of, or list the second project (`ProjectNotFound` or `RepositoryNotFound`);
+opening a repository of one project through the other project gives `RepositoryNotFound`; each list holds only the
+repositories of its project. This scenario is tested by
+`RepositoryService_ProjectAdministrator_ManagesOwnProjectOnly`.
 
 **RepositoryService_Changes_AreAuditedWithoutSecrets**: Creating, updating (with each token change), enabling, and
 disabling are recorded with their actions and the names of the changed fields, and no audit text or message contains the
@@ -156,8 +172,9 @@ nothing and a repeated enable make no audit entry. This scenario is tested by `R
 repository, and a change that would leave a user name on a repository without a token are handled by the rules. This
 scenario is tested by `RepositoryService_UpdateAsync_InvalidRequests_ThrowRules`.
 
-**RepositoryService_DisabledRepository_IsNotSelectable**: Ordinary users see only the identity and name of enabled
-repositories, and a disabled repository is neither listed nor available to the git layer (`RepositoryDisabled`). This
+**RepositoryService_DisabledRepository_IsNotSelectable**: A member of the project sees only the identity and name of
+enabled repositories, and a disabled repository is neither listed nor available to the git layer
+(`RepositoryDisabled`). This
 scenario is tested by `RepositoryService_DisabledRepository_IsNotSelectable`.
 
 **RepositoryService_GetAccessAsync_UnreadableToken_ThrowsCredentialsUnreadable**: A token that can no longer be

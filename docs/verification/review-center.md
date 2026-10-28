@@ -62,7 +62,7 @@ loopback TCP ports.
 - A user created with the `user add` verb takes the password from the environment variable, never prints it, and a
   second user with the same user name is refused; a missing password gives an error and exit code 1.
 - A user signs in with the user name and password, uses the protected pages as that user, and signs out; only
-  signed-in users reach the protected pages, and only administrators reach the users page.
+  signed-in users reach the protected pages, and only system administrators reach the users page.
 - An open page re-checks its user at a fixed interval; when the user is disabled, removed, or changed, the page
   stops showing and accepting actions and shows a message that the session ended, and a user who cannot be checked is
   treated as signed out.
@@ -76,7 +76,8 @@ loopback TCP ports.
 - Every change of data, and every sign-in, sign-out, failed sign-in, and lockout, is recorded in an audit trail whose
   entries are chained by hashes, and the change and its entry are stored together; the entries never contain a password
   or the text of a comment or justification.
-- Every signed-in user sees the history of a review, and only administrators see the whole audit trail, in pages of 50,
+- Every signed-in user sees the history of a review of a project the user may see, and only system administrators see
+  the whole audit trail, in pages of 50,
   newest first.
 - The audit chain is verified on request, from the audit page and with the `audit verify` verb; an intact chain gives
   exit code 0 and a broken chain, or an unreadable database, exit code 1.
@@ -89,6 +90,9 @@ loopback TCP ports.
   value.
 - The API lists the projects and reviews, creates a review draft flagged as created through the API, and downloads the
   attestation of a signed review; a token never signs, never changes a reviewer slot, and never opens a web page.
+- A user who is not a member of a project gets the answer for a project that does not exist from every route of the
+  project (for a token and for a session), a member and a system administrator are served, the project list holds
+  only the projects the user may see, and a token follows the memberships of its owner at once.
 
 ## Test Scenarios
 
@@ -199,9 +203,10 @@ database at start-up and that the protected pages need a sign-in. This scenario 
 `ReviewCenter_ServeVerb_Started_RedirectsAnonymousProjectsRequestToLoginAndCreatesDatabase`.
 
 **ReviewCenter_UserAddVerb_PasswordFromEnvironment_CreatesUserThenRejectsDuplicate**: The tool is run with `user
-add`, a user name, a display name, and the role Admin, on a new temporary database, with the password in the
+add`, a user name, a display name, and the `--system-admin` switch, on a new temporary database, with the password in
+the
 environment variable `REVIEWCENTER_PASSWORD` and not on the command line. The first run exits with code 0 and
-reports "Created user 'root' with the role Admin."; the second run with the same user name exits with code 1 and
+reports "Created user 'root' (system administrator)."; the second run with the same user name exits with code 1 and
 reports that the user already exists; the password appears in neither output. This scenario is tested by
 `ReviewCenter_UserAddVerb_PasswordFromEnvironment_CreatesUserThenRejectsDuplicate`.
 
@@ -230,9 +235,24 @@ resolved state, and both comments in posting order. This scenario is tested by
 page is refused and redirected to the login page, the user signs in with the return URL and reaches the page, the
 page shows the display name of the user, and after signing out the page is refused again. This scenario is tested
 by `IdentitySubsystem_SignInJourney_LoginUseAndLogout_WorksEndToEnd`. In a second scenario every protected page
-redirects an anonymous request to the login page, and the users page is refused to a reviewer and served to an
-administrator. These scenarios are tested by `SignIn_ProtectedPage_Anonymous_RedirectsToLogin` and
+redirects an anonymous request to the login page, and the users page is refused to an ordinary user and served to a
+system administrator. These scenarios are tested by `SignIn_ProtectedPage_Anonymous_RedirectsToLogin` and
 `SignIn_UsersPage_ReviewerAndAdmin_OnlyAdminIsAllowed`.
+
+**Project access**: Every route of the API that belongs to a project is called with the token of a user who is no
+member of the project (as a bearer token and as the password of Basic credentials); each answers 404 with the content
+type and the body of the answer for a project that does not exist. A member and a system administrator who is no member
+are served by every route, the project list holds only the projects of a member (all of them for a system
+administrator), the attestation page answers a signed-in non-member with 404, and the token of a member gets 404 at
+once after the member is removed from the project. These scenarios are tested by
+`ApiProjectAccess_EveryProjectRoute_NonMemberToken_AnswersLikeAMissingProject`,
+`ApiProjectAccess_EveryProjectRoute_MemberAndSystemAdmin_AreNotRefused`,
+`ApiProjectAccess_ListProjects_ShowsOnlyMemberProjectsExceptToSystemAdmins`,
+`ApiProjectAccess_AttestationPage_NonMemberSession_Answers404`, and
+`ApiProjectAccess_Token_OwnerRemovedFromProject_Gets404AtOnce`. The memberships themselves are stored and audited as
+verified by `ReviewStore_AddMembershipAsync_Membership_RoundTripsAndIsListed` and
+`ReviewStore_Membership_Changes_AreAuditedWithTheProject`; the pages that hide a project from a non-member are
+verified in the `Web` subsystem.
 
 **Open session ends**: A user is signed in on the real pipeline and the authentication state provider of a new scope
 (a circuit) is checked; the user is valid. The user is then disabled through the user service and the check is
@@ -240,7 +260,7 @@ repeated; the user is no longer valid, which is what makes an open page show the
 scenario is tested by `IdentitySubsystem_Revalidation_UserDisabledAfterSignIn_OpenSessionIsNoLongerValid`.
 
 **Users and passwords**: Users are created, signed in with in any case of the user name, locked after repeated
-failures, and protected against the loss of the last administrator through the domain service, and users and
+failures, and protected against the loss of the last system administrator through the domain service, and users and
 password changes are kept after the database is reopened. These scenarios are tested by
 `CoreSubsystem_UsersWorkflow_CreateSignInLockoutAndLastAdmin` and `StorageSubsystem_Users_PersistAcrossReopen`.
 
@@ -269,7 +289,7 @@ wrong password, signs in, and signs out over the real pipeline; the trail contai
 chain is intact. This scenario is tested by `SignIn_Flow_LoginFailureAndLogout_FormAnIntactChain`.
 
 **Audit history and audit page**: The history page of a review with a long history shows 50 entries, newest first,
-with Older and Newer links; the audit page refuses a user who is not an administrator and shows no entries. These
+with Older and Newer links; the audit page refuses a user who is not a system administrator and shows no entries. These
 scenarios are tested by `HistoryPage_Render_LongHistory_PagesByFiftyWithOlderAndNewerLinks` and
 `AuditPage_Render_NonAdmin_IsRefusedAndShowsNoEntries`.
 

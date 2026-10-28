@@ -19,7 +19,10 @@
 // SOFTWARE.
 
 using DemaConsulting.ReviewCenter.Core;
+using DemaConsulting.ReviewCenter.Evidence;
 using DemaConsulting.ReviewCenter.Tests.Core;
+
+#pragma warning disable S4136 // The shortcuts are grouped by what they stand in for, not by name
 
 namespace DemaConsulting.ReviewCenter.Tests;
 
@@ -40,6 +43,59 @@ internal static class AuditTestExtensions
     public static Actor DefaultActor => TestActors.Ann;
 
     /// <summary>
+    ///     Gets the identity of the project that the shortcut overloads of the repository calls use; a test that
+    ///     uses them adds that project first (the first project of an empty store has this identity).
+    /// </summary>
+    public const int DefaultProjectId = 1;
+
+    /// <summary>
+    ///     Registers a repository in the default project.
+    /// </summary>
+    public static Task<SourceRepository> CreateAsync(
+        this RepositoryService service,
+        string name,
+        string location,
+        string? username,
+        string? token,
+        Actor actor,
+        CancellationToken cancellationToken = default)
+    {
+        return service.CreateAsync(DefaultProjectId, name, location, username, token, actor, cancellationToken);
+    }
+
+    /// <summary>
+    ///     Lists the repositories of the default project.
+    /// </summary>
+    public static Task<IReadOnlyList<SourceRepository>> ListAsync(
+        this RepositoryService service,
+        Actor actor,
+        CancellationToken cancellationToken = default)
+    {
+        return service.ListAsync(actor, DefaultProjectId, cancellationToken);
+    }
+
+    /// <summary>
+    ///     Gets the access to a repository of the default project.
+    /// </summary>
+    internal static Task<RepositoryAccess> GetAccessAsync(
+        this RepositoryService service,
+        int id,
+        CancellationToken cancellationToken = default)
+    {
+        return service.GetAccessAsync(DefaultProjectId, id, cancellationToken);
+    }
+
+    /// <summary>
+    ///     Lists the registrations of the default project in a repository store.
+    /// </summary>
+    public static Task<IReadOnlyList<SourceRepository>> ListAsync(
+        this IRepositoryStore store,
+        CancellationToken cancellationToken = default)
+    {
+        return store.ListAsync(DefaultProjectId, cancellationToken);
+    }
+
+    /// <summary>
     ///     Builds a generic audit draft.
     /// </summary>
     /// <returns>The draft.</returns>
@@ -55,11 +111,40 @@ internal static class AuditTestExtensions
         this UserService service,
         string? username,
         string? displayName,
+        bool isSystemAdmin,
+        string? password,
+        CancellationToken cancellationToken = default)
+    {
+        return service.CreateAsync(username, displayName, isSystemAdmin, password, DefaultActor, cancellationToken);
+    }
+
+    /// <summary>
+    ///     Creates a user as the default actor, using the test shorthand <see cref="UserRole"/>.
+    /// </summary>
+    public static Task<User> CreateAsync(
+        this UserService service,
+        string? username,
+        string? displayName,
         UserRole role,
         string? password,
         CancellationToken cancellationToken = default)
     {
-        return service.CreateAsync(username, displayName, role, password, DefaultActor, cancellationToken);
+        return service.CreateAsync(username, displayName, role == UserRole.Admin, password, DefaultActor, cancellationToken);
+    }
+
+    /// <summary>
+    ///     Creates a user as the given actor, using the test shorthand <see cref="UserRole"/>.
+    /// </summary>
+    public static Task<User> CreateAsync(
+        this UserService service,
+        string? username,
+        string? displayName,
+        UserRole role,
+        string? password,
+        Actor actor,
+        CancellationToken cancellationToken = default)
+    {
+        return service.CreateAsync(username, displayName, role == UserRole.Admin, password, actor, cancellationToken);
     }
 
     /// <summary>
@@ -75,6 +160,54 @@ internal static class AuditTestExtensions
     }
 
     /// <summary>
+    ///     Builds the evidence index as the default actor.
+    /// </summary>
+    public static Task<IReadOnlyList<EvidenceIndexEntry>> BuildAsync(
+        this EvidenceIndexService service,
+        int projectId,
+        CancellationToken cancellationToken = default)
+    {
+        return service.BuildAsync(DefaultActor, projectId, cancellationToken);
+    }
+
+    /// <summary>
+    ///     Plans a review as the default actor.
+    /// </summary>
+    public static Task<ReviewPlan> PlanAsync(
+        this ReviewPlanner planner,
+        int projectId,
+        int repositoryId,
+        string? headRevision,
+        BaselineMode mode,
+        string? baselineRevision,
+        CancellationToken cancellationToken = default)
+    {
+        return planner.PlanAsync(
+            DefaultActor, projectId, repositoryId, headRevision, mode, baselineRevision, cancellationToken);
+    }
+
+    /// <summary>
+    ///     Lists the projects as the default actor.
+    /// </summary>
+    public static Task<IReadOnlyList<Project>> ListAsync(
+        this ProjectService service,
+        CancellationToken cancellationToken = default)
+    {
+        return service.ListAsync(DefaultActor, cancellationToken);
+    }
+
+    /// <summary>
+    ///     Reads a project as the default actor.
+    /// </summary>
+    public static Task<Project?> GetAsync(
+        this ProjectService service,
+        int id,
+        CancellationToken cancellationToken = default)
+    {
+        return service.GetAsync(DefaultActor, id, cancellationToken);
+    }
+
+    /// <summary>
     ///     Enables or disables a user as the default actor.
     /// </summary>
     public static Task SetEnabledAsync(
@@ -87,7 +220,8 @@ internal static class AuditTestExtensions
     }
 
     /// <summary>
-    ///     Changes a user role as the default actor.
+    ///     Grants or removes system administrator rights as the default actor, using the test shorthand
+    ///     <see cref="UserRole"/>.
     /// </summary>
     public static Task SetRoleAsync(
         this UserService service,
@@ -95,7 +229,46 @@ internal static class AuditTestExtensions
         UserRole role,
         CancellationToken cancellationToken = default)
     {
-        return service.SetRoleAsync(username, role, DefaultActor, cancellationToken);
+        return service.SetSystemAdminAsync(username, role == UserRole.Admin, DefaultActor, cancellationToken);
+    }
+
+    /// <summary>
+    ///     Grants or removes system administrator rights as the given actor, using the test shorthand
+    ///     <see cref="UserRole"/>.
+    /// </summary>
+    public static Task SetRoleAsync(
+        this UserService service,
+        string username,
+        UserRole role,
+        Actor actor,
+        CancellationToken cancellationToken = default)
+    {
+        return service.SetSystemAdminAsync(username, role == UserRole.Admin, actor, cancellationToken);
+    }
+
+    /// <summary>
+    ///     Makes a user a member of a project with a generic audit draft.
+    /// </summary>
+    public static Task AddMembershipAsync(
+        this IReviewStore store,
+        int userId,
+        int projectId,
+        CancellationToken cancellationToken = default)
+    {
+        return store.AddMembershipAsync(userId, projectId, ProjectRole.User, cancellationToken);
+    }
+
+    /// <summary>
+    ///     Makes a user a member of a project with a role and a generic audit draft.
+    /// </summary>
+    public static Task AddMembershipAsync(
+        this IReviewStore store,
+        int userId,
+        int projectId,
+        ProjectRole role,
+        CancellationToken cancellationToken = default)
+    {
+        return store.AddMembershipAsync(new ProjectMembership(userId, projectId, role), Draft(), cancellationToken);
     }
 
     /// <summary>

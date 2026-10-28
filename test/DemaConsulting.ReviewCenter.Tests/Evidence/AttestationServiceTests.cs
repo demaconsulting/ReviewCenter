@@ -347,13 +347,15 @@ public class AttestationServiceTests
         using var keys = new FakeAttestationKeyProvider(TestKeys.SelfSignedRsa());
 
         // Act and assert: each null is refused
-        Assert.Throws<ArgumentNullException>(() => new AttestationService(null!, fixture.Signing, fixture.Audit, keys, new AttestationRenderer(), new AttestationSigner(), fixture.Clock));
-        Assert.Throws<ArgumentNullException>(() => new AttestationService(fixture.Store, null!, fixture.Audit, keys, new AttestationRenderer(), new AttestationSigner(), fixture.Clock));
-        Assert.Throws<ArgumentNullException>(() => new AttestationService(fixture.Store, fixture.Signing, null!, keys, new AttestationRenderer(), new AttestationSigner(), fixture.Clock));
-        Assert.Throws<ArgumentNullException>(() => new AttestationService(fixture.Store, fixture.Signing, fixture.Audit, null!, new AttestationRenderer(), new AttestationSigner(), fixture.Clock));
-        Assert.Throws<ArgumentNullException>(() => new AttestationService(fixture.Store, fixture.Signing, fixture.Audit, keys, null!, new AttestationSigner(), fixture.Clock));
-        Assert.Throws<ArgumentNullException>(() => new AttestationService(fixture.Store, fixture.Signing, fixture.Audit, keys, new AttestationRenderer(), null!, fixture.Clock));
-        Assert.Throws<ArgumentNullException>(() => new AttestationService(fixture.Store, fixture.Signing, fixture.Audit, keys, new AttestationRenderer(), new AttestationSigner(), null!));
+        var access = fixture.Access;
+        Assert.Throws<ArgumentNullException>(() => new AttestationService(null!, fixture.Signing, access, fixture.Audit, keys, new AttestationRenderer(), new AttestationSigner(), fixture.Clock));
+        Assert.Throws<ArgumentNullException>(() => new AttestationService(fixture.Store, null!, access, fixture.Audit, keys, new AttestationRenderer(), new AttestationSigner(), fixture.Clock));
+        Assert.Throws<ArgumentNullException>(() => new AttestationService(fixture.Store, fixture.Signing, null!, fixture.Audit, keys, new AttestationRenderer(), new AttestationSigner(), fixture.Clock));
+        Assert.Throws<ArgumentNullException>(() => new AttestationService(fixture.Store, fixture.Signing, access, null!, keys, new AttestationRenderer(), new AttestationSigner(), fixture.Clock));
+        Assert.Throws<ArgumentNullException>(() => new AttestationService(fixture.Store, fixture.Signing, access, fixture.Audit, null!, new AttestationRenderer(), new AttestationSigner(), fixture.Clock));
+        Assert.Throws<ArgumentNullException>(() => new AttestationService(fixture.Store, fixture.Signing, access, fixture.Audit, keys, null!, new AttestationSigner(), fixture.Clock));
+        Assert.Throws<ArgumentNullException>(() => new AttestationService(fixture.Store, fixture.Signing, access, fixture.Audit, keys, new AttestationRenderer(), null!, fixture.Clock));
+        Assert.Throws<ArgumentNullException>(() => new AttestationService(fixture.Store, fixture.Signing, access, fixture.Audit, keys, new AttestationRenderer(), new AttestationSigner(), null!));
     }
 
     /// <summary>

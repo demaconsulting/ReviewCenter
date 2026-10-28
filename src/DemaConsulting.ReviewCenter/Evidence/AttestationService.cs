@@ -60,6 +60,11 @@ internal sealed class AttestationService
     private readonly SigningService _signing;
 
     /// <summary>
+    ///     Decides who may see which project.
+    /// </summary>
+    private readonly IProjectAccess _access;
+
+    /// <summary>
     ///     The audit trail.
     /// </summary>
     private readonly AuditService _audit;
@@ -89,6 +94,7 @@ internal sealed class AttestationService
     /// </summary>
     /// <param name="store">The review store. Must not be null.</param>
     /// <param name="signing">The signing service. Must not be null.</param>
+    /// <param name="access">The access rules. Must not be null.</param>
     /// <param name="audit">The audit service. Must not be null.</param>
     /// <param name="keys">The signing key provider. Must not be null.</param>
     /// <param name="renderer">The renderer. Must not be null.</param>
@@ -98,6 +104,7 @@ internal sealed class AttestationService
     public AttestationService(
         IReviewStore store,
         SigningService signing,
+        IProjectAccess access,
         AuditService audit,
         IAttestationKeyProvider keys,
         IAttestationRenderer renderer,
@@ -106,6 +113,7 @@ internal sealed class AttestationService
     {
         ArgumentNullException.ThrowIfNull(store);
         ArgumentNullException.ThrowIfNull(signing);
+        ArgumentNullException.ThrowIfNull(access);
         ArgumentNullException.ThrowIfNull(audit);
         ArgumentNullException.ThrowIfNull(keys);
         ArgumentNullException.ThrowIfNull(renderer);
@@ -113,6 +121,7 @@ internal sealed class AttestationService
         ArgumentNullException.ThrowIfNull(time);
         _store = store;
         _signing = signing;
+        _access = access;
         _audit = audit;
         _keys = keys;
         _renderer = renderer;
@@ -147,6 +156,12 @@ internal sealed class AttestationService
     {
         ArgumentNullException.ThrowIfNull(reviewId);
         ArgumentNullException.ThrowIfNull(actor);
+
+        // Whoever may not see the project gets the same answer as for a review that does not exist
+        if (!await _access.CanViewAsync(actor, projectId, cancellationToken))
+        {
+            return new AttestationResult(AttestationStatus.NotFound, null, null, "The review was not found.");
+        }
 
         // Availability first: the review must exist and be complete
         var approval = await _signing.GetApprovalAsync(projectId, reviewId, cancellationToken);

@@ -1,7 +1,7 @@
 ---
 # Software Unit Requirements for the AuditPage Component
 #
-# The AuditPage component shows the whole audit trail to administrators and verifies its hash chain.
+# The AuditPage component shows the whole audit trail to system administrators and verifies its hash chain.
 
 sections:
   - title: AuditPage Unit Requirements
@@ -12,7 +12,7 @@ sections:
           sequence, time, actor, action, review, and detail of each, with links to the older and newer page, a
           message when the trail is empty, and all text rendered as plain text.
         justification: |
-          Administrators review what happened in the system, and the text comes from users.
+          System administrators review what happened in the system, and the text comes from users.
         tests:
           - AuditPage_Render_Admin_ShowsEntriesNewestFirst
           - AuditPage_Render_EmptyTrail_ShowsEmptyMessage
@@ -24,20 +24,21 @@ sections:
           The AuditPage component shall show a long hexadecimal value (a hash or fingerprint) in the detail of an entry
           shortened to its first 12 characters, with the full value available as the tooltip of the shortened value.
         justification: |
-          Hashes and fingerprints make the table too wide to read, yet an administrator who needs the exact value must
-          still be able to get it. The head hash of a verification is not shortened, because it is what is recorded
+          Hashes and fingerprints make the table too wide to read, yet a system administrator who needs the exact
+          value must still be able to get it. The head hash of a verification is not shortened, because it is what is
+          recorded
           outside the database.
         tests:
           - AuditPage_Render_DetailWithLongHash_ShowsShortenedValueWithFullValueInTooltip
 
       - id: ReviewCenter-AuditPage-Verify
         title: >-
-          The AuditPage component shall let an administrator verify the hash chain and shall show the entry count
+          The AuditPage component shall let a system administrator verify the hash chain and shall show the entry count
           and the full head hash of an intact chain, or the first broken entry with the head hash of the last entry
           that verified.
         justification: |
-          The head hash is what an administrator records outside the database to detect later removal of the newest
-          entries.
+          The head hash is what a system administrator records outside the database to detect later removal of the
+          newest entries.
         tests:
           - AuditPage_Verify_IntactChain_ShowsCountAndFullHeadHash
           - AuditPage_Verify_TamperedChain_ShowsFirstBadEntry
@@ -45,8 +46,8 @@ sections:
 
       - id: ReviewCenter-AuditPage-Admin
         title: >-
-          The AuditPage component shall show entries and verify only for a user who is an enabled administrator in
-          the user store, on load and on every verification, and shall show an error and read nothing otherwise.
+          The AuditPage component shall show entries and verify only for a user who is an enabled system administrator
+          in the user store, on load and on every verification, and shall show an error and read nothing otherwise.
         justification: |
           The audit trail names every user and action, and an open page keeps its state for a while after a user is
           demoted or disabled.

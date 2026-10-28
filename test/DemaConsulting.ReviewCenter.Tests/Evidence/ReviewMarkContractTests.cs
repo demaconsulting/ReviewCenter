@@ -261,11 +261,12 @@ public class ReviewMarkContractTests
         var users = app.Services.GetRequiredService<UserService>();
         var annId = (await users.GetAsync("ann", cancellationToken))!.Id;
         var project = await app.Services.GetRequiredService<ProjectService>().CreateAsync("Apollo", null, cancellationToken);
+        var store = app.Services.GetRequiredService<IReviewStore>();
+        await store.AddMembershipAsync(annId, project.Id, cancellationToken);
 
         // Each review is completed on its own day, starting with the day of the clock
         var checklists = app.Services.GetRequiredService<ChecklistService>();
         var signing = app.Services.GetRequiredService<SigningService>();
-        var store = app.Services.GetRequiredService<IReviewStore>();
         foreach (var review in Reviews)
         {
             await EvidenceTestSupport.AddReviewAsync(store, clock, project.Id, review.Id, review.SetId, review.Files);

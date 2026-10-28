@@ -238,33 +238,34 @@ public class ContextTests
     }
 
     /// <summary>
-    ///     Test that the user add verb records the user name, display name and role.
+    ///     Test that the user add verb records the user name, display name and the system administrator switch.
     /// </summary>
     [Fact]
     public void Context_Create_UserAddVerb_SetsUserAddAndOptions()
     {
         // Act: parse the verb with every option
-        using var context = Context.Create(["user", "add", "--username", "ann", "--display-name", "Ann Example", "--role", "admin"]);
+        using var context = Context.Create(["user", "add", "--username", "ann", "--display-name", "Ann Example", "--system-admin"]);
 
-        // Assert: the verb and the options are recorded; the role is not case sensitive
+        // Assert: the verb and the options are recorded
         Assert.True(context.UserAdd);
         Assert.Equal("ann", context.Username);
         Assert.Equal("Ann Example", context.DisplayName);
-        Assert.Equal(UserRole.Admin, context.Role);
+        Assert.True(context.SystemAdmin);
     }
 
     /// <summary>
-    ///     Test that the role of the user add verb defaults to reviewer, and that without the verb it is off.
+    ///     Test that the user add verb does not make a system administrator unless asked, and that without the verb
+    ///     it is off.
     /// </summary>
     [Fact]
-    public void Context_Create_UserAddWithoutRole_DefaultsToReviewer()
+    public void Context_Create_UserAddWithoutSystemAdmin_DefaultsToOrdinaryUser()
     {
-        // Act: parse the verb without a role, and a context with no verb
+        // Act: parse the verb without the switch, and a context with no verb
         using var context = Context.Create(["user", "add", "--username", "ann", "--display-name", "Ann"]);
         using var other = Context.Create([]);
 
-        // Assert: the default role applies and the verb is off when not given
-        Assert.Equal(UserRole.Reviewer, context.Role);
+        // Assert: the default applies and the verb is off when not given
+        Assert.False(context.SystemAdmin);
         Assert.False(other.UserAdd);
     }
 
@@ -278,10 +279,9 @@ public class ContextTests
     [InlineData("user remove", "add action")]
     [InlineData("user add --display-name Ann", "requires --username and --display-name")]
     [InlineData("user add --username ann", "requires --username and --display-name")]
-    [InlineData("user add --username ann --display-name Ann --role Boss", "Admin or Reviewer")]
-    [InlineData("user add --username ann --display-name Ann --role", "--role requires")]
+    [InlineData("user add --username ann --display-name Ann --role Admin", "Unsupported argument '--role'")]
     [InlineData("--username ann", "require the user add verb")]
-    [InlineData("--role Admin", "require the user add verb")]
+    [InlineData("--system-admin", "require the user add verb")]
     public void Context_Create_UserAddMisuse_ThrowsArgumentException(string arguments, string expected)
     {
         // Act: parse the arguments

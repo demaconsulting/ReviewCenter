@@ -3,7 +3,7 @@
    Presentation only; state and event handling live in AuditPage.razor.cs. A "Verify chain" button that checks the
    hash chain of the whole trail and shows either "Chain intact: N entries, head hash <full hash>" or "Chain broken
    at entry N" with the head hash, followed by the entries newest first, 50 per page, with Older / Newer links that
-   carry the position in the address. Access is limited to the Admin role by the attribute below, and the page
+   carry the position in the address. Access is limited to system administrators by the attribute below, and the page
    re-checks the user in the store when it loads and when the button is used. All text comes from the audit trail and
    is rendered as plain text (Razor encodes it; no raw markup). Every interactive element and every key value
    carries a stable kebab-case data-testid, and the data-interactive marker on the root flips to "true" once the

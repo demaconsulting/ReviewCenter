@@ -74,7 +74,9 @@ response.
 - *Postconditions*: The `Database` options, a `ReviewCenterDbContext` factory configured by
   `DatabaseSetup.Configure`, `TimeProvider.System`, one `AuditAppender`, `ReviewStore`, `UserStore`,
   `PersonalAccessTokenStore`, and `AuditStore` as
-  the Core store interfaces, `PasswordHasher` as the Core hasher interface, and `ProjectService`, `ReviewService`,
+  the Core store interfaces, `PasswordHasher` as the Core hasher interface, `ProjectAccess` as the Core interface
+  `IProjectAccess` (one singleton that every service and the API share, registered before the services that take it),
+  and `ProjectService`, `ReviewService`,
   `ThreadService`, `ChecklistService`, `UserService`, `PersonalAccessTokenService`, `SigningService`, and `AuditService`
   as singletons are registered.
   `AuditService` gets a hook that logs a warning when an event cannot be recorded, and the registered `TimeProvider`
@@ -219,6 +221,8 @@ always disposed.
 - **ProjectService**, **ReviewService**, **ThreadService**, **ChecklistService**, **UserService**,
   **PersonalAccessTokenService**, **SigningService**,
   **AuditService**, **RepositoryService** — the Core services registered for the pages and the API.
+- **ProjectAccess**, **IProjectAccess** — Core; the one place that decides which project a user may see, registered as a
+  singleton for the services, the pages, and the API.
 - **ApiTokenAuthentication**, **ApiEndpoints**, **ApiDocument** — the `Api` subsystem, which is registered and mapped.
 - **GitOptions**, **GitRunner**, **GitSource**, **CredentialProtector** — the git content source and the token protector.
 - **AttestationOptions**, **AttestationKeyProviderFactory**, **AttestationKeyException**, **AttestationRenderer**,

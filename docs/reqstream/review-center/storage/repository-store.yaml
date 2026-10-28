@@ -1,7 +1,8 @@
 ---
 # Software Unit Requirements for the RepositoryStore Class
 #
-# The RepositoryStore class persists the registry of git repositories: the registration, the encrypted token, and the
+# The RepositoryStore class persists the registry of git repositories: the registration (which belongs to one
+# project), the encrypted token, and the
 # audit entry of each change, which is stored in the same transaction as the change.
 
 sections:
@@ -9,23 +10,30 @@ sections:
     requirements:
       - id: ReviewCenter-RepositoryStore-Persist
         title: >-
-          The RepositoryStore class shall store a repository with every field and an identity assigned by the
-          database, read it back unchanged, and list the repositories ordered by name without regard to letter case.
+          The RepositoryStore class shall store a repository with every field, including the project it belongs to,
+          and an identity assigned by the
+          database, read it back unchanged, and list the repositories of one project, and of no other project,
+          ordered by name without regard to letter case.
         justification: |
-          The registry must survive a restart, and the page that shows it needs a stable order.
+          The registry must survive a restart, the page that shows the repositories of a project needs a stable
+          order, and a list must never hold the repositories of another project.
         tests:
           - RepositoryStore_AddAsync_Repository_RoundTripsAndAudits
           - RepositoryStore_ListAsync_OrdersByNameIgnoringCase
+          - RepositoryStore_ListAsync_ScopedToProject_AndNamesAreUniquePerProject
 
       - id: ReviewCenter-RepositoryStore-Unique
         title: >-
-          The RepositoryStore class shall refuse a repository name that is already used, regardless of letter case,
-          when adding and when renaming, reporting that the name is taken and leaving the data and the audit trail
-          unchanged.
+          The RepositoryStore class shall refuse a repository name that is already used in the same project,
+          regardless of letter case, when adding and when renaming, reporting that the name is taken and leaving the
+          data and the audit trail unchanged, and shall accept the same name in another project.
         justification: |
-          The database is the last defense against two repositories with the same name when two requests overlap.
+          The database is the last defense against two repositories with the same name in a project when two
+          requests overlap. A name is taken only within its project, so that a refusal never tells a user that
+          another project has a repository of that name.
         tests:
           - RepositoryStore_NameOtherCase_ThrowsRepositoryNameTaken
+          - RepositoryStore_ListAsync_ScopedToProject_AndNamesAreUniquePerProject
 
       - id: ReviewCenter-RepositoryStore-Token
         title: >-

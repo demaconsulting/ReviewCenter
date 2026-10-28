@@ -4,7 +4,8 @@
 
 ### Overview
 
-The `Storage` subsystem keeps projects, reviews, review comment threads, review checklists, users, reviewer slots,
+The `Storage` subsystem keeps projects, project memberships, reviews, review comment threads, review checklists, users,
+reviewer slots,
 signatures, personal access tokens, and the hash-chained audit trail in a relational
 database through Entity
 Framework Core. It
@@ -42,13 +43,19 @@ application; the rest of the system sees only the Core store interfaces.
   `RecordChanged` and stores nothing, a second signature of the same slot and digest raises one for
   `SigningNotAllowed`, and an unknown slot or review raises one for `SlotNotFound` or `ReviewNotFound`. Every change of
   data is stored together with its audit entry in one transaction, and a change that has no effect stores no entry.
+  The membership of a user in a project (the project role `ProjectAdmin` or `User`) is added, changed, removed, read,
+  and listed by project and by user; a second membership of the same user in the same project raises a
+  `DomainRuleException` for `MembershipExists`, a membership of an unknown project or user is refused by the foreign
+  keys of the database, and every change is audited with the project (`project.member-added`,
+  `project.member-role-changed`, and `project.member-removed`) in the same transaction.
 - *Constraints*: Every operation uses its own short-lived database context, so it is safe for concurrent use.
 
 **UserStore (as IUserStore)**: The persistence operations for users.
 
 - *Type*: In-process .NET class implementing the Core interface.
 - *Role*: Provider.
-- *Contract*: Stores a user, reads a user by user name without regard to case, lists the users, and replaces the
+- *Contract*: Stores a user with its system administrator flag, reads a user by user name without regard to case,
+  lists the users, and replaces the
   stored state of a user. An attempt to store a user whose name exists, in any capitalization, raises a
   `DomainRuleException` for `UserNameTaken`. A new user, and an update that carries an audit draft, are stored together
   with their audit entry in one transaction.
@@ -73,13 +80,15 @@ application; the rest of the system sees only the Core store interfaces.
   the hash of its predecessor. There is no operation to update or delete an entry.
 - *Constraints*: Appends from every store are serialized by one process-wide gate and by the database write lock.
 
-**RepositoryStore (as IRepositoryStore)**: The persistence operations for the registry of git repositories.
+**RepositoryStore (as IRepositoryStore)**: The persistence operations for the git repositories of the projects.
 
 - *Type*: In-process .NET class implementing the Core interface.
 - *Role*: Provider.
-- *Contract*: Stores a repository, reads one or lists all (by name, without regard to case), reads the encrypted token
-  of one, and updates one with a token action (keep, replace, or clear). A name that exists, in any capitalization,
-  raises a `DomainRuleException` for `RepositoryNameTaken`, and an update of an unknown repository one for
+- *Contract*: Stores a repository of a project, reads one or lists the repositories of one project (by name, without
+  regard to case), reads the encrypted token
+  of one, and updates one with a token action (keep, replace, or clear). A name that exists in the same project, in any
+  capitalization, raises a `DomainRuleException` for `RepositoryNameTaken` (the same name may exist in another
+  project), and an update of an unknown repository one for
   `RepositoryNotFound`. Each change is stored together with its audit entry in one transaction.
 - *Constraints*: Every operation uses its own short-lived database context, so it is safe for concurrent use. The
   store holds and returns only encrypted token text, and the read model has no token member.
@@ -119,17 +128,18 @@ with migrations. This is adequate while there is no released schema to upgrade: 
 tables, and an existing database is left alone. The cost is that a database created by an earlier version is
 never altered, so a change of the schema needs a migration strategy before the first release that must keep
 data. This is a known limitation, recorded as an open decision in `architecture.md` and not yet resolved. It
-already matters eight times: the tables for comment threads were added after the first schema, the tables for review
+already matters nine times: the tables for comment threads were added after the first schema, the tables for review
 checklists after those, the users table and the user name columns of comments, answers, and section decisions
 after those, the tables of reviewer slots and signatures after those, the audit table after those, the
 `Repositories` table after that, the source and change columns of reviews from a repository after that, and the
-`PersonalAccessTokens` table with the creator columns of reviews after that, so a database
+`PersonalAccessTokens` table with the creator columns of reviews after that, and the `ProjectMemberships` table with
+the project of a repository and the system administrator flag of a user after that, so a database
 created before them does not
 have them and the pages fail until the
 database file is deleted (or a new one is
 named) and created again. Databases created before the identity slice must be deleted and recreated, and so must
 databases created before the signature slice, before the audit trail, before the repository registry, before
-reviews from a repository, and before the personal access tokens; there is no
+reviews from a repository, before the personal access tokens, and before the project access control; there is no
 migration of their data, and no data of a released version is
 affected. A
 second limitation is that two processes starting at the same moment on a brand-new database file can collide
@@ -143,11 +153,20 @@ Data Protection key ring (`keys`), both resolved by `Hosting` from the folder of
 `DatabaseSetup` unit), so backing up the data folder covers the database and the key that decrypts the stored
 tokens.
 
-**Repositories and the token**: The `Repositories` table holds the registered git repositories. The token is stored
+**Repositories and the token**: The `Repositories` table holds the git repositories registered with a project; every
+row has a required `ProjectId` (a foreign key), so a repository belongs to exactly one project. The token is stored
 only as the encrypted text produced by `ICredentialProtector`; the store never sees a plain token, and the read model
-that leaves the store has a flag (`HasToken`) instead of a member for the text. Name uniqueness is enforced by a
-unique index with the case-insensitive collation of SQLite, and a violation is translated to `RepositoryNameTaken`;
+that leaves the store has a flag (`HasToken`) instead of a member for the text. Name uniqueness within a project is
+enforced by a
+unique index on `ProjectId` and `Name` with the case-insensitive collation of SQLite, and a violation is translated to
+`RepositoryNameTaken`;
 like the other stores, the translation is SQLite specific. Repositories are never deleted.
+
+**Project memberships**: The `ProjectMemberships` table holds who may see which project and with which project role.
+Its key is the user and the project together, so a user has at most one membership per project, and both columns are
+foreign keys; the database refuses a membership of a project or user that does not exist. The membership is data of the
+project: it carries no copy of the system administrator flag, which stays on the user, and the decision about
+visibility is not made here (see `ProjectAccess` in the `Core` subsystem).
 
 **Personal access tokens**: The `PersonalAccessTokens` table holds the tokens of the users. Only the lowercase
 hexadecimal SHA-256 hash of a token value is stored, with a unique index that serves the lookup of every request to the

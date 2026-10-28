@@ -103,9 +103,9 @@ internal sealed class Context : IDisposable
     public string? DisplayName { get; private init; }
 
     /// <summary>
-    ///     Gets the role given with <c>--role</c>; <see cref="UserRole.Reviewer"/> when the option is not given.
+    ///     Gets a value indicating whether <c>--system-admin</c> was given: the new user is a system administrator.
     /// </summary>
-    public UserRole Role { get; private init; } = UserRole.Reviewer;
+    public bool SystemAdmin { get; private init; }
 
     /// <summary>
     ///     Gets the proposed exit code for the application (0 for success, 1 for errors).
@@ -160,7 +160,7 @@ internal sealed class Context : IDisposable
             AuditVerify = parser.AuditVerify,
             Username = parser.Username,
             DisplayName = parser.DisplayName,
-            Role = parser.Role ?? UserRole.Reviewer
+            SystemAdmin = parser.SystemAdmin
         };
 
         // Open log file if specified
@@ -264,9 +264,9 @@ internal sealed class Context : IDisposable
         public string? DisplayName { get; private set; }
 
         /// <summary>
-        ///     Gets the value of <c>--role</c>, or <c>null</c> when the option was not given.
+        ///     Gets a value indicating whether <c>--system-admin</c> was given.
         /// </summary>
-        public UserRole? Role { get; private set; }
+        public bool SystemAdmin { get; private set; }
 
         /// <summary>
         ///     Parses command-line arguments
@@ -297,9 +297,9 @@ internal sealed class Context : IDisposable
 
             // The user options belong to 'user add' for the same reason, and 'user add' cannot work without
             // the two names that identify the account
-            if (!UserAdd && (Username != null || DisplayName != null || Role != null))
+            if (!UserAdd && (Username != null || DisplayName != null || SystemAdmin))
             {
-                throw new ArgumentException("--username, --display-name and --role require the user add verb", nameof(args));
+                throw new ArgumentException("--username, --display-name and --system-admin require the user add verb", nameof(args));
             }
 
             if (UserAdd && (Username == null || DisplayName == null))
@@ -387,9 +387,9 @@ internal sealed class Context : IDisposable
                     DisplayName = GetRequiredStringArgument(arg, args, index, "a display name argument");
                     return index + 1;
 
-                case "--role":
-                    Role = GetRequiredRoleArgument(arg, args, index);
-                    return index + 1;
+                case "--system-admin":
+                    SystemAdmin = true;
+                    return index;
 
                 default:
                     throw new ArgumentException($"Unsupported argument '{arg}'", nameof(args));
@@ -438,27 +438,6 @@ internal sealed class Context : IDisposable
             }
 
             return value;
-        }
-
-        /// <summary>
-        ///     Gets a required argument value that must name a user role
-        /// </summary>
-        /// <param name="arg">Argument name</param>
-        /// <param name="args">All arguments</param>
-        /// <param name="index">Current index</param>
-        /// <returns>The role</returns>
-        /// <exception cref="ArgumentException">Thrown when the value is missing or is not <c>Admin</c> or <c>Reviewer</c>.</exception>
-        private static UserRole GetRequiredRoleArgument(string arg, string[] args, int index)
-        {
-            var value = GetRequiredStringArgument(arg, args, index, "a role argument");
-
-            // Enum.TryParse would also accept numbers; only the two names are valid
-            if (!Enum.GetNames<UserRole>().Contains(value, StringComparer.OrdinalIgnoreCase))
-            {
-                throw new ArgumentException($"{arg} requires Admin or Reviewer but was '{value}'", nameof(args));
-            }
-
-            return Enum.Parse<UserRole>(value, ignoreCase: true);
         }
 
         /// <summary>

@@ -1,6 +1,6 @@
 package ReviewCenter {
     part def ProjectsPage {
-        doc /* Pages that list all projects, as rows that link to the project, and hold the separate form to create a project. */
+        doc /* Pages that list the projects the user may see (every project for a system administrator), as rows that link to the project, and hold the separate form to create a project, which only a system administrator may use. */
 
         comment sourceRef /* Source: src/DemaConsulting.ReviewCenter/Web/ProjectsPage.razor, ProjectsPage.razor.cs, NewProjectPage.razor, and NewProjectPage.razor.cs */
         comment testRef /* Test: test/DemaConsulting.ReviewCenter.Tests/Web/ProjectsPageTests.cs and NewProjectPageTests.cs */

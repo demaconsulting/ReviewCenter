@@ -26,9 +26,11 @@ subsystem uses one OTS item, `System.Security.Cryptography.Pkcs`, for the CMS si
 
 - *Type*: HTTP endpoint, `GET /projects/{projectId}/reviews/{reviewId}/attestation.pdf`.
 - *Role*: Provider.
-- *Contract*: A signed-in user gets the signed PDF (`application/pdf`, file name
-  `attestation-{projectId}-{reviewId}.pdf`, `Cache-Control: no-store`). The statuses are 200 for the document, 404 for a
-  review that does not exist, 409 (a problem description, "The review is not complete") for a review that is not
+- *Contract*: A signed-in user who may view the project (a member, or a system administrator) gets the signed PDF
+  (`application/pdf`, file name
+  `attestation-{projectId}-{reviewId}.pdf`, `Cache-Control: no-store`). The statuses are 200 for the document, 404 (empty
+  on this route) for a review that does not exist and for a project that the user may not view, 409 (a problem
+  description, "The review is not complete") for a review that is not
   approved and 409 ("The review changed during generation") for a review that changed while the document was being
   prepared, and 500 (a problem description, "Attestation signing key unavailable", with the reason) when the key cannot
   be used. A visitor who is not signed in is redirected to the sign-in page by the authentication scheme.
@@ -41,7 +43,9 @@ subsystem uses one OTS item, `System.Security.Cryptography.Pkcs`, for the CMS si
 - *Type*: In-process .NET class.
 - *Role*: Provider, to `ApiEndpoints` of the `Api` subsystem, which serves it as `GET
   /api/projects/{projectId}/evidence/index.json`.
-- *Contract*: `BuildAsync` returns one entry (the review-set id, the content fingerprint, the UTC day of the latest
+- *Contract*: `BuildAsync` takes the actor and the project, refuses an actor who may not view the project as for a
+  project that does not exist, and returns one entry (the review-set id, the content fingerprint, the UTC day of the
+  latest
   signature,
   and the review it stands for) for each review-set id and fingerprint of the complete reviews of the project that have
   a
@@ -68,12 +72,13 @@ subsystem uses one OTS item, `System.Security.Cryptography.Pkcs`, for the CMS si
 - *Constraints*: An unknown provider, a missing or malformed thumbprint, or a key that does not meet the rule stops the
   server at start-up with an error that names the setting.
 
-**Core services (consumed)**: `SigningService`, `AuditService`, and `IReviewStore`.
+**Core services (consumed)**: `SigningService`, `AuditService`, `IReviewStore`, and `IProjectAccess`.
 
-- *Type*: In-process .NET classes and interface.
+- *Type*: In-process .NET classes and interfaces.
 - *Role*: Consumer.
 - *Contract*: The approval decision and the record digest, the audit trail (the head of the chain, and the recording of
-  the release), and the review with its files, checklist, threads, and signatures.
+  the release), the review with its files, checklist, threads, and signatures, and the decision which actor may view
+  which project.
 - *Constraints*: None.
 
 ### Design
@@ -140,7 +145,10 @@ server does not start. Because the key is obtained at start-up, a
 configuration that cannot work fails at once, with an error that names the setting; the price is that a server whose key
 is in a hardware module that is not present does not start.
 
-**Release of an attestation**: `AttestationService` first asks `SigningService` for the approval, so a missing review is
+**Release of an attestation**: `AttestationService` first asks `IProjectAccess` whether the actor may view the project,
+and answers an actor who may not exactly as for a review that does not exist, so that the answer does not tell a
+non-member whether the project or the review exists. Then it asks `SigningService` for the approval, so a missing
+review is
 reported as not found and a review that is not complete is refused without the key being touched. Then it gets the key
 (a key problem is reported, and nothing is recorded), reads the review, checks again that the record digest is the one
 that was approved, verifies the audit chain to get its head, renders the document, reads the review again and
@@ -171,7 +179,9 @@ request.
 The fingerprint is the content fingerprint of the review, which is the algorithm of ReviewMark (SHA-256 of the sorted
 SHA-256 hashes of the files); a contract test checks it against an independent implementation. A review that was made
 from the changes since a baseline holds only the changed files, so its fingerprint differs from the one that ReviewMark
-computes for the whole review-set, and ReviewMark shows it as stale.
+computes for the whole review-set, and ReviewMark shows it as stale. The index discloses the review-sets and
+fingerprints of a project, so `BuildAsync` refuses an actor who may not view the project with the rule of a missing
+project.
 
 **Known limitations and planned follow-ups**: These are not implemented, and the subsystem has no requirement and no
 dependency for them. A provider for Azure Key Vault would keep the key in the vault and sign through the Azure SDK; the

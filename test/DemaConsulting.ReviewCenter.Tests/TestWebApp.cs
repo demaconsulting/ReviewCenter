@@ -20,6 +20,7 @@
 
 using System.Collections.Concurrent;
 using DemaConsulting.ReviewCenter.Cli;
+using DemaConsulting.ReviewCenter.Core;
 using DemaConsulting.ReviewCenter.Hosting;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
@@ -188,5 +189,25 @@ internal static class TestWebApp
         });
         await app.StartAsync();
         return app;
+    }
+
+    /// <summary>
+    ///     Creates a project as <c>ann</c>, the default test actor, who is created as a system administrator when
+    ///     the database does not have the user yet.
+    /// </summary>
+    /// <param name="app">The application.</param>
+    /// <param name="name">The project name.</param>
+    /// <param name="description">The description; <c>null</c> for none.</param>
+    /// <returns>The new project.</returns>
+    public static async Task<Project> CreateProjectAsync(WebApplication app, string name, string? description = null)
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var users = app.Services.GetRequiredService<UserService>();
+        if (await users.GetAsync("ann", cancellationToken) is null)
+        {
+            await users.CreateAsync("ann", "Ann", true, TestBrowser.Password, cancellationToken);
+        }
+
+        return await app.Services.GetRequiredService<ProjectService>().CreateAsync(name, description, cancellationToken);
     }
 }

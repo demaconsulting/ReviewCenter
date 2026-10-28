@@ -20,7 +20,9 @@
 
 using System.Globalization;
 using DemaConsulting.ReviewCenter.Core;
+using DemaConsulting.ReviewCenter.Identity;
 using Microsoft.AspNetCore.Components;
+using Microsoft.AspNetCore.Components.Authorization;
 
 namespace DemaConsulting.ReviewCenter.Web;
 
@@ -90,6 +92,12 @@ public partial class HistoryPage : ComponentBase
     private ProjectService ProjectService { get; set; } = null!;
 
     /// <summary>
+    ///     Gets or sets the authentication state of the current user, supplied by dependency injection.
+    /// </summary>
+    [Inject]
+    private AuthenticationStateProvider AuthenticationState { get; set; } = null!;
+
+    /// <summary>
     ///     Gets the name of the owning project shown in the breadcrumb, or <c>null</c> when it is unknown.
     /// </summary>
     private string? ProjectName { get; set; }
@@ -130,8 +138,10 @@ public partial class HistoryPage : ComponentBase
         Page = null;
         ProjectName = null;
 
-        Review = await ReviewService.GetAsync(ProjectId, ReviewId);
-        ProjectName = (await ProjectService.GetAsync(ProjectId))?.Name;
+        // A project the user may not see is treated like a missing one: nothing of its review is loaded
+        var project = await ProjectService.GetAsync(await AuthenticationState.GetActorOrNullAsync(), ProjectId);
+        ProjectName = project?.Name;
+        Review = project is null ? null : await ReviewService.GetAsync(ProjectId, ReviewId);
         if (Review is not null)
         {
             Page = await AuditService.ListAsync(ProjectId, ReviewId, Before, After);

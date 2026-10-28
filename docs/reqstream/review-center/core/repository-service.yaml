@@ -1,8 +1,9 @@
 ---
 # Software Unit Requirements for the RepositoryService Class
 #
-# The RepositoryService class keeps the global registry of git repositories that reviews can be created from, and the
-# access tokens of those repositories. It is administered by administrators only.
+# The RepositoryService class keeps the registry of git repositories that reviews can be created from, and the access
+# tokens of those repositories. Every repository belongs to exactly one project and is administered by the project
+# administrators of that project and by system administrators.
 
 sections:
   - title: RepositoryService Unit Requirements
@@ -11,12 +12,15 @@ sections:
         title: >-
           The RepositoryService class shall register a repository under a name of 1 to 40 letters, digits, dots,
           underscores, and dashes that starts with a letter or digit, refuse any other name, and refuse a second
-          repository whose name differs from an existing one only in letter case.
+          repository in the same project whose name differs from an existing one only in letter case, while the same
+          name may be used in two different projects.
         justification: |
-          The name is what users see and choose, so it must be short, plain, and unambiguous.
+          The name is what users see and choose, so it must be short, plain, and unambiguous. Projects are
+          separate bodies of work and must not have to agree on names with each other.
         tests:
           - RepositoryService_CreateAsync_InvalidName_ThrowsRepositoryNameInvalid
           - RepositoryService_CreateAsync_NameLimitsAndDuplicate_AreEnforced
+          - RepositoryService_ProjectAdministrator_ManagesOwnProjectOnly
 
       - id: ReviewCenter-RepositoryService-Location
         title: >-
@@ -81,21 +85,38 @@ sections:
 
       - id: ReviewCenter-RepositoryService-Admin
         title: >-
-          The RepositoryService class shall let only an enabled administrator list the whole registry, register,
-          change, enable, and disable repositories, checking the acting user again on every call, and shall refuse
-          any other user, an unknown user, and a disabled user.
+          The RepositoryService class shall let only an administrator of the project, that is a project
+          administrator of it or an enabled system administrator, list the registry of the project, register,
+          change, enable, and disable its repositories, checking the acting user again on every call, shall refuse
+          a plain member of the project with the actor not allowed failure, and shall refuse a user who cannot see
+          the project, an unknown user, and a disabled user with the same project not found or repository not found
+          failure as for something that does not exist.
         justification: |
           The registry holds the locations and tokens through which the server reads source code, so changing it
-          is an administrator's duty. An open page keeps its state for a while after a user is demoted, so the check
-          is made again each time.
+          is a duty of the people who run the project. An open page keeps its state for a while after rights are
+          taken away, so the check is made again each time, and a refusal must not show that a repository exists.
         tests:
           - RepositoryService_AdminOnly_RefusesOtherActors
+          - RepositoryService_ProjectAdministrator_ManagesOwnProjectOnly
+
+      - id: ReviewCenter-RepositoryService-Ownership
+        title: >-
+          The RepositoryService class shall register every repository in exactly one project, shall give the git
+          layer the access data of a repository only for the project that owns it and report any other project's
+          repository as not found, and shall offer the enabled repositories of a project only to a user who may
+          see that project.
+        justification: |
+          A repository is registered with the credentials of one body of work. Another project must not be able to
+          open it, not even by guessing its identity.
+        tests:
+          - RepositoryService_ProjectAdministrator_ManagesOwnProjectOnly
+          - RepositoryService_DisabledRepository_IsNotSelectable
 
       - id: ReviewCenter-RepositoryService-Audit
         title: >-
           The RepositoryService class shall record the creation, the change, the disabling, and the enabling of a
-          repository in the audit trail with the names of the fields that changed, never with a token or other secret,
-          and shall record nothing for a request that changes nothing.
+          repository in the audit trail with the project, with the names of the fields that changed, never with a
+          token or other secret, and shall record nothing for a request that changes nothing.
         justification: |
           Who made source code reachable through the server, and who changed that, must be traceable, but the audit
           trail must never become a place where secrets are kept.
@@ -105,11 +126,11 @@ sections:
 
       - id: ReviewCenter-RepositoryService-Disable
         title: >-
-          The RepositoryService class shall disable a repository instead of deleting it, offer ordinary users only
-          the name of the enabled repositories, and refuse access to a disabled repository.
+          The RepositoryService class shall disable a repository instead of deleting it, offer the members of the
+          project only the name of its enabled repositories, and refuse access to a disabled repository.
         justification: |
           Reviews made from a repository keep their reference to it, so it is never deleted, and disabling it is how
-          an administrator stops its use.
+          a project administrator stops its use.
         tests:
           - RepositoryService_DisabledRepository_IsNotSelectable
 

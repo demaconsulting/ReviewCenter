@@ -11,12 +11,12 @@ sections:
         title: >-
           The RevalidatingAuthenticationStateProvider unit shall, at the configured interval, read the signed-in
           user of an open page from the user store again, shall keep the sign-in state only while that user
-          exists, is enabled, and has the same role and display name as at sign-in, and shall otherwise make the
-          sign-in state of the page anonymous.
+          exists, is enabled, and has the same system administrator state and display name as at sign-in, and
+          shall otherwise make the sign-in state of the page anonymous.
         justification: |
           A page that stays open makes no request, so the check of the session cookie never runs for it. Without
-          a periodic check, a user who was disabled, removed, or given another role would keep seeing and
-          changing review data on a page that was opened earlier.
+          a periodic check, a user who was disabled, removed, or demoted from system administrator would keep
+          seeing and changing review data on a page that was opened earlier.
         tests:
           - RevalidatingAuthenticationStateProvider_IsCurrentAsync_EnabledUserSameRole_ReturnsTrue
           - RevalidatingAuthenticationStateProvider_IsCurrentAsync_UserDisabled_ReturnsFalse

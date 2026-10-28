@@ -19,15 +19,18 @@
 // SOFTWARE.
 
 using DemaConsulting.ReviewCenter.Core;
+using DemaConsulting.ReviewCenter.Identity;
 using Microsoft.AspNetCore.Components;
+using Microsoft.AspNetCore.Components.Authorization;
 
 namespace DemaConsulting.ReviewCenter.Web;
 
 /// <summary>
-///     Code-behind for the projects page (<c>ProjectsPage.razor</c>): lists the projects.
+///     Code-behind for the projects page (<c>ProjectsPage.razor</c>): lists the projects the user may see.
 /// </summary>
 /// <remarks>
-///     The page talks to the domain only through <see cref="ProjectService"/>. Each browser connection
+///     The page talks to the domain only through <see cref="ProjectService"/>, which returns every project to a
+///     system administrator and only the member projects to anybody else. Each browser connection
 ///     (circuit) gets its own page instance, so the state here is per-user and needs no synchronization.
 ///     The page requires a signed-in user.
 /// </remarks>
@@ -46,9 +49,20 @@ public partial class ProjectsPage : ComponentBase
     private ProjectService ProjectService { get; set; } = null!;
 
     /// <summary>
+    ///     Gets or sets the authentication state of the current user, supplied by dependency injection.
+    /// </summary>
+    [Inject]
+    private AuthenticationStateProvider AuthenticationState { get; set; } = null!;
+
+    /// <summary>
     ///     Gets the projects shown in the list.
     /// </summary>
     private IReadOnlyList<Project> Projects { get; set; } = [];
+
+    /// <summary>
+    ///     Gets a value indicating whether the user is a system administrator (who may create projects).
+    /// </summary>
+    private bool IsSystemAdmin { get; set; }
 
     /// <summary>
     ///     Gets the value rendered into the <c>data-interactive</c> attribute.
@@ -60,12 +74,14 @@ public partial class ProjectsPage : ComponentBase
     private string InteractiveMarker => _interactive ? "true" : "false";
 
     /// <summary>
-    ///     Loads the project list when the page is created.
+    ///     Loads the visible projects when the page is created.
     /// </summary>
     /// <returns>A task that completes when the list is loaded.</returns>
     protected override async Task OnInitializedAsync()
     {
-        Projects = await ProjectService.ListAsync();
+        var state = await AuthenticationState.GetAuthenticationStateAsync();
+        IsSystemAdmin = state.User.IsInRole(SignIn.AdminRole);
+        Projects = await ProjectService.ListAsync(await AuthenticationState.GetActorOrNullAsync());
     }
 
     /// <summary>

@@ -197,7 +197,7 @@ internal static class Program
     {
         context.WriteLine("Usage: reviewcenter [options]");
         context.WriteLine("       reviewcenter serve [--urls <url>] [options]");
-        context.WriteLine("       reviewcenter user add --username <name> --display-name <text> [--role <role>] [options]");
+        context.WriteLine("       reviewcenter user add --username <name> --display-name <text> [--system-admin] [options]");
         context.WriteLine("       reviewcenter audit verify [options]");
         context.WriteLine("");
         context.WriteLine("Verbs:");
@@ -217,7 +217,7 @@ internal static class Program
         context.WriteLine("  --urls <url>               URL for 'serve' to listen on (default: http://localhost:5000)");
         context.WriteLine("  --username <name>          User name for 'user add' (3-50 letters, digits, '.', '_' or '-')");
         context.WriteLine("  --display-name <text>      Display name for 'user add'");
-        context.WriteLine("  --role <Admin|Reviewer>    Role for 'user add' (default: Reviewer)");
+        context.WriteLine("  --system-admin             Make the user of 'user add' a system administrator (default: an ordinary user)");
     }
 
     /// <summary>

@@ -115,7 +115,7 @@ internal sealed partial class RevalidatingAuthenticationStateProvider : Revalida
     /// <param name="state">The state to check. Must not be null.</param>
     /// <param name="cancellationToken">Cancelled when the circuit is closed.</param>
     /// <returns>
-    ///     <c>true</c> when the user exists, is enabled and has the same role and display name as in the state;
+    ///     <c>true</c> when the user exists, is enabled and has the same administrator flag and display name as in the state;
     ///     <c>false</c> when not, when the state carries no user name, and when the user could not be read.
     /// </returns>
     /// <exception cref="TaskCanceledException">

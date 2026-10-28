@@ -77,7 +77,7 @@ public class PersonalAccessTokenStoreTests
     private static async Task<int> AddUserAsync(TestStore db, string username = "ann")
     {
         var user = await db.Users.AddAsync(
-            new User { Username = username, DisplayName = username, Role = UserRole.Reviewer, PasswordHash = "hash", Created = _created },
+            new User { Username = username, DisplayName = username, PasswordHash = "hash", Created = _created },
             TestContext.Current.CancellationToken);
         return user.Id;
     }

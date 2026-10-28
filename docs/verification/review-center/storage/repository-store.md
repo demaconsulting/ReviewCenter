@@ -24,6 +24,7 @@ N/A - standard test environment (temporary SQLite databases are created by the t
 - An update changes the fields and keeps, replaces, or clears the token as asked.
 - Disabling keeps the registration; updating an unknown repository is `RepositoryNotFound`.
 - The list is ordered by name without regard to case, and an unknown identity reads as null.
+- A project lists only its own repositories, and the same name may be used in two projects but only once within one.
 - The read model has no token member other than the flag.
 
 #### Test Scenarios
@@ -47,6 +48,11 @@ names `RepositoryNotFound`. This scenario is tested by `RepositoryStore_UpdateAs
 
 **RepositoryStore_ListAsync_OrdersByNameIgnoringCase**: The list is ordered by name without regard to case, and an unknown
 identity reads as null. This scenario is tested by `RepositoryStore_ListAsync_OrdersByNameIgnoringCase`.
+
+**RepositoryStore_ListAsync_ScopedToProject_AndNamesAreUniquePerProject**: The same name is added to two projects and
+accepted in both; each project lists only its own repository (by the project identity of the read model); a name that
+differs only in case from one in the same project is refused with `RepositoryNameTaken`. This scenario is tested by
+`RepositoryStore_ListAsync_ScopedToProject_AndNamesAreUniquePerProject`.
 
 **RepositoryStore_ReadModel_HasNoTokenMember**: The read model has no member that can hold a token other than the flag.
 This scenario is tested by `RepositoryStore_ReadModel_HasNoTokenMember`.

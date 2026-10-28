@@ -1,9 +1,15 @@
 @* ProjectsPage: the list of projects, at "/projects". Choosing a project is what nearly every visit is for, so the
-   list is the whole page; a "+ New project" link leads to the separate creation page at "/projects/new".
+   list is the whole page. A system administrator sees every project and gets a "+ New project" link to the
+   separate creation page at "/projects/new"; everybody else sees only the projects they are a member of, with no
+   creation link (only a system administrator may create a project).
 
    Presentation only; state lives in ProjectsPage.razor.cs. Every interactive element and every key value carries a
    stable kebab-case data-testid (row-level ids carry the project id), and the data-interactive marker on the root
    flips to "true" once the live circuit is connected.
+
+   Human factors: (a) the list is the whole page, so the project is one click away; (b) a member sees only their own
+   projects, so nothing else competes for attention; (c) a user without any project is told why the list is empty
+   and whom to ask, instead of being shown a blank page.
 
    The page body is inside SessionGate, which replaces it with a "Session ended" message when the user is no longer
    valid while the page is open. *@
@@ -17,13 +23,25 @@
 <main class="page" data-testid="projects-page" data-interactive="@InteractiveMarker">
     <div class="page-heading">
         <h1>Projects</h1>
-        <a class="action" href="/projects/new" data-testid="new-project-button">+ New project</a>
+        @if (IsSystemAdmin)
+        {
+            <a class="action" href="/projects/new" data-testid="new-project-button">+ New project</a>
+        }
     </div>
     <p class="page-lead">Choose a project to see its reviews.</p>
 
     @if (Projects.Count == 0)
     {
-        <p class="muted" data-testid="projects-empty">There are no projects yet.</p>
+        @if (IsSystemAdmin)
+        {
+            <p class="muted" data-testid="projects-empty">There are no projects yet. Use "+ New project" to create one.</p>
+        }
+        else
+        {
+            <p class="muted" data-testid="projects-empty">
+                You are not a member of any project yet. Ask an administrator to add you.
+            </p>
+        }
     }
     else
     {

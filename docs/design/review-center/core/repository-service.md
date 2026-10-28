@@ -5,14 +5,16 @@
 #### Purpose
 
 `RepositoryService` manages the registry of git repositories that reviews can be created from. Its single
-responsibility is to enforce the rules of that registry: only administrators change it, names, locations, and
-credentials are valid, tokens are stored encrypted and never given back, and every change is audited without any secret.
-It also hands the decrypted access data to the code that reads a repository.
+responsibility is to enforce the rules of that registry: every repository belongs to exactly one project, only the
+administrators of that project (project administrators and system administrators) change it, names, locations, and
+credentials are valid, tokens are stored encrypted and never given back, and every change is audited without any
+secret. It also hands the decrypted access data to the code that reads a repository.
 
 #### Data Model
 
-The service is a singleton. It holds the `IRepositoryStore`, the `ICredentialProtector`, the `UserService` (to re-check
-the acting administrator), and a `TimeProvider`. A semaphore serializes every change and every read of the access data,
+The service is a singleton. It holds the `IRepositoryStore`, the `ICredentialProtector`, the `IProjectAccess` (to
+decide who may see and administer the project, checked again on every call), and a `TimeProvider`. A semaphore
+serializes every change and every read of the access data,
 so the checks and the write of one request are not interleaved with another request's, and the location and the token
 that `GetAccessAsync` returns always belong to the same version of a registration.
 
@@ -20,8 +22,8 @@ that `GetAccessAsync` returns always belong to the same version of a registratio
 
 **Contract types** (defined in `Core`, in `SourceRepository.cs` and `IGitRepository.cs`):
 
-- **SourceRepository**: `Id`, `Name`, `Location`, `Username`, `HasToken`, `Enabled`, `CreatedAt`, `UpdatedAt`. It has no
-  member that can hold a token, so a registration can be listed and shown without risk.
+- **SourceRepository**: `Id`, `ProjectId`, `Name`, `Location`, `Username`, `HasToken`, `Enabled`, `CreatedAt`,
+  `UpdatedAt`. It has no member that can hold a token, so a registration can be listed and shown without risk.
 - **RepositorySummary**: `Id` and `Name` of an enabled repository, for pickers.
 - **NewRepository** and **RepositoryUpdate**: what the service hands to the store (the token already encrypted).
 - **TokenAction** (`Keep`, `Replace`, `Clear`) and **TokenChange**: what an update does with the token; its `ToString`
@@ -33,23 +35,26 @@ that `GetAccessAsync` returns always belong to the same version of a registratio
 
 **CreateAsync**: Registers a repository.
 
-- *Parameters*: `string name`, `string location`, `string? username`, `string? token`, `Actor actor`.
+- *Parameters*: `int projectId`, `string name`, `string location`, `string? username`, `string? token`, `Actor actor`.
 - *Returns*: `SourceRepository` — the stored registration.
-- *Preconditions*: The actor is an enabled administrator.
-- *Postconditions*: The registration exists, enabled, with the token encrypted, and one `repository.created` audit entry
-  was stored in the same transaction.
-- *Algorithm*: Re-check the actor; validate the name, the location, the user name and token, and their combination;
-  encrypt the token; add through the store with an audit draft built from the stored registration. The audit detail is
-  `repository 'N', location 'L', user name set|none, token set|none`.
+- *Preconditions*: The actor administers the project (`IProjectAccess.RequireAdministerAsync`).
+- *Postconditions*: The registration exists in the project, enabled, with the token encrypted, and one
+  `repository.created` audit entry carrying the project was stored in the same transaction.
+- *Algorithm*: Require administration of the project; validate the name, the location, the user name and token, and
+  their combination; encrypt the token; add through the store with an audit draft built from the stored
+  registration. The audit detail is `repository 'N', location 'L', user name set|none, token set|none`.
 
 **UpdateAsync**: Changes a registration.
 
 - *Parameters*: `int id`, `string name`, `string location`, `string? username`, `TokenChange token`, `Actor actor`.
 - *Returns*: `SourceRepository` — the registration after the change.
-- *Preconditions*: As for `CreateAsync`; the repository exists.
+- *Preconditions*: The repository exists and the actor administers its project; the project is taken from the
+  repository, never from the caller.
 - *Postconditions*: When nothing changed, the registration is returned and no audit entry is written. Otherwise one
-  `repository.updated` entry lists the changed fields.
-- *Algorithm*: Re-check the actor; validate the new values as for creation (a `Replace` with an empty token is
+  `repository.updated` entry, carrying the project, lists the changed fields.
+- *Algorithm*: Find the repository and require that the actor may see its project (otherwise `RepositoryNotFound`, so a
+  hidden repository reads like a missing one), then require administration (a plain member gets `ActorNotAllowed`);
+  validate the new values as for creation (a `Replace` with an empty token is
   `RepositoryCredentialInvalid`, and so is a new token contained in the new name, user name, or location, or whose
   percent-escaped form is, compared ignoring case, so `%2f` and `%2F` are the same); then, under
   the semaphore, when the stored token is kept and the name, the user name, or the location changes, decrypt the stored
@@ -62,27 +67,29 @@ that `GetAccessAsync` returns always belong to the same version of a registratio
 
 - *Parameters*: `int id`, `bool enabled`, `Actor actor`.
 - *Returns*: `SourceRepository`.
-- *Postconditions*: A real change writes `repository.enabled` or `repository.disabled` with the detail
-  `repository 'N'`; setting the state it already has writes nothing. A repository is never deleted.
+- *Postconditions*: A real change writes `repository.enabled` or `repository.disabled` (carrying the project) with the
+  detail `repository 'N'`; setting the state it already has writes nothing. A repository is never deleted. The rights
+  are checked as for `UpdateAsync`.
 
-**ListAsync**: Lists all registrations for an administrator (`Actor actor`), ordered by name. **ListEnabledAsync**
-lists the
-`RepositorySummary` of the enabled repositories for any caller.
+**ListAsync**: Lists all registrations of a project for an administrator of that project (`Actor actor`, `int
+projectId`), ordered by name. **ListEnabledAsync** (`Actor actor`, `int projectId`) lists the `RepositorySummary` of the
+enabled repositories of the project for any actor who may see the project.
 
 **GetAccessAsync** (internal to Core): Returns the access data for a read.
 
-- *Parameters*: `int id`.
+- *Parameters*: `int projectId`, `int id`.
 - *Returns*: `RepositoryAccess` — including the decrypted token.
-- *Postconditions*: Only an enabled repository is returned.
-- *Algorithm*: Take the semaphore, so no update can run between the reads. Load the registration; unknown is
-  `RepositoryNotFound`, disabled is `RepositoryDisabled`. Load the
+- *Postconditions*: Only an enabled repository of that project is returned.
+- *Algorithm*: Take the semaphore, so no update can run between the reads. Load the registration; unknown, or one that
+  belongs to another project, is `RepositoryNotFound`, disabled is `RepositoryDisabled`. Load the
   encrypted token, if any, and decrypt it; text that cannot be decrypted is `CredentialsUnreadable` with a message that
   names the repository and says an administrator must enter the token again.
 
 **Validation rules**:
 
 - *Name*: trimmed; letters, digits, `.`, `_`, and `-`; starts with a letter or digit; at most 40 characters
-  (`RepositoryNameInvalid`). Uniqueness ignores case and is decided by the store (`RepositoryNameTaken`).
+  (`RepositoryNameInvalid`). Uniqueness ignores case, is decided by the store, and is per project, so two projects may
+  use the same name (`RepositoryNameTaken`).
 - *Location*: 1 to 500 characters, no control characters, not starting with `-`. Either an `https://`, `http://`, or
   `file://` address that is a valid absolute address without white space, without user information, without a query
   string or fragment, and (except for
@@ -102,20 +109,21 @@ lists the
 
 #### Error Handling
 
-Every violation is a `DomainRuleException`: `ActorNotAllowed` for a caller that is not an enabled administrator,
-`RepositoryNameInvalid`, `RepositoryNameTaken`, `RepositoryLocationInvalid`, `RepositoryCredentialInvalid`,
-`RepositoryNotFound`, `RepositoryDisabled`, or `CredentialsUnreadable`. Nothing is stored when a rule fails. No message,
-audit detail, or `ToString` contains a token. Null arguments raise `ArgumentNullException`.
+Every violation is a `DomainRuleException`: `ActorNotAllowed` for a member of the project who is no administrator,
+`ProjectNotFound` for a project the actor may not see, `RepositoryNameInvalid`, `RepositoryNameTaken`,
+`RepositoryLocationInvalid`, `RepositoryCredentialInvalid`, `RepositoryNotFound` (also for a repository the actor may
+not see and for one of another project), `RepositoryDisabled`, or `CredentialsUnreadable`. Nothing is stored when a
+rule fails. No message, audit detail, or `ToString` contains a token. Null arguments raise `ArgumentNullException`.
 
 #### Dependencies
 
 - **IRepositoryStore** — persistence with audit (implemented by `RepositoryStore`).
 - **ICredentialProtector** — token encryption (implemented by `CredentialProtector`).
-- **UserService** — the administrator re-check.
+- **IProjectAccess** — the view and administer checks, repeated on every call.
 - **AuditDraft**, **DomainRuleException**, **DomainRule** — Core.
 
 #### Callers
 
-- **RepositoriesPage** — registers, edits, enables, disables, and lists repositories.
-- **Review creation from a repository** (a later slice) — lists the enabled repositories and obtains the access data.
+- **RepositoriesPage** — registers, edits, enables, disables, and lists the repositories of a project.
+- **ReviewService** and **ReviewPlanner** — list the enabled repositories of a project and obtain the access data.
 - **ServerHost** — registers the service as a singleton.

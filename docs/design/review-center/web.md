@@ -16,11 +16,15 @@ explain how to use it (`HelpPage` includes the index, a page for each topic, and
 the review-sets of a repository, reviews, and review checklists, where `ProjectsPage` includes `NewProjectPage` and
 `ProjectPage` includes `NewReviewPage`, the pages that hold the creation forms;
 `LoginPage`, `AccountPage`, and `UsersPage`, the pages for signing in, changing one's own password, choosing the
-appearance and managing one's personal access tokens, and managing users (`UsersPage` includes `NewUserPage`);
+appearance and managing one's personal access tokens, and managing users and who is a system administrator
+(`UsersPage` includes `NewUserPage`);
 `HistoryPage` and `AuditPage`, the pages that
-show the history of a review and let an administrator
-verify the audit trail; and `RepositoriesPage`, the page where an administrator registers the git repositories that
-reviews can be created from (it includes `NewRepositoryPage`). The subsystem
+show the history of a review and let a system administrator
+verify the audit trail; and `RepositoriesPage`, the page where whoever manages a project registers the git
+repositories of that project that its reviews can be created from (it includes `NewRepositoryPage`). Which projects
+a user sees is decided by project membership: a system administrator sees every project and any other user the
+projects of which the user is a member, and the pages ask the `Core` access service instead of deciding for
+themselves. The subsystem
 does not start or configure the server; the `Hosting` subsystem maps `App` as the root
 component of the server and supplies the endpoints around it, and the `Identity` subsystem supplies the sign-in and
 the authorization the pages rely on. The pages use the `Core` subsystem for
@@ -33,8 +37,8 @@ all domain behavior and never access the database.
 - *Type*: HTTP `GET`; there is no live connection, because the page is plain server-rendered markup.
 - *Role*: Provider.
 - *Contract*: Returns an HTML document titled "ReviewCenter" containing the home page: the product name and the
-  tagline, and for a signed-in user a Get started section with a link card to the projects page and, for an
-  administrator, to the repositories, audit, and users pages.
+  tagline, and for a signed-in user a Get started section with a link card to the projects page and, for a
+  system administrator, to the audit and users pages (three cards in all).
 - *Constraints*: The page is open to anonymous visitors, who see only the tagline.
 
 **About and Help routes** (`GET /about`, `GET /help`, `GET /help/{topic}`): The pages that describe the product.
@@ -64,22 +68,29 @@ pages for projects, planning, reviews, and review checklists.
 
 - *Type*: HTTP `GET`, followed by a live Blazor connection for interactivity.
 - *Role*: Provider.
-- *Contract*: `/projects` lists the projects as rows that link to them and has a New project button; `/projects/new`
-  holds the form that creates a project and opens it; `/projects/{id}` shows a
-  project with its reviews as a list of rows and a New review button and a Plan reviews button;
-  `/projects/{id}/reviews/new` holds the form that creates a review from selected files or from a git repository (the
+- *Contract*: `/projects` lists the projects the user may see as rows that link to them and, for a system
+  administrator only, has a New project button; `/projects/new` holds the form that creates a project and opens it
+  (system administrators only); `/projects/{id}` shows a
+  project with its reviews as a list of rows and a New review button and a Plan reviews button, and, to a system
+  administrator only, a Members section that lists the members with their role, switches a role, removes a member,
+  and adds a member with the + Add member button, and, to whoever manages the project, a Repositories button that
+  leads to `/projects/{id}/repositories`;
+  `/projects/{id}/reviews/new` holds the form that creates a review from selected files or from a git repository
+  of the project (the
   review identifier `new` is refused, because it would collide with this route);
   `/projects/{id}/plan` plans the
-  reviews that a head revision of a registered repository needs from the review-sets of its `.reviewmark.yaml`
+  reviews that a head revision of a repository of the project needs from the review-sets of its `.reviewmark.yaml`
   and creates the ticked ones; the review route shows a summary of the checklist progress, the reviewers, and the
   threads, then
   the review, its fingerprint, its files, the content of a selected file, its reviewer
   slots with their signature status, and an Approved or In review badge, and lets a reviewer sign;
-  the checklist route shows the checklist, where each check is answered. A project or review that
-  does not exist is reported on the page itself.
+  the checklist route shows the checklist, where each check is answered. A project that
+  does not exist, and equally a project the user may not see, is reported on the page itself with the same
+  message, "Project N does not exist.", with HTTP status 200, so that a user who is no member cannot tell a hidden
+  project from a missing one; a review that does not exist is reported on the page itself.
 - *Constraints*: Every interactive page carries the `data-interactive` marker. Every page requires a
   signed-in user: an anonymous request is redirected to the login page. List and detail pages use a wide container
-  and form pages a narrow one.
+  and form pages a narrow one. `/projects/new` requires the role `SystemAdmin`.
 
 **Account route** (`GET /account`): The page where the signed-in user changes their own password, chooses the
 appearance, and manages their personal access tokens.
@@ -92,13 +103,16 @@ appearance, and manages their personal access tokens.
   with a copy button, lists the tokens with their state, and revokes one.
 - *Constraints*: Requires a signed-in user.
 
-**Users routes** (`GET /users`, `GET /users/new`): The pages where an administrator manages users.
+**Users routes** (`GET /users`, `GET /users/new`): The pages where a system administrator manages users.
 
 - *Type*: HTTP `GET`, followed by a live Blazor connection for interactivity.
 - *Role*: Provider.
-- *Contract*: `/users` lists the users and offers to disable or enable a user, set a role, and set a
-  password, and has a New user button; `/users/new` holds the form that creates a user.
-- *Constraints*: Require the role `Admin`; a signed-in user with another role gets HTTP status 403.
+- *Contract*: `/users` lists the users, with a System admin badge for each system administrator, and offers to
+  disable or enable a user, make a user a system administrator or take that away, and set a
+  password, and has a New user button; `/users/new` holds the form that creates a user, with a System administrator
+  checkbox.
+- *Constraints*: Require the role `SystemAdmin`, which only a system administrator has; a signed-in user without it
+  gets HTTP status 403. The last enabled system administrator cannot be disabled or demoted.
 
 **History route** (`GET /projects/{id}/reviews/{reviewId}/history`): The history of one review.
 
@@ -107,9 +121,10 @@ appearance, and manages their personal access tokens.
 - *Contract*: Lists the audit entries of the review newest first in pages of 50 (time in UTC, actor, action, and
   detail), with Older and Newer links (the position is carried in the query values `before` and `after`), a message when
   the review does not exist, and a message when nothing was recorded.
-- *Constraints*: Requires a signed-in user. It is reached from the link in the title row of the review page.
+- *Constraints*: Requires a signed-in user who may see the project; for another user the page reads nothing of the
+  review. It is reached from the link in the title row of the review page.
 
-**Audit route** (`GET /audit`): The page where an administrator reads and verifies the whole audit trail.
+**Audit route** (`GET /audit`): The page where a system administrator reads and verifies the whole audit trail.
 
 - *Type*: HTTP `GET`, followed by a live Blazor connection for interactivity.
 - *Role*: Provider.
@@ -118,20 +133,24 @@ appearance, and manages their personal access tokens.
   with the full value in a tooltip, and a Verify chain button that checks the whole hash
   chain and shows either "Chain intact" with the number of entries and the head hash, or the first broken entry and the
   head hash.
-- *Constraints*: Requires the role `Admin`, which is re-checked against the stored user on load and on every
-  verification. It is reached from the Audit link of the page frame, which only an administrator sees.
+- *Constraints*: Requires the role `SystemAdmin`, which is re-checked against the stored user on load and on every
+  verification. It is reached from the Audit link of the page frame, which only a system administrator sees.
 
-**Repositories routes** (`GET /repositories`, `GET /repositories/new`): The pages where an administrator manages the
-registered git repositories.
+**Repositories routes** (`GET /projects/{id}/repositories`, `GET /projects/{id}/repositories/new`): The pages where
+whoever manages a project manages the git repositories of that project. There is no registry of repositories outside
+the projects.
 
 - *Type*: HTTP `GET`, followed by a live Blazor connection for interactivity.
 - *Role*: Provider.
-- *Contract*: `/repositories` lists the registered repositories with their location, badges for a user name and a
-  token when set, and whether they are enabled; offers to edit one (name, location, user name, and keeping,
-  replacing, or clearing the token), and to disable or enable one, and has an Add repository button.
-  `/repositories/new` holds the form that registers a repository. A token is never shown. There is no delete.
-- *Constraints*: Require the role `Admin`, which is re-checked against the stored user before every action. They are
-  reached from the Repositories link of the page frame, which only an administrator sees.
+- *Contract*: `/projects/{id}/repositories` lists the repositories of the project with their location, badges for a
+  user name and a token when set, and whether they are enabled; offers to edit one (name, location, user name, and
+  keeping, replacing, or clearing the token), and to disable or enable one, and has an Add repository button.
+  `/projects/{id}/repositories/new` holds the form that registers a repository in the project. A token is never
+  shown. There is no delete. Both pages show breadcrumb links back to the projects and to the project.
+- *Constraints*: The pages need a signed-in user. Only a system administrator and a project admin of the project
+  may manage the repositories, which is checked with the `Core` access service on load and again before every
+  action; any other user, a plain member or a user who is no member, gets the page of a project that does not exist.
+  They are reached from the Repositories button of the project page, which only whoever manages the project sees.
 
 **Unknown routes**: Any other URL.
 
@@ -166,7 +185,8 @@ appearance before the first paint, the router, and the client script reference. 
 matches the requested URL to a page component, with `HomePage` registered at the root route, and renders the not-found
 page (`NotFoundPage`, registered at `/not-found`) inside `MainLayout` for unmatched URLs. The routes that end in `new`
 (`/projects/new`, `/projects/{id}/reviews/new`,
-`/repositories/new`, `/users/new`) are matched before the parameterized routes of the same shape. Each interactive
+`/projects/{id}/reviews/new`, `/projects/{id}/repositories/new`, `/users/new`) are matched before the parameterized
+routes of the same shape. Each interactive
 page opts in to interactive server rendering, so only the
 page, not the shell, holds a live connection. `HomePage`, `AboutPage`, `LoginPage`, and the help pages are static
 markup with no live connection.
@@ -196,12 +216,13 @@ address), and on the ASP.NET Core Blazor components framework.
 the interactive pages: a Razor
 presentation file and a code-behind file, interactive server rendering, and the `data-interactive`
 marker. They obtain `ProjectService`, `ReviewService`, and the other Core services they need (`ReviewPage`:
-`ThreadService`, `ChecklistService`, and `SigningService`; `ProjectPage`: also `SigningService`; `PlanPage`:
+`ThreadService`, `ChecklistService`, and `SigningService`; `ProjectPage`: also `SigningService`, `RepositoryService`,
+`UserService` for the candidates of a new member, and `IProjectAccess`; `PlanPage`:
 `ProjectService`, `RepositoryService`, and `ReviewPlanner`; `ChecklistPage`:
 `ChecklistService`; `AccountPage`: `UserService` and `PersonalAccessTokenService`; `UsersPage`:
 `UserService`; `HistoryPage` and `AuditPage`: `AuditService`, and `AuditPage` also the user store through
-`UserService`; `RepositoriesPage`: `RepositoryService` and `UserService`; each creation page the service of its
-parent page) from the service container and call them
+`UserService`; `RepositoriesPage`: `RepositoryService`, `ProjectService`, and `IProjectAccess`; each creation page
+the service of its parent page) from the service container and call them
 from their handlers. Each page loads its data when it is created, so a connection that is
 established after the server-rendered snapshot shows current data. A rule violation reported by
 Core as a `DomainRuleException` is shown as an error message next to the form, with the entered
@@ -213,13 +234,16 @@ by `@onsubmit`, so Enter submits them and tests can submit them without a button
 
 Every page except the home page, the login page, the About page, and the help pages requires a signed-in user,
 declared on the page with an
-authorization attribute; `UsersPage`, `AuditPage`, and `RepositoriesPage`, and their creation pages, require the role
-`Admin`. The checks are made
+authorization attribute; `UsersPage`, `AuditPage`, and `NewProjectPage`, and the creation page of the users, require
+the role `SystemAdmin`, which the `Identity` subsystem puts into the claims of a system administrator only. The
+repositories pages are open to every signed-in user by attribute, because whether a user may manage a project depends
+on the project; they ask the `Core` access service. The checks are made
 by the
 authorization of the `Identity` subsystem before the page is rendered, so a page never shows data to an anonymous
 visitor. The page frame (`MainLayout` in the `App` unit) is a menu bar with the product name, which links to the home
-page, then a tab for the projects page and, for an administrator, the repositories page, the audit page, and the users
-page, and at the right the Help link, the display name of the signed-in user, a link to the account page, and a logout
+page, then a tab for the projects page and, for a system administrator, the audit page and the users
+page (there is no tab for repositories, which belong to the projects), and at the right the Help link, the display
+name of the signed-in user, a link to the account page, and a logout
 button, or the Help link and a link to the login page when nobody is signed in. The tab of the section that is open
 is marked as current. A footer shows the product name, the version, the copyright holder, and a link to the About
 page. The pages that record something on behalf of a person (`ReviewPage` and
@@ -228,15 +252,87 @@ from the authentication state and pass it to Core as an `Actor`; there is no fie
 another name. A page that is already open makes no request, so the cookie check does not reach it; the
 `RevalidatingAuthenticationStateProvider` of the `Identity` subsystem re-reads the user at a fixed interval and ends the
 authentication state of the page when the user is no longer valid (see *Open pages and the end of a session* below).
-`UsersPage` also re-checks the stored user before every action, `RepositoriesPage` does the same, and `AuditPage` on
-load and before every
+`UsersPage` also re-checks the stored user before every action, `RepositoriesPage` re-checks with the access service
+that the user still manages the project, and `AuditPage` re-checks on load and before every
 verification, so a user who is no longer an enabled
-administrator is refused at once, and so does the signing of a review in Core. The other actions keep acting for the
+system administrator is refused at once, and so does the signing of a review in Core. The other actions keep acting
+for the
 original user until the next check, which is at most one revalidation interval, and what they record is attributed to
 that user. Every action that changes something (creating a project or a review, starting, answering, resolving, and
 reopening a thread, answering checklist checks, changing reviewer slots, signing, changing a password, and the user
 administration actions) first asks `GetActorAsync` for the current user, even where its Core service takes no actor,
 so an action that meets an authentication state that has already ended is refused with a message and saves nothing.
+
+#### Project access
+
+What a user sees of the projects is decided in `Core` and not in the pages. `ProjectService.ListAsync(actor)` returns
+only the projects the user may see, and `ProjectService.GetAsync(actor, id)` returns nothing for a project the user
+may not see, exactly as for a project that does not exist. `ProjectsPage`, `ProjectPage`, `NewReviewPage`, `PlanPage`,
+`ReviewPage`, `ChecklistPage`, `HistoryPage`, `RepositoriesPage`, and `NewRepositoryPage` ask with the actor from
+the authentication state and, when they get nothing, show the same not-found text as for a project that does not
+exist (for `ReviewPage`, `ChecklistPage`, and `HistoryPage` the not-found text of a review, with nothing of the review
+loaded). The answer is a normal page with HTTP status 200, so that neither the status nor the text tells a user who is
+no member that a hidden project exists. Whether the user is a system administrator is asked of `IProjectAccess` by
+`ProjectPage` and read from the role claim (`SystemAdmin`) by `ProjectsPage`; whether the user may manage a project
+(a system administrator or a project admin of it) is asked of
+`IProjectAccess`, so `ProjectPage` offers the Repositories button, and `RepositoriesPage` and `NewRepositoryPage`
+serve their content, only for whoever manages the project.
+
+The Members section of `ProjectPage` is shown only to a system administrator. It lists the members of
+`ProjectService.ListMembersAsync` with a badge for the role (Project admin or Member), a Disabled badge for a disabled
+account, a button that switches the role (`SetMemberRoleAsync`), and a Remove button (`RemoveMemberAsync`). The
+"Add member" button reveals an inline form with a drop-down of the enabled users who are not yet members
+(`UserService`), a Project admin checkbox, and a Cancel button (`AddMemberAsync`); a message says that nobody is
+left to add when there is no candidate. A project without members says that only system administrators can see it.
+The page contains no membership rules; every refusal comes from `ProjectService`, and the page shows it next to the
+list. The reviewer slots of `ReviewPage` offer only the members of the project, from
+`SigningService.ListCandidatesAsync(actor, projectId)`.
+
+#### Access on an open page
+
+The access above is decided when a page loads. A page that stays open does not load again, so a user whose membership
+was removed meanwhile would keep reading through it: the files, comments, checklist answers, and plans that the page
+loads from the services in its handlers, and the data already in its component state. The pages of a project therefore
+ask again, at the start of every handler of the open circuit, with one shared helper,
+`ProjectViewGuard.GuardViewAsync` (an extension of `IProjectAccess`, which also offers `GuardAdministerAsync` and
+`GuardSystemAdminAsync` over the same core, see below): it reads the actor from the authentication state
+and returns whether `IProjectAccess.CanViewAsync` allows that actor to see the project; when it does not, it runs a
+callback of the page, which resets the component state (so that no loaded data is kept) and shows the same not-found
+page as for a project the user may not see. Nobody being signed in is treated as no access. The handler then returns
+without calling a service, so nothing is read and nothing is stored.
+
+The guard is the first statement of the handlers that call a service or read data: `ReviewPage` (view file, view
+thread, start thread, reply, resolve or reopen, add, save and remove slot, and sign), `ChecklistPage` (answer, save,
+and the not-applicable switch), `PlanPage` (show plan and create reviews), and `NewReviewPage` (create the review).
+The handlers that only change what is shown (the thread filter, expanding a thread, the diff, head, and baseline views,
+the open section of the checklist, the next unanswered check, the mode and ticks of `PlanPage`, and the source choice
+of `NewReviewPage`) are wrapped at their binding in the Razor file by the page's `GuardedAsync`, so the first
+interaction after a removal also drops the data. `HistoryPage` has no handler: its
+`OnParametersSetAsync`, which asks `ProjectService.GetAsync(actor, id)` before it reads anything, runs again for every
+new address, which is its one check. `ProjectPage` and the administration pages already re-check, as described above.
+Three handlers are left unguarded on purpose because they show no project data: cancelling a comment form,
+copying a thread link, and reading the file names of a browser selection.
+
+The pages that show data for administrators only use the two other levels of the same guard, because an error shown
+above data that stays rendered still leaves the data readable. `GuardAdministerAsync` (the user manages the project, a
+system administrator or a project admin of it) guards `RepositoriesPage` (every action and the start of an edit) and
+`NewRepositoryPage` (the creation). `GuardSystemAdminAsync` (the user is an enabled system administrator) guards the
+members section of `ProjectPage`, after the view check, and every action of `UsersPage`. All three call one private
+core that reads the actor and runs the callback when the check fails. When the check fails, the page clears what it had
+loaded and shows what an ordinary member would see: the not-found page of the project for the repositories pages and
+for `ProjectPage` when the project is no longer visible, only the members section dropped for `ProjectPage` when the
+user still sees the project, and no user list for `UsersPage`, which has no project and keeps its message. The same
+clearing happens when the list is read again after an action and the service refuses it because the right was lost in
+between.
+
+The Core read services (`ReviewService.GetFileContentAsync` and the like) keep their signatures and take no actor:
+every page reaches them only after the guard, so a second check inside them would only repeat it, and the services
+that change something already require the actor to see the project. The limits are these. A removal that lands between
+the check and the end of a single handler is not caught; the handler finishes with the access it had. There is no push
+to the browser: what is already in the page stays visible until the user's next interaction, which then drops it. The
+sign-in state of the page ends separately and at once (see *Open pages and the end of a session*); for a project page
+that ended state also reads as no access, so the guard shows the not-found page where an action of the ended session
+was refused with a message before.
 
 #### Open pages and the end of a session
 
@@ -272,8 +368,10 @@ a later feature.
 
 `NewReviewPage`, which the New review button of `ProjectPage` opens, offers two sources for a new review, shown as
 two selectable option cards: "Upload files" (the default) and "From a repository". The second
-shows a drop-down of the enabled repositories (by name only; `RepositoryService.ListEnabledAsync` returns a summary
-that has no location and no token), a head revision, an optional baseline revision, and the selection (one pattern
+shows a drop-down of the enabled repositories of the project (by name only; `RepositoryService.ListEnabledAsync`
+returns a summary
+that has no location and no token, and lists the repositories of the given project only), a head revision, an
+optional baseline revision, and the selection (one pattern
 per line, default `**/*`). The page passes the values to `ReviewService.CreateFromRepositoryAsync` and shows every
 refusal, among them "Nothing to review: no files matching the selection changed between X and Y", in the form with the
 values kept. Skipped symbolic links and submodules are listed once before the review is opened, since they are not
@@ -306,9 +404,11 @@ rule is added: the link opens only for a signed-in user, as the page always did.
 
 #### Planning reviews
 
-`PlanPage` is built for a quick read and for a clear next step. It asks for a repository, a head revision and a
+`PlanPage` is built for a quick read and for a clear next step. It asks for a repository of the project, a head
+revision and a
 baseline (None, Explicit revision, or Last reviewed, the default; the text box appears only for Explicit revision),
-asks `ReviewPlanner` for the plan, and shows one plain summary sentence first (for example "3 sets need review, 1
+asks `ReviewPlanner` for the plan on behalf of the signed-in user, and shows one plain summary sentence first (for
+example "3 sets need review, 1
 already filed, 9 have nothing to review."), a line with the repository, head and baseline, and a sentence that says
 what to do next. The sets that need a review come first, ticked by default; the sets with nothing to review are in a
 collapsed list with a count; "Cannot be planned" and "Already filed" (with a link to the review) are groups that are
@@ -316,8 +416,8 @@ shown only when they are not empty. Creating replaces the plan by one result per
 was created and the reason for each that failed. The page contains no planning rules: the baseline choice, the
 classification, the identifiers and the creation are in `ReviewPlanner`. A failure is shown in plain English with what
 to do next; the text git printed, a location, a credential and exception text are never shown. `ProjectPage` links to
-the plan page when an enabled repository exists, and `ReviewPage` shows the review-set of a planned review in the
-details.
+the plan page when an enabled repository of the project exists, and `ReviewPage` shows the review-set of a planned
+review in the details. `PlanPage` shows the not-found text of a project for a project the user may not see.
 
 The review page shows the reviewer slots of a review and lets a reviewer sign. A summary strip at its top (the
 state, the checklist progress with the link to the checklist, the reviewer slots with their signatures, and the open
@@ -361,17 +461,24 @@ time newest first, and the position is carried in the address, so the Older and 
 shows what the trail says; it does not claim more. Only `AuditPage` verifies the chain, and its result text says what
 was checked (the chain is intact, or the first entry that no longer fits) and shows the head hash so that an
 administrator can record it elsewhere: the verification alone cannot tell that the newest entries were removed. The
-history link in the title row of the review page is shown to every signed-in user, and the audit link of the page
-frame only to an administrator, which is a convenience and not the protection: the page has its own authorization.
+history link in the title row of the review page is shown to every signed-in user who may see the project, and the
+audit link of the page
+frame only to a system administrator, which is a convenience and not the protection: the page has its own
+authorization.
 
 #### Repositories
 
-`RepositoriesPage` administers the registry and contains no rules: the name, location, and credential rules and the
-encryption of the token are in `RepositoryService`. The page's part is to collect the input, pass it with the actor,
-and show the result or the refusal next to the control that was used. The token is write-only on the page: the token
+`RepositoriesPage` administers the repositories of one project and contains no rules: the name, location, and
+credential rules and the
+encryption of the token are in `RepositoryService`, and who may manage a project is decided by `IProjectAccess`. The
+page's part is to collect the input, pass it with the actor and the project, and show the result or the refusal next
+to the control that was used. A user who may not manage the project gets the not-found text of a project that does
+not exist, so a repository page never confirms that a hidden project exists. The token is write-only on the page: the
+token
 fields are password inputs, the values are cleared right after every attempt, and the list shows only "token set" or
 "no token". Because a stored token cannot be read back, editing offers three explicit choices (keep, replace, or
-clear), and the default is to keep. Repositories can be disabled but not deleted.
+clear), and the default is to keep. Repositories can be disabled but not deleted. The pages show breadcrumb links to
+the projects page and to the project.
 
 #### Test identifiers
 
@@ -380,15 +487,17 @@ stable, kebab-case `data-testid` attribute, so that every interactive element ca
 tests and by the Puppet tool without depending on text, position, or style. Key displayed values have identifiers
 too, and elements that repeat carry the review id, project id, or list index in the identifier. Each page root is
 a `main` element with its own identifier. An identifier never repeats within a page: the header tabs have the
-unprefixed identifiers `projects-link`, `repositories-link`, and `users-link`, and the breadcrumb links of the pages
-below them are prefixed `breadcrumb-` (for example `breadcrumb-projects-link`). The rule is enforced by tests that render
-every page and check every interactive element and the uniqueness of the identifiers.
+unprefixed identifiers `projects-link`, `audit-link`, and `users-link`, `repositories-link` is the identifier of the
+Repositories button of the project page, and the breadcrumb links of the pages
+below them are prefixed `breadcrumb-` (for example `breadcrumb-projects-link`). The rule is enforced by tests that
+render every page and check every interactive element and the uniqueness of the identifiers.
 
 #### Limitations
 
 An open page checks its user at an interval (`Auth:RevalidationSeconds`, 30 seconds by default), not continuously, so a
-user who is disabled, removed, or changed can keep an open page for up to one interval; signing and the user
-administration actions re-check the stored user on every action. A password change does not end other sessions of
+user who is disabled, removed, or changed can keep an open page for up to one interval; signing, the user
+administration actions, and the repository actions re-check the stored user on every action. A password change does
+not end other sessions of
 the user. A check that cannot read the user ends the page (fail closed), which loses what was typed on it. The header
 is not updated until the next navigation or reload. The lockout after failed sign-ins is per user
 name (see the `Identity` subsystem design).

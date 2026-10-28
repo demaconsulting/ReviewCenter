@@ -10,12 +10,16 @@ package ReviewCenter {
      * and draft reviews of uploaded files, which are stored in a database together
      * with a content fingerprint of each review. Every change is recorded in a
      * hash-chained audit trail that makes later edits of the history evident.
-     * Administrators register git repositories, with access tokens that are stored
-     * encrypted, as the sources of review content. A complete review can be
+     * Access is project based: a user sees a project only as a member, a system
+     * administrator sees every project, and a hidden project looks like a project
+     * that does not exist. The administrators of a project register its git
+     * repositories, with access tokens that are stored encrypted, as the sources of
+     * review content. A complete review can be
      * downloaded as a digitally signed PDF attestation, signed with a key of the
      * server. Users create personal access tokens, with which scripts call a JSON
-     * API under /api, described by an OpenAPI document, to read projects and
-     * reviews, create draft reviews, and download attestations; a token never signs.
+     * API under /api, described by an OpenAPI document, to read the projects they
+     * may see and their reviews, create draft reviews, and download attestations; a
+     * token follows the memberships of its owner and never signs.
      */
 
     part def ReviewCenterSystem {

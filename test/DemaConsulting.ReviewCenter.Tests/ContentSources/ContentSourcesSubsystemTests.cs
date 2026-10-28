@@ -35,11 +35,6 @@ namespace DemaConsulting.ReviewCenter.Tests.ContentSources;
 public class ContentSourcesSubsystemTests
 {
     /// <summary>
-    ///     A password that satisfies the password policy.
-    /// </summary>
-    private const string Password = "correct horse battery";
-
-    /// <summary>
     ///     A token used to check that it never leaks.
     /// </summary>
     private const string Secret = "tkn-Subsystem.Secret";
@@ -72,21 +67,21 @@ public class ContentSourcesSubsystemTests
         var factory = provider.GetRequiredService<IDbContextFactory<ReviewCenterDbContext>>();
         DatabaseSetup.EnsureCreated(factory, options);
         var clock = new MovableTimeProvider(new DateTimeOffset(2025, 3, 4, 5, 6, 7, TimeSpan.Zero));
-        var users = new UserService(new FakeUserStore(), new FakePasswordHasher(), clock);
         var cancellationToken = TestContext.Current.CancellationToken;
-        await users.CreateAsync("adm", "Adm", UserRole.Admin, Password, cancellationToken);
+        var reviewStore = new ReviewStore(factory, new AuditAppender(TimeProvider.System));
+        var project = await TestServices.Projects(reviewStore, clock).CreateAsync("Apollo", null, cancellationToken);
         var gitOptions = new GitOptions { CachePath = Path.Combine(root.Path, "cache"), TimeoutSeconds = 60 };
-        var service = new RepositoryService(
+        var service = TestServices.Repositories(
+            reviewStore,
+            clock,
             new RepositoryStore(factory, new AuditAppender(TimeProvider.System)),
-            new CredentialProtector(provider.GetRequiredService<IDataProtectionProvider>()),
-            users,
-            clock);
+            new CredentialProtector(provider.GetRequiredService<IDataProtectionProvider>()));
         var source = new GitSource(new GitRunner(gitOptions), gitOptions);
 
         // Act: register a private https repository and a local one, read the local one through git
         var admin = new Actor("adm", "Adm");
-        var priv = await service.CreateAsync("private", "https://example.com/org/r.git", "svc", Secret, admin, cancellationToken);
-        var registered = await service.CreateAsync("local", origin, null, null, admin, cancellationToken);
+        var priv = await service.CreateAsync(project.Id, "private", "https://example.com/org/r.git", "svc", Secret, admin, cancellationToken);
+        var registered = await service.CreateAsync(project.Id, "local", origin, null, null, admin, cancellationToken);
         var privateAccess = await service.GetAccessAsync(priv.Id, cancellationToken);
         var access = await service.GetAccessAsync(registered.Id, cancellationToken);
         await using var session = await source.OpenAsync(access, cancellationToken);
@@ -162,21 +157,21 @@ public class ContentSourcesSubsystemTests
         var factory = provider.GetRequiredService<IDbContextFactory<ReviewCenterDbContext>>();
         DatabaseSetup.EnsureCreated(factory, options);
         var clock = new MovableTimeProvider(new DateTimeOffset(2025, 3, 4, 5, 6, 7, TimeSpan.Zero));
-        var users = new UserService(new FakeUserStore(), new FakePasswordHasher(), clock);
         var cancellationToken = TestContext.Current.CancellationToken;
-        await users.CreateAsync("adm", "Adm", UserRole.Admin, Password, cancellationToken);
-        var service = new RepositoryService(
+        var reviewStore = new ReviewStore(factory, new AuditAppender(TimeProvider.System));
+        var project = await TestServices.Projects(reviewStore, clock).CreateAsync("Apollo", null, cancellationToken);
+        var service = TestServices.Repositories(
+            reviewStore,
+            clock,
             new RepositoryStore(factory, new AuditAppender(TimeProvider.System)),
-            new CredentialProtector(provider.GetRequiredService<IDataProtectionProvider>()),
-            users,
-            clock);
+            new CredentialProtector(provider.GetRequiredService<IDataProtectionProvider>()));
         var admin = new Actor("adm", "Adm");
-        var registered = await service.CreateAsync("off", "https://example.com/r.git", null, null, admin, cancellationToken);
+        var registered = await service.CreateAsync(project.Id, "off", "https://example.com/r.git", null, null, admin, cancellationToken);
         await service.SetEnabledAsync(registered.Id, false, admin, cancellationToken);
 
         // Act: ask for the summaries and for access
-        var summaries = await service.ListEnabledAsync(cancellationToken);
-        var exception = await Assert.ThrowsAsync<DomainRuleException>(() => service.GetAccessAsync(registered.Id, cancellationToken));
+        var summaries = await service.ListEnabledAsync(admin, project.Id, cancellationToken);
+        var exception = await Assert.ThrowsAsync<DomainRuleException>(() => service.GetAccessAsync(project.Id, registered.Id, cancellationToken));
 
         // Assert: it is not offered and access is refused
         Assert.Empty(summaries);

@@ -40,6 +40,11 @@ public sealed class ChecklistService
     private readonly IReviewStore _store;
 
     /// <summary>
+    ///     Decides who may see which project; every change needs a user who can see it.
+    /// </summary>
+    private readonly IProjectAccess _access;
+
+    /// <summary>
     ///     The clock that supplies answer times.
     /// </summary>
     private readonly TimeProvider _timeProvider;
@@ -48,13 +53,16 @@ public sealed class ChecklistService
     ///     Initializes a new instance of the <see cref="ChecklistService"/> class.
     /// </summary>
     /// <param name="store">The store that persists checklists. Must not be null.</param>
+    /// <param name="access">The access rules. Must not be null.</param>
     /// <param name="timeProvider">The clock used for answer times; injected so tests control time. Must not be null.</param>
     /// <exception cref="ArgumentNullException">Thrown when an argument is null.</exception>
-    public ChecklistService(IReviewStore store, TimeProvider timeProvider)
+    public ChecklistService(IReviewStore store, IProjectAccess access, TimeProvider timeProvider)
     {
         ArgumentNullException.ThrowIfNull(store);
+        ArgumentNullException.ThrowIfNull(access);
         ArgumentNullException.ThrowIfNull(timeProvider);
         _store = store;
+        _access = access;
         _timeProvider = timeProvider;
     }
 
@@ -108,6 +116,7 @@ public sealed class ChecklistService
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(actor);
+        await _access.RequireViewAsync(actor, projectId, cancellationToken);
         var definition = await GetDefinitionAsync(projectId, reviewId, cancellationToken);
         if (!definition.Sections.Any(section => section.Id == sectionId))
         {
@@ -170,6 +179,7 @@ public sealed class ChecklistService
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(actor);
+        await _access.RequireViewAsync(actor, projectId, cancellationToken);
         if (!Enum.IsDefined(outcome))
         {
             throw new ArgumentOutOfRangeException(nameof(outcome), outcome, "The outcome is not a known value.");

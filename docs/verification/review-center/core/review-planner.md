@@ -4,7 +4,9 @@
 
 `ReviewPlanner` is verified with two groups of tests. The unit tests in `ReviewPlannerTests.cs` use the real
 `ReviewPlanner`, `ReviewService`, `RepositoryService`, and `SigningService` over in-memory fakes of the review store, the
-repository store, the git provider, and the review-set parser, so every branch of the baseline choice and of the
+repository store, the git provider, and the review-set parser, and over the project-access double
+`AllowAllProjectAccess` (the access rules are verified by the `ProjectAccess` unit), so every branch of the baseline
+choice and of the
 classification is reached with exact commits and files, and the number of sessions that git opened can be counted. The
 integration tests in `ReviewPlannerGitTests.cs` use the real `GitSource` and `ReviewMarkConfigParser` over real git
 repositories that the tests create with the installed git (through `GitTestSupport`), and a real SQLite database, so
@@ -22,7 +24,8 @@ N/A - standard test environment (the integration tests need git, and skip themse
 - A plan has one row per review-set in file order, is made with one session, and counts the added, modified, and deleted
   files of each selection.
 - A missing, oversized, or refused configuration file, an unknown revision, and an unknown project or repository stop the
-  plan with their rule; an unusable set is only a `CannotPlan` row.
+  plan with their rule (a project the actor may not see is refused like an unknown one by `IProjectAccess`); an
+  unusable set is only a `CannotPlan` row.
 - With no baseline every selected file is reviewed; with an explicit baseline every set uses it; with the last reviewed
   mode a set uses the head of the review that was signed last when it is an ancestor of the new head and the selection is
   the same, and otherwise gets a full review with a note that says why.
@@ -174,7 +177,8 @@ the base is cut so that the identifier stays valid, unique, and within the limit
 **ReviewPlanner_GenerateTitle_LongSetTitle_CutsTitleKeepsRange**: A long set title is cut so that the range and the whole
 title fit. This scenario is tested by `ReviewPlanner_GenerateTitle_LongSetTitle_CutsTitleKeepsRange`.
 
-**ReviewPlanner_Constructor_NullArgument_Throws**: Every dependency of the constructor is checked for null. This
+**ReviewPlanner_Constructor_NullArgument_Throws**: Every dependency of the constructor, including the project access, is
+checked for null. This
 scenario is tested by `ReviewPlanner_Constructor_NullArgument_Throws`.
 
 **ReviewPlanner_PlanAsync_RealGit_NoBaselineAndExplicitBaseline**: On a real repository with a configuration file, a plan

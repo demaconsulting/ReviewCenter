@@ -1,16 +1,17 @@
 ---
 # Software Unit Requirements for the ProjectsPage Unit
 #
-# The ProjectsPage unit is the page at /projects that lists the projects as the way into each one, and the page at
-# /projects/new that holds the form to create one.
+# The ProjectsPage unit is the page at /projects that lists the projects the user may see as the way into each one
+# (every project for a system administrator, the member projects for anybody else), and the page at /projects/new,
+# for system administrators only, that holds the form to create one.
 
 sections:
   - title: ProjectsPage Unit Requirements
     requirements:
       - id: ReviewCenter-ProjectsPage-List
         title: >-
-          The ProjectsPage unit shall list every project as a row that links to its page and shows its
-          description, or show a message that there are no projects.
+          The ProjectsPage unit shall list every project the user may see as a row that links to its page and shows
+          its description, or show a message that there are no projects.
         justification: |
           The projects page is where users find their work. An explicit empty message tells a new user that
           nothing is wrong and what to do next.
@@ -18,17 +19,39 @@ sections:
           - ProjectsPage_Render_NoProjects_ShowsEmptyMessageAndNewProjectButton
           - ProjectsPage_Render_ExistingProjects_ListsThemWithLinks
 
+      - id: ReviewCenter-ProjectsPage-Visibility
+        title: >-
+          The ProjectsPage unit shall list only the projects the user is a member of, and every project to a system
+          administrator, and shall tell a user who is a member of no project that the list is empty because no
+          administrator added the user, without offering the button that creates a project.
+        justification: |
+          A project is visible to its members and to system administrators only. A user without a project would
+          otherwise see a blank page and not know whether something is wrong or whom to ask.
+        tests:
+          - ProjectsPage_Render_MemberAndSystemAdmin_ListOnlyWhatEachMaySee
+          - ProjectsPage_Render_UserWithoutMembership_ExplainsTheEmptyListAndOffersNoCreateButton
+
       - id: ReviewCenter-ProjectsPage-NewForm
         title: >-
-          The ProjectsPage unit shall offer a button that leads to a separate page holding the form to create a
-          project, shall not show that form in the list, and shall offer on that page a Cancel link back to the
-          list.
+          The ProjectsPage unit shall offer a system administrator a button that leads to a separate page holding the
+          form to create a project, shall not show that form in the list, and shall offer on that page a Cancel link
+          back to the list.
         justification: |
           Choosing a project is what nearly every visit is for, so the list stays uncluttered. Creating a project
           is a deliberate step, and users who change their mind must be able to leave it without side effects.
         tests:
           - ProjectsPage_Render_NoProjects_ShowsEmptyMessageAndNewProjectButton
           - NewProjectPage_Render_Default_ShowsFormAndCancelLink
+
+      - id: ReviewCenter-ProjectsPage-CreateAccess
+        title: >-
+          The ProjectsPage unit shall let only a system administrator create a project, shall refuse the form of
+          any other user with a message that names the missing right, and shall create nothing.
+        justification: |
+          A new project has no members, so creating one is an administrative act. The page refuses a user who is
+          no system administrator even when the user reaches the form, and Core checks the same rule again.
+        tests:
+          - NewProjectPage_CreateForm_MemberWhoIsNoSystemAdmin_IsRefusedAndCreatesNothing
 
       - id: ReviewCenter-ProjectsPage-Create
         title: >-

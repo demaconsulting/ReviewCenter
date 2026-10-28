@@ -1,6 +1,6 @@
 package ReviewCenter {
     part def WebSubsystem {
-        doc /* Blazor Server user interface: the HTML shell, the menu bar and footer of every page, URL routing, the home page, the About page, the built-in Help, the sign-in, account (with the appearance choice), and user administration pages, the project, review, and checklist pages, including review comments and the pages that hold the creation forms, the plan page that creates the reviews of a repository from its review-sets, the review history and audit trail pages, and the git repository administration page. */
+        doc /* Blazor Server user interface: the HTML shell, the menu bar and footer of every page, URL routing, the home page, the About page, the built-in Help, the sign-in, account (with the appearance choice), and user administration pages, the project, review, and checklist pages, including review comments and the pages that hold the creation forms, the plan page that creates the reviews of a repository from its review-sets, the review history and audit trail pages, and the page that administers the git repositories of one project. Every page shows a project only to a user who may see it, and a project that is hidden looks like a project that does not exist; a system administrator additionally manages the members of a project. */
 
         comment testRef /* Test: test/DemaConsulting.ReviewCenter.Tests/Web/WebSubsystemTests.cs */
         comment designRef /* Design: docs/design/review-center/web.md */

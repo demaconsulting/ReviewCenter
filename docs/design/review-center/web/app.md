@@ -64,12 +64,14 @@ an address that matches no page. Opening `/not-found` itself answers with status
 reads the authentication state of the request once, so it keeps showing the name that was current when the page was
 served until the next navigation or reload, even after the state of an open page has ended. It holds two values, set in
 `OnInitializedAsync`: **Actor**, the signed-in user or `null` when nobody is signed in, and **IsAdmin**, true when the
-user has the administrator role. A derived value, **ShortVersion**, is the version of the footer.
+user is a system administrator (has the role `SignIn.AdminRole`). A derived value, **ShortVersion**, is the version of
+the footer.
 
 The header is a menu bar that spans the full width of the window and has two groups, which wrap onto further lines on a
 narrow screen. The left group is the logo (an inline vector image that is hidden from assistive technology), the
 product name `ReviewCenter` as the one link to the home page, and the primary navigation. The primary navigation is,
-for a signed-in user, the tab Projects and, only for an administrator, the tabs Repositories, Audit, and Users; it is
+for a signed-in user, the tab Projects and, only for a system administrator, the tabs Audit and Users (there is no tab
+for repositories, which belong to the projects and are reached from the page of a project); it is
 empty when nobody is signed in. The right group starts with the tab Help, which everyone sees, and then, when nobody is
 signed in, the "Sign in" link to the login page. When a user is signed in it continues with the display name of the
 user, the tab Account, and a logout form that posts to `/auth/logout` with an antiforgery token (signing out changes
@@ -84,8 +86,8 @@ projects` and a link "About" to `/about`. **ShortVersion** is the informational 
 the command line prints) up to the `+`, and, when a commit identifier follows the `+`, a `+` and the first seven
 characters of it; a version without a `+` is shown as it is.
 
-The header and footer elements have `data-testid` values: `home-link`, `projects-link`, `repositories-link`,
-`audit-link`, `users-link`, `help-link`, `signin-link`, `current-user`, `account-link`, `logout-button`, `footer`,
+The header and footer elements have `data-testid` values: `home-link`, `projects-link`, `audit-link`, `users-link`,
+`help-link`, `signin-link`, `current-user`, `account-link`, `logout-button`, `footer`,
 `version-text`, and `about-link`. The layout only shows links; the access rules are enforced by the pages and the
 authorization of the `Identity` subsystem, so a hidden link is a convenience and not a protection.
 
@@ -126,7 +128,7 @@ home page are open to everyone and do not use it.
 - *Returns*: A task that completes when `Actor` and `IsAdmin` are set.
 - *Preconditions*: The authentication state provider is available by injection.
 - *Postconditions*: `Actor` is the signed-in user, or `null` when nobody is; `IsAdmin` is true only for a signed-in user
-  with the administrator role.
+  who is a system administrator.
 
 **ShortVersion (MainLayout)**: Shortens the version for the footer.
 
@@ -142,7 +144,7 @@ home page are open to everyone and do not use it.
 - *Returns*: The rendered header, the page, and the footer.
 - *Postconditions*: The header always has the home link and the help link. It has the sign-in link when nobody is
   signed in; otherwise the projects link, the display name, the account link, and the logout form, with the
-  repositories, audit, and users links for an administrator only. The footer is always present.
+  audit and users links for a system administrator only. The footer is always present.
 
 **Render (SessionGate)**: Guards the content of a protected page.
 
@@ -164,7 +166,7 @@ document ahead of the style sheet, and the Puppet acceptance walk exercises the 
 #### Dependencies
 
 - **HomePage** — found by the router at the root route; `App` does not reference it directly.
-- **SignIn** — `MainLayout` uses `GetActorAsync` to read the signed-in user and the role name of an administrator.
+- **SignIn** — `MainLayout` uses `GetActorAsync` to read the signed-in user and the role name of a system administrator.
 - **Program** — supplies the informational version that the footer shortens.
 - **ASP.NET Core Blazor components** — `Router`, `AuthorizeRouteView`, `AuthorizeView`, `NavLink`, `HeadOutlet`, the
   authentication state (made available to the router by `AddCascadingAuthenticationState` in `ServerHost`), the

@@ -74,6 +74,9 @@ the short hash (8 hexadecimal characters) of the trimmed text (see `AuditChain`)
 | Action | Detail |
 | ------ | ------ |
 | `project.created` | `project 'Name'` |
+| `project.member-added` | `user 'bob', role ProjectAdmin` (the project identifier is in its own field) |
+| `project.member-role-changed` | `user 'bob', role User` (the new role; the project identifier is in its own field) |
+| `project.member-removed` | `user 'bob'` (the project identifier is in its own field) |
 | `review.created` | `review 'Title', fingerprint <64 hex>, N file(s)` |
 | `slot.added`, `slot.updated`, `slot.removed` | `slot {id}: primary ada, alternate bob` (`none` for no alternate) |
 | `signature.added` | `slot {slotId}, role {Primary or Alternate}, record digest <64 hex>` |
@@ -82,9 +85,9 @@ the short hash (8 hexadecimal characters) of the trimmed text (see `AuditChain`)
 | `thread.resolved`, `thread.reopened` | `thread {id}` |
 | `checklist.answered` | `item {id}: {Outcome}`, plus `; justification sha256 {8 hex}` when there is one |
 | `checklist.applicability-changed` | `section {id}:` then `applicable` or `not applicable, reason sha256 {hex}` |
-| `user.created` | `user 'bob', role Reviewer` |
+| `user.created` | `user 'bob'`, plus `, system administrator` when the account is one |
 | `user.enabled`, `user.disabled` | `user 'bob'` |
-| `user.role-changed` | `user 'bob': Reviewer -> Admin` |
+| `user.admin-changed` | `user 'bob': system administrator False -> True` |
 | `user.password-set-by-admin` | `user 'bob'` |
 | `user.password-changed` | `user 'bob'` (the actor is the user who changed their own password) |
 | `repository.created` | `repository 'name', location 'L', user name set` (or `none`), `token set` (or `none`) |

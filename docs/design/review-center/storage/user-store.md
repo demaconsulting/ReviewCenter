@@ -6,7 +6,8 @@
 
 `UserStore` implements the Core interface `IUserStore` on top of `ReviewCenterDbContext`. Its single responsibility is
 to persist users and read them back, translating the unique user name constraint of the database into the terms of the
-domain.
+domain. The system administrator flag of a user is an ordinary stored column that `AddAsync` stores and `UpdateAsync`
+replaces; a user has no role of any other kind, because the project roles are memberships (see `ReviewStore`).
 
 #### Data Model
 

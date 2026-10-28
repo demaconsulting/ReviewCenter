@@ -142,14 +142,15 @@ The server provides these routes:
 - `/help` and `/help/{topic}` - the built-in help (open to everyone); see [Built-in Help](#built-in-help).
 - `/about` - the version and a link to the project (open to everyone).
 - `/account` - your account, with the appearance (theme) setting and a form to change your password.
-- `/users` - the user administration page (administrators only).
-- `/users/new` - the form that creates a user (administrators only).
-- `/repositories` - the registered git repositories (administrators only).
-- `/repositories/new` - the form that registers a repository (administrators only).
-- `/audit` - the audit trail (administrators only).
-- `/projects` - the list of projects.
-- `/projects/new` - the form that creates a project.
-- `/projects/{id}` - one project, with its reviews.
+- `/users` - the user administration page (system administrators only).
+- `/users/new` - the form that creates a user (system administrators only).
+- `/audit` - the audit trail (system administrators only).
+- `/projects` - the list of the projects you can see.
+- `/projects/new` - the form that creates a project (system administrators only).
+- `/projects/{id}` - one project, with its reviews (and, for system administrators, its members).
+- `/projects/{id}/repositories` - the git repositories of the project (project and system administrators).
+- `/projects/{id}/repositories/new` - the form that adds a repository to the project (project and system
+  administrators).
 - `/projects/{id}/reviews/new` - the form that creates a review.
 - `/projects/{id}/plan` - the page that plans reviews from the review-sets of a repository.
 - `/projects/{id}/reviews/{reviewId}` - one review, with its files, their content, and comment threads.
@@ -161,20 +162,21 @@ The server provides these routes:
   to everyone).
 
 Every page except `/`, `/login`, `/help`, `/about`, and `/health` needs a signed-in user; see
-[Users and Sign-in](#users-and-sign-in).
+[Users and Sign-in](#users-and-sign-in). A project, and everything below `/projects/{id}`, is visible only to its
+members and to system administrators; see [Access and Visibility](#access-and-visibility).
 
 ### The Page Frame
 
 Every page has the same header and footer.
 
 - The header shows the **ReviewCenter** brand, which is a link to the home page. When you are signed in, it is
-  followed by **Projects** and, for administrators, **Repositories**, **Audit**, and **Users**. On the right it shows
+  followed by **Projects** and, for system administrators, **Audit** and **Users**. On the right it shows
   **Help**, and then either a **Sign in** link (nobody is signed in) or your display name, an **Account** link, and a
   **Logout** button.
 - The footer shows the version of ReviewCenter, the copyright, and a link to the **About** page, which has the full
   version and a link to the project.
 - The home page shows the title and the tagline. When you are signed in it also shows a **Get started** card with links
-  to **Projects** and, for administrators, **Repositories**, **Audit**, and **Users**, each with a one-line
+  to **Projects** and, for system administrators, **Audit** and **Users**, each with a one-line
   description.
 
 ### Built-in Help
@@ -204,22 +206,23 @@ The `--silent` option suppresses the server's console log output.
 ## Users and Sign-in
 
 ReviewCenter has local user accounts. Each user has a user name, a display name (shown next to comments and
-answers), a role, and a password, of which only a salted hash is stored. The role **Admin** may also manage users;
-the role **Reviewer** may do everything else. Every comment, checklist answer, and change of section applicability is
-recorded under the signed-in user, who cannot be chosen or typed in.
+answers), and a password, of which only a salted hash is stored. A user is either an ordinary user or a **system
+administrator**, who manages users, projects, and project membership; what an ordinary user may do depends on the
+projects the user is a member of (see [Access and Visibility](#access-and-visibility)). Every comment, checklist
+answer, and change of section applicability is recorded under the signed-in user, who cannot be chosen or typed in.
 
 ### Create the First Administrator
 
-A new database has no users, so nobody can sign in yet. Create the first administrator on the command line, with the
-server stopped or running:
+A new database has no users, so nobody can sign in yet. Create the first user, who must be a system administrator, on
+the command line, with the server stopped or running:
 
 ```bash
-reviewcenter user add --username admin --display-name "Ada Admin" --role Admin
+reviewcenter user add --username admin --display-name "Ada Admin" --system-admin
 ```
 
 The options are `--username` (3 to 50 letters, digits, `.`, `_`, or `-`; unique regardless of letter case),
-`--display-name` (1 to 100 characters), and `--role` (`Admin` or `Reviewer`; `Reviewer` when omitted). The user is
-created in the configured database (see [Database](#database)). The password is never given as an option, because a
+`--display-name` (1 to 100 characters), and the switch `--system-admin` (omit it to create an ordinary user). The user
+is created in the configured database (see [Database](#database)). The password is never given as an option, because a
 command line is visible to other processes and is kept in shell history. It is read from the first of these that is
 available:
 
@@ -229,15 +232,16 @@ available:
 
 ```bash
 # Linux: from the environment
-REVIEWCENTER_PASSWORD='a long passphrase' reviewcenter user add --username admin --display-name "Ada Admin" --role Admin
+REVIEWCENTER_PASSWORD='a long passphrase' reviewcenter user add --username admin --display-name "Ada Admin" --system-admin
 ```
 
 ```powershell
 # Windows PowerShell: from standard input
-"a long passphrase" | .\reviewcenter.exe user add --username admin --display-name "Ada Admin" --role Admin
+"a long passphrase" | .\reviewcenter.exe user add --username admin --display-name "Ada Admin" --system-admin
 ```
 
-The command prints `Created user 'admin' with the role Admin.` and never prints the password. When the user cannot
+The command prints `Created user 'admin' (system administrator).` (or `Created user 'name'.` for an ordinary user) and
+never prints the password. Further users are created on the Users page by a system administrator. When the user cannot
 be created (the user name is taken, the password is too short, no password was provided, or the database cannot be
 used) it prints an error and exits with a non-zero exit code.
 
@@ -336,21 +340,23 @@ The **API tokens** card creates and revokes the personal access tokens that let 
 A user has at most 20 active tokens; expired and revoked tokens do not count. The card has an **About API tokens**
 button that opens the Help topic.
 
-### Manage Users (Administrators)
+### Manage Users (System Administrators)
 
-Open `/users` (the Users link in the header); a user who is not an administrator is refused with an "Access denied"
-page that links back to the projects. The page lists the users with their user name, display
-name, role, and state. An administrator can:
+Open `/users` (the Users link in the header); a user who is not a system administrator is refused with an "Access
+denied" page that links back to the projects. The page lists the users with their user name, display name, state, and
+a **System admin** badge for system administrators. A system administrator can:
 
-1. Create a user: press **+ New user**, which opens the form at `/users/new`, enter a user name, display name, role,
-   and password, and create the user. **Cancel** goes back to the list, and so does a successful creation.
+1. Create a user: press **+ New user**, which opens the form at `/users/new`, enter a user name, display name, and
+   password, tick **System administrator** if the user is to be one, and create the user. **Cancel** goes back to the
+   list, and so does a successful creation. A new user is a member of no project until a system administrator adds
+   the user to one (see [Access and Visibility](#access-and-visibility)).
 2. Disable a user, which stops the user from signing in without deleting the record of what the user did, and enable
    the user again.
-3. Change the role of a user.
+3. Make a user a system administrator (**Make system admin**) or take that away (**Remove system admin**).
 4. Set a new password for a user, for example when the user has forgotten it. This also ends a lockout.
 
-The last enabled administrator cannot be disabled or demoted; the page shows an error instead. If you are no longer
-an enabled administrator, the page shows an error for every action.
+The last enabled system administrator cannot be disabled or demoted; the page shows an error instead. If you are no
+longer an enabled system administrator, the page shows an error for every action.
 
 ### Secure Cookie Behind a Reverse Proxy
 
@@ -366,21 +372,76 @@ overwrite it and be the only route to the server. If the server can be reached d
 choose its own address and avoid the per-address and per-name limits (the lockout of the user name still applies).
 Without the setting, behind a proxy, every user appears with the address of the proxy and shares one set of limits.
 
+## Access and Visibility
+
+ReviewCenter controls access by project. There are three roles:
+
+- **System administrator**: a flag on a local user account. A system administrator creates projects, manages users and
+  project membership, reads the audit trail, and can see and manage every project.
+- **Project administrator**: a member of one project who also manages the git repositories of that project.
+- **Member**: a user who belongs to a project (a project member, role "Member" on the project page). A member works on
+  the reviews of that project.
+
+A user who is neither a member of a project nor a system administrator has no access to it. A new project has no
+members; a system administrator adds them (see [Projects and Reviews](#projects-and-reviews)). Accounts are local
+database accounts only.
+
+| Action                                               | Member | Project admin | System admin |
+| ---------------------------------------------------- | ------ | ------------- | ------------ |
+| See the project, its reviews, history, and evidence  | yes    | yes           | yes          |
+| Create reviews, comment, edit checklists             | yes    | yes           | yes          |
+| Edit unsigned reviewer slots                         | yes    | yes           | yes          |
+| Sign a review as the assigned reviewer               | yes    | yes           | if a member  |
+| Download the attestation PDF of an approved review   | yes    | yes           | yes          |
+| Manage the repositories and credentials of a project | no     | yes           | yes          |
+| Add and remove members, change member roles          | no     | no            | yes          |
+| Create projects                                      | no     | no            | yes          |
+| Manage users; read the audit page                    | no     | no            | yes          |
+
+**Hidden means missing.** A project you cannot see looks exactly like a project that does not exist. The project
+pages say "Project N does not exist.", and the API and the PDF routes answer **404**, never 403, so a refused request
+does not reveal that the project exists. The **Projects** list shows only the projects you are a member of, with an
+explanatory text when there are none (a system administrator sees all projects), and `GET /api/projects` returns the
+same list.
+
+**Reviewers must be members.** Both the primary and the alternate reviewer of a slot must be members of the project.
+Signing needs two things: you are a member of the project, and you are the assigned reviewer of the slot. A system
+administrator who is not a member of the project cannot sign it; add yourself as a member first, and then be assigned.
+
+**Tokens.** A personal access token acts as its owner and carries the owner's memberships, so it reads and creates
+reviews only in the projects the owner can see, and the API lists only those projects (see
+[Automation and API Tokens](#automation-and-api-tokens)). A token never signs, so a token user can never sign a
+review.
+
+**Evidence.** The signed attestation PDF of a review and the evidence index of a project are visible only to project
+members and system administrators.
+
+This release has no member management for project administrators: a system administrator manages the members of
+every project, while a project administrator manages the repositories of the project.
+
 ## Projects and Reviews
 
 A project groups the reviews of one body of work. A review is a named set of files whose content is stored
 unchanged, together with a fingerprint of that content.
 
-1. Open `/projects` (the Projects link in the header) and press **+ New project**. On the form at `/projects/new`, enter
+1. Open `/projects` (the Projects link in the header). The list shows the projects you can see: all projects for a
+   system administrator, and for anyone else only the projects they are a member of (the page explains when there are
+   none). A system administrator creates a project: press **+ New project**. On the form at `/projects/new`, enter
    a project name (up to 100 characters) and an optional description (up to 1000 characters), and press the create
-   button. The new project opens. **Cancel** goes back to the list; the list of projects shows each project, and you
-   select one to open its page.
-2. On the project page, press **+ New review**. On the form at `/projects/{id}/reviews/new`, enter a review
+   button. The new project opens, with no members. **Cancel** goes back to the list; select a project to open its page.
+   A project that you cannot see is reported as "Project N does not exist."
+2. A system administrator manages the members on the project page, in the **Members** section. It lists each member
+   with a role badge (**Member** or **Project admin**), a role button (**Make project admin** or **Make member**),
+   and a **Remove** button. **+ Add member** reveals an inline form: choose a user, tick **Project admin** if the
+   member is to administer the project's repositories, and press **Add member** (or **Cancel**). The project page also
+   has a **Repositories** button for the project's git repositories (see
+   [Repositories and Credentials](#repositories-and-credentials)).
+3. On the project page, press **+ New review**. On the form at `/projects/{id}/reviews/new`, enter a review
    identifier (1 to 100 letters, digits, `.`, `_`, or `-`, starting with a letter or digit; unique within the
    project; the identifier `new` is reserved and is refused) and a title (up to 200 characters), choose the files to
    review, and press the create button. The chosen files are listed with their sizes before you submit. **Cancel**
    goes back to the project.
-3. The review page opens. From the top it shows the title, a line that says what to do next, the files with their
+4. The review page opens. From the top it shows the title, a line that says what to do next, the files with their
    size and open comment threads, and the thread index. Select a file to read
    its content as numbered lines (see [Review Comments](#review-comments)); the page scrolls to the code. Binary
    files, and files that are not valid UTF-8 text, show a notice instead of their content. At the bottom, the
@@ -403,13 +464,14 @@ on the page, and nothing is created.
 
 ### Reviews from a Repository
 
-Instead of uploading files you can review what changed in a git repository that an administrator registered (see
-[Repositories and Credentials](#repositories-and-credentials)). On the new review form (**+ New review** on the project
+Instead of uploading files you can review what changed in a git repository that belongs to the project (a project
+administrator or a system administrator adds it; see [Repositories and Credentials](#repositories-and-credentials)).
+On the new review form (**+ New review** on the project
 page), under **Files come from**, choose
 **From a repository** and enter:
 
-- **Repository**: one of the enabled repositories, by name. If there is none, the page says so and offers only the
-  upload.
+- **Repository**: one of the enabled repositories of this project, by name. If there is none, the page says so and
+  offers only the upload.
 - **Head revision**: a branch, a tag, or a commit (for example `main`, `v2.0`, or a commit id).
 - **Baseline revision** (optional): the revision to compare with. Without it every file of the head revision that
   matches the selection counts as Added.
@@ -487,11 +549,12 @@ start from the last signed one.
 ## Planning Reviews
 
 If the repository has a `.reviewmark.yaml` with review-sets, you do not have to create each review by hand. On the
-project page choose **Plan reviews** (it is shown when an administrator has enabled a repository;
+project page choose **Plan reviews** (it is shown when a project administrator has enabled a repository of the project;
 otherwise the page says to ask one). The plan page at `/projects/{id}/plan` finds the review-sets that need a review and
 creates the reviews you tick.
 
-1. Choose the **repository** (a single enabled repository is already chosen) and enter the **head revision**, a branch,
+1. Choose the **repository** (only the enabled repositories of this project are offered; a single one is already
+   chosen) and enter the **head revision**, a branch,
    a tag, or a commit, for example `main`.
 1. Under **What to review** choose one of:
    - **Changes since the last signed review of each set** (the default): each set is compared with the head of its
@@ -531,19 +594,19 @@ while you read the plan does not change them.
 
 When the plan cannot be made, the page says why in plain English and what to do:
 
-- No repository is registered, or it was disabled: ask an administrator.
+- The project has no repository, or it was disabled: ask an administrator of the project.
 - The revision is not known: check the spelling, and push the branch or tag if it is new.
 - The head revision has no `.reviewmark.yaml`: add it, or choose another revision; you can still create a review by hand
   on the project page with **+ New review**.
 - The configuration is not valid or too large: the message names the problem and the position; fix the file.
-- The repository could not be read: try again later, or ask an administrator.
+- The repository could not be read: try again later, or ask an administrator of the project.
 
 The page never shows text printed by git, the location of the repository, or a credential.
 
 ### Limitations of Sign-in
 
-- There is no password reset, no email, no multi-factor sign-in, and no external identity provider. An administrator
-  sets a new password for a user who forgot it.
+- There is no password reset, no email, no multi-factor sign-in, and no external identity provider. A system
+  administrator sets a new password for a user who forgot it.
 - The lockout counts failures per user name, so anyone who knows a user name can keep that account locked for 5
   minutes at a time by guessing wrongly on purpose, also from an address that the throttle allows. The sign-in
   throttle (see Sign In and Out) limits how often one address can try, but it does not prevent this. This is an
@@ -585,7 +648,7 @@ selected, its lines are highlighted, and the page scrolls to them.
 2. A thread is listed below the file's code with the lines it covers (the whole file, a line, or a range of lines)
    and its comments in the order they were posted; the form to start a new thread follows it. Lines that have a
    thread are marked.
-3. Any signed-in user can reply to a thread. Press the resolve button to mark a thread resolved, and the reopen
+3. Any member of the project can reply to a thread. Press the resolve button to mark a thread resolved, and the reopen
    button to open it again. A resolved thread is shown as one line (lines, state, and number of comments); press its
    expand button to read it, reply, or reopen it, and the collapse button to fold it again.
 
@@ -669,14 +732,17 @@ next to the review title, and a **Reviewers** card with the reviewer slots. The 
 each review.
 
 **Reviewer slots.** A slot has a primary reviewer and, optionally, an alternate reviewer, chosen from the enabled
-users. Either of the two can sign the slot. A review can have any number of slots, or none; a review without a slot
-stays In review and its next step says "Add a reviewer slot.". Any signed-in user can add a slot (open **Add a slot**,
-choose the reviewers and press **Add slot**) and change or remove a slot (open **Change reviewers**, then **Save** or
-**Remove**). A user can be in only one slot of
+members of the project. Either of the two can sign the slot. A review can have any number of slots, or none; a review
+without a slot stays In review and its next step says "Add a reviewer slot.". Any member of the project (and any
+system administrator) can add a slot (open **Add a slot**,
+choose the reviewers and press **Add slot**) and change or remove a slot that is not signed (open **Change
+reviewers**, then **Save** or **Remove**). A user can be in only one slot of
 a review, and the primary and the alternate must be different users. A slot that has been signed can no longer be
 changed or removed, even if its signature is out of date; to change the reviewers, add a new slot.
 
-**Signing.** The reviewer of a slot sees a signing form on the slot, if the review can be signed. The form shows
+**Signing.** The reviewer of a slot sees a signing form on the slot, if the review can be signed. Signing needs
+membership of the project and being the assigned reviewer; a system administrator who is not a member cannot sign. The
+form shows
 the statement of the signature, "I have reviewed this record and approve it.", and asks you to confirm your password.
 Enter your password and press **Sign**. The password is checked like at sign-in, so wrong passwords count toward the
 same lockout, and it is never stored or shown. A review can be signed only when:
@@ -727,7 +793,8 @@ signature proves. A review that is not Approved has no button; a direct request 
 refused with the message "The review is not complete" (status 409). If the review changes while the PDF is being
 prepared (for example a reviewer changes an answer), nothing is signed or recorded and the request is also refused
 with status 409 ("The review changed while the attestation was being prepared; try again."); press the button again.
-Every download is recorded in the audit trail as `attestation.generated`.
+Every download is recorded in the audit trail as `attestation.generated`. Only members of the project and system
+administrators can download the PDF; for anyone else the address answers 404, as for a project that does not exist.
 
 ### What a Verifier Sees
 
@@ -818,7 +885,9 @@ signing key unavailable"). A signed-out request to the address is sent to the si
 
 ReviewCenter has a JSON API under `/api` for scripts and tools, for example a build job that reads the state of
 reviews or creates a draft review for a release. The API is authenticated with a **personal access token**, which
-acts as the user who created it, with that user's role. A token is for the API only: it does not sign in to the web
+acts as the user who created it, with that user's access: the token carries the owner's project memberships (or the
+system administrator flag), so the API sees only the projects the owner can see. A token is for the API only: it does
+not sign in to the web
 pages, and the session cookie of the web pages is not accepted by the API.
 
 A token **never signs**. Signing a review, and adding, changing, or removing a reviewer slot, are not available in the
@@ -859,7 +928,7 @@ status, and for a request that is not valid a list of the fields at fault.
 
 | Method | Address                                         | Purpose                                          |
 | ------ | ----------------------------------------------- | ------------------------------------------------ |
-| GET    | `/api/projects`                                 | List the projects                                |
+| GET    | `/api/projects`                                 | List your projects (all for a system admin)      |
 | GET    | `/api/projects/{p}/reviews`                     | List the reviews of project `{p}`                |
 | GET    | `/api/projects/{p}/reviews/{r}`                 | One review: slots, approval, progress, next step |
 | POST   | `/api/projects/{p}/reviews`                     | Create a draft review (201 with the review)      |
@@ -867,7 +936,8 @@ status, and for a request that is not valid a list of the fields at fault.
 | GET    | `/api/projects/{p}/evidence/index.json`         | The evidence index of project `{p}` (ReviewMark) |
 | GET    | `/api/openapi.json`                             | The OpenAPI document; open, no token needed      |
 
-In the addresses `{p}` is the project number and `{r}` the review identifier.
+In the addresses `{p}` is the project number and `{r}` the review identifier. A project that the token's owner cannot
+see is answered 404, as if it did not exist, never 403.
 
 The OpenAPI document describes every endpoint, the request and answer shapes, and the bearer and Basic schemes, so a
 client can be generated from it. A snapshot of it is kept in the repository as `docs/api/openapi.json`.
@@ -927,7 +997,8 @@ Limits to know about:
 
 `POST /api/projects/{projectId}/reviews` takes a JSON body with a review `id`, a `title`, and **exactly one** of
 `files` (uploaded files, each with a `path` and its `contentBase64`) or `repository` (a `repositoryId` of an enabled
-registered repository, a `headRevision`, and optionally a `baselineRevision` and a `selection`, one pattern per line).
+repository of that project, a `headRevision`, and optionally a `baselineRevision` and a `selection`, one pattern per
+line).
 The same rules as on the web pages apply: the identifier and title rules, the upload limits, and the repository rules
 (see [Projects and Reviews](#projects-and-reviews) and [Reviews from a Repository](#reviews-from-a-repository)).
 
@@ -953,8 +1024,9 @@ browser.
   answered **429 Too many requests** for the rest of the window, even with a good token. A good token does not use up
   attempts.
 - A request that is not valid is answered **400** with the fields at fault; a project, review, or repository that does
-  not exist **404**; a review identifier that is already used, a disabled repository, or an attestation of a review
-  that is not complete **409**; and a git repository that is not reachable **502**, **503**, or **504**.
+  not exist (or that the token's owner cannot see) **404**; a review identifier that is already used, a disabled
+  repository, or an attestation of a review that is not complete **409**; and a git repository that is not reachable
+  **502**, **503**, or **504**.
 - Any other address under `/api` is answered with a JSON **404**, with or without a token, for every standard HTTP
   method (`GET`, `HEAD`, `POST`, `PUT`, `PATCH`, `DELETE`, `OPTIONS`).
 - The server behind a reverse proxy needs the setting described in Secure Cookie Behind a Reverse Proxy, or all clients
@@ -979,14 +1051,16 @@ deleted through the application.
 
 ### History of a Review
 
-The review page has a **History** link. It opens the history page of the review, which any signed-in user can read.
+The review page has a **History** link. It opens the history page of the review, which any member of the project (or
+system administrator) can read.
 The page lists the entries about that review, newest first, 50 at a time, with **Older** and **Newer** links. The
 text of every entry is shown as plain text.
 
-### The Audit Page (Administrators)
+### The Audit Page (System Administrators)
 
-An administrator sees an **Audit** link in the page header. It opens `/audit`, which lists the whole trail (for all
-projects and reviews, sign-ins, and user administration), newest first, 50 entries at a time. Other users are refused.
+A system administrator sees an **Audit** link in the page header. It opens `/audit`, which lists the whole trail (for
+all projects and reviews, sign-ins, and user administration), newest first, 50 entries at a time. Other users are
+refused. Events of a project carry the project.
 The page has a **Verify chain** button. It reads the whole trail once and shows either that the chain is intact, with
 the number of entries and the **head hash**, or the first entry at which the chain is broken.
 
@@ -1026,10 +1100,11 @@ head hash is a manual step, and it is most useful after important events such as
 | Group     | Action codes                                                                         |
 | --------- | ------------------------------------------------------------------------------------ |
 | Projects  | `project.created`, `review.created`                                                  |
+| Members   | `project.member-added`, `project.member-role-changed`, `project.member-removed`      |
 | Slots     | `slot.added`, `slot.updated`, `slot.removed`, `signature.added`                      |
 | Threads   | `thread.started`, `thread.replied`, `thread.resolved`, `thread.reopened`             |
 | Checklist | `checklist.answered`, `checklist.applicability-changed`                              |
-| Users     | `user.created`, `user.enabled`, `user.disabled`, `user.role-changed`                 |
+| Users     | `user.created`, `user.enabled`, `user.disabled`, `user.admin-changed`                |
 | Passwords | `user.password-set-by-admin`, `user.password-changed`                                |
 | Sign-in   | `auth.sign-in`, `auth.sign-out`, `auth.sign-in-failed`, `auth.locked-out`            |
 | Sign-in   | `auth.sign-in-locked`, `auth.sign-in-throttled`                                      |
@@ -1095,17 +1170,20 @@ server writes an error message and exits with a non-zero exit code. Database mig
 release: the tables are created only when the database is new. **A database file created by an earlier build, before
 user accounts, reviewer signatures, or the audit trail existed, does not have the tables and columns that are
 needed, and the pages cannot work with it: delete the file (or point `Database:ConnectionString` at a new one) and
-start again, then create the first administrator.** Do this only with development data. The repository registry and
+start again, then create the first system administrator.** Do this only with development data. The repository registry and
 the reviews from a repository add tables and columns, and the record digest of a review from a repository is calculated
 in a new format (version 4) that includes the review-set and the side of every line comment, so a development
 database created before them must be recreated in the same way. The personal access tokens add a table, and every
 review has new columns that tell who created it and whether it was created with an API token, so a development database
-created before them must be recreated as well.
+created before them must be recreated as well. Project-based access control adds the project memberships, replaces the
+role of a user with a system administrator flag, and ties every repository to one project, so a development database
+created before it must be recreated too.
 
 ## Repositories and Credentials
 
-Administrators register the git repositories that reviews will be made from (see
-[Reviews from a Repository](#reviews-from-a-repository)).
+Every git repository belongs to exactly one project, and the repositories are managed per project. Project
+administrators of a project and system administrators add them (see
+[Reviews from a Repository](#reviews-from-a-repository)). There is no global repository list.
 
 ### Prerequisite
 
@@ -1113,12 +1191,14 @@ ReviewCenter reads repositories with the installed `git` program, which must be 
 the server (git 2.31 or later). If git is missing or too old, an operation that needs it fails with a message that says
 so; the rest of the server works.
 
-### The Repositories Page (Administrators)
+### The Repositories Page (Project Administrators)
 
-An administrator sees a **Repositories** link in the page header, next to **Users** and **Audit**. It opens
-`/repositories`. Other users do not get the page.
+On a project page, a project administrator or a system administrator sees a **Repositories** button. It opens
+`/projects/{id}/repositories`, the repositories of that project. Other users, including ordinary members, do not get the
+page; for a user who cannot see the project at all it says "Project N does not exist."
 
-- **Add repository**: press **+ Add repository** on `/repositories`, which opens the form at `/repositories/new`, and
+- **Add repository**: press **+ Add repository** on `/projects/{id}/repositories`, which opens the form at
+  `/projects/{id}/repositories/new`, and
   enter a name (letters, digits, dot, underscore, and hyphen, up to 40 characters, unique without
   regard to case), a location, and for a private repository a user name and an access token. The token must not be
   contained in (a part of, compared with case) the repository name, the user name, or the location (or its URL-escaped
@@ -1138,8 +1218,9 @@ An administrator sees a **Repositories** link in the page header, next to **User
 - **Disable and enable**: a disabled repository cannot be read and is not offered to users. A repository cannot be
   deleted.
 
-Every change is recorded in the audit trail without the token. Users who are not administrators are only offered the
-names of enabled repositories, never the location or the credentials.
+Every change is recorded in the audit trail without the token. Ordinary members of the project are only offered the
+names of its enabled repositories (on the new review form and the Plan reviews page), never the location or the
+credentials.
 
 ### How the Token Is Protected
 
@@ -1149,7 +1230,7 @@ only in the environment of the git process (never on the command line and never 
 encoded forms are removed from every error message and log line. Git never asks for a password interactively.
 
 - **Back up the key ring** (the `DataProtection:KeysPath` folder) separately from the database. If it is lost, the
-  stored tokens become unreadable, and an administrator must enter them again.
+  stored tokens become unreadable, and a project or system administrator must enter them again.
 - **The keys are not encrypted at rest.** On Linux the server creates the folder readable only by its own account;
   keep it that way. Anyone who can read both the key folder and the database can read the tokens.
 - **The first start of this version signs every user out once**, because the cookie keys now persist in the key folder.
@@ -1311,7 +1392,7 @@ The following command-line options are supported:
 | `user add`                            | Create a user; password from environment, stdin, or prompt   |
 | `--username <name>`                   | User name for `user add`                                     |
 | `--display-name <text>`               | Display name for `user add`                                  |
-| `--role <Admin\|Reviewer>`            | Role for `user add` (default: `Reviewer`)                    |
+| `--system-admin`                      | Make the user of `user add` a system administrator           |
 | `audit verify`                        | Verify the hash chain of the audit trail (exit code 0 or 1)  |
 | `-v`, `--version`                     | Display version information                                  |
 | `-?`, `-h`, `--help`                  | Display help message                                         |

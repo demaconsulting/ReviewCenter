@@ -60,7 +60,7 @@
 
         @if (Repositories.Count == 0)
         {
-            <p class="notice" role="status" data-testid="plan-no-repository">No repository is registered; ask an administrator.</p>
+            <p class="notice" role="status" data-testid="plan-no-repository">This project has no repository; ask a project administrator to add one.</p>
         }
         else
         {
@@ -89,17 +89,17 @@
                             <legend>What to review</legend>
                             <label>
                                 <input type="radio" name="plan-baseline" checked="@(Mode == BaselineMode.None)"
-                                       data-testid="plan-baseline-none" disabled="@Busy" @onchange="() => ChooseMode(BaselineMode.None)" />
+                                       data-testid="plan-baseline-none" disabled="@Busy" @onchange="() => GuardedAsync(() => ChooseMode(BaselineMode.None))" />
                                 All files of each set
                             </label>
                             <label>
                                 <input type="radio" name="plan-baseline" checked="@(Mode == BaselineMode.Explicit)"
-                                       data-testid="plan-baseline-explicit" disabled="@Busy" @onchange="() => ChooseMode(BaselineMode.Explicit)" />
+                                       data-testid="plan-baseline-explicit" disabled="@Busy" @onchange="() => GuardedAsync(() => ChooseMode(BaselineMode.Explicit))" />
                                 Changes since a branch, tag or commit
                             </label>
                             <label>
                                 <input type="radio" name="plan-baseline" checked="@(Mode == BaselineMode.LastReviewed)"
-                                       data-testid="plan-baseline-last" disabled="@Busy" @onchange="() => ChooseMode(BaselineMode.LastReviewed)" />
+                                       data-testid="plan-baseline-last" disabled="@Busy" @onchange="() => GuardedAsync(() => ChooseMode(BaselineMode.LastReviewed))" />
                                 Changes since the last signed review of each set
                             </label>
                         </fieldset>
@@ -172,8 +172,8 @@
                         @if (OffersBulkSelection)
                         {
                             <p class="plan-bulk">
-                                <button type="button" class="secondary" data-testid="plan-select-all" disabled="@Busy" @onclick="() => SetAllTicked(true)">Select all</button>
-                                <button type="button" class="secondary" data-testid="plan-select-none" disabled="@Busy" @onclick="() => SetAllTicked(false)">Select none</button>
+                                <button type="button" class="secondary" data-testid="plan-select-all" disabled="@Busy" @onclick="() => GuardedAsync(() => SetAllTicked(true))">Select all</button>
+                                <button type="button" class="secondary" data-testid="plan-select-none" disabled="@Busy" @onclick="() => GuardedAsync(() => SetAllTicked(false))">Select none</button>
                             </p>
                         }
                         <ul class="item-list" data-testid="plan-todo-list">
@@ -183,7 +183,7 @@
                                     <label>
                                         <input type="checkbox" checked="@IsTicked(row.SetId)"
                                                data-testid="plan-row-check-@row.SetId" disabled="@Busy"
-                                               @onchange="e => SetTicked(row.SetId, (bool)e.Value!)" />
+                                               @onchange="e => GuardedAsync(() => SetTicked(row.SetId, (bool)e.Value!))" />
                                         <span class="plan-row-text">
                                             <span>
                                                 <span class="plan-row-title" data-testid="plan-row-title-@row.SetId">@row.Title</span>

@@ -126,3 +126,20 @@ sections:
           - ReviewCenter-EvidenceIndex-Order
         tests:
           - ReviewMarkContract_GoldenIndex_MatchesCommittedFile
+
+      - id: ReviewCenter-Evidence-Visibility
+        title: >-
+          The Evidence subsystem shall release an attestation and an evidence index only to an actor who may view the
+          project of the review, and shall answer any other actor as it answers for a project or review that does not
+          exist.
+        justification: |
+          An attestation and an index disclose the content and the approvals of a project. Answering a non-member
+          differently from a missing project would also tell the non-member which projects exist.
+        children:
+          - ReviewCenter-AttestationService-Visibility
+          - ReviewCenter-AttestationEndpoint-Visibility
+          - ReviewCenter-EvidenceIndex-Visibility
+        tests:
+          - ApiProjectAccess_EveryProjectRoute_NonMemberToken_AnswersLikeAMissingProject
+          - ApiProjectAccess_EveryProjectRoute_MemberAndSystemAdmin_AreNotRefused
+          - ApiProjectAccess_AttestationPage_NonMemberSession_Answers404

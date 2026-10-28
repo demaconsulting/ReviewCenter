@@ -58,16 +58,21 @@ public class SigningServiceTests
             ids[username] = (await users.CreateAsync(username, name, UserRole.Reviewer, Password, TestContext.Current.CancellationToken)).Id;
         }
 
-        var project = await new ProjectService(store, clock).CreateAsync("Apollo", null, TestContext.Current.CancellationToken);
-        await new ReviewService(store, clock).CreateDraftAsync(
+        var project = await TestServices.Projects(store, clock).CreateAsync("Apollo", null, TestContext.Current.CancellationToken);
+        foreach (var id in ids.Values)
+        {
+            await store.AddMembershipAsync(id, project.Id, TestContext.Current.CancellationToken);
+        }
+
+        await TestServices.Reviews(store, clock).CreateDraftAsync(
             project.Id, "rev-1", "First", [new("a.txt", TestContent.A)], TestContext.Current.CancellationToken);
         return new Fixture(
             store,
             clock,
             users,
-            new SigningService(store, users, clock),
-            new ThreadService(store, clock),
-            new ChecklistService(store, clock),
+            TestServices.Signing(store, users, clock),
+            TestServices.Threads(store, clock),
+            TestServices.Checklists(store, clock),
             project.Id,
             ids);
     }
@@ -744,11 +749,12 @@ public class SigningServiceTests
         var userStore = new CountingUserStore(new FakeUserStore());
         var users = new UserService(userStore, new FakePasswordHasher(), clock);
         var ann = await users.CreateAsync("ann", "Ann", UserRole.Reviewer, Password, cancellationToken);
-        var project = await new ProjectService(store, clock).CreateAsync("Apollo", null, cancellationToken);
-        var reviews = new ReviewService(store, clock);
+        var project = await TestServices.Projects(store, clock).CreateAsync("Apollo", null, cancellationToken);
+        await store.AddMembershipAsync(ann.Id, project.Id, cancellationToken);
+        var reviews = TestServices.Reviews(store, clock);
         await reviews.CreateDraftAsync(project.Id, "rev-1", "First", [new("a.txt", TestContent.A)], cancellationToken);
         await reviews.CreateDraftAsync(project.Id, "rev-2", "Second", [new("b.txt", TestContent.A)], cancellationToken);
-        var signing = new SigningService(store, users, clock);
+        var signing = TestServices.Signing(store, users, clock);
         await signing.AddSlotAsync(TestActors.Ann, project.Id, "rev-1", ann.Id, null, cancellationToken);
         var single = await signing.GetApprovalAsync(project.Id, "rev-1", cancellationToken);
         var before = userStore.ListCount;
@@ -774,8 +780,8 @@ public class SigningServiceTests
         var clock = new MovableTimeProvider(_now);
         var userStore = new CountingUserStore(new FakeUserStore());
         var users = new UserService(userStore, new FakePasswordHasher(), clock);
-        var project = await new ProjectService(store, clock).CreateAsync("Apollo", null, cancellationToken);
-        var signing = new SigningService(store, users, clock);
+        var project = await TestServices.Projects(store, clock).CreateAsync("Apollo", null, cancellationToken);
+        var signing = TestServices.Signing(store, users, clock);
 
         // Act: read an empty sequence of reviews
         var batch = await signing.GetApprovalsAsync(project.Id, [], cancellationToken);
@@ -786,20 +792,68 @@ public class SigningServiceTests
     }
 
     /// <summary>
-    ///     Test that only enabled users are offered for a slot, and without anything secret.
+    ///     Test that only enabled members of the project are offered for a slot, and without anything secret.
     /// </summary>
     [Fact]
-    public async Task SigningService_ListCandidatesAsync_ReturnsEnabledUsersOnly()
+    public async Task SigningService_ListCandidatesAsync_ReturnsEnabledMembersOnly()
     {
-        // Arrange: one user disabled
+        // Arrange: one member disabled and one user who is not a member
         var fixture = await CreateAsync();
         await fixture.Users.SetEnabledAsync("dee", false, TestContext.Current.CancellationToken);
+        await fixture.Users.CreateAsync("eve", "Eve", UserRole.Reviewer, Password, TestContext.Current.CancellationToken);
 
         // Act: list the candidates
-        var candidates = await fixture.Signing.ListCandidatesAsync(TestContext.Current.CancellationToken);
+        var candidates = await fixture.Signing.ListCandidatesAsync(Cyd, fixture.ProjectId, TestContext.Current.CancellationToken);
 
-        // Assert: the other three
+        // Assert: the other three members, not eve
         Assert.Equal(["ann", "bob", "cyd"], candidates.Select(c => c.Username).Order());
+    }
+
+    /// <summary>
+    ///     Test that a slot can only be given to enabled members of the project: a user who is not a member, even a
+    ///     system administrator, is refused as primary and as alternate, and nothing is stored.
+    /// </summary>
+    [Fact]
+    public async Task SigningService_AddSlotAsync_NonMember_ThrowsSlotUserInvalid()
+    {
+        // Arrange: a review and two users that are not members of its project
+        var fixture = await CreateAsync();
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var eve = await fixture.Users.CreateAsync("eve", "Eve", UserRole.Admin, Password, cancellationToken);
+
+        // Act: give the slot to the outsider as primary, then as alternate
+        var primary = await Assert.ThrowsAsync<DomainRuleException>(() => fixture.Signing.AddSlotAsync(
+            Cyd, fixture.ProjectId, "rev-1", eve.Id, null, cancellationToken));
+        var alternate = await Assert.ThrowsAsync<DomainRuleException>(() => fixture.Signing.AddSlotAsync(
+            Cyd, fixture.ProjectId, "rev-1", fixture.Ids["ann"], eve.Id, cancellationToken));
+
+        // Assert: both are refused with the slot rule and no slot exists
+        Assert.Equal(DomainRule.SlotUserInvalid, primary.Rule);
+        Assert.Equal(DomainRule.SlotUserInvalid, alternate.Rule);
+        Assert.Empty(await fixture.Store.ListSlotsAsync(fixture.ProjectId, "rev-1", cancellationToken));
+    }
+
+    /// <summary>
+    ///     Test that a member who was removed from the project can no longer sign, even though the slot is still
+    ///     assigned to them: signing needs a membership, which a system administrator's rights do not replace.
+    /// </summary>
+    [Fact]
+    public async Task SigningService_SignAsync_NotAMember_IsRefused()
+    {
+        // Arrange: a review whose primary reviewer is then removed from the project
+        var (fixture, slot) = await CreateReadyAsync();
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var digest = (await ApprovalAsync(fixture)).Digest;
+        await fixture.Store.RemoveMembershipAsync(
+            fixture.ProjectId, fixture.Ids["ann"], AuditTestExtensions.Draft(), cancellationToken);
+
+        // Act: the removed member tries to sign
+        var exception = await Assert.ThrowsAsync<DomainRuleException>(() => fixture.Signing.SignAsync(
+            TestActors.Ann, fixture.ProjectId, "rev-1", slot.Id, digest, Password, cancellationToken));
+
+        // Assert: refused and nothing is signed
+        Assert.Equal(DomainRule.ActorNotAllowed, exception.Rule);
+        Assert.Empty(await fixture.Store.ListSignaturesAsync(fixture.ProjectId, "rev-1", cancellationToken));
     }
 
     /// <summary>
@@ -811,11 +865,13 @@ public class SigningServiceTests
         // Arrange
         var store = new FakeReviewStore();
         var users = new UserService(new FakeUserStore(), new FakePasswordHasher(), TimeProvider.System);
+        var access = new AllowAllProjectAccess(store);
 
         // Act, Assert: each null is refused
-        Assert.Throws<ArgumentNullException>(() => new SigningService(null!, users, TimeProvider.System));
-        Assert.Throws<ArgumentNullException>(() => new SigningService(store, null!, TimeProvider.System));
-        Assert.Throws<ArgumentNullException>(() => new SigningService(store, users, null!));
+        Assert.Throws<ArgumentNullException>(() => new SigningService(null!, users, access, TimeProvider.System));
+        Assert.Throws<ArgumentNullException>(() => new SigningService(store, null!, access, TimeProvider.System));
+        Assert.Throws<ArgumentNullException>(() => new SigningService(store, users, null!, TimeProvider.System));
+        Assert.Throws<ArgumentNullException>(() => new SigningService(store, users, access, null!));
     }
 
     /// <summary>

@@ -90,8 +90,8 @@ sections:
           reading the password from the environment, from redirected standard input, or from a prompt, and
           shall report the outcome without ever printing the password.
         justification: |
-          The first administrator must exist before anybody can sign in, and creating it from the command line
-          needs no web page that would itself need an administrator.
+          The first system administrator must exist before anybody can sign in, and creating it from the command
+          line needs no web page that would itself need a system administrator.
         children:
           - ReviewCenter-UserCommand-Create
           - ReviewCenter-UserCommand-Password
@@ -99,6 +99,20 @@ sections:
         tests:
           - ReviewCenter_UserAddVerb_PasswordFromEnvironment_CreatesUserThenRejectsDuplicate
           - ReviewCenter_UserAddVerb_NoPassword_ReturnsError
+
+      - id: ReviewCenter-Hosting-ProjectAccess
+        title: >-
+          The Hosting subsystem shall make one instance of the project access rules available to every service and
+          every route, so that what a user may see is decided in one place.
+        justification: |
+          Visibility that is decided by several copies of a rule drifts apart, and a copy that is missed shows a
+          project to somebody who is not a member of it. The composition root is the one place that connects the
+          rules to the stores and to the services that use them.
+        children:
+          - ReviewCenter-ServerHost-ProjectAccess
+        tests:
+          - ServerHost_CreateApplication_DatabaseConfigured_CreatesFileAndServesDomainServices
+          - ApiProjectAccess_EveryProjectRoute_NonMemberToken_AnswersLikeAMissingProject
 
       - id: ReviewCenter-Hosting-DatabaseFailure
         title: >-

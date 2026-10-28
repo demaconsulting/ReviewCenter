@@ -24,6 +24,21 @@ sections:
           - ChecklistPage_Render_PartlyAnswered_OpensFirstIncompleteSection
           - ChecklistPage_Render_AllAnswered_ShowsCompleteAndNoNextAction
 
+      - id: ReviewCenter-ChecklistPage-Access
+        title: >-
+          The ChecklistPage unit shall show a user who may not see the project the page for a review that does not
+          exist and none of the checklist, and shall check the view access again at the start of every action of
+          the open page, so that a user whose membership was removed meanwhile gets that page and nothing that was
+          loaded, and an answer is not stored.
+        justification: |
+          A page that stays open does not load again, so without a new check a removed member would keep reading
+          the checklist and could keep answering it. A hidden project looks like a missing one, so the page does
+          not reveal it either.
+        tests:
+          - ChecklistPage_Render_NonMember_LooksLikeAMissingReview
+          - ChecklistPage_Choose_MembershipRevoked_ShowsNotFoundAndNoData
+          - ChecklistPage_ToggleSection_MembershipRevoked_ShowsNotFoundAndNoData
+
       - id: ReviewCenter-ChecklistPage-Answer
         title: >-
           The ChecklistPage unit shall offer Pass, Fail, and N/A buttons for each check of the open section, store

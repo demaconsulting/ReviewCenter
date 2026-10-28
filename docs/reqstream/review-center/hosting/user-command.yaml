@@ -9,15 +9,16 @@ sections:
     requirements:
       - id: ReviewCenter-UserCommand-Create
         title: >-
-          The UserCommand class shall create a user with the given user name, display name, and role, using
-          Reviewer when no role is given, in the configured database, and shall report the created user name and
-          role without printing the password.
+          The UserCommand class shall create a user with the given user name and display name in the configured
+          database, as a system administrator when the `--system-admin` switch is given and as an ordinary user
+          otherwise, and shall report the created user name and whether the user is a system administrator without
+          printing the password.
         justification: |
-          Creating the first administrator is the way into a new installation, and a message that echoed the
-          password would put it in logs and terminal history.
+          Creating the first system administrator is the way into a new installation, and a message that echoed
+          the password would put it in logs and terminal history.
         tests:
           - UserCommand_Run_ValidUser_CreatesUserAndReportsItWithoutPassword
-          - UserCommand_Run_NoRole_CreatesReviewer
+          - UserCommand_Run_NoSwitch_CreatesOrdinaryUser
           - UserCommand_Run_NullContext_ThrowsArgumentNullException
 
       - id: ReviewCenter-UserCommand-Password

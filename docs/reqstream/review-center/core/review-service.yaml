@@ -55,11 +55,16 @@ sections:
           - ReviewService_CreateDraftAsync_TitleTooLong_ThrowsReviewTitleInvalid
 
       - id: ReviewCenter-ReviewService-Project
-        title: The ReviewService class shall reject a review for a project that does not exist.
+        title: >-
+          The ReviewService class shall reject a review for a project that does not exist or that the actor may not
+          see, with the same refusal (ProjectNotFound) in both cases, before anything else is checked or stored.
         justification: |
           A review that belongs to no project could never be found again and would break the project hierarchy.
+          A project that a user may not see must not be told apart from a missing one, so creating a review in it
+          reveals nothing.
         tests:
           - ReviewService_CreateDraftAsync_UnknownProject_ThrowsProjectNotFound
+          - ReviewService_CreateFromRepositoryAsync_DuplicateIdOrUnknownProject_RefusedBeforeOpening
 
       - id: ReviewCenter-ReviewService-Files
         title: >-
@@ -114,7 +119,8 @@ sections:
 
       - id: ReviewCenter-ReviewService-FromRepository
         title: >-
-          The ReviewService class shall create a review from a registered, enabled git repository that covers the
+          The ReviewService class shall create a review from a registered, enabled git repository of the same
+          project as the review (a repository of another project is refused as not found) that covers the
           files changed between an optional baseline revision and a head revision and matching a selection,
           freezing in the database, for each file, its path, its change kind (Added, Modified, or Deleted), and
           its baseline and head content, together with the repository, the two resolved commit identifiers, and

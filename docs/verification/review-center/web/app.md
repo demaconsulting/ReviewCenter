@@ -26,11 +26,13 @@ N/A - standard test environment.
   with the header and the footer. A request under `/api`, a request for an address that ends in a file extension, and a
   POST keep a plain 404 without the page.
 - The router shows the creation form, and no review, for the address of the new-review form of a project.
-- The router applies the authorization rules of a page: a reviewer opening the users route sees the access denied
-  message and not the page, an administrator sees the page, and a signed-out user opening a protected route sees
+- The router applies the authorization rules of a page: an ordinary user opening the users route sees the access
+  denied
+  message and not the page, a system administrator sees the page, and a signed-out user opening a protected route sees
   a link to the login page (returning to the requested page) and not the page.
 - The layout header shows the display name of the signed-in user with the links to the projects page and the account
-  page and the logout button, and the links to the repositories, audit, and users pages only for an administrator; for
+  page and the logout button, and the links to the audit and users pages only for a system administrator (there is no
+  repositories link, because repositories belong to projects); for
   nobody signed in it shows the link to the login page and no projects link, no name, and no logout button.
 - The header shows the help link to everyone, and for nobody signed in it comes before the sign-in link.
 - The header has exactly one link to the home page.
@@ -88,12 +90,12 @@ and the body has no not-found text. This scenario is tested by `App_Request_Post
 the new-review address of the project and `Routes` is rendered; the new-review form is shown and the review page is
 not. This scenario is tested by `Routes_Render_NewReviewRoute_ShowsFormNotReview`.
 
-**Routes_Render_ReviewerOpensUsersRoute_ShowsAccessDeniedNotUserList**: A reviewer is signed in, a user exists, the
+**Routes_Render_ReviewerOpensUsersRoute_ShowsAccessDeniedNotUserList**: An ordinary user is signed in, a user exists, the
 navigation address is `/users` and `Routes` is rendered; the access denied message is shown, and neither the
 creation form nor the user's name is rendered. This scenario is tested by
 `Routes_Render_ReviewerOpensUsersRoute_ShowsAccessDeniedNotUserList`.
 
-**Routes_Render_AdminOpensUsersRoute_ShowsUsersPage**: An administrator is signed in and `Routes` is rendered at
+**Routes_Render_AdminOpensUsersRoute_ShowsUsersPage**: A system administrator is signed in and `Routes` is rendered at
 `/users`; the New user button is shown and there is no access denied message. This scenario is tested by
 `Routes_Render_AdminOpensUsersRoute_ShowsUsersPage`.
 
@@ -101,10 +103,11 @@ creation form nor the user's name is rendered. This scenario is tested by
 `/projects`; the projects page is not rendered, and a link to the login page that returns to `/projects` is
 shown. This scenario is tested by `Routes_Render_AnonymousOpensProjectsRoute_ShowsLoginLinkNotPage`.
 
-**MainLayout_Render_SignedInUser_ShowsNameAccountAndLogout**: `MainLayout` is rendered for a signed-in reviewer; the
-header shows the link to the projects page, the display name, the link to the account page, and the logout button, and
-no repositories, audit, or users link and no sign-in link. After the user signs in as an administrator, the links to the
-users page, the repositories page (`/repositories`), and the audit page (`/audit`) appear. This scenario is tested by
+**MainLayout_Render_SignedInUser_ShowsNameAccountAndLogout**: `MainLayout` is rendered for a signed-in ordinary user;
+the header shows the link to the projects page, the display name, the link to the account page, and the logout button,
+and no audit or users link and no sign-in link. After the user signs in as a system administrator, the links to the
+users page and the audit page (`/audit`) appear, and there is still no repositories link, because repositories belong to
+projects. This scenario is tested by
 `MainLayout_Render_SignedInUser_ShowsNameAccountAndLogout`.
 
 **MainLayout_Render_NobodySignedIn_ShowsSignInLink**: `MainLayout` is rendered with nobody signed in; the header shows
