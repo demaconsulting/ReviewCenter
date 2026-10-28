@@ -22,6 +22,9 @@ N/A - standard test environment (temporary SQLite databases are created by the t
 - A change of the system administrator flag, the enabled flag, the password hash, the failure count, and the lockout time
   is stored.
 - Users are listed ordered by user name.
+- A user of an external identity provider is stored with its issuer and subject and is found by the exact pair only
+  (another case or another issuer gives no user); a second user with the same pair is refused with `UserNameTaken`,
+  while any number of local users without a pair is stored.
 - A user added to a project is stored with its must-change-password flag, its membership with the given role, and
   exactly one audit entry that names the project; a user name that is taken, or a project that does not exist, stores
   no account, no membership, and no entry, and leaves the gate free for the next change.
@@ -56,6 +59,17 @@ user. This scenario is tested by `UserStore_AddToProjectAsync_StoresAccountMembe
 user is added to a project that does not exist; the first throws `UserNameTaken`, and neither stores an account, a
 membership, or an event, and a later add still succeeds because the gate was released. This scenario is tested by
 `UserStore_AddToProjectAsync_Failure_StoresNothing`.
+
+**UserStore_GetByExternalAsync_FindsOnlyTheExactPair**: A local user and a user with the issuer
+`https://idp.example/` and the subject `Sub-1` are added. A lookup of the exact pair finds the second user with both
+values and `IsExternal` set; a lookup with the subject in another case, and one with the issuer without its trailing
+slash, give no user; the local user has no external identity. This scenario is tested by
+`UserStore_GetByExternalAsync_FindsOnlyTheExactPair`.
+
+**UserStore_AddAsync_SameExternalIdentityTwice_IsRefused**: Two local users and one external user are stored; a second
+user with the same issuer and subject but another name is refused with `UserNameTaken`, and three users remain, which
+shows that the unique index of the pair allows many local users. This scenario is tested by
+`UserStore_AddAsync_SameExternalIdentityTwice_IsRefused`.
 
 **Audit drafts**: The store takes an audit draft with the creation of a user and with an update; an update without a
 draft is allowed and is not audited. The tests of this unit build the store with the real `AuditAppender`. The

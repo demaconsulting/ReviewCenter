@@ -71,7 +71,7 @@ internal static class ServerHost
     /// <summary>
     ///     The address prefixes that belong to machine clients and keep a plain 404 without the page frame.
     /// </summary>
-    private static readonly string[] ReservedPrefixes = ["/api", "/_framework", "/_blazor", "/_content"];
+    private static readonly string[] ReservedPrefixes = ["/api", "/_framework", "/_blazor", "/_content", "/signin-oidc"];
 
     /// <summary>
     ///     Builds the web application for the supplied command-line context without starting it.
@@ -87,7 +87,7 @@ internal static class ServerHost
     /// <exception cref="ArgumentNullException">Thrown when <paramref name="context"/> is null.</exception>
     /// <exception cref="InvalidOperationException">
     ///     Thrown when the configured database cannot be prepared (see <see cref="InitializeDatabase"/>) or when the
-    ///     <c>Auth</c> or <c>Git</c> settings are invalid.
+    ///     <c>Auth</c>, <c>Git</c> or (when enabled) <c>Identity:Oidc</c> settings are invalid.
     /// </exception>
     /// <remarks>
     ///     Building is separated from running so tests can start the application against an
@@ -138,6 +138,10 @@ internal static class ServerHost
         // Allow the caller (tests) to replace the server or add logger providers
         options.ConfigureBuilder?.Invoke(builder);
 
+        // The provider of OpenID Connect sign-in is registered after the caller's changes, because only then the
+        // configuration is final (it is read for the Enabled switch)
+        builder.Services.AddOidcSignIn(builder.Configuration);
+
         // Outside the Development environment ASP.NET Core does not load the static web asset
         // manifest on its own, which would leave the Blazor client script empty when the server is
         // started with 'dotnet <dll>'. Load it explicitly (a no-op when the manifest is absent)
@@ -152,6 +156,7 @@ internal static class ServerHost
         // start-up with a clear message instead of failing on the first page request
         InitializeDatabase(app);
         ValidateAuthOptions(app);
+        ValidateOidcOptions(app);
         ValidateGitOptions(app);
         ValidateDataProtection(app);
         ValidateAttestation(app);
@@ -180,6 +185,9 @@ internal static class ServerHost
 
         // Login and logout
         app.MapSignIn();
+
+        // Sign-in and confirmation of identity with an OpenID Connect provider (only when it is enabled)
+        app.MapOidcSignIn();
 
         // The signed PDF attestation of a completed review
         app.MapAttestation();
@@ -241,6 +249,7 @@ internal static class ServerHost
         services.AddSingleton<UserService>();
         services.AddSingleton<PersonalAccessTokenService>();
         services.AddSingleton<SigningService>();
+        services.AddSingleton<ReauthProofStore>();
 
         // The repository registry and the git content source. Tokens are encrypted with Data Protection, whose key
         // ring is persisted in a folder so that the tokens survive a restart
@@ -518,6 +527,28 @@ internal static class ServerHost
         {
             ((IDisposable)app).Dispose();
             throw new InvalidOperationException($"Invalid sign-in settings: {ex.Message}", ex);
+        }
+    }
+
+    /// <summary>
+    ///     Reads the settings of sign-in with an OpenID Connect provider once so an invalid value stops the start-up
+    ///     with a clear message.
+    /// </summary>
+    /// <param name="app">The built application whose services provide the options.</param>
+    /// <exception cref="InvalidOperationException">
+    ///     Thrown when sign-in with a provider is enabled and the <c>Identity:Oidc</c> settings are invalid; the
+    ///     application is disposed before the exception is thrown. The message names the setting, never its value.
+    /// </exception>
+    private static void ValidateOidcOptions(WebApplication app)
+    {
+        try
+        {
+            _ = app.Services.GetRequiredService<IOptions<OidcOptions>>().Value;
+        }
+        catch (OptionsValidationException ex)
+        {
+            ((IDisposable)app).Dispose();
+            throw new InvalidOperationException($"Invalid OpenID Connect sign-in settings: {ex.Message}", ex);
         }
     }
 

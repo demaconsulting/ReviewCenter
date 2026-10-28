@@ -129,17 +129,22 @@ sections:
           - ReviewCenter-OTS-EfCore-Sqlite
 
       - id: Quality-ComponentTesting
-        title: The repository shall rely on bUnit and the ASP.NET Core test host to verify the web interface in memory.
+        title: >-
+          The repository shall rely on bUnit, the ASP.NET Core test host, and OpenIddict as a test identity provider to
+          verify the web interface in memory.
         tags: [quality]
         justification: |
           Verification of the Razor components and the hosting pipeline without a
-          browser depends on bUnit and the ASP.NET Core test host. This grouping
+          browser depends on bUnit and the ASP.NET Core test host, and verification
+          of the sign-in with an identity provider depends on OpenIddict as a
+          provider that is used only by the tests. This grouping
           requirement links those OTS requirements to the quality root so they
           participate in orphan detection without being falsely reported as
           disconnected from tool functionality.
         children:
           - ReviewCenter-OTS-bUnit-Component
           - ReviewCenter-OTS-bUnit-TestHost
+          - ReviewCenter-OTS-OpenIddict-TestProvider
 
       - id: Quality-BrowserAutomation
         title: The repository shall rely on Playwright to drive the web interface from the Puppet developer tool.

@@ -29,6 +29,8 @@ be loadable on the test platform.
 - The comments, answers, and section states keep the user name of the person who made them next to the display name.
 - The table for users stores every field of a user, including the system administrator flag, and its unique index on
   the user name ignores case.
+- The users table stores the external issuer and subject, which are read back exactly, and its unique index on the
+  pair refuses a second user with the same pair while any number of users without one are allowed.
 - The tables for reviewer slots and signatures are created; the database refuses a slot for a review that does not
   exist, refuses to remove a slot that has a signature, and refuses a second signature of the same slot with the same
   digest; the role, digest, and meaning of a signature are read back as stored.
@@ -101,6 +103,13 @@ tested by `UserStore_AddAsync_User_RoundTripsEveryField`.
 existing one only in case is refused by the unique index and reported as taken, and a lookup in another case finds
 the original user. This scenario is tested by
 `UserStore_AddAsync_UsernameOtherCase_ThrowsUserNameTakenAndLookupIgnoresCase`.
+
+**External identity columns**: The `ExternalIssuer` and `ExternalSubject` columns and their unique index are exercised
+by the tests of `UserStore`: a user of an identity provider round-trips its issuer and subject, a lookup of the exact
+pair finds it, and a lookup with another case or another issuer does not, which is tested by
+`UserStore_GetByExternalAsync_FindsOnlyTheExactPair`; and the unique index refuses a second user with the same pair
+while local users without a pair are stored freely, which is tested by
+`UserStore_AddAsync_SameExternalIdentityTwice_IsRefused`.
 
 **ReviewStore_AddSlotAsync_UnknownReview_IsRefusedByDatabase**: A slot for a review that does not exist is refused
 by the database (the foreign key to the review is enforced) and nothing is stored. This scenario is tested by

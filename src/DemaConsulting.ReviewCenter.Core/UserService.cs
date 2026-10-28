@@ -18,7 +18,34 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
+using System.Globalization;
+using System.Security.Cryptography;
+using System.Text;
+
 namespace DemaConsulting.ReviewCenter.Core;
+
+/// <summary>
+///     Why a sign-in with an external identity was refused.
+/// </summary>
+public enum ExternalSignInRefusal
+{
+    /// <summary>The sign-in was accepted.</summary>
+    None,
+
+    /// <summary>The account is disabled.</summary>
+    Disabled,
+
+    /// <summary>The identity, or what was needed to create an account from it, is missing, too long or unusable.</summary>
+    Invalid
+}
+
+/// <summary>
+///     The answer to a sign-in with an external identity.
+/// </summary>
+/// <param name="User">The account to sign in, or <c>null</c> when the sign-in was refused.</param>
+/// <param name="Refusal">Why the sign-in was refused; <see cref="ExternalSignInRefusal.None"/> when it was accepted.</param>
+/// <param name="Created"><c>true</c> when the account was created by this sign-in.</param>
+public sealed record ExternalSignInResult(User? User, ExternalSignInRefusal Refusal, bool Created);
 
 /// <summary>
 ///     Creates users, checks passwords and manages accounts, enforcing the user rules.
@@ -32,7 +59,8 @@ namespace DemaConsulting.ReviewCenter.Core;
 ///     cases apart; the audit trail does tell them apart (see <see cref="AuthenticateAsync"/>). Operations that
 ///     change an existing user run one at a time (a semaphore), which makes the last-administrator check and the
 ///     failure counter race-free; the service must therefore be a single instance (a singleton).
-///     Passwords and hashes are never logged or put into messages.
+///     Passwords and hashes are never logged or put into messages. An account of an external identity provider
+///     (see <see cref="SignInExternalAsync"/>) has no password: every password path refuses it.
 /// </remarks>
 public sealed class UserService
 {
@@ -40,6 +68,21 @@ public sealed class UserService
     ///     The number of consecutive failed password checks that locks an account.
     /// </summary>
     private const int MaxFailedAttempts = 5;
+
+    /// <summary>
+    ///     The room kept free at the end of a derived user name for a collision suffix such as <c>-12</c>.
+    /// </summary>
+    private const int UsernameSuffixRoom = 6;
+
+    /// <summary>
+    ///     The number of suffixed user names tried before the name derived from the identity itself is used.
+    /// </summary>
+    private const int MaxUsernameSuffix = 50;
+
+    /// <summary>
+    ///     The audit action code of a failed sign-in with an external identity.
+    /// </summary>
+    private const string OidcSignInFailedAction = "auth.oidc-sign-in-failed";
 
     /// <summary>
     ///     The audit action code of a failed re-authentication (for example at signature time).
@@ -264,6 +307,19 @@ public sealed class UserService
                 return null;
             }
 
+            // An account of an identity provider has no password to check: a password never signs it in or confirms
+            // a signature, whatever is stored or typed
+            if (user.IsExternal)
+            {
+                VerifyDummy(password);
+                await RecordCoalescedAsync(
+                    user,
+                    reauthentication ? ReauthFailedAction : "auth.sign-in-failed",
+                    "external account has no password",
+                    cancellationToken);
+                return null;
+            }
+
             // A locked account refuses every attempt, without counting it
             if (IsLockedOut(user))
             {
@@ -427,7 +483,7 @@ public sealed class UserService
         try
         {
             var user = await LoadAsync(username, cancellationToken);
-            if (IsLockedOut(user))
+            if (user.IsExternal || IsLockedOut(user))
             {
                 throw CurrentPasswordIncorrect();
             }
@@ -489,6 +545,13 @@ public sealed class UserService
         try
         {
             var user = await LoadAsync(username, cancellationToken);
+            if (user.IsExternal)
+            {
+                throw new DomainRuleException(
+                    DomainRule.PasswordInvalid,
+                    $"The user '{user.Username}' signs in with an identity provider and has no password.");
+            }
+
             user.PasswordHash = _hasher.Hash(newPassword!);
             user.FailedLoginCount = 0;
             user.LockoutUntil = null;
@@ -501,6 +564,269 @@ public sealed class UserService
         {
             _gate.Release();
         }
+    }
+
+    /// <summary>
+    ///     Signs in a person who proved their identity at an external identity provider, creating the account on
+    ///     the first sign-in.
+    /// </summary>
+    /// <param name="issuer">The issuer of the provider, as validated by the sign-in handler. Must not be empty.</param>
+    /// <param name="subject">The identifier of the person at the provider (the <c>sub</c> claim). Must not be empty.</param>
+    /// <param name="usernameCandidate">
+    ///     The name the provider suggests for the account (a preferred user name or the start of an e-mail address);
+    ///     <c>null</c> or unusable text gives a generic name. It is only a starting point: it is reduced to letters,
+    ///     digits, dot, underscore and hyphen, and made unique.
+    /// </param>
+    /// <param name="displayName">The name the provider gives for the person; cleaned before it is stored.</param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <returns>
+    ///     The account when the sign-in is accepted. A refusal (a disabled account, or an identity that is missing
+    ///     or too long) has no account; the caller must answer every refusal the same way.
+    /// </returns>
+    /// <remarks>
+    ///     The account is found by the pair of issuer and subject only, compared exactly; it is never found or
+    ///     linked by user name, display name or e-mail address, so no provider can take over a local account or the
+    ///     account of another provider. A new account is enabled, is not a system administrator, has no project
+    ///     membership and no password. When the derived user name is taken by any account, a numeric suffix is
+    ///     added (<c>-2</c>, <c>-3</c>, and so on), and after <see cref="MaxUsernameSuffix"/> tries a name derived
+    ///     from the identity itself is used. A later sign-in does not change the stored names. Accepted sign-ins
+    ///     and refusals of a disabled account are recorded in the audit trail on a best-effort basis; neither
+    ///     tokens nor claims are recorded. Runs one at a time with the other changes of users.
+    /// </remarks>
+    public async Task<ExternalSignInResult> SignInExternalAsync(
+        string? issuer,
+        string? subject,
+        string? usernameCandidate,
+        string? displayName,
+        CancellationToken cancellationToken = default)
+    {
+        // An identity that is missing or longer than the stored columns can never match or create an account
+        if (string.IsNullOrEmpty(issuer)
+            || issuer.Length > ReviewLimits.MaxExternalIssuerLength
+            || string.IsNullOrEmpty(subject)
+            || subject.Length > ReviewLimits.MaxExternalSubjectLength)
+        {
+            return new ExternalSignInResult(null, ExternalSignInRefusal.Invalid, false);
+        }
+
+        await _gate.WaitAsync(cancellationToken);
+        try
+        {
+            // Match by the exact pair only; create the account when there is none yet
+            var user = await _store.GetByExternalAsync(issuer, subject, cancellationToken);
+            var created = false;
+            if (user is null)
+            {
+                (user, created) = await CreateExternalAsync(
+                    issuer,
+                    subject,
+                    usernameCandidate,
+                    displayName,
+                    cancellationToken);
+                if (user is null)
+                {
+                    return new ExternalSignInResult(null, ExternalSignInRefusal.Invalid, false);
+                }
+            }
+
+            // A disabled account never signs in; the audit trail says why, the caller must not
+            if (!user.Enabled)
+            {
+                await RecordCoalescedAsync(user, OidcSignInFailedAction, "account disabled", cancellationToken);
+                return new ExternalSignInResult(null, ExternalSignInRefusal.Disabled, false);
+            }
+
+            await RecordAsync(user, "auth.oidc-sign-in", $"issuer {IssuerHost(issuer)}", cancellationToken);
+            return new ExternalSignInResult(user, ExternalSignInRefusal.None, created);
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
+
+    /// <summary>
+    ///     Records a refused or failed sign-in with an external identity provider, coalesced.
+    /// </summary>
+    /// <param name="reasonClass">
+    ///     A short fixed word for what went wrong (for example <c>throttled</c> or <c>token-invalid</c>); the only
+    ///     detail recorded. Never pass text taken from a token, a claim or an error message.
+    /// </param>
+    /// <param name="address">The client address, used to coalesce repeated entries; may be <c>null</c>.</param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <returns>A task that completes when the entry is stored, skipped or its failure has been reported.</returns>
+    /// <remarks>
+    ///     Nobody is signed in, so the actor is the plain text <c>not signed in</c>. The entry is limited to one per
+    ///     minute, address and reason, because nothing else limits how often a visitor can trigger it.
+    /// </remarks>
+    public Task RecordExternalSignInFailureAsync(
+        string reasonClass,
+        string? address,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(reasonClass);
+        if (_audit is null)
+        {
+            return Task.CompletedTask;
+        }
+
+        var reason = AuditText.Clean(reasonClass, AuditText.MaxActorNameLength);
+        return _audit.TryRecordCoalescedAsync(
+            new AuditDraft(OidcSignInFailedAction, null, "not signed in", null, null, reason),
+            $"{OidcSignInFailedAction}|{reason}|{address}",
+            cancellationToken);
+    }
+
+    /// <summary>
+    ///     Records that an external-provider user could not confirm their identity for a signature, coalesced.
+    /// </summary>
+    /// <param name="user">The signed-in user who tried to sign. Must not be null.</param>
+    /// <param name="reasonClass">
+    ///     A short fixed word for what went wrong (for example <c>stale-auth-time</c> or <c>no-proof</c>); the only
+    ///     detail recorded after the prefix <c>oidc:</c>.
+    /// </param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <returns>A task that completes when the entry is stored, skipped or its failure has been reported.</returns>
+    /// <remarks>
+    ///     This is the counterpart of the failed password check for an account without a password: the same action
+    ///     code <c>signature.reauth-failed</c>, so the trail shows every refused confirmation in one place.
+    /// </remarks>
+    /// <exception cref="ArgumentNullException">Thrown when an argument is null.</exception>
+    public Task RecordExternalReauthFailureAsync(
+        User user,
+        string reasonClass,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(user);
+        ArgumentNullException.ThrowIfNull(reasonClass);
+        return RecordCoalescedAsync(
+            user,
+            ReauthFailedAction,
+            $"oidc: {AuditText.Clean(reasonClass, 50)}",
+            cancellationToken);
+    }
+
+    /// <summary>
+    ///     Creates the account of an external identity that signs in for the first time.
+    /// </summary>
+    /// <param name="issuer">The issuer of the provider.</param>
+    /// <param name="subject">The subject at the provider.</param>
+    /// <param name="usernameCandidate">The suggested user name, or <c>null</c>.</param>
+    /// <param name="displayName">The suggested display name, or <c>null</c>.</param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <returns>
+    ///     The account and <c>true</c> when it was created; the account of the identity and <c>false</c> when another
+    ///     process created it first; <c>null</c> and <c>false</c> when no free user name was found.
+    /// </returns>
+    private async Task<(User? User, bool Created)> CreateExternalAsync(
+        string issuer,
+        string subject,
+        string? usernameCandidate,
+        string? displayName,
+        CancellationToken cancellationToken)
+    {
+        // The first name that no account has: the derived one, then numbered ones, then one from the identity itself
+        var baseName = DeriveUsername(usernameCandidate);
+        var names = new List<string> { baseName };
+        names.AddRange(Enumerable.Range(2, MaxUsernameSuffix - 1).Select(number => $"{baseName}-{number}"));
+        names.Add("oidc-" + Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes($"{issuer}|{subject}")))[..12]);
+
+        foreach (var name in names)
+        {
+            if (await _store.GetByUsernameAsync(name, cancellationToken) is not null)
+            {
+                continue;
+            }
+
+            try
+            {
+                var created = await _store.AddAsync(
+                    new User
+                    {
+                        Username = name,
+                        DisplayName = SanitizeDisplayName(displayName, name),
+                        IsSystemAdmin = false,
+                        Enabled = true,
+                        PasswordHash = string.Empty,
+                        Created = _timeProvider.GetUtcNow(),
+                        ExternalIssuer = issuer,
+                        ExternalSubject = subject
+                    },
+                    stored => AuditDraft.By(
+                        new Actor(stored.Username, stored.DisplayName),
+                        "account.oidc-created",
+                        $"issuer {IssuerHost(issuer)}"),
+                    cancellationToken);
+                return (created, true);
+            }
+            catch (DomainRuleException ex) when (ex.Rule == DomainRule.UserNameTaken)
+            {
+                // The store refuses a taken name and a second account of the same identity alike: another process
+                // may have created the account just now, otherwise the name was taken and the next one is tried
+                var raced = await _store.GetByExternalAsync(issuer, subject, cancellationToken);
+                if (raced is not null)
+                {
+                    return (raced, false);
+                }
+            }
+        }
+
+        return (null, false);
+    }
+
+    /// <summary>
+    ///     Derives a valid user name from a name suggested by an identity provider.
+    /// </summary>
+    /// <param name="candidate">The suggested name; may be <c>null</c> or hostile.</param>
+    /// <returns>
+    ///     Only letters, digits, dot, underscore and hyphen of the candidate, at most
+    ///     <see cref="ReviewLimits.MaxUsernameLength"/> minus the room for a suffix, and at least
+    ///     <see cref="ReviewLimits.MinUsernameLength"/> characters (<c>user</c> when nothing is left).
+    /// </returns>
+    private static string DeriveUsername(string? candidate)
+    {
+        var kept = new string((candidate ?? string.Empty)
+            .Where(character => char.IsAsciiLetterOrDigit(character) || character is '.' or '_' or '-')
+            .Take(ReviewLimits.MaxUsernameLength - UsernameSuffixRoom)
+            .ToArray());
+        return kept.Length switch
+        {
+            0 => "user",
+            < ReviewLimits.MinUsernameLength => "user-" + kept,
+            _ => kept
+        };
+    }
+
+    /// <summary>
+    ///     Cleans a display name that comes from an identity provider.
+    /// </summary>
+    /// <param name="displayName">The suggested name; may be <c>null</c> or hostile.</param>
+    /// <param name="fallback">The text used when nothing is left (the user name).</param>
+    /// <returns>
+    ///     One line without control, separator or invisible formatting characters (which could reverse or hide text),
+    ///     with runs of white space collapsed, trimmed and at most <see cref="ReviewLimits.MaxDisplayNameLength"/>
+    ///     characters.
+    /// </returns>
+    private static string SanitizeDisplayName(string? displayName, string fallback)
+    {
+        var visible = new string((displayName ?? string.Empty)
+            .Where(character => CharUnicodeInfo.GetUnicodeCategory(character) != UnicodeCategory.Format)
+            .ToArray());
+        var oneLine = AuditText.Clean(visible, ReviewLimits.MaxDisplayNameLength);
+        var collapsed = string.Join(' ', oneLine.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
+        return collapsed.Length == 0 ? fallback : collapsed;
+    }
+
+    /// <summary>
+    ///     Gets the host name of an issuer, for the audit trail.
+    /// </summary>
+    /// <param name="issuer">The issuer URL.</param>
+    /// <returns>The host name, or <c>unknown</c> when the issuer is not an absolute URL.</returns>
+    private static string IssuerHost(string issuer)
+    {
+        return Uri.TryCreate(issuer, UriKind.Absolute, out var uri)
+            ? AuditText.Clean(uri.Host, 100)
+            : "unknown";
     }
 
     /// <summary>

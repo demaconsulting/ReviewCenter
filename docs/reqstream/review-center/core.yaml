@@ -426,3 +426,28 @@ sections:
         tests:
           - CoreSubsystem_AccessTokens_CreateAuthenticateAndRevoke_FollowTheOwner
           - CoreSubsystem_TokenActor_CreatesFlaggedReviewButCannotSign
+
+      - id: ReviewCenter-Core-ExternalIdentity
+        title: >-
+          The Core subsystem shall let a person who signed in at an OpenID Connect provider have an account, found by
+          the issuer and the subject only, created without any right on the first sign-in, never linked to another
+          account, and without a password, and shall let such a person sign a review only with a confirmation of
+          identity from the provider that is for this user and slot, valid for a short time, and used up by the
+          signature.
+        justification: |
+          The provider says who the person is, and the review tool says what the person may do. Keeping the rules in
+          the services keeps every page and route that is ever added from giving a right, a password, or a signature
+          to an account that the provider only vouches for.
+        children:
+          - ReviewCenter-UserService-ExternalSignIn
+          - ReviewCenter-UserService-ExternalCreate
+          - ReviewCenter-UserService-UsernameCollision
+          - ReviewCenter-UserService-ExternalNoPassword
+          - ReviewCenter-SigningService-ExternalReauth
+          - ReviewCenter-ReauthProofStore-SingleUse
+          - ReviewCenter-ReauthProofStore-Binding
+          - ReviewCenter-ReauthProofStore-Expiry
+          - ReviewCenter-ReauthProofStore-Bounded
+        tests:
+          - UserService_SignInExternalAsync_FirstThenSecond_CreatesOnceAndMatches
+          - SigningService_SignAsync_ExternalUserWithProof_SignsOnce

@@ -5,7 +5,8 @@
 #### Purpose
 
 `SigningService` owns the rules for reviewer slots and signatures: it adds, changes, and removes the slots of a review,
-records a signature after the signer has entered the password again, and computes the approval status of a review. It
+records a signature after the signer has confirmed their identity (with the password, or for a user of an external
+identity provider with a fresh sign-in at the provider), and computes the approval status of a review. It
 is the one place where these rules live, so every caller (the pages, a later API) gets the same answer. It is also
 the home of the supporting types of signing: `SlotRole`, `ReviewerSlot`, `ReviewSignature`, `ReviewRecord`,
 `ReviewApproval`, `SlotStatus`, `SlotMember`, and `SlotSignatureState`, together with the signing rules of
@@ -88,12 +89,29 @@ is one.
    signature counts toward the same lockout as at sign-in, and `UserService` records the failure in the audit trail as
    `signature.reauth-failed` (a wrong password, a locked account, and so on, never the password), so the trail shows
    that the password was tried at a signature and not at sign-in. A signature attempt is not throttled by client
-   address: the signer is already signed in, and the lockout applies.
+   address: the signer is already signed in, and the lockout applies. A user of an external identity provider has no
+   password; for that user this step takes the proof that the sign-in callback issued for exactly this user, project,
+   review, and slot from the `ReauthProofStore`, and spends it with `TryConsume`. When there is no live proof (or the
+   service has no store of proofs) the step gives `ReauthenticationFailed` with the message "Your identity is not
+   confirmed. Confirm it again, then sign.", `UserService.RecordExternalReauthFailureAsync` records
+   `signature.reauth-failed` (detail `oidc: no-proof`), and nothing is signed.
 8. The signature is stored by `IReviewStore.AddSignatureAsync`, which recomputes the digest inside a serializable
    transaction and refuses the signature when the record changed since step 4.
 
 The checks of steps 2 to 6 come before the password is asked for, so a refused signing does not count as a failed
-password attempt in the typical case. The password is never stored, logged, or put into a message.
+password attempt in the typical case. For the same reason an external user's proof is spent only in step 7: a refusal
+in steps 1 to 6 (an API token, a changed record, a blocker) keeps it, so the person can correct the cause and sign
+within its lifetime. The proof is single use: once spent in step 7 it is gone, also when the store then refuses the
+signature. The password is never stored, logged, or put into a message.
+
+**External confirmation without spending**: `HasReauthProofAsync` (actor, project identity, review identifier, slot
+identity) answers whether an enabled external user has a live proof for exactly this slot, without spending it; it is
+`false` for a local user, an API token, an unknown user, and a service without a store of proofs. A page uses it to show
+"Identity confirmed". `RequireConfirmableAsync` (same arguments) checks, read-only, that the actor may be asked to
+confirm for a slot: not an API token, able to see the project, an enabled external account that is a member of the
+project and a reviewer (primary or alternate) of the slot; it returns the stored user whose identity the confirmation
+must match, and otherwise raises `ProjectNotFound`, `SlotNotFound`, or `ActorNotAllowed`. The sign-in endpoint calls it
+before anything is sent to the provider, so no confirmation is asked for a signature the user could not make.
 
 **Serialization**: all operations that change slots or signatures run one at a time under one semaphore, which makes
 the one-slot-per-user rule and the signed-slot rule free of races for a single instance, so the service is registered
@@ -152,8 +170,8 @@ changes or deletes a signature. `UpdateSlotAsync` and `RemoveSlotAsync` return `
 
 **SignAsync**: Signs the review in a slot as described above.
 
-- *Parameters*: the actor, project identity, review identifier, slot identity, the expected digest, the password, and
-  a cancellation token.
+- *Parameters*: the actor, project identity, review identifier, slot identity, the expected digest, the password
+  (ignored for a user of an external identity provider), and a cancellation token.
 - *Returns*: `Task<ReviewSignature>` — the stored signature.
 - *Preconditions*: The actor and the expected digest are not null.
 - *Postconditions*: Nothing is stored when a rule fails.
@@ -184,8 +202,10 @@ never contain a password or a hash. An infrastructure failure of the store passe
 
 - **IReviewStore** — reads the record, the slots, and the signatures, and stores slots and signatures.
 - **IProjectAccess** — requires that the actor may see the project and that the signer and the reviewers are members.
-- **UserService** — looks up users, describes the reviewers, and re-authenticates the signer
-  (`ReauthenticateAsync`).
+- **UserService** — looks up users, describes the reviewers, re-authenticates the signer (`ReauthenticateAsync`), and
+  records a refused confirmation of an external user.
+- **ReauthProofStore** — holds the single-use proofs of external users (optional, injected; without it an external
+  user cannot sign).
 - **RecordDigest** — calculates the digest of the record.
 - **ThreadService** — `NextStep` words the next step when signing is blocked.
 - **ChecklistState** — decides which sections apply and what the answers are.
@@ -194,6 +214,7 @@ never contain a password or a hash. An infrastructure failure of the store passe
 #### Callers
 
 - **ReviewPage** and **ProjectPage** (`Web` subsystem) — show the approval, the slots, and the blockers, and make the
-  changes of the signed-in user.
+  changes of the signed-in user; the review page also asks `HasReauthProofAsync` for an external user.
+- **OidcSignIn** (`Identity` subsystem) — asks `RequireConfirmableAsync` before it starts a confirmation at the provider.
 - **ApiEndpoints** (`Api` subsystem) — reads the approval of a review; it cannot change slots or signatures.
 - **ServerHost** (`Hosting` subsystem) — registers the service as a singleton.

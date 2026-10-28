@@ -20,10 +20,13 @@ a Cancel link back to the list, and returns to the list after a user has been cr
 
 The list page uses the wide page container with a heading row that holds the title and the "+ New user" button, which is
 the single primary button of the page. Each user is a row card: the user name in bold, the display name muted, and
-badges for "System admin" (only for a system administrator) and the enabled state; the Disable or Enable button and the
+badges for "System admin" (only for a system administrator), the enabled state, and "OIDC" (only for an account of an
+identity provider; its title names the provider); the Disable or Enable button and the
 button "Make system admin" or "Remove system admin" are small outline buttons at the side of the
 row. Below the row the password field with its "Set password" button is
-kept on one tidy line (it wraps on a narrow screen). `NewUserPage` uses the narrow page container for forms and starts
+kept on one tidy line (it wraps on a narrow screen); an account of an identity provider has no password, so a muted
+note "Signs in with {provider}; no local password." takes the place of that line. `NewUserPage` uses the narrow page
+container for forms and starts
 with a breadcrumb (muted, with "/" separators, and the current page as text instead of a link) that leads back to the
 list.
 
@@ -46,12 +49,19 @@ at the top of the page when `null`, so that the message appears next to the cont
 
 **InteractiveMarker**: as for the other pages.
 
+**External account** (`User.IsExternal`): the row of such an account shows the badge `OIDC`, whose title is "Signs in
+with {DisplayName of the provider}" (from the injected `IOptions<OidcOptions>`), and the note instead of the password
+field and the "Set password" button, because the account has no password and `UserService.SetPasswordAsync` would refuse
+it. The other controls (disable or enable, system administrator) stay, so an administrator can still disable such an
+account. The page of the creation form creates local accounts only.
+
 Every interactive element and key value has a stable `data-testid` (see the test identifier rule of the Web
 subsystem): `users-page` (root), `new-user-button`, `users-error`, `users-status`, `users-list`, and per user (by user
 identity) `user-row-{id}`, `user-username-{id}`, `user-display-name-{id}`, `user-admin-{id}` (the badge, only for a
 system administrator), `user-enabled-{id}`,
-`user-toggle-enabled-{id}`, `user-toggle-admin-{id}`, `user-password-input-{id}`, and
-`user-set-password-{id}`. The page of the form has `new-user-page` (root), `breadcrumb-users-link`, `users-error`,
+`user-toggle-enabled-{id}`, `user-toggle-admin-{id}`, `user-password-input-{id}`, `user-set-password-{id}`,
+`user-oidc-{id}` (the badge, only for an account of an identity provider), and `user-no-password-{id}` (its note).
+The page of the form has `new-user-page` (root), `breadcrumb-users-link`, `users-error`,
 `new-user-form`, `new-user-username-input`, `new-user-display-name-input`, `new-user-system-admin-checkbox`,
 `new-user-password-input`, `create-user-button`, and `cancel-new-user-link`.
 
@@ -108,6 +118,7 @@ a convenience; the service remains the authority. Passwords are never shown or l
 - **SessionGate** (App) — wraps the whole page content, so the page is replaced by a "Session ended" message when the
   sign-in state of the open page ends.
 - **UserService** — lists, creates, and changes users, and looks up the signed-in user.
+- **OidcOptions** (Identity) — the display name of the provider that the badge and the note name (injected options).
 - **IProjectAccess** (Core) — through `ProjectViewGuard.GuardSystemAdminAsync`, tells whether the signed-in user is
   still an enabled system administrator, before and after every action.
 - **AuthenticationStateProvider** (ASP.NET Core) — gives the signed-in user; read through the `Identity` helper that

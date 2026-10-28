@@ -34,6 +34,9 @@ N/A - standard test environment.
 - When the sign-in state of the open page ends because the administrator lost the flag, the page is replaced by the
   "Session ended" message and offers no actions; an action sent after the session ended, before the page learned of
   it, shows an error that says the user is no longer signed in, without the list, and changes nothing.
+- An account of an identity provider carries an "OIDC" badge whose title names the provider and shows a note that it
+  has no local password, with no password field and no "Set password" button; a local account has neither the badge
+  nor the note.
 
 #### Test Scenarios
 
@@ -101,3 +104,9 @@ a click on the stale button changes nothing, and the ordinary user is still enab
 and the sign-in state ends without the page being told; the disable button of a user is used. The error area says that
 the user is no longer signed in and no list is rendered, and the user is still enabled. This scenario is tested by
 `UsersPage_Action_SessionEndedBeforePageKnows_ShowsClearErrorAndChangesNothing`.
+
+**UsersPage_Render_ExternalUser_ShowsMarkerAndNoPasswordControls**: One account of an identity provider and one local
+account exist and the provider is on (in `OidcPageTests.cs`). The row of the provider account has the badge "OIDC"
+with a title that names the provider and the note "no local password", and has no password field and no "Set
+password" button; the local row has no badge and still has the "Set password" button. This scenario is tested by
+`UsersPage_Render_ExternalUser_ShowsMarkerAndNoPasswordControls`.

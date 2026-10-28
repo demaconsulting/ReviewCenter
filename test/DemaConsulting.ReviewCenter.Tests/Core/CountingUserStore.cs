@@ -58,6 +58,12 @@ internal sealed class CountingUserStore(IUserStore inner) : IUserStore
     }
 
     /// <inheritdoc/>
+    public Task<User?> GetByExternalAsync(string issuer, string subject, CancellationToken cancellationToken = default)
+    {
+        return inner.GetByExternalAsync(issuer, subject, cancellationToken);
+    }
+
+    /// <inheritdoc/>
     public Task<IReadOnlyList<User>> ListAsync(CancellationToken cancellationToken = default)
     {
         ListCount++;

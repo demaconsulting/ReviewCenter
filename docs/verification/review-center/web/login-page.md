@@ -23,6 +23,10 @@ N/A - standard test environment (temporary SQLite databases are created by the t
 - A failed sign-in comes back to this page with the error flag and the return URL kept.
 - The notice to sign in with the new password is shown when the address carries `changed=1`, and not without the flag
   or with another value.
+- Only when sign-in with a provider is on, the page shows a "Sign in with" button with the display name of the
+  provider, in a form of its own beside the local form, that carries the local return address; when the address says
+  the provider failed (`error=oidc`) it shows one general message next to the button and none in the local form; when
+  the provider is off it shows no button.
 
 #### Test Scenarios
 
@@ -46,3 +50,24 @@ is redirected to this page with the error flag and the same return URL. This sce
 `/login`, and `/login?changed=0`, rendered as a component with nobody signed in (the one test of this unit that does not
 start the server, in `AppTests.cs`); the notice is shown only for `changed=1`. This scenario is tested by
 `LoginPage_Render_ChangedQuery_ShowsNoticeOnlyAfterPasswordChange`.
+
+**LoginPage_Render_ProviderEnabled_ShowsButtonBesideLocalForm**: With the provider on and nobody signed in, the page is
+rendered as a component with the return address `/projects` in the query (in `OidcPageTests.cs`). The button reads
+"Sign in with"
+and the provider name, its form posts to `/auth/oidc/login` and carries the return address `/projects`, the local form
+still posts to `/auth/login`, and no provider error is shown. This scenario is tested by
+`LoginPage_Render_ProviderEnabled_ShowsButtonBesideLocalForm`.
+
+**LoginPage_Render_ProviderFailed_ShowsGenericMessageNextToButton**: With the provider on, the address
+`/login?error=oidc` shows the general message next to the button, which names the provider and not a cause, and no
+error in the local form. This scenario is tested by `LoginPage_Render_ProviderFailed_ShowsGenericMessageNextToButton`.
+
+**LoginPage_Render_ProviderOff_ShowsNoButton**: With the provider off, the address `/login?error=oidc` shows no
+provider card, and the local form is the only form. This scenario is tested by
+`LoginPage_Render_ProviderOff_ShowsNoButton`.
+
+**OidcSignIn_Enabled_SignInPageOffersButtonBesideLocalForm**: Through the real pipeline with a fake provider and the
+provider on, the page requested over HTTP shows the button with the display name beside the local form, the general
+message after a failure, and the local return address. This scenario is tested by
+`OidcSignIn_Enabled_SignInPageOffersButtonBesideLocalForm`, defined in `OidcSignInTests.cs` and described with the
+`OidcSignIn` unit.

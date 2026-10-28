@@ -6,7 +6,8 @@ ReviewCenter is a web-based formal code review service with a companion command-
 interface. The service is an ASP.NET Core Blazor Server application started with the `serve`
 verb. The current release lets you sign in, create projects and draft reviews made from uploaded files, shows the
 content fingerprint of each review, lets you discuss the files in threaded comments, gives each review a
-checklist, and lets reviewers sign a review with their password, with every action recorded under the signed-in
+checklist, and lets reviewers sign a review with their password (or by signing in again at an identity provider), with
+every action recorded under the signed-in
 user. Every change is also recorded in a hash-chained audit trail that can be read and verified. The remaining review
 feature (review states beyond Draft) is still under development. The web interface has a built-in Help with short
 guides to the main tasks. The command-line
@@ -32,7 +33,7 @@ These items are planned but not yet implemented:
 
 - The remaining review features of the ReviewCenter web service: review states beyond Draft
 - External anchoring, export, and retention of the audit trail
-- Password reset, multi-factor sign-in, and external identity providers
+- Password reset, multi-factor sign-in of local accounts, and a connection to several identity providers at once
 - EF Core database migrations with an explicit `migrate` command, and further database providers (PostgreSQL,
   SQL Server)
 - PDF/A evidence export of review records
@@ -141,7 +142,8 @@ The server provides these routes:
 - `/login` - the sign-in page (open to everyone).
 - `/help` and `/help/{topic}` - the built-in help (open to everyone); see [Built-in Help](#built-in-help).
 - `/about` - the version and a link to the project (open to everyone).
-- `/account` - your account, with the appearance (theme) setting and a form to change your password.
+- `/account` - your account, with the appearance (theme) setting and a form to change your password (an account at
+  an identity provider has no password, so it shows a note instead).
 - `/users` - the user administration page (system administrators only).
 - `/users/new` - the form that creates a user (system administrators only).
 - `/audit` - the audit trail (system administrators only).
@@ -203,7 +205,8 @@ Each topic is a page of its own with links to the previous and the next topic:
 - **Comments and threads** (`/help/comments-and-threads`): comment on a line or a file, reply, resolve, and share a
   link.
 - **Checklist** (`/help/checklist`): answer each check Pass, Fail, or N/A.
-- **Reviewers and signing** (`/help/reviewers-and-signing`): reviewer slots, signing with your password, and approval.
+- **Reviewers and signing** (`/help/reviewers-and-signing`): reviewer slots, signing with your password or at your
+  identity provider, and approval.
 - **Signed attestation** (`/help/signed-attestation`): download a digitally signed PDF of an approved review.
 - **Audit trail** (`/help/audit-trail`): every action is recorded in a tamper-evident chain.
 - **Planning reviews** (`/help/planning-reviews`): create the reviews of the review-sets of a repository in one go.
@@ -326,6 +329,69 @@ Some things to know:
   message is the same whether or not the user name exists. A successful sign-in gives its attempts back, but only to
   the window that was counted.
 
+### Sign In with an OpenID Connect Provider
+
+An administrator can let people sign in with the account they already have at an identity provider (Microsoft Entra ID,
+Keycloak, Okta, Google, or any other provider that follows OpenID Connect). It is off by default. When it is on, the
+sign-in page shows a **Sign in with** button with the name of the provider next to the form for local accounts, and
+both ways work side by side.
+
+**Turn it on.** Register ReviewCenter at the provider as a confidential web client that uses the authorization code
+flow. Give the provider the redirect address `https://<your server>/signin-oidc` (the address that people use to reach
+ReviewCenter, followed by `/signin-oidc`). Then set the following and restart the server. The environment variable of
+a setting has two underscores in place of each colon (for example `Identity__Oidc__ClientId`). The server does not
+start when a value is not valid, and the message names the setting but never its value.
+
+| Setting                              | Meaning                                         |
+| ------------------------------------ | ----------------------------------------------- |
+| `Identity:Oidc:Enabled`              | `true` to turn it on (default `false`)          |
+| `Identity:Oidc:Authority`            | Address of the provider                         |
+| `Identity:Oidc:ClientId`             | The client id of ReviewCenter                   |
+| `Identity:Oidc:ClientSecret`         | The client secret                               |
+| `Identity:Oidc:Scopes`               | Scopes (default `openid profile email`)         |
+| `Identity:Oidc:DisplayName`          | Name on the button (default OpenID Connect)     |
+| `Identity:Oidc:UsernameClaim`        | Claim for the user name (`preferred_username`)  |
+| `Identity:Oidc:RequireEmailVerified` | Refuse an e-mail that is not verified (off)     |
+| `Identity:Oidc:ReauthMaxAgeSeconds`  | How recent a login for a signature must be      |
+
+Keep the client secret in the environment or in a secret store, never in a file in a repository. The address of the
+provider must use `https`; `http` is accepted only for a provider on the same machine (`localhost`) so that it can be
+tried. `ReauthMaxAgeSeconds` is the age that the login at the provider may have when a signature is confirmed (default
+120; 10 to 900).
+
+**What happens at the first sign-in.** ReviewCenter identifies the person by the **issuer and the subject** that the
+provider gives, and by nothing else. A name or an e-mail address is never used to find an account, and an account at a
+provider is **never linked to a local account**, even when the user names are the same. The first time, ReviewCenter
+creates an account that is enabled, is not a system administrator, and has no project, so the person sees nothing until
+a project administrator adds them to a project (see [Managing Project Members](#managing-project-members)) or a system
+administrator changes their role. The display name is taken from the provider and cleaned; the user name is made from
+the claim that you chose and is made unique with a number if it is already taken. The Users page marks these accounts
+with **OIDC**. A system administrator can disable such an account like any other, and a disabled account cannot sign in.
+
+**No password.** An account of a provider has no password: the password sign-in is refused for it, the Account page says
+that the password is managed by the provider, and the Users page offers no password action for it. The provider
+decides how the person proves who they are, including multi-factor sign-in.
+
+**Sign out.** Logout ends the session of ReviewCenter only. The session at the provider stays, so signing in with the
+button again may not ask for anything.
+
+**Signatures.** A person who signs in with a provider confirms a signature by signing in at the provider again, since
+there is no password to type. On the review page, **Confirm identity with** the provider takes the person to the
+provider, which asks for a fresh login. ReviewCenter accepts it only when the login was made just now (within the
+setting above), by the same person as the account (the same subject at the same issuer), and then offers the signature
+for this reviewer slot. The confirmation is used up by one signature and cannot be used for another slot, another
+review, or another person. When anything is missing or does not match, nothing is signed. A token of the API still
+cannot sign.
+
+**When it fails.** Every failure at the sign-in page gives one general message (the provider failed or refused, the
+account is disabled, the answer could not be checked), so the page does not tell an attacker which. The cause is
+recorded as a short class in the audit trail (see [Recorded Actions](#recorded-actions)). The callback is limited like
+the password sign-in (see Password Rules and Lockout). A return address that is not on this server is replaced by the
+home page.
+
+**What is never logged.** ReviewCenter does not log or store the tokens, the claims, or the client secret of the
+provider.
+
 ### Account
 
 Open `/account` (the Account link in the header) to choose how ReviewCenter looks, to change your password, and to
@@ -371,7 +437,8 @@ a **System admin** badge for system administrators. A system administrator can:
 2. Disable a user, which stops the user from signing in without deleting the record of what the user did, and enable
    the user again.
 3. Make a user a system administrator (**Make system admin**) or take that away (**Remove system admin**).
-4. Set a new password for a user, for example when the user has forgotten it. This also ends a lockout.
+4. Set a new password for a user, for example when the user has forgotten it. This also ends a lockout. An account
+   of an identity provider (marked **OIDC**) has no password, so there is no such action for it.
 
 The last enabled system administrator cannot be disabled or demoted; the page shows an error instead. If you are no
 longer an enabled system administrator, the page shows an error for every action.
@@ -679,8 +746,12 @@ The page never shows text printed by git, the location of the repository, or a c
 
 ### Limitations of Sign-in
 
-- There is no password reset, no email, no multi-factor sign-in, and no external identity provider. A system
-  administrator sets a new password for a user who forgot it.
+- There is no password reset, no email, and no multi-factor sign-in for local accounts. A system
+  administrator sets a new password for a user who forgot it. Only one OpenID Connect provider can be set, an account
+  at it is never linked to a local account, and it is not updated when the person changes at the provider (the name
+  and the state of the account are those of the first sign-in, and a person who is removed at the provider keeps the
+  account here until a system administrator disables it). The sign-in at a provider does not end the session at the
+  provider when you log out.
 - The lockout counts failures per user name, so anyone who knows a user name can keep that account locked for 5
   minutes at a time by guessing wrongly on purpose, also from an address that the throttle allows. The sign-in
   throttle (see Sign In and Out) limits how often one address can try, but it does not prevent this. This is an
@@ -819,7 +890,10 @@ membership of the project and being the assigned reviewer; a system administrato
 form shows
 the statement of the signature, "I have reviewed this record and approve it.", and asks you to confirm your password.
 Enter your password and press **Sign**. The password is checked like at sign-in, so wrong passwords count toward the
-same lockout, and it is never stored or shown. A review can be signed only when:
+same lockout, and it is never stored or shown. A reviewer whose account is at an identity provider has no password; the
+slot offers **Confirm identity with** the provider instead, which sends the person to the provider to sign in again,
+and after that the slot offers **Sign** (see
+[Sign In with an OpenID Connect Provider](#sign-in-with-an-openid-connect-provider)). A review can be signed only when:
 
 - it has a checklist, and every check of an applicable section is answered;
 - no check of an applicable section is answered Fail; and
@@ -1320,8 +1394,10 @@ head hash is a manual step, and it is most useful after important events such as
 | Passwords | `user.password-set-by-admin`, `user.password-changed`                                |
 | Sign-in   | `auth.sign-in`, `auth.sign-out`, `auth.sign-in-failed`, `auth.locked-out`            |
 | Sign-in   | `auth.sign-in-locked`, `auth.sign-in-throttled`                                      |
+| Sign-in   | `auth.oidc-sign-in`, `auth.oidc-sign-in-failed` (with a short class of the reason)   |
+| Users     | `account.oidc-created` (an account was created at the first sign-in at a provider)   |
 | Auditing  | `audit.events-suppressed` (events of new keys were not recorded; the table was full) |
-| Signing   | `signature.reauth-failed` (a wrong password when a signature was entered)            |
+| Signing   | `signature.reauth-failed` (a wrong password, or a missing confirmation at a provider)|
 | Evidence  | `attestation.generated` (a signed attestation PDF was downloaded)                    |
 | Evidence  | `project.evidence-settings-changed` (the evidence settings of a project were saved)  |
 | Tokens    | `token.created`, `token.revoked`                                                     |
@@ -1395,7 +1471,9 @@ created before it must be recreated too. Project member management adds the must
 settings add seven columns to the projects (`EvidenceAnonymousIndex`, `EvidenceAnonymousAttestations`,
 `EvidenceIncludeThreads`, `EvidenceIncludeReviewerNames`, `EvidenceIncludeChecklistWording`, `EvidenceIncludeFiles`,
 and `EvidenceIncludeGitContext`), and the record digest is now labeled `ReviewCenter record v1`, a format private to
-ReviewCenter that also covers the wording of the checklist questions and who answered them. There is no migration:
+ReviewCenter that also covers the wording of the checklist questions and who answered them. The sign-in with an
+OpenID Connect provider adds two columns to the users (`Users.ExternalIssuer` and `Users.ExternalSubject`) with a unique
+index on the pair. There is no migration:
 recreate development databases created before them.
 
 ## Repositories and Credentials

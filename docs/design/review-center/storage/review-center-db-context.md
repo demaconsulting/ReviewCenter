@@ -62,7 +62,10 @@ repository registry is the one exception, see `Repositories`).
   ignores case; `DisplayName` is required, at most 100; `IsSystemAdmin` (false for an ordinary user); `Enabled`;
   `PasswordHash` is required; `FailedLoginCount`; `LockoutUntil` (null when the user is not locked out);
   `MustChangePassword` (true for an account created with a temporary password until the user changes it; false for
-  every other account); `Created`.
+  every other account); `Created`; `ExternalIssuer` (at most 512) and `ExternalSubject` (at most 256), both null for a
+  local account and set together for the account of an external identity provider, with the default binary collation
+  so that they compare exactly. A unique index on the pair makes one account per identity; SQLite treats nulls as
+  distinct, so any number of local accounts is allowed.
 - **ProjectMemberships** (`ProjectMembership`): key `UserId` plus `ProjectId`, so a user has at most one membership
   per project and the database refuses a second. Both columns are foreign keys, to `Users` and to `Projects`, and a
   membership is deleted with its user or its project. `Role` (the project role, `ProjectAdmin` or `User`) is stored as
@@ -121,7 +124,8 @@ composite key of a review (project and review identifier) makes the review ident
 allows the same identifier in two projects. The composite key of a file makes its path unique within a review, and the
 composite key of a membership makes a user a member of a project at most once.
 These keys are what enforces uniqueness in the database even when two requests race; the only separate unique indexes
-are the one on the user name, the one on the project and name of a repository, and the one on the slot and digest of a
+are the one on the user name, the one on the external issuer and subject of a user, the one on the project and name of
+a repository, and the one on the slot and digest of a
 signature. The state is stored by name, so
 adding states later does not change the meaning of stored rows. The
 tables of threads and comments are new: a database created before they existed does not have them and is not
@@ -143,7 +147,8 @@ again. The same holds for the `MustChangePassword` column of a user (project mem
 with `EnsureCreated` and has no migrations, so a development database created before that column existed does not have
 it and must be deleted and created again. The same holds for the seven evidence settings columns of a project: there is
 no migration for them either, `EnsureCreated` does not add a column to an existing table, and development databases
-are recreated. The
+are recreated. The same holds for the `ExternalIssuer` and `ExternalSubject` columns of a user and their unique index
+(sign-in with an identity provider): a development database created before them must be deleted and created again. The
 checklist keys are what makes "one answer per check" a rule of the database. The section and
 check identifiers are not related to a table of their own: they name entries inside the snapshot, and the service
 checks them.

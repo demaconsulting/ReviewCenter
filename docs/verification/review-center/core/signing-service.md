@@ -34,6 +34,12 @@ N/A - standard test environment.
   cannot sign.
 - A wrong, empty, or missing password gives `ReauthenticationFailed`, and repeated failures lock the account as at
   sign-in.
+- A user of an external identity provider signs only with a live proof for exactly this user, project, review, and
+  slot, which the signature spends; without one (also with a password, an expired proof, a proof of another binding,
+  or no store of proofs) the signature is refused with `ReauthenticationFailed` and nothing is signed, and a refusal
+  before the password step keeps the proof.
+- The page can ask whether a proof exists without spending it, and the check before a confirmation accepts only an
+  external member who is a reviewer of the slot.
 - Signing is refused with the blockers named while a check is unanswered, a check of an applicable section is answered
   Fail, or a thread is open; a Fail in a section that does not apply does not block.
 - Signing is refused when the record changed after the signer saw it, and when the slot already has a signature of the
@@ -183,6 +189,28 @@ shows that nothing else is checked first, and the slot stays unsigned. This scen
 **SigningService_AddUpdateRemoveSlot_ApiTokenActor_IsRefused**: An actor that came through a token adds, changes, and
 removes a slot; each is refused with `ActorNotAllowed` and the existing slot is unchanged. This scenario is tested by
 `SigningService_AddUpdateRemoveSlot_ApiTokenActor_IsRefused`.
+
+**SigningService external scenarios**: The signature of a user of an external identity provider is verified in
+`SigningServiceExternalTests.cs`, over the same fakes and a real `ReauthProofStore` that shares the clock of the
+service. A live proof for the user, review, and slot lets the user sign without a password, and the proof is spent by
+it, which is tested by `SigningService_SignAsync_ExternalUserWithProof_SignsOnce`. A theory over a null, an empty, and a
+right-looking password without a proof, and over a proof left to expire, is refused with `ReauthenticationFailed` and
+the slot stays unsigned, which is tested by `SigningService_SignAsync_ExternalUserWithoutLiveProof_IsRefused`. Proofs
+for another slot, another review, and another user do not let the user sign, and the proof of the other slot is not
+spent by the attempt, which is tested by `SigningService_SignAsync_ProofOfOtherBinding_IsRefused`. A service without a
+store of proofs refuses an external user even when a proof was issued elsewhere, which is tested by
+`SigningService_SignAsync_ExternalUserWithoutProofStore_IsRefused`. An actor that came through a token with a live
+proof is refused with `ActorNotAllowed` and the proof stays, which is tested by
+`SigningService_SignAsync_ApiTokenActorWithProof_IsRefusedAndKeepsProof`; a stale expected digest is refused with
+`RecordChanged` and the proof stays, which is tested by `SigningService_SignAsync_RecordChanged_KeepsTheProof`.
+`HasReauthProofAsync` answers `true` twice for a live proof (so it does not spend it) and `false` for another slot, a
+local user, a token actor, and an unknown user, which is tested by
+`SigningService_HasReauthProofAsync_AnswersWithoutSpending`. `RequireConfirmableAsync` returns the stored user for the
+reviewer of the slot and refuses a local user and a token actor with `ActorNotAllowed`, an unknown slot with
+`SlotNotFound`, and an unknown user with a named rule, which is tested by
+`SigningService_RequireConfirmableAsync_AcceptsOnlyAReviewerOfTheSlot`; a second external user who is not a reviewer of
+the slot is refused with `ActorNotAllowed`, which is tested by
+`SigningService_RequireConfirmableAsync_NotAReviewerOfTheSlot_IsRefused`.
 
 **SigningService_Constructor_NullArguments_Throw**: A null store, user service, project access, or clock is rejected
 with an

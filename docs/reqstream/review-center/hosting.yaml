@@ -226,3 +226,17 @@ sections:
           - ReviewCenter-ServerHost-ApiRegistration
         tests:
           - ServerHost_CreateApplication_ApiRoutes_AreMapped
+
+      - id: ReviewCenter-Hosting-OidcSignIn
+        title: >-
+          The Hosting subsystem shall connect the sign-in with an OpenID Connect provider to the server when an
+          administrator turns it on, stopping the start with a clear error that never shows a secret when the settings
+          are wrong, and shall leave the server as it was when it is off.
+        justification: |
+          The sign-in is optional, so a server that does not use it must not change, and a server that does must not
+          start with settings that cannot work.
+        children:
+          - ReviewCenter-ServerHost-OidcSettings
+        tests:
+          - ServerHost_CreateApplication_InvalidOidcSettings_ThrowsClearErrorWithoutSecret
+          - ServerHost_CreateApplication_OidcOffOrValid_BuildsTheApplication

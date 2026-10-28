@@ -76,6 +76,15 @@ public interface IUserStore
     Task<User?> GetByUsernameAsync(string username, CancellationToken cancellationToken = default);
 
     /// <summary>
+    ///     Reads the user that belongs to an identity at an external identity provider.
+    /// </summary>
+    /// <param name="issuer">The issuer of the provider; compared exactly (case-sensitive).</param>
+    /// <param name="subject">The identifier of the person at the provider; compared exactly (case-sensitive).</param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <returns>The user, or <c>null</c> when no account belongs to that identity.</returns>
+    Task<User?> GetByExternalAsync(string issuer, string subject, CancellationToken cancellationToken = default);
+
+    /// <summary>
     ///     Lists all users.
     /// </summary>
     /// <param name="cancellationToken">Cancels the operation.</param>

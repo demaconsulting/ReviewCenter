@@ -302,6 +302,25 @@ reviews:
       - "src/**/Identity/SignInThrottleOptions.cs"
       - "test/**/Identity/SignInThrottleTests.cs"
 
+  - id: ReviewCenter-Identity-OidcSignIn
+    title: Review of ReviewCenter OidcSignIn unit implementation
+    context:
+      - docs/design/review-center.md
+      - docs/reqstream/review-center.yaml
+      - docs/design/review-center/identity.md
+      - docs/reqstream/review-center/identity.yaml
+    paths:
+      - "docs/reqstream/review-center/identity/oidc-sign-in.yaml"
+      - "docs/design/review-center/identity/oidc-sign-in.md"
+      - "docs/verification/review-center/identity/oidc-sign-in.md"
+      - "src/**/Identity/OidcSignIn.cs"
+      - "src/**/Identity/OidcOptions.cs"
+      - "test/**/Identity/OidcSignInTests.cs"
+      - "test/**/Identity/OidcReauthTests.cs"
+      - "test/**/Identity/OidcOptionsTests.cs"
+      - "test/**/Identity/OidcTestApp.cs"
+      - "test/**/Identity/FakeIdentityProvider.cs"
+
   - id: ReviewCenter-Identity-RevalidatingAuthenticationStateProvider
     title: Review of ReviewCenter RevalidatingAuthenticationStateProvider unit implementation
     context:
@@ -394,6 +413,7 @@ reviews:
       - "src/**/Web/Help*.razor"
       - "src/**/Web/HelpTopics.cs"
       - "test/**/Web/HelpPageTests.cs"
+      - "test/**/Web/OidcPageTests.cs"
 
   - id: ReviewCenter-Web-ProjectsPage
     title: Review of ReviewCenter ProjectsPage unit implementation
@@ -475,6 +495,7 @@ reviews:
       - "test/**/Web/ReviewPageRepositoryTests.cs"
       - "test/**/Web/ReviewPageDiffTests.cs"
       - "test/**/Web/ReviewLinksTests.cs"
+      - "test/**/Identity/OidcReauthTests.cs"
       - "test/**/Web/ReviewDeepLinkTests.cs"
 
   - id: ReviewCenter-Web-ChecklistPage
@@ -505,6 +526,7 @@ reviews:
       - "docs/verification/review-center/web/login-page.md"
       - "src/**/Web/LoginPage.razor"
       - "src/**/Web/LoginPage.razor.cs"
+      - "test/**/Web/OidcPageTests.cs"
 
   - id: ReviewCenter-Web-AccountPage
     title: Review of ReviewCenter AccountPage unit implementation
@@ -520,6 +542,7 @@ reviews:
       - "src/**/Web/AccountPage.razor"
       - "src/**/Web/AccountPage.razor.cs"
       - "test/**/Web/AccountPageTests.cs"
+      - "test/**/Web/OidcPageTests.cs"
 
   - id: ReviewCenter-Web-UsersPage
     title: Review of ReviewCenter UsersPage unit implementation
@@ -537,6 +560,7 @@ reviews:
       - "src/**/Web/NewUserPage.razor"
       - "src/**/Web/NewUserPage.razor.cs"
       - "test/**/Web/UsersPageTests.cs"
+      - "test/**/Web/OidcPageTests.cs"
 
   - id: ReviewCenter-Web-HistoryPage
     title: Review of ReviewCenter HistoryPage unit implementation
@@ -763,6 +787,7 @@ reviews:
       - "src/DemaConsulting.ReviewCenter.Core/IUserStore.cs"
       - "src/DemaConsulting.ReviewCenter.Core/IPasswordHasher.cs"
       - "test/**/Core/UserServiceTests.cs"
+      - "test/**/Core/UserServiceExternalTests.cs"
       - "test/**/Core/MustChangePasswordTests.cs"
       - "test/**/Core/AuditEventTests.cs"
 
@@ -798,8 +823,23 @@ reviews:
       - "src/DemaConsulting.ReviewCenter.Core/SlotRole.cs"
       - "src/DemaConsulting.ReviewCenter.Core/ReviewApproval.cs"
       - "test/**/Core/SigningServiceTests.cs"
+      - "test/**/Core/SigningServiceExternalTests.cs"
       - "test/**/Core/CountingUserStore.cs"
       - "test/**/Core/AuditEventTests.cs"
+
+  - id: ReviewCenter-Core-ReauthProofStore
+    title: Review of ReviewCenter ReauthProofStore unit implementation
+    context:
+      - docs/design/review-center.md
+      - docs/reqstream/review-center.yaml
+      - docs/design/review-center/core.md
+      - docs/reqstream/review-center/core.yaml
+    paths:
+      - "docs/reqstream/review-center/core/reauth-proof-store.yaml"
+      - "docs/design/review-center/core/reauth-proof-store.md"
+      - "docs/verification/review-center/core/reauth-proof-store.md"
+      - "src/DemaConsulting.ReviewCenter.Core/ReauthProofStore.cs"
+      - "test/**/Core/ReauthProofStoreTests.cs"
 
   # ReviewCenter - Core audit trail
   - id: ReviewCenter-Core-AuditChain
@@ -1506,6 +1546,20 @@ reviews:
       - "docs/reqstream/ots/openapi.yaml"
       - "docs/design/ots/openapi.md"
       - "docs/verification/ots/openapi.md"
+
+  - id: OTS-OpenIdConnect
+    title: Review of Microsoft.AspNetCore.Authentication.OpenIdConnect OTS verification evidence
+    paths:
+      - "docs/reqstream/ots/openidconnect.yaml"
+      - "docs/design/ots/openidconnect.md"
+      - "docs/verification/ots/openidconnect.md"
+
+  - id: OTS-OpenIddict
+    title: Review of OpenIddict test identity provider OTS verification evidence
+    paths:
+      - "docs/reqstream/ots/openiddict.yaml"
+      - "docs/design/ots/openiddict.md"
+      - "docs/verification/ots/openiddict.md"
 
   - id: OTS-Pandoc
     title: Review of Pandoc OTS verification evidence

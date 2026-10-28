@@ -31,6 +31,11 @@ N/A - standard test environment.
   custom set are accepted.
 - A git timeout (`Git:TimeoutSeconds`) outside 1 to 3600 seconds is reported with an error that names the setting;
   1 and 3600 are accepted.
+- Invalid settings of sign-in with an OpenID Connect provider (a missing or insecure authority, a bad client
+  identifier, scopes without `openid`, a long display name, a bad user name claim, an age outside 10 to 900 seconds, or
+  a control character in the secret) stop the start with an error that names the `Identity:Oidc` setting and never
+  contains the value or the secret; with the provider off nothing is checked, and valid settings (https, or http on a
+  loopback host) build the application. With the provider off the endpoints and the callback are not mapped.
 - An unsupported database provider and an unusable database location are reported as the error "Failed to prepare
   the database", and `RunAsync` returns exit code 1 for each.
 - The repository store, the git source, and the token protector are registered as shared instances; the git cache and
@@ -110,6 +115,23 @@ settings" and names the setting is thrown. This scenario is tested by
 **ServerHost_CreateApplication_ValidThrottleSettings_BuildsTheApplication**: The pipeline is built with the default
 throttle settings and with explicit valid ones (3, 3, and 86400 seconds); both are built. This scenario is tested by
 `ServerHost_CreateApplication_ValidThrottleSettings_BuildsTheApplication`.
+
+**ServerHost_CreateApplication_InvalidOidcSettings_ThrowsClearErrorWithoutSecret**: A theory; with
+`Identity:Oidc:Enabled` true and valid settings otherwise (and a secret), the pipeline is built with one invalid value:
+an empty, http, malformed, or query-carrying authority, an empty or space-containing client identifier, scopes without
+`openid`, a display name of 51 characters, a user name claim with a space, an age of 5 or 901 seconds, or a control
+character in the client secret. An `InvalidOperationException` that says "Invalid OpenID Connect sign-in settings" and
+names the setting is thrown, and its message never holds the secret. This scenario is tested by
+`ServerHost_CreateApplication_InvalidOidcSettings_ThrowsClearErrorWithoutSecret`.
+
+**ServerHost_CreateApplication_OidcOffOrValid_BuildsTheApplication**: The pipeline is built with the provider off and a
+garbage authority (not read), with an https authority, and with an http loopback authority and the largest age of 900
+seconds; all three are built. This scenario is tested by `ServerHost_CreateApplication_OidcOffOrValid_BuildsTheApplication`.
+
+**OidcSignIn_Disabled_EndpointsAreNotMappedAndNoButtonIsShown**: With the provider off, the endpoints of the sign-in
+and the callback address `/signin-oidc` are answered like an unknown address, and the login page shows no button. This
+scenario is tested by `OidcSignIn_Disabled_EndpointsAreNotMappedAndNoButtonIsShown`, defined in
+`OidcSignInTests.cs` and described with the `OidcSignIn` unit.
 
 **ServerHost_CreateApplication_GitTimeoutOutOfRange_ThrowsClearError**: A theory over 0, -5, and 3601: the pipeline is built
 with the setting `Git:TimeoutSeconds` set to that value; an `InvalidOperationException` whose message names the setting

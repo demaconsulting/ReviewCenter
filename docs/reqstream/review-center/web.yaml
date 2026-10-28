@@ -559,3 +559,23 @@ sections:
           - EvidenceSettingsPage_Render_NoAdministerRight_ShowsNotFoundAndNoSwitches
           - EvidenceSettingsPage_Save_Change_StoresConfirmsAndAudits
           - HelpEvidenceSettingsPage_Render_ExplainsAnonymousAccessContentSwitchesAndScope
+
+      - id: ReviewCenter-Web-OidcSignIn
+        title: >-
+          The Web subsystem shall offer the sign-in with an OpenID Connect provider as a button beside the form for a
+          local account, mark the accounts of the provider on the user list without offering a password for them,
+          replace the password form of their own page by a sentence, offer a confirmation at the provider in place of
+          the password for a signature, and explain all of this in the help topics.
+        justification: |
+          People must find the way that suits their account without reading a manual, and the pages must not offer what
+          the rules refuse. The behavior needs a live connection, so it is verified by the component tests of the
+          units and by the tests of the flow.
+        children:
+          - ReviewCenter-LoginPage-OidcButton
+          - ReviewCenter-UsersPage-ExternalAccount
+          - ReviewCenter-AccountPage-ExternalAccount
+          - ReviewCenter-ReviewPage-ExternalSignature
+          - ReviewCenter-HelpPage-OidcSignIn
+        tests:
+          - LoginPage_Render_ProviderEnabled_ShowsButtonBesideLocalForm
+          - OidcReauth_ReviewPage_OffersConfirmationThenSigning

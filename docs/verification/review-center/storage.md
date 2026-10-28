@@ -48,6 +48,8 @@ The native SQLite library must be loadable on the test platform (it is supplied 
   unknown project; the last enabled project administrator cannot be removed or demoted when the caller requires another
   administrator, also when two changes race; and an account is stored with its membership and its audit entry together
   or not at all; these are verified in the unit tests of `ReviewStore` and `UserStore` on the real database.
+- An account of an identity provider is stored with its issuer and subject, is found only by the exact pair, and a
+  second account with the same pair is refused; this is verified in the unit tests of `UserStore` on the real database.
 - The evidence settings of a project are stored with the project (the defaults for a new project), are changed only
   when the stored settings still equal the expected ones, and are stored with their audit entry or not at all; this is
   verified in the unit tests of `ReviewStore` on the real database.
@@ -138,6 +140,11 @@ membership and its audit entry by `UserStore_AddToProjectAsync_StoresAccountMemb
 `UserStore_AddToProjectAsync_Failure_StoresNothing`, all defined in `ProjectMembersStoreTests.cs`. The listing of the
 audit trail for one project only is tested by `AuditStore_ListAsync_ProjectOnly_IsIsolatedAndTheChainStillVerifies`
 in the same file.
+
+**External identity**: An account of an identity provider is found only by the exact pair of issuer and subject, and a
+second account with the same pair is refused, while any number of local accounts (no pair) are stored; these are tested
+by `UserStore_GetByExternalAsync_FindsOnlyTheExactPair` and `UserStore_AddAsync_SameExternalIdentityTwice_IsRefused`,
+defined in `UserStoreTests.cs` and verified on the real database.
 
 **Evidence settings**: A new project has the default evidence settings, a change is stored for its own project only
 together with its audit entry, and a change based on settings that are no longer stored changes nothing; these are

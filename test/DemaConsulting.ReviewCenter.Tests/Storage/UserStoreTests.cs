@@ -55,11 +55,15 @@ public class UserStoreTests
     ///     Builds a user for the tests.
     /// </summary>
     /// <param name="username">The user name.</param>
+    /// <param name="issuer">The issuer of the external identity, or <c>null</c> for a local user.</param>
+    /// <param name="subject">The subject of the external identity, or <c>null</c> for a local user.</param>
     /// <returns>The user.</returns>
-    private static User NewUser(string username)
+    private static User NewUser(string username, string? issuer = null, string? subject = null)
     {
         return new User
         {
+            ExternalIssuer = issuer,
+            ExternalSubject = subject,
             Id = 9001, // supplied identities must be ignored; the store assigns its own
             Username = username,
             DisplayName = "Display " + username,
@@ -162,5 +166,58 @@ public class UserStoreTests
 
         // Assert: ordered by user name
         Assert.Equal(["ann", "bob", "cy"], listed.Select(user => user.Username));
+    }
+
+    /// <summary>
+    ///     Test that an account of an identity provider round-trips its issuer and subject, is found by the exact
+    ///     pair only, and that a local user has none.
+    /// </summary>
+    [Fact]
+    public async Task UserStore_GetByExternalAsync_FindsOnlyTheExactPair()
+    {
+        // Arrange: a store with a local user and a user of a provider
+        var store = Open(out var provider);
+        using var _ = provider;
+        await store.AddAsync(NewUser("ann"), TestContext.Current.CancellationToken);
+        var external = NewUser("olive", "https://idp.example/", "Sub-1");
+        var added = await store.AddAsync(external, TestContext.Current.CancellationToken);
+
+        // Act
+        var found = await store.GetByExternalAsync("https://idp.example/", "Sub-1", TestContext.Current.CancellationToken);
+        var otherCase = await store.GetByExternalAsync("https://idp.example/", "sub-1", TestContext.Current.CancellationToken);
+        var otherIssuer = await store.GetByExternalAsync("https://idp.example", "Sub-1", TestContext.Current.CancellationToken);
+        var local = await store.GetByUsernameAsync("ann", TestContext.Current.CancellationToken);
+
+        // Assert
+        Assert.Equal(added.Id, found?.Id);
+        Assert.True(found?.IsExternal);
+        Assert.Equal(("https://idp.example/", "Sub-1"), (found?.ExternalIssuer, found?.ExternalSubject));
+        Assert.Null(otherCase);
+        Assert.Null(otherIssuer);
+        Assert.False(local?.IsExternal);
+    }
+
+    /// <summary>
+    ///     Test that two accounts of the same issuer and subject are refused by the database, so a race between two
+    ///     first sign-ins cannot create two accounts, while many local users (without an identity) are allowed.
+    /// </summary>
+    [Fact]
+    public async Task UserStore_AddAsync_SameExternalIdentityTwice_IsRefused()
+    {
+        // Arrange: a store with a user of a provider and two local users
+        var store = Open(out var provider);
+        using var _ = provider;
+        await store.AddAsync(NewUser("ann"), TestContext.Current.CancellationToken);
+        await store.AddAsync(NewUser("bob"), TestContext.Current.CancellationToken);
+        await store.AddAsync(NewUser("olive", "https://idp.example/", "sub-1"), TestContext.Current.CancellationToken);
+        var second = NewUser("olive-2", "https://idp.example/", "sub-1");
+
+        // Act
+        var exception = await Assert.ThrowsAsync<DomainRuleException>(
+            () => store.AddAsync(second, TestContext.Current.CancellationToken));
+
+        // Assert
+        Assert.Equal(DomainRule.UserNameTaken, exception.Rule);
+        Assert.Equal(3, (await store.ListAsync(TestContext.Current.CancellationToken)).Count);
     }
 }

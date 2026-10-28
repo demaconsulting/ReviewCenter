@@ -23,6 +23,8 @@ N/A - standard test environment.
 - The page shows the appearance options System, Light, and Dark with System selected when nothing is stored; choosing
   one is applied through the browser script at once and shown as selected; a stored choice is shown as selected.
 - A valid change changes the password of the signed-in user, shows a confirmation, and empties the fields.
+- A user who signs in with an identity provider sees a sentence that names the provider instead of the password form,
+  and has no password field and no change button.
 - A wrong current password, new passwords that do not match, and a new password that breaks the policy are each shown
   as an error and change nothing.
 - A user whose session carries the must-change-password claim sees a banner and the password form, and no tokens card
@@ -107,3 +109,8 @@ scenario is tested by `AccountPage_Render_NormalSession_ShowsNoBanner`.
 **AccountPage_ChangePassword_TemporaryPassword_RedirectsToLoginWithNotice**: A flagged user fills in the form with the
 current and a new password and submits; the browser is sent to `/login?changed=1` and the stored user no longer has the
 flag. This scenario is tested by `AccountPage_ChangePassword_TemporaryPassword_RedirectsToLoginWithNotice`.
+
+**AccountPage_Render_ExternalUser_ShowsNoPasswordForm**: The signed-in user is an account of an identity provider and
+the provider is on (in `OidcPageTests.cs`); the page shows the sentence that names the provider, and has no current
+password field and no change button. This scenario is tested by
+`AccountPage_Render_ExternalUser_ShowsNoPasswordForm`.

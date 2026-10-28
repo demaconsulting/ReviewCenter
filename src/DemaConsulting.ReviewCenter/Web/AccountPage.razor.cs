@@ -22,6 +22,7 @@ using DemaConsulting.ReviewCenter.Core;
 using DemaConsulting.ReviewCenter.Identity;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Authorization;
+using Microsoft.Extensions.Options;
 using Microsoft.JSInterop;
 
 namespace DemaConsulting.ReviewCenter.Web;
@@ -82,6 +83,12 @@ public partial class AccountPage : ComponentBase
     /// </summary>
     [Inject]
     private TimeProvider Time { get; set; } = null!;
+
+    /// <summary>
+    ///     Gets or sets the settings of sign-in with an identity provider, supplied by dependency injection.
+    /// </summary>
+    [Inject]
+    private IOptions<OidcOptions> Oidc { get; set; } = null!;
 
     /// <summary>
     ///     Gets the tokens of the signed-in user, newest first; never a token value.
@@ -167,11 +174,19 @@ public partial class AccountPage : ComponentBase
         // A temporary password limits the page to the password change; the service refuses tokens for it anyway
         var state = await AuthenticationState.GetAuthenticationStateAsync();
         MustChangePassword = SignIn.IsPasswordChangeRequired(state.User);
+        var name = state.User.Identity?.IsAuthenticated == true ? state.User.Identity.Name : null;
+        IsExternal = name is not null && (await UserService.GetAsync(name))?.IsExternal == true;
         if (!MustChangePassword)
         {
             await LoadTokensAsync();
         }
     }
+
+    /// <summary>
+    ///     Gets a value indicating whether the signed-in user signs in with an identity provider and so has no
+    ///     password to change here.
+    /// </summary>
+    private bool IsExternal { get; set; }
 
     /// <summary>
     ///     Gets a value indicating whether the signed-in user still has to replace a temporary password; the page

@@ -24,6 +24,7 @@ using DemaConsulting.ReviewCenter.Evidence;
 using DemaConsulting.ReviewCenter.Identity;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Authorization;
+using Microsoft.Extensions.Options;
 using Microsoft.JSInterop;
 
 namespace DemaConsulting.ReviewCenter.Web;
@@ -146,6 +147,13 @@ public partial class ReviewPage : ComponentBase, IDisposable
     public string? SideText { get; set; }
 
     /// <summary>
+    ///     Gets or sets the <c>reauth</c> query value: how the last confirmation of identity at the identity provider
+    ///     ended (<c>ok</c> or <c>failed</c>), put there by the sign-in endpoint when it sends the browser back.
+    /// </summary>
+    [SupplyParameterFromQuery(Name = "reauth")]
+    public string? ReauthText { get; set; }
+
+    /// <summary>
     ///     Gets or sets the service that reads reviews, supplied by dependency injection.
     /// </summary>
     [Inject]
@@ -168,6 +176,19 @@ public partial class ReviewPage : ComponentBase, IDisposable
     /// </summary>
     [Inject]
     private SigningService SigningService { get; set; } = null!;
+
+    /// <summary>
+    ///     Gets or sets the service that reads and changes users, used to tell whether the signed-in user signs in
+    ///     with an identity provider, supplied by dependency injection.
+    /// </summary>
+    [Inject]
+    private UserService Users { get; set; } = null!;
+
+    /// <summary>
+    ///     Gets or sets the settings of sign-in with an identity provider, supplied by dependency injection.
+    /// </summary>
+    [Inject]
+    private IOptions<OidcOptions> Oidc { get; set; } = null!;
 
     /// <summary>
     ///     Gets or sets the service that reads projects, supplied by dependency injection.
@@ -408,6 +429,24 @@ public partial class ReviewPage : ComponentBase, IDisposable
     ///     Gets or sets a counter that makes the browser build a fresh, empty password field after each attempt.
     /// </summary>
     private int PasswordKey { get; set; }
+
+    /// <summary>
+    ///     Gets a value indicating whether the signed-in user has no password because the account belongs to an
+    ///     identity provider; such a user confirms a signature by signing in again at the provider.
+    /// </summary>
+    private bool CurrentIsExternal { get; set; }
+
+    /// <summary>
+    ///     Gets the slots for which the signed-in user has confirmed their identity at the identity provider and not
+    ///     yet signed.
+    /// </summary>
+    private HashSet<int> ConfirmedSlots { get; } = [];
+
+    /// <summary>
+    ///     Gets or sets a value indicating whether the user has acted on the page since a failed confirmation was
+    ///     reported, so the report is not shown again.
+    /// </summary>
+    private bool ReauthReportDismissed { get; set; }
 
     /// <summary>
     ///     Gets or sets the text of the first line field of the new-thread form (blank for the whole file).
@@ -775,6 +814,66 @@ public partial class ReviewPage : ComponentBase, IDisposable
         // just ended, this reload must not fail; the page is replaced by the session-ended message instead
         var principal = (await AuthenticationState.GetAuthenticationStateAsync()).User;
         CurrentUsername = principal.Identity?.IsAuthenticated == true ? principal.Identity.Name ?? string.Empty : string.Empty;
+        await LoadConfirmationsAsync(actor);
+    }
+
+    /// <summary>
+    ///     Finds out whether the signed-in user signs in with an identity provider and which signatures they have
+    ///     already confirmed their identity for.
+    /// </summary>
+    /// <param name="actor">The signed-in user, or <c>null</c> when the sign-in state has ended.</param>
+    /// <returns>A task that completes when both are known.</returns>
+    /// <remarks>
+    ///     Nothing is spent: the confirmation is used up only by the signature itself. A user with a password is not
+    ///     looked up for confirmations.
+    /// </remarks>
+    private async Task LoadConfirmationsAsync(Actor? actor)
+    {
+        ConfirmedSlots.Clear();
+        CurrentIsExternal = false;
+        if (actor is null || Approval is null)
+        {
+            return;
+        }
+
+        CurrentIsExternal = (await Users.GetAsync(actor.Username))?.IsExternal == true;
+        if (!CurrentIsExternal)
+        {
+            return;
+        }
+
+        foreach (var slotId in Approval.Slots.Where(IsOccupant).Select(slot => slot.SlotId))
+        {
+            if (await SigningService.HasReauthProofAsync(actor, ProjectId, ReviewId, slotId))
+            {
+                ConfirmedSlots.Add(slotId);
+            }
+        }
+    }
+
+    /// <summary>
+    ///     Gets the address the confirmation of identity returns to: this review, without any file or thread.
+    /// </summary>
+    private string ReviewAddress => $"/projects/{ProjectId}/reviews/{Uri.EscapeDataString(ReviewId)}";
+
+    /// <summary>
+    ///     Gets the message to show next to the sign control of a slot.
+    /// </summary>
+    /// <param name="slotId">The identity of the slot.</param>
+    /// <returns>
+    ///     The message of the last failed signing attempt, or the report of a failed confirmation of identity, or
+    ///     <c>null</c> when there is nothing to report.
+    /// </returns>
+    private string? SignMessage(int slotId)
+    {
+        if (SignErrors.TryGetValue(slotId, out var error))
+        {
+            return error;
+        }
+
+        return CurrentIsExternal && !ReauthReportDismissed && ReauthText == OidcSignIn.ReauthFailed
+            ? $"We could not confirm your identity. Sign in again at {Oidc.Value.DisplayName} when asked."
+            : null;
     }
 
     /// <summary>
@@ -1500,7 +1599,9 @@ public partial class ReviewPage : ComponentBase, IDisposable
     /// <returns>A task that completes when the signature is stored or the problem is shown.</returns>
     /// <remarks>
     ///     The password is cleared after every attempt, whatever its outcome, and the field is rebuilt empty. It is
-    ///     only passed to the service, never kept, logged or rendered.
+    ///     only passed to the service, never kept, logged or rendered. A user of an identity provider has no password
+    ///     field; the service spends the confirmation of identity that the user made, and the page shows the result
+    ///     like any other.
     /// </remarks>
     private async Task SignAsync(int slotId)
     {
@@ -1508,6 +1609,8 @@ public partial class ReviewPage : ComponentBase, IDisposable
         {
             return;
         }
+
+        ReauthReportDismissed = true;
 
         try
         {

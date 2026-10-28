@@ -208,3 +208,17 @@ sections:
           script that mistypes an address must not receive the HTML of the not-found page.
         tests:
           - ServerHost_CreateApplication_ApiRoutes_AreMapped
+
+      - id: ReviewCenter-ServerHost-OidcSettings
+        title: >-
+          The ServerHost class shall, when the sign-in with an OpenID Connect provider is turned on, check its settings
+          at the start and stop with an error that names the setting that is wrong and never shows its value or the
+          client secret, shall do nothing for the provider when it is off, and shall keep the address of the callback
+          for itself so that no other route is mapped there.
+        justification: |
+          A wrong setting of a sign-in must be found by the administrator when the server starts, not by the first
+          person who cannot sign in, and a message that holds the secret would put it in the logs.
+        tests:
+          - ServerHost_CreateApplication_InvalidOidcSettings_ThrowsClearErrorWithoutSecret
+          - ServerHost_CreateApplication_OidcOffOrValid_BuildsTheApplication
+          - OidcSignIn_Disabled_EndpointsAreNotMappedAndNoButtonIsShown

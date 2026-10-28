@@ -139,6 +139,12 @@ internal sealed class GatedUserStore(IUserStore inner, string gatedPrefix) : IUs
     }
 
     /// <inheritdoc/>
+    public Task<User?> GetByExternalAsync(string issuer, string subject, CancellationToken cancellationToken = default)
+    {
+        return inner.GetByExternalAsync(issuer, subject, cancellationToken);
+    }
+
+    /// <inheritdoc/>
     public Task<IReadOnlyList<User>> ListAsync(CancellationToken cancellationToken = default)
     {
         return inner.ListAsync(cancellationToken);

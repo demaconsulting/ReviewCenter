@@ -85,4 +85,26 @@ public sealed class User
     ///     Gets the moment the account was created (UTC).
     /// </summary>
     public DateTimeOffset Created { get; init; }
+
+    /// <summary>
+    ///     Gets the issuer of the external identity provider that owns this account, or <c>null</c> for a local account.
+    /// </summary>
+    /// <remarks>
+    ///     Together with <see cref="ExternalSubject"/> it identifies the person at the provider; it is compared
+    ///     exactly, never by user name or e-mail address, so a provider can not take over another account. Never
+    ///     changes once the account exists.
+    /// </remarks>
+    public string? ExternalIssuer { get; init; }
+
+    /// <summary>
+    ///     Gets the identifier of the person at the external identity provider (the <c>sub</c> claim), or
+    ///     <c>null</c> for a local account.
+    /// </summary>
+    public string? ExternalSubject { get; init; }
+
+    /// <summary>
+    ///     Gets a value indicating whether the account belongs to an external identity provider: such an account
+    ///     has no password, and confirms a signature by signing in again at the provider.
+    /// </summary>
+    public bool IsExternal => ExternalIssuer is not null;
 }

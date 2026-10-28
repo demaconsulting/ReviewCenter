@@ -5,7 +5,8 @@
 #### Purpose
 
 `AccountPage` is the page at `/account`. Its responsibilities are to let the signed-in user choose the appearance of the
-interface, let the user change their own password, let the user create, list, and revoke their personal access tokens
+interface, let the user change their own password (a user who signs in with an identity provider has no password, so
+the page says so instead), let the user create, list, and revoke their personal access tokens
 for the API, and report when the page is interactive. It requires a signed-in user. When the account still has a
 temporary password (the claim `must_change_password`), it is also the only page the user may use: it then shows a
 banner and only the change-password form (no appearance and no tokens), and after the change it sends the user to the
@@ -35,6 +36,11 @@ of the first password field reads "Temporary password" instead of "Current passw
 **CurrentPassword**, **NewPassword**, **ConfirmPassword**: the values typed into the form. The second entry of the new
 password only guards against a typing error, so it is compared on the page; Core does not know it.
 
+**IsExternal**: whether the signed-in user signs in with an identity provider, read once with `UserService.GetAsync`
+when the page is initialized. When it is true the change-password card holds only the sentence "Your password is
+managed by {DisplayName of the provider}. There is no password to change here." (the display name comes from the
+injected `IOptions<OidcOptions>`), and no form. The appearance and tokens cards are the same as for any user.
+
 **ErrorMessage**: the message of the last rejected attempt; `null` when there is none.
 
 **Message**: the confirmation of the last successful change; `null` when there is none.
@@ -58,7 +64,8 @@ Every interactive element and key value has a stable `data-testid` (see the test
 subsystem): `account-page` (root), `password-change-required-banner` (only with a temporary password), `appearance-card`,
 `theme-system`, `theme-light`, `theme-dark`,
 `change-password-form`, `current-password-input`, `new-password-input`, `confirm-password-input`, `account-error`,
-`account-message`, `change-password-button`, and for the tokens card `tokens-card`, `tokens-help-link`,
+`account-message`, `change-password-button`, `account-external-password` (only for a user of an identity provider,
+in place of the form), and for the tokens card `tokens-card`, `tokens-help-link`,
 `create-token-form`, `token-name-input`, `token-expiry-{days}`, `create-token-button`, `token-error`, `token-message`,
 `new-token-box`, `new-token-value`, `copy-token-button`, `dismiss-token-button`, `token-copy-status`,
 `token-list-empty`, `token-list`, and for each token (by its identity) `token-row-{id}`, `token-name-{id}`,
@@ -125,7 +132,8 @@ the authority.
 
 - **SessionGate** (App) — wraps the whole page content, so the page is replaced by a "Session ended" message when the
   sign-in state of the open page ends.
-- **UserService** — changes the password.
+- **UserService** — changes the password, and tells whether the signed-in user is an account of an identity provider.
+- **OidcOptions** (Identity) — the display name of the provider named in the sentence (injected options).
 - **PersonalAccessTokenService** — creates, lists, and revokes the tokens.
 - **TimeProvider** — decides whether a token has expired.
 - **SignIn** — `GetActorAsync` supplies the user name from the authentication state, and `IsPasswordChangeRequired`

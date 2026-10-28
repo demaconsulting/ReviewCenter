@@ -75,6 +75,7 @@ public abstract class PageTestBase : BunitContext
         UserStore = userStore;
         Users = new UserService(userStore, new FakePasswordHasher(), clock, Audit);
         TokenStore = new FakePersonalAccessTokenStore(userStore);
+        Proofs = new ReauthProofStore(Time);
         Tokens = new PersonalAccessTokenService(TokenStore, userStore, Time);
         Services.AddSingleton(Tokens);
         RepositoryStore = new FakeRepositoryStore();
@@ -90,7 +91,7 @@ public abstract class PageTestBase : BunitContext
         Checklists = new ChecklistService(store, allowAll, clock);
         Repositories = new RepositoryService(RepositoryStore, new FakeCredentialProtector(), allowAll, clock);
         Reviews = new ReviewService(store, allowAll, clock, Repositories, Git);
-        Signing = new SigningService(store, Users, allowAll, clock);
+        Signing = new SigningService(store, Users, allowAll, clock, Proofs);
         Planner = new ReviewPlanner(store, Reviews, Repositories, Git, Signing, SetParser, allowAll);
 
         Access = new SignedInUserAccess(new ProjectAccess(userStore, store), userStore, () => _revalidating ? null : _authentication.Current);
@@ -98,7 +99,7 @@ public abstract class PageTestBase : BunitContext
         var pageProjects = new ProjectService(store, userStore, Access, new FakePasswordHasher(), clock, Audit);
         var pageRepositories = new RepositoryService(RepositoryStore, new FakeCredentialProtector(), Access, clock);
         var pageReviews = new ReviewService(store, Access, clock, pageRepositories, Git);
-        var pageSigning = new SigningService(store, Users, Access, clock);
+        var pageSigning = new SigningService(store, Users, Access, clock, Proofs);
         Services.AddSingleton(Audit);
         Services.AddSingleton(pageProjects);
         Services.AddSingleton(pageReviews);
@@ -155,6 +156,12 @@ public abstract class PageTestBase : BunitContext
     ///     Gets the in-memory user store behind the user service.
     /// </summary>
     internal FakeUserStore UserStore { get; }
+
+    /// <summary>
+    ///     Gets the store of the confirmations of identity behind the signing services, for arranging that an
+    ///     external user has confirmed a signature.
+    /// </summary>
+    internal ReauthProofStore Proofs { get; }
 
     /// <summary>
     ///     Gets the real access rules the pages use, for asking what a user may do.

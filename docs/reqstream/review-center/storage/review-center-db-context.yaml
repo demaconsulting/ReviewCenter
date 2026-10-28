@@ -185,3 +185,13 @@ sections:
           ambiguous, and the creator of a review must be kept with the review to be shown and audited later.
         tests:
           - ReviewCenterDbContext_Model_HasTokenTableAndReviewCreatorColumns
+
+      - id: ReviewCenter-DbContext-ExternalIdentity
+        title: >-
+          The ReviewCenterDbContext class shall map the issuer and the subject of the identity of a user at a provider
+          to columns of the user, with a unique index on the pair for the users that have one.
+        justification: |
+          The database is the last defense against two accounts for one identity at a provider, while any number of
+          local accounts, which have no such identity, must remain possible.
+        tests:
+          - UserStore_AddAsync_SameExternalIdentityTwice_IsRefused

@@ -31,6 +31,7 @@ This document covers the verification design for the following software items:
     - **PasswordHasher** — password hashing and verification
     - **SignIn** — cookie sign-in, authorization, and the signed-in actor
     - **SignInThrottle** — in-memory limit on failed sign-in attempts
+    - **OidcSignIn** — sign-in with an OpenID Connect provider and confirmation of identity for a signature
     - **RevalidatingAuthenticationStateProvider** — periodic re-check of the user of an open page
   - **Web** subsystem
     - **App** — HTML shell, router, page frame, and the session gate
@@ -74,6 +75,7 @@ This document covers the verification design for the following software items:
     - **ChecklistService** — review checklist rules, default checklist, and progress
     - **UserService** — user, password, lockout, and last administrator rules
     - **SigningService** — reviewer slot, re-authenticated signature, and approval rules
+    - **ReauthProofStore** — in-memory single-use proof of a confirmation of identity at a provider
     - **SelectionMatcher** — include and exclude pattern matching for file selection
     - **RevisionValidator** — git revision name validation
     - **RepositoryService** — repository registry rules
@@ -105,7 +107,9 @@ This document covers the verification design for the following software items:
 - **bUnit** — Blazor component testing library and in-memory test host
 - **Entity Framework Core** — object-relational mapper and SQLite provider
 - **FileAssert** — document assertion tool
+- **Microsoft.AspNetCore.Authentication.OpenIdConnect** — OpenID Connect sign-in handler
 - **Microsoft.AspNetCore.OpenApi** — OpenAPI document generation for the API
+- **OpenIddict** — OpenID Connect server library used by the tests as a fake identity provider
 - **Pandoc** — Markdown-to-HTML conversion tool
 - **Playwright** — browser automation library used by the Puppet developer tool
 - **ReqStream** — requirements traceability tool

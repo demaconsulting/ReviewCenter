@@ -5,8 +5,9 @@
 # - Define requirements for the ReviewCenter Identity subsystem
 # - The Identity subsystem spans PasswordHasher.cs (the password hash adapter), the sign-in code (cookie
 #   sign-in, the login and logout endpoints, the authorization policy, and the actor of the signed-in user),
-#   SignInThrottle.cs (the in-memory limit on sign-in attempts), and
-#   RevalidatingAuthenticationStateProvider.cs (the periodic re-check of the user of an open page)
+#   SignInThrottle.cs (the in-memory limit on sign-in attempts), RevalidatingAuthenticationStateProvider.cs (the
+#   periodic re-check of the user of an open page), and OidcSignIn.cs with OidcOptions.cs (the sign-in with an
+#   OpenID Connect provider and the confirmation of identity for a signature)
 # - Subsystem requirements describe the externally visible behavior of signing in, authorization, the end of
 #   open pages of a user who is no longer valid, and the identity of the person who acts
 
@@ -154,3 +155,34 @@ sections:
           - ReviewCenter-SignIn-Audit
         tests:
           - SignIn_Flow_LoginFailureAndLogout_FormAnIntactChain
+
+      - id: ReviewCenter-Identity-OidcSignIn
+        title: >-
+          The Identity subsystem shall, when an administrator has enabled it, let a person sign in with an account at
+          an OpenID Connect provider next to the password sign-in, by the authorization code flow with checks of the
+          token, create the account on the first sign-in without any right, never link it to a local account, never
+          offer a password for it, refuse it when it is disabled, keep the session as for a local user, and let the
+          person confirm a signature by signing in again at the provider, with an authentication time that is fresh,
+          for the same person, once, failing closed.
+        justification: |
+          Organizations already know their people at an identity provider and do not want a second set of passwords.
+          Using the provider for sign-in and for the confirmation of a signature keeps one place where people are
+          managed and where their passwords are protected, and the rules about accounts keep the provider from giving
+          anybody a right that only the administrators of the review tool give.
+        children:
+          - ReviewCenter-OidcSignIn-Login
+          - ReviewCenter-OidcSignIn-Settings
+          - ReviewCenter-OidcSignIn-Account
+          - ReviewCenter-OidcSignIn-DisabledRefused
+          - ReviewCenter-OidcSignIn-OpenRedirect
+          - ReviewCenter-OidcSignIn-Throttle
+          - ReviewCenter-OidcSignIn-Audit
+          - ReviewCenter-OidcSignIn-FailureAnswer
+          - ReviewCenter-OidcSignIn-Reauth
+          - ReviewCenter-OidcSignIn-LocalSession
+          - ReviewCenter-OidcSignIn-NoPassword
+          - ReviewCenter-OTS-OpenIdConnect-CodeFlow
+        tests:
+          - OidcSignIn_FirstSignIn_CreatesPlainAccountAndSignsIn
+          - OidcSignIn_Logout_IsLocalOnly
+          - OidcReauth_FreshSignInOfSamePerson_AllowsExactlyOneSignature

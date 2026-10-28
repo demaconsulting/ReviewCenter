@@ -2,7 +2,8 @@
 
    Presentation only; state and event handling live in UsersPage.razor.cs. A list of all users with, per user,
    the controls to disable or enable the account, to make the user a system administrator (or take that away) and
-   to set a new password; a "+ New user" button leads to the separate form page at "/users/new". Access is limited
+   to set a new password (not for an account of an identity provider, which has none and carries a badge with the
+   name of the provider); a "+ New user" button leads to the separate form page at "/users/new". Access is limited
    to system administrators by the attribute below. Which projects a user is a member of is managed on the project
    page, not here. Every interactive element and every key value carries a stable kebab-case data-testid
    (row-level ids carry the user id), and the data-interactive marker on the root flips to "true" once the live
@@ -64,6 +65,11 @@
                             <span class="badge" data-testid="user-admin-@userId">System admin</span>
                         }
                         <span class="badge @(user.Enabled ? "approved" : null)" data-testid="user-enabled-@userId">@(user.Enabled ? "Enabled" : "Disabled")</span>
+                        @if (user.IsExternal)
+                        {
+                            <span class="badge" title="Signs in with @Oidc.Value.DisplayName"
+                                  data-testid="user-oidc-@userId">OIDC</span>
+                        }
                     </p>
                 </div>
                 <div class="row-actions">
@@ -73,6 +79,14 @@
                             @onclick="() => ToggleSystemAdminAsync(user)">@(user.IsSystemAdmin ? "Remove system admin" : "Make system admin")</button>
                 </div>
                 <div class="user-controls">
+                    @if (user.IsExternal)
+                    {
+                        <p class="muted hint" data-testid="user-no-password-@userId">
+                            Signs in with @Oidc.Value.DisplayName; no local password.
+                        </p>
+                    }
+                    else
+                    {
                     <div class="control-group grow">
                         <input type="password" autocomplete="new-password" aria-label="New password for @username"
                                placeholder="New password (at least @ReviewLimits.MinPasswordLength characters)"
@@ -83,6 +97,7 @@
                         <button type="button" class="outline small" data-testid="user-set-password-@userId"
                                 @onclick="() => SetPasswordAsync(user)">Set password</button>
                     </div>
+                    }
                 </div>
                 @if (MessageUserId == userId)
                 {

@@ -63,9 +63,11 @@ application; the rest of the system sees only the Core store interfaces.
 
 - *Type*: In-process .NET class implementing the Core interface.
 - *Role*: Provider.
-- *Contract*: Stores a user with its system administrator and must-change-password flags, reads a user by user name
-  without regard to case, lists the users, and replaces the
-  stored state of a user. An attempt to store a user whose name exists, in any capitalization, raises a
+- *Contract*: Stores a user with its system administrator and must-change-password flags and, for an account of an
+  identity provider, its external issuer and subject, reads a user by user name
+  without regard to case or by the pair of issuer and subject (exact match), lists the users, and replaces the
+  stored state of a user. An attempt to store a user whose name exists, in any capitalization, or whose pair of issuer
+  and subject exists, raises a
   `DomainRuleException` for `UserNameTaken`. A new user, and an update that carries an audit draft, are stored together
   with their audit entry in one transaction. A new user can also be stored together with a project membership in one
   transaction (`AddToProjectAsync`); neither exists when either fails.
@@ -146,14 +148,15 @@ after those, the tables of reviewer slots and signatures after those, the audit 
 `Repositories` table after that, the source and change columns of reviews from a repository after that, and the
 `PersonalAccessTokens` table with the creator columns of reviews after that, and the `ProjectMemberships` table with
 the project of a repository and the system administrator flag of a user after that, and the `MustChangePassword` column
-of a user after that, so a database
+of a user after that, and the external identity columns of a user after that, so a database
 created before them does not
 have them and the pages fail until the
 database file is deleted (or a new one is
 named) and created again. Databases created before the identity slice must be deleted and recreated, and so must
 databases created before the signature slice, before the audit trail, before the repository registry, before
-reviews from a repository, before the personal access tokens, before the project access control, and before the
-project members management (the `MustChangePassword` column); there is no
+reviews from a repository, before the personal access tokens, before the project access control, before the
+project members management (the `MustChangePassword` column), and before the sign-in with an identity provider (the
+external identity columns); there is no
 migration of their data, and no data of a released version is
 affected. A
 second limitation is that two processes starting at the same moment on a brand-new database file can collide
@@ -181,6 +184,13 @@ Its key is the user and the project together, so a user has at most one membersh
 foreign keys; the database refuses a membership of a project or user that does not exist. The membership is data of the
 project: it carries no copy of the system administrator flag, which stays on the user, and the decision about
 visibility is not made here (see `ProjectAccess` in the `Core` subsystem).
+
+**External identity of a user**: The `Users` table has two optional columns, `ExternalIssuer` and `ExternalSubject`,
+which are set together for an account of an OpenID Connect provider and are null for a local account. A unique index
+over the pair (only for the rows that have one) makes an identity belong to one account and gives the lookup of every
+sign-in with the provider, so two concurrent first sign-ins of one person cannot create two accounts; the second one
+is reported as `UserNameTaken`, like a taken user name. The pair is compared exactly, without the case-insensitive
+collation of the user name. The columns are never changed after the account is created.
 
 **Personal access tokens**: The `PersonalAccessTokens` table holds the tokens of the users. Only the lowercase
 hexadecimal SHA-256 hash of a token value is stored, with a unique index that serves the lookup of every request to the

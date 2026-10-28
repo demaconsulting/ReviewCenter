@@ -43,6 +43,10 @@
     <!-- Microsoft.AspNetCore.OpenApi generates the OpenAPI document of the /api endpoints. It is not part of the
          ASP.NET Core shared framework, so the package is needed to compile and to run. -->
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.14" />
+    <!-- Microsoft.AspNetCore.Authentication.OpenIdConnect is the handler for the optional sign-in with an external
+         OpenID Connect provider (authorization code flow with PKCE). It is not part of the ASP.NET Core shared
+         framework, so the package is needed to compile and to run. -->
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.OpenIdConnect" Version="10.0.14" />
     <!-- System.Security.Cryptography.Pkcs builds the detached CMS signature (adbe.pkcs7.detached) of the PDF
          attestation. It has no reference assembly in the shared framework, so the package is needed to compile. -->
     <PackageReference Include="System.Security.Cryptography.Pkcs" Version="10.0.14" />

@@ -11,15 +11,18 @@ that protect them, the content fingerprint that identifies a review's files and 
 hash-chained audit trail of everything that happens. It
 is
 deliberately free of web and database technology so that the rules can be reviewed and tested on their own. It
-It contains eighteen units: `Fingerprint`, the content fingerprint algorithm; `RecordDigest`, the digest of a review
+It contains nineteen units: `Fingerprint`, the content fingerprint algorithm; `RecordDigest`, the digest of a review
 record that a signature binds to; `AuditChain`, the audit entry types, their hash, and the verifier of the chain;
 `AuditService`, the recording, reading, and verification of the audit trail; `ProjectAccess`, the one place that
 decides who can see and administer which project; `ProjectService`, the rules
 for projects and their members; `EvidenceSettingsService`, the rules for the per-project evidence settings (anonymous
 access to the evidence and the content of the attestation PDFs); `ReviewService`, the rules for reviews;
 `ThreadService`, the rules for review comments;
-`ChecklistService`, the rules for the review checklist; `UserService`, the rules for users; `SigningService`, the
-rules for reviewer slots and signatures; `RepositoryService`, the registry of git repositories that reviews can be
+`ChecklistService`, the rules for the review checklist; `UserService`, the rules for users, including the accounts that
+sign in with an external identity provider; `SigningService`, the
+rules for reviewer slots and signatures; `ReauthProofStore`, the in-memory, single-use proofs that a user of an
+identity provider has just confirmed their identity for one signature; `RepositoryService`, the registry of git
+repositories that reviews can be
 created from, with their credentials; `SelectionMatcher`, the file pattern language that selects the files of a
 repository; `RevisionValidator`, the check that a revision name cannot be taken for an option or an expression;
 `LineDiff`, the comparison of the lines of two versions of a file and its division into shown and collapsed regions;
@@ -80,11 +83,15 @@ used by the `Web`, `Identity`, and `Api` subsystems and by the `Hosting` subsyst
   checklist of a review with its progress, set whether a section applies, and answer a check; create a user, check a
   user name and password, list and read users, enable and disable a user, make a user a system administrator or take
   the right away, and change a
-  password (a user with a temporary password must choose a different one; it clears the flag). A user with a temporary
+  password (a user with a temporary password must choose a different one; it clears the flag). Find or create the
+  account of an external identity (an issuer and subject of an OpenID Connect provider; first sign-in creates an
+  enabled non-admin account with no project and no password; every password operation refuses such an account). A user
+  with a temporary
   password has no project access, cannot sign, and cannot use personal access tokens. Posting a comment or saving a
   checklist decision takes the signed-in user (an `Actor`), never free text.
   Add, change, and remove a reviewer slot of a review (only for members of the project), sign a slot with the password
-  entered again (members only), read the
+  entered again, or, for a user of an identity provider, with a single-use proof of a fresh confirmation at the
+  provider (members only), tell whether such a proof exists without spending it, read the
   approval status of a review (its slots, blockers, record digest, and next step), and list the enabled members of a
   project, who can be chosen for a slot. `RecordDigest` calculates the digest of a record. Every operation that changes
   data takes
@@ -130,9 +137,11 @@ used by the `Web`, `Identity`, and `Api` subsystems and by the `Hosting` subsyst
 
 - *Type*: In-process .NET interface.
 - *Role*: Consumer (implemented by `UserStore` in the `Storage` subsystem).
-- *Contract*: Add a user, read a user by user name without regard to case, list the users, and replace the stored
+- *Contract*: Add a user, read a user by user name without regard to case, read a user by the pair of issuer and
+  subject of an external identity, list the users, and replace the stored
   state of a user. Adding a user, and an update that carries a draft, append that audit entry in the same transaction.
-- *Constraints*: An attempt to add a user whose name exists fails with a `DomainRuleException` for `UserNameTaken`.
+- *Constraints*: An attempt to add a user whose name exists, or whose external identity exists, fails with a
+  `DomainRuleException` for `UserNameTaken`.
   Every read returns a new object.
 
 **IPersonalAccessTokenStore**: The store interface the subsystem requires for personal access tokens.
@@ -382,6 +391,16 @@ that the `Api` subsystem builds from it carries the identity of the token. The s
 refuse it themselves: `SigningService` rejects an actor that carries a token for every signature and slot operation, so
 the rule "a token can never sign" does not depend on which routes exist. `ReviewService` records that a review was
 created by a token. See the `PersonalAccessTokenService` unit.
+
+External identities are a sixth kind of fact, owned by a user: an account may be tied to the pair of issuer and subject
+of an OpenID Connect provider (`User.ExternalIssuer` and `ExternalSubject`, set once when the account is created). The
+pair is the only key of a sign-in with the provider, so the name and e-mail address that the provider sends can never
+select an existing account; they only suggest the name of a new one. Such an account has no password, and every
+password operation refuses it, so the provider is the only way in. A signature of such a user needs a fresh
+confirmation at the provider instead of a password: the `Identity` subsystem issues a proof into `ReauthProofStore`
+(bound to user, project, review, and slot, single use, short-lived, in memory) and `SigningService` spends it when it
+signs. The proof is held in the memory of one process and is lost on restart, which only means that the user confirms
+again. See the `UserService`, `SigningService`, and `ReauthProofStore` units.
 
 Access to projects is decided in one place, `ProjectAccess`, and is based on membership. A user is a system
 administrator (the flag `User.IsSystemAdmin`) or a member of a project with the role `User` or `ProjectAdmin`

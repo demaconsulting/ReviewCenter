@@ -22,6 +22,7 @@ using DemaConsulting.ReviewCenter.Core;
 using DemaConsulting.ReviewCenter.Identity;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Authorization;
+using Microsoft.Extensions.Options;
 
 namespace DemaConsulting.ReviewCenter.Web;
 
@@ -71,6 +72,13 @@ public partial class UsersPage : ComponentBase
     /// </summary>
     [Inject]
     private AuthenticationStateProvider AuthenticationState { get; set; } = null!;
+
+    /// <summary>
+    ///     Gets or sets the settings of sign-in with an identity provider, supplied by dependency injection; the
+    ///     display name of the provider marks the accounts that belong to it.
+    /// </summary>
+    [Inject]
+    private IOptions<OidcOptions> Oidc { get; set; } = null!;
 
     /// <summary>
     ///     Gets the users shown in the list.

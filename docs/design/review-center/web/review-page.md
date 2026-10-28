@@ -86,7 +86,12 @@ for nobody) and its message. **SlotPrimaryChoices**, **SlotAlternateChoices**, *
 the edit fields and the message of each slot, by slot identity; until the reader changes a choice the stored
 primary and alternate are shown. **SignPasswords**, **SignErrors**: the password typed into the sign form and the
 message of each slot, by slot identity. **PasswordKey**: a counter that makes the browser build a fresh, empty
-password field after every signing attempt.
+password field after every signing attempt. **CurrentIsExternal**, **ConfirmedSlots**, **ReauthText**,
+**ReauthReportDismissed**: whether the signed-in user signs in with an identity provider, the slots that have a live
+confirmation (asked from `SigningService` when the page loads and after each change, never spent by the page), the
+`reauth` query value (`ok` or `failed`) with which the identity endpoint sent the browser back, and whether the user
+has acted since so that a failure report is no longer shown. The settings of the provider are injected
+(`IOptions<OidcOptions>`) for its display name and whether it is on.
 
 **NewStartLine**, **NewEndLine**, **NewText**, **NewThreadError**: the new-thread form fields and its message.
 **ReplyTexts**, **ReplyErrors**: the reply text and the message of each thread, by thread identity.
@@ -105,7 +110,9 @@ Test identifiers: `review-page` (root), `breadcrumb-projects-link`, `project-lin
 `slot-alternate-{id}`, `slot-primary-not-member-{id}`, `slot-alternate-not-member-{id}`, `slot-not-member-hint-{id}`,
 `slot-status-{id}`, `slot-primary-select-{id}`, `slot-alternate-select-{id}`,
 `slot-save-{id}`, `slot-remove-{id}`, `slot-error-{id}`, `sign-blockers-{id}`, `sign-form-{id}`, `sign-meaning-{id}`,
-`sign-password-{id}`, `sign-error-{id}`, `sign-button-{id}` (all by slot identity), `slot-add-form`,
+`sign-password-{id}`, `sign-error-{id}`, `sign-button-{id}` (all by slot identity), and for an external user
+`sign-reauth-form-{id}`, `sign-reauth-{id}`, `sign-reauth-hint-{id}`, `sign-reauth-off-{id}`, and `sign-confirmed-{id}`,
+`slot-add-form`,
 `new-slot-primary-select`, `new-slot-alternate-select`, `new-slot-add-button`, `new-slot-error`,
 `review-details`, `review-details-summary`, `review-id`,
 `review-state`, `review-fingerprint`, `record-digest`, `file-hash-path-{index}`, `file-hash-{index}`, `thread-index`,
@@ -287,8 +294,17 @@ change as well.
 alternate of a slot that is not currently signed (decided from the user name in the authentication state). While the
 review has blockers (no checklist, unanswered or failed checks, open threads), the page draws the list of blockers
 headed "This review cannot be signed yet:" instead of the form. Otherwise the form shows the meaning text of the
-signature (`SigningService.MeaningText`) and a password field. On submit the page calls `SigningService.SignAsync`
-with the signed-in user, the slot, the password typed, and the record digest it displayed (`Approval.Digest`), so what
+signature (`SigningService.MeaningText`) and a password field. For a user who signs in with an identity provider
+(`CurrentIsExternal`, from `UserService.GetAsync`) the password field is replaced: until a confirmation exists for the
+slot (`ConfirmedSlots`, from `SigningService.HasReauthProofAsync`, which spends nothing) the page draws a form that
+posts to `/auth/oidc/reauth` with the project, review, slot, and the address of this review, and the button "Confirm
+identity with {provider}" with a hint; when the provider is switched off it says that instead and offers no button.
+After the confirmation the page shows "Identity confirmed. Review the record, then sign." and the same Sign button,
+with no password field; a failed confirmation (`reauth=failed` in the address, until the user acts) is shown as "We
+could not confirm your identity. Sign in again at {provider} when asked." next to the button. On submit the page
+calls `SigningService.SignAsync`
+with the signed-in user, the slot, the password typed (empty for an external user, whose proof is held by Core), and the
+record digest it displayed (`Approval.Digest`), so what
 is signed is exactly what the reader saw; a record that changed in the meantime is refused by Core, and the page shows
 that message. A `DomainRuleException` (wrong password, a user who is not in the slot, a locked-out user, a changed
 record) is shown in `sign-error-{id}`; the wrong-password message is the generic one Core produces. A reviewer who is no
@@ -399,7 +415,11 @@ page.
   shapes them for the index.
 - **ChecklistService** — reads the checklist progress for the summary.
 - **SigningService** — computes the approval status (blockers, record digest, next step), lists the users that can
-  fill a slot, adds, changes, and removes slots, and signs; it holds every signing rule.
+  fill a slot, adds, changes, and removes slots, and signs; it holds every signing rule. It also tells
+  (`HasReauthProofAsync`) whether an external user has confirmed the identity for a slot.
+- **UserService** — tells whether the signed-in user is an account of an identity provider.
+- **OidcSignIn** and **OidcOptions** (Identity) — the endpoint `/auth/oidc/reauth` that the confirmation form posts to,
+  the `reauth` query values, and the display name and state of the provider.
 - **FileText** — decides whether a file is text and splits it into lines.
 - **SignIn** — `GetActorAsync` supplies the signed-in user from the authentication state.
 - **ProjectService** — reads the project for the signed-in user (nothing is loaded when the user may not see it) and its

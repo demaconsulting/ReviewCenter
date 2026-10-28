@@ -96,6 +96,9 @@ loopback TCP ports.
 - A project admin or system administrator adds an existing user by the exact user name or creates an account as part of
   adding it, the created account gets a temporary password that is shown once and must be replaced at the first
   sign-in, and the last project admin cannot be removed or demoted by a project admin.
+- With sign-in with an OpenID Connect provider turned on, a new person is created as an account without any right and
+  found again by issuer and subject only, a local account is never linked by name, a foreign return address is
+  replaced by the home page, and a signature needs one fresh sign-in at the provider as the same person.
 
 ## Test Scenarios
 
@@ -268,6 +271,17 @@ scenario is tested by `IdentitySubsystem_Revalidation_UserDisabledAfterSignIn_Op
 failures, and protected against the loss of the last system administrator through the domain service, and users and
 password changes are kept after the database is reopened. These scenarios are tested by
 `CoreSubsystem_UsersWorkflow_CreateSignInLockoutAndLastAdmin` and `StorageSubsystem_Users_PersistAcrossReopen`.
+
+**Sign-in with an OpenID Connect provider**: The real pipeline is started with a fake identity provider (the test-only
+OpenIddict server) and the settings turned on. A new person signs in at the provider and gets a plain enabled account
+without membership or administrator right, which is found again at the second sign-in. This scenario is tested by
+`OidcSignIn_FirstSignIn_CreatesPlainAccountAndSignsIn`. A person who proposes the name of a local administrator gets a
+new account and never the local one, which is tested by `OidcSignIn_NameOfLocalAccount_NeverLinksToIt`; a return
+address that is not on this server is replaced by the home page, which is tested by
+`OidcSignIn_ForeignReturnUrl_IsReplacedByHome`. A signature of a user of the provider needs a fresh sign-in of the
+same person at the provider, and one such sign-in allows exactly one signature. This scenario is tested by
+`OidcReauth_FreshSignInOfSamePerson_AllowsExactlyOneSignature`. The settings, the services, the store, and the pages
+are verified in the `Identity`, `Core`, `Storage`, `Hosting`, and `Web` subsystems.
 
 **Review checklist**: Two checks of a new review are answered through the domain service over the real pipeline, one
 Pass and one Fail with a justification; the checklist page, requested twice, shows the progress, the pressed Pass

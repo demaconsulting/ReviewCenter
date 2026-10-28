@@ -1,0 +1,51 @@
+---
+# Software Unit Requirements for the ReauthProofStore Class
+#
+# The ReauthProofStore class remembers, for a short time and in memory, that a user of an identity provider has just
+# confirmed their identity for one signature, so that the signature can use the confirmation once.
+
+sections:
+  - title: ReauthProofStore Unit Requirements
+    requirements:
+      - id: ReviewCenter-ReauthProofStore-SingleUse
+        title: >-
+          The ReauthProofStore class shall let a confirmation of identity be consumed exactly once, and shall refuse
+          every later attempt to consume it until a new confirmation is issued.
+        justification: |
+          A confirmation that could be used twice would let one login at the provider sign more than one slot, or the
+          same slot again after the record changed, so each signature needs its own confirmation.
+        tests:
+          - ReauthProofStore_TryConsume_SucceedsExactlyOnce
+          - ReauthProofStore_IssueAgain_RestartsTheLifetime
+
+      - id: ReviewCenter-ReauthProofStore-Binding
+        title: >-
+          The ReauthProofStore class shall accept a confirmation only for the user, project, review, and slot it was
+          issued for, and shall keep the confirmation when another binding is tried.
+        justification: |
+          A confirmation for one slot of one review must not sign another slot, another review, or for another user.
+          Keeping it when another binding is tried means that an attempt for something else does not use it up.
+        tests:
+          - ReauthProofStore_OtherBinding_IsRefusedAndKeepsTheProof
+          - ReauthProofStore_NullArguments_Throw
+
+      - id: ReviewCenter-ReauthProofStore-Expiry
+        title: >-
+          The ReauthProofStore class shall treat a confirmation as ended after its lifetime of five minutes, counted
+          from the time it was issued.
+        justification: |
+          A confirmation is proof that the person was at the keyboard a moment ago. It must not be good for a day,
+          when somebody else may sit there.
+        tests:
+          - ReauthProofStore_Expiry_EndsTheProofAtTheLifetime
+          - ReauthProofStore_IssueAgain_RestartsTheLifetime
+
+      - id: ReviewCenter-ReauthProofStore-Bounded
+        title: >-
+          The ReauthProofStore class shall keep at most 10000 confirmations and, when it is full, drop the ended ones
+          first and then the oldest.
+        justification: |
+          Anybody who can sign in at the provider can make a confirmation, so the memory it takes must have a limit
+          that a flood cannot pass.
+        tests:
+          - ReauthProofStore_Full_DropsExpiredThenOldest

@@ -138,6 +138,17 @@ public static class ReviewLimits
     public const int MaxDisplayNameLength = 100;
 
     /// <summary>
+    ///     The longest accepted issuer of an external identity provider, in characters.
+    /// </summary>
+    public const int MaxExternalIssuerLength = 512;
+
+    /// <summary>
+    ///     The longest accepted subject (the identifier of a person at an external identity provider), in characters;
+    ///     the OpenID Connect specification allows at most 255.
+    /// </summary>
+    public const int MaxExternalSubjectLength = 256;
+
+    /// <summary>
     ///     The shortest accepted password, in characters.
     /// </summary>
     public const int MinPasswordLength = 12;

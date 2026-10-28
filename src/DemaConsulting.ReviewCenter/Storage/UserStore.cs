@@ -110,7 +110,9 @@ internal sealed class UserStore(IDbContextFactory<ReviewCenterDbContext> factory
             FailedLoginCount = user.FailedLoginCount,
             LockoutUntil = user.LockoutUntil,
             MustChangePassword = user.MustChangePassword,
-            Created = user.Created
+            Created = user.Created,
+            ExternalIssuer = user.ExternalIssuer,
+            ExternalSubject = user.ExternalSubject
         };
         context.Users.Add(entity);
         try
@@ -137,6 +139,21 @@ internal sealed class UserStore(IDbContextFactory<ReviewCenterDbContext> factory
         await using var context = await factory.CreateDbContextAsync(cancellationToken);
         return await context.Users.AsNoTracking()
             .FirstOrDefaultAsync(u => u.Username == username, cancellationToken);
+    }
+
+    /// <inheritdoc />
+    public async Task<User?> GetByExternalAsync(
+        string issuer,
+        string subject,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(issuer);
+        ArgumentNullException.ThrowIfNull(subject);
+
+        // Both columns keep the default (binary) collation, so the comparison is exact
+        await using var context = await factory.CreateDbContextAsync(cancellationToken);
+        return await context.Users.AsNoTracking()
+            .FirstOrDefaultAsync(u => u.ExternalIssuer == issuer && u.ExternalSubject == subject, cancellationToken);
     }
 
     /// <inheritdoc />

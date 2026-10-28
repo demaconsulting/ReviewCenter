@@ -31,6 +31,11 @@ N/A - standard test environment.
   change of the own password must differ from the temporary one and ends the temporary state; a password set by an
   administrator leaves the state unchanged.
 - A change of a user that does not exist is reported as such.
+- A sign-in with an external identity finds the account by the exact issuer and subject only, creates an enabled
+  account with no right, no project, and no password on the first sign-in, and never uses an account by its name;
+  a missing or too long identity and a disabled account are refused.
+- The display name and user name of a new external account are cleaned and bounded, the user name is made unique by a
+  number or a generated name, and every password path refuses an external account.
 - Null arguments are rejected with an `ArgumentNullException`.
 
 #### Test Scenarios
@@ -151,6 +156,42 @@ disabled account record one `signature.reauth-failed` per minute, which is teste
 and a locked attempt on the same account within one minute are both recorded, because the reason is part of the
 coalescing key, which is tested by `UserService_ReauthenticateAsync_DisabledThenLockedInOneMinute_RecordsBothReasons`.
 These tests are defined in `AuditEventTests.cs`.
+
+**UserService_SignInExternalAsync scenarios**: The accounts of an external identity provider are verified in
+`UserServiceExternalTests.cs` over `FakeUserStore`. The first sign-in creates an enabled account that is not a system
+administrator and has an empty password hash, with one `account.oidc-created` entry that names only the host of the
+issuer, and the second sign-in finds the same account and keeps its names, which is tested by
+`UserService_SignInExternalAsync_FirstThenSecond_CreatesOnceAndMatches`. With a local account of the same name, a
+sign-in, one with the subject in another case, and one with another issuer each create their own account (`olive-2`,
+`olive-3`, `olive-4`), none is the local one, and none is an administrator, which is tested by
+`UserService_SignInExternalAsync_MatchesOnlyByIssuerAndSubject`. A missing or empty issuer or subject gives
+`Invalid` and no account, which is tested by `UserService_SignInExternalAsync_MissingIdentity_IsInvalid`; an issuer and
+a subject at their limit are accepted and one character more is refused, which is tested by
+`UserService_SignInExternalAsync_IdentityLengthLimits_AreEnforced`. A disabled account is refused as `Disabled`, has no
+user in the answer, and stays unchanged, which is tested by `UserService_SignInExternalAsync_DisabledAccount_IsRefused`.
+
+**UserService_SignInExternalAsync_Candidate_IsReducedToAValidUsername**: A theory over suggested names: valid names are
+kept, markup characters are dropped, a name without usable characters or a null gives `user`, a single character gives
+`user-a`, and a long name is cut to 44 characters. This scenario is tested by
+`UserService_SignInExternalAsync_Candidate_IsReducedToAValidUsername`.
+
+**UserService_SignInExternalAsync_DisplayName_IsSanitized**: A theory over display names: control characters, a
+bidirectional override, and zero-width characters are removed, white space is collapsed and trimmed, and a blank or
+null name is replaced by the user name. This scenario is tested by
+`UserService_SignInExternalAsync_DisplayName_IsSanitized`.
+
+**UserService_SignInExternalAsync_LongDisplayName_IsBounded**: A display name of 1000 characters is cut to 100. This
+scenario is tested by `UserService_SignInExternalAsync_LongDisplayName_IsBounded`.
+
+**UserService_SignInExternalAsync_AllNamesTaken_UsesNameFromIdentity**: With the plain name and the numbered names up to
+`-50` taken by other accounts, the new account gets a generated name that starts with `oidc-` and has 17 characters,
+and no other account is used. This scenario is tested by
+`UserService_SignInExternalAsync_AllNamesTaken_UsesNameFromIdentity`.
+
+**UserService_ExternalAccount_EveryPasswordPathIsRefused**: For an external account, `AuthenticateAsync` with an empty
+and with a hash-like password, and `ReauthenticateAsync` give no user, `ChangeOwnPasswordAsync` is refused, and
+`SetPasswordAsync` throws the rule `PasswordInvalid`; the failure count stays 0. This scenario is tested by
+`UserService_ExternalAccount_EveryPasswordPathIsRefused`.
 
 **UserService temporary password scenarios**: The temporary password of an account created for a project is modeled
 in `MustChangePasswordTests.cs` by a user whose must-change flag is set, over `FakeUserStore`, `FakeReviewStore`,

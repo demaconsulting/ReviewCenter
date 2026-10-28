@@ -24,6 +24,9 @@ words:
   - TOTP
   - wwwroot
   - aspnetcore
+  - openidconnect
+  - OpenIddict
+  - PKCE
   - icdp
   - labelledby
   - bunit

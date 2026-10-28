@@ -1,0 +1,30 @@
+---
+# OpenIdConnect OTS Software Requirements
+#
+# Requirements for Microsoft.AspNetCore.Authentication.OpenIdConnect, which performs the sign-in with an OpenID Connect
+# provider: the authorization code flow with a proof key, and the validation of the identity token.
+
+sections:
+  - title: OTS Software Requirements
+    sections:
+      - title: OpenIdConnect Requirements
+        requirements:
+          - id: ReviewCenter-OTS-OpenIdConnect-CodeFlow
+            title: >-
+              Microsoft.AspNetCore.Authentication.OpenIdConnect shall perform the authorization code flow with a proof
+              key, a state, and a nonce against the provider, shall accept the identity token only when its signature,
+              issuer, audience, and lifetime are valid and the state is the one it issued, and shall let the
+              application add prompt and max_age to the request and read the claims of the token.
+            justification: |
+              The sign-in with a provider and the confirmation of identity for a signature rely on this package to
+              speak the protocol and to check the token. Passing tests that run the whole flow against a test provider
+              that signs real tokens, and that tamper with the state or make the provider refuse, confirm that a valid
+              answer signs the user in, that a wrong one does not, and that the request carries what the application
+              asked for.
+            tags: [ots]
+            tests:
+              - OidcSignIn_FirstSignIn_CreatesPlainAccountAndSignsIn
+              - OidcSignIn_Flow_NeverLogsSecretsAndUsesCodeFlowWithPkce
+              - OidcSignIn_TamperedState_IsRefused
+              - OidcSignIn_ProviderRefusesTheCode_EndsWithoutSession
+              - OidcReauth_FreshSignInOfSamePerson_AllowsExactlyOneSignature

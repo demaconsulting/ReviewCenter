@@ -16,7 +16,8 @@ explain how to use it (`HelpPage` includes the index, a page for each topic, and
 the review-sets of a repository, reviews, and review checklists, where `ProjectsPage` includes `NewProjectPage` and
 `ProjectPage` includes `NewReviewPage`, `NewMemberPage`, and `NewMemberAccountPage`, the pages that hold the creation
 and member forms;
-`LoginPage`, `AccountPage`, and `UsersPage`, the pages for signing in, changing one's own password (the only page a
+`LoginPage`, `AccountPage`, and `UsersPage`, the pages for signing in (with a password, and, when an administrator has
+turned it on, with an OpenID Connect provider), changing one's own password (the only page a
 user with a temporary password may use), choosing the
 appearance and managing one's personal access tokens, and managing users and who is a system administrator
 (`UsersPage` includes `NewUserPage`);
@@ -63,7 +64,9 @@ all domain behavior and never access the database.
 - *Role*: Provider.
 - *Contract*: Shows a form that posts the user name, the password, and the return address to the login endpoint of the
   `Identity` subsystem, a generic failure message when the query value `error` is present, and a notice to sign in
-  with the new password when the query value `changed` is `1`.
+  with the new password when the query value `changed` is `1`. When sign-in with a provider is enabled it also shows a
+  "Sign in with {provider}" button, in a form of its own that posts to `/auth/oidc/login`, and one general message when
+  the query value `error` is `oidc`; with the provider off there is no button.
 - *Constraints*: Open to anonymous visitors.
 
 **Project routes** (`GET /projects`, `GET /projects/new`, `GET /projects/{id}`, `GET /projects/{id}/plan`,
@@ -119,7 +122,8 @@ appearance, and manages their personal access tokens.
   browser. An API tokens card creates a token from a name and a lifetime of 30, 90, or 365 days and shows its value once
   with a copy button, lists the tokens with their state, and revokes one. For a user whose password is temporary the
   page shows a banner and only the password form (labeled with the temporary password), and a successful change leads
-  to `/login?changed=1`.
+  to `/login?changed=1`. For a user who signs in with an identity provider a sentence that names the provider replaces
+  the password form, because such an account has no password.
 - *Constraints*: Requires a signed-in user. A user with a temporary password may open no other page of the
   application except the login, help, and About pages (the layout redirects to this page).
 
@@ -129,7 +133,8 @@ appearance, and manages their personal access tokens.
 - *Role*: Provider.
 - *Contract*: `/users` lists the users, with a System admin badge for each system administrator, and offers to
   disable or enable a user, make a user a system administrator or take that away, and set a
-  password, and has a New user button; `/users/new` holds the form that creates a user, with a System administrator
+  password, and has a New user button; an account of an identity provider has an OIDC badge and no password controls;
+  `/users/new` holds the form that creates a user, with a System administrator
   checkbox.
 - *Constraints*: Require the role `SystemAdmin`, which only a system administrator has; a signed-in user without it
   gets HTTP status 403. The last enabled system administrator cannot be disabled or demoted.
@@ -461,7 +466,11 @@ signed, or the list of blockers while the review cannot be signed), and to pass 
 Signing re-authenticates the user: the form asks for the password, which the page holds only in a component field
 while it is typed, passes to `SigningService.SignAsync`, and clears in a `finally` block after every attempt; it is
 never rendered back into the page. The page also passes the record digest it displayed, so a signature always covers
-the record the reader saw, and a record that changed since the page was drawn is refused. The project page shows the
+the record the reader saw, and a record that changed since the page was drawn is refused. For a user who signs in with
+an identity provider there is no password: the page offers a button that posts to the confirmation endpoint of the
+`Identity` subsystem, which sends the user to the provider to sign in again, and after the return (asked from
+`SigningService.HasReauthProofAsync`, which spends nothing) it shows the same Sign button; Core spends the proof when
+it signs. The project page shows the
 approval status of every listed review, one lookup per review.
 
 #### Signed attestation

@@ -4,9 +4,11 @@
 
 #### Purpose
 
-`UserService` owns the rules for local user accounts: it creates users, checks a user name and password for sign-in,
+`UserService` owns the rules for user accounts: it creates users, checks a user name and password for sign-in,
 enables and disables users, sets the system administrator right, changes passwords, and protects accounts against
-password guessing and against losing the last system administrator. It is also the home of the supporting types of
+password guessing and against losing the last system administrator. It also owns the accounts of people who sign in
+at an external OpenID Connect provider: it finds them by the pair of issuer and subject only, creates them on the first
+sign-in without any right, and refuses every password path for them. It is also the home of the supporting types of
 identity: `User`, `Actor`, and the interfaces `IPasswordHasher` and `IUserStore`, together with the user rules of
 `DomainRule` and the user limits of `ReviewLimits`. What a user may see and do in a project is not a property of the
 account but of its project memberships, which `ProjectAccess` and `ProjectService` own.
@@ -15,10 +17,20 @@ account but of its project memberships, which `ProjectAccess` and `ProjectServic
 
 **User**: a data class of `Id` (assigned by the store), `Username`, `DisplayName`, `IsSystemAdmin`, `Enabled`,
 `PasswordHash`, `FailedLoginCount`, `LockoutUntil` (`null` when the user is not locked out), `MustChangePassword`, and
-`Created` (UTC). `Username`, `DisplayName`, and `Created` are fixed once the user exists; the system administrator flag,
+`Created` (UTC), and the optional `ExternalIssuer` and `ExternalSubject` (both `null` for a local account).
+`Username`, `DisplayName`, `Created`, and the two external values are fixed once the user exists (they are init-only);
+`IsExternal` is true when `ExternalIssuer` is set. The system administrator flag,
 the enabled flag, the hash, the lockout state, and the must-change-password flag have setters, so the service can change
 a copy it has read and give it back to the store. The password hash is never shown, logged, or put into a message, and
 the password itself is never stored.
+
+**External account**: an account with `ExternalIssuer` and `ExternalSubject` belongs to an external identity provider
+(see _OidcSignIn_). The pair is the only key: the account is never found or linked by user name, display name, or
+e-mail address, so a provider cannot take over a local account or the account of another provider. The account has no
+password (the stored hash is empty) and every password path refuses it: `AuthenticateAsync` and `ReauthenticateAsync`
+return `null` (after a dummy verification, recorded coalesced with the reason `external account has no password`),
+`ChangeOwnPasswordAsync` reports `CurrentPasswordIncorrect`, and `SetPasswordAsync` reports `PasswordInvalid`. It
+confirms a signature by signing in again at the provider (see _SigningService_ and _ReauthProofStore_).
 
 **Must change password**: `MustChangePassword` is set on an account that a project administrator created
 (`ProjectService.CreateMemberAccountAsync`) with a generated temporary password, and is cleared when the user changes the
@@ -43,7 +55,9 @@ fake.
 
 **IUserStore**: the persistence interface of users, with the operations `AddAsync`, `AddToProjectAsync` (adds a user and
 the membership of that user in a project, and the audit event built from the stored user, in one atomic step; it raises
-`UserNameTaken` and stores nothing when the name exists), `GetByUsernameAsync`, `ListAsync`, and `UpdateAsync`. Users
+`UserNameTaken` and stores nothing when the name exists), `GetByUsernameAsync`, `GetByExternalAsync` (reads the user of
+an issuer and subject, compared exactly; `null` when
+there is none), `ListAsync`, and `UpdateAsync`. Users
 have their own interface so that the review store stays about reviews. It is
 implemented by `UserStore` in the `Storage` subsystem. Every read returns a new `User` object, so a caller can change
 it and pass it to `UpdateAsync` without touching shared state.
@@ -82,8 +96,12 @@ values `CommentAuthorInvalid` and
 
 **ReviewLimits constants** added for users: `MinUsernameLength` (3), `MaxUsernameLength` (50),
 `MaxDisplayNameLength` (100), `MinPasswordLength` (12), and `MaxPasswordLength` (128). `MaxAuthorLength` (100) now
-limits the display name stored with a comment, an answer, or a section decision. The lockout settings (5 failures,
-5 minutes) are private constants of the service.
+limits the display name stored with a comment, an answer, or a section decision. The identity limits
+`MaxExternalIssuerLength` (512) and `MaxExternalSubjectLength` (256) bound what is stored for an external account. The
+lockout settings (5 failures, 5 minutes) are private constants of the service.
+
+**ExternalSignInResult**: the answer of `SignInExternalAsync`, a record of the `User` (`null` when refused), the
+`ExternalSignInRefusal` (`None`, `Disabled`, or `Invalid`), and `Created` (true when this sign-in created the account).
 
 #### Key Methods
 
@@ -125,6 +143,32 @@ One difference: an account with a temporary password (`MustChangePassword`) is r
 with the reason `password change pending` recorded (coalesced) under `signature.reauth-failed`, because the temporary
 password proves identity only well enough to reach the password change, and cannot confirm a signature. `AuthenticateAsync`
 still accepts the account, so that the user can sign in and change the password.
+
+**SignInExternalAsync**: Signs in a person who proved their identity at an external provider, creating the account on
+the first sign-in.
+
+- _Parameters_: `string? issuer`, `string? subject`, `string? usernameCandidate`, `string? displayName`, and a
+  cancellation token.
+- _Returns_: `Task<ExternalSignInResult>` — the account when accepted; otherwise no account and the refusal.
+- _Postconditions_: An accepted sign-in is recorded as `auth.oidc-sign-in` and a created account as
+  `account.oidc-created`, with only the host of the issuer as detail. Later sign-ins change no stored name.
+
+A missing issuer or subject, or one longer than the limits, is refused as `Invalid`. The account is found by the exact
+pair through `IUserStore.GetByExternalAsync`. A new account is enabled, is not a system administrator, has no project
+membership and no password, and gets a display name cleaned of control, separator, and invisible formatting characters,
+with white space collapsed and cut to 100 characters (the user name when nothing is left). Its user name is made from
+the suggestion of the provider by keeping only letters, digits, dot, underscore, and hyphen, cut to leave room for a
+suffix (`user` when nothing is left). When any account holds the name, `-2`, `-3`, and so on are tried up to 50, and
+then a generated name from a hash of the identity; the account that holds the name is never used. When another
+process created the same identity first, that account is used. A disabled account is refused as `Disabled`, recorded
+coalesced as `auth.oidc-sign-in-failed`; the caller answers every refusal alike. The method runs under the same
+semaphore as the other changes.
+
+**RecordExternalSignInFailureAsync**: Records a failed sign-in at the provider as `auth.oidc-sign-in-failed`, with a
+fixed reason class as the only detail and the text `not signed in` as actor, at most once per minute, address, and
+reason. **RecordExternalReauthFailureAsync**: Records a refused confirmation of a known external user as
+`signature.reauth-failed` with the detail `oidc: <reason class>`, coalesced. Neither records a token, a claim, or text
+of an error.
 
 **ListAsync**: Lists all users ordered by user name. **GetAsync**: Reads a user by user name, without regard to case;
 `null` when there is none.
@@ -218,7 +262,9 @@ not an error: `AuthenticateAsync` returns
 #### Callers
 
 - **SignIn** — checks the password at sign-in and reads the user to validate the cookie of each request.
-- **SigningService** — checks the password again at signing time through `ReauthenticateAsync`.
+- **SigningService** — checks the password again at signing time through `ReauthenticateAsync`, and records a refused
+  confirmation of an external user through `RecordExternalReauthFailureAsync`.
+- **OidcSignIn** — signs in an external identity through `SignInExternalAsync` and records the failures.
 - **AccountPage** — changes the password of the signed-in user (also the forced change of a temporary password).
 - **UsersPage** — lists, creates, enables, disables, and changes users.
 - **UserCommand** — creates the first system administrator and other users from the command line.
