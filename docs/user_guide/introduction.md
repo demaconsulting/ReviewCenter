@@ -868,7 +868,8 @@ there are; the full threads are in the review record. The last section describes
 signature proves. A review that is not Approved has no button; a direct request to its `attestation.pdf` address is
 refused with the message "The review is not complete" (status 409). For a caller who is not signed in (the anonymous API
 route, see [Evidence Settings](#evidence-settings)) a review that is not complete is answered 404, like a review that
-does not exist, so that review identifiers cannot be probed; signed-in members still get the 409. If the review changes while the PDF is being
+does not exist, so that review identifiers cannot be probed; signed-in members still get the 409. If the review changes
+while the PDF is being
 prepared (for example a reviewer changes an answer), nothing is signed or recorded and the request is also refused
 with status 409 ("The review changed while the attestation was being prepared; try again."); press the button again.
 Every download is recorded in the audit trail as `attestation.generated`. Only members of the project and system
