@@ -30,9 +30,7 @@ a project checklist, and sign the review with their password. Every action is re
 - ✍️ **Re-authenticated Signatures** - Reviewers sign again with their password, bound to the exact record reviewed
 - 🔗 **Tamper-Evident Audit Trail** - Every change is chained by SHA-256 hashes and can be verified at any time
 - 📄 **Signed PDF Attestation** - Approved reviews download as a digitally signed PDF that any reader can verify
-- ⚙️ **Evidence Settings** - Per project, project administrators choose what the attestation PDFs contain (a PDF with
-  less carries a Content scope section that says what was left out) and may open the evidence index and the PDFs to
-  anonymous readers; both are off by default, warn about regulatory impact and exposure, and every change is audited
+- ⚙️ **Evidence Settings** - Choose what PDFs contain (less content says so) and who may read them anonymously
 - 🔐 **Local Accounts** - Sign-in lockout and throttling, and password changes
 - 🛡️ **Project-Based Access Control** - System administrators, project administrators, and project members; project
   administrators manage their own members; a project you are not a member of looks like a project that does not exist
