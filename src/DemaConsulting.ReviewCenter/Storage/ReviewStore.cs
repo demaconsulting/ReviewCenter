@@ -70,7 +70,8 @@ internal sealed class ReviewStore(IDbContextFactory<ReviewCenterDbContext> facto
                 {
                     Name = project.Name,
                     Description = project.Description,
-                    Created = project.Created
+                    Created = project.Created,
+                    Evidence = project.Evidence
                 };
                 context.Projects.Add(entity);
                 await context.SaveChangesAsync(cancellationToken);
@@ -95,6 +96,47 @@ internal sealed class ReviewStore(IDbContextFactory<ReviewCenterDbContext> facto
             .OrderBy(p => p.Name)
             .ThenBy(p => p.Id)
             .ToListAsync(cancellationToken);
+    }
+
+    /// <inheritdoc />
+    public async Task<bool> UpdateEvidenceSettingsAsync(
+        int projectId,
+        EvidenceSettings expected,
+        EvidenceSettings updated,
+        AuditDraft audit,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(expected);
+        ArgumentNullException.ThrowIfNull(updated);
+        ArgumentNullException.ThrowIfNull(audit);
+
+        return await appender.ExecuteAsync<bool>(
+            factory,
+            async context =>
+            {
+                // The comparison is part of the update statement, so it is atomic with the change
+                var rows = await context.Projects
+                    .Where(p => p.Id == projectId
+                                && p.Evidence.AnonymousIndex == expected.AnonymousIndex
+                                && p.Evidence.AnonymousAttestations == expected.AnonymousAttestations
+                                && p.Evidence.IncludeThreads == expected.IncludeThreads
+                                && p.Evidence.IncludeReviewerNames == expected.IncludeReviewerNames
+                                && p.Evidence.IncludeChecklistWording == expected.IncludeChecklistWording
+                                && p.Evidence.IncludeFiles == expected.IncludeFiles
+                                && p.Evidence.IncludeGitContext == expected.IncludeGitContext)
+                    .ExecuteUpdateAsync(
+                        p => p
+                            .SetProperty(x => x.Evidence.AnonymousIndex, updated.AnonymousIndex)
+                            .SetProperty(x => x.Evidence.AnonymousAttestations, updated.AnonymousAttestations)
+                            .SetProperty(x => x.Evidence.IncludeThreads, updated.IncludeThreads)
+                            .SetProperty(x => x.Evidence.IncludeReviewerNames, updated.IncludeReviewerNames)
+                            .SetProperty(x => x.Evidence.IncludeChecklistWording, updated.IncludeChecklistWording)
+                            .SetProperty(x => x.Evidence.IncludeFiles, updated.IncludeFiles)
+                            .SetProperty(x => x.Evidence.IncludeGitContext, updated.IncludeGitContext),
+                        cancellationToken);
+                return rows > 0 ? (true, audit) : (false, null);
+            },
+            cancellationToken);
     }
 
     /// <inheritdoc />

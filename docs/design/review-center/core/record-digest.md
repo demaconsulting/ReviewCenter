@@ -10,6 +10,10 @@ exactly what a signature approves. The unit is a stateless static class and ther
 `ReviewRecord`, is an immutable snapshot of everything the digest covers, loaded by one call of the store so that the
 digest and the signing blockers describe the same data.
 
+The digest format is private to ReviewCenter: no other tool is expected to reproduce it, and it is versioned from
+`v1` at the first release. There is no earlier history to describe; the version only grows when a later release
+changes the format.
+
 #### Data Model
 
 The digest is the SHA-256 hash, written as 64 lowercase hexadecimal characters, of the UTF-8 bytes of a canonical
@@ -18,55 +22,60 @@ text. Hashing is the only use of the text; it is never stored.
 **What the digest covers** (and therefore what a signature approves):
 
 1. The content fingerprint of the review (the hash of the file contents, see `Fingerprint`).
-2. The source of the files (new in version 2): for an uploaded review only the word `upload`; for a review from a
-   git repository the identity of the repository, the baseline commit (or none), the head commit, the selection
-   text, and every change as its path, its kind (`Added`, `Modified`, or `Deleted`), the SHA-256 of its baseline
-   content (none for an addition), and the SHA-256 of its head content (none for a deletion). Since version 3 the
-   source line also carries the identifier of the review-set of `.reviewmark.yaml` the review was planned from (none
-   for a review that was not planned from a set; the empty text is a different value from none). A signature therefore
-   binds to the commits, the selection, and each changed file, not only to the fingerprint, which covers the head
-   content alone and would not change if a deleted file, the baseline, or the selection changed.
-3. Every stored checklist answer: the check id, the outcome (`Pass`, `Fail`, or `NotApplicable`), and the
-   justification.
-4. Every checklist section that is marked as not applicable: the section id and the reason.
-5. Every comment thread: the file path, the side (`Head` or `Baseline`, new in version 4), the start and end line (or
-   none for a whole file), the state (`Open` or `Resolved`), and the creation time of the thread; and every comment
-   of the thread in posting order: the display name of the author, the user name of the author, the text, and the
-   time. A line of a thread means a line of the text of its side, so a head thread and a baseline thread on the same
-   numbers are different discussions and give different digests.
+2. The source of the files: for an uploaded review only the word `upload`; for a review from a git repository the
+   identity of the repository, the baseline commit (or none), the head commit, the selection text, the identifier of
+   the review-set of `.reviewmark.yaml` the review was planned from (none for a review that was not planned from a
+   set; the empty text is a different value from none), and every change as its path, its kind (`Added`, `Modified`,
+   or `Deleted`), the SHA-256 of its baseline content (none for an addition), and the SHA-256 of its head content
+   (none for a deletion). A signature therefore binds to the commits, the selection, and each changed file, not only
+   to the fingerprint, which covers the head content alone and would not change if a deleted file, the baseline, or
+   the selection changed.
+3. The checklist the review was created with (frozen at creation): its version label and, for every section, its
+   identifier and title and, for every check, its identifier and question wording. A signature therefore binds to the
+   questions that were asked, not only to the replies; a review without a checklist is written as none.
+4. Every stored checklist answer: the check id, the outcome (`Pass`, `Fail`, or `NotApplicable`), the justification,
+   and who answered (the display name and the user name of the person).
+5. Every checklist section that is marked as not applicable: the section id and the reason.
+6. Every comment thread: the file path, the side (`Head` or `Baseline`), the start and end line (or none for a whole
+   file), the state (`Open` or `Resolved`), and the creation time of the thread; and every comment of the thread in
+   posting order: the display name of the author, the user name of the author, the text, and the time. A line of a
+   thread means a line of the text of its side, so a head thread and a baseline thread on the same numbers are
+   different discussions and give different digests.
 
 **What the digest does not cover**:
 
-- Who gave an answer and when (`AnsweredBy` and `AnsweredAt`). Answering a check again with the same outcome and
-  justification therefore does not invalidate a signature. This is a deliberate choice that can be reversed by adding
-  the two values to the text and raising the version.
+- When an answer was given (`AnsweredAt`). Answering a check again with the same outcome and justification, as the
+  same person, therefore does not invalidate a signature. Because who answered is covered, a different person
+  answering the same value again does invalidate the signatures: the record then says something different about who
+  vouches for the answer.
+- The hint of a checklist section that says when it can be skipped. It is display help, not wording of a check.
 - Sections that apply. Applying is the default and carries no reason, so only the exception is recorded.
 - The identities (row numbers) of answers, threads, and comments, and the order in which the store happens to return
-  them or the changes.
+  them or the changes, or the order the checklist definition lists its sections and checks in.
 - The name of the repository. It is a display copy made when the review was created; the identity of the repository
   is covered, so renaming a repository does not make a signature out of date.
 - The reviewer slots and the signatures. Signing must not change what was signed.
-- The review identifier and title, the list of files, and the checklist definition. The file list and the checklist
-  are fixed when the review is created, and the file contents are covered through the fingerprint (and, for a review
-  from a repository, through the changes); the file paths that matter enter the digest through the anchors of
-  threads and the changes.
+- The review identifier and title, and the list of files. The file list is fixed when the review is created, and the
+  file contents are covered through the fingerprint (and, for a review from a repository, through the changes); the
+  file paths that matter enter the digest through the anchors of threads and the changes.
 
-**Canonical text, version 4**: the lines below are joined with a line feed (`\n`, no trailing line feed). Version 1
-had the same text without the source lines and with the header `ReviewCenter record v1`; version 2 had the source
-lines without the review-set identifier and the header `ReviewCenter record v2`; version 3 had the review-set
-identifier but no side in the thread line and the header `ReviewCenter record v3`. Every digest changed with each of
-the three moves, which is intended: the database of the product is recreated at these moves, so no signature of an
-earlier version exists, and a signature that did would simply show as out of date.
+The digest always covers the complete record, whatever the evidence settings of the project omit from the PDF
+(see `AttestationRenderer`).
+
+**Canonical text, version 1**: the lines below are joined with a line feed (`\n`, no trailing line feed).
 
 ```text
-ReviewCenter record v4
+ReviewCenter record v1
 fingerprint {S}
 source upload                                              for an uploaded review, or
 source git {repositoryId} {S:baseline} {S:head} {S:selection} {S:reviewSetId}   for a review from a repository, then
 changes
 change {S:path} {S:kind} {S:baselineHash} {S:headHash}     one line per change, sorted by path
+checklist {S:version}                                      or "checklist -" for a review without a checklist
+section {S:id} {S:title}                                   one line per section, sorted by id, each followed by
+item {S:id} {S:text}                                       one line per check of the section, sorted by id
 answers
-answer {S:itemId} {S:outcome} {S:justification}            one line per answer, sorted by item id
+answer {S:itemId} {S:outcome} {S:justification} {S:answeredBy} {S:answeredByUsername}   sorted by item id
 sections
 not-applicable {S:sectionId} {S:reason}                    one line per section that does not apply, sorted by id
 threads
@@ -87,59 +96,84 @@ Notation and rules:
   side as a length-prefixed string, for example `4:Head` or `8:Baseline`).
 - The selection text is the text kept with the review: the patterns in the order given, one per line, with `!` in
   front of an exclusion.
-- Changes are sorted by path, answers by item id, and sections by section id, all with the ordinal comparison. Each
-  thread is first rendered to its block (the thread line and its comment lines joined by line feeds); the blocks are
-  sorted with the ordinal comparison, so the order of threads, which the store does not guarantee, does not matter.
-  The order of the comments inside a thread does matter and is kept as stored, because it is part of what was said.
+- Changes are sorted by path, checklist sections and checks by id, answers by item id, and not-applicable sections
+  by section id, all with the ordinal comparison. Each thread is first rendered to its block (the thread line and
+  its comment lines joined by line feeds); the blocks are sorted with the ordinal comparison, so the order of
+  threads, which the store does not guarantee, does not matter. The order of the comments inside a thread does matter
+  and is kept as stored, because it is part of what was said.
 - The header line holds the format version. Any change to this format, to what is covered, or to the way a value is
   written must change the version, because it changes the digest of every record and makes all earlier signatures
   out of date.
 
-**Known-answer vectors**: for an uploaded review with the fingerprint `abc`, no answers, no sections that do not
-apply, and no threads, the canonical text is the six lines
+**Known-answer vectors**: for an uploaded review with the fingerprint `abc`, no checklist, no answers, no sections
+that do not apply, and no threads, the canonical text is the seven lines
 
 ```text
-ReviewCenter record v4
+ReviewCenter record v1
 fingerprint 3:abc
 source upload
+checklist -
 answers
 sections
 threads
 ```
 
-and the digest is `244341c991c7ad467cb6f84ea3236bf06cddaada609cabc5ef7a5f3326f7aeb0` (the digest of the same
-record in version 3 was `0527d1b7805490ea49b3ace3b00c531b07b44276996e0118c6c654c3f1dd8ef6`, and in version 2
-`fd4f16444ef233068c76aad7bed87b1bafd550c20a0019f576e5cdaaadb9384c`). For a review from the
+and the digest is `9fee8bc5c8ddc1c908ed605ccb301bfa1be3e0499cc824d787275c7a783543f0`. For a review from the
 repository 7 with the fingerprint `abc`, the baseline `aaaa...` and the head `bbbb...` (forty characters each), the
-selection `**/*`, no review-set, a modified file `a.txt` (baseline hash `bs1`, head hash `hs1`) and a deleted file
-`b.txt` (baseline hash `bs2`), and nothing else, the canonical text is
+selection `**/*`, no review-set, no checklist, a modified file `a.txt` (baseline hash `bs1`, head hash `hs1`) and a
+deleted file `b.txt` (baseline hash `bs2`), and nothing else, the canonical text is
 
 ```text
-ReviewCenter record v4
+ReviewCenter record v1
 fingerprint 3:abc
 source git 7 40:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa 40:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb 4:**/* -
 changes
 change 5:a.txt 8:Modified 3:bs1 3:hs1
 change 5:b.txt 7:Deleted 3:bs2 -
+checklist -
 answers
 sections
 threads
 ```
 
-and the digest is `1c2c05b15941c7bc7f8c6b63aff356e4efd5123c0ed8d97ffa3ead7635046387`. With the review-set `core` the
-source line ends with `4:core` and the digest is `54b660301c966a5e5fb0e76bbf91860da1e6ea5544b74232fe851762f0721cbc`,
-and with the empty review-set it ends with `0:` and the digest is
-`6b9383b83e087a9f862b95079e9eb2caccda8b51e04bb4e2484fd0c94a430364`. For a record with the
-fingerprint `abc`, one answer (check `REQ-01`, outcome `Fail`, justification `bad`), the sections `DES` (does not
-apply, reason `none`) and `DOC` (applies), and one thread on `a.txt` (head side, lines 1 to 2, `Open`, created at time
-T) with the comment by `Ann` (`ann`) with the text `Please fix` at time T, the upload canonical text is
+and the digest is `b0eae44ae9062359375b7a361857794617e5c28b5a6a2b7ac732ec36549857d8`. With the review-set `core`
+the source line ends with `4:core` and the digest is
+`27b7ef9d9b7303fc1c55808f00331469c99e8518e66af16a3317d1811e678059`, and with the empty review-set it ends with `0:`
+and the digest is `d44de252d6f0c7d7d878db59fedc2f21d20592d8669050216b5d77487cbf0760`. For an upload with the
+fingerprint `abc`, the checklist `default-1` with the section `REQ` ("Requirements"; checks `REQ-01` "Is the code
+correct?" and `REQ-02` "Is it traced?") and the section `DES` ("Design"; check `DES-01` "Is it sound?"), defined in
+that order, and one answer (check `REQ-01`, outcome `Pass`, no justification, answered by `Ann` / `ann`), the
+canonical text is
 
 ```text
-ReviewCenter record v4
+ReviewCenter record v1
 fingerprint 3:abc
 source upload
+checklist 9:default-1
+section 3:DES 6:Design
+item 6:DES-01 12:Is it sound?
+section 3:REQ 12:Requirements
+item 6:REQ-01 20:Is the code correct?
+item 6:REQ-02 13:Is it traced?
 answers
-answer 6:REQ-01 4:Fail 3:bad
+answer 6:REQ-01 4:Pass - 3:Ann 3:ann
+sections
+threads
+```
+
+and the digest is `5f6e64aa7091e4156ec43493c56d9f0cc2407a24a92efec3012ae02e1f954e43`. For a record with the
+fingerprint `abc`, one answer (check `REQ-01`, outcome `Fail`, justification `bad`, answered by `Ann` / `ann`), the
+sections `DES` (does not apply, reason `none`) and `DOC` (applies), and one thread on `a.txt` (head side, lines 1 to
+2, `Open`, created at time T) with the comment by `Ann` (`ann`) with the text `Please fix` at time T, the upload
+canonical text is
+
+```text
+ReviewCenter record v1
+fingerprint 3:abc
+source upload
+checklist -
+answers
+answer 6:REQ-01 4:Fail 3:bad 3:Ann 3:ann
 sections
 not-applicable 3:DES 4:none
 threads
@@ -147,22 +181,23 @@ thread 5:a.txt 4:Head 1 2 4:Open {T ticks}
 comment 3:Ann 3:ann 10:Please fix {T ticks}
 ```
 
-The side vectors use the upload record with the fingerprint `abc`, no answers, and one thread on `a.txt` for lines 1
-to 2, `Open`, created at the UTC time 2025-03-04 05:06:07 (ticks `638766615670000000`) with the comment by `Ann` (`ann`)
-with the text `Please fix` at the same time. With the side `Head` the digest is
-`9fbaa65dceeba949bcfb6ebbf94570035516a11aed51df672503fee68c08a528`, and with the side `Baseline` (written
-`8:Baseline`) it is `b3254cedc7e54cac4d5452de47858bb0b64de2f2bc7daa703a58012e632042df`. All version 4 answers were
+The side vectors use the upload record with the fingerprint `abc`, no checklist, no answers, and one thread on `a.txt`
+for lines 1 to 2, `Open`, created at the UTC time 2025-03-04 05:06:07 (ticks `638766615670000000`) with the
+comment by `Ann` (`ann`) with the text `Please fix` at the same time. With the side `Head` the digest is
+`fe1a3eea5aab9f90922ebdea3caa92b637333d4f082eb7a80b44eb1335acc896`, and with the side `Baseline` (written
+`8:Baseline`) it is `68acc67bebb0c5decad4669037cc3f7618844cf0e59919cb911aef79e525cf0d`. All answers were
 calculated independently of the implementation with a short script (SHA-256 of the canonical text as written
 above), not copied from the code under test.
 
-The tests check the digests of the first two vectors, of the two review-set variants, and of the two side vectors,
-and the exact canonical text of the second and the third.
+The tests check the digests of the first two vectors, of the two review-set variants, of the checklist vector, and of
+the two side vectors, and the exact canonical text of the second, the third, and the fourth.
 
 #### Key Methods
 
 **Canonicalize**: Builds the canonical text of a record.
 
-- *Parameters*: `ReviewRecord record` — the record; the checklist definition it carries is not used.
+- *Parameters*: `ReviewRecord record` — the record; the frozen checklist definition it carries is read for the
+  checklist lines.
 - *Returns*: `string` — the canonical text described above.
 - *Preconditions*: The record is not null.
 - *Postconditions*: The text does not depend on the order of the lists in the record or on any identity.
@@ -176,12 +211,16 @@ and the exact canonical text of the second and the third.
 
 #### Error Handling
 
-A null record raises `ArgumentNullException`. No other failure is possible: every value can be written, and the hash
-cannot fail. Whether a record is signable is not decided here (see `SigningService`).
+A null record raises `ArgumentNullException`. A stored checklist definition that is not valid JSON, or not a complete
+definition (`ChecklistDefinition.FromJson` rejects a missing version, section list, section, item, identifier, title or
+text), raises `JsonException`, never a `NullReferenceException`: the store only holds text written by the definition
+itself, so this signals corrupted data and is
+not hidden. Whether a record is signable is not decided here (see `SigningService`).
 
 #### Dependencies
 
-- **ReviewRecord** and the thread, comment, answer, and section types of the `Core` subsystem, which it reads.
+- **ReviewRecord** and the thread, comment, answer, checklist, and section types of the `Core` subsystem, which it
+  reads.
 - **.NET runtime library** — `System.Security.Cryptography.SHA256`, `System.Text.Encoding` for UTF-8, and
   `System.Globalization.CultureInfo` for the invariant number format.
 
@@ -190,4 +229,4 @@ cannot fail. Whether a record is signable is not decided here (see `SigningServi
 - **SigningService** — computes the digest to show, to compare with the digest the signer saw, and to find the
   current signatures.
 - **ReviewStore** (`Storage` subsystem) — computes the digest again inside the transaction that stores a signature.
-- **Tests** — check the format and the known-answer vector.
+- **Tests** — check the format and the known-answer vectors.

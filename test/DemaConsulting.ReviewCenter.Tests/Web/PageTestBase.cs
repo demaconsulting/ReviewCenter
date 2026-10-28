@@ -110,6 +110,9 @@ public abstract class PageTestBase : BunitContext
         Services.AddSingleton(new ReviewPlanner(store, pageReviews, pageRepositories, Git, pageSigning, SetParser, Access));
         Services.AddSingleton<AuthenticationStateProvider>(_authentication);
 
+        // The evidence settings page enforces the real access rules; EvidenceSettingsService is exposed for arranging
+        SettingsService = new EvidenceSettingsService(store, allowAll);
+        Services.AddSingleton(new EvidenceSettingsService(store, Access));
         // The review page offers the attestation; the default key is an in-memory self-signed key, and a test that
         // needs another key or a problem registers its own provider before the first render
         Services.AddSingleton<IAttestationKeyProvider>(_ => new FakeAttestationKeyProvider(TestKeys.SelfSignedRsa()));
@@ -212,6 +215,11 @@ public abstract class PageTestBase : BunitContext
     ///     Gets the planner the plan page uses.
     /// </summary>
     protected ReviewPlanner Planner { get; }
+
+    /// <summary>
+    ///     Gets the evidence settings service that allows everything, for arranging the settings of a project.
+    /// </summary>
+    protected EvidenceSettingsService SettingsService { get; }
 
     /// <summary>
     ///     Gets the signing service the pages use.

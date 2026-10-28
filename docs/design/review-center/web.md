@@ -69,8 +69,8 @@ all domain behavior and never access the database.
 **Project routes** (`GET /projects`, `GET /projects/new`, `GET /projects/{id}`, `GET /projects/{id}/plan`,
 `GET /projects/{id}/reviews/new`, `GET /projects/{id}/reviews/{reviewId}`,
 `GET /projects/{id}/reviews/{reviewId}/checklist`, `GET /projects/{id}/members/new`,
-`GET /projects/{id}/members/account`): The
-pages for projects, planning, reviews, review checklists, and project members.
+`GET /projects/{id}/members/account`, `GET /projects/{id}/evidence-settings`): The
+pages for projects, planning, reviews, review checklists, project members, and evidence settings.
 
 - *Type*: HTTP `GET`, followed by a live Blazor connection for interactivity.
 - *Role*: Provider.
@@ -79,8 +79,14 @@ pages for projects, planning, reviews, review checklists, and project members.
   (system administrators only); `/projects/{id}` shows a
   project with its reviews as a list of rows and a New review button and a Plan reviews button, and, to whoever
   administers the project (a project admin or a system administrator), a Members section that lists the members with
-  their role, switches a role, removes a member, and has a + Add member button, and Repositories and Audit trail
-  buttons that lead to `/projects/{id}/repositories` and `/projects/{id}/audit`;
+  their role, switches a role, removes a member, and has a + Add member button, and Repositories, Audit trail, and
+  Evidence settings buttons that lead to `/projects/{id}/repositories`, `/projects/{id}/audit`, and
+  `/projects/{id}/evidence-settings`;
+  `/projects/{id}/evidence-settings` shows seven switches: whether the evidence index and the attestation PDFs of the
+  project may be read without signing in (both off by default) and what every attestation PDF contains (review
+  discussion threads, reviewer names, checklist wording, file list and hashes, git context; all on by default), with
+  a warning below each content switch that is off, a summary of what is left out, and an exposure warning while an
+  anonymous switch is on, and saves them with one button;
   `/projects/{id}/members/new` adds an existing user by the exact user name (no list of users) with an optional
   project admin role, and has a Create a new account button; `/projects/{id}/members/account` creates a local account
   for the project from a user name and a display name and shows its temporary password once;
@@ -99,7 +105,9 @@ pages for projects, planning, reviews, review checklists, and project members.
   project from a missing one; a review that does not exist is reported on the page itself.
 - *Constraints*: Every interactive page carries the `data-interactive` marker. Every page requires a
   signed-in user: an anonymous request is redirected to the login page. List and detail pages use a wide container
-  and form pages a narrow one. `/projects/new` requires the role `SystemAdmin`.
+  and form pages a narrow one. `/projects/new` requires the role `SystemAdmin`. `/projects/{id}/evidence-settings` is
+  shown only to whoever administers the project; anybody else gets the same message as for a project that does not
+  exist.
 
 **Account route** (`GET /account`): The page where the signed-in user changes their own password, chooses the
 appearance, and manages their personal access tokens.
@@ -466,6 +474,18 @@ subject and the start of
 its thumbprint), or the reason why the key cannot be used. The link is a plain anchor to the endpoint of the `Evidence`
 subsystem, built by `ReviewLinks.ForAttestation`; the document is made and signed there, never in the page. The Help
 topic `signed-attestation` explains what the signature proves and does not prove.
+
+#### Evidence settings
+
+`EvidenceSettingsPage` (`/projects/{id}/evidence-settings`, reached from the Evidence settings button of the project
+page) lets whoever administers a project decide who may read the evidence of the project without signing in and what
+the attestation PDFs contain. The page contains no rule about the effect of a switch: `EvidenceSettingsService` in
+`Core` stores and audits the settings, and the `Api` and `Evidence` subsystems enforce them. The page's part is to show
+the switches with their defaults, to warn while a choice is made (a warning below each content switch that is off, a
+summary of what is left out, and an exposure warning while an anonymous switch is on), to save all the switches
+together on one button, and to say what happened. A change made by someone else after the page loaded is never
+overwritten: the page shows the stored settings and says so. Every switch change and every save re-checks that the user
+still administers the project. The Help topic `evidence-settings` explains the switches and their consequences.
 
 #### Personal access tokens
 

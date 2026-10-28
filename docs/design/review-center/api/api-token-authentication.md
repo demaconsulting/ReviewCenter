@@ -7,15 +7,38 @@
 `ApiTokenAuthentication` makes a personal access token the way to sign in to the API, and only to the API. Its single
 responsibility is to turn a token in the `Authorization` header (a bearer token, or the password of HTTP Basic
 credentials, which is what ReviewMark sends) into the principal of the token's owner, or into one generic
-refusal, and to leave every other kind of request unauthenticated by this scheme.
+refusal, and to leave every other kind of request unauthenticated by this scheme. It also decides the one exception to
+"a token is needed": a project can open its evidence index and its attestation PDFs to a caller that sends no
+credentials at all (the unit holds the policies, the handler, and the limiter for that exception).
 
 #### Data Model
 
-The file holds two types.
+The unit is three files.
 
-`ApiTokenAuthentication` is a static class. It holds the constants (the scheme `ReviewCenterToken`, the policy `Api`,
-the claim `rc_auth` with the value `pat`, and the claim `rc_token_id`) and the extension method
-`AddApiTokenAuthentication`.
+`ApiTokenAuthentication` is a static class. It holds the constants (the scheme `ReviewCenterToken`, the policies
+`Api`, `ApiEvidenceIndex`, and `ApiAttestation`, the claim `rc_auth` with the value `pat`, and the claim
+`rc_token_id`) and the extension method `AddApiTokenAuthentication`.
+
+`AnonymousEvidenceAccess.cs` holds `AnonymousEvidenceRequirement`, an authorization requirement that carries a function
+from the evidence settings of a project to the one switch that the route depends on (`AnonymousIndex` or
+`AnonymousAttestations`), and `AnonymousEvidenceHandler`, the stateless handler that decides it. The handler uses only
+`EvidenceSettingsService`.
+
+`AnonymousRateLimit.cs` holds `AnonymousRateLimit`, a singleton that counts the requests of each client address in a
+fixed window of one minute and allows 30 requests in a window. The counters are in memory, so they start empty after a
+restart. All state is behind one lock: a dictionary of one small window object per address and a linked list of the
+addresses in the order their windows were created (the same pattern as `SignInThrottle`). The table holds at most 4096
+addresses. When a new address needs room, the windows that have ended are removed first (cheaply from the head of the
+list, and by a full scan when the table is still full, because a clock that stepped backwards breaks the order), and if
+the table is still full the oldest windows are dropped, only as many as are needed; the table is never cleared as a
+whole. Pruning removes only windows that have ended and runs under the same lock as the renewal of a window, so a
+renewed window is never lost. A flood of more than 4096 addresses within one minute (for example from one IPv6 /64 or
+with a forged forwarded header) can push live windows out, so those clients get a fresh budget: the limit degrades
+toward failing open for them but never refuses anybody. The address is the one that
+`SignIn.ClientAddress` gives, the address of the direct connection (`Connection.RemoteIpAddress`). Behind a reverse
+proxy without `ASPNETCORE_FORWARDEDHEADERS_ENABLED=true` it is the address of the proxy, so all anonymous callers share
+one counter and the limit is reached sooner (it fails safe). This is the same limitation as for `SignInThrottle`
+(see `identity/sign-in-throttle.md`).
 
 `ApiTokenHandler` is the authentication handler of the scheme. A new instance serves each request. It holds the three
 services it uses (`PersonalAccessTokenService`, `SignInThrottle`, and `AuditService`) and no state of its own; the
@@ -26,12 +49,42 @@ of the token, which is not secret).
 
 #### Key Methods
 
-**AddApiTokenAuthentication**: Registers the scheme and the policy.
+**AddApiTokenAuthentication**: Registers the scheme, the policies, the handler, and the limiter.
 
 - *Parameters*: The service collection. Must not be null.
 - *Returns*: The same collection.
 - *Postconditions*: The scheme is registered as an additional scheme; the default and challenge schemes (the cookie) are
-  unchanged. The authorization policy `Api` requires the scheme and an authenticated user.
+  unchanged. The authorization policy `Api` requires the scheme and an authenticated user. The policies
+  `ApiEvidenceIndex` and `ApiAttestation` use the same scheme and, instead of "authenticated user", the requirement
+  `AnonymousEvidenceRequirement` with the switch `AnonymousIndex` or `AnonymousAttestations`. `AnonymousEvidenceHandler`
+  and `AnonymousRateLimit` are registered as singletons.
+- *Preconditions*: `EvidenceSettingsService` and `TimeProvider` are registered.
+
+**AnonymousEvidenceHandler.HandleRequirementAsync**: Decides the requirement of the two open policies.
+
+- *Postconditions*:
+  - A request whose token was accepted (an authenticated user) satisfies the requirement. The route then applies the
+    normal project rules to the owner of the token, so a non-member still gets the 404 of a missing project.
+  - A request without an authenticated user that carries an `Authorization` header of any kind never satisfies the
+    requirement, so a wrong, expired, or revoked token is still answered with the 401 challenge and is never treated as
+    anonymous.
+  - A request with no `Authorization` header and a `projectId` route value reads the effective evidence settings of the
+    project (`EvidenceSettingsService.GetEffectiveAsync`) and satisfies the requirement only when the switch of the
+    route is on. A project that does not exist, and a project whose switch is off, do not satisfy it, so both get the
+    same generic 401: the answer never tells whether the project exists.
+  - A request without a usable `projectId` route value does not satisfy the requirement.
+- *Notes*: Each switch opens only its own route; the handler holds no state.
+
+**AnonymousRateLimit.TryAcquire**: Counts a request of an address.
+
+- *Parameters*: The client address (`null` when it is not known, which is counted under one shared name).
+- *Returns*: `true` when the request is within the limit, and in an out parameter how long until the window ends.
+- *Postconditions*: The first request of an address, or the first request after a window has ended, starts a new window
+  with a count of one. Every later request in the window adds one. The 31st and later requests of a window are refused.
+  The clock is the `TimeProvider`, so a test can move it. The table never holds more than 4096 addresses: to add an
+  address to a full table the windows that have ended are removed first and then the oldest windows, never the address
+  that is being counted. A window that has not ended is removed only by that last step, and a renewed window is never
+  removed by pruning. The method is safe to call from many threads.
 
 **HandleAuthenticateAsync**: Authenticates a request.
 
@@ -84,8 +137,10 @@ by its display id only.
 - **SignInThrottle** — Identity; the count of attempts per address.
 - **SignIn** — Identity; the client address (`ClientAddress`) and the display name claim type.
 - **AuditService**, **AuditDraft** — Core; the audit events of a refusal.
+- **EvidenceSettingsService**, **EvidenceSettings** — Core; the per-project switches that open the two routes.
 
 #### Callers
 
-- **ServerHost** — registers the scheme and the policy.
-- **ApiEndpoints** — its route group requires the policy.
+- **ServerHost** — registers the scheme and the policies.
+- **ApiEndpoints** — its route group requires the `Api` policy, and the two routes of the second group require
+  `ApiEvidenceIndex` and `ApiAttestation`; its filter of that group calls `AnonymousRateLimit`.

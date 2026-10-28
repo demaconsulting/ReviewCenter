@@ -11,8 +11,8 @@ the JSON document, and does not know the address of a file (that is `ApiEndpoint
 
 #### Data Model
 
-The service is stateless and thread-safe. It is created with the review service, the signing service, and the project
-access rules. Its result is a
+The service is stateless and thread-safe. It is created with the review service, the signing service, the project
+access rules, and the evidence settings service. Its result is a
 list of `EvidenceIndexEntry` records: the `Id` (the review-set id of the review, which is the ReviewMark review id), the
 `Fingerprint` (the content fingerprint of the review), the `Date` (the UTC day of the latest signature as `yyyy-MM-dd`),
 and the `ReviewId` of the review that the entry stands for, which the endpoint uses to build the address of the
@@ -22,11 +22,15 @@ attestation. Nothing is stored: the index is built for each request.
 
 **BuildAsync**: Builds the index of a project.
 
-- *Parameters*: The `Actor` who asks, an `int projectId`, and a cancellation token.
+- *Parameters*: The `Actor?` who asks (`null` for a request without a signed-in user), an `int projectId`, and a
+  cancellation token.
 - *Returns*: the entries, one for each review-set id and fingerprint, ordered by id and then by fingerprint (ordinal);
   an empty list when no review qualifies.
-- *Postconditions*: First `IProjectAccess.RequireViewAsync` is called, so an actor who may not view the project gets the
-  rule of a missing project and nothing is read. A review is considered only when it has a review-set id. Its approval
+- *Postconditions*: First the asker is checked. With an actor, `IProjectAccess.RequireViewAsync` is called, so an actor
+  who may not view the project gets the rule of a missing project and nothing is read. Without an actor, the effective
+  evidence settings of the project are read (`EvidenceSettingsService.GetEffectiveAsync`), and unless the project
+  exists and has `AnonymousIndex` on the rule of a missing project is thrown, the same as for a project that does not
+  exist, and nothing else is read. A review is considered only when it has a review-set id. Its approval
   is read from `SigningService` (all in one batch, see Cost);
   a review that has no approval, or whose approval is not complete (no slot, an unsigned slot, or a signature of an
   older record), is not listed. The completion time of a review is the latest `SignedAt` of its slots. Of the reviews
@@ -37,7 +41,8 @@ attestation. Nothing is stored: the index is built for each request.
 #### Error Handling
 
 A review that cannot be read as complete is not listed, and no review causes an error. A null argument to the
-constructor raises `ArgumentNullException`, and so does a null actor. Exceptions of the stores reach the caller.
+constructor raises `ArgumentNullException`. A null actor is not an error: it is an anonymous request, which is checked
+against the project switch (see `BuildAsync`). Exceptions of the stores reach the caller.
 
 **Why only passes**: A review with a failed checklist answer cannot be signed, so no completed review has failed. The
 index therefore never holds a `fail` entry, and ReviewMark shows a review without a current entry as missing or stale.
@@ -53,7 +58,8 @@ snapshot of each review is still one read per review.
 
 #### Dependencies
 
-- **ReviewService**, **SigningService**, **ReviewApproval**, **IProjectAccess** — Core. The completion rule is that of
+- **ReviewService**, **SigningService**, **ReviewApproval**, **IProjectAccess**, **EvidenceSettingsService** — Core. The
+  completion rule is that of
   the attestation: every slot signed with the current record digest.
 
 #### Callers

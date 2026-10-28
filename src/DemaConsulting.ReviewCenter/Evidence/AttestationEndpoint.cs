@@ -32,8 +32,9 @@ namespace DemaConsulting.ReviewCenter.Evidence;
 ///     system administrator or a member of the project may download it, and anybody else is sent to the sign-in page by
 ///     the authentication scheme (when not signed in) or gets the same 404 as for a review that does not exist (when
 ///     not allowed to see the project; see <see cref="AttestationService.GenerateAsync"/>).
-///     It answers 200 with the PDF, 404 when the review does not exist, 409 when the review is not complete or changed
-///     while the attestation was being prepared, and 500
+///     It answers 200 with the PDF, 404 when the review does not exist, 409 when the review is not complete (to a
+///     signed-in caller; a caller without a token gets the 404 of a review that does not exist, so review identifiers
+///     cannot be probed) or changed while the attestation was being prepared, and 500
 ///     (a problem document that names the setting to correct) when the signing key is not usable.
 /// </remarks>
 internal static class AttestationEndpoint
@@ -74,7 +75,8 @@ internal static class AttestationEndpoint
     ///     Creates the answer for a missing project or review, so the page route can answer an empty 404 and the API a
     ///     JSON problem document while every other status is answered identically.
     /// </param>
-    /// <returns>The file for <see cref="AttestationStatus.Ok"/>; a 409 problem when the review is not complete or
+    /// <returns>The file for <see cref="AttestationStatus.Ok"/>; a 409 problem when the review is not complete (only for
+    ///     a signed-in caller, because the service answers a request without an actor with <c>NotFound</c>) or
     ///     changed; a 500 problem when the signing key is not usable.</returns>
     /// <remarks>
     ///     Shared by the page route and the API route so the two cannot drift apart. A signed attestation is evidence

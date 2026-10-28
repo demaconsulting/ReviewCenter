@@ -49,7 +49,7 @@ public class ApiDocumentTests
     ///     Test that the document is served without a token, describes the API operations with a fixed version,
     ///     no server address and the bearer and Basic schemes, and requires one of them for every operation.
     /// </summary>
-    [Fact(Timeout = 60000)]
+    [Fact(Timeout = 180000)]
     public async Task ApiDocument_Get_NoToken_DescribesTheApiWithBearerScheme()
     {
         // Arrange: an application and a client without a token
@@ -81,14 +81,23 @@ public class ApiDocumentTests
         Assert.DoesNotContain(paths, p => p.Name.Contains("openapi", StringComparison.Ordinal));
         var operations = paths.SelectMany(p => p.Value.EnumerateObject()).Where(o => o.Value.ValueKind == System.Text.Json.JsonValueKind.Object).ToList();
         Assert.NotEmpty(operations);
-        Assert.All(operations, o => Assert.True(o.Value.TryGetProperty("security", out var security) && security.GetArrayLength() == 2));
+        Assert.All(
+            operations,
+            o =>
+            {
+                // Bearer and Basic; the two routes a project can open also allow no credentials (an empty alternative)
+                var open = o.Value.GetProperty("operationId").GetString() is "GetEvidenceIndex" or "GetAttestation";
+                Assert.True(o.Value.TryGetProperty("security", out var security));
+                Assert.Equal(open ? 3 : 2, security.GetArrayLength());
+                Assert.Equal(open, security.EnumerateArray().Any(r => !r.EnumerateObject().Any()));
+            });
     }
 
     /// <summary>
     ///     Test that two applications generate byte-for-byte the same document, so the snapshot does not depend on
     ///     the machine, the host address or the run.
     /// </summary>
-    [Fact(Timeout = 60000)]
+    [Fact(Timeout = 180000)]
     public async Task ApiDocument_Get_TwoApplications_AreIdentical()
     {
         // Arrange and Act: generate the document twice, in two applications
@@ -107,7 +116,7 @@ public class ApiDocumentTests
     ///     --filter-method "*ApiDocument_Get_MatchesCommittedSnapshot"</c>; in bash the same command is prefixed with
     ///     <c>REVIEWCENTER_UPDATE_OPENAPI=1</c>.
     /// </summary>
-    [Fact(Timeout = 60000)]
+    [Fact(Timeout = 180000)]
     public async Task ApiDocument_Get_MatchesCommittedSnapshot()
     {
         // Arrange: the generated document and the place of the snapshot

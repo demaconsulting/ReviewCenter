@@ -26,9 +26,11 @@ namespace DemaConsulting.ReviewCenter.Evidence;
 ///     Lays out an <see cref="AttestationDocument"/> as a PDF with <see cref="PdfDocumentWriter"/>.
 /// </summary>
 /// <remarks>
-///     The sections are: the review, its status, the files, the checklist, the comment threads, the reviewer
-///     sign-offs, the audit trail anchor and the digital signature (with what it does and does not prove). The
-///     renderer reads no clock and no environment, so the same document always renders to the same bytes.
+///     The sections are: the review, the content scope, the files, the checklist, the comment threads, the reviewer
+///     sign-offs, the audit trail anchor and the digital signature (with what it does and does not prove). The files
+///     and the comment threads are left out when the evidence settings of the project turn them off, and so are the
+///     checklist wording and the git context in the parts that show them; the content scope names what is left out.
+///     The renderer reads no clock and no environment, so the same document always renders to the same bytes.
 /// </remarks>
 internal sealed class AttestationRenderer : IAttestationRenderer
 {
@@ -78,9 +80,18 @@ internal sealed class AttestationRenderer : IAttestationRenderer
             "This document attests that the review below is complete and signed by all reviewer slots.",
             PdfFont.HelveticaOblique);
         WriteReview(writer, document);
-        WriteFiles(writer, document);
+        WriteContentScope(writer, document);
+        if (document.Content.IncludeFiles)
+        {
+            WriteFiles(writer, document);
+        }
+
         WriteChecklist(writer, document);
-        WriteThreads(writer, document);
+        if (document.Content.IncludeThreads)
+        {
+            WriteThreads(writer, document);
+        }
+
         WriteSignOffs(writer, document);
         WriteAudit(writer, document);
         WriteSignature(writer, document);
@@ -108,7 +119,11 @@ internal sealed class AttestationRenderer : IAttestationRenderer
         writer.Row("Project", $"{document.ProjectName} (#{document.ProjectId.ToString(CultureInfo.InvariantCulture)})");
         writer.Row("Review", $"{document.ReviewTitle}");
         writer.Row("Review identifier", document.ReviewId);
-        if (document.RepositoryName is not null)
+        if (document.RepositoryName is null)
+        {
+            writer.Row("Source", "Files uploaded to ReviewCenter");
+        }
+        else if (document.Content.IncludeGitContext)
         {
             writer.Row("Repository", document.RepositoryName);
             writer.Row("Head revision", document.HeadSha ?? "-", PdfFont.Courier);
@@ -116,7 +131,7 @@ internal sealed class AttestationRenderer : IAttestationRenderer
         }
         else
         {
-            writer.Row("Source", "Files uploaded to ReviewCenter");
+            writer.Row("Source", "(git context omitted - see Content scope)");
         }
 
         if (document.ReviewSetId is not null)
@@ -128,6 +143,55 @@ internal sealed class AttestationRenderer : IAttestationRenderer
         writer.Row("Record digest", $"{document.RecordDigest}\n({document.DigestVersion})", PdfFont.Courier);
         writer.Row("Generated", $"{Time(document.GeneratedAt)} by {document.GeneratedBy}");
     }
+
+    /// <summary>
+    ///     Writes what the PDF contains and what it leaves out, with the settings that decided it.
+    /// </summary>
+    /// <remarks>
+    ///     Every PDF has this section, also when nothing is left out, so that a reader never has to guess whether a
+    ///     part is missing by accident. It states that the record digest covers the whole record.
+    /// </remarks>
+    /// <param name="writer">The writer.</param>
+    /// <param name="document">The document.</param>
+    private static void WriteContentScope(PdfDocumentWriter writer, AttestationDocument document)
+    {
+        var content = document.Content;
+        writer.Heading("Content scope");
+        writer.Paragraph(
+            $"These are the evidence settings of the project at {Time(document.GeneratedAt)}, when this document was "
+            + "generated. A part that a setting turns off is left out of this document; it is not lost from the review.",
+            PdfFont.Helvetica,
+            9);
+        writer.Row("Requested", document.IsAnonymousRequest
+            ? "without signing in (the project allows anonymous access to attestation PDFs)"
+            : "by a signed-in user");
+        writer.Row("Discussion threads", Switch(content.IncludeThreads));
+        writer.Row("Reviewer names", Switch(content.IncludeReviewerNames));
+        writer.Row("Checklist wording", Switch(content.IncludeChecklistWording));
+        writer.Row(
+            "File list and hashes",
+            content.IncludeFiles
+                ? Switch(true)
+                : $"{Switch(false)} ({document.Files.Count.ToString(CultureInfo.InvariantCulture)} files; the content fingerprint covers them)");
+        writer.Row("Git context", Switch(content.IncludeGitContext));
+        writer.Paragraph(
+            content.IsReduced
+                ? $"Left out of this document: {string.Join(", ", content.OmittedSections)}."
+                : "Nothing is left out of this document.",
+            PdfFont.HelveticaBold,
+            9);
+        writer.Paragraph(
+            "The record digest covers the complete record, including the parts left out of this document.",
+            PdfFont.HelveticaOblique,
+            9);
+    }
+
+    /// <summary>
+    ///     Names the state of a content switch.
+    /// </summary>
+    /// <param name="included">Whether the part is included.</param>
+    /// <returns><c>Included</c> or <c>Omitted</c>.</returns>
+    private static string Switch(bool included) => included ? "Included" : "Omitted";
 
     /// <summary>
     ///     Writes the files under review with the status of each.
@@ -164,9 +228,18 @@ internal sealed class AttestationRenderer : IAttestationRenderer
         }
 
         writer.Paragraph($"Checklist version {document.ChecklistVersion}", PdfFont.HelveticaOblique, 9);
+        var wording = document.Content.IncludeChecklistWording;
+        if (!wording)
+        {
+            writer.Paragraph(
+                "The wording of the sections and checks is left out (see Content scope); the checks are named by identifier.",
+                PdfFont.HelveticaOblique,
+                9);
+        }
+
         foreach (var section in document.Sections)
         {
-            writer.Paragraph(section.Title, PdfFont.HelveticaBold, 10, 0, 8);
+            writer.Paragraph(wording ? section.Title : section.Id, PdfFont.HelveticaBold, 10, 0, 8);
             if (!section.IsApplicable)
             {
                 writer.Paragraph($"Not applicable: {section.Reason}", PdfFont.HelveticaOblique, 9, 12);
@@ -175,7 +248,14 @@ internal sealed class AttestationRenderer : IAttestationRenderer
 
             foreach (var item in section.Items)
             {
-                writer.Row($"{item.Id}  {item.Outcome}", item.Text, PdfFont.Helvetica, 12, 110);
+                if (wording)
+                {
+                    writer.Row($"{item.Id}  {item.Outcome}", item.Text, PdfFont.Helvetica, 12, 110);
+                }
+                else
+                {
+                    writer.Paragraph($"{item.Id}  {item.Outcome}", PdfFont.Helvetica, 10, 12, 3);
+                }
                 if (!string.IsNullOrWhiteSpace(item.Comment))
                 {
                     // The full comment: it is the reviewer's own words, and the paragraph wraps and breaks pages

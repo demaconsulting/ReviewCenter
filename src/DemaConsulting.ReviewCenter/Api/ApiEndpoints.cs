@@ -18,9 +18,11 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
+using System.Globalization;
 using System.Text.Json;
 using DemaConsulting.ReviewCenter.Core;
 using DemaConsulting.ReviewCenter.Evidence;
+using DemaConsulting.ReviewCenter.Identity;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Http.Metadata;
 
@@ -28,11 +30,15 @@ namespace DemaConsulting.ReviewCenter.Api;
 
 /// <summary>
 ///     The JSON API under <c>/api</c>: list projects and reviews, read a review, create a review, download the
-///     attestation and read the evidence index, all with a personal access token.
+///     attestation and read the evidence index, all with a personal access token (the attestation and the evidence
+///     index can also be read without a token when the project allows it).
 /// </summary>
 /// <remarks>
-///     Every endpoint is in one group that requires the <c>Api</c> policy (the token scheme only), so no endpoint can
-///     be left open by mistake. The token acts as its owner: the owner's project memberships decide what is visible, and
+///     Every endpoint but two is in one group that requires the <c>Api</c> policy (the token scheme only), so no
+///     endpoint can be left open by mistake. The two exceptions, the evidence index and the attestation PDF, are in a
+///     second group with their own policies (see <see cref="AnonymousEvidenceHandler"/>): a project can switch each
+///     of them open to callers without a token in its evidence settings, and a test enumerates the endpoints so that
+///     no third route can join them. The token acts as its owner: the owner's project memberships decide what is visible, and
 ///     a project the owner may not see is answered with the same 404 as a project that does not exist. The endpoints
 ///     call the same Core services as the web pages, so the rules (limits,
 ///     validation, audit trail) are identical. A failed domain rule becomes a problem document through one filter
@@ -89,6 +95,12 @@ internal static class ApiEndpoints
             .RequireAuthorization(ApiTokenAuthentication.PolicyName)
             .AddEndpointFilter(DomainRuleFilterAsync);
 
+        // The two routes that a project can open to callers without a token have their own group and their own
+        // policies instead of the Api policy; nothing else under /api is reachable without a token
+        var open = endpoints.MapGroup(Prefix)
+            .AddEndpointFilter(DomainRuleFilterAsync)
+            .AddEndpointFilter(AnonymousRateLimitFilterAsync);
+
         group.MapGet("/projects", ListProjectsAsync)
             .WithName("ListProjects")
             .WithSummary("Lists the projects.")
@@ -140,27 +152,37 @@ internal static class ApiEndpoints
             .WithOrder(1)
             .ExcludeFromDescription();
 
-        group.MapGet("/projects/{projectId:int}/reviews/{reviewId}/attestation.pdf", GetAttestationAsync)
-            .WithName("GetAttestation")
+        open.MapGet("/projects/{projectId:int}/reviews/{reviewId}/attestation.pdf", GetAttestationAsync)
+            .RequireAuthorization(ApiTokenAuthentication.AttestationPolicyName)
+            .WithName(ApiDocument.AttestationOperation)
             .WithSummary("Downloads the signed attestation of a complete review.")
-            .WithDescription("Returns the signed PDF attestation; the review must be complete (every slot signed).")
+            .WithDescription(
+                "Returns the signed PDF attestation; the review must be complete (every slot signed). What the PDF "
+                + "contains follows the evidence settings of the project. Without a token the request is answered "
+                + "only when the project allows anonymous attestation PDFs; otherwise the answer is 401.")
             .Produces(StatusCodes.Status200OK, contentType: "application/pdf")
             .ProducesProblem(StatusCodes.Status401Unauthorized)
             .ProducesProblem(StatusCodes.Status404NotFound)
             .ProducesProblem(StatusCodes.Status409Conflict)
+            .ProducesProblem(StatusCodes.Status429TooManyRequests)
             .ProducesProblem(StatusCodes.Status500InternalServerError);
 
-        group.MapGet("/projects/{projectId:int}/evidence/index.json", GetEvidenceIndexAsync)
-            .WithName("GetEvidenceIndex")
+        open.MapGet("/projects/{projectId:int}/evidence/index.json", GetEvidenceIndexAsync)
+            .RequireAuthorization(ApiTokenAuthentication.EvidenceIndexPolicyName)
+            .WithName(ApiDocument.EvidenceIndexOperation)
             .WithSummary("Gets the evidence index of a project, in the format of a ReviewMark index.json.")
             .WithDescription(
                 "Returns the completed reviews of the project that were planned from a review-set, one per review-set "
                 + "id and fingerprint, as {\"reviews\":[{id, fingerprint, date, result, file}]}. The result is always "
                 + "'pass'; 'file' is the absolute address of the signed attestation. Use it as the evidence-source of "
-                + "a .reviewmark.yaml file, with a personal access token as the Basic password.")
+                + "a .reviewmark.yaml file, with a personal access token as the Basic password. Without a token the "
+                + "request is answered only when the project allows an anonymous evidence index; otherwise the "
+                + "answer is 401.")
             .Produces<EvidenceIndexDto>()
             .ProducesProblem(StatusCodes.Status401Unauthorized)
-            .ProducesProblem(StatusCodes.Status404NotFound);
+            .ProducesProblem(StatusCodes.Status404NotFound)
+            .ProducesProblem(StatusCodes.Status429TooManyRequests);
+
         // Every other address under /api answers a JSON 404, with or without a token. A more specific route above wins
         // over this catch-all, so it only sees what nothing else handles
         endpoints.MapMethods(Prefix + "/{**rest}", AllMethods, () => ApiProblems.NotFound("The address does not exist."))
@@ -188,6 +210,35 @@ internal static class ApiEndpoints
         {
             return ApiProblems.ToResult(ex);
         }
+    }
+
+    /// <summary>
+    ///     Answers 429 to a caller without a token whose address makes too many requests.
+    /// </summary>
+    /// <param name="context">The invocation context.</param>
+    /// <param name="next">The rest of the endpoint.</param>
+    /// <returns>The result of the endpoint, or the 429 problem with <c>Retry-After</c>.</returns>
+    private static async ValueTask<object?> AnonymousRateLimitFilterAsync(
+        EndpointFilterInvocationContext context,
+        EndpointFilterDelegate next)
+    {
+        var http = context.HttpContext;
+        if (http.User.Identity?.IsAuthenticated != true)
+        {
+            var limit = http.RequestServices.GetRequiredService<AnonymousRateLimit>();
+            if (!limit.TryAcquire(SignIn.ClientAddress(http), out var retryAfter))
+            {
+                http.Response.Headers.CacheControl = "no-store";
+                http.Response.Headers.RetryAfter =
+                    Math.Max(1, (int)Math.Ceiling(retryAfter.TotalSeconds)).ToString(CultureInfo.InvariantCulture);
+                return Results.Problem(
+                    title: "Too Many Requests",
+                    detail: "Too many requests without a token from this address; try again later.",
+                    statusCode: StatusCodes.Status429TooManyRequests);
+            }
+        }
+
+        return await next(context);
     }
 
     /// <summary>
@@ -378,7 +429,7 @@ internal static class ApiEndpoints
         var result = await attestations.GenerateAsync(
             projectId,
             reviewId,
-            ApiProblems.ActorOf(http.User),
+            ApiProblems.ActorOrAnonymous(http.User),
             http.RequestAborted);
         return AttestationEndpoint.ToResult(result, http, () => ApiProblems.NotFound("The review does not exist."));
     }
@@ -400,8 +451,11 @@ internal static class ApiEndpoints
         // The index holds the addresses of signed documents behind a token: never cache any response of it in a
         // shared cache, including the not-found problem
         http.Response.Headers.CacheControl = "no-store";
-        var actor = ApiProblems.ActorOf(http.User);
-        if (await projects.GetAsync(actor, projectId, http.RequestAborted) is null)
+        var actor = ApiProblems.ActorOrAnonymous(http.User);
+
+        // Without a token the index service answers only for a project that allows it, and refuses with the same
+        // not-found as a project that does not exist
+        if (actor is not null && await projects.GetAsync(actor, projectId, http.RequestAborted) is null)
         {
             return ApiProblems.NotFound("The project does not exist.");
         }

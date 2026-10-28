@@ -17,7 +17,8 @@ N/A - standard test environment.
 
 - All unit tests pass with zero failures.
 - The default checklist has the 14 sections and 58 items of the review template, in order, with unique ids that
-  start with the id of their section, and it survives a JSON round trip.
+  start with the id of their section, and it survives a JSON round trip; a definition that is read from JSON but is
+  incomplete is rejected with a `JsonException`.
 - A review's checklist is the snapshot stored when the review was created; a later change to the default does not
   change it, and an unknown review has no checklist.
 - A section marked as not applicable needs a reason, which is stored trimmed; marking it applicable again clears the
@@ -41,6 +42,11 @@ section id. This scenario is tested by `ChecklistService_DefaultChecklist_IdsUni
 
 **ChecklistService_DefaultChecklist_RoundTripsThroughJson**: The default checklist is written to JSON and read back
 unchanged. This scenario is tested by `ChecklistService_DefaultChecklist_RoundTripsThroughJson`.
+
+**ChecklistService_FromJson_IncompleteDefinition_ThrowsJsonException**: A theory over JSON that parses but is not a
+complete definition (`null`, `{}`, missing or null sections, a null section, a section without id, title or items, a
+null item, an item without id or text, no version): `ChecklistDefinition.FromJson` and `ReviewChecklist.Parse` both
+raise a `JsonException`. This scenario is tested by `ChecklistService_FromJson_IncompleteDefinition_ThrowsJsonException`.
 
 **ReviewService_CreateDraftAsync_ValidInput_AttachesDefaultChecklistSnapshot**: A review is created; it carries the
 version and the sections of the default checklist. This scenario is tested by

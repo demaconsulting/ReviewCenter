@@ -75,6 +75,43 @@ public class AttestationServiceTests
     }
 
     /// <summary>
+    ///     Test that a request without an actor gets the answer of a review that does not exist when the review is not
+    ///     complete, so it cannot be used to list review identifiers or their state, while a signed-in caller keeps
+    ///     the informative not-approved answer; nothing is recorded and the key is not asked for.
+    /// </summary>
+    [Fact]
+    public async Task AttestationService_GenerateAsync_AnonymousIncompleteReview_ReturnsNotFoundLikeMissing()
+    {
+        // Arrange: an incomplete review in a project that allows anonymous attestation PDFs
+        var fixture = await AttestationFixture.CreateAsync(signed: false);
+        using var keys = new FakeAttestationKeyProvider(TestKeys.SelfSignedRsa());
+        var service = fixture.CreateService(keys);
+        Assert.True(await fixture.Store.UpdateEvidenceSettingsAsync(
+            fixture.ProjectId,
+            EvidenceSettings.Default,
+            EvidenceSettings.Default with { AnonymousAttestations = true },
+            AuditDraft.By(TestActors.Ann, EvidenceSettingsService.ChangedAction, "x", fixture.ProjectId),
+            TestContext.Current.CancellationToken));
+
+        // Act: an anonymous request for the incomplete review and for a review that does not exist, and a member's request
+        var incomplete = await service.GenerateAsync(
+            fixture.ProjectId, AttestationFixture.ReviewId, null, TestContext.Current.CancellationToken);
+        var missing = await service.GenerateAsync(fixture.ProjectId, "nope", null, TestContext.Current.CancellationToken);
+        var asMember = await service.GenerateAsync(
+            fixture.ProjectId, AttestationFixture.ReviewId, TestActors.Ann, TestContext.Current.CancellationToken);
+
+        // Assert: the two anonymous answers are the same, nothing was recorded, the key was not needed, and the
+        // member is still told that the review is not complete
+        Assert.Equal(AttestationStatus.NotFound, incomplete.Status);
+        Assert.Equal(missing, incomplete);
+        Assert.Equal("The review was not found.", incomplete.Message);
+        Assert.Null(incomplete.Content);
+        Assert.Equal(AttestationStatus.NotApproved, asMember.Status);
+        Assert.Empty(await AttestationAuditAsync(fixture));
+        Assert.Equal(0, keys.Requests);
+    }
+
+    /// <summary>
     ///     Test that a signature of an older record does not make the review complete: after the record changes
     ///     there is no attestation.
     /// </summary>

@@ -6,7 +6,8 @@
 # - The Storage subsystem spans the ReviewCenterDbContext, ReviewStore, UserStore, AuditStore, RepositoryStore, and
 #   DatabaseSetup units
 # - Subsystem requirements describe the externally visible behavior of the persistence of users, projects, reviews,
-#   checklists, comment threads, reviewer slots, signatures, project memberships, the audit trail, and git repositories
+#   checklists, comment threads, reviewer slots, signatures, project memberships, the evidence settings of projects,
+#   the audit trail, and git repositories
 
 sections:
   - title: Storage Subsystem Requirements
@@ -197,6 +198,27 @@ sections:
           - ReviewStore_AddMembershipAsync_UnknownProject_IsRefusedByTheDatabase
           - ReviewStore_RemoveMembershipAsync_TwoAdminsRemoveEachOther_ExactlyOneSucceeds
           - UserStore_AddToProjectAsync_StoresAccountMembershipAndOneEventTogether
+
+      - id: ReviewCenter-Storage-EvidenceSettings
+        title: >-
+          The Storage subsystem shall keep the evidence settings of each project with the project in the database
+          file, with the default settings for a project that was not given others, so that they are still there,
+          unchanged, when the database is opened again, change them only by an atomic compare-and-set against the
+          settings the caller started from, store each change together with its audit entry in one transaction, and
+          change nothing and record nothing for a project that does not exist or settings that were changed
+          meanwhile. The schema is created without a migration, so a development database that was created before
+          the settings existed has to be recreated.
+        justification: |
+          The settings decide who may read the evidence, so they must survive a restart and must not be lost when two
+          administrators save at the same time. The history of a change must stay true, so the entry is stored with
+          the change or not at all.
+        children:
+          - ReviewCenter-ReviewStore-EvidenceSettings
+          - ReviewCenter-DbContext-EvidenceSettings
+        tests:
+          - ReviewStore_AddProjectAsync_NewProject_HasDefaultEvidenceSettings
+          - ReviewStore_UpdateEvidenceSettingsAsync_Change_IsPersistedAndAudited
+          - ReviewStore_UpdateEvidenceSettingsAsync_ExpectedDiffers_ChangesNothing
 
       - id: ReviewCenter-Storage-RepositoryReviews
         title: >-

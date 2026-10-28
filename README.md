@@ -21,25 +21,22 @@ a project checklist, and sign the review with their password. Every action is re
 
 ## Features
 
-- 🔍 **File-Set Reviews** - Review uploaded files or the changes between two revisions of a git repository
-- 🌿 **Git Sources** - Register each project's repositories with encrypted access tokens and plan reviews from
-  `.reviewmark.yaml`
-- 💬 **Threaded Comments** - Discuss a whole file or a line range, reply, resolve, and share a link to any thread
-- ✅ **Review Checklist** - Every review gets a 14-section checklist answered Pass, Fail, or N/A
-- 👥 **Primary and Alternate Reviewers** - Any number of reviewer slots, each signed by the primary or the alternate
-- ✍️ **Re-authenticated Signatures** - Reviewers sign again with their password, bound to the exact record reviewed
-- 🔗 **Tamper-Evident Audit Trail** - Every change is chained by SHA-256 hashes and can be verified at any time
-- 📄 **Signed PDF Attestation** - Approved reviews download as a digitally signed PDF that any reader can verify
-- 🔐 **Local Accounts** - Sign-in lockout and throttling, and password changes
-- 🛡️ **Project-Based Access Control** - System administrators, project administrators, and project members; project
-  administrators manage their own members; a project you are not a member of looks like a project that does not exist
-- 🔑 **API Tokens** - Personal access tokens for automation, with a REST API, an OpenAPI document, and an evidence index
-  for ReviewMark
-- 🌗 **Light and Dark Theme** - Follows the system setting, or choose a theme in your account
-- 🤖 **Puppet UI Automation** - A developer tool that lets AI agents drive the web interface and take screenshots
-- 📦 **Self-Contained Executable** - A single executable for Windows (win-x64) and Linux (linux-x64), no runtime needed
-- 🗄️ **SQLite Storage** - Reviews, users, and the audit trail in one database file created on first start
-- 🧪 **Self-Validation** - Built-in validation tests with TRX and JUnit output
+- 🔍 **File-Set Reviews** - Review uploaded files or git revision changes
+- 🌿 **Git Sources** - Plan reviews from repository review-sets
+- 💬 **Threaded Comments** - Discuss files or line ranges inline
+- ✅ **Review Checklist** - 14-section Pass, Fail, or N/A checklist
+- 👥 **Reviewer Slots** - Primary and alternate reviewers sign each slot
+- ✍️ **Re-authenticated Signatures** - Password-confirmed sign-off bound to reviewed record
+- 🔗 **Tamper-Evident Audit Trail** - SHA-256 hash-chained, verifiable change history
+- 📄 **Signed PDF Attestation** - Approved reviews download as verifiable PDFs
+- ⚙️ **Evidence Settings** - Control PDF contents and anonymous evidence access
+- 🛡️ **Access Control** - Project roles, local accounts, and sign-in lockout
+- 🔑 **API Tokens** - Personal tokens for REST API and ReviewMark
+- 🌗 **Light and Dark Theme** - Follows system setting or account choice
+- 🤖 **Puppet UI Automation** - Lets AI agents drive and screenshot the UI
+- 📦 **Self-Contained Executable** - Single Windows and Linux executable, no runtime
+- 🗄️ **SQLite Storage** - Everything in one auto-created database file
+- 🧪 **Self-Validation** - Built-in tests with TRX and JUnit output
 
 ## Installation
 
@@ -86,6 +83,7 @@ The [User Guide][link-guide] describes everything in detail, including:
 - [Planning Reviews][link-guide-planning]: create the reviews of all review-sets of a repository in one go
 - [Review Signatures][link-guide-signatures]: reviewer slots, signing, and approval
 - [Signed Attestation][link-guide-attestation]: the PDF, its signing key, and what the signature proves
+- [Evidence Settings][link-guide-evidence-settings]: anonymous access to the evidence and what the PDFs contain
 - [Audit Trail][link-guide-audit]: the hash chain, verification, and its limits
 - [Database][link-guide-database]: data location and database settings
 - [Repositories and Credentials][link-guide-repositories]: git access and token protection
@@ -134,6 +132,7 @@ By contributing to this project, you agree that your contributions will be licen
 [link-guide-planning]: https://github.com/demaconsulting/ReviewCenter/blob/main/docs/user_guide/introduction.md#planning-reviews
 [link-guide-signatures]: https://github.com/demaconsulting/ReviewCenter/blob/main/docs/user_guide/introduction.md#review-signatures
 [link-guide-attestation]: https://github.com/demaconsulting/ReviewCenter/blob/main/docs/user_guide/introduction.md#signed-attestation
+[link-guide-evidence-settings]: https://github.com/demaconsulting/ReviewCenter/blob/main/docs/user_guide/introduction.md#evidence-settings
 [link-guide-audit]: https://github.com/demaconsulting/ReviewCenter/blob/main/docs/user_guide/introduction.md#audit-trail
 [link-guide-database]: https://github.com/demaconsulting/ReviewCenter/blob/main/docs/user_guide/introduction.md#database
 [link-guide-repositories]: https://github.com/demaconsulting/ReviewCenter/blob/main/docs/user_guide/introduction.md#repositories-and-credentials

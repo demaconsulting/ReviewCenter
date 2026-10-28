@@ -48,6 +48,9 @@ The native SQLite library must be loadable on the test platform (it is supplied 
   unknown project; the last enabled project administrator cannot be removed or demoted when the caller requires another
   administrator, also when two changes race; and an account is stored with its membership and its audit entry together
   or not at all; these are verified in the unit tests of `ReviewStore` and `UserStore` on the real database.
+- The evidence settings of a project are stored with the project (the defaults for a new project), are changed only
+  when the stored settings still equal the expected ones, and are stored with their audit entry or not at all; this is
+  verified in the unit tests of `ReviewStore` on the real database.
 - Personal access tokens written through the service, with one of them revoked, are still present after the database is
   closed and opened again: the value of the kept token still authenticates its owner, the revoked token is refused,
   and no
@@ -135,6 +138,13 @@ membership and its audit entry by `UserStore_AddToProjectAsync_StoresAccountMemb
 `UserStore_AddToProjectAsync_Failure_StoresNothing`, all defined in `ProjectMembersStoreTests.cs`. The listing of the
 audit trail for one project only is tested by `AuditStore_ListAsync_ProjectOnly_IsIsolatedAndTheChainStillVerifies`
 in the same file.
+
+**Evidence settings**: A new project has the default evidence settings, a change is stored for its own project only
+together with its audit entry, and a change based on settings that are no longer stored changes nothing; these are
+tested by `ReviewStore_AddProjectAsync_NewProject_HasDefaultEvidenceSettings`,
+`ReviewStore_UpdateEvidenceSettingsAsync_Change_IsPersistedAndAudited`, and
+`ReviewStore_UpdateEvidenceSettingsAsync_ExpectedDiffers_ChangesNothing`, all defined in
+`EvidenceSettingsStoreTests.cs`.
 
 **Audit trail transaction**: Changes are made at the same moment through different stores that share the
 process-wide gate; the sequence numbers are consecutive and the chain is intact. This scenario is tested by

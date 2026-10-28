@@ -738,6 +738,9 @@ public class ProjectPageTests : PageTestBase
         Assert.Equal(
             $"/projects/{projectId}/audit",
             cut.Find("[data-testid='project-audit-link']").GetAttribute("href"));
+        Assert.Equal(
+            $"/projects/{projectId}/evidence-settings",
+            cut.Find("[data-testid='evidence-settings-link']").GetAttribute("href"));
         Assert.Empty(cut.FindAll("select"));
         Assert.DoesNotContain("outsider", cut.Markup, StringComparison.Ordinal);
     }
@@ -760,6 +763,7 @@ public class ProjectPageTests : PageTestBase
         Assert.Empty(cut.FindAll("[data-testid='members-list']"));
         Assert.Empty(cut.FindAll("[data-testid='add-member-button']"));
         Assert.Empty(cut.FindAll("[data-testid='project-audit-link']"));
+        Assert.Empty(cut.FindAll("[data-testid='evidence-settings-link']"));
         Assert.DoesNotContain("Pam Admin", cut.Markup, StringComparison.Ordinal);
     }
 

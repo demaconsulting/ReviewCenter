@@ -5,7 +5,8 @@
 # - Define requirements for the ReviewCenter Core subsystem
 # - The Core subsystem spans the Fingerprint, ProjectService, ReviewService, ThreadService, ChecklistService,
 #   UserService, RecordDigest, SigningService, RepositoryService, SelectionMatcher, RevisionValidator,
-#   ReviewPlanner, LineDiff, and ProjectAccess units, with the domain types they share (project, review,
+#   ReviewPlanner, LineDiff, ProjectAccess, and EvidenceSettingsService units, with the domain types they share
+#   (project, evidence settings, review,
 #   review file, thread, comment, checklist, user, project membership, actor, reviewer slot, signature, upload,
 #   limits, repository, rule exception, and store interfaces)
 # - Subsystem requirements describe the externally visible behavior of the domain model and its rules
@@ -72,6 +73,34 @@ sections:
           - ProjectService_Members_SystemAdminManages_OthersAreRefused
           - ProjectService_GetAsync_HiddenProject_ReadsAsMissing
           - CoreSubsystem_RuleViolation_IsReportedAsDomainRuleAndStoresNothing
+
+      - id: ReviewCenter-Core-EvidenceSettings
+        title: >-
+          The Core subsystem shall keep evidence settings for each project, private and complete by default, that
+          decide whether the evidence index and the attestation PDFs may be read without signing in and which
+          sections the PDFs contain, let only a system administrator or a project administrator of the project read
+          and change them (every other actor gets the answer for a project that does not exist, and a plain member is
+          told it may not), change them only from the settings the caller started from, refuse a change that was
+          overtaken by another, record every change in the audit trail with its changed keys, and give the services
+          that apply the settings to a request a read that needs no actor.
+        justification: |
+          Evidence is kept private unless the people who administer a project open it, and an attestation may be
+          reduced only on purpose. The decision belongs to those administrators, must not be lost or undone by a
+          simultaneous change, and must be traceable in the history of the project.
+        children:
+          - ReviewCenter-EvidenceSettingsService-Defaults
+          - ReviewCenter-EvidenceSettingsService-Describe
+          - ReviewCenter-EvidenceSettingsService-Access
+          - ReviewCenter-EvidenceSettingsService-Change
+          - ReviewCenter-EvidenceSettingsService-Audit
+          - ReviewCenter-EvidenceSettingsService-NoChange
+          - ReviewCenter-EvidenceSettingsService-Conflict
+          - ReviewCenter-EvidenceSettingsService-Effective
+          - ReviewCenter-EvidenceSettingsService-Arguments
+        tests:
+          - EvidenceSettingsService_GetAndSet_ActorKinds_AreAllowedOrRefused
+          - EvidenceSettingsService_SetAsync_Change_IsStoredAndAudited
+          - EvidenceSettingsService_SetAsync_ChangedMeanwhile_IsRefusedAsRecordChanged
 
       - id: ReviewCenter-Core-Reviews
         title: >-
@@ -229,6 +258,8 @@ sections:
         children:
           - ReviewCenter-RecordDigest-Format
           - ReviewCenter-RecordDigest-Coverage
+          - ReviewCenter-RecordDigest-Checklist
+          - ReviewCenter-RecordDigest-AnsweredBy
           - ReviewCenter-RecordDigest-Independence
           - ReviewCenter-RecordDigest-Unambiguous
           - ReviewCenter-SigningService-Slots
@@ -267,6 +298,7 @@ sections:
           - ReviewCenter-AuditService-Verify
           - ReviewCenter-ProjectService-Audit
           - ReviewCenter-ProjectService-MemberAudit
+          - ReviewCenter-EvidenceSettingsService-Audit
           - ReviewCenter-ReviewService-Audit
           - ReviewCenter-ThreadService-Audit
           - ReviewCenter-ChecklistService-Audit

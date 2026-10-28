@@ -426,6 +426,8 @@ reviews:
       - "docs/verification/review-center/web/project-page.md"
       - "src/**/Web/ProjectPage.razor"
       - "src/**/Web/ProjectPage.razor.cs"
+      - "src/**/Web/EvidenceSettingsPage.razor"
+      - "src/**/Web/EvidenceSettingsPage.razor.cs"
       - "src/**/Web/NewReviewPage.razor"
       - "src/**/Web/NewReviewPage.razor.cs"
       - "src/**/Web/NewMemberPage.razor"
@@ -433,6 +435,7 @@ reviews:
       - "src/**/Web/NewMemberAccountPage.razor"
       - "src/**/Web/NewMemberAccountPage.razor.cs"
       - "test/**/Web/ProjectPageTests.cs"
+      - "test/**/Web/EvidenceSettingsPageTests.cs"
       - "test/**/Web/NewMemberPageTests.cs"
       - "test/**/Web/NewMemberAccountPageTests.cs"
       - "test/**/Web/NewReviewPageRepositoryTests.cs"
@@ -642,6 +645,22 @@ reviews:
       - "test/**/Core/ProjectMemberServiceTests.cs"
       - "test/**/Core/GatedUserStore.cs"
       - "test/**/Core/AuditEventTests.cs"
+
+  - id: ReviewCenter-Core-EvidenceSettingsService
+    title: Review of ReviewCenter EvidenceSettingsService unit implementation
+    context:
+      - docs/design/review-center.md
+      - docs/reqstream/review-center.yaml
+      - docs/design/review-center/core.md
+      - docs/reqstream/review-center/core.yaml
+    paths:
+      - "docs/reqstream/review-center/core/evidence-settings-service.yaml"
+      - "docs/design/review-center/core/evidence-settings-service.md"
+      - "docs/verification/review-center/core/evidence-settings-service.md"
+      - "docs/sysml2/model/review-center/core/evidence-settings-service.sysml"
+      - "src/DemaConsulting.ReviewCenter.Core/EvidenceSettings.cs"
+      - "src/DemaConsulting.ReviewCenter.Core/EvidenceSettingsService.cs"
+      - "test/**/Core/EvidenceSettingsServiceTests.cs"
 
   - id: ReviewCenter-Core-ProjectAccess
     title: Review of ReviewCenter ProjectAccess unit implementation
@@ -961,6 +980,7 @@ reviews:
       - "test/**/Storage/ReviewStoreRepositoryTests.cs"
       - "test/**/Storage/ReviewStoreSigningTests.cs"
       - "test/**/Storage/ReviewStoreMembershipTests.cs"
+      - "test/**/Storage/EvidenceSettingsStoreTests.cs"
       - "test/**/Storage/ProjectMembersStoreTests.cs"
 
   - id: ReviewCenter-Storage-UserStore
@@ -1228,6 +1248,7 @@ reviews:
       - "src/**/Evidence/AttestationService.cs"
       - "src/**/Evidence/AttestationResult.cs"
       - "test/**/Evidence/AttestationServiceTests.cs"
+      - "test/**/Evidence/AttestationContentSettingsTests.cs"
 
   - id: ReviewCenter-Evidence-AttestationEndpoint
     title: Review of ReviewCenter AttestationEndpoint unit implementation
@@ -1287,7 +1308,11 @@ reviews:
       - "docs/verification/review-center/api/api-token-authentication.md"
       - "docs/sysml2/model/review-center/api/api-token-authentication.sysml"
       - "src/**/Api/ApiTokenAuthentication.cs"
+      - "src/**/Api/AnonymousEvidenceAccess.cs"
+      - "src/**/Api/AnonymousRateLimit.cs"
       - "test/**/Api/ApiTokenAuthenticationTests.cs"
+      - "test/**/Api/AnonymousEvidenceAccessTests.cs"
+      - "test/**/Api/AnonymousRateLimitTests.cs"
 
   - id: ReviewCenter-Api-ApiEndpoints
     title: Review of ReviewCenter ApiEndpoints unit implementation

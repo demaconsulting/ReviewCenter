@@ -183,6 +183,21 @@ internal sealed class ReviewCenterDbContext : DbContext
             project.HasKey(p => p.Id);
             project.Property(p => p.Name).IsRequired().HasMaxLength(ReviewLimits.MaxProjectNameLength);
             project.Property(p => p.Description).IsRequired().HasMaxLength(ReviewLimits.MaxProjectDescriptionLength);
+
+            // Evidence settings: seven boolean columns; the defaults match EvidenceSettings.Default. There is no
+            // migration: the database is created from this model and recreated while the product is pre-release
+            project.ComplexProperty(
+                p => p.Evidence,
+                evidence =>
+                {
+                    evidence.Property(e => e.AnonymousIndex).HasColumnName("EvidenceAnonymousIndex").HasDefaultValue(false);
+                    evidence.Property(e => e.AnonymousAttestations).HasColumnName("EvidenceAnonymousAttestations").HasDefaultValue(false);
+                    evidence.Property(e => e.IncludeThreads).HasColumnName("EvidenceIncludeThreads").HasDefaultValue(true);
+                    evidence.Property(e => e.IncludeReviewerNames).HasColumnName("EvidenceIncludeReviewerNames").HasDefaultValue(true);
+                    evidence.Property(e => e.IncludeChecklistWording).HasColumnName("EvidenceIncludeChecklistWording").HasDefaultValue(true);
+                    evidence.Property(e => e.IncludeFiles).HasColumnName("EvidenceIncludeFiles").HasDefaultValue(true);
+                    evidence.Property(e => e.IncludeGitContext).HasColumnName("EvidenceIncludeGitContext").HasDefaultValue(true);
+                });
         });
 
         // Reviews: composite key, state stored by name so new states never renumber old rows

@@ -52,6 +52,7 @@ flowchart TD
     subgraph Core
         Fingerprint
         ProjectService
+        EvidenceSettingsService
         ReviewService
         ThreadService
         ChecklistService
@@ -111,6 +112,7 @@ flowchart TD
     ServerHost --> PasswordHasher
     ServerHost --> SignIn
     ServerHost --> ProjectService
+    ServerHost --> EvidenceSettingsService
     ServerHost --> ReviewService
     ServerHost --> ThreadService
     ServerHost --> ChecklistService
@@ -523,7 +525,8 @@ is running.
   password), 404 for an unknown project, review, or address (a project that the owner of the
   token may not see answers exactly like an unknown project), 409 for a conflict (including the removal or demotion of
   the last administrator of a project) or an
-  attestation of a review that is not complete, 429 when too many tokens were refused from one address or too many
+  attestation of a review that is not complete (a request without a token gets the 404 of a missing review instead),
+  429 when too many tokens were refused from one address or too many
   member additions failed, and 5xx for
   repository or key failures.
 - *Constraints*: A token acts with the current memberships and system administrator flag of its owner, read again at

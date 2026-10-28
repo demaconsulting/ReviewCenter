@@ -3,7 +3,8 @@
 #
 # The ApiTokenAuthentication unit signs in the requests under /api from a personal access token that is sent as a
 # bearer token or as the password of HTTP Basic credentials (the way ReviewMark sends it), and answers a request
-# without a valid token. It never uses the session cookie of the web pages.
+# without a valid token. It never uses the session cookie of the web pages. It also decides when a project has opened
+# its evidence index or its attestation PDFs to callers without credentials, and limits those callers.
 
 sections:
   - title: ApiTokenAuthentication Unit Requirements
@@ -23,7 +24,8 @@ sections:
 
       - id: ReviewCenter-ApiTokenAuthentication-Refusal
         title: >-
-          The ApiTokenAuthentication unit shall answer a request under /api with no token, an unknown or revoked
+          The ApiTokenAuthentication unit shall answer a request under /api (except a request without any credentials
+          to one of the two routes that a project can open, see AnonymousEvidence) with no token, an unknown or revoked
           token, an expired token, or a token whose owner still has to change a temporary password
           with status 401 and a Bearer challenge, and shall give the same answer for
           every reason that a token is refused, a wrong Basic password included. The challenge shall name the bearer and
@@ -82,3 +84,47 @@ sections:
           would give everybody who can read the log the access of its owner.
         tests:
           - ApiTokenAuthentication_Request_AnyOutcome_NeverLogsTheToken
+
+      - id: ReviewCenter-ApiTokenAuthentication-AnonymousEvidence
+        title: >-
+          The ApiTokenAuthentication unit shall let a request without credentials reach the evidence index route or the
+          attestation PDF route of a project only when the project has switched on the anonymous access of that route,
+          and no other route; shall answer a request without credentials to a route that is switched off, or to a
+          project that does not exist, with the same generic 401 as a missing token; shall never treat a request that
+          carries an Authorization header, valid or not, as anonymous; and shall let a request with a valid token
+          through to the normal project rules.
+        justification: |
+          A project may choose to publish its evidence to a pipeline or an auditor without an account, but the choice
+          must be the project's, per route, and must not widen anything else. An answer that differed for a project
+          that does not exist would tell a stranger which projects exist, and a wrong token that was silently treated
+          as anonymous would hide a broken pipeline and bypass the throttle of refused tokens.
+        tests:
+          - AnonymousEvidenceAccess_SwitchOff_Anonymous_AnswersLikeAMissingProject
+          - AnonymousEvidenceAccess_Matrix_ServesOnlyWhoMay
+          - AnonymousEvidenceAccess_OneSwitchOn_DoesNotOpenTheOtherRoute
+          - AnonymousEvidenceAccess_SwitchOn_OpensOnlyItsOwnProject
+          - AnonymousEvidenceAccess_SwitchTurnedOff_RefusesAtOnce
+          - AnonymousEvidenceAccess_BothOn_OtherRoutes_StayClosed
+          - AnonymousEvidenceAccess_BothOn_AttestationPageRoute_StillNeedsSignIn
+
+      - id: ReviewCenter-ApiTokenAuthentication-AnonymousRateLimit
+        title: >-
+          The ApiTokenAuthentication unit shall allow a client address at most 30 requests without credentials in a
+          window of one minute to the two routes that a project can open, count each address on its own, start a new
+          window when the old one has ended, and tell how long the window lasts; and shall keep the windows of at most
+          4096 addresses, removing the windows that have ended first and then the oldest ones, never a renewed window
+          by pruning, and be safe for concurrent use.
+        justification: |
+          An anonymous attestation costs a signature and the caller has no account to hold responsible, so one address
+          must not be able to use up the server. A count by address does not stop other clients. The caller chooses
+          the address (for example by rotating through an IPv6 range), so the table must have a hard bound or it
+          could be used to exhaust memory.
+        tests:
+          - AnonymousRateLimit_TryAcquire_CountsPerAddressAndWindow
+          - AnonymousRateLimit_TryAcquire_ManyDistinctAddresses_NeverExceedsCapacity
+          - AnonymousRateLimit_TryAcquire_FullTable_RemovesExpiredBeforeEvictingLive
+          - AnonymousRateLimit_TryAcquire_FullOfLiveWindows_EvictsOldestFirst
+          - AnonymousRateLimit_TryAcquire_RenewedWindow_IsNotRemovedByPruning
+          - AnonymousRateLimit_TryAcquire_ClockStepsBack_StillBoundedAndConsistent
+          - AnonymousRateLimit_TryAcquire_Concurrent_GrantsExactlyTheLimitPerAddress
+          - AnonymousRateLimit_TryAcquire_ConcurrentDistinctAddresses_StaysWithinCapacity

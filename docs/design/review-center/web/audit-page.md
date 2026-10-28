@@ -12,7 +12,10 @@ access denied message of the router instead of the page, and an anonymous visito
 changes nothing. `ProjectAuditPage` is the page at `/projects/{id}/audit`: it shows the audit entries of one project,
 newest first, 50 to a page, to whoever administers that project (a project admin or a system administrator), with the
 same paging, and it has no verification (the chain verifies as a whole on `/audit`; the project view is a filtered
-read of the same chain). It requires a signed-in user and shows the same "Project N does not exist." message as the
+read of the same chain). The entries of a project are those that name the project, among them the member changes and
+`project.evidence-settings-changed`, which the evidence settings page causes through `EvidenceSettingsService`; the pages
+show every entry in the same way and know no action by name. It requires a signed-in user and shows the same "Project N
+does not exist." message as the
 other project pages to a project that does not exist, to a user who may not see it, and to a user who sees it but does
 not administer it. `AuditEntryTable` is the component that both pages use to show one page of entries with the paging
 buttons; it holds no state and no access rule, because its parent decides who sees the entries and clears them when the
@@ -134,5 +137,6 @@ only.
 
 - **App** — the router renders `AuditPage` for `/audit` and `ProjectAuditPage` for `/projects/{id}/audit`.
 - **App** (`MainLayout`) — the header has a link to `/audit` while a system administrator is signed in.
-- **ProjectPage** — the "Audit trail" button for an administrator of the project leads to `/projects/{id}/audit`.
+- **ProjectPage** — the "Audit trail" button for an administrator of the project leads to `/projects/{id}/audit`; the
+  entries of the evidence settings page (`project.evidence-settings-changed`) are shown there.
 - **HelpAuditPage** (`HelpPage` unit) — describes both views.

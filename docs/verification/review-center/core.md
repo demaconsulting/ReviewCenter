@@ -17,7 +17,7 @@ database; the real database is verified in the `Storage` subsystem, the real has
 real token protector and git in the `ContentSources` subsystem.
 The tests show that the units cooperate as the
 design describes: the services create, store, and read back what the fingerprint algorithm and the rules require.
-The rules and the algorithm themselves are verified in detail by the unit tests of the seventeen units.
+The rules and the algorithm themselves are verified in detail by the unit tests of the eighteen units.
 
 ### Test Environment
 
@@ -48,6 +48,10 @@ N/A - standard test environment.
   temporary password has no access to any project; every membership change is audited with the project; and reviewer
   slots and signing are limited to members (see the unit tests of `ProjectAccess`, `ProjectService`, `SigningService`,
   and `UserService`).
+- The evidence settings of a project are private and complete by default; only a system administrator and a project
+  administrator of the project read and change them (a plain member is told it may not, and every other actor gets the
+  answer for a missing project); a change that was overtaken by another is refused and stores nothing; and every change
+  is audited with its changed keys (see the unit tests of `EvidenceSettingsService`).
 - A review with a reviewer slot, answered completely and without open threads, is signed with the password; the
   signature makes the review approved, a later change of the record makes it out of date and not approved, and the
   slot can be signed again.

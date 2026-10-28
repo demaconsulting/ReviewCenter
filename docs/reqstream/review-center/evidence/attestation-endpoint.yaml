@@ -12,9 +12,12 @@ sections:
           The AttestationEndpoint class shall answer a visitor who is not signed in with a redirect to the sign-in page
           and not with the document.
         justification: |
-          An attestation contains the whole review. Only the signed-in users of the server may see it.
+          An attestation contains the whole review. Only the signed-in users of the server may see it on this page
+          route.
+          A project that publishes its attestations opens only the API route of the Api subsystem, never this page.
         tests:
           - AttestationEndpoint_Get_SignedOut_RedirectsToLogin
+          - AnonymousEvidenceAccess_BothOn_AttestationPageRoute_StillNeedsSignIn
 
       - id: ReviewCenter-AttestationEndpoint-Visibility
         title: >-

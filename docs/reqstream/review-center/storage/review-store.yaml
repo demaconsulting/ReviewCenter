@@ -162,6 +162,24 @@ sections:
           - ReviewStore_AddSignatureAsync_UnknownSlotOrReview_IsRefused
           - ReviewStore_SerializableTransaction_TakesWriteLockAtBegin
 
+      - id: ReviewCenter-ReviewStore-EvidenceSettings
+        title: >-
+          The ReviewStore class shall store the evidence settings of a project with the project, with the default
+          settings for a project that was not given others, return them with every project it reads or lists, and
+          change them only through an atomic compare-and-set that applies the new settings when the stored ones
+          still equal the settings the caller started from, changes only that project, stores the audit entry of
+          the change in the same transaction, and reports, without a change and without an entry, a project that
+          does not exist or settings that are no longer the expected ones.
+        justification: |
+          The settings decide who may read the evidence and what a PDF contains, so a change must neither be lost
+          nor silently overwrite the change of another administrator, and a change that is stored without its entry,
+          or an entry without its change, would leave the history of the settings untrue. The comparison is part
+          of the update, so two administrators who save at the same time cannot both succeed.
+        tests:
+          - ReviewStore_AddProjectAsync_NewProject_HasDefaultEvidenceSettings
+          - ReviewStore_UpdateEvidenceSettingsAsync_Change_IsPersistedAndAudited
+          - ReviewStore_UpdateEvidenceSettingsAsync_ExpectedDiffers_ChangesNothing
+
       - id: ReviewCenter-ReviewStore-Audit
         title: >-
           The ReviewStore class shall store every audited change (project, review, thread, comment, thread state,

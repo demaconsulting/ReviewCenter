@@ -10,10 +10,13 @@ sections:
       - id: ReviewCenter-ApiDocument-Document
         title: >-
           The ApiDocument unit shall serve, without a token, an OpenAPI document at /api/openapi.json that describes
-          the API and names the bearer scheme that its routes need.
+          the API and names the bearer scheme that its routes need, and shall mark the evidence index and the
+          attestation PDF as the only two operations that can also be called without credentials, by an empty
+          security alternative next to the two schemes.
         justification: |
           A client generator and a person who starts to write a script need the contract of the API, and they can
-          fetch it before they have a token.
+          fetch it before they have a token. A generator that read an empty alternative on any other operation would
+          drop the credentials from calls that need them, so the alternative must appear only where it is true.
         tests:
           - ApiDocument_Get_NoToken_DescribesTheApiWithBearerScheme
 

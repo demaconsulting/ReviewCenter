@@ -4,7 +4,8 @@
 
 ### Overview
 
-The `Storage` subsystem keeps projects, project memberships, reviews, review comment threads, review checklists, users,
+The `Storage` subsystem keeps projects (with their evidence settings), project memberships, reviews, review comment
+threads, review checklists, users,
 reviewer slots,
 signatures, personal access tokens, and the hash-chained audit trail in a relational
 database through Entity
@@ -50,6 +51,12 @@ application; the rest of the system sees only the Core store interfaces.
   `project.member-role-changed`, and `project.member-removed`) in the same transaction. A removal or a demotion can be
   made to require that another enabled project administrator remains: the check and the change are one step in the
   serialized transaction, and a violation raises a `DomainRuleException` for `LastProjectAdmin` and stores nothing.
+  The evidence settings of a project are stored with the project (seven boolean columns, whose defaults are the default
+  settings) and are read with every project; they are changed only by a compare-and-set
+  (`UpdateEvidenceSettingsAsync`) that stores the new settings together with the audit entry
+  `project.evidence-settings-changed` in one transaction when the stored settings still equal the expected ones, and
+  otherwise changes nothing and stores no entry. The schema has no migration: a development database that was created
+  before the settings existed is recreated.
 - *Constraints*: Every operation uses its own short-lived database context, so it is safe for concurrent use.
 
 **UserStore (as IUserStore)**: The persistence operations for users.

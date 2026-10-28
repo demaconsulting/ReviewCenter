@@ -50,6 +50,11 @@ internal sealed class AttestationService
     public const string AuditAction = "attestation.generated";
 
     /// <summary>
+    ///     The actor text of the audit entry for an attestation that was requested without signing in.
+    /// </summary>
+    public const string AnonymousActorName = "anonymous";
+
+    /// <summary>
     ///     The review store.
     /// </summary>
     private readonly IReviewStore _store;
@@ -138,31 +143,44 @@ internal sealed class AttestationService
     /// <summary>
     ///     Creates the signed attestation of a review.
     /// </summary>
+    /// <remarks>
+    ///     What the PDF contains is decided by the evidence settings of the project, read once at the start; they are
+    ///     read again before signing, and a change in between gives <see cref="AttestationStatus.Changed"/>, so a
+    ///     document never mixes two settings. A request without an actor is allowed only when the project allows
+    ///     anonymous attestation PDFs; otherwise it gets the answer for a review that does not exist. An anonymous
+    ///     request for a review that is not complete gets that same answer, so it cannot be used to list review
+    ///     identifiers or their state; a signed-in caller gets <see cref="AttestationStatus.NotApproved"/>. The caller
+    ///     (the route) has already decided whether an anonymous request may reach this method.
+    /// </remarks>
     /// <param name="projectId">The project number.</param>
     /// <param name="reviewId">The review identifier. Must not be null.</param>
-    /// <param name="actor">The user who asks for it. Must not be null.</param>
+    /// <param name="actor">The user who asks for it, or <c>null</c> for a request without signing in.</param>
     /// <param name="cancellationToken">A token to cancel the work.</param>
     /// <returns>
     ///     The result: the signed PDF when the review is complete and the key is usable; otherwise why not
     ///     (including <see cref="AttestationStatus.Changed"/> when the review changed while the document was being
-    ///     prepared). Only the success is recorded in the audit trail.
+    ///     prepared, and <see cref="AttestationStatus.NotFound"/> instead of
+    ///     <see cref="AttestationStatus.NotApproved"/> for a request without an actor). Only the success is
+    ///     recorded in the audit trail.
     /// </returns>
-    /// <exception cref="ArgumentNullException">Thrown when <paramref name="reviewId"/> or <paramref name="actor"/> is null.</exception>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="reviewId"/> is null.</exception>
     public async Task<AttestationResult> GenerateAsync(
         int projectId,
         string reviewId,
-        Actor actor,
+        Actor? actor,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(reviewId);
-        ArgumentNullException.ThrowIfNull(actor);
 
-        // Whoever may not see the project gets the same answer as for a review that does not exist
-        if (!await _access.CanViewAsync(actor, projectId, cancellationToken))
+        // Whoever may not see the project gets the same answer as for a review that does not exist; so does an
+        // anonymous request to a project that does not allow it
+        var project = await _store.GetProjectAsync(projectId, cancellationToken);
+        if (project is null || !await MayAskAsync(actor, project, cancellationToken))
         {
             return new AttestationResult(AttestationStatus.NotFound, null, null, "The review was not found.");
         }
 
+        var settings = project.Evidence;
         // Availability first: the review must exist and be complete
         var approval = await _signing.GetApprovalAsync(projectId, reviewId, cancellationToken);
         if (approval is null)
@@ -170,9 +188,13 @@ internal sealed class AttestationService
             return new AttestationResult(AttestationStatus.NotFound, null, null, "The review was not found.");
         }
 
+        // An anonymous caller must not learn which review identifiers exist or whether they are complete, so an
+        // incomplete review looks like a missing one; people who are signed in get the informative answer
         if (!approval.IsApproved)
         {
-            return new AttestationResult(AttestationStatus.NotApproved, null, null, "The review is not complete: not every reviewer slot has signed the current record.");
+            return actor is null
+                ? new AttestationResult(AttestationStatus.NotFound, null, null, "The review was not found.")
+                : new AttestationResult(AttestationStatus.NotApproved, null, null, "The review is not complete: not every reviewer slot has signed the current record.");
         }
 
         // Then the key: without a usable key there is nothing to produce, and nothing is recorded
@@ -189,8 +211,7 @@ internal sealed class AttestationService
         // Read the review once more for the content; the digest must still be the one that was approved
         var snapshot = await _store.GetSnapshotAsync(projectId, reviewId, cancellationToken);
         var review = await _store.GetReviewAsync(projectId, reviewId, cancellationToken);
-        var project = await _store.GetProjectAsync(projectId, cancellationToken);
-        if (snapshot is null || review is null || project is null)
+        if (snapshot is null || review is null)
         {
             return new AttestationResult(AttestationStatus.NotFound, null, null, "The review was not found.");
         }
@@ -205,7 +226,7 @@ internal sealed class AttestationService
         // linear in the number of audit entries
         var chain = await _audit.VerifyAsync(cancellationToken);
         var now = _time.GetUtcNow();
-        var document = BuildDocument(project, review, snapshot, approval, chain, key.Info, actor, now);
+        var document = BuildDocument(project, review, snapshot, approval, chain, key.Info, actor, settings, now);
         var unsigned = _renderer.Render(document);
 
         // The reads above and the render take time, so check again that the review is still what was rendered
@@ -214,7 +235,7 @@ internal sealed class AttestationService
             await AfterRender(cancellationToken);
         }
 
-        if (!await IsUnchangedAsync(projectId, reviewId, approval.Digest, snapshot, cancellationToken))
+        if (!await IsUnchangedAsync(projectId, reviewId, approval.Digest, snapshot, settings, cancellationToken))
         {
             return ChangedResult();
         }
@@ -231,17 +252,33 @@ internal sealed class AttestationService
         }
 
         // The event is recorded strictly: an attestation that cannot be traced is not handed out. It records the
-        // digest that was attested.
+        // digest that was attested, and who asked: a request without signing in is recorded as "anonymous"
         var hash = Convert.ToHexString(SHA256.HashData(signed)).ToLowerInvariant();
+        var detail =
+            $"record digest {approval.Digest}, chain head {chain.HeadHash}, pdf sha256 {hash}, key {key.Info.Thumbprint}, selfSigned={key.Info.IsSelfSigned}";
         await _audit.RecordAsync(
-            AuditDraft.By(
-                actor,
-                AuditAction,
-                $"record digest {approval.Digest}, chain head {chain.HeadHash}, pdf sha256 {hash}, key {key.Info.Thumbprint}, selfSigned={key.Info.IsSelfSigned}",
-                projectId,
-                reviewId),
+            actor is null
+                ? new AuditDraft(AuditAction, null, AnonymousActorName, projectId, reviewId, detail)
+                : AuditDraft.By(actor, AuditAction, detail, projectId, reviewId),
             cancellationToken);
         return new AttestationResult(AttestationStatus.Ok, signed, FileNameFor(projectId, reviewId), null);
+    }
+
+    /// <summary>
+    ///     Decides whether the asker may read attestations of the project.
+    /// </summary>
+    /// <param name="actor">The signed-in user, or <c>null</c> for a request without signing in.</param>
+    /// <param name="project">The project.</param>
+    /// <param name="cancellationToken">A token to cancel the work.</param>
+    /// <returns>
+    ///     <c>true</c> for a user who may see the project; for nobody, only when the project allows anonymous
+    ///     attestation PDFs.
+    /// </returns>
+    private async Task<bool> MayAskAsync(Actor? actor, Project project, CancellationToken cancellationToken)
+    {
+        return actor is null
+            ? project.Evidence.AnonymousAttestations
+            : await _access.CanViewAsync(actor, project.Id, cancellationToken);
     }
 
     /// <summary>
@@ -264,18 +301,26 @@ internal sealed class AttestationService
     /// <param name="reviewId">The review identifier.</param>
     /// <param name="digest">The record digest that was approved and rendered.</param>
     /// <param name="rendered">The snapshot the document was built from.</param>
+    /// <param name="settings">The evidence settings the document was built with.</param>
     /// <param name="cancellationToken">A token to cancel the work.</param>
     /// <returns>
     ///     <c>true</c> when the review is still approved with the same record digest, and has the same slots and the
-    ///     same signatures that count as the rendered one.
+    ///     same signatures that count as the rendered one, and the evidence settings are still the ones rendered.
     /// </returns>
     private async Task<bool> IsUnchangedAsync(
         int projectId,
         string reviewId,
         string digest,
         ReviewSnapshot rendered,
+        EvidenceSettings settings,
         CancellationToken cancellationToken)
     {
+        var project = await _store.GetProjectAsync(projectId, cancellationToken);
+        if (project is null || project.Evidence != settings)
+        {
+            return false;
+        }
+
         var approval = await _signing.GetApprovalAsync(projectId, reviewId, cancellationToken);
         if (approval is null || !approval.IsApproved || approval.Digest != digest)
         {
@@ -344,7 +389,8 @@ internal sealed class AttestationService
     /// <param name="approval">The approval status, which names the slot members.</param>
     /// <param name="chain">The result of verifying the audit chain.</param>
     /// <param name="key">The description of the signing key.</param>
-    /// <param name="actor">The user who asked.</param>
+    /// <param name="actor">The user who asked, or <c>null</c> for a request without signing in.</param>
+    /// <param name="settings">The evidence settings in effect.</param>
     /// <param name="now">The time of generation.</param>
     /// <returns>The document.</returns>
     private static AttestationDocument BuildDocument(
@@ -354,12 +400,14 @@ internal sealed class AttestationService
         ReviewApproval approval,
         AuditVerificationResult chain,
         AttestationKeyInfo key,
-        Actor actor,
+        Actor? actor,
+        EvidenceSettings settings,
         DateTimeOffset now)
     {
         var record = snapshot.Record;
         var digestVersion = RecordDigest.Canonicalize(record).Split('\n', 2)[0];
         var threads = record.Threads.ToList();
+        var people = new PersonLabels(settings.IncludeReviewerNames, approval);
         return new AttestationDocument(
             project.Id,
             project.Name,
@@ -377,28 +425,31 @@ internal sealed class AttestationService
                 .Select(f => new AttestationFile(f.Path, review.IsFromRepository ? f.ChangeKind.ToString() : "Uploaded", f.Sha256, f.Size))
                 .ToList(),
             record.Checklist?.Version,
-            BuildSections(record),
+            BuildSections(record, people),
             threads.Count(t => t.State == ReviewThreadState.Open),
             threads
                 .Where(t => t.State == ReviewThreadState.Resolved)
-                .Select(SummarizeThread)
+                .Select(t => SummarizeThread(t, people))
                 .ToList(),
-            BuildSlots(snapshot, approval, digestVersion),
+            BuildSlots(snapshot, approval, digestVersion, people),
             chain.HeadHash,
             chain.Count,
             chain.IsIntact,
             key,
             Program.Version,
             now,
-            $"{actor.DisplayName} ({actor.Username})");
+            people.Requester(actor),
+            settings,
+            actor is null);
     }
 
     /// <summary>
     ///     Gathers the checklist sections with their answers.
     /// </summary>
     /// <param name="record">The review record.</param>
+    /// <param name="people">The labels of the people the document names.</param>
     /// <returns>The sections; empty when the review has no checklist.</returns>
-    private static List<AttestationSection> BuildSections(ReviewRecord record)
+    private static List<AttestationSection> BuildSections(ReviewRecord record, PersonLabels people)
     {
         if (record.Checklist is null)
         {
@@ -408,6 +459,7 @@ internal sealed class AttestationService
         var state = new ChecklistState(record.Checklist.Parse(), record.SectionStates, record.Answers);
         return state.Definition.Sections
             .Select(section => new AttestationSection(
+                section.Id,
                 section.Title,
                 state.IsApplicable(section.Id),
                 state.ReasonFor(section.Id),
@@ -419,7 +471,7 @@ internal sealed class AttestationService
                         item.Text,
                         answer is null ? "Not answered" : OutcomeText(answer.Outcome),
                         answer?.Justification,
-                        answer?.AnsweredBy);
+                        answer is null ? null : people.Name(answer.AnsweredBy, answer.AnsweredByUsername, false));
                 }).ToList()))
             .ToList();
     }
@@ -443,8 +495,9 @@ internal sealed class AttestationService
     ///     Summarizes a resolved thread: where it is and what was first said.
     /// </summary>
     /// <param name="thread">The thread.</param>
+    /// <param name="people">The labels of the people the document names.</param>
     /// <returns>The summary.</returns>
-    private static AttestationThread SummarizeThread(ReviewThread thread)
+    private static AttestationThread SummarizeThread(ReviewThread thread, PersonLabels people)
     {
         var lines = string.Empty;
         if (thread.StartLine is not null)
@@ -455,7 +508,9 @@ internal sealed class AttestationService
                 : $", line {start}";
         }
         var first = thread.Comments.OrderBy(c => c.Created).FirstOrDefault();
-        var text = first is null ? "(no comments)" : $"{first.Author}: {first.Text}";
+        var text = first is null
+            ? "(no comments)"
+            : $"{people.Name(first.Author, first.AuthorUsername, false)}: {first.Text}";
         return new AttestationThread(
             thread.FilePath + lines,
             text.Length <= SummaryLength ? text : text[..SummaryLength] + "...",
@@ -468,8 +523,13 @@ internal sealed class AttestationService
     /// <param name="snapshot">The record, slots and signatures.</param>
     /// <param name="approval">The approval status, which names the members of each slot.</param>
     /// <param name="digestVersion">The version of the digest format.</param>
+    /// <param name="people">The labels of the people the document names.</param>
     /// <returns>One entry per slot.</returns>
-    private static List<AttestationSlot> BuildSlots(ReviewSnapshot snapshot, ReviewApproval approval, string digestVersion)
+    private static List<AttestationSlot> BuildSlots(
+        ReviewSnapshot snapshot,
+        ReviewApproval approval,
+        string digestVersion,
+        PersonLabels people)
     {
         var result = new List<AttestationSlot>();
         foreach (var status in approval.Slots)
@@ -485,7 +545,7 @@ internal sealed class AttestationService
             if (signature is not null)
             {
                 attested = new AttestationSignature(
-                    signer is null ? signature.DisplayName : $"{signature.DisplayName} ({signer.Username})",
+                    people.Name(signature.DisplayName, signer?.Username, true),
                     signature.Role.ToString(),
                     signature.SignedAt,
                     digestVersion,
@@ -495,11 +555,108 @@ internal sealed class AttestationService
 
             result.Add(new AttestationSlot(
                 status.Number,
-                $"{status.Primary.DisplayName} ({status.Primary.Username})",
-                status.Alternate is null ? null : $"{status.Alternate.DisplayName} ({status.Alternate.Username})",
+                people.Name(status.Primary.DisplayName, status.Primary.Username, true),
+                status.Alternate is null
+                    ? null
+                    : people.Name(status.Alternate.DisplayName, status.Alternate.Username, true),
                 attested));
         }
 
         return result;
+    }
+
+    /// <summary>
+    ///     Writes the names of the people a document mentions, or the labels that stand in for them when the
+    ///     evidence settings keep names out of PDFs.
+    /// </summary>
+    /// <remarks>
+    ///     A label is chosen from the role a person has in the review, so the PDF still shows that the primary of
+    ///     slot 1 and the signer of slot 1 are the same person: <c>Reviewer 1 (primary)</c>,
+    ///     <c>Reviewer 1 (alternate)</c>. Everybody else (for example a person who commented or answered but holds
+    ///     no seat) is <c>Participant N</c>, numbered in the order in which they are first named. A person is
+    ///     recognized by user name, or by display name when only that is known. Only the structured name fields are
+    ///     replaced: names that people typed into a comment or a justification are the author's text and stay.
+    /// </remarks>
+    private sealed class PersonLabels
+    {
+        /// <summary>
+        ///     The label of the person who asked for the document when names are left out.
+        /// </summary>
+        private const string RequesterLabel = "a signed-in user";
+
+        /// <summary>
+        ///     Whether names are written.
+        /// </summary>
+        private readonly bool _includeNames;
+
+        /// <summary>
+        ///     The label of each person met so far, by user name or display name.
+        /// </summary>
+        private readonly Dictionary<string, string> _labels = new(StringComparer.OrdinalIgnoreCase);
+
+        /// <summary>
+        ///     The number of participants labeled so far.
+        /// </summary>
+        private int _participants;
+
+        /// <summary>
+        ///     Initializes a new instance of the <see cref="PersonLabels"/> class.
+        /// </summary>
+        /// <param name="includeNames">Whether names are written.</param>
+        /// <param name="approval">The approval, whose slot members get the first labels.</param>
+        public PersonLabels(bool includeNames, ReviewApproval approval)
+        {
+            _includeNames = includeNames;
+            foreach (var slot in approval.Slots)
+            {
+                _labels.TryAdd(slot.Primary.Username, $"Reviewer {slot.Number.ToString(CultureInfo.InvariantCulture)} (primary)");
+                if (slot.Alternate is not null)
+                {
+                    _labels.TryAdd(
+                        slot.Alternate.Username,
+                        $"Reviewer {slot.Number.ToString(CultureInfo.InvariantCulture)} (alternate)");
+                }
+            }
+        }
+
+        /// <summary>
+        ///     Writes a person.
+        /// </summary>
+        /// <param name="displayName">The display name.</param>
+        /// <param name="username">The user name, or <c>null</c> or empty when it is not known.</param>
+        /// <param name="withUsername">Whether the user name is written after the display name.</param>
+        /// <returns>The name, or the label that stands in for it.</returns>
+        public string Name(string displayName, string? username, bool withUsername)
+        {
+            if (_includeNames)
+            {
+                return withUsername && !string.IsNullOrEmpty(username) ? $"{displayName} ({username})" : displayName;
+            }
+
+            var key = string.IsNullOrEmpty(username) ? displayName : username;
+            if (!_labels.TryGetValue(key, out var label))
+            {
+                _participants++;
+                label = $"Participant {_participants.ToString(CultureInfo.InvariantCulture)}";
+                _labels[key] = label;
+            }
+
+            return label;
+        }
+
+        /// <summary>
+        ///     Writes who requested the document.
+        /// </summary>
+        /// <param name="actor">The user, or <c>null</c> for a request without signing in.</param>
+        /// <returns>The name of the user, a label, or a statement that the request was anonymous.</returns>
+        public string Requester(Actor? actor)
+        {
+            if (actor is null)
+            {
+                return "an anonymous request";
+            }
+
+            return _includeNames ? $"{actor.DisplayName} ({actor.Username})" : RequesterLabel;
+        }
     }
 }

@@ -28,11 +28,13 @@ namespace DemaConsulting.ReviewCenter.Core;
 ///     Computes the digest of a review record: the value a signature binds itself to.
 /// </summary>
 /// <remarks>
-///     The digest is SHA-256 over a canonical text of the record, written as lowercase hexadecimal. The text
-///     is built so that it never depends on storage row identities or on the order rows happen to be read
-///     in, and so that two different records can never produce the same text:
+///     The digest is SHA-256 over a canonical text of the record, written as lowercase hexadecimal. The format
+///     is private to ReviewCenter (no other tool is expected to reproduce it) and is versioned from v1 at the
+///     first release; any later change to it must bump the version. The text is built so that it never depends
+///     on storage row identities or on the order rows happen to be read in, and so that two different records
+///     can never produce the same text:
 ///     <list type="number">
-///         <item>a version header line (<c>ReviewCenter record v4</c>; any change to this format must bump it);</item>
+///         <item>a version header line (<c>ReviewCenter record v1</c>);</item>
 ///         <item>the content fingerprint;</item>
 ///         <item>the source of the files: <c>source upload</c> for an upload, otherwise
 ///               <c>source git</c> with the repository identity, the baseline commit (or <c>-</c>), the head commit,
@@ -41,9 +43,13 @@ namespace DemaConsulting.ReviewCenter.Core;
 ///               file, sorted by path: path, kind, baseline hash (or <c>-</c>) and head hash (or <c>-</c>). The
 ///               repository name is not covered (it is a display snapshot, and renaming a repository must not
 ///               invalidate a signature);</item>
-///         <item>every stored checklist answer, sorted by check id: id, outcome, justification
-///               (who answered and when are deliberately not covered, so answering the same value again does not
-///               invalidate a signature);</item>
+///         <item>the frozen checklist the review was created with: a <c>checklist</c> line with its version
+///               (<c>-</c> when the review has none), then each section sorted by id (<c>section</c> line: id and
+///               title) followed by its checks sorted by id (<c>item</c> line: id and question wording), so a
+///               signature binds to the exact questions that were answered;</item>
+///         <item>every stored checklist answer, sorted by check id: id, outcome, justification, and who answered
+///               (display name and user name). The moment of answering is deliberately not covered, so answering
+///               the same value again as the same person does not invalidate a signature;</item>
 ///         <item>the sections that do not apply, sorted by section id: id and reason;</item>
 ///         <item>every thread rendered to one block (anchor with its side, state, creation time, and its comments in posting
 ///               order with author display name, author user name, text and time); the blocks are sorted, so
@@ -58,7 +64,7 @@ public static class RecordDigest
     /// <summary>
     ///     The first line of the canonical text; names the format version.
     /// </summary>
-    private const string Header = "ReviewCenter record v4";
+    private const string Header = "ReviewCenter record v1";
 
     /// <summary>
     ///     Builds the canonical text of a record.
@@ -79,11 +85,16 @@ public static class RecordDigest
         // The source comes straight after the fingerprint so a signature binds to where the files came from
         AddSource(lines, record.Source);
 
-        // Answers, in check id order; the identity of the person and the time are left out on purpose
+        // The questions come before the answers so a signature binds to what was asked, not only to the replies
+        AddChecklist(lines, record.Checklist);
+
+        // Answers, in check id order, with who answered; only the time is left out on purpose
         lines.Add("answers");
         foreach (var answer in record.Answers.OrderBy(a => a.ItemId, StringComparer.Ordinal))
         {
-            lines.Add($"answer {Text(answer.ItemId)} {Text(answer.Outcome.ToString())} {Text(answer.Justification)}");
+            lines.Add(
+                $"answer {Text(answer.ItemId)} {Text(answer.Outcome.ToString())} {Text(answer.Justification)} " +
+                $"{Text(answer.AnsweredBy)} {Text(answer.AnsweredByUsername)}");
         }
 
         // Only the sections that do not apply matter; "applies" is the default and carries no reason
@@ -111,6 +122,42 @@ public static class RecordDigest
     public static string Compute(ReviewRecord record)
     {
         return Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(Canonicalize(record))));
+    }
+
+    /// <summary>
+    ///     Writes the checklist block of the canonical text: the wording of every question the reviewers answered.
+    /// </summary>
+    /// <remarks>
+    ///     The block is read from the definition frozen with the review, so it cannot change after the review
+    ///     is created; covering it makes the digest say which questions the answers belong to. Sections and
+    ///     checks are sorted by identifier so the order of the definition does not matter. The applicability
+    ///     hint of a section is display help and is not covered.
+    /// </remarks>
+    /// <param name="lines">The lines written so far.</param>
+    /// <param name="checklist">The frozen checklist, or <c>null</c> when the review has none.</param>
+    /// <exception cref="System.Text.Json.JsonException">
+    ///     Thrown when the stored definition is not valid JSON or not a complete definition
+    ///     (<see cref="ChecklistDefinition.FromJson"/> rejects both); the store only holds text written by
+    ///     <see cref="ChecklistDefinition.ToJson"/>, so this signals corrupted data and must not be hidden.
+    /// </exception>
+    private static void AddChecklist(List<string> lines, ReviewChecklist? checklist)
+    {
+        if (checklist is null)
+        {
+            lines.Add("checklist -");
+            return;
+        }
+
+        var definition = checklist.Parse();
+        lines.Add($"checklist {Text(definition.Version)}");
+        foreach (var section in definition.Sections.OrderBy(s => s.Id, StringComparer.Ordinal))
+        {
+            lines.Add($"section {Text(section.Id)} {Text(section.Title)}");
+            foreach (var item in section.Items.OrderBy(i => i.Id, StringComparer.Ordinal))
+            {
+                lines.Add($"item {Text(item.Id)} {Text(item.Text)}");
+            }
+        }
     }
 
     /// <summary>

@@ -52,4 +52,10 @@ public sealed class Project
     ///     Gets the moment the project was created.
     /// </summary>
     public DateTimeOffset Created { get; init; }
+
+    /// <summary>
+    ///     Gets the evidence settings of the project (anonymous access and the content of the attestation PDFs);
+    ///     <see cref="EvidenceSettings.Default"/> for a project that was never changed.
+    /// </summary>
+    public EvidenceSettings Evidence { get; init; } = EvidenceSettings.Default;
 }

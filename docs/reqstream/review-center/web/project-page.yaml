@@ -6,8 +6,9 @@
 # the page at /projects/{project}/reviews/new that holds the form to create a review from uploaded files or from a
 # repository of the project, and the two pages that add a member: /projects/{project}/members/new, which adds an
 # existing user by the exact user name, and /projects/{project}/members/account, which creates a new account together
-# with its membership. A project the user may not see, or may not administer where it matters, looks like a missing
-# one.
+# with its membership, and the page /projects/{project}/evidence-settings (EvidenceSettingsPage), where whoever
+# administers the project decides who may read its evidence without signing in and what its attestation PDFs
+# contain. A project the user may not see, or may not administer where it matters, looks like a missing one.
 
 sections:
   - title: ProjectPage Unit Requirements
@@ -278,6 +279,7 @@ sections:
           - ProjectPage_AfterRender_Interactive_SetsMarker
           - NewMemberPage_AfterRender_Interactive_SetsMarker
           - NewMemberAccountPage_AfterRender_Interactive_SetsMarker
+          - EvidenceSettingsPage_AfterRender_Interactive_SetsMarker
 
       - id: ReviewCenter-ProjectPage-PlanLink
         title: >-
@@ -288,3 +290,109 @@ sections:
           offered instead of finding no link and guessing.
         tests:
           - ProjectPage_Render_PlanLink_ShownOnlyWithEnabledRepository
+
+      - id: ReviewCenter-ProjectPage-EvidenceSettingsLink
+        title: >-
+          The ProjectPage unit shall show an Evidence settings button that leads to the evidence settings page of the
+          project to a system administrator and to a project admin of the project only.
+        justification: |
+          The evidence settings decide who may read the evidence of the project without signing in, so they are
+          reached from the project page by the people who may change them. A plain member does not change them and
+          is not offered a page that would show only a not-found message.
+        tests:
+          - ProjectPage_Render_ProjectAdmin_ShowsMembersAndButtons
+          - ProjectPage_Render_PlainMember_ShowsNoMembersAndNoAuditLink
+
+      - id: ReviewCenter-ProjectPage-EvidenceSettingsAccess
+        title: >-
+          The ProjectPage unit shall provide the page /projects/{project}/evidence-settings, which shows whoever
+          administers the project (a system administrator or a project admin of it) the evidence settings form with a
+          Save settings button and a Back to project button, and shows the not-found message and no form to a plain
+          member, to a user who is no member, and for a project that does not exist.
+        justification: |
+          Anonymous access and the content of the evidence are decisions of the people who answer for the project, so
+          nobody else may see or change them. The same message as for a missing project keeps the page from revealing
+          that the project exists.
+        tests:
+          - EvidenceSettingsPage_Render_Administrator_ShowsDefaultsWithoutWarnings
+          - EvidenceSettingsPage_Render_NoAdministerRight_ShowsNotFoundAndNoSwitches
+
+      - id: ReviewCenter-ProjectPage-EvidenceSettingsSwitches
+        title: >-
+          The ProjectPage unit shall show on the evidence settings page the stored settings of the project, or the
+          defaults when none are stored, as seven switches each with a short description: the anonymous evidence index
+          and the anonymous attestation PDFs, both off by default, where the description of the index says that the
+          index alone is useless to ReviewMark unless anonymous PDFs are on or the client has credentials, and the
+          review discussion threads, the reviewer names, the checklist wording, the file list and hashes, and the git
+          context of the PDFs, all on by default.
+        justification: |
+          The defaults keep everything behind a sign-in and keep the PDFs complete, so nothing is opened or left out
+          unless someone chooses it. A person who turns a switch must be told in one sentence what it does, and the
+          index switch must not promise more than it gives, because the index without the PDFs or credentials does not
+          let ReviewMark verify anything.
+        tests:
+          - EvidenceSettingsPage_Render_Administrator_ShowsDefaultsWithoutWarnings
+          - EvidenceSettingsPage_Render_EverySwitchHasADescription
+          - EvidenceSettingsPage_Render_StoredSettings_AreShown
+
+      - id: ReviewCenter-ProjectPage-EvidenceSettingsWarnings
+        title: >-
+          The ProjectPage unit shall, while the switches are changed and before anything is saved, show below each
+          content switch that is off a warning of its own that omitting it may not satisfy the regulatory regime and
+          that says to confirm with the quality or compliance lead, show a summary at the top that names every
+          section left out of the PDFs, and show an exposure warning while an anonymous switch is on that says that
+          anyone who reaches the server can read what was opened, and in addition says
+          that the PDFs still contain the review discussion or the reviewer names, whichever are on, while the
+          anonymous PDFs are on; and shall show none of these when nothing is left out and nothing is anonymous.
+        justification: |
+          Leaving content out of the evidence, or opening it to anyone, can break the obligations of a regulated
+          project. The warning belongs next to the switch that causes it and appears at once, so the person sees the
+          consequence before saving instead of finding it out afterwards.
+        tests:
+          - EvidenceSettingsPage_Render_Administrator_ShowsDefaultsWithoutWarnings
+          - EvidenceSettingsPage_Switch_ContentOff_ShowsItsWarningAndTheBanner
+          - EvidenceSettingsPage_Switch_AllContentOff_WarningsAreTailoredAndBannerListsAll
+          - EvidenceSettingsPage_Switch_AnonymousOn_ShowsExposureWarningAndPeopleLine
+
+      - id: ReviewCenter-ProjectPage-EvidenceSettingsSave
+        title: >-
+          The ProjectPage unit shall save all seven switches together with one Save settings button, confirm the
+          saved settings in words and stay open on the page, say that there is nothing to save and record nothing when
+          nothing changed, and, for a change, cause one audit entry of the project with the action
+          project.evidence-settings-changed that names the changed settings with their old and new values and the
+          user who saved them, so that it shows on the audit page of the project.
+        justification: |
+          The settings decide what leaves the system, so a change must be accountable: who changed what, from what, to
+          what, and when. One save for all switches keeps the stored settings consistent, and the confirmation tells
+          the person what happened.
+        tests:
+          - EvidenceSettingsPage_Save_Change_StoresConfirmsAndAudits
+          - EvidenceSettingsPage_Save_NoChange_SaysNothingToSaveAndRecordsNothing
+
+      - id: ReviewCenter-ProjectPage-EvidenceSettingsConflict
+        title: >-
+          The ProjectPage unit shall, when the settings were changed by someone else after the page loaded them,
+          store nothing on save, say that the settings were changed by someone else, and show the settings that are
+          stored now.
+        justification: |
+          Two administrators must not overwrite each other without knowing it, least of all for settings that open
+          the evidence to anonymous readers. Showing the current settings lets the person decide again.
+        tests:
+          - EvidenceSettingsPage_Save_ChangedByOthers_ShowsMessageAndTheCurrentSettings
+
+      - id: ReviewCenter-ProjectPage-EvidenceSettingsRightLost
+        title: >-
+          The ProjectPage unit shall check on every switch change and every save that the user still administers the
+          project and, when the
+          right was lost while the page was open (the membership was revoked, the user was demoted, or the sign-in
+          state ended), store and record nothing and replace the page with the not-found message and none of the
+          settings or messages, and shall drop the choices and the project when the page is reused for another
+          project.
+        justification: |
+          An open page keeps its state after the user is demoted or removed, and a stale page must not be able to open
+          the evidence of a project to anonymous readers. Choices made for one project must not follow the user to
+          another.
+        tests:
+          - EvidenceSettingsPage_Save_RightLostWhileOpen_StoresNothingAndDropsThePage
+          - EvidenceSettingsPage_Switch_RightLostWhileOpen_DropsThePageAndTakesNoChange
+          - EvidenceSettingsPage_Load_OtherProject_DropsTheChoicesAndTheProject

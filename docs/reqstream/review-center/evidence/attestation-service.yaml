@@ -2,7 +2,9 @@
 # Software Unit Requirements for the AttestationService Class
 #
 # The AttestationService class releases the signed attestation of an approved review: it checks that the record is
-# approved, gets the signing key, renders and signs the document, and records the release in the audit trail.
+# approved, applies the evidence settings of the project, gets the signing key, renders and signs the document, and
+# records the release in the audit trail. It serves a signed-in user and, when the project allows it, a request
+# without a user.
 
 sections:
   - title: AttestationService Unit Requirements
@@ -24,39 +26,77 @@ sections:
         title: >-
           The AttestationService class shall check, before it reads the review, that the actor may view the project of
           the review, and shall report the review as not found, as for a review that does not exist, when the actor may
-          not.
+          not. For a request without an actor it shall go on only when the project has switched on anonymous
+          attestation PDFs, and otherwise report the review as not found. For a request without an actor it shall also
+          report a review that is not complete as not found, as for a review that does not exist, so that the answer
+          cannot be used to list review identifiers or their state; an actor keeps the not-approved answer.
         justification: |
           An attestation contains the whole review. Answering differently for a project the user may not see would
-          tell the user that the project and its review exist.
+          tell the user that the project and its review exist. A project may publish its attestations by its own
+          decision, and the service enforces that decision itself. An anonymous caller has no account, so the
+          informative answer for a review that is not complete would let anyone probe which review identifiers exist
+          and which are complete.
         tests:
           - ApiProjectAccess_EveryProjectRoute_NonMemberToken_AnswersLikeAMissingProject
           - ApiProjectAccess_EveryProjectRoute_MemberAndSystemAdmin_AreNotRefused
+          - AttestationService_GenerateAsync_AnonymousToggleOff_ReturnsNotFound
+          - AttestationService_GenerateAsync_AnonymousUnknownProject_ReturnsNotFound
+          - AttestationService_GenerateAsync_AnonymousToggleOn_ReturnsPdfAndAuditsAnonymous
+          - AttestationService_GenerateAsync_AnonymousIncompleteReview_ReturnsNotFoundLikeMissing
 
       - id: ReviewCenter-AttestationService-Revalidation
         title: >-
-          The AttestationService class shall read the review again after the document is rendered and before it is
-          signed, and when the review is no longer complete, or its record digest, its slots, its signers, or the
-          digests they signed differ from what was rendered, shall report that the review changed, and shall sign
-          nothing, return no document, and record nothing in the audit trail.
+          The AttestationService class shall read the review and the evidence settings of the project again after the
+          document is rendered and before it is signed, and when the review is no longer complete, or its record
+          digest, its slots, its signers, or the digests they signed differ from what was rendered, or the settings
+          differ from the ones that the document was rendered with, shall report that the review changed, and shall
+          sign nothing, return no document, and record nothing in the audit trail.
         justification: |
           The approval and the content are read in separate steps and rendering takes time. Without the second check a
           slot added or a record changed in between would yield a signed document that attests a review that was no
-          longer complete when it was signed.
+          longer complete when it was signed. A setting that was changed in between, for instance a switch that hides
+          the names of the reviewers, would otherwise yield a document that discloses what the project had just
+          decided to keep back.
         tests:
           - AttestationService_GenerateAsync_RecordChangesWhileRendering_ReturnsChangedAndRecordsNothing
           - AttestationService_GenerateAsync_SlotAddedWhileRendering_ReturnsChangedAndRecordsNothing
           - AttestationService_GenerateAsync_SlotsChangeWhileRenderingButStillComplete_ReturnsChangedAndRecordsNothing
           - AttestationService_GenerateAsync_ReviewUnchangedWhileRendering_PassesRevalidationAndIsAttested
+          - AttestationService_GenerateAsync_SettingsChangeWhileRendering_ReturnsChanged
 
       - id: ReviewCenter-AttestationService-Document
         title: >-
           The AttestationService class shall return a signed PDF of the review, with its content, checklist, threads,
-          sign-offs, audit head, and key, and a file name that keeps only safe characters.
+          sign-offs, audit head, and key, as far as the evidence settings of the project include them, and a file name
+          that keeps only safe characters, and shall sign the document after the settings were applied so that the
+          signature stays valid.
         justification: |
-          The caller needs the finished document and a name that is safe to put in a download header.
+          The caller needs the finished document and a name that is safe to put in a download header. A project that
+          keeps parts of a review out of its PDFs must get a document whose signature still verifies, because the
+          signature covers the bytes that were released.
         tests:
           - AttestationService_GenerateAsync_CompleteReview_ReturnsSignedPdfOfTheReview
           - AttestationService_FileNameFor_ReviewId_KeepsOnlySafeCharacters
+          - AttestationService_GenerateAsync_DefaultSettings_IncludesEverything
+          - AttestationService_GenerateAsync_NamesOff_ReplacesPeopleWithLabelsAndStillVerifies
+          - AttestationService_GenerateAsync_ThreadsOff_OmitsThreadSectionAndStillVerifies
+          - AttestationService_GenerateAsync_FilesOff_OmitsFileListAndStillVerifies
+          - AttestationService_GenerateAsync_ChecklistWordingOff_OmitsQuestionTextAndStillVerifies
+
+      - id: ReviewCenter-AttestationService-Labels
+        title: >-
+          The AttestationService class shall, when the evidence settings keep the names of people out of PDFs, give the
+          renderer the labels Reviewer N (primary) and Reviewer N (alternate) for the people of the reviewer slots,
+          Participant N for anybody else, in the order they are first named, and the labels a signed-in user or an
+          anonymous request for the requester, use one label for one person everywhere in the document, and leave the
+          text that people typed into comments and justifications as it is.
+        justification: |
+          A project that publishes its attestations may not want the names of its reviewers in them. The label of a
+          person must be the same in every section, or the reader would count more people than there are, and the
+          words that people wrote belong to the record and are not changed.
+        tests:
+          - AttestationService_GenerateAsync_NamesOff_ReplacesPeopleWithLabelsAndStillVerifies
+          - AttestationService_GenerateAsync_AnonymousToggleOn_ReturnsPdfAndAuditsAnonymous
 
       - id: ReviewCenter-AttestationService-KeyUnavailable
         title: >-
@@ -73,13 +113,16 @@ sections:
         title: >-
           The AttestationService class shall record an attestation.generated event in the audit trail for every
           attestation it releases, with the record digest, the head of the audit chain, the SHA-256 hash of the PDF,
-          and the key, and shall release nothing when that record cannot be written.
+          and the key, and with the actor anonymous when the request had no actor, and shall release nothing when that
+          record cannot be written.
         justification: |
-          A document that leaves the server is an action that someone must be able to find later. If the trail cannot
-          be written, releasing the document would leave an action without a trace.
+          A document that leaves the server is an action that someone must be able to find later, including a release
+          to a caller without an account. If the trail cannot be written, releasing the document would leave an action
+          without a trace.
         tests:
           - AttestationService_GenerateAsync_CompleteReview_RecordsAuditEventWithDigestAndPdfHash
           - AttestationService_GenerateAsync_AskedTwice_RecordsTwoEvents
+          - AttestationService_GenerateAsync_AnonymousToggleOn_ReturnsPdfAndAuditsAnonymous
 
       - id: ReviewCenter-AttestationService-Arguments
         title: >-

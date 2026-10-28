@@ -43,7 +43,11 @@ Acceptance Criteria).
   about the self-signed key; the download is in the audit trail.
 - A review that is not complete is not offered on the page, and the download is refused with 409.
 - The attestation download and the evidence index answer a user who is not a member of the project exactly like a
-  project that does not exist (404), and a member and a system administrator are served.
+  project that does not exist (404), and a member and a system administrator are served. A request without credentials
+  is served only when the project has switched on that route (see the `Api` subsystem).
+- A PDF follows the evidence settings of the project: a part that a switch turns off is missing, the neutral labels
+  replace the names when those are off, every PDF has a Content scope section, and the signature of the reduced PDF
+  verifies.
 - The evidence index that the application serves equals a committed file, has the shape that ReviewMark reads, and
   carries
   a fingerprint that equals the one that the algorithm of ReviewMark computes from the same files.
@@ -93,7 +97,25 @@ real application, by the tests of the `Api` subsystem: `ApiProjectAccess_EveryPr
 `ApiProjectAccess_EveryProjectRoute_MemberAndSystemAdmin_AreNotRefused` (a member and a system administrator are served),
 and `ApiProjectAccess_AttestationPage_NonMemberSession_Answers404` (the web route answers an empty 404 for a signed-in
 non-member). An anonymous request to the web route is redirected to the login page, which is tested by
-`AttestationEndpoint_Get_SignedOut_RedirectsToLogin`.
+`AttestationEndpoint_Get_SignedOut_RedirectsToLogin`. A request without an actor is refused like a missing project
+unless the project has switched on the matching anonymous setting, which is tested in the units
+(`AttestationService_GenerateAsync_AnonymousToggleOff_ReturnsNotFound` and
+`EvidenceIndexService_Build_NoActor_NeedsTheAnonymousIndexSetting`) and over HTTP in the `Api` subsystem. A request
+without an actor for a review that is not complete is answered like a review that does not exist
+(`AttestationService_GenerateAsync_AnonymousIncompleteReview_ReturnsNotFoundLikeMissing`, and over HTTP
+`AnonymousEvidenceAccess_AttestationPdf_IncompleteReview_AnswersLikeMissingReview`), while a signed-in caller still gets
+409 (`AttestationEndpoint_Get_ReviewNotSigned_Answers409`).
+
+**Content settings**: The evidence settings of a project decide what a PDF contains. The units verify it: the renderer
+tests print every switch, the Content scope section, and each omission
+(`AttestationRenderer_Render_DefaultSettings_ContentScopeSaysNothingIsLeftOut`,
+`AttestationRenderer_Render_EverythingOff_KeepsTheAlwaysIncludedParts`, and the tests of the single switches), and the
+tests of `AttestationContentSettingsTests.cs` run the service with each switch off, check the neutral labels, and verify
+the signature of the reduced PDF (`AttestationService_GenerateAsync_NamesOff_ReplacesPeopleWithLabelsAndStillVerifies`),
+the audit actor `anonymous` (`AttestationService_GenerateAsync_AnonymousToggleOn_ReturnsPdfAndAuditsAnonymous`), and the
+check of the settings before the signing (`AttestationService_GenerateAsync_SettingsChangeWhileRendering_ReturnsChanged`).
+The same PDF is downloaded without credentials by `AnonymousEvidenceAccess_BothOn_ServesIndexEntryAndSignedPdfAndAuditsAnonymous`
+in the `Api` subsystem. The page that changes the settings is verified in the `Web` subsystem.
 
 **Units**: The file structure and the layout are verified in the unit tests of `PdfDocumentWriter`; the content and the
 statements of the document in the unit tests of `AttestationRenderer`; the signature, its structure, and its resistance

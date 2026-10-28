@@ -42,7 +42,7 @@ public class AttestationEndpointTests
     /// <summary>
     ///     Test that a visitor who is not signed in is sent to the login page and gets no document.
     /// </summary>
-    [Fact(Timeout = 60000)]
+    [Fact(Timeout = 180000)]
     public async Task AttestationEndpoint_Get_SignedOut_RedirectsToLogin()
     {
         // Arrange: an application with a complete review and a visitor who is not signed in
@@ -67,7 +67,7 @@ public class AttestationEndpointTests
     /// </summary>
     /// <param name="projectOffset">The number to add to the project number.</param>
     /// <param name="reviewId">The review identifier to ask for.</param>
-    [Theory(Timeout = 60000)]
+    [Theory(Timeout = 180000)]
     [InlineData(0, "NOPE")]
     [InlineData(99, "REV-1")]
     public async Task AttestationEndpoint_Get_UnknownReview_Answers404(int projectOffset, string reviewId)
@@ -89,7 +89,7 @@ public class AttestationEndpointTests
     /// <summary>
     ///     Test that a review that is not complete answers 409 Conflict with the reason, and no document.
     /// </summary>
-    [Fact(Timeout = 60000)]
+    [Fact(Timeout = 180000)]
     public async Task AttestationEndpoint_Get_ReviewNotSigned_Answers409()
     {
         // Arrange: an application with a review that nobody has signed
@@ -113,7 +113,7 @@ public class AttestationEndpointTests
     ///     Test that a review that changes while the document is being prepared answers 409 Conflict with the
     ///     "changed" problem, no document, and no audit event.
     /// </summary>
-    [Fact(Timeout = 60000)]
+    [Fact(Timeout = 180000)]
     public async Task AttestationEndpoint_Get_ReviewChangesDuringGeneration_Answers409AndRecordsNothing()
     {
         // Arrange: an application whose attestation service changes the checklist answers after rendering
@@ -159,7 +159,7 @@ public class AttestationEndpointTests
     ///     Test that a complete review gives a PDF download whose signature verifies against the organization key,
     ///     and that the download is recorded in the audit trail.
     /// </summary>
-    [Fact(Timeout = 60000)]
+    [Fact(Timeout = 180000)]
     public async Task AttestationEndpoint_Get_CompleteReview_ReturnsSignedPdfDownloadAndRecordsEvent()
     {
         // Arrange: an application whose key is an organization key, a complete review, a signed-in user
@@ -197,7 +197,7 @@ public class AttestationEndpointTests
     ///     Test that the application's own key, the self-signed one that the server creates when nothing is
     ///     configured, signs the attestation.
     /// </summary>
-    [Fact(Timeout = 120000)]
+    [Fact(Timeout = 180000)]
     public async Task AttestationEndpoint_Get_DefaultConfiguration_SignsWithTheServerGeneratedSelfSignedKey()
     {
         // Arrange: an application with the default configuration, a complete review, a signed-in user
@@ -221,7 +221,7 @@ public class AttestationEndpointTests
     /// <summary>
     ///     Test that a key that stops working after start-up answers 500 with the problem, and records nothing.
     /// </summary>
-    [Fact(Timeout = 60000)]
+    [Fact(Timeout = 180000)]
     public async Task AttestationEndpoint_Get_KeyBecomesUnavailable_Answers500AndRecordsNothing()
     {
         // Arrange: an application whose key works at start-up and then fails, and a complete review

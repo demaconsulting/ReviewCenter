@@ -5,8 +5,9 @@
 `ReviewStore` is verified with unit tests defined in `ReviewStoreTests.cs` (projects, reviews, threads, and
 checklists), `ReviewStoreSigningTests.cs` (reviewer slots, the record, and signatures), and
 `ReviewStoreRepositoryTests.cs` (reviews from a repository), `ReviewStoreMembershipTests.cs` (project
-memberships), and `ProjectMembersStoreTests.cs` (the last project administrator rule, including two changes made at
-the same time). The tests use the real
+memberships), `ProjectMembersStoreTests.cs` (the last project administrator rule, including two changes made at
+the same time), and `EvidenceSettingsStoreTests.cs` (the evidence settings of a project and their compare-and-set
+change). The tests use the real
 store over a real
 SQLite database file that each test class instance creates in a private temporary folder and deletes afterward.
 Real SQLite is used because ordering, keys, constraints, transactions, and binary content are the behavior under test.
@@ -61,6 +62,9 @@ be loadable on the test platform.
   administrator with the rule `LastProjectAdmin`, stores nothing and no audit entry for the refusal, does not count a
   disabled administrator as the other one, lets exactly one of two administrators who remove each other at the same
   time succeed, and applies the same change without the check when it is not told to require one.
+- A new project has the default evidence settings; a change of the settings is stored for its own project only, is read
+  back with the project, and is stored with one audit entry of the project whose chain verifies; a change that names
+  settings which are no longer stored, and a change of an unknown project, change nothing and write no entry.
 
 #### Test Scenarios
 
@@ -276,6 +280,22 @@ tested by `ReviewStore_RemoveMembershipAsync_LastAdmin_RefusedAndRolledBackUnles
 **ReviewStore_RemoveMembershipAsync_OtherAdminDisabled_IsRefused**: The other administrator is disabled, so the
 removal of the remaining one with the check required throws `LastProjectAdmin` and both memberships remain. This
 scenario is tested by `ReviewStore_RemoveMembershipAsync_OtherAdminDisabled_IsRefused`.
+
+**ReviewStore_AddProjectAsync_NewProject_HasDefaultEvidenceSettings**: A project is stored without other settings; it
+is read back with the default evidence settings (the two anonymous switches off and the five content switches on). This
+scenario is defined in `EvidenceSettingsStoreTests.cs` and is tested by
+`ReviewStore_AddProjectAsync_NewProject_HasDefaultEvidenceSettings`.
+
+**ReviewStore_UpdateEvidenceSettingsAsync_Change_IsPersistedAndAudited**: The settings of one of two projects are
+changed from the defaults, with an audit draft. The call reports `true`; the new settings are read back by
+`GetProjectAsync` and by `ListProjectsAsync`; the other project keeps the defaults; one entry
+`project.evidence-settings-changed` of the project is stored; and the hash chain of the audit trail still verifies. This
+scenario is tested by `ReviewStore_UpdateEvidenceSettingsAsync_Change_IsPersistedAndAudited`.
+
+**ReviewStore_UpdateEvidenceSettingsAsync_ExpectedDiffers_ChangesNothing**: After a first change, a second change that
+still names the defaults as the expected settings, and a change of a project that does not exist, both report `false`;
+the stored settings are those of the first change, and only the entry of the first change exists. This scenario is
+tested by `ReviewStore_UpdateEvidenceSettingsAsync_ExpectedDiffers_ChangesNothing`.
 
 **Audit drafts**: Every mutation of the store takes an audit draft, and the tests of this unit pass one through
 the real `AuditAppender`; the helper `TestStore` builds the store and an `AuditStore` over the same database. The

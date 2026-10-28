@@ -11,6 +11,14 @@ the content type, and the body; the state of the tokens and the audit trail are 
 limit is lowered by a setting of the test, and the clock is a movable `TimeProvider` where the expiry of a token
 matters.
 
+The anonymous access of the two evidence routes (`AnonymousEvidenceAccess.cs`, `AnonymousRateLimit.cs`) is verified with
+the tests of `AnonymousEvidenceAccessTests.cs` and, for the memory bound and the thread safety of the limit,
+`AnonymousRateLimitTests.cs`. The first start the same in-process application, create a project with a
+review that all reviewers signed, set the evidence settings of the project through the real
+`EvidenceSettingsService`, and send requests with and without an `Authorization` header. The responses are examined for
+the status, the body, the cache header, and `Retry-After`; the audit trail is read through the services, and the rate
+limit is also called directly with a movable clock.
+
 #### Test Environment
 
 N/A - standard test environment (a temporary database is created by each test).
@@ -31,6 +39,20 @@ N/A - standard test environment (a temporary database is created by each test).
 - Refused tokens are throttled per address with 429, without stopping people signing in with a password.
 - A refused token is audited once for each address and minute and the value is never recorded.
 - No token value, and no text with the token prefix, is written to the application log for any outcome.
+- A request without credentials is served by the evidence index route and the attestation PDF route only when the
+  project has switched on that route, and is otherwise answered with the same generic 401 as for a project that does
+  not exist; a wrong token, a disabled owner, or a non-member is never served as anonymous (401, 401, 404).
+- Turning a switch on opens only its own route and only its own project, and turning it off refuses at once.
+- Every other route of the API, and the page route of the attestation, stay closed to a request without credentials
+  when both switches are on.
+- An anonymous release of an attestation is audited with the actor `anonymous`, and a served response is never cached.
+- A client address is limited to 30 anonymous requests per minute with 429 and `Retry-After`, and a request with a
+  token is not limited.
+- An anonymous request for the attestation of a review that is not complete is answered like one for a review that does
+  not exist (404, same body); a member still gets 409.
+- The table of addresses never holds more than 4096 addresses: ended windows are removed first, then the oldest
+  ones; a renewed window is not lost to pruning; the limit is exact under parallel requests.
+- Exactly two endpoints use the open policies.
 
 #### Test Scenarios
 
@@ -107,3 +129,97 @@ presented (both 401), each as a bearer token and as a Basic password. The log is
 property of any entry contains a token value, its secret part, its Base64 form in Basic credentials, or the token
 prefix. This scenario is tested by
 `ApiTokenAuthentication_Request_AnyOutcome_NeverLogsTheToken`.
+
+**AnonymousEvidenceAccess_SwitchOff_Anonymous_AnswersLikeAMissingProject**: With both switches off, which is the
+default, both routes are requested without credentials for a project with a complete review and for a project number
+that does not exist. Each answer is 401 with the bearer challenge, and the bodies of the two answers are the same. This
+scenario is tested by `AnonymousEvidenceAccess_SwitchOff_Anonymous_AnswersLikeAMissingProject`.
+
+**AnonymousEvidenceAccess_Matrix_ServesOnlyWhoMay**: For each route, with its own switch off and on, an anonymous
+caller, a member with a bearer token and with Basic credentials, a non-member, a disabled member, and a caller with a
+wrong token request the route. An anonymous caller is served only with the switch on, a member always, a non-member
+gets 404, and the disabled member and the wrong token get 401 also with the switch on. The answer served to an
+anonymous caller carries `Cache-Control: no-store`. This scenario is tested by
+`AnonymousEvidenceAccess_Matrix_ServesOnlyWhoMay`.
+
+**AnonymousEvidenceAccess_OneSwitchOn_DoesNotOpenTheOtherRoute**: With only the index open the PDF is refused to an
+anonymous caller, and with only the PDF open the index is refused. This scenario is tested by
+`AnonymousEvidenceAccess_OneSwitchOn_DoesNotOpenTheOtherRoute`.
+
+**AnonymousEvidenceAccess_SwitchOn_OpensOnlyItsOwnProject**: With the index of one project open, an anonymous request
+for the index of a second project is answered with 401. This scenario is tested by
+`AnonymousEvidenceAccess_SwitchOn_OpensOnlyItsOwnProject`.
+
+**AnonymousEvidenceAccess_BothOn_ServesIndexEntryAndSignedPdfAndAuditsAnonymous**: With both switches on, an anonymous
+caller reads the index, follows the file address of its single entry, and receives a PDF with a valid signature that is
+not cached. The audit trail has one attestation event with the actor `anonymous` and the project. This scenario is
+tested by `AnonymousEvidenceAccess_BothOn_ServesIndexEntryAndSignedPdfAndAuditsAnonymous`.
+
+**AnonymousEvidenceAccess_BothOn_OtherRoutes_StayClosed**: With both switches on, an anonymous caller requests the other
+routes of the API. The list of projects, the reviews, one review, and the creation of a review are answered with 401,
+and a path or method that is not a route is answered with 404. This scenario is tested by
+`AnonymousEvidenceAccess_BothOn_OtherRoutes_StayClosed`.
+
+**AnonymousEvidenceAccess_BothOn_AttestationPageRoute_StillNeedsSignIn**: With both switches on, the attestation page
+route of the web pages is requested without signing in and answers with a redirect to the sign-in page. This scenario
+is tested by `AnonymousEvidenceAccess_BothOn_AttestationPageRoute_StillNeedsSignIn`.
+
+**AnonymousEvidenceAccess_SwitchTurnedOff_RefusesAtOnce**: An open index is read, the switch is turned off, and the next
+request from the same client is answered with 401 without a restart. This scenario is tested by
+`AnonymousEvidenceAccess_SwitchTurnedOff_RefusesAtOnce`.
+
+**AnonymousEvidenceAccess_TooManyAnonymousRequests_Answers429WithRetryAfter**: An anonymous client makes one request
+more than the limit allows. The last answer is 429 with `Retry-After` and `Cache-Control: no-store`, and a request with
+a token from the same address is still answered with 200. This scenario is tested by
+`AnonymousEvidenceAccess_TooManyAnonymousRequests_Answers429WithRetryAfter`.
+
+**AnonymousEvidenceAccess_AttestationPdf_IncompleteReview_AnswersLikeMissingReview**: A project opens the attestation
+PDFs and holds a review that nobody signed. An anonymous request for that review and one for a review that does not
+exist are both answered 404 with identical bodies and `Cache-Control: no-store`, and no `attestation.generated` event is
+recorded; a member with a token gets 409 for the incomplete review and 404 for the unknown one. This scenario is tested
+by `AnonymousEvidenceAccess_AttestationPdf_IncompleteReview_AnswersLikeMissingReview`.
+
+**AnonymousRateLimit_TryAcquire_CountsPerAddressAndWindow**: With a movable clock, one address uses up its budget and
+is refused with a wait that is longer than zero and at most the window; another address and an unknown address are
+still served, and after the window ended the first address is served again. This scenario is tested by
+`AnonymousRateLimit_TryAcquire_CountsPerAddressAndWindow`.
+
+**AnonymousRateLimit_TryAcquire_ManyDistinctAddresses_NeverExceedsCapacity**: Three times the capacity of distinct
+addresses ask once each inside one window; every request is granted and the table never holds more than 4096 addresses
+(it holds exactly 4096 at the end). This scenario is tested by
+`AnonymousRateLimit_TryAcquire_ManyDistinctAddresses_NeverExceedsCapacity`.
+
+**AnonymousRateLimit_TryAcquire_FullTable_RemovesExpiredBeforeEvictingLive**: A table that is full of two halves, one
+ended and one live with an address that is used up, takes a new address: the ended half is removed, the live half is
+kept and the used-up address is still refused. This scenario is tested by
+`AnonymousRateLimit_TryAcquire_FullTable_RemovesExpiredBeforeEvictingLive`.
+
+**AnonymousRateLimit_TryAcquire_FullOfLiveWindows_EvictsOldestFirst**: A table full of live windows takes a new
+address: the new address is granted, the table stays at 4096, the oldest window is dropped (its address starts again)
+and the next oldest is still there (still refused). This scenario is tested by
+`AnonymousRateLimit_TryAcquire_FullOfLiveWindows_EvictsOldestFirst`.
+
+**AnonymousRateLimit_TryAcquire_RenewedWindow_IsNotRemovedByPruning**: Regression of the pruning race: an address
+renews its window after the first one ended and is then over its limit; new addresses make the table prune the ended
+windows of the others, and the renewed address is still refused. This scenario is tested by
+`AnonymousRateLimit_TryAcquire_RenewedWindow_IsNotRemovedByPruning`.
+
+**AnonymousRateLimit_TryAcquire_ClockStepsBack_StillBoundedAndConsistent**: After the clock steps back, ended windows
+that sit behind a live window are still found by the full scan, the wait is not negative, and a flood of addresses
+keeps the table at its capacity without an error. This scenario is tested by
+`AnonymousRateLimit_TryAcquire_ClockStepsBack_StillBoundedAndConsistent`.
+
+**AnonymousRateLimit_TryAcquire_Concurrent_GrantsExactlyTheLimitPerAddress**: Eight workers make 1600 parallel
+requests of one address with a fixed clock; exactly 30 are granted. This scenario is tested by
+`AnonymousRateLimit_TryAcquire_Concurrent_GrantsExactlyTheLimitPerAddress`.
+
+**AnonymousRateLimit_TryAcquire_ConcurrentDistinctAddresses_StaysWithinCapacity**: Parallel requests of many distinct
+addresses next to four hot addresses: while the table is not full each hot address is granted exactly 30, and after a
+parallel flood of three times the capacity the table holds exactly 4096 addresses. This scenario is tested by
+`AnonymousRateLimit_TryAcquire_ConcurrentDistinctAddresses_StaysWithinCapacity`.
+
+**AnonymousEvidenceAccess_Endpoints_OnlyTheTwoRoutesUseTheOpenPolicies**: The endpoints of the application are
+enumerated. Exactly the evidence index and the attestation PDF use the open policies, and every other endpoint of the
+API, except the OpenAPI document and the answer for an unknown address, requires the token policy. This scenario is
+tested by
+`AnonymousEvidenceAccess_Endpoints_OnlyTheTwoRoutesUseTheOpenPolicies`.

@@ -22,6 +22,16 @@ internal static class TestServices
     }
 
     /// <summary>
+    ///     Builds an evidence settings service.
+    /// </summary>
+    /// <param name="store">The review store.</param>
+    /// <returns>The service.</returns>
+    public static EvidenceSettingsService EvidenceSettings(IReviewStore store)
+    {
+        return new EvidenceSettingsService(store, new AllowAllProjectAccess(store));
+    }
+
+    /// <summary>
     ///     Builds a review service.
     /// </summary>
     /// <param name="store">The review store.</param>

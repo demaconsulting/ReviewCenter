@@ -8,6 +8,10 @@
 fake key provider (`FakeAttestationKeyProvider`) that returns a temporary key, throws, or counts its calls, so that the
 order of the sequence and the audit event can be checked. A fake signer that throws covers the failure of signing.
 
+The effect of the evidence settings is verified with tests defined in `AttestationContentSettingsTests.cs`. They use
+the same fixture, set the settings through the real `EvidenceSettingsService`, call the service with an actor or
+without one, read the text of the signed PDF with `PdfInspector`, and verify its signature.
+
 #### Test Environment
 
 N/A - standard test environment (everything runs in memory).
@@ -26,6 +30,17 @@ N/A - standard test environment (everything runs in memory).
 - A user who cannot see the project is answered `NotFound`, like a missing review. The unit tests have no case for
   this guard; it is verified over HTTP by `ApiProjectAccess_EveryProjectRoute_NonMemberToken_AnswersLikeAMissingProject`
   and `ApiProjectAccess_EveryProjectRoute_MemberAndSystemAdmin_AreNotRefused` in the `Api` subsystem.
+- The evidence settings of the project decide the content: with the defaults the PDF has everything; with the
+  reviewer names off every person is a label (`Reviewer N (primary)`, `Reviewer N (alternate)`, `Participant N`) and the
+  requester is a signed-in user; with the threads, the files, or the checklist wording off the section is missing; and
+  in every case the signature of the PDF verifies.
+- A settings change between the rendering and the signing gives the status `Changed`, and nothing is recorded.
+- A request without an actor is `NotFound` while the project does not allow anonymous attestation PDFs and for a
+  project that does not exist, and is served, with a PDF that says the request was anonymous, when it does; the audit
+  event then names the actor `anonymous`.
+- A request without an actor for a review that is not complete gets `NotFound`, the same answer as for a review that
+  does not exist, while an actor gets `NotApproved`.
+
 The second check is made testable by the internal `AfterRender` step of the service, which the tests use to change the
 review in the moment between the rendering and the check. The short window between the second check and the signing
 and the audit event is not covered by a test; it contains no read of the review.
@@ -89,3 +104,48 @@ into a file name. Only letters, digits, dot, underscore, and hyphen remain. This
 
 **AttestationService_Constructor_NullCollaborator_Throws**: A missing collaborator is passed. `ArgumentNullException` is
 raised. This scenario is tested by `AttestationService_Constructor_NullCollaborator_Throws`.
+
+**AttestationService_GenerateAsync_DefaultSettings_IncludesEverything**: A complete review is asked for with the default
+settings. The PDF names the reviewers, has the question text and the files, has the content scope section, and its
+signature verifies. This scenario is tested by `AttestationService_GenerateAsync_DefaultSettings_IncludesEverything`.
+
+**AttestationService_GenerateAsync_NamesOff_ReplacesPeopleWithLabelsAndStillVerifies**: The reviewer names are turned
+off. No user name or display name appears in the PDF; the people of the slot are `Reviewer 1 (primary)` and
+`Reviewer 1 (alternate)`, anybody else is `Participant 1`, the requester is a signed-in user, and the signature
+verifies over the reduced PDF. This scenario is tested by
+`AttestationService_GenerateAsync_NamesOff_ReplacesPeopleWithLabelsAndStillVerifies`.
+
+**AttestationService_GenerateAsync_ThreadsOff_OmitsThreadSectionAndStillVerifies**: The threads are turned off. The
+thread section and the comment text are missing, and the signature verifies. This scenario is tested by
+`AttestationService_GenerateAsync_ThreadsOff_OmitsThreadSectionAndStillVerifies`.
+
+**AttestationService_GenerateAsync_FilesOff_OmitsFileListAndStillVerifies**: The files are turned off. The list of files
+and hashes is missing, and the signature verifies. This scenario is tested by
+`AttestationService_GenerateAsync_FilesOff_OmitsFileListAndStillVerifies`.
+
+**AttestationService_GenerateAsync_ChecklistWordingOff_OmitsQuestionTextAndStillVerifies**: The checklist wording is
+turned off. The question text is missing, the identifiers and outcomes stay, and the signature verifies. This scenario
+is tested by `AttestationService_GenerateAsync_ChecklistWordingOff_OmitsQuestionTextAndStillVerifies`.
+
+**AttestationService_GenerateAsync_AnonymousToggleOff_ReturnsNotFound**: A request without an actor is made while the
+project does not allow anonymous attestation PDFs. The status is `NotFound` and nothing is recorded. This scenario is
+tested by `AttestationService_GenerateAsync_AnonymousToggleOff_ReturnsNotFound`.
+
+**AttestationService_GenerateAsync_AnonymousToggleOn_ReturnsPdfAndAuditsAnonymous**: A request without an actor is made
+while the project allows it. The PDF is returned and says that the request was anonymous, and the audit entry names the
+actor `anonymous`. This scenario is tested by
+`AttestationService_GenerateAsync_AnonymousToggleOn_ReturnsPdfAndAuditsAnonymous`.
+
+**AttestationService_GenerateAsync_AnonymousUnknownProject_ReturnsNotFound**: A request without an actor is made for a
+project that does not exist while another project allows anonymous PDFs. The status is `NotFound`. This scenario is
+tested by `AttestationService_GenerateAsync_AnonymousUnknownProject_ReturnsNotFound`.
+
+**AttestationService_GenerateAsync_AnonymousIncompleteReview_ReturnsNotFoundLikeMissing**: A project that allows
+anonymous attestation PDFs has a review that is not complete. A request without an actor for it, and one for a review
+that does not exist, both give `NotFound` with the same message ("The review was not found."), nothing is recorded and
+the key provider is not called; a request of a member for the incomplete review still gives `NotApproved`. This scenario
+is tested by `AttestationService_GenerateAsync_AnonymousIncompleteReview_ReturnsNotFoundLikeMissing`.
+
+**AttestationService_GenerateAsync_SettingsChangeWhileRendering_ReturnsChanged**: The settings change in the moment
+between the rendering and the second check. The status is `Changed`, there is no content, and nothing is recorded. This
+scenario is tested by `AttestationService_GenerateAsync_SettingsChangeWhileRendering_ReturnsChanged`.

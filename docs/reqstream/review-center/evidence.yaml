@@ -16,7 +16,8 @@ sections:
         title: >-
           The Evidence subsystem shall produce, for a completed review, a PDF document that states the review, its
           content fingerprint, its files, its checklist answers, its threads, its reviewer sign-offs, the head of the
-          audit trail, and the key that signed it, in the same bytes for the same input.
+          audit trail, and the key that signed it, in the same bytes for the same input, with the files, checklist
+          wording, threads, reviewer names, and git context left out as the evidence settings of the project say.
         justification: |
           The approval of a review must be portable. A document that holds what was reviewed and who signed, and that
           is the same when it is made again, can be filed, printed, and checked outside the tool.
@@ -89,7 +90,8 @@ sections:
 
       - id: ReviewCenter-Evidence-Release
         title: >-
-          The Evidence subsystem shall release the attestation only of a completed review, to a signed-in user, on
+          The Evidence subsystem shall release the attestation only of a completed review, to a signed-in user or, for
+          the API route, when the project allows it, to a request without a user, on
           demand and without keeping it, shall record each release in the audit trail, and shall refuse an incomplete
           review and an unusable key with a status that tells them apart.
         justification: |
@@ -131,10 +133,15 @@ sections:
         title: >-
           The Evidence subsystem shall release an attestation and an evidence index only to an actor who may view the
           project of the review, and shall answer any other actor as it answers for a project or review that does not
+          exist; a request without an actor shall be served only when the project has switched on the anonymous
+          evidence index or the anonymous attestation PDFs for that kind of document, and otherwise answered in the
+          same way; such a request for a review that is not complete shall be answered as for a review that does not
           exist.
         justification: |
           An attestation and an index disclose the content and the approvals of a project. Answering a non-member
-          differently from a missing project would also tell the non-member which projects exist.
+          differently from a missing project would also tell the non-member which projects exist. Publishing the
+          evidence without an account is a decision of the project. An anonymous caller must not be able to tell a
+          review that is not complete from one that does not exist.
         children:
           - ReviewCenter-AttestationService-Visibility
           - ReviewCenter-AttestationEndpoint-Visibility
@@ -143,3 +150,29 @@ sections:
           - ApiProjectAccess_EveryProjectRoute_NonMemberToken_AnswersLikeAMissingProject
           - ApiProjectAccess_EveryProjectRoute_MemberAndSystemAdmin_AreNotRefused
           - ApiProjectAccess_AttestationPage_NonMemberSession_Answers404
+          - AttestationService_GenerateAsync_AnonymousToggleOff_ReturnsNotFound
+          - AnonymousEvidenceAccess_AttestationPdf_IncompleteReview_AnswersLikeMissingReview
+          - EvidenceIndexService_Build_NoActor_NeedsTheAnonymousIndexSetting
+
+      - id: ReviewCenter-Evidence-ContentSettings
+        title: >-
+          The Evidence subsystem shall make every PDF it releases follow the evidence settings of the project, read
+          once and read again before signing, with a Content scope section that states what was left out and the
+          settings in effect, names replaced by neutral labels, a signature that stays valid after the reduction, and
+          the audit actor anonymous for a request without a user.
+        justification: |
+          A project that publishes its evidence needs to keep parts of a review out of the document, and a reader needs
+          to see that this was done. The signature must cover the reduced document so that it can still be checked, and
+          the release must be traceable even when nobody signed in.
+        children:
+          - ReviewCenter-AttestationService-Revalidation
+          - ReviewCenter-AttestationService-Document
+          - ReviewCenter-AttestationService-Labels
+          - ReviewCenter-AttestationService-Audit
+          - ReviewCenter-AttestationRenderer-ContentScope
+          - ReviewCenter-AttestationRenderer-ContentSwitches
+        tests:
+          - AttestationService_GenerateAsync_NamesOff_ReplacesPeopleWithLabelsAndStillVerifies
+          - AttestationService_GenerateAsync_AnonymousToggleOn_ReturnsPdfAndAuditsAnonymous
+          - AttestationService_GenerateAsync_SettingsChangeWhileRendering_ReturnsChanged
+          - AttestationRenderer_Render_EverythingOff_KeepsTheAlwaysIncludedParts

@@ -14,7 +14,13 @@ The context exposes fifteen sets and maps the Core types directly, without separ
 repository registry is the one exception, see `Repositories`).
 
 - **Projects** (`Project`): key `Id`, assigned by the database. `Name` is required, at most 100 characters;
-  `Description` is required (may be empty), at most 1000; `Created`.
+  `Description` is required (may be empty), at most 1000; `Created`. The evidence settings of the project
+  (`Project.Evidence`, an `EvidenceSettings` value) are a complex property mapped to seven boolean columns of the same
+  table, `EvidenceAnonymousIndex`, `EvidenceAnonymousAttestations`, `EvidenceIncludeThreads`,
+  `EvidenceIncludeReviewerNames`, `EvidenceIncludeChecklistWording`, `EvidenceIncludeFiles`, and
+  `EvidenceIncludeGitContext`. The column defaults are the default settings: the two anonymous switches are false and
+  the five content switches are true, so a project that was never given other settings reads back with
+  `EvidenceSettings.Default`.
 - **Reviews** (`Review`): key `ProjectId` plus `Id`. `Title` is required, at most 200; `State` is stored as text, at
   most 32; `ContentFingerprint` is required, at most 64; `Created`; `CreatedBy` (the user name of the creator, at most
   the user name limit, null for a review stored before the column existed) and `CreatedViaApi` (default false, true
@@ -135,7 +141,9 @@ before the personal-access-token slice does not have them and must be deleted an
 of a repository: a database created before the project access slice does not have them and must be deleted and created
 again. The same holds for the `MustChangePassword` column of a user (project members management): the schema is created
 with `EnsureCreated` and has no migrations, so a development database created before that column existed does not have
-it and must be deleted and created again. The
+it and must be deleted and created again. The same holds for the seven evidence settings columns of a project: there is
+no migration for them either, `EnsureCreated` does not add a column to an existing table, and development databases
+are recreated. The
 checklist keys are what makes "one answer per check" a rule of the database. The section and
 check identifiers are not related to a table of their own: they name entries inside the snapshot, and the service
 checks them.
@@ -156,7 +164,7 @@ mapped constraints surface as database update exceptions to `ReviewStore`.
 
 #### Dependencies
 
-- **Core domain types** — `Project`, `Review`, `ReviewFile`, `ReviewState`, `ReviewThread`, `ReviewComment`,
+- **Core domain types** — `Project`, `EvidenceSettings`, `Review`, `ReviewFile`, `ReviewState`, `ReviewThread`, `ReviewComment`,
   `ReviewThreadState`, `ReviewChecklist`, `ChecklistSectionState`, `ChecklistAnswer`, `ChecklistOutcome`, `User`,
   `ProjectMembership`, `ProjectRole`, `ReviewerSlot`, `ReviewSignature`, `SlotRole`, `AuditEntry`, `PersonalAccessToken`,
   `AuditText` (the column

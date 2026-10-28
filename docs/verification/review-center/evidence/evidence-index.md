@@ -34,6 +34,8 @@ running server is a manual check.
   project. The unit tests have no case for this guard; it is verified over HTTP by
   `ApiProjectAccess_EveryProjectRoute_NonMemberToken_AnswersLikeAMissingProject` and
   `ApiProjectAccess_EveryProjectRoute_MemberAndSystemAdmin_AreNotRefused` in the `Api` subsystem.
+- A build without an actor is refused like a missing project unless the project has switched on the anonymous evidence
+  index, and is served when it has.
 
 #### Test Scenarios
 
@@ -92,3 +94,8 @@ known vectors. This scenario is tested by `ReviewMarkContract_IndexFingerprint_E
 fingerprint of a listed review, stale (naming the newest date) for another fingerprint of a listed id, and missing for
 an id that is not listed, such as a review set whose only review is not signed. This scenario is tested by
 `ReviewMarkContract_Index_FollowsReviewMarkSemantics`.
+
+**EvidenceIndexService_Build_NoActor_NeedsTheAnonymousIndexSetting**: A project has a complete review with a review-set
+id. The index is built without an actor while the anonymous evidence index is off, and for a project that does not
+exist; both are refused with the rule `ProjectNotFound`. After the setting is switched on, the index built without an
+actor lists the entry. This scenario is tested by `EvidenceIndexService_Build_NoActor_NeedsTheAnonymousIndexSetting`.

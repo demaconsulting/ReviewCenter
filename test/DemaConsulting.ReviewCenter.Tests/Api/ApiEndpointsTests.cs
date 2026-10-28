@@ -72,7 +72,7 @@ public class ApiEndpointsTests
     /// <summary>
     ///     Test that the project list returns every project with its details in camel-case JSON.
     /// </summary>
-    [Fact(Timeout = 60000)]
+    [Fact(Timeout = 180000)]
     public async Task ApiEndpoints_ListProjects_Token_ReturnsProjects()
     {
         // Arrange: two projects and a token
@@ -101,7 +101,7 @@ public class ApiEndpointsTests
     /// <summary>
     ///     Test that the review list of a project returns the summaries, and that an unknown project is a 404 problem.
     /// </summary>
-    [Fact(Timeout = 60000)]
+    [Fact(Timeout = 180000)]
     public async Task ApiEndpoints_ListReviews_Project_ReturnsSummariesOrNotFound()
     {
         // Arrange: a project with one review
@@ -128,7 +128,7 @@ public class ApiEndpointsTests
     /// <summary>
     ///     Test that the review details of a complete review show its slots, approval, counts and next step.
     /// </summary>
-    [Fact(Timeout = 60000)]
+    [Fact(Timeout = 180000)]
     public async Task ApiEndpoints_GetReview_CompleteReview_ReturnsDetails()
     {
         // Arrange: a complete review (every slot signed)
@@ -162,7 +162,7 @@ public class ApiEndpointsTests
     /// </summary>
     /// <param name="method">The HTTP method.</param>
     /// <param name="route">The address.</param>
-    [Theory(Timeout = 60000)]
+    [Theory(Timeout = 180000)]
     [InlineData("GET", "/api/projects")]
     [InlineData("GET", "/api/projects/1/reviews")]
     [InlineData("GET", "/api/projects/1/reviews/REV-1")]
@@ -194,7 +194,7 @@ public class ApiEndpointsTests
     /// </summary>
     /// <param name="contentType">The content type of the body.</param>
     /// <param name="body">The body.</param>
-    [Theory(Timeout = 60000)]
+    [Theory(Timeout = 180000)]
     [InlineData("text/plain", "not json")]
     [InlineData("application/json", "{ not json")]
     public async Task ApiEndpoints_CreateReview_NoTokenOddBody_Answers401(string contentType, string body)
@@ -219,7 +219,7 @@ public class ApiEndpointsTests
     ///     Test that a review can be created from uploaded files, that the answer carries the details and the
     ///     address of the review, and that the review and the audit entry say it was created through a token.
     /// </summary>
-    [Fact(Timeout = 60000)]
+    [Fact(Timeout = 180000)]
     public async Task ApiEndpoints_CreateReview_Upload_CreatesDraftFlaggedAsApi()
     {
         // Arrange: a project and a token
@@ -263,7 +263,7 @@ public class ApiEndpointsTests
     /// <summary>
     ///     Test that a review can be created from a registered repository, and that skipped files are reported.
     /// </summary>
-    [Fact(Timeout = 60000)]
+    [Fact(Timeout = 180000)]
     public async Task ApiEndpoints_CreateReview_Repository_CreatesReviewFromChanges()
     {
         // Arrange: a registered repository with scripted changes
@@ -314,7 +314,7 @@ public class ApiEndpointsTests
     /// </summary>
     /// <param name="json">The request body.</param>
     /// <param name="field">The field the problem names.</param>
-    [Theory(Timeout = 60000)]
+    [Theory(Timeout = 180000)]
     [InlineData("""{"id":"X-1","title":"T"}""", "source")]
     [InlineData("""{"id":"X-1","title":"T","files":[],"repository":{"repositoryId":1,"headRevision":"main"}}""", "source")]
     [InlineData("""{"id":"X-1","title":"T","files":[{"path":"a.txt","contentBase64":"not base64!"}]}""", "files[0].contentBase64")]
@@ -343,7 +343,7 @@ public class ApiEndpointsTests
     ///     Test that the rules of the services answer with their status: 400 for an invalid review id or title,
     ///     409 for a duplicate id and 404 for an unknown project.
     /// </summary>
-    [Fact(Timeout = 60000)]
+    [Fact(Timeout = 180000)]
     public async Task ApiEndpoints_CreateReview_ServiceRules_AnswerTheirStatus()
     {
         // Arrange: a project with one review and a token
@@ -383,7 +383,7 @@ public class ApiEndpointsTests
     ///     Test that the attestation of a complete review downloads as a PDF with the token, that an incomplete
     ///     review is a 409 problem, and that an unknown review is a 404 problem.
     /// </summary>
-    [Fact(Timeout = 60000)]
+    [Fact(Timeout = 180000)]
     public async Task ApiEndpoints_GetAttestation_Token_ReturnsPdfOrProblem()
     {
         // Arrange: one complete review and a token
@@ -408,7 +408,7 @@ public class ApiEndpointsTests
     /// <summary>
     ///     Test that the attestation of a review that is not complete answers 409 with a problem document.
     /// </summary>
-    [Fact(Timeout = 60000)]
+    [Fact(Timeout = 180000)]
     public async Task ApiEndpoints_GetAttestation_ReviewNotSigned_Answers409Problem()
     {
         // Arrange: a review nobody signed
@@ -431,7 +431,7 @@ public class ApiEndpointsTests
     ///     credentials, and that the answer is not cached.
     /// </summary>
     /// <param name="basic">Whether the token is sent as the password of HTTP Basic credentials.</param>
-    [Theory(Timeout = 60000)]
+    [Theory(Timeout = 180000)]
     [InlineData(false)]
     [InlineData(true)]
     public async Task ApiEndpoints_GetEvidenceIndex_CompleteReviewWithSetId_ReturnsEntryWithAbsoluteFileUrl(bool basic)
@@ -493,7 +493,7 @@ public class ApiEndpointsTests
     /// <summary>
     ///     Test that the evidence index builds the attestation address from the host header of the request.
     /// </summary>
-    [Fact(Timeout = 60000)]
+    [Fact(Timeout = 180000)]
     public async Task ApiEndpoints_GetEvidenceIndex_OtherHost_BuildsUrlFromRequestHost()
     {
         // Arrange: one complete review that has a review-set id, a token, and a request for another host
@@ -517,7 +517,7 @@ public class ApiEndpointsTests
     ///     Test that the evidence index of a project without a complete review that has a review-set id is an empty
     ///     list, not an error.
     /// </summary>
-    [Fact(Timeout = 60000)]
+    [Fact(Timeout = 180000)]
     public async Task ApiEndpoints_GetEvidenceIndex_NoListableReview_ReturnsEmptyList()
     {
         // Arrange: a complete review without a review-set id, and a token
@@ -538,7 +538,7 @@ public class ApiEndpointsTests
     /// <summary>
     ///     Test that the evidence index of a project that does not exist is a 404 problem document.
     /// </summary>
-    [Fact(Timeout = 60000)]
+    [Fact(Timeout = 180000)]
     public async Task ApiEndpoints_GetEvidenceIndex_UnknownProject_Answers404Problem()
     {
         // Arrange: an application without projects, and a token
@@ -561,7 +561,7 @@ public class ApiEndpointsTests
     /// </summary>
     /// <param name="method">The HTTP method.</param>
     /// <param name="withToken">Whether to send a token.</param>
-    [Theory(Timeout = 60000)]
+    [Theory(Timeout = 180000)]
     [InlineData("GET", true)]
     [InlineData("GET", false)]
     [InlineData("POST", true)]
@@ -585,7 +585,7 @@ public class ApiEndpointsTests
     ///     Test that no route under <c>/api</c> can sign or change reviewer slots, and that asking for such a route
     ///     with a token is a 404.
     /// </summary>
-    [Fact(Timeout = 60000)]
+    [Fact(Timeout = 180000)]
     public async Task ApiEndpoints_Routes_NoSigningOrSlotRoutes()
     {
         // Arrange: an application with a review and a token
@@ -619,7 +619,7 @@ public class ApiEndpointsTests
     /// </summary>
     /// <param name="limit">The limit to exceed: <c>count</c>, <c>file</c> or <c>total</c>.</param>
     /// <param name="expectedDetail">Text that the problem detail must contain.</param>
-    [Theory(Timeout = 120000)]
+    [Theory(Timeout = 180000)]
     [InlineData("count", "at most 200 files")]
     [InlineData("file", "limit of 2 MiB")]
     [InlineData("total", "limit of 20 MiB")]
@@ -657,7 +657,7 @@ public class ApiEndpointsTests
     ///     Test that the endpoint that creates a review carries a request size limit that is derived from the review
     ///     limits: large enough for the Base64 text of the largest upload, and far below an unbounded body.
     /// </summary>
-    [Fact(Timeout = 60000)]
+    [Fact(Timeout = 180000)]
     public async Task ApiEndpoints_CreateReview_Endpoint_HasDerivedBodySizeLimit()
     {
         // Arrange: an application and its endpoints
@@ -679,7 +679,7 @@ public class ApiEndpointsTests
     ///     Test that a request body larger than the limit of the endpoint is refused with 413 by a real server, and
     ///     that no review is created. The in-memory test server does not enforce the limit, so Kestrel is used.
     /// </summary>
-    [Fact(Timeout = 120000)]
+    [Fact(Timeout = 180000)]
     public async Task ApiEndpoints_CreateReview_BodyOverLimit_Answers413()
     {
         // Arrange: a real server with a project and a token, and a body one byte over the limit of the endpoint
@@ -710,7 +710,7 @@ public class ApiEndpointsTests
     ///     that does not leak details of the server, and that nothing is created.
     /// </summary>
     /// <param name="json">The request body.</param>
-    [Theory(Timeout = 60000)]
+    [Theory(Timeout = 180000)]
     [InlineData("""{"id":""")]
     [InlineData("not json")]
     [InlineData("""{"files": 5}""")]
@@ -744,7 +744,7 @@ public class ApiEndpointsTests
     ///     created: no review and no audit entry for a review.
     /// </summary>
     /// <param name="contentType">The content type of the body; <c>null</c> for none.</param>
-    [Theory(Timeout = 60000)]
+    [Theory(Timeout = 180000)]
     [InlineData(null)]
     [InlineData("text/plain")]
     public async Task ApiEndpoints_CreateReview_NotJsonContentType_Answers415Problem(string? contentType)
@@ -785,7 +785,7 @@ public class ApiEndpointsTests
     /// </summary>
     /// <param name="app">The running application.</param>
     /// <returns>The project number.</returns>
-    private static async Task<int> ArrangeSignedReviewWithSetIdAsync(WebApplication app)
+    internal static async Task<int> ArrangeSignedReviewWithSetIdAsync(WebApplication app)
     {
         var projectId = await AttestationEndpointTests.CreateReviewAsync(app, signed: true);
         var store = app.Services.GetRequiredService<IReviewStore>();

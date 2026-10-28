@@ -99,6 +99,22 @@ sections:
           - UserStore_AddAsync_User_RoundTripsEveryField
           - UserStore_AddToProjectAsync_StoresAccountMembershipAndOneEventTogether
 
+      - id: ReviewCenter-DbContext-EvidenceSettings
+        title: >-
+          The ReviewCenterDbContext class shall map the evidence settings of a project to seven boolean columns of
+          the project table, whose defaults are the default settings (anonymous index and anonymous attestations
+          off, and the five content switches on), so that a project that was not given other settings reads back
+          with the defaults and a changed setting is stored in its own column. The schema is created from the
+          model without a migration, so a database that was created before the columns existed has to be recreated.
+        justification: |
+          The settings belong to exactly one project and are read with it, so they are columns of the project, not
+          a table of their own. Defaults that make the evidence private and complete mean that nothing is opened or
+          left out until a project administrator decides so. The schema is created from the model and not
+          migrated while the product is not released, so development databases are recreated.
+        tests:
+          - ReviewStore_AddProjectAsync_NewProject_HasDefaultEvidenceSettings
+          - ReviewStore_UpdateEvidenceSettingsAsync_Change_IsPersistedAndAudited
+
       - id: ReviewCenter-DbContext-Signatures
         title: >-
           The ReviewCenterDbContext class shall map reviewer slots and signatures to tables in which a slot and

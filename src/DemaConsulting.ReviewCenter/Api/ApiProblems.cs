@@ -135,6 +135,17 @@ internal static class ApiProblems
     }
 
     /// <summary>
+    ///     Builds the actor of an API call that may also come without a token.
+    /// </summary>
+    /// <param name="principal">The principal of the request. Must not be null.</param>
+    /// <returns>The token actor, or <c>null</c> when nobody was authenticated (an anonymous request).</returns>
+    public static Actor? ActorOrAnonymous(ClaimsPrincipal principal)
+    {
+        ArgumentNullException.ThrowIfNull(principal);
+        return principal.Identity?.IsAuthenticated == true ? ActorOf(principal) : null;
+    }
+
+    /// <summary>
     ///     Gives the short title of a status.
     /// </summary>
     /// <param name="status">The HTTP status.</param>

@@ -11,24 +11,29 @@ sections:
       - id: ReviewCenter-AttestationRenderer-Review
         title: >-
           The AttestationRenderer class shall show the identity of the review, its project, its revisions or the fact
-          that its files were uploaded, its content fingerprint, and a list of its files with their status.
+          that its files were uploaded, its content fingerprint, and a list of its files with their status, as far as
+          the evidence settings of the project include the revisions and the files; the fingerprint and the number of
+          files are always shown.
         justification: |
           A reader of the attestation must be able to tell which review and which content it is about, and to compare
-          the fingerprint with the one the tool shows, without opening the tool.
+          the fingerprint with the one the tool shows, without opening the tool. A project may keep the names of its
+          files out of the document, and the fingerprint still identifies the content.
         tests:
           - AttestationRenderer_Render_Document_ShowsReviewIdentityRevisionsAndFingerprint
           - AttestationRenderer_Render_UploadedReview_SaysFilesWereUploaded
           - AttestationRenderer_Render_Document_ListsFilesWithStatus
+          - AttestationRenderer_Render_FilesOff_OmitsFileListButKeepsFingerprint
 
       - id: ReviewCenter-AttestationRenderer-Findings
         title: >-
           The AttestationRenderer class shall show every checklist answer with its comment in full, never truncated, say
           so when the review has no checklist, and summarize the comment threads with exact counts of open and
-          resolved threads.
+          resolved threads, as far as the evidence settings of the project include the checklist wording and the
+          threads.
         justification: |
           The approval is based on what the reviewers found and answered. An attestation that left it out would prove
           that someone signed, but not what they were signing, and a comment that is cut is a reviewer answer that the
-          signed evidence no longer shows.
+          signed evidence no longer shows. The settings leave out whole parts, never a part of a part.
         tests:
           - AttestationRenderer_Render_Document_ShowsChecklistAnswersAndComments
           - AttestationRenderer_Render_LongChecklistComment_IsPrintedInFull
@@ -52,15 +57,50 @@ sections:
       - id: ReviewCenter-AttestationRenderer-SignOffs
         title: >-
           The AttestationRenderer class shall show every reviewer slot with the signer, the time of the signature, and
-          the digest the signature covers, the head of the audit trail, and the version of the tool.
+          the digest the signature covers, the head of the audit trail, and the version of the tool, with the names
+          that the document holds.
         justification: |
           The in-record signatures are the evidence of who approved. The audit head ties the document to the audit
-          trail, and the tool version tells a reader which rules produced it.
+          trail, and the tool version tells a reader which rules produced it. The names are already final text when
+          they reach the renderer, so a project that keeps the names out of its PDFs is served without the renderer
+          knowing about it (see the AttestationService labels).
         tests:
           - AttestationRenderer_Render_Document_ShowsSlotsSignersTimestampsAndDigests
           - AttestationRenderer_Render_Document_ShowsSlotDigestOnOneLine
           - AttestationRenderer_Render_Document_ShowsAuditHeadAndToolVersion
+          - AttestationRenderer_Render_EverythingOff_KeepsTheAlwaysIncludedParts
 
+      - id: ReviewCenter-AttestationRenderer-ContentScope
+        title: >-
+          The AttestationRenderer class shall always print, directly after the review section, a Content scope section
+          that states which sections the evidence settings left out, whether the request was anonymous, and the
+          settings that were in effect when the document was made, and shall say that nothing is left out when every
+          switch is on.
+        justification: |
+          A reader of a reduced document must be able to tell a section that was left out by the project from a
+          section that never existed. The statement is part of the signed bytes, so it cannot be removed afterwards.
+        tests:
+          - AttestationRenderer_Render_DefaultSettings_ContentScopeSaysNothingIsLeftOut
+          - AttestationRenderer_Render_AnonymousRequest_ContentScopeSaysSo
+          - AttestationRenderer_Render_EverythingOff_KeepsTheAlwaysIncludedParts
+
+      - id: ReviewCenter-AttestationRenderer-ContentSwitches
+        title: >-
+          The AttestationRenderer class shall, for a switch that is off in the evidence settings, leave out the whole
+          thread section, replace the repository and revisions by a statement that the git context is omitted, leave
+          out the text of the checklist questions and print the identifiers, outcomes and justifications only, or
+          leave out the list of files while the file count and the fingerprint stay, and shall keep the parts that
+          are always included.
+        justification: |
+          A project decides how much of its review may leave the server. Each switch must remove what it says and no
+          more, and what proves the approval, the outcomes, the signatures, the fingerprint and the audit head, must
+          stay.
+        tests:
+          - AttestationRenderer_Render_ThreadsOff_OmitsThreadsAndSaysSo
+          - AttestationRenderer_Render_FilesOff_OmitsFileListButKeepsFingerprint
+          - AttestationRenderer_Render_ChecklistWordingOff_PrintsIdsOutcomesAndJustificationsOnly
+          - AttestationRenderer_Render_GitContextOff_OmitsRepositoryAndRevisions
+          - AttestationRenderer_Render_EverythingOff_KeepsTheAlwaysIncludedParts
       - id: ReviewCenter-AttestationRenderer-KeyStatement
         title: >-
           The AttestationRenderer class shall name the subject and the issuer of the signing certificate and print no

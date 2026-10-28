@@ -8,7 +8,8 @@
 # - Subsystem requirements describe the externally visible behavior of a script that calls the API with a personal
 #   access token: reading projects and reviews, creating review drafts, downloading attestations, the evidence index
 #   for ReviewMark, the document that
-#   describes the API, and the limits on what a token can do
+#   describes the API, the limits on what a token can do, and the evidence that a project chooses to publish
+#   without credentials
 
 sections:
   - title: Api Subsystem Requirements
@@ -62,7 +63,8 @@ sections:
         title: >-
           The Api subsystem shall let ReviewMark read the evidence index of a project and follow the file address of an
           entry with a personal access token that it sends as the password of HTTP Basic credentials, and shall refuse
-          the token once it is revoked.
+          the token once it is revoked. A project may also open the index and its files to a client without credentials
+          (see AnonymousEvidence).
         justification: |
           ReviewMark can send only HTTP Basic credentials. Accepting the token that way, with the same checks and the
           same refusal as a bearer token, lets a pipeline verify the reviews against ReviewCenter without a second
@@ -90,8 +92,8 @@ sections:
       - id: ReviewCenter-Api-Document
         title: >-
           The Api subsystem shall describe the API in an OpenAPI document, served without a token, that names the
-          bearer scheme, is the same for every server start, and matches the document that is kept with the
-          documentation.
+          bearer scheme, marks the two operations that can be called without credentials, is the same for every server
+          start, and matches the document that is kept with the documentation.
         justification: |
           A client generator and a person reading the documentation both need the contract of the API. A document
           that is committed and compared with the running server is kept from drifting away from the behavior.
@@ -109,7 +111,8 @@ sections:
           token being neither a member of the project nor a system administrator, with the 404 that it answers for a
           project that does not exist, with the same body, on every route of a project and for a bearer token as well as
           for HTTP Basic credentials, list only the projects the owner may see, serve a member and a system
-          administrator, and stop serving a token for a project at once when its owner is removed from it.
+          administrator, and stop serving a token for a project at once when its owner is removed from it. A request
+          without credentials is decided by the project (see AnonymousEvidence).
         justification: |
           A project may hold confidential work, and a script that holds a token must see only what its owner sees. An
           answer that differed between a project the owner may not see and a project that does not exist would tell
@@ -124,3 +127,27 @@ sections:
           - ApiProjectAccess_EveryProjectRoute_MemberAndSystemAdmin_AreNotRefused
           - ApiProjectAccess_ListProjects_ShowsOnlyMemberProjectsExceptToSystemAdmins
           - ApiProjectAccess_Token_OwnerRemovedFromProject_Gets404AtOnce
+
+      - id: ReviewCenter-Api-AnonymousEvidence
+        title: >-
+          The Api subsystem shall let a project open its evidence index and its attestation PDFs to a client without
+          credentials, each by its own setting that is off by default, and no other route; shall refuse a client
+          without credentials as it refuses a missing token when the setting is off, whether or not the project
+          exists; shall never treat a request with a wrong token as a request without credentials; shall limit such
+          a client by address; shall record such a release of an attestation in the audit trail with the actor
+          anonymous; and shall describe the two routes in the OpenAPI document as callable without credentials.
+        justification: |
+          Evidence is useful when a pipeline or an auditor can read it without an account, but whether a project
+          publishes it is the decision of the project. The exception must be narrow, switched off by default, no
+          different for a project that does not exist, limited by address, and visible in the audit trail and in the
+          contract of the API.
+        children:
+          - ReviewCenter-ApiTokenAuthentication-AnonymousEvidence
+          - ReviewCenter-ApiTokenAuthentication-AnonymousRateLimit
+          - ReviewCenter-ApiEndpoints-OpenRoutes
+          - ReviewCenter-ApiEndpoints-AnonymousLimit
+          - ReviewCenter-ApiDocument-Document
+        tests:
+          - AnonymousEvidenceAccess_Matrix_ServesOnlyWhoMay
+          - AnonymousEvidenceAccess_BothOn_ServesIndexEntryAndSignedPdfAndAuditsAnonymous
+          - AnonymousEvidenceAccess_TooManyAnonymousRequests_Answers429WithRetryAfter
