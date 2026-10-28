@@ -3,9 +3,10 @@
 ### Verification Approach
 
 The `Utilities` subsystem is verified by integration tests defined in
-`UtilitiesSubsystemTests.cs`. Each test exercises `PathHelpers` through realistic
-path-combination workflows to confirm that valid paths are resolved correctly, traversal attacks
-are rejected, and the resulting paths can be used for actual directory creation. `PathHelpers`
+`UtilitiesSubsystemTests.cs`. Each test exercises `PathHelpers` or `TemporaryDirectory` through
+realistic workflows to confirm that valid paths are resolved correctly, traversal attacks
+are rejected, the resulting paths can be used for actual directory creation, and a temporary
+directory with files in it is removed when it is disposed. `PathHelpers`
 has no dependencies on other tool units, so no mocking is required.
 
 ### Test Environment
@@ -19,8 +20,14 @@ N/A - standard test environment.
 - Path traversal patterns (e.g., `../`) cause `ArgumentException` to be thrown.
 - Absolute paths supplied as the relative argument cause `ArgumentException` to be thrown.
 - Paths produced by `SafePathCombine` can be passed directly to `Directory.CreateDirectory`.
+- Files created through a `TemporaryDirectory`, including in nested folders, are gone after it is disposed.
 
 ### Test Scenarios
+
+**UtilitiesSubsystem_TemporaryDirectoryWorkflow_FilesCreated_AreRemovedOnDispose**: Files are
+created in nested folders through `TemporaryDirectory.GetFilePath` and written; after the
+instance is disposed neither the files nor the directory exist. This scenario is tested by
+`UtilitiesSubsystem_TemporaryDirectoryWorkflow_FilesCreated_AreRemovedOnDispose`.
 
 **UtilitiesSubsystem_PathResolutionWorkflow_ValidPaths_ResolvesCorrectly**: Multiple valid
 relative path arguments are combined with a base path using `PathHelpers.SafePathCombine`; all

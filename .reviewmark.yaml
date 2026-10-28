@@ -143,6 +143,8 @@ reviews:
       - "docs/design/review-center/self-test.md"
       - "docs/verification/review-center/self-test.md"
       - "test/**/SelfTest/SelfTestSubsystemTests.cs"
+      - "test/**/SelfTest/RealValidationRun.cs"
+      - "test/**/SelfTest/FastValidationChecks.cs"
 
   - id: ReviewCenter-SelfTest-Validation
     title: Review of ReviewCenter Validation unit implementation
@@ -156,7 +158,22 @@ reviews:
       - "docs/design/review-center/self-test/validation.md"
       - "docs/verification/review-center/self-test/validation.md"
       - "src/**/SelfTest/Validation.cs"
+      - "src/**/SelfTest/ValidationRunner.cs"
       - "test/**/SelfTest/ValidationTests.cs"
+
+  - id: ReviewCenter-SelfTest-ValidationChecks
+    title: Review of ReviewCenter self-validation checks implementation
+    context:
+      - docs/design/review-center.md
+      - docs/reqstream/review-center.yaml
+      - docs/design/review-center/self-test.md
+      - docs/reqstream/review-center/self-test.yaml
+    paths:
+      - "docs/reqstream/review-center/self-test/validation-checks.yaml"
+      - "docs/design/review-center/self-test/validation-checks.md"
+      - "docs/verification/review-center/self-test/validation-checks.md"
+      - "src/**/SelfTest/Checks/*.cs"
+      - "test/**/SelfTest/ValidationChecksTests.cs"
 
   # ReviewCenter - Utilities
   - id: ReviewCenter-Utilities
@@ -183,6 +200,20 @@ reviews:
       - "docs/verification/review-center/utilities/path-helpers.md"
       - "src/**/Utilities/PathHelpers.cs"
       - "test/**/Utilities/PathHelpersTests.cs"
+
+  - id: ReviewCenter-Utilities-TemporaryDirectory
+    title: Review of ReviewCenter TemporaryDirectory unit implementation
+    context:
+      - docs/design/review-center.md
+      - docs/reqstream/review-center.yaml
+      - docs/design/review-center/utilities.md
+      - docs/reqstream/review-center/utilities.yaml
+    paths:
+      - "docs/reqstream/review-center/utilities/temporary-directory.yaml"
+      - "docs/design/review-center/utilities/temporary-directory.md"
+      - "docs/verification/review-center/utilities/temporary-directory.md"
+      - "src/**/Utilities/TemporaryDirectory.cs"
+      - "test/**/Utilities/TemporaryDirectoryTests.cs"
 
   # ReviewCenter - Hosting
   - id: ReviewCenter-Hosting

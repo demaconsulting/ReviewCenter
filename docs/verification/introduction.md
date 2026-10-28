@@ -91,8 +91,10 @@ This document covers the verification design for the following software items:
     - **DatabaseSetup** — provider selection, connection resolution, and database creation
   - **SelfTest** subsystem
     - **Validation** — self-validation test runner
+    - **ValidationChecks** — the checks the runner runs, from git to the web host
   - **Utilities** subsystem
     - **PathHelpers** — safe path combination utilities
+    - **TemporaryDirectory** — uniquely named temporary directory that is removed on disposal
 - **ReviewCenterPuppet** — a separate development-tool system with its own system and unit verification:
   - **PuppetProgram** — command-line parsing, start, and result printing
   - **ControlChannel** — control file and loopback protocol

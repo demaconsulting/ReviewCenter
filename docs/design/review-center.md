@@ -17,9 +17,11 @@ flowchart TD
     end
     subgraph SelfTest
         Validation
+        ValidationChecks
     end
     subgraph Utilities
         PathHelpers
+        TemporaryDirectory
     end
     subgraph Hosting
         ServerHost
@@ -102,8 +104,10 @@ flowchart TD
     Program --> ServerHost
     Program --> UserCommand
     Program --> AuditCommand
-    Validation --> Program
-    Validation --> PathHelpers
+    Validation --> ValidationChecks
+    ValidationChecks --> TemporaryDirectory
+    ValidationChecks --> ServerHost
+    TemporaryDirectory --> PathHelpers
     Context --> UserService
     ServerHost --> Context
     ServerHost --> App
@@ -260,8 +264,9 @@ flowchart TD
 subsystem when the `serve` verb is passed, dispatches to `UserCommand` when the `user add` verb is passed, dispatches
 to `AuditCommand` when the `audit verify` verb is passed, and
 returns the exit code from `Context`.
-`Validation` calls `Program.Run` recursively to exercise the tool during self-testing, and
-uses `PathHelpers` to construct safe temporary file paths.
+`Validation` lists and runs the `ValidationChecks`, which call the production services (git, the review workflow,
+the fingerprint, the audit chain, the attestation signer and the web host through `ServerHost`) over temporary
+data, and each check keeps its files in a `TemporaryDirectory`, which uses `PathHelpers` to construct safe paths.
 
 `ServerHost` builds and runs the ASP.NET Core web application: it reads the listen URL and
 the silent option from `Context`, configures structured logging, registers the sign-in of the `Identity` subsystem,

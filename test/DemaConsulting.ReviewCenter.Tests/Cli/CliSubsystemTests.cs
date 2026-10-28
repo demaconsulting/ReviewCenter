@@ -190,28 +190,15 @@ public class CliSubsystemTests
     [Fact]
     public void CliSubsystem_ValidateFlow_ContextAndProgram_RunsValidationAndExits()
     {
-        // Arrange: command line arguments with validate flag; capture console output
-        var args = new[] { "--validate" };
-        var originalOut = Console.Out;
-        using var capturedOut = new StringWriter();
+        // Arrange: the shared real run: command line --validate through Context.Create and Program.Run
 
-        try
-        {
-            Console.SetOut(capturedOut);
+        // Act: read the outcome of the real run
+        var run = RealValidationRun.Result;
 
-            // Act: create context and run program logic
-            using var context = Context.Create(args);
-            Program.Run(context);
-
-            // Assert: validate flag is parsed, summary is output, and exit code is success
-            Assert.True(context.Validate, "Context should parse validate flag");
-            Assert.Equal(0, context.ExitCode);
-            Assert.Contains("Total Tests:", capturedOut.ToString());
-        }
-        finally
-        {
-            Console.SetOut(originalOut);
-        }
+        // Assert: validate flag is parsed, summary is output, and exit code is success
+        Assert.True(run.Validate, "Context should parse validate flag");
+        Assert.Equal(0, run.ExitCode);
+        Assert.Contains("Total Tests:", run.Log);
     }
 
     /// <summary>
@@ -255,30 +242,14 @@ public class CliSubsystemTests
     [Fact]
     public void CliSubsystem_ResultsFlow_ContextAndProgram_WritesResultsFile()
     {
-        // Arrange: temporary results file path and validation command with results output
-        var tempDir = Path.GetTempPath();
-        var resultsFile = Path.Combine(tempDir, $"cli_test_{Guid.NewGuid()}.trx");
-        var args = new[] { "--validate", "--silent", "--results", resultsFile };
+        // Arrange: the shared real run, which asked for a TRX results file with --results
 
-        try
-        {
-            // Act: create context and run program logic
-            using var context = Context.Create(args);
-            Program.Run(context);
+        // Act: read the outcome of the real run
+        var run = RealValidationRun.Result;
 
-            // Assert: results flag is parsed, validation runs, and results file is written
-            Assert.Equal(resultsFile, context.ResultsFile);
-            Assert.Equal(0, context.ExitCode);
-            Assert.True(File.Exists(resultsFile), "Results file should be written to specified path");
-        }
-        finally
-        {
-            // Cleanup
-            if (File.Exists(resultsFile))
-            {
-                File.Delete(resultsFile);
-            }
-        }
+        // Assert: validation ran with a successful exit code and the results file was written
+        Assert.Equal(0, run.ExitCode);
+        Assert.Contains("<TestRun", run.Trx);
     }
 
     /// <summary>
@@ -381,32 +352,38 @@ public class CliSubsystemTests
     ///     Test that Context and Program work together to handle the --result legacy alias for results.
     /// </summary>
     [Fact]
-    public void CliSubsystem_ResultAliasFlow_ContextAndProgram_WritesResultsFile()
+    public void CliSubsystem_ResultAliasFlow_ContextAndProgram_ParsesResultsFile()
     {
-        // Arrange: temporary results file path and validation command with legacy --result alias
-        var tempDir = Path.GetTempPath();
-        var resultsFile = Path.Combine(tempDir, $"cli_test_{Guid.NewGuid()}.trx");
+        // Arrange: a results path given with the legacy --result alias; the alias is a pure parsing concern, and
+        // the real process run of the integration tests writes its results file through it
+        var resultsFile = Path.Combine(Path.GetTempPath(), $"cli_test_{Guid.NewGuid()}.trx");
         var args = new[] { "--validate", "--silent", "--result", resultsFile };
 
-        try
-        {
-            // Act: create context and run program logic
-            using var context = Context.Create(args);
-            Program.Run(context);
+        // Act: create context from the command line
+        using var context = Context.Create(args);
 
-            // Assert: legacy --result alias is parsed, validation runs, and results file is written
-            Assert.Equal(resultsFile, context.ResultsFile);
-            Assert.Equal(0, context.ExitCode);
-            Assert.True(File.Exists(resultsFile), "Results file should be written to specified path");
-        }
-        finally
-        {
-            // Cleanup
-            if (File.Exists(resultsFile))
-            {
-                File.Delete(resultsFile);
-            }
-        }
+        // Assert: the legacy alias is parsed as the results file and nothing is written by parsing
+        Assert.Equal(resultsFile, context.ResultsFile);
+        Assert.True(context.Validate);
+        Assert.Equal(0, context.ExitCode);
+        Assert.False(File.Exists(resultsFile), "Parsing must not write the results file");
+    }
+
+    /// <summary>
+    ///     Test that Context and Program work together to handle the --check-config option of a validation run.
+    /// </summary>
+    [Fact]
+    public void CliSubsystem_CheckConfigFlow_ContextAndProgram_RequiresValidate()
+    {
+        // Arrange: the opt-in option with and without --validate
+
+        // Act: create the contexts from the command lines
+        using var withValidate = Context.Create(["--validate", "--check-config", "--silent"]);
+        var withoutValidate = Assert.Throws<ArgumentException>(() => Context.Create(["--check-config"]));
+
+        // Assert: the option is parsed with --validate and rejected without it
+        Assert.True(withValidate.CheckConfig);
+        Assert.Contains("--check-config requires --validate", withoutValidate.Message);
     }
 
     /// <summary>
@@ -415,35 +392,15 @@ public class CliSubsystemTests
     [Fact]
     public void CliSubsystem_DepthFlow_ContextAndProgram_AdjustsHeadingDepth()
     {
-        // Arrange: command line with --validate, --depth 2, and a log file to capture output
-        var tempDir = Path.GetTempPath();
-        var logFile = Path.Combine(tempDir, $"cli_test_{Guid.NewGuid()}.log");
-        var args = new[] { "--validate", "--silent", "--depth", "2", "--log", logFile };
+        // Arrange: the shared real run, which asked for heading depth 3 and a log file
 
-        try
-        {
-            // Act: create context and run program logic
-            using (var context = Context.Create(args))
-            {
-                Program.Run(context);
+        // Act: read the outcome of the real run
+        var run = RealValidationRun.Result;
 
-                // Assert: depth is parsed correctly
-                Assert.Equal(2, context.HeadingDepth);
-                Assert.Equal(0, context.ExitCode);
-            }
-
-            // Assert: log contains level-2 heading
-            var logContent = File.ReadAllText(logFile);
-            Assert.Contains("## DEMA Consulting", logContent);
-        }
-        finally
-        {
-            // Cleanup
-            if (File.Exists(logFile))
-            {
-                File.Delete(logFile);
-            }
-        }
+        // Assert: depth is parsed correctly and the log contains the level-3 heading
+        Assert.Equal(RealValidationRun.HeadingDepth, run.HeadingDepthParsed);
+        Assert.Equal(0, run.ExitCode);
+        Assert.Contains("### DEMA Consulting", run.Log);
     }
 
     /// <summary>

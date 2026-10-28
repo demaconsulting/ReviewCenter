@@ -58,6 +58,15 @@ internal sealed class Context : IDisposable
     public bool Validate { get; private init; }
 
     /// <summary>
+    ///     Gets a value indicating whether <c>--check-config</c> was specified.
+    /// </summary>
+    /// <remarks>
+    ///     Only meaningful together with <see cref="Validate"/>; <see cref="Create"/> rejects the flag
+    ///     otherwise. It opts the self-validation in to one extra, read-only check of the configured database.
+    /// </remarks>
+    public bool CheckConfig { get; private init; }
+
+    /// <summary>
     ///     Gets the validation results file path.
     /// </summary>
     public string? ResultsFile { get; private init; }
@@ -152,6 +161,7 @@ internal sealed class Context : IDisposable
             Help = parser.Help,
             Silent = parser.Silent,
             Validate = parser.Validate,
+            CheckConfig = parser.CheckConfig,
             ResultsFile = parser.ResultsFile,
             HeadingDepth = parser.HeadingDepth,
             Serve = parser.Serve,
@@ -219,6 +229,11 @@ internal sealed class Context : IDisposable
         public bool Validate { get; private set; }
 
         /// <summary>
+        ///     Gets a value indicating whether the <c>--check-config</c> flag was specified.
+        /// </summary>
+        public bool CheckConfig { get; private set; }
+
+        /// <summary>
         ///     Gets the log file path.
         /// </summary>
         public string? LogFile { get; private set; }
@@ -274,7 +289,8 @@ internal sealed class Context : IDisposable
         /// <param name="args">Command-line arguments.</param>
         /// <exception cref="ArgumentException">
         ///     Thrown when an argument is unknown or malformed, when <c>--urls</c> is given
-        ///     without the <c>serve</c> verb, or when the <c>user add</c> options and the verb do not match.
+        ///     without the <c>serve</c> verb, when <c>--check-config</c> is given without <c>--validate</c>,
+        ///     or when the <c>user add</c> options and the verb do not match.
         /// </exception>
         public void ParseArguments(string[] args)
         {
@@ -293,6 +309,13 @@ internal sealed class Context : IDisposable
             if (Urls != null && !Serve)
             {
                 throw new ArgumentException("--urls requires the serve verb", nameof(args));
+            }
+
+            // --check-config adds a check to the self-validation run, so without --validate it would do
+            // nothing; reject it for the same typo-protection reason
+            if (CheckConfig && !Validate)
+            {
+                throw new ArgumentException("--check-config requires --validate", nameof(args));
             }
 
             // The user options belong to 'user add' for the same reason, and 'user add' cannot work without
@@ -336,6 +359,10 @@ internal sealed class Context : IDisposable
 
                 case "--validate":
                     Validate = true;
+                    return index;
+
+                case "--check-config":
+                    CheckConfig = true;
                     return index;
 
                 case "--log":

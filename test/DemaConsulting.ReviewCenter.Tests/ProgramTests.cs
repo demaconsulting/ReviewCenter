@@ -95,21 +95,37 @@ public class ProgramTests
     [Fact]
     public void Program_Run_WithValidateFlag_RunsValidation()
     {
-        // Arrange: setup test conditions
+        // Arrange: the shared real run, which went through Program.Run with --validate (see RealValidationRun)
+
+        // Act: read the outcome of the real run
+        var run = RealValidationRun.Result;
+
+        // Assert: the validation ran its checks, printed the summary and succeeded
+        Assert.Contains("Total Tests: 8", run.Log);
+        Assert.Equal(0, run.ExitCode);
+    }
+
+    /// <summary>
+    ///     Test that the help text documents the --check-config option next to --validate.
+    /// </summary>
+    [Fact]
+    public void Program_Run_WithHelpFlag_ListsCheckConfigOption()
+    {
+        // Arrange: capture console output
         var originalOut = Console.Out;
         try
         {
             using var outWriter = new StringWriter();
             Console.SetOut(outWriter);
-            using var context = Context.Create(["--validate"]);
+            using var context = Context.Create(["--help"]);
 
-            // Act: execute the operation being tested
+            // Act: print help
             Program.Run(context);
 
-            // Assert: verify expected behavior
+            // Assert: the option and its read-only purpose are documented
             var output = outWriter.ToString();
-            Assert.Contains("Total Tests:", output);
-            Assert.Equal(0, context.ExitCode);
+            Assert.Contains("--check-config", output);
+            Assert.Contains("--validate", output);
         }
         finally
         {

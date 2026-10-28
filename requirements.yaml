@@ -24,8 +24,10 @@ includes:
   - docs/reqstream/review-center/cli/context.yaml
   - docs/reqstream/review-center/self-test.yaml
   - docs/reqstream/review-center/self-test/validation.yaml
+  - docs/reqstream/review-center/self-test/validation-checks.yaml
   - docs/reqstream/review-center/utilities.yaml
   - docs/reqstream/review-center/utilities/path-helpers.yaml
+  - docs/reqstream/review-center/utilities/temporary-directory.yaml
   - docs/reqstream/review-center/content-sources.yaml
   - docs/reqstream/review-center/content-sources/git-runner.yaml
   - docs/reqstream/review-center/content-sources/git-source.yaml

@@ -18,17 +18,65 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
+using System.Text.RegularExpressions;
 using DemaConsulting.ReviewCenter.Cli;
 using DemaConsulting.ReviewCenter.SelfTest;
 
 namespace DemaConsulting.ReviewCenter.Tests;
 
 /// <summary>
-///     Unit tests for the Validation class.
+///     Unit tests for the Validation class. The report, the summary and the results files are tested with fast
+///     stand-in checks; the real checks run once in the shared real run (see <see cref="RealValidationRun"/>).
 /// </summary>
 [Collection("Sequential")]
 public class ValidationTests
 {
+    /// <summary>
+    ///     The text a run left behind.
+    /// </summary>
+    /// <param name="ExitCode">The exit code of the run.</param>
+    /// <param name="Log">The report, as written to the log file.</param>
+    /// <param name="Results">The text of the results file, or an empty string when none was requested.</param>
+    private sealed record RunOutput(int ExitCode, string Log, string Results);
+
+    /// <summary>
+    ///     Runs the supplied checks through <c>Validation.Run</c> in silent mode and reads the outputs back.
+    /// </summary>
+    /// <param name="checks">The checks to run.</param>
+    /// <param name="resultsExtension">The extension of the results file to request, or <c>null</c> for none.</param>
+    /// <returns>The exit code, the report and the results file text.</returns>
+    private static RunOutput Run(IReadOnlyList<ValidationCheck> checks, string? resultsExtension = null)
+    {
+        var folder = Path.Combine(Path.GetTempPath(), $"validation_test_{Guid.NewGuid():N}");
+        Directory.CreateDirectory(folder);
+        try
+        {
+            var logFile = Path.Combine(folder, "report.log");
+            var resultsFile = Path.Combine(folder, "results" + resultsExtension);
+            var args = new List<string> { "--silent", "--log", logFile };
+            if (resultsExtension != null)
+            {
+                args.AddRange(["--results", resultsFile]);
+            }
+
+            int exitCode;
+            using (var context = Context.Create([.. args]))
+            {
+                Validation.Run(context, checks);
+                exitCode = context.ExitCode;
+            }
+
+            return new RunOutput(
+                exitCode,
+                File.ReadAllText(logFile),
+                resultsExtension != null && File.Exists(resultsFile) ? File.ReadAllText(resultsFile) : string.Empty);
+        }
+        finally
+        {
+            Directory.Delete(folder, recursive: true);
+        }
+    }
+
     /// <summary>
     ///     Test that Run throws ArgumentNullException when context is null.
     /// </summary>
@@ -46,34 +94,39 @@ public class ValidationTests
     }
 
     /// <summary>
-    ///     Test that Run prints a summary containing total, passed, and failed counts.
+    ///     Test that Run throws ArgumentNullException when the check list is null.
+    /// </summary>
+    [Fact]
+    public void Validation_Run_NullChecks_ThrowsArgumentNullException()
+    {
+        // Arrange: a silent context
+        using var context = Context.Create(["--silent"]);
+
+        // Act: invoke Run with a null check list
+        var exception = Record.Exception(() => Validation.Run(context, null!));
+
+        // Assert: verify ArgumentNullException is thrown
+        Assert.IsType<ArgumentNullException>(exception);
+    }
+
+    /// <summary>
+    ///     Test that Run prints a summary containing total, passed, skipped, failed counts and the total time.
     /// </summary>
     [Fact]
     public void Validation_Run_WithSilentContext_PrintsSummary()
     {
-        // Arrange: setup unique log file path to capture silent context output
-        var logFile = Path.Combine(Path.GetTempPath(), $"validation_test_{Guid.NewGuid()}.log");
-        try
-        {
-            using (var context = Context.Create(["--silent", "--log", logFile]))
-            {
-                // Act: run validation with silent context and log file
-                Validation.Run(context);
-            }
+        // Arrange: one passing and one skipped check
+        var checks = new[] { FastValidationChecks.Passing(), FastValidationChecks.Skipped() };
 
-            // Assert: verify summary lines are written to log file
-            var logContent = File.ReadAllText(logFile);
-            Assert.Contains("Total Tests:", logContent);
-            Assert.Contains("Passed:", logContent);
-            Assert.Contains("Failed:", logContent);
-        }
-        finally
-        {
-            if (File.Exists(logFile))
-            {
-                File.Delete(logFile);
-            }
-        }
+        // Act: run validation with silent context and a log file
+        var output = Run(checks);
+
+        // Assert: verify summary lines are written to the log file
+        Assert.Contains("Total Tests: 2", output.Log);
+        Assert.Contains("Passed: 1", output.Log);
+        Assert.Contains("Skipped: 1", output.Log);
+        Assert.Contains("Failed: 0", output.Log);
+        Assert.Matches(@"Total Time: \d+\.\d s", output.Log);
     }
 
     /// <summary>
@@ -82,14 +135,14 @@ public class ValidationTests
     [Fact]
     public void Validation_Run_WithSilentContext_ExitCodeIsZero()
     {
-        // Arrange: create silent context for validation run
-        using var context = Context.Create(["--silent"]);
+        // Arrange: checks that all pass
+        var checks = new[] { FastValidationChecks.Passing("ReviewCenter_One"), FastValidationChecks.Passing("ReviewCenter_Two") };
 
-        // Act: run validation with silent context
-        Validation.Run(context);
+        // Act: run validation
+        var output = Run(checks);
 
         // Assert: verify exit code is zero indicating successful validation
-        Assert.Equal(0, context.ExitCode);
+        Assert.Equal(0, output.ExitCode);
     }
 
     /// <summary>
@@ -98,27 +151,16 @@ public class ValidationTests
     [Fact]
     public void Validation_Run_WithTrxResultsFile_WritesTrxFile()
     {
-        // Arrange: setup TRX file path for test results output
-        var trxFile = Path.Combine(Path.GetTempPath(), $"validation_test_{Guid.NewGuid()}.trx");
-        try
-        {
-            using var context = Context.Create(["--silent", "--results", trxFile]);
+        // Arrange: a passing check named like a real one
+        var checks = new[] { FastValidationChecks.Passing("ReviewCenter_Fast") };
 
-            // Act: run validation with TRX results output
-            Validation.Run(context);
+        // Act: run validation with TRX results output
+        var output = Run(checks, ".trx");
 
-            // Assert: verify TRX file is created with expected content
-            Assert.True(File.Exists(trxFile));
-            var content = File.ReadAllText(trxFile);
-            Assert.Contains("<TestRun", content);
-        }
-        finally
-        {
-            if (File.Exists(trxFile))
-            {
-                File.Delete(trxFile);
-            }
-        }
+        // Assert: verify the TRX file has the expected content, with the test name and outcome
+        Assert.Contains("<TestRun", output.Results);
+        Assert.Contains("ReviewCenter_Fast", output.Results);
+        Assert.Contains("Passed", output.Results);
     }
 
     /// <summary>
@@ -127,27 +169,15 @@ public class ValidationTests
     [Fact]
     public void Validation_Run_WithXmlResultsFile_WritesXmlFile()
     {
-        // Arrange: setup XML file path for JUnit results output
-        var xmlFile = Path.Combine(Path.GetTempPath(), $"validation_test_{Guid.NewGuid()}.xml");
-        try
-        {
-            using var context = Context.Create(["--silent", "--results", xmlFile]);
+        // Arrange: a passing check named like a real one
+        var checks = new[] { FastValidationChecks.Passing("ReviewCenter_Fast") };
 
-            // Act: run validation with XML results output  
-            Validation.Run(context);
+        // Act: run validation with XML results output
+        var output = Run(checks, ".xml");
 
-            // Assert: verify XML file is created with JUnit format content
-            Assert.True(File.Exists(xmlFile));
-            var content = File.ReadAllText(xmlFile);
-            Assert.Contains("<testsuites", content);
-        }
-        finally
-        {
-            if (File.Exists(xmlFile))
-            {
-                File.Delete(xmlFile);
-            }
-        }
+        // Assert: verify the XML file has JUnit format content with the test name
+        Assert.Contains("<testsuites", output.Results);
+        Assert.Contains("ReviewCenter_Fast", output.Results);
     }
 
     /// <summary>
@@ -156,38 +186,154 @@ public class ValidationTests
     [Fact]
     public void Validation_Run_WithUnsupportedResultsFormat_DoesNotWriteFile()
     {
-        // Arrange: setup unsupported file extension and log file to capture error output
-        var jsonFile = Path.Combine(Path.GetTempPath(), $"validation_test_{Guid.NewGuid()}.json");
-        var logFile = Path.Combine(Path.GetTempPath(), $"validation_test_{Guid.NewGuid()}.log");
-        try
+        // Arrange: a passing check and an unsupported file extension
+        var checks = new[] { FastValidationChecks.Passing() };
+
+        // Act: run validation with unsupported results file extension
+        var output = Run(checks, ".json");
+
+        // Assert: no results file, a non-zero exit code and the error in the log
+        Assert.Equal(string.Empty, output.Results);
+        Assert.Equal(1, output.ExitCode);
+        Assert.Contains("Unsupported results file format", output.Log);
+    }
+
+    /// <summary>
+    ///     Test that a failed check is reported, counted and turns the exit code non-zero, while the other checks
+    ///     still run.
+    /// </summary>
+    [Fact]
+    public void Validation_Run_FailingCheck_ReportsFailureAndSetsExitCode()
+    {
+        // Arrange: a failing check between two passing ones
+        var checks = new[]
         {
-            using (var context = Context.Create(["--silent", "--results", jsonFile, "--log", logFile]))
-            {
-                // Act: run validation with unsupported results file extension
-                Validation.Run(context);
+            FastValidationChecks.Passing("ReviewCenter_Before"),
+            FastValidationChecks.Failing("ReviewCenter_Failing", "it is wrong"),
+            FastValidationChecks.Passing("ReviewCenter_After")
+        };
 
-                // Assert context state while still valid: no results file and non-zero exit code
-                Assert.False(File.Exists(jsonFile));
-                Assert.Equal(1, context.ExitCode);
-            }
+        // Act: run validation with a TRX file
+        var output = Run(checks, ".trx");
 
-            // Assert log content after disposal to ensure the log writer has been closed and flushed
-            Assert.True(File.Exists(logFile));
-            var logContent = File.ReadAllText(logFile);
-            Assert.Contains("Unsupported results file format", logContent);
-        }
-        finally
+        // Assert: the failure and its message are reported, the run fails and every check was recorded
+        Assert.Equal(1, output.ExitCode);
+        Assert.Contains("✗ ReviewCenter_Failing - Failed", output.Log);
+        Assert.Contains("it is wrong", output.Log);
+        Assert.Contains("Total Tests: 3", output.Log);
+        Assert.Contains("Failed: 1", output.Log);
+        Assert.Contains("ReviewCenter_After", output.Results);
+        Assert.Contains("Failed", output.Results);
+    }
+
+    /// <summary>
+    ///     Test that an unexpected exception is recorded as a failed check with the exception type in the message.
+    /// </summary>
+    [Fact]
+    public void Validation_Run_ThrowingCheck_RecordsFailureWithExceptionType()
+    {
+        // Arrange: a check that throws an exception that is not a validation failure
+        var checks = new[] { FastValidationChecks.Throwing() };
+
+        // Act: run validation
+        var output = Run(checks);
+
+        // Assert: the run fails and the line names the exception type and message
+        Assert.Equal(1, output.ExitCode);
+        Assert.Contains("✗ ReviewCenter_Throwing - Failed", output.Log);
+        Assert.Contains("InvalidOperationException: boom", output.Log);
+    }
+
+    /// <summary>
+    ///     Test that a skipped check is reported as skipped, does not fail the run and is recorded as not executed.
+    /// </summary>
+    [Fact]
+    public void Validation_Run_SkippedCheck_ReportsSkippedAndDoesNotFail()
+    {
+        // Arrange: a skipped check and a passing check
+        var checks = new[] { FastValidationChecks.Skipped("ReviewCenter_Skipped", "nothing to check"), FastValidationChecks.Passing() };
+
+        // Act: run validation with a TRX file and again with a JUnit file
+        var trx = Run(checks, ".trx");
+        var junit = Run(checks, ".xml");
+
+        // Assert: the line says SKIPPED, the exit code is zero, and the results files record the skip
+        Assert.Equal(0, trx.ExitCode);
+        Assert.Contains("- ReviewCenter_Skipped - SKIPPED", trx.Log);
+        Assert.Contains("nothing to check", trx.Log);
+        Assert.Contains("Skipped: 1", trx.Log);
+        Assert.Contains("NotExecuted", trx.Results);
+        Assert.Contains("<skipped", junit.Results);
+    }
+
+    /// <summary>
+    ///     Test that every line of the report carries the elapsed time of the check, measured from the check itself.
+    /// </summary>
+    [Fact]
+    public void Validation_Run_SlowCheck_ReportsElapsedTime()
+    {
+        // Arrange: a check that takes at least 150 ms
+        var checks = new[] { FastValidationChecks.Slow("ReviewCenter_Slow", TimeSpan.FromMilliseconds(150)) };
+
+        // Act: run validation
+        var output = Run(checks);
+
+        // Assert: the line shows an elapsed time of at least 150 ms
+        var match = Regex.Match(output.Log, @"ReviewCenter_Slow - Passed \((\d+) ms\)");
+        Assert.True(match.Success, "The line should show the elapsed time");
+        Assert.True(int.Parse(match.Groups[1].Value) >= 140, $"Elapsed time {match.Groups[1].Value} ms is too short");
+    }
+
+    /// <summary>
+    ///     Test that the report lists the checks in their listed order even when they finish in another order.
+    /// </summary>
+    [Fact]
+    public void Validation_Run_SlowFirstCheck_ReportsInListedOrder()
+    {
+        // Arrange: a slow check listed before a fast one, so the fast one finishes first
+        var checks = new[]
         {
-            if (File.Exists(jsonFile))
-            {
-                File.Delete(jsonFile);
-            }
+            FastValidationChecks.Slow("ReviewCenter_SlowFirst", TimeSpan.FromMilliseconds(150)),
+            FastValidationChecks.Passing("ReviewCenter_FastSecond")
+        };
 
-            if (File.Exists(logFile))
-            {
-                File.Delete(logFile);
-            }
-        }
+        // Act: run validation
+        var output = Run(checks);
+
+        // Assert: the slow check is reported first
+        Assert.True(
+            output.Log.IndexOf("ReviewCenter_SlowFirst", StringComparison.Ordinal) <
+            output.Log.IndexOf("ReviewCenter_FastSecond", StringComparison.Ordinal));
+    }
+
+    /// <summary>
+    ///     Test that the default check list has the eight hermetic checks in their order, with the opt-in check absent.
+    /// </summary>
+    [Fact]
+    public void Validation_CreateChecks_Default_ListsEightHermeticChecks()
+    {
+        // Arrange: no setup; the default list is asked for
+
+        // Act: create the default check list
+        var checks = Validation.CreateChecks(includeConfiguredDatabase: false);
+
+        // Assert: eight checks, in order, all with the ReviewCenter_ prefix and no configured-database check
+        Assert.Equal(RealValidationRun.CheckNames, checks.Select(check => check.Name));
+    }
+
+    /// <summary>
+    ///     Test that the opt-in check list adds only the configured-database check, after the default ones.
+    /// </summary>
+    [Fact]
+    public void Validation_CreateChecks_CheckConfig_AddsConfiguredDatabaseLast()
+    {
+        // Arrange: no setup; the opt-in list is asked for
+
+        // Act: create the opt-in check list
+        var checks = Validation.CreateChecks(includeConfiguredDatabase: true);
+
+        // Assert: nine checks and the configured-database check is the last
+        Assert.Equal(9, checks.Count);
+        Assert.Equal("ReviewCenter_ConfiguredDatabase", checks[^1].Name);
     }
 }
-

@@ -65,9 +65,10 @@ internal sealed record CapturedError(byte[] Bytes, bool Dropped);
 internal sealed class GitRunner
 {
     /// <summary>
-    ///     The oldest supported git version, as major and minor; <c>GIT_CONFIG_COUNT</c> arrived in 2.31.
+    ///     The oldest supported git version, as major and minor; <c>GIT_CONFIG_COUNT</c> arrived in 2.31. Internal so
+    ///     the self-validation can name the version the server really requires.
     /// </summary>
-    private static readonly Version MinimumVersion = new(2, 31);
+    internal static readonly Version MinimumVersion = new(2, 31);
 
     /// <summary>
     ///     How much of the end of standard error is kept in a result, in bytes.

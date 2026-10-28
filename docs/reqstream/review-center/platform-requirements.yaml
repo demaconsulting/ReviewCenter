@@ -31,8 +31,14 @@ sections:
           installed .NET runtime.
         tests:
           # Tests link to "windows" to ensure results come from Windows platform
-          - "windows@ReviewCenter_VersionDisplay"
-          - "windows@ReviewCenter_HelpDisplay"
+          - "windows@ReviewCenter_GitAvailable"
+          - "windows@ReviewCenter_GitRoundTrip"
+          - "windows@ReviewCenter_ReviewWorkflow"
+          - "windows@ReviewCenter_Fingerprint"
+          - "windows@ReviewCenter_PasswordHash"
+          - "windows@ReviewCenter_AuditChain"
+          - "windows@ReviewCenter_AttestationPdf"
+          - "windows@ReviewCenter_HostStart"
 
       - id: ReviewCenter-Platform-Linux
         title: The tool shall execute successfully on Linux (linux-x64) as a self-contained single-file executable.
@@ -42,8 +48,14 @@ sections:
           linux-x64 executable must run without an installed .NET runtime.
         tests:
           # Tests link to "ubuntu" to ensure results come from Linux platform
-          - "ubuntu@ReviewCenter_VersionDisplay"
-          - "ubuntu@ReviewCenter_HelpDisplay"
+          - "ubuntu@ReviewCenter_GitAvailable"
+          - "ubuntu@ReviewCenter_GitRoundTrip"
+          - "ubuntu@ReviewCenter_ReviewWorkflow"
+          - "ubuntu@ReviewCenter_Fingerprint"
+          - "ubuntu@ReviewCenter_PasswordHash"
+          - "ubuntu@ReviewCenter_AuditChain"
+          - "ubuntu@ReviewCenter_AttestationPdf"
+          - "ubuntu@ReviewCenter_HostStart"
 
       - id: ReviewCenter-Platform-Net10
         title: The tool shall run on the .NET 10 runtime that is bundled into the self-contained executable.
@@ -53,5 +65,11 @@ sections:
           is bundled into the executable, so the version the tool runs on does not depend on what is
           installed on the operator's machine.
         tests:
-          - "net10.0@ReviewCenter_VersionDisplay"
-          - "net10.0@ReviewCenter_HelpDisplay"
+          - "net10.0@ReviewCenter_GitAvailable"
+          - "net10.0@ReviewCenter_GitRoundTrip"
+          - "net10.0@ReviewCenter_ReviewWorkflow"
+          - "net10.0@ReviewCenter_Fingerprint"
+          - "net10.0@ReviewCenter_PasswordHash"
+          - "net10.0@ReviewCenter_AuditChain"
+          - "net10.0@ReviewCenter_AttestationPdf"
+          - "net10.0@ReviewCenter_HostStart"

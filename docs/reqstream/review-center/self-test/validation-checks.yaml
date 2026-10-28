@@ -1,0 +1,127 @@
+---
+# Software Unit Requirements for the Self-Validation Checks
+#
+# The checks are the tests that `--validate` runs: each one exercises a real part of ReviewCenter (git, a
+# complete review workflow, the content fingerprint, password hashing, the audit chain, the signed attestation
+# PDF and the web host) against throw-away data in a temporary folder. The ninth check, opt-in through
+# `--check-config`, compares the configured database with the schema of this build, read-only.
+
+sections:
+  - title: Validation Checks Unit Requirements
+    requirements:
+      - id: ReviewCenter-ValidationChecks-GitAvailable
+        title: >-
+          The GitAvailable check shall verify that git can be started and is at least the minimum version that
+          ReviewCenter needs.
+        justification: |
+          Every content source of ReviewCenter is a git repository that is read through the git command line, so a
+          machine without a usable git cannot run the tool at all; the qualification run has to say so first.
+        tests:
+          - SelfTestSubsystem_ValidationWorkflow_NoResultFiles_CompletesSuccessfully
+          - ValidationChecks_RealRun_HeavyChecks_ReportTheirDetails
+
+      - id: ReviewCenter-ValidationChecks-GitRoundTrip
+        title: >-
+          The GitRoundTrip check shall create a repository, read back its history, the changes between two commits
+          and a file at a revision through the production git source, and compare them with what was committed.
+        justification: |
+          Review planning depends on the exact commits, changed files and file contents that git reports; reading
+          back what was just committed proves the git integration end to end on this machine.
+        tests:
+          - SelfTestSubsystem_ValidationWorkflow_NoResultFiles_CompletesSuccessfully
+          - ValidationChecks_RealRun_HeavyChecks_ReportTheirDetails
+
+      - id: ReviewCenter-ValidationChecks-ReviewWorkflow
+        title: >-
+          The ReviewWorkflow check shall, on a temporary embedded SQLite database, create a project and a review,
+          answer the checklist, sign the review with a local-password re-authentication, and read the evidence index
+          back with the content fingerprint and the record digest.
+        justification: |
+          The signed review and its evidence index are the product of ReviewCenter. Running the production services
+          through the whole path, from the project to the evidence, shows that the pieces work together on this
+          machine, on a database that is private to the run.
+        tests:
+          - SelfTestSubsystem_ValidationWorkflow_NoResultFiles_CompletesSuccessfully
+          - ValidationChecks_RealRun_HeavyChecks_ReportTheirDetails
+
+      - id: ReviewCenter-ValidationChecks-Fingerprint
+        title: >-
+          The Fingerprint check shall hash a fixed set of files with the production fingerprint code and compare
+          the result with a literal value that was computed independently.
+        justification: |
+          The fingerprint is what ReviewMark compares, so it must be the same on every platform. A literal in the
+          source, not a value computed by the same code, catches differences in line endings, text encoding or
+          ordering between platforms.
+        tests:
+          - ValidationChecks_Fingerprint_Run_MatchesPinnedLiteral
+
+      - id: ReviewCenter-ValidationChecks-PasswordHash
+        title: >-
+          The PasswordHash check shall hash a throw-away password with the production hasher, accept the right
+          password, and reject a wrong one.
+        justification: |
+          The local sign-in and the re-authentication of a signature depend on the password hash; the check shows
+          that it works on this platform.
+        tests:
+          - ValidationChecks_PasswordHash_Run_AcceptsRightAndRejectsWrongPassword
+
+      - id: ReviewCenter-ValidationChecks-AuditChain
+        title: >-
+          The AuditChain check shall append entries to the audit chain of a temporary database, verify that the
+          chain is intact, change an entry, and verify that the production verifier reports the change.
+        justification: |
+          The audit trail is evidence only if a change to it is found; the check proves that the verifier finds
+          one, rather than only that an untouched chain passes.
+        tests:
+          - ValidationChecks_AuditChain_Run_DetectsTamperedEntry
+
+      - id: ReviewCenter-ValidationChecks-AttestationPdf
+        title: >-
+          The AttestationPdf check shall render and sign an attestation PDF with a temporary self-signed key through
+          the production renderer and signer, verify the CMS signature and the DocMDP certification independently of
+          the production code, and show that a changed byte makes the verification fail.
+        justification: |
+          The signed attestation is what an auditor opens. Verifying it with the platform cryptography, and not with
+          the code that made it, proves that the document is really signed and that a change to it is detectable.
+        tests:
+          - SelfTestSubsystem_ValidationWorkflow_NoResultFiles_CompletesSuccessfully
+          - ValidationChecks_RealRun_HeavyChecks_ReportTheirDetails
+
+      - id: ReviewCenter-ValidationChecks-HostStart
+        title: >-
+          The HostStart check shall start the real web host on an ephemeral loopback port with a temporary
+          configuration and database, request the login page and an embedded static asset, expect success for both,
+          and stop the host cleanly.
+        justification: |
+          Starting the host proves that the dependency injection, the middleware, the embedded assets and the
+          database start-up work in the deployed executable, including a single-file publish; an ephemeral port on
+          the loopback interface never collides with the configured port.
+        tests:
+          - SelfTestSubsystem_ValidationWorkflow_NoResultFiles_CompletesSuccessfully
+          - ValidationChecks_RealRun_HeavyChecks_ReportTheirDetails
+
+      - id: ReviewCenter-ValidationChecks-ConfiguredDatabase
+        title: >-
+          The ConfiguredDatabase check shall, only when asked for with `--check-config`, load the configuration the way
+          the server does, open the configured database read-only, compare its tables and columns with the model of
+          this build, report differences by name only, never write, and be skipped when nothing is configured.
+        justification: |
+          An operator upgrading a deployment wants to know, before starting the server, that the database can be
+          opened and has the schema of the new build. The check must not change the database and must not reveal
+          the connection string or the path, which can hold secrets, in a report that is archived.
+        tests:
+          - ValidationChecks_ConfiguredDatabase_NothingConfigured_IsSkipped
+          - ValidationChecks_ConfiguredDatabase_CurrentSchema_PassesWithoutWriting
+          - ValidationChecks_ConfiguredDatabase_MissingTable_FailsNamingTableOnly
+          - ValidationChecks_ConfiguredDatabase_MissingFile_FailsWithoutCreatingIt
+          - ValidationChecks_ConfiguredDatabase_UnsupportedProvider_Fails
+
+      - id: ReviewCenter-ValidationChecks-Hermetic
+        title: >-
+          The default checks shall create every file they need in a uniquely named temporary folder that is removed
+          at the end, use an in-memory configuration, and listen only on an ephemeral loopback port.
+        justification: |
+          The qualification run must give the same answer on every machine, must not depend on or change the
+          configuration of the deployment, and must leave nothing behind.
+        tests:
+          - SelfTestSubsystem_ValidationWorkflow_DefaultRun_IsHermetic

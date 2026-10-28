@@ -25,6 +25,7 @@ sections:
           - Program_Run_WithHelpFlag_DisplaysUsageInformation
           - Program_Run_WithShortHelpFlag_DisplaysUsage
           - Program_Run_WithQuestionMarkFlag_DisplaysUsage
+          - Program_Run_WithHelpFlag_ListsCheckConfigOption
 
       - id: ReviewCenter-Program-Validate
         title: The Program class shall support --validate flag to invoke the self-validation framework.

@@ -15,9 +15,50 @@ sections:
           in the deployment environment. A summary is printed for human review.
         children:
           - ReviewCenter-Utilities-SafePaths
+          - ReviewCenter-Utilities-TempFiles
         tests:
           - Validation_Run_WithSilentContext_PrintsSummary
           - Validation_Run_WithSilentContext_ExitCodeIsZero
+          - Validation_Run_NullContext_ThrowsArgumentNullException
+          - Validation_Run_NullChecks_ThrowsArgumentNullException
+
+      - id: ReviewCenter-Validation-Timing
+        title: >-
+          The Validation class shall time every check, print one line with its outcome and elapsed time, record the
+          duration in the results, and report the checks in the order they are listed.
+        justification: |
+          A reviewer reading the report or the results file must see at a glance which check passed or failed and
+          how long it took, and a check that hangs or turns slow must be noticed. The checks run at the same time to
+          keep the whole run short, so the report must still be stable and in a fixed order. A check that fails or
+          throws is a failed test with a message, never a crash, so that the remaining checks still run and the
+          report is complete.
+        tests:
+          - Validation_Run_SlowCheck_ReportsElapsedTime
+          - Validation_Run_SlowFirstCheck_ReportsInListedOrder
+          - Validation_Run_FailingCheck_ReportsFailureAndSetsExitCode
+          - Validation_Run_ThrowingCheck_RecordsFailureWithExceptionType
+
+      - id: ReviewCenter-Validation-Skipped
+        title: >-
+          The Validation class shall report a check that finds nothing to check as skipped, record it as not
+          executed in the results, count it separately in the summary, and not fail the run for it.
+        justification: |
+          The opt-in configured-database check has nothing to check on a machine without configuration. That is not
+          a failure of the tool, so it must not turn the exit code non-zero, but it must not be mistaken for a pass
+          either, so it is shown as skipped and recorded as not executed.
+        tests:
+          - Validation_Run_SkippedCheck_ReportsSkippedAndDoesNotFail
+
+      - id: ReviewCenter-Validation-CheckConfig
+        title: >-
+          The Validation class shall run the eight hermetic checks by default and shall add the configured-database
+          check, last, only when `--check-config` was given.
+        justification: |
+          The default run must give the same answer on every machine and must never read or touch the deployment's
+          configuration; the check of the configured database is for the operator who asks for it.
+        tests:
+          - Validation_CreateChecks_Default_ListsEightHermeticChecks
+          - Validation_CreateChecks_CheckConfig_AddsConfiguredDatabaseLast
 
       - id: ReviewCenter-Validation-TrxResults
         title: >-

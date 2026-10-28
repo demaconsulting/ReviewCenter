@@ -26,3 +26,18 @@ sections:
           - UtilitiesSubsystem_DirectoryCreationWorkflow_ValidPaths_CreatesDirectories
           - UtilitiesSubsystem_PathTraversalValidation_DangerousPaths_ThrowsException
           - UtilitiesSubsystem_AbsolutePathRejection_ThrowsException
+
+      - id: ReviewCenter-Utilities-TempFiles
+        title: >-
+          The Utilities subsystem shall provide a temporary directory that is uniquely named, hands out only paths
+          inside itself, and is removed when it is disposed.
+        justification: |
+          Self-validation, and any other code that needs scratch files, must be able to create files without
+          colliding with other runs, without writing outside its own folder, and without leaving them behind. This
+          requirement captures that guarantee for the consumers of the Utilities subsystem.
+        children:
+          - ReviewCenter-TemporaryDirectory-Unique
+          - ReviewCenter-TemporaryDirectory-GetFilePath
+          - ReviewCenter-TemporaryDirectory-Dispose
+        tests:
+          - UtilitiesSubsystem_TemporaryDirectoryWorkflow_FilesCreated_AreRemovedOnDispose

@@ -21,8 +21,37 @@ sections:
           without requiring a separate test harness.
         children:
           - ReviewCenter-Validation-Run
+          - ReviewCenter-Validation-Timing
+          - ReviewCenter-Validation-Skipped
+          - ReviewCenter-ValidationChecks-GitAvailable
+          - ReviewCenter-ValidationChecks-GitRoundTrip
+          - ReviewCenter-ValidationChecks-ReviewWorkflow
+          - ReviewCenter-ValidationChecks-Fingerprint
+          - ReviewCenter-ValidationChecks-PasswordHash
+          - ReviewCenter-ValidationChecks-AuditChain
+          - ReviewCenter-ValidationChecks-AttestationPdf
+          - ReviewCenter-ValidationChecks-HostStart
+          - ReviewCenter-ValidationChecks-ConfiguredDatabase
         tests:
           - SelfTestSubsystem_ValidationWorkflow_NoResultFiles_CompletesSuccessfully
+          - SelfTestSubsystem_ValidationWorkflow_RealRun_FinishesWithinBound
+
+      - id: ReviewCenter-SelfTest-Hermetic
+        title: >-
+          The self-validation run shall be hermetic: every file it creates lives in a temporary folder that is
+          removed at the end, and by default it reads no configuration, touches no configured database and binds no
+          configured port.
+        justification: |
+          Tool qualification evidence is only worth something if it comes out the same on every machine and cannot
+          damage the deployment it qualifies. A run that used the configured database or port would depend on, and
+          could change, the state of the system under test, and a run that left files behind would fill the disk of
+          a CI runner. The only look at the deployment's own configuration is the opt-in `--check-config` check,
+          which is read-only.
+        children:
+          - ReviewCenter-Validation-CheckConfig
+          - ReviewCenter-ValidationChecks-Hermetic
+        tests:
+          - SelfTestSubsystem_ValidationWorkflow_DefaultRun_IsHermetic
 
       - id: ReviewCenter-SelfTest-ResultsOutput
         title: The tool shall write self-validation results to a standard test result file when --results is provided.

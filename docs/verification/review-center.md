@@ -29,8 +29,10 @@ the same job must run with the normal environment and must fail under the isolat
 the executable is larger than 20 MiB, which a
 framework-dependent publish is not. The commands run are: `--version`, `--help`,
 `--validate --results validation-<os>-net10.0-<rid>.trx`, and a `serve` smoke test that checks `/health`, the home
-page, and the Blazor script. The self-validation results (`ReviewCenter_VersionDisplay` and
-`ReviewCenter_HelpDisplay`) in those TRX files are the evidence for the platform requirements; the platform
+page, and the Blazor script. The self-validation results (the eight `ReviewCenter_` tests:
+`GitAvailable`, `GitRoundTrip`, `ReviewWorkflow`, `Fingerprint`, `PasswordHash`, `AuditChain`,
+`AttestationPdf`, and `HostStart`) in those TRX files are the evidence for the platform
+requirements; the platform
 (`windows`, `ubuntu`) and runtime (`net10.0`) in the file name are the source filters.
 
 ## Test Environment
@@ -111,19 +113,16 @@ as the sole argument; the combined output contains "Usage" and "Options" and the
 with code 0. This scenario is tested by
 `ReviewCenter_HelpFlag_Provided_OutputsUsageInformation`.
 
-**ReviewCenter_ValidateFlag_Provided_RunsValidation**: The `--validate` flag is passed as
-the sole argument; the combined output contains "Total Tests:" and the tool exits with code 0,
-confirming the self-validation suite runs and completes successfully. This scenario is tested by
-`ReviewCenter_ValidateFlag_Provided_RunsValidation`.
+**ReviewCenter_ValidateFlag_Provided_RunsValidation**: The `--validate` flag is passed together
+with `--depth 3` and `--result <path>.xml`, as one shared real process run of the whole default
+self-validation; the combined output contains "Total Tests: 8", "Passed: 8" and "Failed: 0" and
+the tool exits with code 0, confirming the self-validation suite runs and completes successfully.
+This scenario is tested by `ReviewCenter_ValidateFlag_Provided_RunsValidation`.
 
-**ReviewCenter_ValidateWithTrxResults_Requested_GeneratesTrxFile**: The `--validate` flag
-is combined with `--results <path>.trx`; a TRX file containing a `<TestRun` XML element is
-created at the specified path and the tool exits with code 0. This scenario is tested by
-`ReviewCenter_ValidateWithTrxResults_Requested_GeneratesTrxFile`.
-
-**ReviewCenter_ValidateWithXmlResults_Requested_GeneratesJUnitFile**: The `--validate` flag
-is combined with `--results <path>.xml`; a JUnit XML file containing a `<testsuites` XML element
-is created at the specified path and the tool exits with code 0. This scenario is tested by
+**ReviewCenter_ValidateWithXmlResults_Requested_GeneratesJUnitFile**: The shared real process run
+wrote a JUnit XML file containing a `<testsuites` XML element and eight test cases and the tool
+exited with code 0. The TRX format is verified at the subsystem level by
+`SelfTestSubsystem_ValidationWorkflow_WithTrxFile_GeneratesResults`. This scenario is tested by
 `ReviewCenter_ValidateWithXmlResults_Requested_GeneratesJUnitFile`.
 
 **ReviewCenter_SilentFlag_Provided_SuppressesOutput**: The `--version` and `--silent`
@@ -141,24 +140,25 @@ output that also appears in the combined console output. This scenario is tested
 an error message identifying the unknown argument. This scenario is tested by
 `ReviewCenter_UnknownArgument_Provided_ReturnsError`.
 
-**ReviewCenter_ValidateWithDepth_DepthThree_OutputsCorrectHeadingLevel**: The `--validate`
-flag is combined with `--depth 3`; the combined output contains `###` (heading at depth 3) and
-the tool exits with code 0. This scenario is tested by
+**ReviewCenter_ValidateWithDepth_DepthThree_OutputsCorrectHeadingLevel**: The shared real process
+run used `--depth 3`; the combined output contains `### DEMA Consulting` (heading at depth 3)
+and the tool exited with code 0. This scenario is tested by
 `ReviewCenter_ValidateWithDepth_DepthThree_OutputsCorrectHeadingLevel`.
 
 **ReviewCenter_NoArguments_Invoked_DisplaysBanner**: The tool is invoked with no
 arguments; the combined output contains the tool name and copyright notice and the exit code is
 0. This scenario is tested by `ReviewCenter_NoArguments_Invoked_DisplaysBanner`.
 
-**ReviewCenter_ResultAlias_LegacyFlag_WritesResultsFile**: The `--validate` flag is
-combined with `--result <path>.trx` (the legacy alias); a TRX file is created at the specified
-path and the tool exits with code 0. This scenario is tested by
+**ReviewCenter_ResultAlias_LegacyFlag_WritesResultsFile**: The shared real process run used the
+legacy `--result <path>.xml` alias; a results file was created at the specified path and the tool
+exited with code 0. This scenario is tested by
 `ReviewCenter_ResultAlias_LegacyFlag_WritesResultsFile`.
 
-**ReviewCenter_ValidateWithBadExtension_ExtensionInvalid_ReturnsNonZero**: The `--validate`
-flag is combined with `--results <path>.bad` (unsupported extension); the tool exits with a
-non-zero code and no file is created at the specified path. This scenario is tested by
-`ReviewCenter_ValidateWithBadExtension_ExtensionInvalid_ReturnsNonZero`.
+The unsupported results extension (requirement `ReviewCenter-System-ValidateFailure`) is verified
+at the subsystem level by
+`SelfTestSubsystem_ValidationWorkflow_WithUnsupportedExtension_EmitsErrorAndNoFile`, which runs
+`Validation.Run` with stand-in checks, instead of a process run that would repeat the real
+validation only to reach the same error path.
 
 **ReviewCenter_ServeVerb_Started_HealthEndpointReturnsHealthy**: The tool is started with the
 `serve` verb on a free loopback port; once the server answers, a request to `/health` returns
