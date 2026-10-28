@@ -431,6 +431,68 @@ public class GitRunnerTests
     }
 
     /// <summary>
+    ///     Test that checking the version returns the version text and makes the first command skip its own check.
+    /// </summary>
+    [Fact]
+    public async Task GitRunner_CheckVersionAsync_SupportedGit_ReturnsVersionAndIsNotRepeatedByRunAsync()
+    {
+        // Arrange: a fake git executable that reports a supported version and counts its invocations
+        using var cache = new TempFolder();
+        var counter = Path.Combine(cache.Path, "count.txt");
+        var script = OperatingSystem.IsWindows()
+            ? Path.Combine(cache.Path, "counting-git.cmd")
+            : Path.Combine(cache.Path, "counting-git.sh");
+        await File.WriteAllTextAsync(
+            script,
+            OperatingSystem.IsWindows()
+                ? "@echo x>>\"%~dp0count.txt\"\r\n@echo git version 2.40.0\r\n"
+                : "#!/bin/sh\necho x >> \"$(dirname \"$0\")/count.txt\"\necho git version 2.40.0\n",
+            TestContext.Current.CancellationToken);
+        if (!OperatingSystem.IsWindows())
+        {
+            File.SetUnixFileMode(script, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+        }
+
+        var runner = new GitRunner(Options(cache.Path), script);
+
+        // Act: check the version, then run one command
+        var version = await runner.CheckVersionAsync(TestContext.Current.CancellationToken);
+        await runner.RunAsync(["status"], null, 1024, TestContext.Current.CancellationToken);
+
+        // Assert: the text is returned and git ran twice (the check and the command), not three times
+        Assert.Equal("git version 2.40.0", version);
+        Assert.Equal(2, (await File.ReadAllLinesAsync(counter, TestContext.Current.CancellationToken)).Length);
+    }
+
+    /// <summary>
+    ///     Test that checking the version refuses a git older than the minimum.
+    /// </summary>
+    [Fact]
+    public async Task GitRunner_CheckVersionAsync_OldGit_ThrowsGitUnavailable()
+    {
+        // Arrange: a fake git executable that reports an old version
+        using var cache = new TempFolder();
+        var script = OperatingSystem.IsWindows()
+            ? Path.Combine(cache.Path, "old-git2.cmd")
+            : Path.Combine(cache.Path, "old-git2.sh");
+        await File.WriteAllTextAsync(
+            script,
+            OperatingSystem.IsWindows() ? "@echo git version 2.30.0\r\n" : "#!/bin/sh\necho git version 2.30.0\n",
+            TestContext.Current.CancellationToken);
+        if (!OperatingSystem.IsWindows())
+        {
+            File.SetUnixFileMode(script, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+        }
+
+        var runner = new GitRunner(Options(cache.Path), script);
+
+        // Act and assert: the check itself fails with the rule that names git as unavailable
+        var exception = await Assert.ThrowsAsync<DomainRuleException>(
+            () => runner.CheckVersionAsync(TestContext.Current.CancellationToken));
+        Assert.Equal(DomainRule.GitUnavailable, exception.Rule);
+    }
+
+    /// <summary>
     ///     Test that a real git call returns its output and a failing call returns its exit code and error text.
     /// </summary>
     [Fact]

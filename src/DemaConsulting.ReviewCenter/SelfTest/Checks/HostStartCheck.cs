@@ -22,9 +22,6 @@ using System.Net;
 using DemaConsulting.ReviewCenter.Cli;
 using DemaConsulting.ReviewCenter.Hosting;
 using DemaConsulting.ReviewCenter.Utilities;
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.Configuration.EnvironmentVariables;
-using Microsoft.Extensions.Configuration.Json;
 
 namespace DemaConsulting.ReviewCenter.SelfTest.Checks;
 
@@ -33,11 +30,14 @@ namespace DemaConsulting.ReviewCenter.SelfTest.Checks;
 ///     operating system and over a temporary configuration and database.
 /// </summary>
 /// <remarks>
-///     The host is the production <see cref="ServerHost.CreateApplication"/>. Its configuration is replaced, so
-///     the <c>appsettings.json</c> file and the plain environment variables are not read, the configured database
-///     is not opened and the configured port is not bound; the address is <c>http://127.0.0.1:0</c>, which makes
-///     the operating system pick a free port. The check requests the login page and an embedded static asset and
-///     then stops the host. Nothing but loopback is used. The class is stateless and thread-safe.
+///     The host is the production <see cref="ServerHost.CreateApplication"/>, built fully isolated
+///     (<see cref="ServerHostOptions.IsolatedSettings"/>): no <c>appsettings.json</c>, no <c>ASPNETCORE_</c> or
+///     <c>DOTNET_</c> variable and no other environment variable is read, so a broken or hostile configuration of
+///     the machine can neither break the check nor move it to another address. The only settings are the temporary
+///     ones, the configured database is not opened and the configured port is not bound; the single address is
+///     <c>http://127.0.0.1:0</c>, which makes the operating system pick a free loopback port, and the check fails
+///     if the host listens anywhere else. It requests the login page and an embedded static asset and then stops
+///     the host. Nothing but loopback is used. The class is stateless and thread-safe.
 /// </remarks>
 internal static class HostStartCheck
 {
@@ -59,22 +59,20 @@ internal static class HostStartCheck
     /// <exception cref="ValidationFailedException">Thrown when the host does not start, answers wrongly or does not stop.</exception>
     public static async Task<string> RunAsync(CancellationToken cancellationToken)
     {
+        // Disposal order matters: the host (and its database connections) is stopped and disposed first, the
+        // temporary folder is deleted last
         using var folder = new TemporaryDirectory();
-        var settings = SelfTestServices.CreateSettings(folder);
 
         // Port 0: the operating system picks a free loopback port, never the configured one
         using var context = Context.Create(["serve", "--silent", "--urls", "http://127.0.0.1:0"]);
         var app = ServerHost.CreateApplication(
             context,
-            new ServerHostOptions { ConfigureBuilder = builder => UseOnlyTheTemporarySettings(builder.Configuration, settings) });
+            new ServerHostOptions { IsolatedSettings = SelfTestServices.CreateSettings(folder) });
 
         try
         {
             await app.StartAsync(cancellationToken);
-            var address = new Uri(app.Urls.First());
-            ValidationFailedException.ThrowUnless(
-                IPAddress.IsLoopback(IPAddress.Parse(address.Host)) && address.Port > 0,
-                "The host did not listen on a loopback address.");
+            var address = ExpectOneLoopbackAddress(app.Urls);
 
             // A page and an embedded asset, over a client that neither redirects nor uses a proxy
             using var handler = new HttpClientHandler { AllowAutoRedirect = false, UseProxy = false };
@@ -92,26 +90,30 @@ internal static class HostStartCheck
     }
 
     /// <summary>
-    ///     Replaces the file and environment configuration of the host with the temporary settings.
+    ///     Requires that the host listens on exactly one address and that it is a loopback address with a real port.
     /// </summary>
-    /// <param name="configuration">The configuration of the host builder.</param>
-    /// <param name="settings">The temporary settings.</param>
+    /// <param name="urls">The addresses the started host reports.</param>
+    /// <returns>The one address.</returns>
+    /// <exception cref="ValidationFailedException">
+    ///     Thrown when the host listens on no address, on more than one, or on an address that is not loopback.
+    /// </exception>
     /// <remarks>
-    ///     Only the <c>appsettings.json</c> sources and the unprefixed environment variables are removed: the
-    ///     other sources (such as the listen address that <see cref="ServerHost.CreateApplication"/> set) stay. The
-    ///     in-memory source is added last, so it wins over anything that is left.
+    ///     A configuration that adds a second endpoint (for example one for all interfaces) must fail the check
+    ///     instead of being tested through the first address and ignored.
     /// </remarks>
-    private static void UseOnlyTheTemporarySettings(ConfigurationManager configuration, Dictionary<string, string?> settings)
+    internal static Uri ExpectOneLoopbackAddress(IEnumerable<string> urls)
     {
-        foreach (var source in configuration.Sources
-                     .Where(s => s is JsonConfigurationSource
-                         || (s is EnvironmentVariablesConfigurationSource { Prefix: null or "" }))
-                     .ToList())
-        {
-            configuration.Sources.Remove(source);
-        }
+        ArgumentNullException.ThrowIfNull(urls);
+        var addresses = urls.ToList();
+        ValidationFailedException.ThrowUnless(
+            addresses.Count == 1,
+            $"The host listened on {addresses.Count} addresses instead of exactly one loopback address.");
 
-        configuration.AddInMemoryCollection(settings);
+        var address = new Uri(addresses[0]);
+        ValidationFailedException.ThrowUnless(
+            IPAddress.TryParse(address.Host, out var ip) && IPAddress.IsLoopback(ip) && address.Port > 0,
+            "The host did not listen on a loopback address.");
+        return address;
     }
 
     /// <summary>

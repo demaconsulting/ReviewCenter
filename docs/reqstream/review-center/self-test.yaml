@@ -22,6 +22,7 @@ sections:
         children:
           - ReviewCenter-Validation-Run
           - ReviewCenter-Validation-Timing
+          - ReviewCenter-Validation-Timeout
           - ReviewCenter-Validation-Skipped
           - ReviewCenter-ValidationChecks-GitAvailable
           - ReviewCenter-ValidationChecks-GitRoundTrip
@@ -50,6 +51,8 @@ sections:
         children:
           - ReviewCenter-Validation-CheckConfig
           - ReviewCenter-ValidationChecks-Hermetic
+          - ReviewCenter-ValidationChecks-FastCommit
+          - ReviewCenter-ServerHost-IsolatedSettings
         tests:
           - SelfTestSubsystem_ValidationWorkflow_DefaultRun_IsHermetic
 

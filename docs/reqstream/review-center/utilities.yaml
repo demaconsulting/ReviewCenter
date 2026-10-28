@@ -39,5 +39,6 @@ sections:
           - ReviewCenter-TemporaryDirectory-Unique
           - ReviewCenter-TemporaryDirectory-GetFilePath
           - ReviewCenter-TemporaryDirectory-Dispose
+          - ReviewCenter-TemporaryDirectory-BoundedRetry
         tests:
           - UtilitiesSubsystem_TemporaryDirectoryWorkflow_FilesCreated_AreRemovedOnDispose

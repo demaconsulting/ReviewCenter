@@ -28,6 +28,9 @@ N/A - standard test environment.
   JUnit XML, and does not fail the run.
 - Every line shows the elapsed time of its check, and lines appear in the listed order even when
   the first check finishes last.
+- A check that blocks its thread and ignores its token is recorded as `Timed out after N s` when
+  the deadline passes, without the runner waiting for it; a cancellation is reported as `Cancelled`,
+  and a late exception of an abandoned check is observed.
 - TRX and JUnit XML result files are created with the correct XML root elements.
 - An unsupported result file extension produces no file and an error message on the context.
 - `Validation.CreateChecks` lists the eight default checks, and adds the configured-database
@@ -99,3 +102,42 @@ tested by `Validation_CreateChecks_Default_ListsEightHermeticChecks`.
 **Validation_CreateChecks_CheckConfig_AddsConfiguredDatabaseLast**: `Validation.CreateChecks(true)`
 returns nine checks with `ReviewCenter_ConfiguredDatabase` last. This scenario is tested by
 `Validation_CreateChecks_CheckConfig_AddsConfiguredDatabaseLast`.
+
+**ValidationRunner_ExecuteAsync_CheckBlocksAndIgnoresToken_FailsAsTimedOutWithoutWaiting**: A check
+blocks its thread synchronously and ignores its token; with a deadline of 100 ms the runner returns
+a failed outcome `Timed out after 0.1 s` long before the check ends. Without the independent
+deadline the call would not return, and a guard turns that into a failure. This scenario is tested
+by `ValidationRunner_ExecuteAsync_CheckBlocksAndIgnoresToken_FailsAsTimedOutWithoutWaiting`.
+
+**ValidationRunner_ExecuteAsync_DeadlinePasses_CancelsTheTokenOfTheCheck**: A cooperative check
+waits on its token; after the deadline it has seen the cancellation, and the outcome is the timeout
+message. This scenario is tested by
+`ValidationRunner_ExecuteAsync_DeadlinePasses_CancelsTheTokenOfTheCheck`.
+
+**ValidationRunner_ExecuteAsync_CheckThrowsCancellation_ReportsCancelledNotTimedOut**: A check
+throws `OperationCanceledException` before the deadline; the message is `Cancelled`, not a timeout.
+This scenario is tested by
+`ValidationRunner_ExecuteAsync_CheckThrowsCancellation_ReportsCancelledNotTimedOut`.
+
+**ValidationRunner_ExecuteAsync_CallerCancels_ReportsCancelledWithoutWaitingForTheCheck**: The
+caller cancels while a check that ignores its token still runs; the outcome is `Cancelled` and the
+runner does not wait for the check. This scenario is tested by
+`ValidationRunner_ExecuteAsync_CallerCancels_ReportsCancelledWithoutWaitingForTheCheck`.
+
+**ValidationRunner_ExecuteAsync_CheckThrowsTimeoutException_ReportsTheCheckOwnFailure**: A check
+throws a `TimeoutException` of its own; it is reported with its own type and message and not as the
+deadline. This scenario is tested by
+`ValidationRunner_ExecuteAsync_CheckThrowsTimeoutException_ReportsTheCheckOwnFailure`.
+
+**ValidationRunner_ExecuteAsync_AbandonedCheckThrowsLater_ExceptionIsObserved**: An abandoned check
+throws after the deadline; after garbage collection no unobserved task exception is raised. This
+scenario is tested by `ValidationRunner_ExecuteAsync_AbandonedCheckThrowsLater_ExceptionIsObserved`.
+
+**ValidationRunner_ExecuteAsync_NonPositiveTimeout_ThrowsArgumentOutOfRangeException**: A zero or
+negative deadline is refused. This scenario is tested by
+`ValidationRunner_ExecuteAsync_NonPositiveTimeout_ThrowsArgumentOutOfRangeException`.
+
+**Validation_Run_HungCheck_ReportsTimeoutAndOtherChecksStillPass**: A whole run with one hung check
+and a short deadline reports only that check as `Timed out`, passes the others, sets the exit code
+to 1 and returns. This scenario is tested by
+`Validation_Run_HungCheck_ReportsTimeoutAndOtherChecksStillPass`.

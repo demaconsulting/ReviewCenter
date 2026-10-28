@@ -171,4 +171,111 @@ public class TemporaryDirectoryTests
         stream.Dispose();
         directory.Dispose();
     }
+
+    /// <summary>
+    ///     Test that Dispose retries while a file is locked for a short time and then removes the directory. Without
+    ///     the retry the single attempt fails, the directory stays and this test fails.
+    /// </summary>
+    [Fact]
+    public async Task TemporaryDirectory_Dispose_FileLockedBriefly_RetriesAndDeletesDirectory()
+    {
+        Assert.SkipUnless(OperatingSystem.IsWindows(), "An open file blocks a delete only on Windows");
+
+        // Arrange: a file that stays open for about 100 ms, while the directory retries every 50 ms for up to 2 s; the
+        // generous bound keeps the test stable on a machine that is busy, and only a delete that never retries fails it
+        var directory = new TemporaryDirectory(40, TimeSpan.FromMilliseconds(50));
+        var path = directory.GetFilePath("locked.txt");
+        var stream = new FileStream(path, FileMode.Create, FileAccess.ReadWrite, FileShare.None);
+        var directoryPath = directory.DirectoryPath;
+        var release = Task.Run(async () =>
+        {
+            await Task.Delay(100, TestContext.Current.CancellationToken);
+            await stream.DisposeAsync();
+        }, TestContext.Current.CancellationToken);
+
+        // Act: dispose while the file is still open
+        var exception = Record.Exception(directory.Dispose);
+        await release;
+
+        // Assert: the retry outlasted the lock and the whole directory is gone
+        Assert.Null(exception);
+        Assert.False(Directory.Exists(directoryPath));
+    }
+
+    /// <summary>
+    ///     Test that a file that stays locked makes Dispose give up after the configured attempts, without throwing
+    ///     and without waiting longer than the attempts and pauses allow.
+    /// </summary>
+    [Fact]
+    public void TemporaryDirectory_Dispose_FileLockedPermanently_GivesUpWithoutThrowingInBoundedTime()
+    {
+        Assert.SkipUnless(OperatingSystem.IsWindows(), "An open file blocks a delete only on Windows");
+
+        // Arrange: a file that stays open for the whole test and the default policy of 5 attempts, 75 ms apart
+        var directory = new TemporaryDirectory();
+        var path = directory.GetFilePath("locked.txt");
+        using var stream = new FileStream(path, FileMode.Create, FileAccess.ReadWrite, FileShare.None);
+
+        // Act: dispose and measure how long it takes
+        var watch = System.Diagnostics.Stopwatch.StartNew();
+        var exception = Record.Exception(directory.Dispose);
+        watch.Stop();
+
+        // Assert: nothing is thrown, the pauses were really taken (4 x 75 ms) and the wait stays bounded
+        Assert.Null(exception);
+        Assert.True(Directory.Exists(directory.DirectoryPath));
+        Assert.True(watch.Elapsed >= TimeSpan.FromMilliseconds(200), $"Gave up too early: {watch.Elapsed}");
+        Assert.True(watch.Elapsed < TimeSpan.FromSeconds(3), $"Waited too long: {watch.Elapsed}");
+
+        // Cleanup: release the file and remove what is left
+        stream.Dispose();
+        directory.Dispose();
+        Assert.False(Directory.Exists(directory.DirectoryPath));
+    }
+
+    /// <summary>
+    ///     Test that the retry policy rejects values that would never delete or would wait a negative time.
+    /// </summary>
+    [Theory]
+    [InlineData(0, 10)]
+    [InlineData(-1, 10)]
+    [InlineData(3, -1)]
+    public void TemporaryDirectory_Constructor_InvalidRetryPolicy_ThrowsArgumentOutOfRangeException(
+        int attempts,
+        int delayMilliseconds)
+    {
+        // Act: create a directory with an invalid policy
+        var exception = Record.Exception(
+            () => new TemporaryDirectory(attempts, TimeSpan.FromMilliseconds(delayMilliseconds)));
+
+        // Assert: the policy is refused
+        Assert.IsType<ArgumentOutOfRangeException>(exception);
+    }
+
+    /// <summary>
+    ///     Test that a policy of one attempt makes Dispose try exactly once and never pause.
+    /// </summary>
+    [Fact]
+    public void TemporaryDirectory_Dispose_SingleAttemptPolicy_DoesNotPause()
+    {
+        Assert.SkipUnless(OperatingSystem.IsWindows(), "An open file blocks a delete only on Windows");
+
+        // Arrange: a locked file and a policy of one attempt with a long pause that must never be taken
+        var directory = new TemporaryDirectory(1, TimeSpan.FromSeconds(30));
+        var path = directory.GetFilePath("locked.txt");
+        using var stream = new FileStream(path, FileMode.Create, FileAccess.ReadWrite, FileShare.None);
+
+        // Act: dispose
+        var watch = System.Diagnostics.Stopwatch.StartNew();
+        var exception = Record.Exception(directory.Dispose);
+        watch.Stop();
+
+        // Assert: it returned at once
+        Assert.Null(exception);
+        Assert.True(watch.Elapsed < TimeSpan.FromSeconds(5), $"Paused after the last attempt: {watch.Elapsed}");
+
+        // Cleanup
+        stream.Dispose();
+        directory.Dispose();
+    }
 }

@@ -18,12 +18,16 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
+using DemaConsulting.ReviewCenter.Hosting;
 using DemaConsulting.ReviewCenter.SelfTest;
 using DemaConsulting.ReviewCenter.SelfTest.Checks;
 using DemaConsulting.ReviewCenter.Storage;
 using DemaConsulting.ReviewCenter.Utilities;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 
 namespace DemaConsulting.ReviewCenter.Tests.SelfTest;
 
@@ -75,15 +79,15 @@ public class ValidationChecksTests
     ///     Test that the audit chain check detects a tampered entry.
     /// </summary>
     [Fact]
-    public async Task ValidationChecks_AuditChain_Run_DetectsTamperedEntry()
+    public void ValidationChecks_AuditChain_Run_DetectsTamperedEntry()
     {
-        // Arrange: nothing; the check builds its own chain in a temporary database
+        // Arrange: the shared real run, in which the check built its own chain in a temporary database
 
-        // Act: run the check, which throws unless the intact chain verifies and the changed entry is reported
-        var detail = await AuditChainCheck.RunAsync(CancellationToken.None);
+        // Act: read its log
+        var log = RealValidationRun.Result.Log;
 
-        // Assert: the check reports that the change was detected
-        Assert.Contains("detected", detail);
+        // Assert: the check passed, which means the intact chain verified and the changed entry was reported
+        Assert.Matches(@"✓ ReviewCenter_AuditChain - Passed \(\d+ ms\): 3 entries intact; change of entry 2 detected", log);
     }
 
     /// <summary>
@@ -104,6 +108,36 @@ public class ValidationChecksTests
         Assert.Contains("ReviewCenter_AttestationPdf - Passed", log);
         Assert.Contains("/login", log);
         Assert.Contains("stopped cleanly", log);
+    }
+
+    /// <summary>
+    ///     Test that the real validation passes in a hostile environment and uses nothing of it: the program copy has
+    ///     a broken <c>appsettings.json</c> (and so does the working directory), and the environment names all-interface
+    ///     listen addresses, the Development environment and a database, key ring, git cache and attestation key
+    ///     outside the temporary folders. Before the host was built isolated, the broken file made the host check fail
+    ///     and the ambient endpoint decided where it listened.
+    /// </summary>
+    [Fact]
+    public void ValidationChecks_HostStart_HostileEnvironment_PassesOnLoopbackAndTouchesNothingAmbient()
+    {
+        // Arrange: the shared real process run, made in the hostile environment (see RealValidationRun)
+
+        // Act: read the outcome of that run
+        var run = RealValidationRun.Process;
+
+        // Assert: every check passed, including the host check, which listened on one loopback port that is not the
+        // poisoned one
+        Assert.Equal(0, run.ExitCode);
+        Assert.Contains("Passed: 8", run.Output);
+        var match = System.Text.RegularExpressions.Regex.Match(
+            run.Output,
+            @"ReviewCenter_HostStart - Passed \(\d+ ms\): listened on 127\.0\.0\.1:(\d+);");
+        Assert.True(match.Success, "The host check should report a loopback address:" + Environment.NewLine + run.Output);
+        Assert.NotEqual(run.PoisonedPort, int.Parse(match.Groups[1].Value, System.Globalization.CultureInfo.InvariantCulture));
+
+        // Assert: nothing was created where the poisoned settings pointed, and the checks removed all they created
+        Assert.Empty(run.SentinelEntries);
+        Assert.Empty(run.PrivateTempEntries);
     }
 
     /// <summary>
@@ -207,6 +241,158 @@ public class ValidationChecksTests
 
         // Assert: the provider is named
         Assert.Contains("Oracle", exception.Message);
+    }
+
+    /// <summary>
+    ///     Test that the services the checks build run their throw-away database with the fast commit settings.
+    /// </summary>
+    [Fact]
+    public async Task ValidationChecks_FastCommit_SelfTestServices_RelaxesTheEmbeddedDatabase()
+    {
+        // Arrange: the production services over an embedded database in a temporary folder
+        using var folder = new TemporaryDirectory();
+        var provider = SelfTestServices.Create(folder);
+        try
+        {
+            // Act: read the commit settings of a connection of that database
+            var factory = provider.GetRequiredService<IDbContextFactory<ReviewCenterDbContext>>();
+            await using var context = await factory.CreateDbContextAsync(TestContext.Current.CancellationToken);
+            await context.Database.OpenConnectionAsync(TestContext.Current.CancellationToken);
+            var settings = await ReadCommitSettingsAsync(context.Database.GetDbConnection());
+
+            // Assert: synchronous=OFF (0) and journal_mode=MEMORY
+            Assert.Equal(("0", "memory"), settings);
+        }
+        finally
+        {
+            await provider.DisposeAsync();
+        }
+    }
+
+    /// <summary>
+    ///     Test that the production service registration alone, which the server uses, keeps the safe defaults.
+    /// </summary>
+    [Fact]
+    public async Task ValidationChecks_FastCommit_ProductionServices_KeepDefaultCommitSettings()
+    {
+        // Arrange: the production registration over the same kind of database, without the self-test interceptor
+        using var folder = new TemporaryDirectory();
+        var configuration = new ConfigurationBuilder().AddInMemoryCollection(SelfTestServices.CreateSettings(folder)).Build();
+        var services = new ServiceCollection();
+        services.AddLogging();
+        ServerHost.AddServices(services, configuration);
+        var provider = services.BuildServiceProvider();
+        try
+        {
+            // Act: create the database and read the commit settings of a connection
+            DatabaseSetup.EnsureCreated(
+                provider.GetRequiredService<IDbContextFactory<ReviewCenterDbContext>>(),
+                provider.GetRequiredService<IOptions<DatabaseOptions>>().Value);
+            var factory = provider.GetRequiredService<IDbContextFactory<ReviewCenterDbContext>>();
+            await using var context = await factory.CreateDbContextAsync(TestContext.Current.CancellationToken);
+            await context.Database.OpenConnectionAsync(TestContext.Current.CancellationToken);
+            var settings = await ReadCommitSettingsAsync(context.Database.GetDbConnection());
+
+            // Assert: synchronous=FULL (2) and the write-ahead log the product database uses; the relaxation never
+            // reaches the product registration
+            Assert.Equal(("2", "wal"), settings);
+        }
+        finally
+        {
+            await provider.DisposeAsync();
+        }
+    }
+
+    /// <summary>
+    ///     Test that the interceptor relaxes a database inside its folder and leaves every other one as it is.
+    /// </summary>
+    /// <param name="database">Where the database is, relative to the allowed folder.</param>
+    /// <param name="options">Extra connection string options.</param>
+    /// <param name="relaxed">Whether the commit settings are expected to change.</param>
+    [Theory]
+    [InlineData("inside.db", "", true)]
+    [InlineData("sub/inside.db", "", true)]
+    [InlineData("../outside.db", "", false)]
+    [InlineData("../allowed-sibling/other.db", "", false)]
+    [InlineData("inside.db", "Mode=ReadOnly", false)]
+    public async Task ValidationChecks_FastCommit_Interceptor_RelaxesOnlyDatabasesInsideItsFolder(
+        string database,
+        string options,
+        bool relaxed)
+    {
+        // Arrange: an allowed folder next to a sibling folder whose name starts the same, and an interceptor for it
+        using var root = new TemporaryDirectory();
+        var allowed = Directory.CreateDirectory(root.GetFilePath("allowed")).FullName;
+        Directory.CreateDirectory(root.GetFilePath("allowed-sibling"));
+        Directory.CreateDirectory(Path.Combine(allowed, "sub"));
+        var path = Path.GetFullPath(Path.Combine(allowed, database));
+        await File.WriteAllBytesAsync(path, [], TestContext.Current.CancellationToken);
+        var interceptor = new FastCommitInterceptor(allowed);
+        await using var connection = new SqliteConnection($"Data Source={path};Pooling=False;{options}");
+        await connection.OpenAsync(TestContext.Current.CancellationToken);
+
+        // Act: let the interceptor see the connection that was just opened
+        await interceptor.ConnectionOpenedAsync(connection, null!, CancellationToken.None);
+        var settings = await ReadCommitSettingsAsync(connection);
+
+        // Assert: only a writable database inside the folder is relaxed
+        Assert.Equal(relaxed ? ("0", "memory") : ("2", "delete"), settings);
+    }
+
+    /// <summary>
+    ///     Test that the interceptor never touches an in-memory database, also not through the synchronous hook.
+    /// </summary>
+    [Fact]
+    public void ValidationChecks_FastCommit_Interceptor_LeavesInMemoryDatabaseAlone()
+    {
+        // Arrange: an in-memory connection and an interceptor for an arbitrary folder
+        using var root = new TemporaryDirectory();
+        var interceptor = new FastCommitInterceptor(root.DirectoryPath);
+        using var connection = new SqliteConnection("Data Source=:memory:");
+        connection.Open();
+
+        // Act: let the interceptor see the connection
+        interceptor.ConnectionOpened(connection, null!);
+
+        // Assert: the commit mode of the in-memory database stays at the default (FULL)
+        using var synchronous = connection.CreateCommand();
+        synchronous.CommandText = "PRAGMA synchronous";
+        Assert.Equal(2L, synchronous.ExecuteScalar());
+    }
+
+    /// <summary>
+    ///     Test that an interceptor cannot be created without the folder that makes it safe.
+    /// </summary>
+    /// <param name="folder">The invalid folder value.</param>
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("   ")]
+    public void ValidationChecks_FastCommit_Interceptor_RequiresAllowedFolder(string? folder)
+    {
+        // Act and assert: a missing folder is refused, so the guard cannot be left out
+        Assert.ThrowsAny<ArgumentException>(() => new FastCommitInterceptor(folder!));
+    }
+
+    /// <summary>
+    ///     Reads the commit settings of an open or closed SQLite connection.
+    /// </summary>
+    /// <param name="connection">The connection; opened when it is closed.</param>
+    /// <returns>The values of <c>PRAGMA synchronous</c> and <c>PRAGMA journal_mode</c>.</returns>
+    private static async Task<(string Synchronous, string Journal)> ReadCommitSettingsAsync(System.Data.Common.DbConnection connection)
+    {
+        if (connection.State != System.Data.ConnectionState.Open)
+        {
+            await connection.OpenAsync();
+        }
+
+        await using var synchronous = connection.CreateCommand();
+        synchronous.CommandText = "PRAGMA synchronous";
+        var sync = Convert.ToString(await synchronous.ExecuteScalarAsync(), System.Globalization.CultureInfo.InvariantCulture)!;
+        await using var journal = connection.CreateCommand();
+        journal.CommandText = "PRAGMA journal_mode";
+        var mode = Convert.ToString(await journal.ExecuteScalarAsync(), System.Globalization.CultureInfo.InvariantCulture)!;
+        return (sync, mode.ToLowerInvariant());
     }
 
     /// <summary>

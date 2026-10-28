@@ -38,6 +38,28 @@ sections:
           - Validation_Run_FailingCheck_ReportsFailureAndSetsExitCode
           - Validation_Run_ThrowingCheck_RecordsFailureWithExceptionType
 
+      - id: ReviewCenter-Validation-Timeout
+        title: >-
+          The Validation class shall give every check a deadline that it enforces itself: a check that does not
+          finish in time is recorded as failed with a "Timed out" message, its cancellation token is cancelled, the
+          run does not wait for it, and a cancellation that is not the deadline is reported as "Cancelled".
+        justification: |
+          A cooperative time limit only works for a check that looks at its token. A check that blocks a thread,
+          waits on a lock or runs a child process that ignores the token would hang the qualification run, and with
+          it the pipeline that waits for the run. The runner therefore waits for the check and for the deadline at
+          the same time and gives up on the check when the deadline passes. The report must say whether time ran out
+          or the check was cancelled, and a late failure of an abandoned check must not surface as an unobserved
+          exception.
+        tests:
+          - ValidationRunner_ExecuteAsync_CheckBlocksAndIgnoresToken_FailsAsTimedOutWithoutWaiting
+          - ValidationRunner_ExecuteAsync_DeadlinePasses_CancelsTheTokenOfTheCheck
+          - ValidationRunner_ExecuteAsync_CheckThrowsCancellation_ReportsCancelledNotTimedOut
+          - ValidationRunner_ExecuteAsync_CallerCancels_ReportsCancelledWithoutWaitingForTheCheck
+          - ValidationRunner_ExecuteAsync_CheckThrowsTimeoutException_ReportsTheCheckOwnFailure
+          - ValidationRunner_ExecuteAsync_AbandonedCheckThrowsLater_ExceptionIsObserved
+          - ValidationRunner_ExecuteAsync_NonPositiveTimeout_ThrowsArgumentOutOfRangeException
+          - Validation_Run_HungCheck_ReportsTimeoutAndOtherChecksStillPass
+
       - id: ReviewCenter-Validation-Skipped
         title: >-
           The Validation class shall report a check that finds nothing to check as skipped, record it as not

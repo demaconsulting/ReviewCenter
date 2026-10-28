@@ -43,23 +43,33 @@ types are in `ValidationRunner.cs`:
 
 Calls `Run(context, CreateChecks(context.CheckConfig))`.
 
-**Run(Context, IReadOnlyList&lt;ValidationCheck&gt;)** (internal): The seam that lets tests run the report, the
-summary and the results files with fast stand-in checks.
+**Run(Context, IReadOnlyList&lt;ValidationCheck&gt;, TimeSpan?)** (internal): The seam that lets tests run the
+report, the summary and the results files with fast stand-in checks, and with a short deadline.
 
 Calls `PrintValidationHeader`, constructs a `TestResults` object named `"ReviewCenter Self-Validation"`, starts
-every check with `Task.Run(() => ValidationRunner.ExecuteAsync(check))` so that they run at the same time, then
-takes the outcomes in the listed order and passes each to `ValidationRunner.Report`, which records it and prints
-its line. It then prints the totals with `PrintSummary` and calls `WriteResultsFile` if `context.ResultsFile` is
-set.
+every check with `Task.Run(() => ValidationRunner.ExecuteAsync(check, timeout, CancellationToken.None))` so that
+they run at the same time, then takes the outcomes in the listed order and passes each to
+`ValidationRunner.Report`, which records it and prints its line. The timeout is `ValidationRunner.CheckTimeout`
+(60 seconds) unless the caller passes another one. It then prints the totals with `PrintSummary` and calls
+`WriteResultsFile` if `context.ResultsFile` is set.
 
 **ValidationRunner.ExecuteAsync**: Runs one check and turns its result or exception into a `CheckOutcome`.
 
-Starts a stopwatch and runs the check under a 60 second `CancellationTokenSource`. A returned detail text is a
-pass (`TestOutcome.Passed`, the text in `SystemOutput`). A `ValidationSkippedException` is a skip
-(`TestOutcome.NotExecuted`, because the test results library has no separate skipped outcome). A timeout, a
-`ValidationFailedException` or any other exception is a failure (`TestOutcome.Failed`, the message in
-`ErrorMessage`). The line has the form `✓ Name - Passed (123 ms): detail`, with `-` and `SKIPPED` for a skip and
-`✗` and `Failed` for a failure.
+Starts a stopwatch and starts the check on the thread pool with `Task.Run`, so that a check that blocks its thread
+before its first `await` cannot block the runner. The runner then waits with `Task.WhenAny` for three things: the
+check, a delay of the deadline (`timeout`, default 60 seconds; not positive is an `ArgumentOutOfRangeException`) and
+the cancellation of the caller. The deadline is therefore enforced by the runner and does not depend on the check
+looking at its token. A returned detail text is a pass (`TestOutcome.Passed`, the text in `SystemOutput`). A
+`ValidationSkippedException` is a skip (`TestOutcome.NotExecuted`, because the test results library has no separate
+skipped outcome). A `ValidationFailedException` or any other exception is a failure (`TestOutcome.Failed`, the
+message in `ErrorMessage`).
+
+When the deadline passes first, the token handed to the check is cancelled, the check is abandoned, and the
+outcome is a failure with the message `Timed out after N s`; the runner returns at once. A continuation observes
+the exception that the abandoned task may still throw later, so that it never becomes an unobserved task
+exception. When an `OperationCanceledException` reaches the runner while the deadline has not passed, the failure
+message is `Cancelled`, which is not mistaken for a timeout. The line has the form
+`✓ Name - Passed (123 ms): detail`, with `-` and `SKIPPED` for a skip and `✗` and `Failed` for a failure.
 
 **ValidationRunner.Report**: Adds the result to the collection and prints the line; a failed check goes through
 `context.WriteError`, which makes the exit code non-zero, and a pass or a skip through `context.WriteLine`.

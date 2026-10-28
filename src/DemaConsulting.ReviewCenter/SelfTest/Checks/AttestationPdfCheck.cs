@@ -62,6 +62,7 @@ internal static class AttestationPdfCheck
     public static Task<string> RunAsync(CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        // Declared first, so it is disposed last: the key provider (which may hold its key file) goes first
         using var folder = new TemporaryDirectory();
         using var keys = new SelfSignedKeyProvider(
             new AttestationOptions { SelfSignedFolder = Path.Combine(folder.DirectoryPath, "attestation") },

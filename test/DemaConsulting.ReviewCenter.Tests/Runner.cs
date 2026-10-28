@@ -55,6 +55,26 @@ internal static class Runner
         string program,
         params string[] arguments)
     {
+        return RunInFolder(out output, null, environment, program, arguments);
+    }
+
+    /// <summary>
+    ///     Runs the specified program in a working directory with extra environment variables and captures its output.
+    /// </summary>
+    /// <param name="output">Program output (stdout and stderr combined).</param>
+    /// <param name="workingDirectory">The working directory of the program, or <c>null</c> for the current one.</param>
+    /// <param name="environment">Environment variables to set for the program, added to the inherited ones.</param>
+    /// <param name="program">Program name or path.</param>
+    /// <param name="arguments">Program arguments.</param>
+    /// <returns>Program exit code.</returns>
+    /// <exception cref="InvalidOperationException">Thrown when process fails to start.</exception>
+    public static int RunInFolder(
+        out string output,
+        string? workingDirectory,
+        IReadOnlyDictionary<string, string> environment,
+        string program,
+        params string[] arguments)
+    {
         // Construct the start information
         var startInfo = new ProcessStartInfo(program)
         {
@@ -64,6 +84,10 @@ internal static class Runner
             UseShellExecute = false,
             CreateNoWindow = true
         };
+        if (workingDirectory is not null)
+        {
+            startInfo.WorkingDirectory = workingDirectory;
+        }
 
         // Add the environment variables
         foreach (var (name, value) in environment)

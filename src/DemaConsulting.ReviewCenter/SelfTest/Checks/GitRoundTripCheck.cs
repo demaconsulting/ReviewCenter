@@ -49,6 +49,7 @@ internal static class GitRoundTripCheck
     /// <exception cref="ValidationFailedException">Thrown when git fails or the data read back is wrong.</exception>
     public static async Task<string> RunAsync(CancellationToken cancellationToken)
     {
+        // Declared first, so it is disposed last: the repository (and its git processes) is closed before the folder
         using var folder = new TemporaryDirectory();
         var options = new GitOptions { CachePath = Path.Combine(folder.DirectoryPath, "git-cache"), TimeoutSeconds = 60 };
         var runner = new GitRunner(options);

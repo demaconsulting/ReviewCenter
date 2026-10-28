@@ -22,6 +22,9 @@ the test still confirms that disposal never throws.
   `ArgumentNullException` for a null path.
 - `Dispose` removes the directory with all its files, including read-only files.
 - `Dispose` never throws, not when a file is in use and not when it is called twice.
+- `Dispose` retries a locked directory a bounded number of times: a lock released within the time
+  is overcome, a permanent lock is given up quietly after about five attempts, and a retry policy
+  with no attempt or a negative pause is refused.
 
 #### Test Scenarios
 
@@ -60,3 +63,22 @@ exception is thrown. This scenario is tested by
 exclusively while the directory is disposed; no exception is thrown, and after the file is
 released a second disposal removes what is left. This scenario is tested by
 `TemporaryDirectory_Dispose_FileInUse_DoesNotThrow`.
+
+**TemporaryDirectory_Dispose_FileLockedBriefly_RetriesAndDeletesDirectory**: On Windows a file is
+held open and released about 100 ms later while the directory is disposed with a short retry
+policy; the single `Dispose` call removes the whole directory, which a single attempt could not.
+This scenario is tested by `TemporaryDirectory_Dispose_FileLockedBriefly_RetriesAndDeletesDirectory`.
+
+**TemporaryDirectory_Dispose_FileLockedPermanently_GivesUpWithoutThrowingInBoundedTime**: On
+Windows a file stays held open for the whole disposal with the default policy; no exception is
+thrown, the call takes at least about 200 ms (the retries happened) and returns well within the
+bound of five attempts. This scenario is tested by
+`TemporaryDirectory_Dispose_FileLockedPermanently_GivesUpWithoutThrowingInBoundedTime`.
+
+**TemporaryDirectory_Constructor_InvalidRetryPolicy_ThrowsArgumentOutOfRangeException**: Zero
+attempts and a negative pause are refused. This scenario is tested by
+`TemporaryDirectory_Constructor_InvalidRetryPolicy_ThrowsArgumentOutOfRangeException`.
+
+**TemporaryDirectory_Dispose_SingleAttemptPolicy_DoesNotPause**: With one attempt and a long pause
+a locked directory is given up at once, so the pause is only used between attempts. This scenario is
+tested by `TemporaryDirectory_Dispose_SingleAttemptPolicy_DoesNotPause`.

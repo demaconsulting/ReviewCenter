@@ -51,9 +51,54 @@ internal static class ReviewWorkflowCheck
     /// <exception cref="ValidationFailedException">Thrown when a step fails or the data read back is wrong.</exception>
     public static async Task<string> RunAsync(CancellationToken cancellationToken)
     {
+        // Declared first, so it is deleted last: everything below that uses the folder is finished by then
         using var folder = new TemporaryDirectory();
-        await using var provider = SelfTestServices.Create(folder);
 
+        // The repository does not depend on the services, so it is built while they start; the two together
+        // would otherwise add up. It has its own git runner and is awaited before the folder is deleted.
+        var originRunner = new GitRunner(new GitOptions { CachePath = folder.GetFilePath("origin-git-cache"), TimeoutSeconds = 60 });
+        var originTask = SelfTestGit.CreateOriginAsync(originRunner, folder, cancellationToken, secondCommit: false);
+
+        try
+        {
+            await using var provider = SelfTestServices.Create(folder);
+
+            // The first call of the production git runner checks the git version with a process of its own. Make
+            // it now, while the user is created, so that the planner does not wait for it.
+            var gitVersion = provider.GetRequiredService<GitRunner>().CheckVersionAsync(cancellationToken);
+            try
+            {
+                return await RunWorkflowAsync(provider, originTask, gitVersion, cancellationToken);
+            }
+            finally
+            {
+                await Task.WhenAny(gitVersion);
+                _ = gitVersion.Exception;
+            }
+        }
+        finally
+        {
+            // Never delete the folder under a git process that is still working in it
+            await Task.WhenAny(originTask);
+            _ = originTask.Exception;
+        }
+    }
+
+    /// <summary>
+    ///     Runs the steps of the workflow on the services.
+    /// </summary>
+    /// <param name="provider">The production services over the embedded database.</param>
+    /// <param name="originTask">The task that builds the local repository; awaited when it is registered.</param>
+    /// <param name="gitVersion">The task that checks the git version; awaited before the planner runs git.</param>
+    /// <param name="cancellationToken">Cancels the check.</param>
+    /// <returns>A short description of the signed review and of what the evidence index recorded.</returns>
+    /// <exception cref="ValidationFailedException">Thrown when a step fails or the data read back is wrong.</exception>
+    private static async Task<string> RunWorkflowAsync(
+        ServiceProvider provider,
+        Task<SelfTestGit.Origin> originTask,
+        Task gitVersion,
+        CancellationToken cancellationToken)
+    {
         try
         {
             // A system administrator who is also the project member who signs; the password goes through the
@@ -67,8 +112,8 @@ internal static class ReviewWorkflowCheck
             await projects.AddMemberAsync(actor, project.Id, user.Username, ProjectRole.User, cancellationToken);
 
             // A local repository registered like any other, then planned and created through the planner
-            var origin = await SelfTestGit.CreateOriginAsync(
-                provider.GetRequiredService<GitRunner>(), folder, cancellationToken, secondCommit: false);
+            var origin = await originTask;
+            await gitVersion;
             var repository = await provider.GetRequiredService<RepositoryService>().CreateAsync(
                 project.Id, "selftest", origin.Folder, null, null, actor, cancellationToken);
             var planner = provider.GetRequiredService<ReviewPlanner>();

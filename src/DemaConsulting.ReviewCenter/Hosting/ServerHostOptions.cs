@@ -52,4 +52,27 @@ internal sealed class ServerHostOptions
     ///     logger provider. <c>null</c> (the default) means no extra configuration is applied.
     /// </remarks>
     public Action<WebApplicationBuilder>? ConfigureBuilder { get; init; }
+
+    /// <summary>
+    ///     Gets the complete configuration of a fully isolated host, or <c>null</c> (the default) for the normal host
+    ///     that reads its configuration from the usual sources.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         When set, <see cref="ServerHost.CreateApplication"/> builds the host on
+    ///         <see cref="WebApplication.CreateEmptyBuilder"/> instead of <see cref="WebApplication.CreateBuilder()"/>
+    ///         and these values are the only configuration. That builder has no defaults: it does not read
+    ///         <c>appsettings.json</c> (neither beside the program nor in the working directory), the
+    ///         <c>DOTNET_</c> and <c>ASPNETCORE_</c> environment variables, any other environment variable, the user
+    ///         secrets or the command line, and it does not take the environment name from the environment (it is
+    ///         always <c>Production</c>). The only listen address is the one of the context. Kestrel and routing are
+    ///         added explicitly.
+    ///     </para>
+    ///     <para>
+    ///         The self-validation uses it so that its host check can be neither broken nor redirected by how the
+    ///         server happens to be configured. It is not for production: an isolated host ignores the operator's
+    ///         configuration on purpose.
+    ///     </para>
+    /// </remarks>
+    public IReadOnlyDictionary<string, string?>? IsolatedSettings { get; init; }
 }

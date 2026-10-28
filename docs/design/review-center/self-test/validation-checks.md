@@ -21,15 +21,19 @@ skip by throwing `ValidationSkippedException`. The checks hold no state. The hel
 
 The default run has eight checks:
 
-- **GitAvailableCheck** (`ReviewCenter_GitAvailable`): runs `git --version` through the production `GitRunner`,
-  which enforces the minimum version.
+- **GitAvailableCheck** (`ReviewCenter_GitAvailable`): runs one `git --version` through the production
+  `GitRunner.CheckVersionAsync`, which enforces the minimum version and returns the version text; the same
+  runner does not repeat the version check on its first command.
 - **GitRoundTripCheck** (`ReviewCenter_GitRoundTrip`): creates a local repository with `SelfTestGit`, mirrors it
   with the production `GitSource` into a temporary cache, resolves the branch, lists the changes and reads a file
   as a raw blob.
 - **ReviewWorkflowCheck** (`ReviewCenter_ReviewWorkflow`): on an embedded SQLite database in a temporary folder,
   with the services registered by `SelfTestServices`, creates a user, a project and a review, answers the
   checklist, signs the review with a local-password re-authentication, and reads the evidence index back with the
-  fingerprint and the record digest. The detail says `embedded SQLite`.
+  fingerprint and the record digest. The detail says `embedded SQLite`. To keep the run short, the local origin
+  repository (four git commands) is created at the same time as the services are built, and the git version check
+  of the services' `GitRunner` starts as soon as they exist; both are awaited before the repository is registered,
+  and neither is left running when the check ends. The embedded database uses `FastCommitInterceptor` (below).
 - **FingerprintCheck** (`ReviewCenter_Fingerprint`): hashes three files of fixed bytes with the production
   `Fingerprint` and compares each hash and the combined fingerprint with literals computed once, independently
   (the fingerprint literal is `13e028da06299fcedffff47b2b55cca46a68111f3124d77d355364339c4215f2`), so a platform
@@ -43,10 +47,13 @@ The default run has eight checks:
   an attestation with the production renderer and signer, verifies the CMS signature and the DocMDP certification
   independently with `System.Security.Cryptography.Pkcs`, then changes one byte and requires the verification to
   fail.
-- **HostStartCheck** (`ReviewCenter_HostStart`): starts the production host (`ServerHost.CreateApplication`) over
-  a replaced in-memory configuration, a temporary SQLite database and the address `http://127.0.0.1:0` (the
-  operating system picks a free port), requests `/login` and an embedded static asset, expects HTTP 200 for both,
-  and stops the host cleanly. The host is started once.
+- **HostStartCheck** (`ReviewCenter_HostStart`): starts the production host (`ServerHost.CreateApplication`) in
+  isolated mode (`ServerHostOptions.IsolatedSettings` holds the in-memory settings and a temporary SQLite database;
+  the host is built from an empty builder, so no `appsettings.json`, environment variable or host default is read)
+  on the address `http://127.0.0.1:0` (the operating system picks a free port). `ExpectOneLoopbackAddress` requires
+  that the host bound exactly one loopback address with a real port; the check requests `/login` and an embedded
+  static asset, expects HTTP 200 for both, and stops the host cleanly before the temporary folder is disposed. The
+  host is started once.
 
 The opt-in ninth check is run only with `--validate --check-config`:
 
@@ -57,12 +64,26 @@ The opt-in ninth check is run only with `--validate --check-config`:
   nothing is configured and no database exists at the default location, it throws `ValidationSkippedException`.
   The database has no schema version number, so the comparison of tables and columns is the version check.
 
+**FastCommitInterceptor** (internal, `SelfTestServices`): an EF Core connection interceptor that sets
+`synchronous=OFF` and `journal_mode=MEMORY` when a connection opens, so that the many commits of the review
+workflow do not wait for the disk. It is created with the required `allowedFolder` (the temporary folder of the
+check; null or white space is an `ArgumentException`) and relaxes only a writable file database whose full path is
+inside that folder. A read-only or in-memory connection, and a path outside the folder (including a sibling
+folder with the same name prefix and a path with `..`), is left alone. It is registered only by
+`SelfTestServices`, never by the production `AddServices`, so a stored review database keeps the default
+commit behavior.
+
+**Disposal order**: every check creates its `TemporaryDirectory` first and stops everything that uses it (host,
+child processes, database connections, services) before the directory is disposed. `Dispose` retries a lock that
+goes away a moment later but does not close handles.
+
 #### Error Handling
 
 A check lets its exceptions escape; `ValidationRunner.ExecuteAsync` records them as failures, so no check contains
 its own `try`/`catch` scaffolding. Messages never contain the connection string, the database path, a password or
-another secret. Every check receives a 60 second cancellation token from the runner, so a hung git process or host
-ends as a failure instead of hanging the run.
+another secret. Every check receives a cancellation token from the runner, which also enforces the 60 second deadline
+itself: a check that blocks a thread or ignores its token is recorded as `Timed out after 60 s` and the run goes on,
+so a hung git process or host ends as a failure instead of hanging the run.
 
 #### Dependencies
 

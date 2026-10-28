@@ -31,9 +31,14 @@ The escape check is `PathHelpers.SafePathCombine`, so a caller-supplied name can
 that is deleted on disposal.
 
 **Dispose**: Deletes the directory tree. The read-only flag of every file is cleared first, because git writes its
-object files read-only and Windows refuses to delete such files. `IOException` and `UnauthorizedAccessException`
+object files read-only and Windows refuses to delete such files. If a file is still in use, the deletion is retried
+a bounded number of times: by default 5 attempts with a pause of about 75 ms between two attempts, so a `Dispose`
+that cannot succeed returns after about 0.3 s. `IOException` and `UnauthorizedAccessException` of the last attempt
 are swallowed, because a cleanup failure must not turn finished work into a failure; calling it more than once is
-safe.
+safe. An internal constructor takes the number of attempts (at least 1) and the pause (not negative) so that tests
+can use a short policy. The caller must stop everything that uses the directory (a web host, a database
+connection, a child process) before it disposes the directory; the retry only covers a lock that is released a
+moment later, such as the one of a virus scanner.
 
 #### Error Handling
 

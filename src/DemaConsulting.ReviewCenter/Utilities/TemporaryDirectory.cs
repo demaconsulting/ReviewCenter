@@ -34,6 +34,26 @@ namespace DemaConsulting.ReviewCenter.Utilities;
 internal sealed class TemporaryDirectory : IDisposable
 {
     /// <summary>
+    ///     The number of times <see cref="Dispose"/> tries to delete the directory before it gives up.
+    /// </summary>
+    internal const int DefaultDeleteAttempts = 5;
+
+    /// <summary>
+    ///     The pause between two delete attempts; long enough for a scanner or a closing handle to let go.
+    /// </summary>
+    internal static readonly TimeSpan DefaultRetryDelay = TimeSpan.FromMilliseconds(75);
+
+    /// <summary>
+    ///     How many times <see cref="Dispose"/> tries to delete the directory.
+    /// </summary>
+    private readonly int _deleteAttempts;
+
+    /// <summary>
+    ///     How long <see cref="Dispose"/> waits between two attempts.
+    /// </summary>
+    private readonly TimeSpan _retryDelay;
+
+    /// <summary>
     ///     Gets the full path of the temporary directory.
     /// </summary>
     public string DirectoryPath { get; }
@@ -46,7 +66,29 @@ internal sealed class TemporaryDirectory : IDisposable
     ///     <see cref="UnauthorizedAccessException"/> or <see cref="ArgumentException"/>.
     /// </exception>
     public TemporaryDirectory()
+        : this(DefaultDeleteAttempts, DefaultRetryDelay)
     {
+    }
+
+    /// <summary>
+    ///     Initializes a new instance of the <see cref="TemporaryDirectory"/> class with its own retry policy; it
+    ///     exists so that tests can exercise the retry without waiting for the production delay.
+    /// </summary>
+    /// <param name="deleteAttempts">How many times <see cref="Dispose"/> tries to delete the directory; at least 1.</param>
+    /// <param name="retryDelay">The pause between two attempts; not negative.</param>
+    /// <exception cref="ArgumentOutOfRangeException">
+    ///     Thrown when <paramref name="deleteAttempts"/> is less than 1 or <paramref name="retryDelay"/> is negative.
+    /// </exception>
+    /// <exception cref="InvalidOperationException">
+    ///     Thrown when the directory cannot be created because of an <see cref="IOException"/>,
+    ///     <see cref="UnauthorizedAccessException"/> or <see cref="ArgumentException"/>.
+    /// </exception>
+    internal TemporaryDirectory(int deleteAttempts, TimeSpan retryDelay)
+    {
+        ArgumentOutOfRangeException.ThrowIfLessThan(deleteAttempts, 1);
+        ArgumentOutOfRangeException.ThrowIfLessThan(retryDelay, TimeSpan.Zero);
+        _deleteAttempts = deleteAttempts;
+        _retryDelay = retryDelay;
         DirectoryPath = PathHelpers.SafePathCombine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
 
         try
@@ -88,34 +130,48 @@ internal sealed class TemporaryDirectory : IDisposable
     }
 
     /// <summary>
-    ///     Deletes the temporary directory and all of its contents.
+    ///     Deletes the temporary directory and all of its contents, retrying a few times when something still holds it.
     /// </summary>
     /// <remarks>
-    ///     <see cref="IOException"/> and <see cref="UnauthorizedAccessException"/> are swallowed on purpose: a
-    ///     cleanup failure must not turn a finished piece of work into a failure. Read-only flags are cleared first,
-    ///     because git writes its object files read-only and Windows refuses to delete such files. Calling the method
-    ///     more than once is safe.
+    ///     A file can stay locked for a moment after the process or connection that used it was stopped (an
+    ///     anti-virus scanner, the indexer, a SQLite handle that is released asynchronously), and Windows refuses to
+    ///     delete such a file. The delete is therefore tried up to <c>_deleteAttempts</c> times, with a short pause
+    ///     between the attempts, so the total wait is bounded (about 0.3 s by default). <see cref="IOException"/> and
+    ///     <see cref="UnauthorizedAccessException"/> are swallowed on purpose after the last attempt: a cleanup
+    ///     failure must not turn a finished piece of work into a failure, and a folder that is still locked is left
+    ///     to the operating system's temporary-file cleanup. Read-only flags are cleared first, because git writes
+    ///     its object files read-only and Windows refuses to delete such files. Calling the method more than once is
+    ///     safe: it returns at once when the folder is gone. Everything that uses the folder (hosts, processes,
+    ///     database connections) must be stopped before the call, which the callers do by disposing it last.
     /// </remarks>
     public void Dispose()
     {
-        try
+        for (var attempt = 1; attempt <= _deleteAttempts; attempt++)
         {
-            if (!Directory.Exists(DirectoryPath))
+            try
             {
+                if (!Directory.Exists(DirectoryPath))
+                {
+                    return;
+                }
+
+                // Git object files are read-only, which blocks the recursive delete on Windows
+                foreach (var file in Directory.EnumerateFiles(DirectoryPath, "*", SearchOption.AllDirectories))
+                {
+                    File.SetAttributes(file, FileAttributes.Normal);
+                }
+
+                Directory.Delete(DirectoryPath, recursive: true);
                 return;
             }
-
-            // Git object files are read-only, which blocks the recursive delete on Windows
-            foreach (var file in Directory.EnumerateFiles(DirectoryPath, "*", SearchOption.AllDirectories))
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
             {
-                File.SetAttributes(file, FileAttributes.Normal);
+                // Wait for the lock to go away, except after the last attempt, which gives up quietly
+                if (attempt < _deleteAttempts)
+                {
+                    Thread.Sleep(_retryDelay);
+                }
             }
-
-            Directory.Delete(DirectoryPath, recursive: true);
-        }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-        {
-            // Ignore cleanup errors during disposal
         }
     }
 }

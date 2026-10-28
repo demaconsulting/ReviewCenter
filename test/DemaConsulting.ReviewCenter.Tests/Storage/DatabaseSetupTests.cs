@@ -18,6 +18,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
+using DemaConsulting.ReviewCenter.SelfTest.Checks;
 using DemaConsulting.ReviewCenter.Storage;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
@@ -281,7 +282,8 @@ public class DatabaseSetupTests
         using var plainProvider = services.BuildServiceProvider();
         var fastServices = new ServiceCollection()
             .AddDbContextFactory<ReviewCenterDbContext>(builder => DatabaseSetup.Configure(builder, fastOptions));
-        FastCommitInterceptor.AddTo(fastServices);
+        fastServices.ConfigureDbContext<ReviewCenterDbContext>(
+            builder => builder.AddInterceptors(new FastCommitInterceptor(folder)));
         using var fastProvider = fastServices.BuildServiceProvider();
 
         try

@@ -94,15 +94,20 @@ internal static class Validation
     /// </summary>
     /// <param name="context">The context containing command line arguments and program state.</param>
     /// <param name="checks">The checks to run, in order. Must not be null.</param>
+    /// <param name="checkTimeout">
+    ///     The deadline of each check, or <c>null</c> for <see cref="ValidationRunner.CheckTimeout"/>; tests pass a
+    ///     short one to prove that a hung check is reported instead of hanging the run.
+    /// </param>
     /// <exception cref="ArgumentNullException">Thrown when an argument is null.</exception>
     /// <remarks>
     ///     The seam that lets tests exercise the report, the summary and the results files with fast checks, so
     ///     the suite does not pay for the real checks more than a few times.
     /// </remarks>
-    internal static void Run(Context context, IReadOnlyList<ValidationCheck> checks)
+    internal static void Run(Context context, IReadOnlyList<ValidationCheck> checks, TimeSpan? checkTimeout = null)
     {
         ArgumentNullException.ThrowIfNull(context);
         ArgumentNullException.ThrowIfNull(checks);
+        var timeout = checkTimeout ?? ValidationRunner.CheckTimeout;
 
         // Print validation header
         PrintValidationHeader(context);
@@ -114,8 +119,11 @@ internal static class Validation
         };
         // The checks are independent and hermetic, so they run at the same time: the slow ones (the review
         // workflow, the host start) overlap instead of adding up. The report is still printed in the listed order.
+        // Every check has its own deadline, enforced by the runner, so one hung check cannot hang the run.
         var watch = Stopwatch.StartNew();
-        var running = checks.Select(check => Task.Run(() => ValidationRunner.ExecuteAsync(check))).ToList();
+        var running = checks
+            .Select(check => Task.Run(() => ValidationRunner.ExecuteAsync(check, timeout, CancellationToken.None)))
+            .ToList();
         foreach (var task in running)
         {
             ValidationRunner.Report(context, testResults, task.GetAwaiter().GetResult());

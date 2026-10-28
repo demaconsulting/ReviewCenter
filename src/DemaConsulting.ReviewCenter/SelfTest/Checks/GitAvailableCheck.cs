@@ -18,7 +18,6 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-using System.Text;
 using DemaConsulting.ReviewCenter.ContentSources;
 using DemaConsulting.ReviewCenter.Core;
 using DemaConsulting.ReviewCenter.Utilities;
@@ -30,8 +29,8 @@ namespace DemaConsulting.ReviewCenter.SelfTest.Checks;
 /// </summary>
 /// <remarks>
 ///     The check runs <c>git --version</c> through the production <see cref="GitRunner"/>, which enforces the
-///     minimum version, so it proves exactly what the server will find. Its working folders are temporary. The
-///     class is stateless and thread-safe.
+///     minimum version, so it proves exactly what the server will find. It makes that one call only. Its working
+///     folders are temporary. The class is stateless and thread-safe.
 /// </remarks>
 internal static class GitAvailableCheck
 {
@@ -53,8 +52,7 @@ internal static class GitAvailableCheck
 
         try
         {
-            var result = await runner.RunAsync(["--version"], null, 4096, cancellationToken);
-            var text = Encoding.UTF8.GetString(result.Output).Trim();
+            var text = await runner.CheckVersionAsync(cancellationToken);
             return $"{text} (minimum {GitRunner.MinimumVersion})";
         }
         catch (DomainRuleException ex)

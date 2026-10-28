@@ -19,6 +19,7 @@
 // SOFTWARE.
 
 using System.Diagnostics;
+using System.Globalization;
 using DemaConsulting.ReviewCenter.Cli;
 using DemaConsulting.TestResults;
 
@@ -94,7 +95,8 @@ internal static class ValidationRunner
     public static readonly TimeSpan CheckTimeout = TimeSpan.FromSeconds(60);
 
     /// <summary>
-    ///     Runs a check, times it and turns its result or exception into an outcome; nothing is printed yet.
+    ///     Runs a check under the default <see cref="CheckTimeout"/>, times it and turns its result or exception into
+    ///     an outcome; nothing is printed yet.
     /// </summary>
     /// <param name="check">The check to run. Must not be null.</param>
     /// <returns>The recorded result and the report line for it.</returns>
@@ -103,21 +105,68 @@ internal static class ValidationRunner
     ///     Never throws for a failing check: every exception becomes a failed result. The elapsed time is that of
     ///     the check itself, so it includes any slowdown from checks that run at the same time.
     /// </remarks>
-    public static async Task<CheckOutcome> ExecuteAsync(ValidationCheck check)
+    public static Task<CheckOutcome> ExecuteAsync(ValidationCheck check)
+    {
+        return ExecuteAsync(check, CheckTimeout, CancellationToken.None);
+    }
+
+    /// <summary>
+    ///     Runs a check with its own deadline, times it and turns its result or exception into an outcome; nothing is
+    ///     printed yet.
+    /// </summary>
+    /// <param name="check">The check to run. Must not be null.</param>
+    /// <param name="timeout">The longest the check may take; must be positive.</param>
+    /// <param name="cancellationToken">Cancels the check on behalf of the caller (for example Ctrl+C).</param>
+    /// <returns>The recorded result and the report line for it.</returns>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="check"/> is null.</exception>
+    /// <exception cref="ArgumentOutOfRangeException">Thrown when <paramref name="timeout"/> is not positive.</exception>
+    /// <remarks>
+    ///     <para>
+    ///         The deadline is enforced by the runner itself, not by the check: the check starts on the thread pool
+    ///         and the runner waits for whichever comes first, the check, the deadline or the caller's
+    ///         cancellation. A check that blocks synchronously or never looks at its token therefore cannot hang
+    ///         the validation. When the deadline passes the token is cancelled, the outcome is recorded as failed
+    ///         ("Timed out after N s") and the runner returns without waiting for the check.
+    ///     </para>
+    ///     <para>
+    ///         Limitation: .NET cannot abort a running delegate, so a check that ignores its token keeps running
+    ///         in the background until it ends on its own (or the process exits). Whatever it later throws is
+    ///         observed and dropped, so it cannot surface as an unobserved task exception. A check that is
+    ///         cancelled by the caller, or that throws <see cref="OperationCanceledException"/> by itself, is
+    ///         reported as "Cancelled", which is distinct from a timeout.
+    ///     </para>
+    ///     <para>
+    ///         Never throws for a failing check: every exception becomes a failed result. The elapsed time is that of
+    ///         the check itself, so it includes any slowdown from checks that run at the same time.
+    ///     </para>
+    /// </remarks>
+    internal static async Task<CheckOutcome> ExecuteAsync(
+        ValidationCheck check,
+        TimeSpan timeout,
+        CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(check);
+        ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(timeout, TimeSpan.Zero);
 
         var test = new TestResult { Name = check.Name, ClassName = "Validation", CodeBase = "ReviewCenter" };
         var watch = Stopwatch.StartNew();
         string line;
         try
         {
-            // Run the check under a time limit so that a hung git process or host cannot hang the validation
-            using var timeout = new CancellationTokenSource(CheckTimeout);
-            var detail = await check.RunAsync(timeout.Token);
-            test.Outcome = TestOutcome.Passed;
-            test.SystemOutput = detail;
-            line = Format("✓", check.Name, "Passed", watch, detail);
+            var detail = await RunWithDeadlineAsync(check, timeout, cancellationToken);
+            if (detail is null)
+            {
+                // The runner stopped waiting: this is the deadline, not a failure of the check itself
+                test.Outcome = TestOutcome.Failed;
+                test.ErrorMessage = $"Timed out after {timeout.TotalSeconds.ToString("0.##", CultureInfo.InvariantCulture)} s";
+                line = Format("✗", check.Name, "Failed", watch, test.ErrorMessage);
+            }
+            else
+            {
+                test.Outcome = TestOutcome.Passed;
+                test.SystemOutput = detail;
+                line = Format("✓", check.Name, "Passed", watch, detail);
+            }
         }
         catch (ValidationSkippedException ex)
         {
@@ -127,8 +176,9 @@ internal static class ValidationRunner
         }
         catch (OperationCanceledException)
         {
+            // Cancelled by the caller or by the check itself, which is not a timeout
             test.Outcome = TestOutcome.Failed;
-            test.ErrorMessage = $"Timed out after {CheckTimeout.TotalSeconds:0} s";
+            test.ErrorMessage = "Cancelled";
             line = Format("✗", check.Name, "Failed", watch, test.ErrorMessage);
         }
         // Generic catch is justified here as this is a test framework - any exception, expected or not, is
@@ -142,6 +192,58 @@ internal static class ValidationRunner
 
         test.Duration = watch.Elapsed;
         return new CheckOutcome(test, line);
+    }
+
+    /// <summary>
+    ///     Starts a check on the thread pool and waits for it, for the deadline or for the caller's cancellation,
+    ///     whichever comes first.
+    /// </summary>
+    /// <param name="check">The check to run.</param>
+    /// <param name="timeout">The deadline.</param>
+    /// <param name="cancellationToken">The caller's cancellation.</param>
+    /// <returns>The detail text of the check, or <c>null</c> when the deadline passed before the check ended.</returns>
+    /// <exception cref="OperationCanceledException">Thrown when the caller cancelled or the check was cancelled.</exception>
+    private static async Task<string?> RunWithDeadlineAsync(
+        ValidationCheck check,
+        TimeSpan timeout,
+        CancellationToken cancellationToken)
+    {
+        using var checkSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        using var timerSource = new CancellationTokenSource();
+        var callerCancelled = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        using var registration = cancellationToken.Register(() => callerCancelled.TrySetResult());
+
+        // The thread pool runs the check, so even code that blocks synchronously before its first await cannot
+        // keep this method from reaching the deadline
+        var token = checkSource.Token;
+        var work = Task.Run(() => check.RunAsync(token), CancellationToken.None);
+        var deadline = Task.Delay(timeout, timerSource.Token);
+        var first = await Task.WhenAny(work, deadline, callerCancelled.Task);
+
+        // Stop the timer; a finished check must not leave it running
+        await timerSource.CancelAsync();
+
+        if (ReferenceEquals(first, work) || work.IsCompleted)
+        {
+            return await work ?? string.Empty;
+        }
+
+        // Deadline or caller cancellation: tell the check to stop, but do not wait for it. Its exception, if it
+        // ever ends with one, is observed here so that it does not become an unobserved task exception.
+        await checkSource.CancelAsync();
+        _ = work.ContinueWith(
+            static task => _ = task.Exception,
+            CancellationToken.None,
+            TaskContinuationOptions.OnlyOnFaulted | TaskContinuationOptions.ExecuteSynchronously,
+            TaskScheduler.Default);
+
+        if (ReferenceEquals(first, deadline))
+        {
+            // The deadline passed: no detail, which the caller reports as a timeout
+            return null;
+        }
+
+        throw new OperationCanceledException(cancellationToken);
     }
 
     /// <summary>

@@ -41,3 +41,20 @@ sections:
           - TemporaryDirectory_Dispose_DirectoryWithReadOnlyFile_DeletesEverything
           - TemporaryDirectory_Dispose_CalledTwice_DoesNotThrow
           - TemporaryDirectory_Dispose_FileInUse_DoesNotThrow
+
+      - id: ReviewCenter-TemporaryDirectory-BoundedRetry
+        title: >-
+          The TemporaryDirectory class shall, when the directory cannot be deleted because a file is still in use,
+          retry the deletion a bounded number of times (five attempts about 75 ms apart by default), succeed when the
+          lock goes away within that time, give up quietly and without a further wait when it does not, and refuse a
+          retry policy that has no attempt or a negative pause.
+        justification: |
+          A file can stay locked for a moment after the process or database connection that used it was stopped, for
+          example while a virus scanner or the indexer still holds it, and Windows refuses to delete such a file. A
+          single attempt left temporary folders behind and a retry without a limit could hang a run, so the number of
+          attempts and the pause are fixed and small, and the total wait stays under half a second.
+        tests:
+          - TemporaryDirectory_Dispose_FileLockedBriefly_RetriesAndDeletesDirectory
+          - TemporaryDirectory_Dispose_FileLockedPermanently_GivesUpWithoutThrowingInBoundedTime
+          - TemporaryDirectory_Constructor_InvalidRetryPolicy_ThrowsArgumentOutOfRangeException
+          - TemporaryDirectory_Dispose_SingleAttemptPolicy_DoesNotPause

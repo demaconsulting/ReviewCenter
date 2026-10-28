@@ -23,8 +23,11 @@ using DemaConsulting.ReviewCenter.ContentSources;
 using DemaConsulting.ReviewCenter.Core;
 using DemaConsulting.ReviewCenter.Evidence;
 using DemaConsulting.ReviewCenter.Hosting;
+using DemaConsulting.ReviewCenter.SelfTest;
+using DemaConsulting.ReviewCenter.SelfTest.Checks;
 using DemaConsulting.ReviewCenter.Storage;
 using DemaConsulting.ReviewCenter.Tests.Core;
+using DemaConsulting.ReviewCenter.Utilities;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.Configuration;
@@ -951,5 +954,243 @@ public class ServerHostTests
                 });
             }
         };
+    }
+}
+
+/// <summary>
+///     Tests of the fully isolated host (<see cref="ServerHostOptions.IsolatedSettings"/>): it must ignore every
+///     ambient configuration source. They change process environment variables, so they run exclusively.
+/// </summary>
+[Collection("Sequential")]
+public class ServerHostIsolationTests
+{
+    /// <summary>
+    ///     Sets environment variables and restores the previous values when disposed.
+    /// </summary>
+    private sealed class PoisonedEnvironment : IDisposable
+    {
+        /// <summary>
+        ///     The values the variables had before.
+        /// </summary>
+        private readonly Dictionary<string, string?> _previous = [];
+
+        /// <summary>
+        ///     Initializes a new instance of the <see cref="PoisonedEnvironment"/> class and sets the variables.
+        /// </summary>
+        /// <param name="poisonedPort">The port the poisoned listen addresses name.</param>
+        /// <param name="sentinelFolder">A folder that must stay empty; the poisoned paths point into it.</param>
+        public PoisonedEnvironment(int poisonedPort, string sentinelFolder)
+        {
+            Set("ASPNETCORE_URLS", $"http://127.0.0.1:{poisonedPort}");
+            Set("ASPNETCORE_HTTP_PORTS", poisonedPort.ToString(System.Globalization.CultureInfo.InvariantCulture));
+            Set("ASPNETCORE_HTTPS_PORTS", null);
+            Set("ASPNETCORE_Kestrel__Endpoints__Default__Url", $"http://127.0.0.1:{poisonedPort}");
+            Set("Kestrel__Endpoints__Default__Url", $"http://127.0.0.1:{poisonedPort}");
+            Set("DOTNET_URLS", $"http://127.0.0.1:{poisonedPort}");
+            Set("ASPNETCORE_ENVIRONMENT", "Development");
+            Set("DOTNET_ENVIRONMENT", "Development");
+            Set("Database__Provider", "Oracle");
+            Set("DataProtection__KeysPath", Path.Combine(sentinelFolder, "keys"));
+            Set("Git__CachePath", Path.Combine(sentinelFolder, "git"));
+            Set(TestDatabase.ConnectionStringVariable, $"Data Source={Path.Combine(sentinelFolder, "ambient.db")};Pooling=False");
+        }
+
+        /// <summary>
+        ///     Sets one variable and remembers its previous value.
+        /// </summary>
+        /// <param name="name">The variable name.</param>
+        /// <param name="value">The new value, or <c>null</c> to remove the variable.</param>
+        private void Set(string name, string? value)
+        {
+            _previous.TryAdd(name, Environment.GetEnvironmentVariable(name));
+            Environment.SetEnvironmentVariable(name, value);
+        }
+
+        /// <inheritdoc />
+        public void Dispose()
+        {
+            foreach (var (name, value) in _previous)
+            {
+                Environment.SetEnvironmentVariable(name, value);
+            }
+        }
+    }
+
+    /// <summary>
+    ///     Finds a loopback port that is free right now.
+    /// </summary>
+    /// <returns>The port number.</returns>
+    private static int FindFreePort()
+    {
+        var listener = new System.Net.Sockets.TcpListener(System.Net.IPAddress.Loopback, 0);
+        listener.Start();
+        try
+        {
+            return ((System.Net.IPEndPoint)listener.LocalEndpoint).Port;
+        }
+        finally
+        {
+            listener.Stop();
+        }
+    }
+
+    /// <summary>
+    ///     Creates the options of the isolated host over a temporary folder.
+    /// </summary>
+    /// <param name="folder">The temporary folder.</param>
+    /// <returns>The options.</returns>
+    private static ServerHostOptions IsolatedOptions(TemporaryDirectory folder)
+    {
+        return new ServerHostOptions { IsolatedSettings = SelfTestServices.CreateSettings(folder) };
+    }
+
+    /// <summary>
+    ///     Test that the isolated host listens only on the address of the context and takes nothing from a poisoned
+    ///     environment: the listen address, the environment name and the database settings.
+    /// </summary>
+    [Fact]
+    public async Task ServerHost_CreateApplication_IsolatedSettings_IgnoresPoisonedEnvironment()
+    {
+        // Arrange: a poisoned process environment and a sentinel folder that must stay untouched
+        using var folder = new TemporaryDirectory();
+        using var sentinel = new TemporaryDirectory();
+        var poisonedPort = FindFreePort();
+        using var poison = new PoisonedEnvironment(poisonedPort, sentinel.DirectoryPath);
+        using var context = Context.Create(["serve", "--silent", "--urls", "http://127.0.0.1:0"]);
+
+        // Act: create and start the isolated host
+        var app = ServerHost.CreateApplication(context, IsolatedOptions(folder));
+        try
+        {
+            await app.StartAsync(TestContext.Current.CancellationToken);
+            var address = HostStartCheck.ExpectOneLoopbackAddress(app.Urls);
+
+            // Assert: one loopback address that is not the poisoned one, a production environment and a database
+            // in the temporary folder only
+            Assert.NotEqual(poisonedPort, address.Port);
+            Assert.Equal("Production", app.Environment.EnvironmentName);
+            Assert.True(File.Exists(Path.Combine(folder.DirectoryPath, "selftest.db")));
+            Assert.Empty(Directory.GetFileSystemEntries(sentinel.DirectoryPath));
+            await app.StopAsync(TestContext.Current.CancellationToken);
+        }
+        finally
+        {
+            await app.DisposeAsync();
+        }
+    }
+
+    /// <summary>
+    ///     Test that the poison used above is effective: the normal host, which reads the environment, listens on the
+    ///     poisoned address. Without this the test above could pass because the poison does nothing.
+    /// </summary>
+    [Fact]
+    public async Task ServerHost_CreateApplication_WithoutIsolation_AmbientEndpointWins()
+    {
+        // Arrange: the same poisoned environment, and a normal host that only gets a temporary database
+        using var folder = new TemporaryDirectory();
+        using var sentinel = new TemporaryDirectory();
+        var poisonedPort = FindFreePort();
+        using var poison = new PoisonedEnvironment(poisonedPort, sentinel.DirectoryPath);
+        using var context = Context.Create(["serve", "--silent", "--urls", "http://127.0.0.1:0"]);
+        var settings = SelfTestServices.CreateSettings(folder);
+        var options = new ServerHostOptions
+        {
+            ConfigureBuilder = builder => builder.Configuration.AddInMemoryCollection(settings)
+        };
+
+        // Act: create and start the normal host
+        var app = ServerHost.CreateApplication(context, options);
+        try
+        {
+            await app.StartAsync(TestContext.Current.CancellationToken);
+
+            // Assert: the ambient endpoint decided where it listens
+            Assert.Contains(app.Urls, url => url.EndsWith($":{poisonedPort}", StringComparison.Ordinal));
+            await app.StopAsync(TestContext.Current.CancellationToken);
+        }
+        finally
+        {
+            await app.DisposeAsync();
+        }
+    }
+
+    /// <summary>
+    ///     Test that routes with constraints work on the isolated host, which needs the full routing registration:
+    ///     a non-numeric project id is "not found" and a numeric one reaches the API, which asks for a token.
+    /// </summary>
+    [Fact]
+    public async Task ServerHost_CreateApplication_IsolatedSettings_ConstrainedRoutesWork()
+    {
+        // Arrange: start the isolated host
+        using var folder = new TemporaryDirectory();
+        using var context = Context.Create(["serve", "--silent", "--urls", "http://127.0.0.1:0"]);
+        var app = ServerHost.CreateApplication(context, IsolatedOptions(folder));
+        try
+        {
+            await app.StartAsync(TestContext.Current.CancellationToken);
+            using var handler = new HttpClientHandler { AllowAutoRedirect = false, UseProxy = false };
+            using var client = new HttpClient(handler) { BaseAddress = new Uri(app.Urls.Single()) };
+
+            // Act: request an API route with a constraint, with a failing and a matching value
+            var notNumeric = await client.GetAsync("/api/projects/abc/reviews", TestContext.Current.CancellationToken);
+            var numeric = await client.GetAsync("/api/projects/1/reviews", TestContext.Current.CancellationToken);
+
+            // Assert: the constraint is applied (404) and the matching route is reached (401: no token)
+            Assert.Equal(System.Net.HttpStatusCode.NotFound, notNumeric.StatusCode);
+            Assert.Equal(System.Net.HttpStatusCode.Unauthorized, numeric.StatusCode);
+            await app.StopAsync(TestContext.Current.CancellationToken);
+        }
+        finally
+        {
+            await app.DisposeAsync();
+        }
+    }
+
+    /// <summary>
+    ///     Test that a configuration that makes the host listen on more than one address is refused by the host check
+    ///     instead of being tested through its first address.
+    /// </summary>
+    [Fact]
+    public void HostStartCheck_ExpectOneLoopbackAddress_MoreThanOneAddress_ThrowsValidationFailed()
+    {
+        // Act: two loopback addresses
+        var exception = Record.Exception(
+            () => HostStartCheck.ExpectOneLoopbackAddress(["http://127.0.0.1:5001", "http://127.0.0.1:5002"]));
+
+        // Assert: refused with a message that says how many addresses there were
+        var failed = Assert.IsType<ValidationFailedException>(exception);
+        Assert.Contains("2 addresses", failed.Message, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    ///     Test that an address that is not loopback, or has no real port, is refused by the host check.
+    /// </summary>
+    [Theory]
+    [InlineData("http://0.0.0.0:5001")]
+    [InlineData("http://192.0.2.1:5001")]
+    [InlineData("http://localhost:5001")]
+    [InlineData("http://127.0.0.1:0")]
+    public void HostStartCheck_ExpectOneLoopbackAddress_NotLoopbackOrNoPort_ThrowsValidationFailed(string url)
+    {
+        // Act: check one unacceptable address
+        var exception = Record.Exception(() => HostStartCheck.ExpectOneLoopbackAddress([url]));
+
+        // Assert: refused
+        Assert.IsType<ValidationFailedException>(exception);
+    }
+
+    /// <summary>
+    ///     Test that no address at all is refused, and that exactly one loopback address is accepted.
+    /// </summary>
+    [Fact]
+    public void HostStartCheck_ExpectOneLoopbackAddress_NoAddressOrOneLoopback_RefusesOrAccepts()
+    {
+        // Act: check an empty list and a good address
+        var none = Record.Exception(() => HostStartCheck.ExpectOneLoopbackAddress([]));
+        var address = HostStartCheck.ExpectOneLoopbackAddress(["http://[::1]:5001"]);
+
+        // Assert: the empty list is refused and the IPv6 loopback address with its port is returned
+        Assert.IsType<ValidationFailedException>(none);
+        Assert.Equal(5001, address.Port);
     }
 }

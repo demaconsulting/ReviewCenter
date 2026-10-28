@@ -27,6 +27,9 @@ settings that let a caller adjust the build.
   standard services are registered and before the application is built. Tests use it to select
   the in-memory server, to attach a capturing logger provider, and to point the `Database` settings
   at a temporary database.
+- **IsolatedSettings**: `IReadOnlyDictionary<string, string?>?` — `null` by default; when set, the host is built
+  from an empty builder that reads these settings and nothing else (see **CreateBuilder** below). Only the
+  self-validation sets it.
 
 #### Key Methods
 
@@ -60,6 +63,17 @@ enabled); maps the signed attestation download; maps the JSON API with `MapApi` 
 server render mode; and registers the start-up log callback. After the sign-in, it registers the token authentication
 scheme and the `Api` policy with `ApiTokenAuthentication.AddApiTokenAuthentication` and the OpenAPI generator with
 `ApiDocument.AddApiDocument`; the cookie stays the default scheme.
+
+**CreateBuilder** (isolated mode): When `ServerHostOptions.IsolatedSettings` is set, the builder is created with
+`WebApplication.CreateEmptyBuilder`, which registers no configuration source, no logging, no Kestrel and no
+routing. The content root is the application directory and the environment name is fixed to `Production`. The
+only configuration is the in-memory dictionary of the options (the listen address of the context is applied by the
+shared registration, as in the normal mode); then `UseKestrelCore`, `AddRouting` (the full registration, because
+the API routes use constraints)
+and `AddLogging` are added explicitly. No `appsettings.json`, no `DOTNET_`/`ASPNETCORE_` or other environment
+variable, no user secrets and no host default is read, so the host cannot be broken or redirected by the machine
+that it runs on. In the normal mode (`IsolatedSettings` is `null`) `WebApplication.CreateBuilder` is used as
+before. Everything after the builder is the same in both modes.
 
 **UseNotFoundPage**: Answers a page request that no page handles with the framed "Page not found" page. A URL that
 matches no endpoint never reaches the router, so without this the response is an empty 404. The middleware sits before

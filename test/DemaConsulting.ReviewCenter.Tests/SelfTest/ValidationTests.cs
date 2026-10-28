@@ -44,8 +44,12 @@ public class ValidationTests
     /// </summary>
     /// <param name="checks">The checks to run.</param>
     /// <param name="resultsExtension">The extension of the results file to request, or <c>null</c> for none.</param>
+    /// <param name="checkTimeout">The deadline of each check, or <c>null</c> for the production default.</param>
     /// <returns>The exit code, the report and the results file text.</returns>
-    private static RunOutput Run(IReadOnlyList<ValidationCheck> checks, string? resultsExtension = null)
+    private static RunOutput Run(
+        IReadOnlyList<ValidationCheck> checks,
+        string? resultsExtension = null,
+        TimeSpan? checkTimeout = null)
     {
         var folder = Path.Combine(Path.GetTempPath(), $"validation_test_{Guid.NewGuid():N}");
         Directory.CreateDirectory(folder);
@@ -62,7 +66,7 @@ public class ValidationTests
             int exitCode;
             using (var context = Context.Create([.. args]))
             {
-                Validation.Run(context, checks);
+                Validation.Run(context, checks, checkTimeout);
                 exitCode = context.ExitCode;
             }
 
@@ -304,6 +308,256 @@ public class ValidationTests
         Assert.True(
             output.Log.IndexOf("ReviewCenter_SlowFirst", StringComparison.Ordinal) <
             output.Log.IndexOf("ReviewCenter_FastSecond", StringComparison.Ordinal));
+    }
+
+    /// <summary>
+    ///     Test that a check that blocks synchronously and ignores its token is failed at the deadline, without
+    ///     the runner waiting for it. Before the deadline was enforced by the runner this call never returned.
+    /// </summary>
+    [Fact]
+    public async Task ValidationRunner_ExecuteAsync_CheckBlocksAndIgnoresToken_FailsAsTimedOutWithoutWaiting()
+    {
+        // Arrange: a check that blocks its thread until the test releases it, and never looks at its token
+        using var release = new ManualResetEventSlim(false);
+        var check = new ValidationCheck("ReviewCenter_Blocked", _ =>
+        {
+            release.Wait();
+            return Task.FromResult("never reported");
+        });
+
+        try
+        {
+            // Act: run it with a 100 ms deadline; WaitAsync turns a hang into a failure after a much longer wait
+            var outcome = await ValidationRunner
+                .ExecuteAsync(check, TimeSpan.FromMilliseconds(100), CancellationToken.None)
+                .WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+
+            // Assert: the runner returned a failed outcome with the timeout message while the check still blocks
+            Assert.Equal(DemaConsulting.TestResults.TestOutcome.Failed, outcome.Result.Outcome);
+            Assert.Equal("Timed out after 0.1 s", outcome.Result.ErrorMessage);
+            Assert.Contains("✗ ReviewCenter_Blocked - Failed", outcome.Line);
+            Assert.True(outcome.Result.Duration < TimeSpan.FromSeconds(5), $"Took {outcome.Result.Duration}");
+        }
+        finally
+        {
+            release.Set();
+        }
+    }
+
+    /// <summary>
+    ///     Test that the token of a check that is still running is cancelled when the deadline passes, so a
+    ///     cooperative check stops.
+    /// </summary>
+    [Fact]
+    public async Task ValidationRunner_ExecuteAsync_DeadlinePasses_CancelsTheTokenOfTheCheck()
+    {
+        // Arrange: a check that waits for its token to be cancelled and records that it saw the cancellation
+        var sawCancellation = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var check = new ValidationCheck("ReviewCenter_Cooperative", async token =>
+        {
+            try
+            {
+                await Task.Delay(Timeout.Infinite, token);
+            }
+            catch (OperationCanceledException)
+            {
+                sawCancellation.TrySetResult(true);
+                throw;
+            }
+
+            return "unreachable";
+        });
+
+        // Act: run it with a short deadline
+        var outcome = await ValidationRunner.ExecuteAsync(check, TimeSpan.FromMilliseconds(100), CancellationToken.None);
+
+        // Assert: it is reported as timed out and its token was cancelled
+        Assert.Equal("Timed out after 0.1 s", outcome.Result.ErrorMessage);
+        Assert.True(await sawCancellation.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken));
+    }
+
+    /// <summary>
+    ///     Test that a check that cancels itself is reported as cancelled, not as a timeout.
+    /// </summary>
+    [Fact]
+    public async Task ValidationRunner_ExecuteAsync_CheckThrowsCancellation_ReportsCancelledNotTimedOut()
+    {
+        // Arrange: a check that throws OperationCanceledException long before the deadline
+        var check = new ValidationCheck("ReviewCenter_SelfCancelled", _ => throw new OperationCanceledException());
+
+        // Act: run it with the default deadline
+        var outcome = await ValidationRunner.ExecuteAsync(check);
+
+        // Assert: the failure says cancelled and does not claim a timeout
+        Assert.Equal(DemaConsulting.TestResults.TestOutcome.Failed, outcome.Result.Outcome);
+        Assert.Equal("Cancelled", outcome.Result.ErrorMessage);
+        Assert.DoesNotContain("Timed out", outcome.Line);
+    }
+
+    /// <summary>
+    ///     Test that a cancellation requested by the caller is reported as cancelled even when the check ignores it.
+    /// </summary>
+    [Fact]
+    public async Task ValidationRunner_ExecuteAsync_CallerCancels_ReportsCancelledWithoutWaitingForTheCheck()
+    {
+        // Arrange: a blocking check that ignores its token and a caller that cancels after a moment
+        using var release = new ManualResetEventSlim(false);
+        using var source = new CancellationTokenSource(TimeSpan.FromMilliseconds(100));
+        var check = new ValidationCheck("ReviewCenter_Ignoring", _ =>
+        {
+            release.Wait();
+            return Task.FromResult("never reported");
+        });
+
+        try
+        {
+            // Act: run it with a long deadline, so only the caller's cancellation can end the wait
+            var outcome = await ValidationRunner
+                .ExecuteAsync(check, TimeSpan.FromMinutes(5), source.Token)
+                .WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+
+            // Assert: the runner returned "Cancelled"
+            Assert.Equal("Cancelled", outcome.Result.ErrorMessage);
+        }
+        finally
+        {
+            release.Set();
+        }
+    }
+
+    /// <summary>
+    ///     Test that a TimeoutException thrown by the check itself is not mistaken for the deadline of the runner.
+    /// </summary>
+    [Fact]
+    public async Task ValidationRunner_ExecuteAsync_CheckThrowsTimeoutException_ReportsTheCheckOwnFailure()
+    {
+        // Arrange: a check that fails with its own timeout exception
+        var check = new ValidationCheck("ReviewCenter_OwnTimeout", _ => throw new TimeoutException("git hung"));
+
+        // Act: run it
+        var outcome = await ValidationRunner.ExecuteAsync(check);
+
+        // Assert: the message is the check's own
+        Assert.Equal("TimeoutException: git hung", outcome.Result.ErrorMessage);
+    }
+
+    /// <summary>
+    ///     Test that an exception thrown later by an abandoned check does not surface as an unobserved task exception.
+    /// </summary>
+    [Fact]
+    public async Task ValidationRunner_ExecuteAsync_AbandonedCheckThrowsLater_ExceptionIsObserved()
+    {
+        // Arrange: a check that ignores its deadline and then throws when released
+        var unobserved = new List<Exception>();
+        void OnUnobserved(object? sender, UnobservedTaskExceptionEventArgs args)
+        {
+            lock (unobserved)
+            {
+                unobserved.AddRange(args.Exception.InnerExceptions);
+            }
+        }
+
+        using var release = new ManualResetEventSlim(false);
+        using var finishedWork = new ManualResetEventSlim(false);
+        var check = new ValidationCheck("ReviewCenter_ThrowsLater", _ =>
+        {
+            release.Wait();
+            try
+            {
+                throw new InvalidOperationException("late failure of an abandoned check");
+            }
+            finally
+            {
+                finishedWork.Set();
+            }
+        });
+        TaskScheduler.UnobservedTaskException += OnUnobserved;
+        try
+        {
+            var outcome = await ValidationRunner.ExecuteAsync(check, TimeSpan.FromMilliseconds(100), CancellationToken.None);
+            Assert.Equal("Timed out after 0.1 s", outcome.Result.ErrorMessage);
+
+            // Act: let the abandoned check throw, then collect so that an unobserved exception would be raised
+            release.Set();
+            while (!finishedWork.IsSet)
+            {
+                await Task.Delay(10, TestContext.Current.CancellationToken);
+            }
+
+            await Task.Delay(20, TestContext.Current.CancellationToken);
+            for (var i = 0; i < 2; i++)
+            {
+#pragma warning disable S1215 // A collection is the only way to make the finalizer raise an unobserved exception
+                GC.Collect();
+#pragma warning restore S1215
+                GC.WaitForPendingFinalizers();
+            }
+
+            // Assert: nothing was left unobserved
+            lock (unobserved)
+            {
+                Assert.DoesNotContain(unobserved, ex => ex.Message.Contains("late failure", StringComparison.Ordinal));
+            }
+        }
+        finally
+        {
+            TaskScheduler.UnobservedTaskException -= OnUnobserved;
+        }
+    }
+
+    /// <summary>
+    ///     Test that the runner refuses a deadline that is not positive.
+    /// </summary>
+    [Fact]
+    public async Task ValidationRunner_ExecuteAsync_NonPositiveTimeout_ThrowsArgumentOutOfRangeException()
+    {
+        // Act: run a check with a zero deadline
+        var exception = await Record.ExceptionAsync(
+            () => ValidationRunner.ExecuteAsync(FastValidationChecks.Passing(), TimeSpan.Zero, CancellationToken.None));
+
+        // Assert: refused
+        Assert.IsType<ArgumentOutOfRangeException>(exception);
+    }
+
+    /// <summary>
+    ///     Test that a hung check does not hang the whole run: it is reported as timed out, the other checks pass and
+    ///     the exit code is non-zero.
+    /// </summary>
+    [Fact]
+    public async Task Validation_Run_HungCheck_ReportsTimeoutAndOtherChecksStillPass()
+    {
+        // Arrange: a check that blocks until released and ignores its token, between two passing checks
+        using var release = new ManualResetEventSlim(false);
+        var hung = new ValidationCheck("ReviewCenter_Hung", _ =>
+        {
+            release.Wait();
+            return Task.FromResult("never reported");
+        });
+        var checks = new[]
+        {
+            FastValidationChecks.Passing("ReviewCenter_Before"),
+            hung,
+            FastValidationChecks.Passing("ReviewCenter_After")
+        };
+
+        try
+        {
+            // Act: run validation with a 150 ms deadline on a worker; WaitAsync turns a hang into a failure
+            var output = await Task
+                .Run(() => Run(checks, checkTimeout: TimeSpan.FromMilliseconds(150)), TestContext.Current.CancellationToken)
+                .WaitAsync(TimeSpan.FromSeconds(20), TestContext.Current.CancellationToken);
+
+            // Assert: the hung check is the only failure and the run fails
+            Assert.Equal(1, output.ExitCode);
+            Assert.Contains("✗ ReviewCenter_Hung - Failed", output.Log);
+            Assert.Contains("Timed out after 0.15 s", output.Log);
+            Assert.Contains("Passed: 2", output.Log);
+            Assert.Contains("Failed: 1", output.Log);
+        }
+        finally
+        {
+            release.Set();
+        }
     }
 
     /// <summary>

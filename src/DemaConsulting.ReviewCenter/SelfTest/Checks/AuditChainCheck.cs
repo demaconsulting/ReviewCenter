@@ -50,6 +50,7 @@ internal static class AuditChainCheck
     /// <exception cref="ValidationFailedException">Thrown when the intact chain is rejected or the change is not noticed.</exception>
     public static async Task<string> RunAsync(CancellationToken cancellationToken)
     {
+        // Declared first, so it is disposed last: the provider (database connections) is disposed before the folder
         using var folder = new TemporaryDirectory();
         await using var provider = SelfTestServices.Create(folder);
         var audit = provider.GetRequiredService<AuditService>();

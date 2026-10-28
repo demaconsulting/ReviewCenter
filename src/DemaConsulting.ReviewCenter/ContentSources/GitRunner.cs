@@ -426,9 +426,13 @@ internal sealed class GitRunner
     ///     Runs <c>git --version</c> once and checks that it is new enough.
     /// </summary>
     /// <param name="cancellationToken">Cancels the call.</param>
-    /// <returns>A task that completes when the version is known to be supported.</returns>
+    /// <returns>The version text that git reported, without the trailing line break.</returns>
     /// <exception cref="DomainRuleException">Thrown with <see cref="DomainRule.GitUnavailable"/> when git is missing or too old.</exception>
-    private async Task CheckVersionAsync(CancellationToken cancellationToken)
+    /// <remarks>
+    ///     The self-validation calls this directly, so that it proves the same check the server makes before its
+    ///     first git call with one process instead of two.
+    /// </remarks>
+    internal async Task<string> CheckVersionAsync(CancellationToken cancellationToken)
     {
         var result = await ExecuteAsync(["--version"], null, 4096, cancellationToken);
         var text = Encoding.UTF8.GetString(result.Output);
@@ -441,6 +445,7 @@ internal sealed class GitRunner
         }
 
         _versionChecked = true;
+        return text.Trim();
     }
 
     /// <summary>

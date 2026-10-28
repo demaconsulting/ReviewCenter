@@ -65,6 +65,9 @@ words:
   - sysml
   - sysml2tools
   - tabindex
+  - testhost
+  - finalizer
+  - finalizers
   - reviewcenter
   - reanswer
   - reauthentication

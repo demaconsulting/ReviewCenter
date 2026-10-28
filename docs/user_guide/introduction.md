@@ -1680,8 +1680,16 @@ JUnit files.
 - **`ReviewCenter_AuditChain`** - the audit trail verifies, and a changed entry is reported by the verifier.
 - **`ReviewCenter_AttestationPdf`** - a signed attestation PDF is produced with a temporary key, its signature and
   its change-prevention certification verify independently, and a changed byte makes the verification fail.
-- **`ReviewCenter_HostStart`** - the real web host starts on a free loopback port with a temporary configuration,
-  answers `/login` and a static asset with 200, and stops cleanly.
+- **`ReviewCenter_HostStart`** - the real web host starts from temporary settings alone on a free loopback port,
+  answers `/login` and a static asset with 200, and stops cleanly. The host ignores an `appsettings.json`, the
+  `ASPNETCORE_` and `DOTNET_` environment variables and any other ambient configuration, so a broken or unusual
+  configuration of the machine cannot change this test.
+
+Every test has a time limit of 60 seconds that the validation enforces itself. A test that does not finish in
+time is reported as `Failed` with the message `Timed out after 60 s`, the other tests still complete, and the run
+does not hang. The temporary folders are deleted at the end of each test; a file that is still locked for a moment
+(for example by a virus scanner) is retried for a short time and, if it stays locked, left to the operating system's
+temporary cleanup without failing the run.
 
 ### Checking the Configured Database
 

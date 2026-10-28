@@ -18,13 +18,10 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-using System.Data.Common;
 using DemaConsulting.ReviewCenter.Hosting;
 using DemaConsulting.ReviewCenter.Storage;
 using DemaConsulting.ReviewCenter.Utilities;
-using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
@@ -72,8 +69,10 @@ internal static class SelfTestServices
         services.AddLogging();
         ServerHost.AddServices(services, configuration);
 
-        // Only the speed of a commit changes, not what is stored (see FastCommitInterceptor)
-        services.ConfigureDbContext<ReviewCenterDbContext>(builder => builder.AddInterceptors(new FastCommitInterceptor()));
+        // Only the speed of a commit changes, not what is stored; the interceptor acts on this folder only
+        // (see FastCommitInterceptor)
+        var interceptor = new FastCommitInterceptor(folder.DirectoryPath);
+        services.ConfigureDbContext<ReviewCenterDbContext>(builder => builder.AddInterceptors(interceptor));
 
         var provider = services.BuildServiceProvider();
         try
@@ -113,62 +112,5 @@ internal static class SelfTestServices
             ["Git:TimeoutSeconds"] = "60",
             ["Attestation:SelfSignedFolder"] = Path.Combine(folder.DirectoryPath, "attestation")
         };
-    }
-
-    /// <summary>
-    ///     Makes the commits of the throw-away database cheap: the journal is kept in memory and a commit does not
-    ///     wait for the disk.
-    /// </summary>
-    /// <remarks>
-    ///     With the default settings every commit waits for several disk flushes, which is the dominant cost of a
-    ///     review workflow (about a hundred commits). The settings change only how long a commit takes, not what
-    ///     is stored, and a lost file would only be a lost temporary database. The product database settings are
-    ///     not touched. A read-only connection is skipped because its journal mode cannot be changed.
-    /// </remarks>
-    private sealed class FastCommitInterceptor : DbConnectionInterceptor
-    {
-        /// <summary>
-        ///     The statements that turn the disk waits off for a connection.
-        /// </summary>
-        private const string Pragmas = "PRAGMA synchronous=OFF; PRAGMA journal_mode=MEMORY;";
-
-        /// <inheritdoc />
-        public override void ConnectionOpened(DbConnection connection, ConnectionEndEventData eventData)
-        {
-            if (IsReadOnly(connection))
-            {
-                return;
-            }
-
-            using var command = connection.CreateCommand();
-            command.CommandText = Pragmas;
-            command.ExecuteNonQuery();
-        }
-
-        /// <inheritdoc />
-        public override async Task ConnectionOpenedAsync(
-            DbConnection connection,
-            ConnectionEndEventData eventData,
-            CancellationToken cancellationToken = default)
-        {
-            if (IsReadOnly(connection))
-            {
-                return;
-            }
-
-            await using var command = connection.CreateCommand();
-            command.CommandText = Pragmas;
-            await command.ExecuteNonQueryAsync(cancellationToken);
-        }
-
-        /// <summary>
-        ///     Checks whether a connection was opened read-only.
-        /// </summary>
-        /// <param name="connection">The connection that was just opened.</param>
-        /// <returns><c>true</c> when the connection is read-only.</returns>
-        private static bool IsReadOnly(DbConnection connection)
-        {
-            return new SqliteConnectionStringBuilder(connection.ConnectionString).Mode == SqliteOpenMode.ReadOnly;
-        }
     }
 }

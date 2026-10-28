@@ -19,6 +19,8 @@ sections:
         tests:
           - SelfTestSubsystem_ValidationWorkflow_NoResultFiles_CompletesSuccessfully
           - ValidationChecks_RealRun_HeavyChecks_ReportTheirDetails
+          - GitRunner_CheckVersionAsync_SupportedGit_ReturnsVersionAndIsNotRepeatedByRunAsync
+          - GitRunner_CheckVersionAsync_OldGit_ThrowsGitUnavailable
 
       - id: ReviewCenter-ValidationChecks-GitRoundTrip
         title: >-
@@ -89,16 +91,23 @@ sections:
 
       - id: ReviewCenter-ValidationChecks-HostStart
         title: >-
-          The HostStart check shall start the real web host on an ephemeral loopback port with a temporary
-          configuration and database, request the login page and an embedded static asset, expect success for both,
-          and stop the host cleanly.
+          The HostStart check shall start the real web host from the temporary settings alone, with no configuration
+          file, environment variable or host default read, on an ephemeral loopback port, request the login page and
+          an embedded static asset, expect success for both, and stop the host cleanly.
         justification: |
           Starting the host proves that the dependency injection, the middleware, the embedded assets and the
           database start-up work in the deployed executable, including a single-file publish; an ephemeral port on
-          the loopback interface never collides with the configured port.
+          the loopback interface never collides with the configured port. The host is built from an empty builder, so
+          a broken appsettings.json, an ambient listen address or an environment name on the machine cannot change
+          what the qualification run proves, and a host that bound anything but one loopback port fails the check.
         tests:
           - SelfTestSubsystem_ValidationWorkflow_NoResultFiles_CompletesSuccessfully
           - ValidationChecks_RealRun_HeavyChecks_ReportTheirDetails
+          - ValidationChecks_HostStart_HostileEnvironment_PassesOnLoopbackAndTouchesNothingAmbient
+          - ServerHost_CreateApplication_IsolatedSettings_IgnoresPoisonedEnvironment
+          - HostStartCheck_ExpectOneLoopbackAddress_MoreThanOneAddress_ThrowsValidationFailed
+          - HostStartCheck_ExpectOneLoopbackAddress_NotLoopbackOrNoPort_ThrowsValidationFailed
+          - HostStartCheck_ExpectOneLoopbackAddress_NoAddressOrOneLoopback_RefusesOrAccepts
 
       - id: ReviewCenter-ValidationChecks-ConfiguredDatabase
         title: >-
@@ -125,3 +134,22 @@ sections:
           configuration of the deployment, and must leave nothing behind.
         tests:
           - SelfTestSubsystem_ValidationWorkflow_DefaultRun_IsHermetic
+          - ValidationChecks_HostStart_HostileEnvironment_PassesOnLoopbackAndTouchesNothingAmbient
+
+      - id: ReviewCenter-ValidationChecks-FastCommit
+        title: >-
+          The checks shall speed up the commits of their throw-away SQLite database through one internal interceptor
+          that is created with the temporary folder of the check and relaxes only a writable database file inside
+          that folder, and no database of the server or of the configured deployment shall ever be relaxed.
+        justification: |
+          A review workflow makes about a hundred commits, and waiting for the disk after each one dominates the run
+          time of the qualification. Turning that wait off is only acceptable for a database that is thrown away. The
+          interceptor cannot be created without the folder it is allowed to act in, ignores read-only, in-memory
+          and outside-the-folder databases, and is not part of the production registration, so the relaxation cannot
+          reach stored review evidence.
+        tests:
+          - ValidationChecks_FastCommit_SelfTestServices_RelaxesTheEmbeddedDatabase
+          - ValidationChecks_FastCommit_ProductionServices_KeepDefaultCommitSettings
+          - ValidationChecks_FastCommit_Interceptor_RelaxesOnlyDatabasesInsideItsFolder
+          - ValidationChecks_FastCommit_Interceptor_LeavesInMemoryDatabaseAlone
+          - ValidationChecks_FastCommit_Interceptor_RequiresAllowedFolder
