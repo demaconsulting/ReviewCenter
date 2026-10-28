@@ -6,7 +6,10 @@
    back here with "error=1"; the message is the same whatever went wrong, so it never reveals whether a user
    name exists. A client that made too many attempts comes back with "error=throttled" and a message that is
    the same for every name; any other non-empty value shows the generic message. After a forced password change the
-   account page sends the user here with "changed=1", which shows a notice to sign in with the new password. *@
+   account page sends the user here with "changed=1", which shows a notice to sign in with the new password.
+   When sign-in with an OpenID Connect provider is enabled, a second card offers a "Sign in with ..." button (a
+   form that posts to /auth/oidc/login with its own antiforgery token); "error=oidc" shows one generic message
+   next to that button, whatever went wrong at the provider. *@
 @page "/login"
 
 <PageTitle>Sign in - ReviewCenter</PageTitle>
@@ -39,11 +42,29 @@
             {
                 <p class="error" role="alert" data-testid="login-throttled">Too many sign-in attempts. Try again in a few minutes.</p>
             }
-            else if (Failed)
+            else if (Failed && !ProviderFailed)
             {
                 <p class="error" role="alert" data-testid="login-error">Invalid user name or password.</p>
             }
             <button type="submit" data-testid="login-button">Sign in</button>
         </form>
     </section>
+
+    @if (Provider.Enabled)
+    {
+        <section class="card" data-testid="oidc-card">
+            <p class="muted" data-testid="oidc-lead">Or use the account you have at @Provider.DisplayName.</p>
+            @if (ProviderFailed)
+            {
+                <p class="error" role="alert" data-testid="oidc-error">
+                    Sign-in with @Provider.DisplayName did not work. Try again or ask an administrator.
+                </p>
+            }
+            <form method="post" action="/auth/oidc/login" data-testid="oidc-form">
+                <AntiforgeryToken />
+                <input type="hidden" name="returnUrl" value="@SafeReturnUrl" />
+                <button type="submit" class="secondary" data-testid="oidc-login">Sign in with @Provider.DisplayName</button>
+            </form>
+        </section>
+    }
 </main>

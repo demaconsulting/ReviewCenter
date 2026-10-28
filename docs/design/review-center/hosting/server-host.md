@@ -45,12 +45,16 @@ Anchors the content root at the application directory; clears the default loggin
 and adds the console provider only when the context is not silent; registers Blazor Server
 components; registers the persistence and the Core services with `AddServices`; registers cookie sign-in, and with it
 the revalidating authentication state provider of open pages, with `SignIn.AddSignIn` (after the Razor components, so
-that its provider replaces the framework default); applies the options callback; loads static web assets
-when enabled; builds the application; calls `InitializeDatabase`, `ValidateAuthOptions`, `ValidateGitOptions`, and
+that its provider replaces the framework default); applies the options callback; registers sign-in with an OpenID
+Connect provider with `OidcSignIn.AddOidcSignIn` after the callback, because only then is the configuration final (it
+registers nothing unless `Identity:Oidc:Enabled` is true); loads static web assets
+when enabled; builds the application; calls `InitializeDatabase`, `ValidateAuthOptions`, `ValidateOidcOptions`,
+`ValidateGitOptions`, and
 `ValidateDataProtection`; adds `UseNotFoundPage` (the not-found middleware, below) and routing; adds authentication,
 authorization, and request forgery protection, in that order, ahead of the endpoints they protect; maps static assets
 when enabled; maps `/health` to a plain-text 200 response; maps the login and logout endpoints with
-`SignIn.MapSignIn`; maps the signed attestation download; maps the JSON API with `MapApi` and its OpenAPI document with
+`SignIn.MapSignIn`; maps the endpoints of sign-in with a provider with `OidcSignIn.MapOidcSignIn` (only when it is
+enabled); maps the signed attestation download; maps the JSON API with `MapApi` and its OpenAPI document with
 `MapApiDocument` ahead of the user interface, so that an unknown address under `/api` is answered by the API's own JSON
 404; maps `App` with the interactive
 server render mode; and registers the start-up log callback. After the sign-in, it registers the token authentication
@@ -59,7 +63,8 @@ scheme and the `Api` policy with `ApiTokenAuthentication.AddApiTokenAuthenticati
 
 **UseNotFoundPage**: Answers a page request that no page handles with the framed "Page not found" page. A URL that
 matches no endpoint never reaches the router, so without this the response is an empty 404. The middleware sits before
-routing. When a GET or HEAD request outside the reserved prefixes (`/api`, `/_framework`, `/_blazor`, `/_content`) and
+routing. When a GET or HEAD request outside the reserved prefixes (`/api`, `/_framework`, `/_blazor`, `/_content`,
+`/signin-oidc`) and
 without a file extension ends in an empty 404, the request is re-executed against `/not-found` in a new service scope,
 with the original status code kept and the original request published as `IStatusCodeReExecuteFeature`. Any other
 status (a 400 or a 405, for example), any other method, a reserved prefix, and an address that ends in a file
@@ -77,7 +82,9 @@ response.
   the Core store interfaces, `PasswordHasher` as the Core hasher interface, `ProjectAccess` as the Core interface
   `IProjectAccess` (one singleton that every service and the API share, registered before the services that take it),
   and `ProjectService`, `ReviewService`,
-  `ThreadService`, `ChecklistService`, `UserService`, `PersonalAccessTokenService`, `SigningService`, and `AuditService`
+  `ThreadService`, `ChecklistService`, `UserService`, `PersonalAccessTokenService`, `SigningService`, `ReauthProofStore`
+  (the single-use proofs of users of an identity provider, shared by the sign-in and the signing service), and
+  `AuditService`
   as singletons are registered.
   `AuditService` gets a hook that logs a warning when an event cannot be recorded, and the registered `TimeProvider`
   (its coalescing of repeated events uses the clock, so tests can move time). The `DataProtection` and `Git`
@@ -129,6 +136,19 @@ The options are validated when they are first read, so reading them at start-up 
 session length that is not positive, an interval for the re-check of open pages below 5 seconds, a sign-in throttle
 limit that is not positive or a window outside 1 to 86400 seconds) into one clear
 start-up message, which names the setting, rather than a failure at the first sign-in.
+
+**ValidateOidcOptions**: Reads the settings of sign-in with an OpenID Connect provider of a built application once.
+
+- *Parameters*: `WebApplication app` — supplies the options.
+- *Returns*: `void`.
+- *Postconditions*: The `Identity:Oidc` settings are valid or sign-in with a provider is off, or the application is
+  disposed and an `InvalidOperationException` beginning "Invalid OpenID Connect sign-in settings:" is thrown with the
+  validation failure as its inner exception.
+
+The validator (see `OidcSignIn`) does nothing while `Enabled` is false, so a server that does not use the provider is
+not changed. Otherwise a wrong value is reported with the setting that is wrong (for example `Identity:Oidc:Authority`)
+and the rule, never the value and never the client secret, so the message can be logged. Reading the options at
+start-up turns a wrong setting into one clear message instead of a failure at the first sign-in.
 
 **ValidateGitOptions**: Reads the git options of a built application once.
 
@@ -201,10 +221,12 @@ This is the mechanism behind the requirement that the listen URL be exposed as a
 `CreateApplication` and `RunAsync` throw `ArgumentNullException` for a null context. `RunAsync`
 handles three environmental conditions locally: an `OperationCanceledException` raised while the
 caller has requested cancellation is treated as a normal stop and returns 0; an
-`InvalidOperationException` from building, which is how a database that cannot be prepared and invalid sign-in or git
+`InvalidOperationException` from building, which is how a database that cannot be prepared and invalid sign-in, OpenID
+Connect sign-in, or git
 settings are reported, is
 written through `Context.WriteError` as is ("Failed to prepare the database: {detail}", "Invalid sign-in
-settings: {detail}", "Invalid git settings: {detail}", "The Data Protection key ring folder '{path}' is not
+settings: {detail}", "Invalid OpenID Connect sign-in settings: {detail}", "Invalid git settings: {detail}", "The Data
+Protection key ring folder '{path}' is not
 writable: ...", or "The attestation signing key is not usable: {detail}") and returns 1; and an
 `IOException`, which Kestrel uses to report an address that is in use or not bindable, is
 reported as "Failed to start the server on {url}: {detail}" through `Context.WriteError` and
@@ -231,6 +253,8 @@ always disposed.
 - **ASP.NET Core Data Protection** — the key ring and the protection of tokens.
 - **PasswordHasher**, **SignIn** — the password hasher registered for the Core, and the cookie sign-in, authorization,
   and login and logout endpoints.
+- **OidcSignIn**, **OidcOptions**, **ReauthProofStore** — sign-in with an OpenID Connect provider (registered, validated
+  at the start, and mapped only when enabled) and the proofs of confirmed identity.
 - **ASP.NET Core shared framework** — `WebApplication`, Kestrel, endpoint routing, authentication, authorization,
   request forgery protection, Blazor Server components, and `Microsoft.Extensions.Logging`.
 - **Entity Framework Core** — the database context factory registration.

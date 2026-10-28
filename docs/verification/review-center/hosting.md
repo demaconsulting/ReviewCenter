@@ -29,6 +29,9 @@ N/A - standard test environment.
   `ApiProjectAccess_EveryProjectRoute_NonMemberToken_AnswersLikeAMissingProject` shows.
 - The routes of the `Api` subsystem and the personal access token service are registered, and an unknown address under
   `/api` is answered with a JSON problem document; the behavior is verified in the unit tests of `ServerHost`.
+- Optional sign-in with an OpenID Connect provider: invalid settings stop the start-up with an error that names the
+  setting and never shows the secret, and the server starts when the provider is off or its settings are valid; the
+  behavior is verified in the unit tests of `ServerHost`.
 
 ### Test Scenarios
 
@@ -89,3 +92,11 @@ entry count and exit code 0, which is tested by `AuditCommand_Run_IntactTrail_Re
 a tampered entry gives the first bad entry and exit code 1, which is tested by
 `AuditCommand_Run_TamperedEntry_ReportsFirstBadEntryWithExitCodeOne`. The registration of the audit services in
 `ServerHost.AddServices` is exercised by the sign-in audit tests, not by a separate hosting test.
+
+**OpenID Connect settings**: Starting the real pipeline with sign-in with a provider enabled and an invalid setting
+throws an `InvalidOperationException` that names the setting and does not contain the client secret, which is tested
+by `ServerHost_CreateApplication_InvalidOidcSettings_ThrowsClearErrorWithoutSecret`. With the provider off, or on with
+valid settings, the application is built, which is tested by
+`ServerHost_CreateApplication_OidcOffOrValid_BuildsTheApplication`; both are unit tests of `ServerHost`. With the
+provider off, its endpoints answer 404, which is tested by `OidcSignIn_Disabled_EndpointsAreNotMappedAndNoButtonIsShown`
+(see the `OidcSignIn` verification).

@@ -40,6 +40,7 @@ N/A - standard test environment.
   anonymous switches (independent, with the use for ReviewMark), the warning to think before turning them on, the five
   content switches, the regulatory warning, the Content scope section, and the audit trail, and contains no link that
   begins with `#`.
+- The Getting started, Reviewers and signing, and API tokens topics each mention the identity provider.
 
 #### Test Scenarios
 
@@ -95,3 +96,8 @@ by their titles, mentions the regulatory warning, the Content scope section, and
 with `#`. This scenario is tested by `HelpEvidenceSettingsPage_Render_ExplainsAnonymousAccessContentSwitchesAndScope`.
 The list of topics holds the topic at `/help/evidence-settings`, which
 `HelpTopicPages_Render_EveryTopicHasAPageWithValidNavigation` checks.
+
+**HelpTopicPage_Render_MentionsSignInWithProvider**: A theory over the topics `getting-started`,
+`reviewers-and-signing`, and `api-tokens` (in `OidcPageTests.cs`); each page is found by its route and rendered, and
+its markup contains the words "identity provider". This scenario is tested by
+`HelpTopicPage_Render_MentionsSignInWithProvider`.

@@ -31,7 +31,11 @@ namespace DemaConsulting.ReviewCenter.Core;
 ///     most one slot of a review.
 ///     Signing needs the signer's password again: it is checked by <see cref="UserService.ReauthenticateAsync"/>,
 ///     the same path the login uses, so the hasher, the lockout counting and the single generic failure are the
-///     same as at login; a failure is recorded in the audit trail as <c>signature.reauth-failed</c>. The signer is the <see cref="Actor"/> taken from the signed-in principal, never a form
+///     same as at login; a failure is recorded in the audit trail as <c>signature.reauth-failed</c>. A user of an
+///     external identity provider has no password: that user confirms by signing in again at the provider, and
+///     the signing step spends the single-use proof (<see cref="ReauthProofStore"/>) that the sign-in callback
+///     issued for exactly this user, review and slot; without one the signature is refused and
+///     <c>signature.reauth-failed</c> is recorded. The signer is the <see cref="Actor"/> taken from the signed-in principal, never a form
 ///     field, and the password is neither stored, logged nor put in a message. A signature is allowed only when
 ///     every applicable check is answered, none is answered Fail and no thread is open; otherwise the blockers
 ///     are returned as plain sentences. A signature is current only while its digest (see
@@ -75,14 +79,28 @@ public sealed class SigningService
     private readonly SemaphoreSlim _gate = new(1, 1);
 
     /// <summary>
+    ///     The proofs of external-provider users, or <c>null</c> when sign-in with a provider is not available.
+    /// </summary>
+    private readonly ReauthProofStore? _proofs;
+
+    /// <summary>
     ///     Initializes a new instance of the <see cref="SigningService"/> class.
     /// </summary>
     /// <param name="store">The store that persists slots and signatures. Must not be null.</param>
     /// <param name="users">The user service used to look up users and to re-authenticate signers. Must not be null.</param>
     /// <param name="access">The access rules; slots belong to project members. Must not be null.</param>
     /// <param name="timeProvider">The clock used for signing times; injected so tests control time. Must not be null.</param>
-    /// <exception cref="ArgumentNullException">Thrown when an argument is null.</exception>
-    public SigningService(IReviewStore store, UserService users, IProjectAccess access, TimeProvider timeProvider)
+    /// <param name="proofs">
+    ///     The proofs of identity that users of an external identity provider obtain by signing in again; <c>null</c>
+    ///     means there are none, so such a user can not sign.
+    /// </param>
+    /// <exception cref="ArgumentNullException">Thrown when a required argument is null.</exception>
+    public SigningService(
+        IReviewStore store,
+        UserService users,
+        IProjectAccess access,
+        TimeProvider timeProvider,
+        ReauthProofStore? proofs = null)
     {
         ArgumentNullException.ThrowIfNull(store);
         ArgumentNullException.ThrowIfNull(users);
@@ -92,6 +110,88 @@ public sealed class SigningService
         _users = users;
         _access = access;
         _timeProvider = timeProvider;
+        _proofs = proofs;
+    }
+
+    /// <summary>
+    ///     Tells whether a user of an external identity provider has confirmed their identity for a signature, without
+    ///     spending the confirmation.
+    /// </summary>
+    /// <param name="actor">The signed-in user. Must not be null.</param>
+    /// <param name="projectId">The project identity.</param>
+    /// <param name="reviewId">The review identifier. Must not be null.</param>
+    /// <param name="slotId">The slot.</param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <returns>
+    ///     <c>true</c> when the user has an external account and a live confirmation for exactly this review and
+    ///     slot; otherwise <c>false</c>, also for a local account, an API token and an unknown user.
+    /// </returns>
+    /// <remarks>A page uses it to show "Identity confirmed"; <see cref="SignAsync"/> decides on its own.</remarks>
+    /// <exception cref="ArgumentNullException">Thrown when an argument is null.</exception>
+    public async Task<bool> HasReauthProofAsync(
+        Actor actor,
+        int projectId,
+        string reviewId,
+        int slotId,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(actor);
+        ArgumentNullException.ThrowIfNull(reviewId);
+        if (_proofs is null || actor.ViaApiToken)
+        {
+            return false;
+        }
+
+        var user = await _users.GetAsync(actor.Username, cancellationToken);
+        return user is { IsExternal: true, Enabled: true } && _proofs.Has(user.Id, projectId, reviewId, slotId);
+    }
+
+    /// <summary>
+    ///     Checks that a signed-in user of an external identity provider may be asked to confirm their identity for
+    ///     a slot, so no confirmation is requested for a signature the user could not make.
+    /// </summary>
+    /// <param name="actor">The signed-in user. Must not be null.</param>
+    /// <param name="projectId">The project identity.</param>
+    /// <param name="reviewId">The review identifier. Must not be null.</param>
+    /// <param name="slotId">The slot the user wants to sign.</param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <returns>The stored user, whose external identity the confirmation must match.</returns>
+    /// <remarks>Read-only; nothing is stored and nothing is spent.</remarks>
+    /// <exception cref="ArgumentNullException">Thrown when an argument is null.</exception>
+    /// <exception cref="DomainRuleException">
+    ///     Thrown with <see cref="DomainRule.ActorNotAllowed"/> when the actor is an API token, has no enabled
+    ///     external account, is not a member of the project or is not a reviewer of the slot,
+    ///     <see cref="DomainRule.ProjectNotFound"/> when the actor may not see the project, and
+    ///     <see cref="DomainRule.SlotNotFound"/> when the slot does not exist.
+    /// </exception>
+    public async Task<User> RequireConfirmableAsync(
+        Actor actor,
+        int projectId,
+        string reviewId,
+        int slotId,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(actor);
+        ArgumentNullException.ThrowIfNull(reviewId);
+        RejectApiToken(actor);
+
+        // The same rules as signing, in the same order, minus everything that needs the record
+        var user = await EnsureActorAsync(actor, projectId, cancellationToken);
+        if (!user.IsExternal || !await _access.IsMemberAsync(user.Id, projectId, cancellationToken))
+        {
+            throw new DomainRuleException(
+                DomainRule.ActorNotAllowed,
+                "Only a member of the project who signs in with an identity provider can confirm this way.");
+        }
+
+        var slot = (await _store.ListSlotsAsync(projectId, reviewId, cancellationToken))
+            .FirstOrDefault(s => s.Id == slotId) ?? throw SlotNotFound(slotId);
+        if (user.Id != slot.PrimaryUserId && user.Id != slot.AlternateUserId)
+        {
+            throw new DomainRuleException(DomainRule.ActorNotAllowed, "You are not a reviewer of this slot.");
+        }
+
+        return user;
     }
 
     /// <summary>
@@ -410,7 +510,7 @@ public sealed class SigningService
     /// </param>
     /// <param name="password">
     ///     The signer's password, checked like a login. It is never stored, logged or put in a message; the caller
-    ///     should discard it as soon as this call returns.
+    ///     should discard it as soon as this call returns. Ignored for a user of an external identity provider.
     /// </param>
     /// <param name="cancellationToken">Cancels the operation.</param>
     /// <returns>The stored signature.</returns>
@@ -487,12 +587,31 @@ public sealed class SigningService
                     "The review cannot be signed yet: " + string.Join("; ", blockers) + ".");
             }
 
-            // Re-authenticate through the login path (same hasher, lockout and generic failure); a failure is
-            // recorded as a failed re-authentication, not as a failed sign-in
-            var verified = await _users.ReauthenticateAsync(actor.Username, password, cancellationToken);
-            if (verified is null || verified.Id != user.Id)
+            // Re-authenticate. A local account goes through the login path (same hasher, lockout and generic
+            // failure; a failure is recorded as a failed re-authentication, not as a failed sign-in). An external
+            // account has no password: its proof is the fresh sign-in at the provider that the callback issued for
+            // exactly this user, review and slot, spent here and only here, after every other check passed
+            User verified;
+            if (user.IsExternal)
             {
-                throw new DomainRuleException(DomainRule.ReauthenticationFailed, "The password is incorrect.");
+                if (_proofs is null || !_proofs.TryConsume(user.Id, projectId, reviewId, slotId))
+                {
+                    await _users.RecordExternalReauthFailureAsync(user, "no-proof", cancellationToken);
+                    throw new DomainRuleException(
+                        DomainRule.ReauthenticationFailed,
+                        "Your identity is not confirmed. Confirm it again, then sign.");
+                }
+
+                verified = user;
+            }
+            else
+            {
+                verified = await _users.ReauthenticateAsync(actor.Username, password, cancellationToken)
+                           ?? throw new DomainRuleException(DomainRule.ReauthenticationFailed, "The password is incorrect.");
+                if (verified.Id != user.Id)
+                {
+                    throw new DomainRuleException(DomainRule.ReauthenticationFailed, "The password is incorrect.");
+                }
             }
 
             // The store recomputes the digest inside its transaction and refuses the signature if it changed

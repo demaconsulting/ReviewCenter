@@ -34,7 +34,10 @@ OTS items:
 - **bUnit**: integration and usage design.
 - **Entity Framework Core**: integration and usage design (including its SQLite provider).
 - **FileAssert**: integration and usage design.
+- **Microsoft.AspNetCore.Authentication.OpenIdConnect**: integration and usage design (used for sign-in with an OpenID
+  Connect provider).
 - **Microsoft.AspNetCore.OpenApi**: integration and usage design (used to generate the OpenAPI document of the API).
+- **OpenIddict**: integration and usage design (used only by the tests as a fake identity provider).
 - **Pandoc**: integration and usage design.
 - **Playwright**: integration and usage design (used by ReviewCenterPuppet).
 - **System.Security.Cryptography.Pkcs**: integration and usage design (used to sign the PDF attestations).
@@ -73,8 +76,9 @@ The ReviewCenter system is divided as follows:
   `user add` verb, and verifies the audit trail for the `audit verify` verb; contains the ServerHost, UserCommand, and
   AuditCommand units
 - **Identity** (subsystem): the web side of local accounts, cookie sign-in and authorization, and the periodic re-check
-  of the user of an open page, and the in-memory limit on failed sign-in attempts; contains the PasswordHasher, SignIn,
-  SignInThrottle, and RevalidatingAuthenticationStateProvider units
+  of the user of an open page, the in-memory limit on failed sign-in attempts, and sign-in with an OpenID Connect
+  provider; contains the PasswordHasher, SignIn, SignInThrottle, OidcSignIn, and
+  RevalidatingAuthenticationStateProvider units
 - **Web** (subsystem): the Blazor Server user interface; contains the App unit (HTML shell, router, page frame with
   the menu bar and the footer, and the SessionGate that replaces an open page when its user is no longer signed in),
   the HomePage, AboutPage, and HelpPage units, the ProjectsPage, ProjectPage (with the new review and member pages),
@@ -87,7 +91,8 @@ The ReviewCenter system is divided as follows:
   repositories, free of web and database technology; contains the Fingerprint, RecordDigest, AuditChain, AuditService,
   ProjectService, EvidenceSettingsService, ReviewService, ThreadService, ChecklistService, UserService,
   PersonalAccessTokenService,
-  SigningService, RepositoryService, SelectionMatcher, RevisionValidator, ReviewPlanner, and LineDiff units
+  SigningService, ReauthProofStore, RepositoryService, SelectionMatcher, RevisionValidator, ReviewPlanner, and LineDiff
+  units
 - **Storage** (subsystem): persistence of projects, reviews, comment threads, checklists, users, personal access
   tokens, reviewer slots, signatures, the audit trail, and the registered repositories in a database
   through Entity

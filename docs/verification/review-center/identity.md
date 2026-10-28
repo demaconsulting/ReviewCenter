@@ -8,7 +8,9 @@ database, and uses the real `SignIn`, `RevalidatingAuthenticationStateProvider`,
 with the real `UserService` and the real
 database, so nothing is mocked. A user is created through the service, and the browser helper `TestBrowser` signs in
 over HTTP the way a person does, with the antiforgery token of the login page. The units are verified in detail by
-their own unit tests.
+their own unit tests. The optional sign-in with an OpenID Connect provider is verified end to end by the tests of the
+`OidcSignIn` unit (`OidcSignInTests.cs`, `OidcReauthTests.cs`), which start the real application with its real OpenID
+Connect handler and talk to a fake provider built on OpenIddict over loopback http (see the `OidcSignIn` verification).
 
 ### Test Environment
 
@@ -27,6 +29,9 @@ N/A - standard test environment (temporary SQLite databases are created by the t
   reports a user as valid while enabled and as no longer valid after the user is disabled.
 - The role claim `SystemAdmin` belongs only to a system administrator, and a session ends when the system
   administrator state of its user changes.
+- With a fake OpenID Connect provider, a first sign-in creates a plain account (no project, no administrator right, no
+  password) and a session, sign-out is local only, and a fresh sign-in of the same person at the provider allows
+  exactly one signature without a password.
 
 ### Test Scenarios
 
@@ -60,3 +65,16 @@ first three answers are the generic failure; the next attempts are refused with 
 right password; the login page then shows the throttle message; and the audit trail holds three `auth.sign-in-failed`
 entries and one `auth.sign-in-throttled` entry, none with a password. This scenario is tested by
 `IdentitySubsystem_Throttle_RepeatedFailures_AreRefusedAndAuditedOncePerWindow`.
+
+**OidcSignIn_FirstSignIn_CreatesPlainAccountAndSignsIn**: With the fake provider, a person signs in for the first
+time; the account is created with the issuer and subject, no password, no administrator right, and no project, and the
+person has a session at the local return address. This scenario is tested by
+`OidcSignIn_FirstSignIn_CreatesPlainAccountAndSignsIn`.
+
+**OidcSignIn_Logout_IsLocalOnly**: After such a sign-in the person signs out; the session ends and the provider sees
+no request. This scenario is tested by `OidcSignIn_Logout_IsLocalOnly`.
+
+**OidcReauth_FreshSignInOfSamePerson_AllowsExactlyOneSignature**: A reviewer of the provider confirms the identity for
+a slot; the provider is asked with `prompt=login` and `max_age=0`, a proof is issued, one signature without a password
+uses it up, and the slot is signed. This scenario is tested by
+`OidcReauth_FreshSignInOfSamePerson_AllowsExactlyOneSignature`.

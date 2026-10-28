@@ -179,3 +179,26 @@ sections:
         tests:
           - SigningService_SignAsync_ApiTokenActor_IsRefusedBeforeAnyCheck
           - SigningService_AddUpdateRemoveSlot_ApiTokenActor_IsRefused
+
+      - id: ReviewCenter-SigningService-ExternalReauth
+        title: >-
+          The SigningService class shall let a user of a provider sign a slot only when a confirmation of identity that
+          was issued for this user, project, review, and slot is still valid, shall use that confirmation up only after
+          every other check has passed, shall keep it when the signature is refused before for another reason, shall
+          refuse the signature, record it as a failed confirmation, and sign nothing when there is none, and shall let
+          the page ask whether a confirmation exists without using it up.
+        justification: |
+          A user of a provider has no password to type, so the confirmation that the person just signed in again takes
+          its place, and it must be as hard to reuse as a password that has to be typed for every signature. Keeping
+          it when a signature is refused for another reason lets the person correct the cause and sign. The page needs
+          to know whether to offer the signature or the confirmation without spending it.
+        tests:
+          - SigningService_SignAsync_ExternalUserWithProof_SignsOnce
+          - SigningService_SignAsync_ExternalUserWithoutLiveProof_IsRefused
+          - SigningService_SignAsync_ProofOfOtherBinding_IsRefused
+          - SigningService_SignAsync_ExternalUserWithoutProofStore_IsRefused
+          - SigningService_SignAsync_ApiTokenActorWithProof_IsRefusedAndKeepsProof
+          - SigningService_SignAsync_RecordChanged_KeepsTheProof
+          - SigningService_HasReauthProofAsync_AnswersWithoutSpending
+          - SigningService_RequireConfirmableAsync_AcceptsOnlyAReviewerOfTheSlot
+          - SigningService_RequireConfirmableAsync_NotAReviewerOfTheSlot_IsRefused

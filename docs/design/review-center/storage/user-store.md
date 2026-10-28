@@ -22,14 +22,20 @@ The user name is unique without regard to case: the column has the case-insensit
 index on it uses that collation, so the same collation also makes every lookup by user name case-insensitive (see
 `ReviewCenterDbContext`).
 
+The issuer and the subject of an account of an external identity provider (see `UserService`) are stored in two
+nullable columns of the user, both `null` for a local account. The columns keep the default binary collation, so the
+lookup compares exactly (case-sensitive), unlike the user name.
+
 #### Key Methods
 
 **AddAsync**: Stores a user and returns it with the identity assigned by the database. The unit copies the fields of
-the argument (including the must-change-password flag) into a new entity through the private `InsertAsync`, so an
+the argument (including the must-change-password flag and the external issuer and subject) into a new entity through
+the private `InsertAsync`, so an
 identity supplied by the caller is ignored and can neither be persisted nor
 collide with an existing user; the returned user is the stored entity. The audit draft is built from the stored user (so
 it can name the assigned identity) and saved in the same transaction. A user name that already exists, in any
-capitalization, is reported as a `DomainRuleException` for `UserNameTaken`, and nothing is stored.
+capitalization, is reported as a `DomainRuleException` for `UserNameTaken`, and nothing is stored. A second user with the
+same issuer and subject violates the unique index of the pair and is reported the same way.
 
 **AddToProjectAsync**: Stores a user and the membership of that user in a project, with the audit entry built from the
 stored user, in one audit transaction: the user is inserted and saved (so the identity is known), the membership is
@@ -38,6 +44,10 @@ rolled back and `UserNameTaken` is reported; when the project does not exist the
 it and nothing is stored either. A user therefore never exists without the membership it was created for.
 
 **GetByUsernameAsync**: Reads one user by user name, without regard to case; null when absent.
+
+**GetByExternalAsync**: Reads the user of an identity at an external provider by the exact pair of issuer and subject;
+null when there is none. Nothing else (no name, no e-mail address) is matched. A null issuer or subject raises
+`ArgumentNullException`.
 
 **ListAsync**: Lists all users ordered by user name and then identity.
 
@@ -49,8 +59,9 @@ but the update still passes through the gate, so that all writes stay serialized
 
 #### Error Handling
 
-A duplicate user name is detected from the SQLite unique constraint error code (2067) and reported as the domain
-rule; like `ReviewStore`, the unit holds this provider-specific knowledge. Any other database failure
+A duplicate user name, and a duplicate pair of external issuer and subject, are detected from the SQLite unique
+constraint error code (2067) and reported as the domain rule; like `ReviewStore`, the unit holds this
+provider-specific knowledge. Any other database failure
 propagates unchanged to the caller. Null arguments raise `ArgumentNullException`. The password hash is stored and read
 but never logged.
 
@@ -63,5 +74,6 @@ but never logged.
 
 #### Callers
 
-- **ProjectService** and **UserService** — through the Core interface.
+- **ProjectService** and **UserService** — through the Core interface (`UserService` also finds an external account
+  with `GetByExternalAsync`).
 - **ServerHost** — registers the store as the implementation of the Core interface.

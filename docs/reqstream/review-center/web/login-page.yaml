@@ -42,3 +42,17 @@ sections:
           notice tells why the sign-in page is shown instead of the next page. It must not appear on a plain visit.
         tests:
           - LoginPage_Render_ChangedQuery_ShowsNoticeOnlyAfterPasswordChange
+
+      - id: ReviewCenter-LoginPage-OidcButton
+        title: >-
+          The LoginPage unit shall, only when the sign-in with a provider is on, show a button "Sign in with" and the
+          display name of the provider beside the form for a local account, show a general message next to it when the
+          provider failed, and show no button when it is off.
+        justification: |
+          People must see at once how to sign in with the provider, and the local form must stay for the accounts that
+          have no provider. The message does not say why, so that it does not help an attacker.
+        tests:
+          - LoginPage_Render_ProviderEnabled_ShowsButtonBesideLocalForm
+          - LoginPage_Render_ProviderFailed_ShowsGenericMessageNextToButton
+          - LoginPage_Render_ProviderOff_ShowsNoButton
+          - OidcSignIn_Enabled_SignInPageOffersButtonBesideLocalForm

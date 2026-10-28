@@ -159,6 +159,14 @@ internal sealed class FakeUserStore : IUserStore
     }
 
     /// <inheritdoc />
+    public Task<User?> GetByExternalAsync(string issuer, string subject, CancellationToken cancellationToken = default)
+    {
+        var user = _users.FirstOrDefault(
+            existing => existing.ExternalIssuer == issuer && existing.ExternalSubject == subject);
+        return Task.FromResult(user is null ? null : Copy(user, user.Id));
+    }
+
+    /// <inheritdoc />
     public Task<IReadOnlyList<User>> ListAsync(CancellationToken cancellationToken = default)
     {
         IReadOnlyList<User> list = _users
@@ -200,7 +208,9 @@ internal sealed class FakeUserStore : IUserStore
             FailedLoginCount = user.FailedLoginCount,
             LockoutUntil = user.LockoutUntil,
             MustChangePassword = user.MustChangePassword,
-            Created = user.Created
+            Created = user.Created,
+            ExternalIssuer = user.ExternalIssuer,
+            ExternalSubject = user.ExternalSubject
         };
     }
 }

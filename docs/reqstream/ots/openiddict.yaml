@@ -1,0 +1,25 @@
+---
+# OpenIddict OTS Software Requirements
+#
+# Requirements for OpenIddict, which the tests use as a fake identity provider, so that the sign-in with an OpenID
+# Connect provider can be verified without an external service. It is not part of the shipped product.
+
+sections:
+  - title: OTS Software Requirements
+    sections:
+      - title: OpenIddict Requirements
+        requirements:
+          - id: ReviewCenter-OTS-OpenIddict-TestProvider
+            title: >-
+              OpenIddict shall serve the discovery document and the signing keys, and shall issue identity tokens, with
+              the authentication time of the login, that are signed with its keys, in the authorization code flow with
+              a proof key, so that the sign-in code can be verified against a real provider in the tests.
+            justification: |
+              The tests of the sign-in need a provider that signs real tokens and speaks the protocol. Passing tests
+              that run the full flow against it, and that read the time of the login from the tokens it issues, confirm
+              that it does, and so that the tests that rely on it test the product and not a mock.
+            tags: [ots]
+            tests:
+              - OidcSignIn_FirstSignIn_CreatesPlainAccountAndSignsIn
+              - OidcReauth_FreshSignInOfSamePerson_AllowsExactlyOneSignature
+              - OidcReauth_AuthTimeNotInWindow_IsRefusedFailClosed

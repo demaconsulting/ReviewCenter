@@ -142,6 +142,11 @@ internal static class SignIn
                 $"{SignInThrottleOptions.SectionName}:WindowSeconds must be between 1 and {SignInThrottleOptions.MaximumWindowSeconds}.");
         services.AddSingleton<SignInThrottle>();
 
+        // Sign-in with an OpenID Connect provider: only the settings are registered here, and they are not read
+        // until start-up; the provider itself is added by AddOidcSignIn once the configuration is final
+        services.AddOptions<OidcOptions>().Bind(configuration.GetSection(OidcOptions.SectionName));
+        services.AddSingleton<IValidateOptions<OidcOptions>, OidcOptionsValidator>();
+
         // An open page (circuit) re-checks its user through this provider. A plain AddScoped is needed, not
         // TryAddScoped: AddRazorComponents().AddInteractiveServerComponents() registers the framework default with
         // TryAdd, and the host calls AddSignIn after it, so this last registration is the one that wins
@@ -405,7 +410,7 @@ internal static class SignIn
     ///     instead; never the password or its hash. Project roles are not in the cookie: they are read when needed,
     ///     so a change of membership takes effect at once.
     /// </returns>
-    private static ClaimsPrincipal BuildPrincipal(User user)
+    internal static ClaimsPrincipal BuildPrincipal(User user)
     {
         var claims = new List<Claim>
         {

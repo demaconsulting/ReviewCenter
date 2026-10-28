@@ -81,3 +81,18 @@ sections:
           - SignInThrottle_Succeeded_CalledTwiceWithOneReservation_RefundsOnce
           - SignInThrottle_Succeeded_NullReservation_Throws
           - SignInThrottle_Reset_DoesNotReuseGenerations
+
+      - id: ReviewCenter-SignInThrottle-AddressOnly
+        title: >-
+          The SignInThrottle unit shall, on request, count an attempt against the counter of the client address
+          alone, with no counter per name, refuse it only when the address has used up its attempts, give the
+          attempt back for a success only once, and keep to the same cap on counters as an attempt with a name.
+        justification: |
+          A request that carries no user name that can be trusted, such as the callback of an identity provider, must
+          not be counted under a constant name: all people behind one shared address would share that one counter, and
+          a few bad requests would lock them all out. Counting the address alone keeps the protection against floods
+          from one address without that effect.
+        tests:
+          - SignInThrottle_TryBeginAddressOnly_NoNameLimit_RefusesOnlyAtAddressLimit
+          - SignInThrottle_Succeeded_AddressOnlyReservation_ReturnsTheSlotOnce
+          - SignInThrottle_TryBeginAddressOnly_TableFull_EvictsOldestAndStaysAtCap

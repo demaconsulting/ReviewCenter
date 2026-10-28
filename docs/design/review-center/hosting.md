@@ -8,7 +8,8 @@ The `Hosting` subsystem turns a parsed command-line request into a running web s
 command line, and verifies the audit trail from the command line. It owns
 the composition of the ASP.NET Core application behind the `serve` verb: the listen address,
 the logging configuration, the health endpoint, the sign-in configuration and endpoints of the `Identity`
-subsystem, the mapping of the user interface provided
+subsystem (including the optional sign-in with an OpenID Connect provider, off unless `Identity:Oidc:Enabled` is
+true), the mapping of the user interface provided
 by the `Web` subsystem, the registration and mapping of the JSON API of the `Api` subsystem, and the connection of
 the pages to the database: reading the `Database` settings,
 creating the database, and registering the `Core` services with the `Storage` stores. It also owns the
@@ -39,8 +40,9 @@ documented with `ServerHost` as a supporting type, `UserCommand`, and `AuditComm
   `ServerHostOptions` adjusts the build, which lets tests run the production pipeline against
   an in-memory server and a temporary database.
 - *Constraints*: Throws `ArgumentNullException` for a null context and `InvalidOperationException`
-  ("Failed to prepare the database: ..." or "Invalid sign-in settings: ...") when the database cannot be prepared or
-  the sign-in settings are invalid. Nothing is bound to a
+  ("Failed to prepare the database: ..." or "Invalid sign-in settings: ..." or "Invalid OpenID Connect sign-in
+  settings: ...") when the database cannot be prepared or
+  the sign-in or the OpenID Connect settings are invalid. Nothing is bound to a
   network port until the returned application is started.
 
 **ServerHost.AddServices**: Registers the persistence and the Core services.
@@ -48,7 +50,8 @@ documented with `ServerHost` as a supporting type, `UserCommand`, and `AuditComm
 - *Type*: In-process .NET static method.
 - *Role*: Provider.
 - *Contract*: Registers the database settings and context factory, the clock, the stores, the password hasher, the
-  project access rules (`ProjectAccess` as the Core `IProjectAccess`), the Core
+  project access rules (`ProjectAccess` as the Core `IProjectAccess`), the store of single-use confirmation proofs
+  (`ReauthProofStore`), the Core
   services, and the git content source (its settings, the key ring of the Data Protection system, the token protector,
   and the repository store) in a service collection built from a configuration. It is shared by the server,
   `UserCommand`, and `AuditCommand`.
@@ -93,10 +96,20 @@ the server.
 - *Role*: Consumer.
 
 **Identity (consumed)**: `SignIn` (registration of cookie authentication and authorization, and the endpoints
-`/auth/login` and `/auth/logout`) and `PasswordHasher` of the `Identity` subsystem.
+`/auth/login` and `/auth/logout`), `OidcSignIn` and `OidcOptions` (the optional OpenID Connect sign-in, its endpoints,
+and the settings), and `PasswordHasher` of the `Identity` subsystem.
 
 - *Type*: In-process .NET types.
 - *Role*: Consumer.
+
+**Identity:Oidc settings**: The `Identity:Oidc` configuration section, described in the `Identity` design.
+
+- *Type*: Configuration (`appsettings.json` and environment variables such as `Identity__Oidc__Enabled`).
+- *Role*: Consumer.
+- *Contract*: Off by default. When `Enabled` is true the server validates the settings at start-up, registers the
+  provider and its endpoints, and reserves `/signin-oidc` for the callback.
+- *Constraints*: An invalid setting stops the start-up with an error that names it and never shows a value or the
+  secret.
 
 **Storage and Core (consumed)**: `DatabaseSetup`, `ReviewCenterDbContext`, `ReviewStore`, `UserStore`, `AuditStore`,
 `RepositoryStore`, `PersonalAccessTokenStore`, and `AuditAppender` of the
@@ -171,7 +184,8 @@ the Core hasher interface, `ProjectAccess` as the Core `IProjectAccess` (a singl
 that take it, so that every service and the API decide visibility with the same instance), and the seven Core services
 (`ProjectService`, `ReviewService`, `ThreadService`,
 `ChecklistService`, `UserService`, `SigningService`, and `AuditService`) as singletons shared by all browser
-connections. `AuditService` is created with a hook that writes a warning to the log when an event cannot be recorded
+connections, and `ReauthProofStore` as a singleton so that the Identity endpoints and `SigningService` share one set of
+proofs. `AuditService` is created with a hook that writes a warning to the log when an event cannot be recorded
 (the failure is never shown to the user), and `UserService` receives it so that failed sign-ins and lockouts are
 recorded. `RepositoryStore` (as the Core repository store interface), `CredentialProtector` (as the Core token
 protector), `RepositoryService`, `GitRunner`, and `GitSource` (as the Core git provider interface) are registered as
@@ -205,7 +219,13 @@ problem with the settings or the file system stops the start-up with one clear m
 failing on the first page request. The sign-in settings (`Auth:SessionHours` and `Auth:RevalidationSeconds`) are
 validated at the same point, for the
 same reason: an invalid value stops the start-up with the message "Invalid sign-in settings: ...", instead of
-failing at the first sign-in. The git setting `Git:TimeoutSeconds` is checked the same way and must be from 1 to 3600:
+failing at the first sign-in. The settings of the OpenID Connect provider (`ValidateOidcOptions`) are checked right
+after them, by reading the options once so that their validator runs: an invalid value stops the start-up with
+"Invalid OpenID Connect sign-in settings: ...", which names the setting and never a value or the secret, and while the
+provider is off nothing is read. `OidcSignIn.AddOidcSignIn` registers the provider only when it is enabled, and
+`MapOidcSignIn` maps its endpoints next to the sign-in endpoints; `/signin-oidc`, the callback of the handler, is a
+reserved address, so the pages and the API never answer it. The git setting `Git:TimeoutSeconds` is checked the same
+way and must be from 1 to 3600:
 any other number stops the start-up with "Invalid git settings: Git:TimeoutSeconds must be between 1 and 3600
 seconds."
 
@@ -236,7 +256,7 @@ the shipped one.
 Error handling is local to the subsystem: an address that is unavailable at start-up, which
 Kestrel reports as an `IOException`, is converted into a message on `Context.WriteError` and a
 result of 1; a database that cannot be prepared (an unsupported provider, an unusable location) or sign-in settings
-that are invalid raise
+(including the OpenID Connect settings) that are invalid raise
 an `InvalidOperationException` while building, which `RunAsync` converts into the same kind of error
 report and a result of 1; and a cancellation requested before start-up completes is treated as a normal
 stop. Any other exception propagates to `Program.Main`.

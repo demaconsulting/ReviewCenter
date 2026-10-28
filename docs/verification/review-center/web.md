@@ -78,6 +78,12 @@ N/A - standard test environment (temporary SQLite databases are created by the t
   so they are verified at unit level by the component tests of `ProjectPage` (`EvidenceSettingsPageTests.cs`) and
   `HelpPage` (see the children of the requirement `ReviewCenter-Web-EvidenceSettings` in `web.yaml`). What the stored
   settings do to the API and the PDFs is verified in the `Api` and `Evidence` subsystems.
+- Optional sign-in with an OpenID Connect provider: the login page offers the button of the provider beside the local
+  form only while it is enabled, the users and account pages show that such an account has no password, the review
+  page offers the confirmation at the provider instead of the password field, and the help topics mention it; the
+  pages are verified at unit level by their component tests (`OidcPageTests.cs`) and the review page by the
+  integration test of the `Identity` subsystem (see the children of the requirement `ReviewCenter-Web-OidcSignIn` in
+  `web.yaml`).
 
 ### Test Scenarios
 
@@ -274,3 +280,10 @@ replacing the password sends the browser to the login page with the notice, whic
 `AccountPage_ChangePassword_TemporaryPassword_RedirectsToLoginWithNotice` and
 `LoginPage_Render_ChangedQuery_ShowsNoticeOnlyAfterPasswordChange`. The refusals on the server side (signatures, access
 tokens, project access) are verified in the `Core` and `Api` subsystems.
+
+**Sign-in with an OpenID Connect provider**: With the provider on and nobody signed in, the login page shows the button
+beside the local form, which is tested by `LoginPage_Render_ProviderEnabled_ShowsButtonBesideLocalForm`. A reviewer
+who signs in at the provider sees, on the review page, the button to confirm the identity and no password field, and
+after the confirmation the Sign button, which is tested by `OidcReauth_ReviewPage_OffersConfirmationThenSigning`. The
+other states of the pages (the failure message, the missing button, the account and user pages, and the help topics)
+are tested in the unit tests of `LoginPage`, `UsersPage`, `AccountPage`, and `HelpPage`.

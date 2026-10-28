@@ -7,7 +7,8 @@
    Presentation only; state and event handling live in ReviewPage.razor.cs. From the top it shows the title, a
    one-sentence next step (checklist, threads and signatures) under an Approved / In review badge, the checklist
    progress with a link to the checklist page, the Reviewers card (slots with primary, alternate and signature
-   status; an occupant of a slot signs there after confirming the password, or sees what blocks signing; an
+   status; an occupant of a slot signs there after confirming the password (an account of an identity provider
+   confirms its identity at the provider with a button instead), or sees what blocks signing; an
    unsigned slot can be changed or removed and slots can be added), the
    list of files with size and open-thread count, the thread index of all files
    (filter All/Open/Resolved, default Open; choosing a row selects the file and highlights the lines), and for
@@ -190,17 +191,58 @@
                                     </ul>
                                 </div>
                             }
+                            else if (CurrentIsExternal && !ConfirmedSlots.Contains(slotId))
+                            {
+                                <form method="post" action="/auth/oidc/reauth" data-testid="sign-reauth-form-@slotId">
+                                    <AntiforgeryToken />
+                                    <input type="hidden" name="projectId" value="@ProjectId" />
+                                    <input type="hidden" name="reviewId" value="@ReviewId" />
+                                    <input type="hidden" name="slotId" value="@slotId" />
+                                    <input type="hidden" name="returnUrl" value="@ReviewAddress" />
+                                    <p class="muted" data-testid="sign-meaning-@slotId">@SigningService.MeaningText</p>
+                                    @if (!Oidc.Value.Enabled)
+                                    {
+                                        <p class="muted" role="status" data-testid="sign-reauth-off-@slotId">
+                                            Signing in with an identity provider is switched off, so this review
+                                            cannot be signed now. Ask an administrator.
+                                        </p>
+                                    }
+                                    else
+                                    {
+                                        <p class="muted" data-testid="sign-reauth-hint-@slotId">
+                                            To sign, confirm it is you: @Oidc.Value.DisplayName asks you to sign in
+                                            again, then you come back here to sign.
+                                        </p>
+                                        @if (SignMessage(slotId) is { } reauthMessage)
+                                        {
+                                            <p class="error" role="alert" data-testid="sign-error-@slotId">@reauthMessage</p>
+                                        }
+                                        <button type="submit" data-testid="sign-reauth-@slotId">
+                                            Confirm identity with @Oidc.Value.DisplayName
+                                        </button>
+                                    }
+                                </form>
+                            }
                             else
                             {
                                 <form data-testid="sign-form-@slotId" novalidate @onsubmit="() => SignAsync(slotId)">
                                     <p class="muted" data-testid="sign-meaning-@slotId">@SigningService.MeaningText</p>
-                                    <div class="field">
-                                        <label for="sign-password-@slotId">Confirm your password to sign</label>
-                                        <input id="sign-password-@slotId" type="password" autocomplete="current-password"
-                                               data-testid="sign-password-@slotId" @key="@($"{slotId}-{PasswordKey}")"
-                                               @oninput="e => SignPasswords[slotId] = e.Value?.ToString() ?? string.Empty" />
-                                    </div>
-                                    @if (SignErrors.TryGetValue(slotId, out var signError))
+                                    @if (CurrentIsExternal)
+                                    {
+                                        <p class="notice" role="status" data-testid="sign-confirmed-@slotId">
+                                            Identity confirmed. Review the record, then sign.
+                                        </p>
+                                    }
+                                    else
+                                    {
+                                        <div class="field">
+                                            <label for="sign-password-@slotId">Confirm your password to sign</label>
+                                            <input id="sign-password-@slotId" type="password" autocomplete="current-password"
+                                                   data-testid="sign-password-@slotId" @key="@($"{slotId}-{PasswordKey}")"
+                                                   @oninput="e => SignPasswords[slotId] = e.Value?.ToString() ?? string.Empty" />
+                                        </div>
+                                    }
+                                    @if (SignMessage(slotId) is { } signError)
                                     {
                                         <p class="error" role="alert" data-testid="sign-error-@slotId">@signError</p>
                                     }

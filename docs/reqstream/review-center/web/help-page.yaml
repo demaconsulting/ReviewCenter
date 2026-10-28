@@ -116,3 +116,14 @@ sections:
         tests:
           - HelpEvidenceSettingsPage_Render_ExplainsAnonymousAccessContentSwitchesAndScope
           - HelpTopicPages_Render_EveryTopicHasAPageWithValidNavigation
+
+      - id: ReviewCenter-HelpPage-OidcSignIn
+        title: >-
+          The HelpPage unit shall explain, in the topics for getting started, for signing, and for API tokens, that
+          an account of an identity provider signs in at the provider, confirms a signature there, and has no password
+          and no token that signs.
+        justification: |
+          People who sign in with a provider meet different steps, and they should find the reasons where they look
+          for help on those tasks.
+        tests:
+          - HelpTopicPage_Render_MentionsSignInWithProvider

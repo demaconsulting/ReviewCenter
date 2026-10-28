@@ -383,6 +383,32 @@ sections:
           - IdentitySubsystem_SignInJourney_LoginUseAndLogout_WorksEndToEnd
           - IdentitySubsystem_Revalidation_UserDisabledAfterSignIn_OpenSessionIsNoLongerValid
 
+      - id: ReviewCenter-System-OidcSignIn
+        title: >-
+          The tool shall, when an administrator turns it on, let a user sign in with an account at an OpenID Connect
+          provider beside the local sign-in, create the account of a new person without any right, find it again by
+          the issuer and the subject only, never link it to a local account, never give it a password, refuse a
+          disabled account, accept the return address of a sign-in only when it is on this server, check the settings
+          when it starts, and let the person confirm a signature by signing in again at the provider, once, with a
+          time of sign-in that is fresh, as the same person, failing closed.
+        tags: [system]
+        justification: |
+          Organizations already manage their people and their passwords at an identity provider. Using it avoids a
+          second set of passwords, while the rules that the account has no rights of its own, is never joined to
+          another account by a name, and must prove the same person again for every signature keep what the provider
+          says from giving anybody more than the administrators of the review tool give.
+        children:
+          - ReviewCenter-Identity-OidcSignIn
+          - ReviewCenter-Core-ExternalIdentity
+          - ReviewCenter-Storage-ExternalIdentity
+          - ReviewCenter-Hosting-OidcSignIn
+          - ReviewCenter-Web-OidcSignIn
+        tests:
+          - OidcSignIn_FirstSignIn_CreatesPlainAccountAndSignsIn
+          - OidcReauth_FreshSignInOfSamePerson_AllowsExactlyOneSignature
+          - OidcSignIn_NameOfLocalAccount_NeverLinksToIt
+          - OidcSignIn_ForeignReturnUrl_IsReplacedByHome
+
       - id: ReviewCenter-System-Authorization
         title: >-
           The tool shall send a request without a signed-in user for a project, review, checklist, account, or

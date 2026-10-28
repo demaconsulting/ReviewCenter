@@ -28,7 +28,7 @@ namespace DemaConsulting.ReviewCenter.Identity;
 /// <remarks>
 ///     Two fixed-window counters are kept: one per client address and lower-cased user name, and one per client
 ///     address for all names together. <see cref="TryBegin"/> reserves a slot in both before the password is
-///     checked, so a burst of parallel requests cannot all pass, and returns a <see cref="Reservation"/>;
+///     checked (<see cref="TryBeginAddressOnly"/> reserves in the address counter alone), so a burst of parallel requests cannot all pass, and returns a <see cref="Reservation"/>;
 ///     <see cref="Succeeded"/> gives the slots back, but only to the windows the reservation was counted in (a
 ///     window that has since been removed or started again is left alone, and a reservation is given back once).
 ///     Every attempt is counted whether or not the user name exists, so the state never depends on the account.
@@ -115,14 +115,44 @@ internal sealed class SignInThrottle
     /// </returns>
     public Reservation? TryBegin(string? clientAddress, string? username)
     {
+        return Begin(clientAddress, NameKey(clientAddress, username));
+    }
+
+    /// <summary>
+    ///     Counts an attempt against the quota of the client address only, with no name counter, unless the address
+    ///     has used up its attempts.
+    /// </summary>
+    /// <param name="clientAddress">The client address as text; <c>null</c> is counted as one unknown address.</param>
+    /// <returns>
+    ///     The reservation to give to <see cref="Succeeded"/> when the attempt may go on (it has been counted);
+    ///     <c>null</c> when the address limit is reached (nothing is counted then).
+    /// </returns>
+    /// <remarks>
+    ///     For a request that carries no user name the caller can trust, such as the callback of a provider: a
+    ///     shared constant name would let a few bad requests from one shared address block every person behind
+    ///     it, so only the address limit applies. The cap on the table and the eviction are those of
+    ///     <see cref="TryBegin"/>.
+    /// </remarks>
+    public Reservation? TryBeginAddressOnly(string? clientAddress)
+    {
+        return Begin(clientAddress, null);
+    }
+
+    /// <summary>
+    ///     Counts an attempt against the address counter and, when a name key is given, the name counter.
+    /// </summary>
+    /// <param name="clientAddress">The client address, or <c>null</c>.</param>
+    /// <param name="nameKey">The name key, or <c>null</c> to count the address only.</param>
+    /// <returns>The reservation; <c>null</c> when a limit is reached (nothing is counted then).</returns>
+    private Reservation? Begin(string? clientAddress, string? nameKey)
+    {
         var addressKey = AddressKey(clientAddress);
-        var nameKey = NameKey(clientAddress, username);
         var window = TimeSpan.FromSeconds(_options.WindowSeconds);
         lock (_lock)
         {
             var now = _timeProvider.GetUtcNow();
             PruneExpired(now, window);
-            if (CountOf(nameKey, now, window) >= _options.MaxFailuresPerName
+            if ((nameKey is not null && CountOf(nameKey, now, window) >= _options.MaxFailuresPerName)
                 || CountOf(addressKey, now, window) >= _options.MaxFailuresPerAddress)
             {
                 return null;
@@ -138,7 +168,7 @@ internal sealed class SignInThrottle
             }
 
             MakeRoom(missing, nameKey, addressKey);
-            var nameGeneration = Increment(nameKey, now, window);
+            var nameGeneration = nameKey is null ? 0 : Increment(nameKey, now, window);
             var addressGeneration = Increment(addressKey, now, window);
             return new Reservation(nameKey, nameGeneration, addressKey, addressGeneration);
         }
@@ -161,7 +191,9 @@ internal sealed class SignInThrottle
             }
 
             reservation.Consumed = true;
-            if (_windows.TryGetValue(reservation.CountedNameKey, out var name) && name.Generation == reservation.NameGeneration)
+            if (reservation.CountedNameKey is not null
+                && _windows.TryGetValue(reservation.CountedNameKey, out var name)
+                && name.Generation == reservation.NameGeneration)
             {
                 RemoveWindow(reservation.CountedNameKey, name);
             }
@@ -326,12 +358,12 @@ internal sealed class SignInThrottle
     /// <summary>
     ///     Counts the keys of this attempt that are not in the table.
     /// </summary>
-    /// <param name="nameKey">The name key of this attempt.</param>
+    /// <param name="nameKey">The name key of this attempt, or <c>null</c> when only the address is counted.</param>
     /// <param name="addressKey">The address key of this attempt.</param>
     /// <returns>The number of keys that need a new slot, 0 to 2.</returns>
-    private int MissingKeys(string nameKey, string addressKey)
+    private int MissingKeys(string? nameKey, string addressKey)
     {
-        return (_windows.ContainsKey(nameKey) ? 0 : 1) + (_windows.ContainsKey(addressKey) ? 0 : 1);
+        return (nameKey is null || _windows.ContainsKey(nameKey) ? 0 : 1) + (_windows.ContainsKey(addressKey) ? 0 : 1);
     }
 
     /// <summary>
@@ -339,9 +371,9 @@ internal sealed class SignInThrottle
     ///     are needed. The expired windows have already been removed by <see cref="PruneAllExpired"/>.
     /// </summary>
     /// <param name="missing">The number of keys that are about to be added.</param>
-    /// <param name="nameKey">The name key of this attempt, which is never removed.</param>
+    /// <param name="nameKey">The name key of this attempt, which is never removed; <c>null</c> when none.</param>
     /// <param name="addressKey">The address key of this attempt, which is never removed.</param>
-    private void MakeRoom(int missing, string nameKey, string addressKey)
+    private void MakeRoom(int missing, string? nameKey, string addressKey)
     {
         var node = _order.First;
         while (_windows.Count + missing > MaxKeys && node is not null)
@@ -364,11 +396,11 @@ internal sealed class SignInThrottle
         /// <summary>
         ///     Initializes a new instance of the <see cref="Reservation"/> class.
         /// </summary>
-        /// <param name="nameKey">The name key that was counted.</param>
+        /// <param name="nameKey">The name key that was counted; <c>null</c> when only the address was counted.</param>
         /// <param name="nameGeneration">The generation of the name window that was counted.</param>
         /// <param name="addressKey">The address key that was counted.</param>
         /// <param name="addressGeneration">The generation of the address window that was counted.</param>
-        internal Reservation(string nameKey, long nameGeneration, string addressKey, long addressGeneration)
+        internal Reservation(string? nameKey, long nameGeneration, string addressKey, long addressGeneration)
         {
             CountedNameKey = nameKey;
             NameGeneration = nameGeneration;
@@ -377,9 +409,9 @@ internal sealed class SignInThrottle
         }
 
         /// <summary>
-        ///     Gets the name key that was counted.
+        ///     Gets the name key that was counted; <c>null</c> when only the address was counted.
         /// </summary>
-        internal string CountedNameKey { get; }
+        internal string? CountedNameKey { get; }
 
         /// <summary>
         ///     Gets the generation of the name window that was counted.

@@ -336,6 +336,104 @@ public class ServerHostTests
     }
 
     /// <summary>
+    ///     Test that invalid settings of sign-in with an OpenID Connect provider stop the build with an error that
+    ///     names the setting and never contains the secret.
+    /// </summary>
+    /// <param name="name">The setting under <c>Identity:Oidc</c>.</param>
+    /// <param name="value">The invalid value.</param>
+    [Theory]
+    [InlineData("Authority", "")]
+    [InlineData("Authority", "http://idp.example.com/")]
+    [InlineData("Authority", "not an address")]
+    [InlineData("Authority", "https://idp.example.com/?x=1")]
+    [InlineData("ClientId", "")]
+    [InlineData("ClientId", "has space")]
+    [InlineData("Scopes", "profile email")]
+    [InlineData("DisplayName", "12345678901234567890123456789012345678901234567890X")]
+    [InlineData("UsernameClaim", "has space")]
+    [InlineData("ReauthMaxAgeSeconds", "5")]
+    [InlineData("ReauthMaxAgeSeconds", "901")]
+    [InlineData("ClientSecret", "top-secret-bell-\u0007-character")]
+    [InlineData("ClientSecret", "")]
+    [InlineData("ClientSecret", "   ")]
+    public void ServerHost_CreateApplication_InvalidOidcSettings_ThrowsClearErrorWithoutSecret(string name, string value)
+    {
+        // Arrange: valid enabled settings with one invalid value, and a secret that must stay out of the message
+        const string secret = "top-secret-value";
+        using var context = Context.Create(["serve", "--silent"]);
+        var options = new ServerHostOptions
+        {
+            MapStaticAssets = false,
+            ConfigureBuilder = builder =>
+            {
+                builder.WebHost.UseTestServer();
+                builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
+                {
+                    ["Database:ConnectionString"] = TestDatabase.NewConnectionString(),
+                    ["Identity:Oidc:Enabled"] = "true",
+                    ["Identity:Oidc:Authority"] = "https://idp.example.com/",
+                    ["Identity:Oidc:ClientId"] = "reviewcenter",
+                    ["Identity:Oidc:ClientSecret"] = secret,
+                    [$"Identity:Oidc:{name}"] = value
+                });
+            }
+        };
+
+        // Act: create the application
+        var exception = Assert.Throws<InvalidOperationException>(() => ServerHost.CreateApplication(context, options));
+
+        // Assert: the message is the sign-in settings error, names the setting and has no value
+        Assert.Contains("Invalid OpenID Connect sign-in settings", exception.Message, StringComparison.Ordinal);
+        Assert.Contains($"Identity:Oidc:{name}", exception.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("top-secret", exception.Message, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    ///     Test that the provider settings are not checked while sign-in with a provider is off, and that valid
+    ///     settings (https, and http for a loopback host) build the application.
+    /// </summary>
+    [Fact]
+    public void ServerHost_CreateApplication_OidcOffOrValid_BuildsTheApplication()
+    {
+        // Arrange
+        using var context = Context.Create(["serve", "--silent"]);
+        ServerHostOptions Options(Dictionary<string, string?> extra) => new()
+        {
+            MapStaticAssets = false,
+            ConfigureBuilder = builder =>
+            {
+                builder.WebHost.UseTestServer();
+                extra["Database:ConnectionString"] = TestDatabase.NewConnectionString();
+                builder.Configuration.AddInMemoryCollection(extra);
+            }
+        };
+
+        // Act / Assert: all three build
+        using var off = ServerHost.CreateApplication(context, Options(new Dictionary<string, string?>
+        {
+            ["Identity:Oidc:Authority"] = "garbage"
+        }));
+        using var secure = ServerHost.CreateApplication(context, Options(new Dictionary<string, string?>
+        {
+            ["Identity:Oidc:Enabled"] = "true",
+            ["Identity:Oidc:Authority"] = "https://idp.example.com/realm",
+            ["Identity:Oidc:ClientId"] = "reviewcenter",
+            ["Identity:Oidc:ClientSecret"] = "top-secret-value"
+        }));
+        using var loopback = ServerHost.CreateApplication(context, Options(new Dictionary<string, string?>
+        {
+            ["Identity:Oidc:Enabled"] = "true",
+            ["Identity:Oidc:Authority"] = "http://localhost:8080/realm",
+            ["Identity:Oidc:ClientId"] = "reviewcenter",
+            ["Identity:Oidc:ClientSecret"] = "top-secret-value",
+            ["Identity:Oidc:ReauthMaxAgeSeconds"] = "900"
+        }));
+        Assert.NotNull(off);
+        Assert.NotNull(secure);
+        Assert.NotNull(loopback);
+    }
+
+    /// <summary>
     ///     Test that an attestation provider that does not exist stops the build with an error naming the setting.
     /// </summary>
     [Fact]

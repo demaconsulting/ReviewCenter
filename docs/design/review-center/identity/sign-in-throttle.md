@@ -35,8 +35,9 @@ key gets a new one. The generation identifies the window a reservation was count
 **Window**: a counter whose window started more than `WindowSeconds` ago counts as 0. The window is fixed, not
 sliding: it starts with the first attempt of the key and the count starts again after it ends.
 
-**Reservation**: a small object returned by `TryBegin`. It holds the two keys that were counted, the generation of
-each window, and a flag that tells whether it has been given back.
+**Reservation**: a small object returned by `TryBegin` and `TryBeginAddressOnly`. It holds the keys that were counted
+(the name key is absent for an address-only attempt), the generation of each window, and a flag that tells whether it
+has been given back.
 
 **MaxKeys**: `int` (constant) — 10,000; the most keys held.
 
@@ -68,12 +69,27 @@ Counting after the failure would let a burst of parallel requests all pass the c
 Every attempt is counted the same way whether or not the user name exists, so the state of the throttle never depends
 on the account.
 
+**TryBeginAddressOnly**: Counts an attempt against the quota of the client address alone, unless the address has used
+up its attempts.
+
+- *Parameters*: `string? clientAddress` — a null value is counted as the single address `unknown`.
+- *Returns*: a reservation when the attempt may go on and has been counted; `null` when the counter of the address has
+  reached its limit in the current window.
+- *Postconditions*: When `null` is returned nothing is counted. When a reservation is returned only the address
+  counter has been increased (no name key exists), and `Succeeded` gives that one slot back, once. The table cap and
+  the eviction are the same as for `TryBegin` (only the address key is protected from eviction).
+
+It is for a request whose user name cannot be trusted, such as the callback of an identity provider (`OidcSignIn`):
+counting it under one constant name would make a single counter for everybody behind a shared address.
+
 **Succeeded**: Gives the slots of a successful sign-in back.
 
-- *Parameters*: `Reservation reservation` — as returned by `TryBegin`; a null value raises `ArgumentNullException`.
+- *Parameters*: `Reservation reservation` — as returned by `TryBegin` or `TryBeginAddressOnly`; a null value raises
+  `ArgumentNullException`.
 - *Postconditions*: The reservation is marked as given back; a second call with it changes nothing. For the name
-  counter and for the address counter separately, and only when the window in the table is still the window the
-  reservation was counted in (same generation): the name counter is removed, and the address counter is decreased by
+  counter (when the reservation has one) and for the address counter separately, and only when the window in the
+  table is still the window the reservation was counted in (same generation): the name counter is removed, and the
+  address counter is decreased by
   one (and removed when it reaches 0). A window that has been removed or started again is left alone.
 
 A user who types the password wrong twice and then right is therefore not closer to the limit than before. Because
@@ -135,5 +151,7 @@ Documented limitations, all deliberate:
 
 - **SignIn** — the login endpoint calls `TryBegin` before the password is checked and `Succeeded` with the
   reservation after a successful sign-in; `AddSignIn` registers the options and the singleton.
+- **OidcSignIn** — the callback of an identity provider calls `TryBeginAddressOnly` and `Succeeded` for an accepted
+  callback.
 - **ServerHost** — reads the options once at start-up to report invalid settings.
 - Tests — call `Reset` and `KeyCount`.

@@ -8,7 +8,9 @@ render the real component over real Core services and an in-memory fake store ho
 The signed-in user is supplied by a test authentication state in `PageTestBase`: the user `ann` (display name "Ann")
 unless a test signs in as someone else. The signing tests also create real users (with a password) through
 `UserService`, and the page uses the real `SigningService` over the same fake store, so signatures and passwords are
-checked by the same code as in production.
+checked by the same code as in production. The one scenario of an identity-provider user, which needs the provider
+flow, is not a component test: it starts the real server pipeline with a fake identity provider
+(see the `OidcSignIn` verification) and requests the page over HTTP.
 Tests locate elements by their `data-testid` attributes (the page units share the helper `PageTestBase`) and
 compare the shown values with the known hashes and fingerprint. The real database is covered by the `Storage`
 subsystem and the integration tests of the `Web` subsystem.
@@ -62,8 +64,11 @@ N/A - standard test environment.
   the page; the right password records the signature, shows who signed and when, shows the review as Approved with
   the Approved next-step sentence, and removes the sign form and the slot controls. A change to the record after
   signing shows the signature as out of date and the review as In review, with the slot still locked and the sign
-  form offered again. Signing a record that changed since the page was drawn is refused with a message and stores
   nothing.
+- A reviewer who signs in with an identity provider sees, instead of the password field, a button to confirm the
+  identity at the provider, whose form posts to the confirmation endpoint, and no Sign form and no password field; a
+  failed confirmation is shown next to the button; after a confirmation the page shows the Sign button and a note that
+  the identity is confirmed, and no confirmation button.
 - The thread index shows the open threads by default and can show all or only resolved threads, each row with file,
   anchor, state, number of comments, first author, and last activity, and an accessible name that states the same
   facts; choosing a row selects its file, highlights
@@ -476,6 +481,13 @@ by `ReviewPage_Render_RecordChangedAfterSigning_ShowsOutOfDateAndInReview`.
 **ReviewPage_Sign_RecordChangedSincePageDrawn_IsRefused**: A signable page is drawn, the record is changed through
 the service, and the occupant signs with the right password; the message says the record changed and no signature is
 stored. This scenario is tested by `ReviewPage_Sign_RecordChangedSincePageDrawn_IsRefused`.
+
+**OidcReauth_ReviewPage_OffersConfirmationThenSigning**: Through the real pipeline with a fake identity provider (the
+test is in `OidcReauthTests.cs`), a reviewer who signs in at the provider and occupies a slot opens the review page.
+Before the confirmation the page offers the button "Confirm identity with" and the provider name, whose form posts to
+`/auth/oidc/reauth`, and has no password field and no Sign form; after `reauth=failed` the failure is shown next to the
+button; after the confirmation at the provider the page shows the Sign button and the "Identity confirmed" note and no
+confirmation button. This scenario is tested by `OidcReauth_ReviewPage_OffersConfirmationThenSigning`.
 
 **ReviewPage_Render_Details_ShowShortDigestWithFullValueInTitle**: Inside the Details element, the record digest
 shows its first 16 characters, and its title holds the full 64-character digest computed by the service. This

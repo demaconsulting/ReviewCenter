@@ -20,6 +20,7 @@ sections:
         tests:
           - RevalidatingAuthenticationStateProvider_IsCurrentAsync_EnabledUserSameRole_ReturnsTrue
           - RevalidatingAuthenticationStateProvider_IsCurrentAsync_UserDisabled_ReturnsFalse
+          - RevalidatingAuthenticationStateProvider_IsCurrentAsync_ExternalUserDisabled_ReturnsFalse
           - RevalidatingAuthenticationStateProvider_IsCurrentAsync_UserDeleted_ReturnsFalse
           - RevalidatingAuthenticationStateProvider_IsCurrentAsync_RoleChanged_ReturnsFalse
           - RevalidatingAuthenticationStateProvider_IsCurrentAsync_DisplayNameChanged_ReturnsFalse

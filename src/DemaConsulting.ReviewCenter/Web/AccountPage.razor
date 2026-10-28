@@ -7,7 +7,8 @@
    The page body is inside SessionGate, which replaces it with a "Session ended" message when the user is no longer
    valid while the page is open. A user who still has a temporary password (set by the person who created the
    account) sees only a banner and the change-password form; after the change the user is sent to the login page to
-   sign in again with the new password. *@
+   sign in again with the new password. A user of an identity provider has no password: the change-password card is
+   replaced by a sentence that says who manages it. *@
 @page "/account"
 @rendermode InteractiveServer
 @attribute [Authorize]
@@ -54,6 +55,14 @@
 
     <section class="card">
         <h2>Change password</h2>
+        @if (IsExternal)
+        {
+            <p class="muted" data-testid="account-external-password">
+                Your password is managed by @Oidc.Value.DisplayName. There is no password to change here.
+            </p>
+        }
+        else
+        {
         <form data-testid="change-password-form" @onsubmit="ChangePasswordAsync">
             <div class="field">
                 <label for="current-password">@(MustChangePassword ? "Temporary password" : "Current password")</label>
@@ -83,6 +92,7 @@
             }
             <button type="submit" data-testid="change-password-button">Change password</button>
         </form>
+        }
     </section>
 
     @if (!MustChangePassword)

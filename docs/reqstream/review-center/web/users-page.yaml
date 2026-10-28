@@ -90,3 +90,13 @@ sections:
           - UsersPage_Action_SessionEndedBeforePageKnows_ShowsClearErrorAndChangesNothing
           - UsersPage_Action_AdminDemotedAfterOpening_DropsUserListAndTypedPasswords
           - UsersPage_ToggleSystemAdmin_AdminDemotesSelf_ShowsStatusButDropsTheList
+
+      - id: ReviewCenter-UsersPage-ExternalAccount
+        title: >-
+          The UsersPage unit shall mark an account of a provider with a badge that names the provider, and shall show
+          no password control, and no temporary password control, for it.
+        justification: |
+          An administrator must see which accounts are managed by the provider, and must not be offered an action
+          that cannot work for them, or that could give such an account a password.
+        tests:
+          - UsersPage_Render_ExternalUser_ShowsMarkerAndNoPasswordControls

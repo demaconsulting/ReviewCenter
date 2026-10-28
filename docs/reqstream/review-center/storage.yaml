@@ -254,3 +254,16 @@ sections:
           - ReviewCenter-DbContext-Tokens
         tests:
           - StorageSubsystem_AccessTokens_PersistAcrossReopen
+
+      - id: ReviewCenter-Storage-ExternalIdentity
+        title: >-
+          The Storage subsystem shall keep the issuer and the subject of the identity of a user at a provider in the
+          database file, find the user by the exact pair, and allow only one user for a pair.
+        justification: |
+          The account of a person must be the same account at every sign-in, and no sign-in may open two accounts.
+        children:
+          - ReviewCenter-UserStore-ExternalIdentity
+          - ReviewCenter-DbContext-ExternalIdentity
+        tests:
+          - UserStore_GetByExternalAsync_FindsOnlyTheExactPair
+          - UserStore_AddAsync_SameExternalIdentityTwice_IsRefused

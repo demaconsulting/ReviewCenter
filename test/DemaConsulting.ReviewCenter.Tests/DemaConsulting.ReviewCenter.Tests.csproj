@@ -54,6 +54,16 @@
     <PackageReference Include="Microsoft.AspNetCore.TestHost" Version="10.0.14" />
   </ItemGroup>
 
+  <!-- Identity Provider Test Dependency -->
+  <ItemGroup>
+    <!-- OpenIddict runs the in-process fake OpenID Connect provider that the sign-in tests talk to; it is only
+         referenced by the tests, so no provider code ships with the server. -->
+    <PackageReference Include="OpenIddict.AspNetCore" Version="7.7.2" />
+    <!-- OpenIddict pulls in a Data Protection package version whose System.Security.Cryptography.Xml has known
+         vulnerabilities; the patched version is pinned here until OpenIddict moves to it. -->
+    <PackageReference Include="System.Security.Cryptography.Xml" Version="10.0.14" />
+  </ItemGroup>
+
   <!-- Differential Test Dependency -->
   <ItemGroup>
     <!-- The globbing library that ReviewMark uses; only the tests reference it, to check that the file selection

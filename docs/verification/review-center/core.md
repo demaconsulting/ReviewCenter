@@ -17,7 +17,7 @@ database; the real database is verified in the `Storage` subsystem, the real has
 real token protector and git in the `ContentSources` subsystem.
 The tests show that the units cooperate as the
 design describes: the services create, store, and read back what the fingerprint algorithm and the rules require.
-The rules and the algorithm themselves are verified in detail by the unit tests of the eighteen units.
+The rules and the algorithm themselves are verified in detail by the unit tests of the nineteen units.
 
 ### Test Environment
 
@@ -74,6 +74,10 @@ N/A - standard test environment.
   while the token is active; a revoked token and a wrong value are refused; and an actor that came through a token
   cannot create a token, name a reviewer, or sign, while it can create a review that is flagged as created through the
   API (see the unit tests of `PersonalAccessTokenService`, `SigningService`, and `ReviewService`).
+- An account of an identity provider is found only by the pair of issuer and subject, is created on the first sign-in
+  without any project, system administrator right, or password, and refuses every password operation; its user signs a
+  slot only with a live single-use proof of a confirmation (see the unit tests of `UserService`, `SigningService`, and
+  `ReauthProofStore`).
 
 ### Test Scenarios
 
@@ -158,3 +162,10 @@ without a password,
 which is tested by `UserService_AdministrationEvents_AreRecordedWithoutPasswords`. The domain services are tested
 against a fake store that holds the entries in memory; the transaction that stores a change with its entry is verified
 in the `Storage` subsystem.
+
+**External identities**: The unit tests of `UserService` and `SigningService` verify the subsystem requirement for
+accounts of an identity provider. The first sign-in with an issuer and subject creates one plain account, and the
+second finds it, which is tested by `UserService_SignInExternalAsync_FirstThenSecond_CreatesOnceAndMatches`. A user of
+the provider signs a slot once with a live proof of a confirmation, and the proof is then spent, which is tested by
+`SigningService_SignAsync_ExternalUserWithProof_SignsOnce`. The proof store itself is verified by the unit tests of
+`ReauthProofStore`.

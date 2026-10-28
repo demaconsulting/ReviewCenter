@@ -41,6 +41,10 @@ is tested by `RevalidatingAuthenticationStateProvider_IsCurrentAsync_EnabledUser
 the state was created; the check answers `false`. This scenario is tested by
 `RevalidatingAuthenticationStateProvider_IsCurrentAsync_UserDisabled_ReturnsFalse`.
 
+**RevalidatingAuthenticationStateProvider_IsCurrentAsync_ExternalUserDisabled_ReturnsFalse**: An account created by a
+sign-in at an OpenID Connect provider is valid while enabled and, once it is disabled, the check answers `false`. This
+scenario is tested by `RevalidatingAuthenticationStateProvider_IsCurrentAsync_ExternalUserDisabled_ReturnsFalse`.
+
 **RevalidatingAuthenticationStateProvider_IsCurrentAsync_UserDeleted_ReturnsFalse**: The store has no user of the
 name in the state; the check answers `false`. This scenario is tested by
 `RevalidatingAuthenticationStateProvider_IsCurrentAsync_UserDeleted_ReturnsFalse`.

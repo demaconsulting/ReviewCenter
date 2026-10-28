@@ -108,6 +108,20 @@ reservation; the address slot is given back only once. This scenario is tested b
 **SignInThrottle_Succeeded_NullReservation_Throws**: A null reservation is refused with an `ArgumentNullException`.
 This scenario is tested by `SignInThrottle_Succeeded_NullReservation_Throws`.
 
+**SignInThrottle_TryBeginAddressOnly_NoNameLimit_RefusesOnlyAtAddressLimit**: With a limit of 3 per name and 5 per
+address, four address-only attempts from one address all pass (past the limit per name), a named attempt takes the
+fifth address slot, and the next address-only attempt and an attempt with another name are refused; another address
+is not affected. This scenario is tested by `SignInThrottle_TryBeginAddressOnly_NoNameLimit_RefusesOnlyAtAddressLimit`.
+
+**SignInThrottle_Succeeded_AddressOnlyReservation_ReturnsTheSlotOnce**: Four address-only attempts hold one key; a
+success reported twice for one reservation gives back exactly one slot (two more attempts pass, the third is refused),
+and the success of a lone attempt removes its counter. This scenario is tested by
+`SignInThrottle_Succeeded_AddressOnlyReservation_ReturnsTheSlotOnce`.
+
+**SignInThrottle_TryBeginAddressOnly_TableFull_EvictsOldestAndStaysAtCap**: With a full table, an address-only attempt
+from a new address is allowed and the table stays at the cap. This scenario is tested by
+`SignInThrottle_TryBeginAddressOnly_TableFull_EvictsOldestAndStaysAtCap`.
+
 **SignInThrottle_Reset_DoesNotReuseGenerations**: A reservation is taken, `Reset` is called, and the same keys are
 counted again; the success of the old reservation does not touch the new counters. This scenario is tested by
 `SignInThrottle_Reset_DoesNotReuseGenerations`.

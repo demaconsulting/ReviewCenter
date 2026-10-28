@@ -13,6 +13,7 @@ includes:
   - docs/reqstream/review-center/identity/password-hasher.yaml
   - docs/reqstream/review-center/identity/sign-in.yaml
   - docs/reqstream/review-center/identity/sign-in-throttle.yaml
+  - docs/reqstream/review-center/identity/oidc-sign-in.yaml
   - docs/reqstream/review-center/identity/revalidating-authentication-state-provider.yaml
   - docs/reqstream/review-center/api.yaml
   - docs/reqstream/review-center/api/api-token-authentication.yaml
@@ -77,6 +78,7 @@ includes:
   - docs/reqstream/review-center/core/review-planner.yaml
   - docs/reqstream/review-center/core/line-diff.yaml
   - docs/reqstream/review-center/core/personal-access-token-service.yaml
+  - docs/reqstream/review-center/core/reauth-proof-store.yaml
   - docs/reqstream/review-center/storage.yaml
   - docs/reqstream/review-center/storage/review-center-db-context.yaml
   - docs/reqstream/review-center/storage/review-store.yaml
@@ -112,3 +114,5 @@ includes:
   - docs/reqstream/ots/yamldotnet.yaml
   - docs/reqstream/ots/pkcs.yaml
   - docs/reqstream/ots/openapi.yaml
+  - docs/reqstream/ots/openidconnect.yaml
+  - docs/reqstream/ots/openiddict.yaml

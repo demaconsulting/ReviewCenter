@@ -20,12 +20,14 @@
 
 using DemaConsulting.ReviewCenter.Identity;
 using Microsoft.AspNetCore.Components;
+using Microsoft.Extensions.Options;
 
 namespace DemaConsulting.ReviewCenter.Web;
 
 /// <summary>
 ///     Code-behind for the sign-in page (<c>LoginPage.razor</c>): reads the return address and the failure
-///     flag (a generic failure or "too many attempts") from the query string.
+///     flag (a generic failure, "too many attempts" or a failure at the identity provider) from the query string, and
+///     tells whether the button of the identity provider is offered.
 /// </summary>
 /// <remarks>
 ///     The page is static, so it holds no state of its own and needs no synchronization. The return address is
@@ -54,6 +56,22 @@ public partial class LoginPage : ComponentBase
     ///     Gets a value indicating whether the previous attempt failed.
     /// </summary>
     private bool Failed => !string.IsNullOrEmpty(Error);
+
+    /// <summary>
+    ///     Gets or sets the settings of sign-in with an identity provider, supplied by dependency injection.
+    /// </summary>
+    [Inject]
+    private IOptions<OidcOptions> Oidc { get; set; } = null!;
+
+    /// <summary>
+    ///     Gets the settings of the identity provider; the button is shown only when it is enabled.
+    /// </summary>
+    private OidcOptions Provider => Oidc.Value;
+
+    /// <summary>
+    ///     Gets a value indicating whether the previous attempt failed at the identity provider.
+    /// </summary>
+    private bool ProviderFailed => Provider.Enabled && Error == OidcSignIn.ErrorValue;
 
     /// <summary>
     ///     Gets a value indicating whether the previous attempt was refused because there were too many.

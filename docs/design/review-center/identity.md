@@ -8,13 +8,15 @@ The `Identity` subsystem lets a person sign in to the web server and tells the r
 It owns the connection between the local accounts of the `Core` subsystem and the ASP.NET Core authentication
 framework: how a password is hashed, how the sign-in and sign-out requests are handled, what the authentication
 cookie holds and when it is no longer accepted, and how the signed-in user is turned into the `Actor` that the Core
-services record with a comment or a checklist answer. It contains four units: `PasswordHasher`, the implementation of
+services record with a comment or a checklist answer. It contains five units: `PasswordHasher`, the implementation of
 the Core password hasher interface on top of the password hasher of the ASP.NET Core shared framework; `SignIn`,
 the cookie authentication setup, the `POST /auth/login` and `POST /auth/logout` endpoints, the return-URL check, the
 rule that decides whether a signed-in user is still valid, and the conversion between the signed-in principal and an
 `Actor`, together with its small options type `AuthOptions`, which is documented with `SignIn` as a supporting type;
 `SignInThrottle`, the in-memory limit on sign-in attempts per client address and user name, with its options type
-`SignInThrottleOptions`; and `RevalidatingAuthenticationStateProvider`, which applies that rule to every open
+`SignInThrottleOptions`; `OidcSignIn`, the optional sign-in with a generic OpenID Connect provider and the
+confirmation of identity for a signature, with its options type `OidcOptions`; and
+`RevalidatingAuthenticationStateProvider`, which applies that rule to every open
 interactive page at a fixed interval. The types of the subsystem are internal to the application.
 The rules about accounts (the password policy, the lockout, the last system administrator) are not here: they belong to
 `UserService` in the `Core` subsystem. The rules about which project a user may see are not here either: they belong to
@@ -87,6 +89,28 @@ that does not depend on a project, the system administrator right.
 - *Constraints*: A limit that is not greater than 0, a limit per address that is lower than the limit per name, or a
   window that is not between 1 and 86400 seconds stops the start-up with an error that names the setting.
 
+**Identity:Oidc settings**: The `Identity:Oidc` configuration section, optional and off by default.
+
+- *Type*: Configuration (`appsettings.json` and environment variables such as `Identity__Oidc__Enabled`,
+  `Identity__Oidc__Authority`, `Identity__Oidc__ClientId`, and `Identity__Oidc__ClientSecret`).
+- *Role*: Consumer.
+- *Contract*: `Enabled` turns the sign-in with a provider on; `Authority`, `ClientId`, a required `ClientSecret`,
+  `Scopes`, `DisplayName`, `UsernameClaim`, `RequireEmailVerified`, and `ReauthMaxAgeSeconds` describe the provider (see
+  the `OidcSignIn` design for the rules and defaults).
+- *Constraints*: While `Enabled` is false nothing else is read, registered, or mapped. When it is true an invalid value
+  stops the start-up with an error that names the setting and never prints a value or the secret.
+
+**OIDC endpoints** (`POST /auth/oidc/login`, `GET /auth/oidc/complete`, `POST /auth/oidc/reauth`, and the callback
+`/signin-oidc`): Mapped only when the provider is enabled; provided by `OidcSignIn`.
+
+- *Type*: HTTP endpoints (the callback is served by the OpenID Connect handler).
+- *Role*: Provider.
+- *Contract*: The login endpoint sends the browser to the provider; the complete endpoint turns the validated identity
+  into the normal session cookie of a local account found or created by issuer and subject; the reauth endpoint sends a
+  signed-in reviewer to the provider again and, on a fresh and matching sign-in, stores a single-use proof for one
+  review slot. Every refusal ends with one generic message and no cookie.
+- *Constraints*: The antiforgery token is required on the `POST` endpoints; return addresses are reduced to local ones.
+
 **RevalidatingAuthenticationStateProvider (as the authentication state provider)**: Used by the framework for every
 open interactive page (circuit).
 
@@ -114,9 +138,16 @@ changed session.
 - *Constraints*: Never throws `DomainRuleException`; the caller decides what a missing actor means (project access
   gives no access to a null actor).
 
-**UserService (consumed)**: The `Core` service that checks passwords and reads users.
+**UserService (consumed)**: The `Core` service that checks passwords, finds or creates the account of an external
+identity, and reads users.
 
 - *Type*: In-process .NET class.
+- *Role*: Consumer.
+
+**SigningService and ReauthProofStore (consumed)**: The `Core` pieces that decide who may confirm a slot and that hold
+the single-use proof of a confirmation.
+
+- *Type*: In-process .NET classes.
 - *Role*: Consumer.
 
 **AuditService (consumed)**: The `Core` service that records sign-in and sign-out.
@@ -176,6 +207,19 @@ can differ slightly between a known and an unknown user (a failure on a known ac
 and an audit entry), so timing can in principle reveal which user names exist (see the `UserService` design). The
 throttle holds at most 10,000 counters and evicts the oldest ones when it is full, so a distributed flood can push
 out older counters (see the `SignInThrottle` design).
+
+**Sign-in with an OpenID Connect provider** (optional): An administrator can turn on a second way to sign in, with a
+generic OpenID Connect provider, without removing the local accounts. The button is on the login page; the browser is
+sent to the provider with the authorization code flow and PKCE, and the validated identity token is handed to the
+complete endpoint, which asks `UserService.SignInExternalAsync` for the account. The account is found by the pair of
+issuer and subject only, never by a user name or an e-mail address, so a person cannot take over a local account by
+choosing its name at the provider. A new account is created on the first sign-in with no project, no system
+administrator right, and no password; a project admin adds it to projects. The normal session cookie is issued, so
+the rest of the system (cookie check, revalidation, actors, audit) works as for a local account. Sign-out is local
+only. A signature of such a user cannot ask for a password; the reauth endpoint makes the provider ask the user again
+(forcing a new login) and, when the new sign-in is fresh and has the same issuer and subject as the account, stores a
+single-use proof in `ReauthProofStore` that the signing step spends once. This subsystem holds the protocol side; the
+account and signing rules stay in `Core`.
 
 **Sign-in throttle**: Before the password is checked the login endpoint asks `SignInThrottle` whether the client
 address has attempts left, once per name and once over all names. A refused attempt is not authenticated at all and

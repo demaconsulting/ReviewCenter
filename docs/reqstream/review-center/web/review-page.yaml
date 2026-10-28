@@ -510,3 +510,13 @@ sections:
           - ReviewPage_Render_ReviewApprovedWithKeyProblem_ShowsProblemInsteadOfDownload
           - ReviewPage_Sign_CorrectPassword_OffersAttestationDownload
           - ReviewLinks_ForAttestation_ProjectAndReview_BuildsAddress
+
+      - id: ReviewCenter-ReviewPage-ExternalSignature
+        title: >-
+          The ReviewPage unit shall, for a user of a provider, offer a button that confirms identity at the provider
+          instead of the password field, and after a successful confirmation offer the signature that uses it.
+        justification: |
+          A user of a provider has no password to type, and the confirmation must come before the signature so that
+          the person knows that the next step records it.
+        tests:
+          - OidcReauth_ReviewPage_OffersConfirmationThenSigning

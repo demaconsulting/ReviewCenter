@@ -88,6 +88,31 @@ public class RevalidatingAuthenticationStateProviderTests
     }
 
     /// <summary>
+    ///     Test that an account of an OpenID Connect provider stays valid while it is enabled and is no longer valid
+    ///     once it is disabled, so a disabled account's open session ends like that of a local account.
+    /// </summary>
+    [Fact]
+    public async Task RevalidatingAuthenticationStateProvider_IsCurrentAsync_ExternalUserDisabled_ReturnsFalse()
+    {
+        // Arrange: an account created by a first sign-in at a provider, and a state signed in as that account
+        var users = NewUsers();
+        var result = await users.SignInExternalAsync(
+            "https://idp.example/", "sub-1", "olive", "Olive Oidc", TestContext.Current.CancellationToken);
+        var username = result.User!.Username;
+        var provider = NewProvider(users);
+        var state = StateOf(username, "Olive Oidc", UserRole.Reviewer);
+
+        // Act: check while enabled, disable, and check again
+        var enabled = await provider.IsCurrentAsync(state, TestContext.Current.CancellationToken);
+        await users.SetEnabledAsync(username, false, TestContext.Current.CancellationToken);
+        var disabled = await provider.IsCurrentAsync(state, TestContext.Current.CancellationToken);
+
+        // Assert
+        Assert.True(enabled);
+        Assert.False(disabled);
+    }
+
+    /// <summary>
     ///     Test that a user who is not in the store at all is not valid.
     /// </summary>
     [Fact]
@@ -402,6 +427,15 @@ public class RevalidatingAuthenticationStateProviderTests
         public Task<User?> GetByUsernameAsync(string username, CancellationToken cancellationToken = default)
         {
             return get(username, cancellationToken);
+        }
+
+        /// <inheritdoc />
+        public Task<User?> GetByExternalAsync(
+            string issuer,
+            string subject,
+            CancellationToken cancellationToken = default)
+        {
+            throw new NotSupportedException();
         }
 
         /// <inheritdoc />

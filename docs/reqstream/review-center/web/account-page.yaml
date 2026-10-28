@@ -103,3 +103,12 @@ sections:
         tests:
           - AccountPage_RevokeToken_ActiveToken_MarksRevokedAndRemovesButton
           - AccountPage_Render_ExpiredToken_ShowsExpiredWithoutRevokeButton
+
+      - id: ReviewCenter-AccountPage-ExternalAccount
+        title: >-
+          The AccountPage unit shall show, for an account of a provider, a sentence that the password is managed by the
+          provider instead of the form that changes the password.
+        justification: |
+          The account has no password, so a form for it would only fail, and the sentence tells the person where to go.
+        tests:
+          - AccountPage_Render_ExternalUser_ShowsNoPasswordForm

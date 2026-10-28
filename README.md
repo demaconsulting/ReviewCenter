@@ -17,7 +17,7 @@ Web service and command-line tool for formal code reviews with a tamper-evident 
 
 ReviewCenter is a DEMA Consulting ASP.NET Core web service, with a companion command-line interface, for performing
 formal code reviews of file sets against earlier revisions. Reviewers discuss the files in threaded comments, answer
-a project checklist, and sign the review with their password. Every action is recorded in a hash-chained audit trail.
+a project checklist, and sign the review with their credentials. Every action is recorded in a hash-chained audit trail.
 
 ## Features
 
@@ -26,11 +26,12 @@ a project checklist, and sign the review with their password. Every action is re
 - 💬 **Threaded Comments** - Discuss files or line ranges inline
 - ✅ **Review Checklist** - 14-section Pass, Fail, or N/A checklist
 - 👥 **Reviewer Slots** - Primary and alternate reviewers sign each slot
-- ✍️ **Re-authenticated Signatures** - Password-confirmed sign-off bound to reviewed record
+- ✍️ **Re-authenticated Signatures** - Identity-confirmed sign-off bound to reviewed record
 - 🔗 **Tamper-Evident Audit Trail** - SHA-256 hash-chained, verifiable change history
 - 📄 **Signed PDF Attestation** - Approved reviews download as verifiable PDFs
 - ⚙️ **Evidence Settings** - Control PDF contents and anonymous evidence access
 - 🛡️ **Access Control** - Project roles, local accounts, and sign-in lockout
+- 🪪 **OpenID Connect Sign-in** - Single sign-on with any provider
 - 🔑 **API Tokens** - Personal tokens for REST API and ReviewMark
 - 🌗 **Light and Dark Theme** - Follows system setting or account choice
 - 🤖 **Puppet UI Automation** - Lets AI agents drive and screenshot the UI

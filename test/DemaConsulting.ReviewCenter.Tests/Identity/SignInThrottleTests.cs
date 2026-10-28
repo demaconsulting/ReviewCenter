@@ -236,6 +236,76 @@ public class SignInThrottleTests
     }
 
     /// <summary>
+    ///     Test that an address-only attempt has no per-name limit: more attempts than the name limit pass from one
+    ///     address, other names from that address are not blocked below the address limit, and the address limit
+    ///     still refuses.
+    /// </summary>
+    [Fact]
+    public void SignInThrottle_TryBeginAddressOnly_NoNameLimit_RefusesOnlyAtAddressLimit()
+    {
+        // Arrange: the name limit is 3 and the address limit is 5
+        var throttle = Create(out _);
+
+        // Act: four address-only attempts (past the name limit), then a named attempt, then one more
+        var four = Enumerable.Range(0, 4).Select(_ => throttle.TryBeginAddressOnly("10.0.0.1") is not null).ToArray();
+        var named = Allowed(throttle, "10.0.0.1", "oidc");
+        var sixth = throttle.TryBeginAddressOnly("10.0.0.1");
+
+        // Assert: all four pass, the named attempt takes the fifth address slot, the sixth attempt is refused
+        Assert.All(four, Assert.True);
+        Assert.True(named);
+        Assert.Null(sixth);
+        Assert.False(Allowed(throttle, "10.0.0.1", "ann"));
+        Assert.NotNull(throttle.TryBeginAddressOnly("10.0.0.2"));
+    }
+
+    /// <summary>
+    ///     Test that an address-only attempt keeps one counter only, and that a success gives its slot back and
+    ///     removes the counter, once.
+    /// </summary>
+    [Fact]
+    public void SignInThrottle_Succeeded_AddressOnlyReservation_ReturnsTheSlotOnce()
+    {
+        // Arrange: four of five address slots are used by address-only attempts
+        var throttle = Create(out _);
+        var reservations = Enumerable.Range(0, 4).Select(_ => throttle.TryBeginAddressOnly("10.0.0.1")).ToArray();
+        Assert.All(reservations, Assert.NotNull);
+        Assert.Equal(1, throttle.KeyCount());
+
+        // Act: one attempt succeeds, and its reservation is given back twice
+        throttle.Succeeded(reservations[0]!);
+        throttle.Succeeded(reservations[0]!);
+
+        // Assert: exactly one slot came back: the address takes two more attempts (4 - 1 + 2 = 5), not three
+        Assert.NotNull(throttle.TryBeginAddressOnly("10.0.0.1"));
+        Assert.NotNull(throttle.TryBeginAddressOnly("10.0.0.1"));
+        Assert.Null(throttle.TryBeginAddressOnly("10.0.0.1"));
+        throttle.Reset();
+        var single = throttle.TryBeginAddressOnly("10.0.0.3");
+        throttle.Succeeded(single!);
+        Assert.Equal(0, throttle.KeyCount());
+    }
+
+    /// <summary>
+    ///     Test that an address-only attempt follows the cap of the table: a full table evicts its oldest counter and
+    ///     stays at the cap.
+    /// </summary>
+    [Fact]
+    public void SignInThrottle_TryBeginAddressOnly_TableFull_EvictsOldestAndStaysAtCap()
+    {
+        // Arrange: a full table
+        var throttle = CreateWithHighAddressLimit(out _);
+        FillTo(throttle, "10.0.0.1", "filler", SignInThrottle.MaxKeys);
+
+        // Act: an attempt from an address the table has not seen
+        var reservation = throttle.TryBeginAddressOnly("10.9.9.9");
+
+        // Assert
+        Assert.NotNull(reservation);
+        Assert.Equal(SignInThrottle.MaxKeys, throttle.KeyCount());
+    }
+
+    /// <summary>
     ///     Test that a missing address or name is handled and counted like any other.
     /// </summary>
     [Fact]

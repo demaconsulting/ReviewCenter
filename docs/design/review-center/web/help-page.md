@@ -95,7 +95,17 @@ API only). It has one screenshot, `api-tokens-1.png`, of the token card of the A
 it
 (see the `AccountPage` design). The topic also says that a request without any token may read the evidence index or an
 attestation PDF of a project whose administrators opened that to anonymous readers, that a wrong token is still
-refused, and links to the Evidence settings topic.
+refused, and links to the Evidence settings topic. The topic says that a signature needs a person who confirms it is
+them again, with the password or by signing in again at the identity provider.
+
+**Identity provider text**: Three topics mention sign-in with an OpenID Connect provider, in static text that does not
+depend on whether an administrator has turned it on (the pages have no access to the settings): Getting started
+(`HelpGettingStartedPage`) says that the sign-in page may offer a "Sign in with ..." button, that the account is
+created at the first sign-in without any project, and that a project admin has to add the person; Reviewers and signing
+(`HelpSigningPage`) says that a person who signs in with a provider has no password here, presses "Confirm identity" on
+the slot, signs in again at the provider, and returns to press "Sign", and that the confirmation is good for one
+signature and a few minutes; and the API tokens topic, above. The summary of the Reviewers and signing topic in
+`HelpTopics` reads "Reviewer slots, signing with your password or identity provider, and approval."
 
 **Evidence settings topic** (`HelpEvidenceSettingsPage`, slug `evidence-settings`, title "Evidence settings"): The last
 topic, after Automation and API tokens. It explains, in static text, that only a project admin or a system

@@ -219,3 +219,58 @@ sections:
           - UserService_ChangeOwnPasswordAsync_NewPassword_ClearsTheFlagAndGivesAccess
           - UserService_ChangeOwnPasswordAsync_SameAsTemporary_IsRefusedAndKeepsTheFlag
           - UserService_SetPasswordAsync_ByAdministrator_LeavesTheFlagAlone
+
+      - id: ReviewCenter-UserService-ExternalSignIn
+        title: >-
+          The UserService class shall find the account of an identity at a provider by the issuer and the subject
+          only, never by a name or an e-mail address, create the account on the first sign-in as an enabled user who is
+          not a system administrator and has no project, refuse the sign-in of a disabled account, refuse a missing
+          identity or one that is longer than the stored limits, and record the creation in the audit trail.
+        justification: |
+          A name that a person chooses at the provider is no proof of who they are, so only the pair that the provider
+          guarantees may find an account. A new person has no rights until somebody who may give them does so, and the
+          limits keep a hostile provider answer out of the database.
+        tests:
+          - UserService_SignInExternalAsync_FirstThenSecond_CreatesOnceAndMatches
+          - UserService_SignInExternalAsync_MatchesOnlyByIssuerAndSubject
+          - UserService_SignInExternalAsync_MissingIdentity_IsInvalid
+          - UserService_SignInExternalAsync_IdentityLengthLimits_AreEnforced
+          - UserService_SignInExternalAsync_DisabledAccount_IsRefused
+
+      - id: ReviewCenter-UserService-ExternalCreate
+        title: >-
+          The UserService class shall give the account of a provider a display name that is cleaned of control
+          characters and cut to the limit, and a user name that is made from the suggestion of the provider by keeping
+          only the allowed characters and the length limit, and that is unique.
+        justification: |
+          The names come from another system and may hold anything, so they are cleaned before they are stored and
+          shown.
+        tests:
+          - UserService_SignInExternalAsync_Candidate_IsReducedToAValidUsername
+          - UserService_SignInExternalAsync_DisplayName_IsSanitized
+          - UserService_SignInExternalAsync_LongDisplayName_IsBounded
+
+      - id: ReviewCenter-UserService-UsernameCollision
+        title: >-
+          The UserService class shall, when the user name made for a new account of a provider is taken, add a number
+          to it, and when no such name is free use a generated name from the identity, numbered the same way when a
+          local account holds that name too, so that the sign-in does not fail because of a name and never uses the
+          account that holds the name.
+        justification: |
+          Two people can have the same name at a provider, and a person can have the name of a local account, even the
+          generated one. Neither may be refused for that, and neither may get another person's account.
+        tests:
+          - UserService_SignInExternalAsync_MatchesOnlyByIssuerAndSubject
+          - UserService_SignInExternalAsync_AllNamesTaken_UsesNameFromIdentity
+          - UserService_SignInExternalAsync_OnlyIdentityNameTaken_UsesFirstVariant
+          - UserService_SignInExternalAsync_IdentityNameTakenByLocalAccount_UsesNumberedVariant
+
+      - id: ReviewCenter-UserService-ExternalNoPassword
+        title: >-
+          The UserService class shall refuse to authenticate, to confirm for a signature, to change the password of,
+          and to set the password of an account of a provider, so that the account has no password at all.
+        justification: |
+          An account that is managed by a provider must not have a second way in, which could be guessed or set by
+          somebody who does not pass the rules of the provider.
+        tests:
+          - UserService_ExternalAccount_EveryPasswordPathIsRefused

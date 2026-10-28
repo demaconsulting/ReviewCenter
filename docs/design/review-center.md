@@ -30,6 +30,7 @@ flowchart TD
         PasswordHasher
         SignIn
         SignInThrottle
+        OidcSignIn
         RevalidatingAuthenticationStateProvider
     end
     subgraph Web
@@ -60,6 +61,7 @@ flowchart TD
         PersonalAccessTokenService
         RecordDigest
         SigningService
+        ReauthProofStore
         AuditChain
         AuditService
         RepositoryService
@@ -111,6 +113,8 @@ flowchart TD
     ServerHost --> AuditStore
     ServerHost --> PasswordHasher
     ServerHost --> SignIn
+    ServerHost --> OidcSignIn
+    ServerHost --> ReauthProofStore
     ServerHost --> ProjectService
     ServerHost --> EvidenceSettingsService
     ServerHost --> ReviewService
@@ -141,6 +145,11 @@ flowchart TD
     SignIn --> UserService
     SignIn --> SignInThrottle
     SignIn --> AuditService
+    OidcSignIn --> SignIn
+    OidcSignIn --> SignInThrottle
+    OidcSignIn --> UserService
+    OidcSignIn --> SigningService
+    OidcSignIn --> ReauthProofStore
     RevalidatingAuthenticationStateProvider --> SignIn
     RevalidatingAuthenticationStateProvider --> UserService
     PasswordHasher --> UserService
@@ -160,10 +169,13 @@ flowchart TD
     App --> RepositoriesPage
     App --> SignIn
     LoginPage --> SignIn
+    LoginPage --> OidcSignIn
     AccountPage --> SignIn
+    AccountPage --> OidcSignIn
     AccountPage --> UserService
     AccountPage --> PersonalAccessTokenService
     UsersPage --> UserService
+    UsersPage --> OidcSignIn
     ProjectsPage --> ProjectService
     ProjectPage --> ProjectService
     ProjectPage --> ReviewService
@@ -179,6 +191,8 @@ flowchart TD
     ReviewPage --> ChecklistService
     ReviewPage --> SigningService
     ReviewPage --> SignIn
+    ReviewPage --> OidcSignIn
+    ReviewPage --> UserService
     ReviewPage --> AttestationKeyProvider
     ReviewPage --> HistoryPage
     ChecklistPage --> ReviewService
@@ -201,6 +215,7 @@ flowchart TD
     SigningService --> ReviewStore
     SigningService --> UserService
     SigningService --> RecordDigest
+    SigningService --> ReauthProofStore
     AuditService --> AuditChain
     AuditService --> AuditStore
     ReviewStore --> RecordDigest
@@ -272,6 +287,7 @@ actions are handled on the server.
 The `Identity` subsystem is the web side of local accounts: `SignIn` configures cookie authentication and
 authorization, checks a password through `UserService`, signs the user in and out, and tells the pages who is signed
 in; `SignInThrottle` limits the failed sign-in attempts per client address and typed name, in memory;
+`OidcSignIn` is the optional sign-in with an OpenID Connect provider and the confirmation of identity for a signature;
 `RevalidatingAuthenticationStateProvider` re-checks the user of every open page at a fixed interval with the same rule
 as the cookie check and ends the sign-in state of the page when the user is no longer valid; `PasswordHasher` hashes and
 verifies passwords with the password hasher of the ASP.NET Core shared framework. The cookie carries the user name, the
@@ -339,7 +355,12 @@ as a second line of defense. `ApiDocument` serves the OpenAPI description of the
 `Microsoft.AspNetCore.OpenApi` generates and a test compares with the snapshot `docs/api/openapi.json`.
 
 The system is a single process with one database; there is no separate service tier. Users are local accounts
-with a user name, a display name, a system administrator flag, and a password that is stored only as a hash. A user
+with a user name, a display name, a system administrator flag, and a password that is stored only as a hash. When an
+administrator turns it on (settings `Identity:Oidc`, off by default), a user can instead sign in with a generic OpenID
+Connect provider: the account is matched only by the issuer and the subject of the provider, created on the first
+sign-in without any project membership or administrator right, and has no password at all. Such a user confirms their
+identity for a signature by signing in again at the provider, and `SigningService` accepts one such proof (kept in
+memory by `ReauthProofStore`, bound to the user, the slot, and a short time, and spent once) for one signature. A user
 signs in on the login page and stays signed in through a cookie; every page except the home page and the login page
 requires a signed-in user, and the users page, the new project page, and the audit page require a system
 administrator. Project access is by membership: a user sees a project only as a member (with the project role `User`
@@ -458,7 +479,10 @@ is running.
   site, otherwise `/`), and on failure redirects back to the login page with a generic message (or, when the
   sign-in throttle refuses the attempt, with a "too many attempts" message that is the same for known and unknown
   user names); `POST /auth/logout`
-  ends the session and redirects to `/`. Both posts require the antiforgery token of the form. `GET /account`
+  ends the session and redirects to `/`. Both posts require the antiforgery token of the form. With sign-in with a
+  provider enabled, `POST /auth/oidc/login` starts the sign-in at the provider and `POST /auth/oidc/reauth` the
+  confirmation for a signature (`GET /auth/oidc/complete` and the reserved `/signin-oidc` finish them); with it off
+  these addresses do not exist. `GET /account`
   returns the page where the signed-in user changes their password, and `GET /users` the page where a system
   administrator
   manages users. `GET /projects` returns the projects page (it lists the projects that the user may see),
@@ -650,6 +674,11 @@ is running.
   `Evidence` subsystem; see the PKCS integration design in the OTS chapter.
 - **Microsoft.AspNetCore.OpenApi**: generates the OpenAPI document of the `Api` subsystem. It is a package of its own,
   not part of the ASP.NET Core shared framework; see the OpenAPI integration design in the OTS chapter.
+- **Microsoft.AspNetCore.Authentication.OpenIdConnect**: the protocol handler of the optional sign-in with an OpenID
+  Connect provider in the `Identity` subsystem. It is a package of its own; see the OpenIdConnect integration design in
+  the OTS chapter.
+- **OpenIddict** (test only): provides a fake identity provider for the tests of the sign-in with a provider; it is
+  not part of the shipped product.
 
 ## Risk Control Measures
 
@@ -682,7 +711,9 @@ connection back to the server, after which clicks are sent to the server, handle
 parts are sent back. A request for `/health` is answered directly by `ServerHost`. A request for any other page
 passes the authorization of the `Identity` subsystem: an anonymous visitor is redirected to `/login`; the
 form of `LoginPage` is posted to `/auth/login`, where `SignIn` asks `UserService` to check the password and, on
-success, sets the authentication cookie. On every later request `SignIn` validates the cookie against the stored user,
+success, sets the authentication cookie. With sign-in with a provider enabled, `OidcSignIn` instead sends the user to the
+provider and, on the return, asks `UserService` to match or create the account by issuer and subject. On every later
+request `SignIn` validates the cookie against the stored user,
 so a disabled or changed user is signed out. A page that stays open makes no request, so the scoped
 `RevalidatingAuthenticationStateProvider` of that page re-reads the user at the configured interval and, when the user
 is no longer valid or cannot be read, makes the state anonymous, and the `SessionGate` of the page replaces the page
@@ -698,7 +729,9 @@ to start, answer, resolve, and reopen comment threads on a file, passing the sig
 stores the threads through `ReviewStore`. `ReviewPage` and `ChecklistPage` call `ChecklistService`, which applies
 the checklist rules and stores answers, saved on behalf of the signed-in user, through `ReviewStore`. `ReviewPage`
 calls `SigningService` to add, change, and remove reviewer slots and to sign: the service checks the rules, asks
-`UserService` to check the password again, takes the digest of the record from `RecordDigest`, and stores the
+`UserService` to check the password again (for a user of a provider, `OidcSignIn` puts a proof of a new sign-in at the
+provider into `ReauthProofStore`, and `SigningService` spends it), takes the digest of the record from `RecordDigest`,
+and stores the
 signature through `ReviewStore`, which checks the digest once more inside the database transaction. `ProjectPage`
 calls `SigningService` to show whether each review is Approved. `AccountPage` and
 `UsersPage` call `UserService`, which stores users through `UserStore`. A request for the attestation of a review is
@@ -739,11 +772,13 @@ result or the reason of a failure is reported through `Context`.
   are sent in sign-in requests.
 - Persistence: the database provider is selected by configuration, and only SQLite is supported. The schema is
   created at start-up and not migrated (see the Storage subsystem design); a database created before the identity
-  slice or before the signature slice must be deleted and created again.
+  slice, the signature slice, or the sign-in with an identity provider must be deleted and created again.
 - Authentication: passwords are stored only as salted hashes and never logged or shown; five consecutive wrong
   passwords lock a user name for 5 minutes (per user name, not per source); the last enabled system administrator
   cannot be disabled or demoted. A signature asks for the password again through the same check, so wrong passwords at a
-  signature count toward the same lockout.
+  signature count toward the same lockout. Users of an OpenID Connect provider have no password; they are matched only
+  by issuer and subject, a name of a local account never links to them, and their signature needs a fresh, single-use
+  sign-in at the provider instead.
 - Signatures: a signature is bound to the digest of the review record and is never changed or removed; the approval
   of a review is computed from the record and the signatures each time and is never stored.
 - Access tokens: only the SHA-256 hash of a token is stored and the value is shown once, when it is created; a token

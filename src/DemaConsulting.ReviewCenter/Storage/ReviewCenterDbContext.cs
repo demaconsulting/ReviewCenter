@@ -274,6 +274,12 @@ internal sealed class ReviewCenterDbContext : DbContext
             user.Property(u => u.IsSystemAdmin);
             user.Property(u => u.MustChangePassword);
             user.Property(u => u.PasswordHash).IsRequired();
+
+            // The identity at an external provider (both null for a local account): compared exactly, unique as a
+            // pair; SQLite treats nulls as distinct, so any number of local accounts is fine
+            user.Property(u => u.ExternalIssuer).HasMaxLength(ReviewLimits.MaxExternalIssuerLength);
+            user.Property(u => u.ExternalSubject).HasMaxLength(ReviewLimits.MaxExternalSubjectLength);
+            user.HasIndex(u => new { u.ExternalIssuer, u.ExternalSubject }).IsUnique();
         });
 
         // Personal access tokens: only the SHA-256 hash of the value is stored (unique, and the key of the lookup when
