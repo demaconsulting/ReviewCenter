@@ -19,6 +19,7 @@
 // SOFTWARE.
 
 using System.Text.RegularExpressions;
+using DemaConsulting.ReviewCenter.Core;
 using DemaConsulting.ReviewCenter.Evidence;
 
 namespace DemaConsulting.ReviewCenter.Tests.Evidence;
@@ -71,8 +72,13 @@ public class AttestationRendererTests
     ///     Creates a complete sample document.
     /// </summary>
     /// <param name="key">The signing key description.</param>
+    /// <param name="content">The evidence settings in effect; every part included when <c>null</c>.</param>
+    /// <param name="anonymous">Whether the request came without signing in.</param>
     /// <returns>The document.</returns>
-    internal static AttestationDocument Sample(AttestationKeyInfo? key = null)
+    internal static AttestationDocument Sample(
+        AttestationKeyInfo? key = null,
+        EvidenceSettings? content = null,
+        bool anonymous = false)
     {
         return new AttestationDocument(
             7,
@@ -93,6 +99,7 @@ public class AttestationRendererTests
             "1.0",
             [
                 new AttestationSection(
+                    "correctness",
                     "Correctness",
                     true,
                     null,
@@ -101,7 +108,7 @@ public class AttestationRendererTests
                         new AttestationCheck("C-2", "Are errors handled?", "Fail", null, "Ann"),
                         new AttestationCheck("C-3", "Is it thread safe?", "N/A", "Single threaded", "Bob")
                     ]),
-                new AttestationSection("Security", false, "No external input", [])
+                new AttestationSection("security", "Security", false, "No external input", [])
             ],
             2,
             [new AttestationThread("src/a.txt, lines 3-5", "Bob: please rename this", 3)],
@@ -119,7 +126,9 @@ public class AttestationRendererTests
             key ?? KeyInfo(),
             "1.2.3",
             _generated,
-            "Ann (ann)");
+            "Ann (ann)",
+            content ?? EvidenceSettings.Default,
+            anonymous);
     }
 
     /// <summary>
@@ -599,6 +608,182 @@ public class AttestationRendererTests
 
         // Assert: the statement
         Assert.Contains("The review has no checklist.", lines);
+    }
+
+    /// <summary>
+    ///     Test that every PDF has a content scope that says nothing is left out when every switch is on, names the
+    ///     state of each switch, and says that the record digest covers the complete record.
+    /// </summary>
+    [Fact]
+    public void AttestationRenderer_Render_DefaultSettings_ContentScopeSaysNothingIsLeftOut()
+    {
+        // Arrange, Act
+        var lines = Render(Sample()).TextLines;
+
+        // Assert
+        Assert.Contains("Content scope", lines);
+        Assert.Contains("Nothing is left out of this document.", lines);
+        Assert.Contains("by a signed-in user", lines);
+        Assert.Equal(5, lines.Count(l => l == "Included"));
+        Assert.DoesNotContain("Omitted", lines);
+        Assert.Contains(
+            "The record digest covers the complete record, including the parts left out of this document.",
+            lines);
+        Assert.Contains("Comment threads", lines);
+        Assert.Contains("Files (2)", lines);
+    }
+
+    /// <summary>
+    ///     Test that the content scope is printed with the time of the settings and says that a request without
+    ///     signing in was anonymous.
+    /// </summary>
+    [Fact]
+    public void AttestationRenderer_Render_AnonymousRequest_ContentScopeSaysSo()
+    {
+        // Arrange, Act
+        var lines = Render(Sample(anonymous: true)).TextLines;
+
+        // Assert
+        Assert.Contains(
+            "without signing in (the project allows anonymous access to attestation PDFs)", lines);
+        Assert.DoesNotContain("by a signed-in user", lines);
+        Assert.Contains(lines, l => l.Contains("2025-03-04 05:06:07 UTC", StringComparison.Ordinal)
+                                    && l.Contains("evidence settings", StringComparison.Ordinal));
+    }
+
+    /// <summary>
+    ///     Test that turning the discussion threads off leaves out the thread section and its text, and says so.
+    /// </summary>
+    [Fact]
+    public void AttestationRenderer_Render_ThreadsOff_OmitsThreadsAndSaysSo()
+    {
+        // Arrange
+        var document = Sample(content: EvidenceSettings.Default with { IncludeThreads = false });
+
+        // Act
+        var lines = Render(document).TextLines;
+
+        // Assert
+        Assert.DoesNotContain("Comment threads", lines);
+        Assert.DoesNotContain(lines, l => l.Contains("please rename this", StringComparison.Ordinal));
+        Assert.Contains("Left out of this document: Review discussion threads.", lines);
+        Assert.Contains("Omitted", lines);
+        Assert.Contains("Files (2)", lines);
+    }
+
+    /// <summary>
+    ///     Test that turning the file list off leaves out every path and hash but keeps the fingerprint, and that
+    ///     the content scope gives the number of files.
+    /// </summary>
+    [Fact]
+    public void AttestationRenderer_Render_FilesOff_OmitsFileListButKeepsFingerprint()
+    {
+        // Arrange
+        var document = Sample(content: EvidenceSettings.Default with { IncludeFiles = false });
+
+        // Act
+        var lines = Render(document).TextLines;
+
+        // Assert
+        Assert.DoesNotContain(lines, l => l.StartsWith("Files (", StringComparison.Ordinal));
+        Assert.DoesNotContain("src/b.txt", lines);
+        Assert.DoesNotContain(lines, l => l.Contains("SHA-256", StringComparison.Ordinal));
+        Assert.Contains("fingerprint-1234", lines);
+        Assert.Contains("Omitted (2 files; the content fingerprint covers them)", lines);
+        Assert.Contains("Left out of this document: File list and hashes.", lines);
+    }
+
+    /// <summary>
+    ///     Test that turning the checklist wording off prints identifiers and outcomes and the reviewers' own
+    ///     justifications, but neither the question text nor the section title.
+    /// </summary>
+    [Fact]
+    public void AttestationRenderer_Render_ChecklistWordingOff_PrintsIdsOutcomesAndJustificationsOnly()
+    {
+        // Arrange
+        var document = Sample(content: EvidenceSettings.Default with { IncludeChecklistWording = false });
+
+        // Act
+        var lines = Render(document).TextLines;
+
+        // Assert: no wording
+        Assert.DoesNotContain("Does it compile?", lines);
+        Assert.DoesNotContain("Are errors handled?", lines);
+        Assert.DoesNotContain("Correctness", lines);
+        Assert.DoesNotContain("Security", lines);
+
+        // Assert: identifiers, outcomes and the justifications stay
+        Assert.Contains("correctness", lines);
+        Assert.Contains("C-1 Pass", lines);
+        Assert.Contains("C-2 Fail", lines);
+        Assert.Contains("Comment: Built on CI", lines);
+        Assert.Contains("Not applicable: No external input", lines);
+        Assert.Contains("Left out of this document: Checklist wording.", lines);
+    }
+
+    /// <summary>
+    ///     Test that turning the git context off leaves out the repository and both revisions of a review from a
+    ///     repository but keeps the fingerprint and the review set, and that an uploaded review is unaffected.
+    /// </summary>
+    [Fact]
+    public void AttestationRenderer_Render_GitContextOff_OmitsRepositoryAndRevisions()
+    {
+        // Arrange
+        var off = EvidenceSettings.Default with { IncludeGitContext = false };
+
+        // Act
+        var lines = Render(Sample(content: off)).TextLines;
+        var uploaded = Render(Sample(content: off) with { RepositoryName = null, HeadSha = null, BaselineSha = null })
+            .TextLines;
+
+        // Assert
+        Assert.DoesNotContain("apollo-repo", lines);
+        Assert.DoesNotContain("a".PadRight(40, 'a'), lines);
+        Assert.DoesNotContain("b".PadRight(40, 'b'), lines);
+        Assert.Contains("(git context omitted - see Content scope)", lines);
+        Assert.Contains("set-core", lines);
+        Assert.Contains("fingerprint-1234", lines);
+        Assert.Contains("Left out of this document: Git context.", lines);
+        Assert.Contains("Files uploaded to ReviewCenter", uploaded);
+    }
+
+    /// <summary>
+    ///     Test that with every content switch off the identifiers, the fingerprint, the outcomes, the sign-offs, the
+    ///     record digest and the signing-key note are still printed, and every omitted part is named.
+    /// </summary>
+    [Fact]
+    public void AttestationRenderer_Render_EverythingOff_KeepsTheAlwaysIncludedParts()
+    {
+        // Arrange
+        var off = EvidenceSettings.Default with
+        {
+            IncludeThreads = false,
+            IncludeReviewerNames = false,
+            IncludeChecklistWording = false,
+            IncludeFiles = false,
+            IncludeGitContext = false
+        };
+
+        // Act
+        var lines = Render(Sample(content: off)).TextLines;
+
+        // Assert
+        Assert.Contains("Apollo (#7)", lines);
+        Assert.Contains("rev-1", lines);
+        Assert.Contains("fingerprint-1234", lines);
+        Assert.Contains("C-1 Pass", lines);
+        Assert.Contains("Reviewer sign-offs", lines);
+        Assert.Contains(Digest, lines);
+        Assert.Contains("Digital signature", lines);
+        Assert.Contains(lines, l => l.StartsWith("SELF-SIGNED KEY", StringComparison.Ordinal));
+
+        // The list of omitted parts is a long sentence that wraps, so it is read across lines
+        var text = string.Join(" ", lines);
+        Assert.Contains(
+            "Left out of this document: Review discussion threads, Reviewer names, Checklist wording, "
+            + "File list and hashes, Git context.",
+            text);
+        Assert.Equal(5, lines.Count(l => l.StartsWith("Omitted", StringComparison.Ordinal)));
     }
 
     /// <summary>

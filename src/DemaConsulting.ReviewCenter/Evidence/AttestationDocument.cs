@@ -18,6 +18,8 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
+using DemaConsulting.ReviewCenter.Core;
+
 namespace DemaConsulting.ReviewCenter.Evidence;
 
 /// <summary>
@@ -51,7 +53,16 @@ namespace DemaConsulting.ReviewCenter.Evidence;
 /// <param name="SigningKey">The key that signs the document.</param>
 /// <param name="ToolVersion">The ReviewCenter version.</param>
 /// <param name="GeneratedAt">The time of generation.</param>
-/// <param name="GeneratedBy">The user who requested the document.</param>
+/// <param name="GeneratedBy">
+///     Who requested the document: the name of the user, a fixed label when the project's evidence settings keep
+///     names out of its PDFs, or a statement that the request was anonymous.
+/// </param>
+/// <param name="Content">
+///     The evidence settings in effect when the document was generated. The renderer leaves out what a switch turns
+///     off and prints them in the content scope. Names are not part of this: the person fields of the document are
+///     already the final text (see <see cref="AttestationService"/>).
+/// </param>
+/// <param name="IsAnonymousRequest">Whether the request that produced the document came without signing in.</param>
 internal sealed record AttestationDocument(
     int ProjectId,
     string ProjectName,
@@ -76,7 +87,9 @@ internal sealed record AttestationDocument(
     AttestationKeyInfo SigningKey,
     string ToolVersion,
     DateTimeOffset GeneratedAt,
-    string GeneratedBy);
+    string GeneratedBy,
+    EvidenceSettings Content,
+    bool IsAnonymousRequest);
 
 /// <summary>A file under review.</summary>
 /// <param name="Path">The path of the file.</param>
@@ -86,11 +99,17 @@ internal sealed record AttestationDocument(
 internal sealed record AttestationFile(string Path, string Status, string Sha256, long Size);
 
 /// <summary>A checklist section with its answers.</summary>
+/// <param name="Id">The identifier of the section, which the PDF prints when the checklist wording is left out.</param>
 /// <param name="Title">The section title.</param>
 /// <param name="IsApplicable">Whether the section applies to the review.</param>
 /// <param name="Reason">The reason the section does not apply, or <c>null</c>.</param>
 /// <param name="Items">The checks of the section.</param>
-internal sealed record AttestationSection(string Title, bool IsApplicable, string? Reason, IReadOnlyList<AttestationCheck> Items);
+internal sealed record AttestationSection(
+    string Id,
+    string Title,
+    bool IsApplicable,
+    string? Reason,
+    IReadOnlyList<AttestationCheck> Items);
 
 /// <summary>A check of the checklist and its answer.</summary>
 /// <param name="Id">The identifier of the check.</param>
