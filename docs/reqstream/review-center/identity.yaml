@@ -75,17 +75,23 @@ sections:
       - id: ReviewCenter-Identity-AdminClaim
         title: >-
           The Identity subsystem shall give the session of a user the system administrator role only when the user is
-          a system administrator, and no project role at all, so that the memberships of a user are always read
-          from the database when needed and a change of them takes effect at once.
+          a system administrator who has no temporary password to change, and no project role at all, so that the
+          memberships of a user are always read from the database when needed and a change of them takes effect at
+          once, and shall give a user who has to change a temporary password a must-change-password claim instead,
+          sign that user in to the account page, and end the session when the password is changed.
         justification: |
           A role that is copied into the cookie stays true until the cookie ends. Only the system administrator
           role is kept there, and the session ends when it no longer matches the account, while project roles are
-          never copied, so removing a member from a project cannot be missed by a session that is already open.
+          never copied, so removing a member from a project cannot be missed by a session that is already open. A
+          temporary password was handed over by somebody else, so it opens only the way to replacing it.
         children:
           - ReviewCenter-SignIn-AdminClaim
+          - ReviewCenter-SignIn-TemporaryPassword
         tests:
           - SignIn_IsCurrent_StoredUserVersusPrincipal_FollowsTheRule
           - SignIn_Session_RoleChangedAfterLogin_IsRejected
+          - SignIn_Login_TemporaryPassword_GoesToAccountPageWithoutAdminRoleAndStaleWhenFlagChanges
+          - SignIn_IsCurrent_TemporaryPasswordFlag_MustMatchTheClaim
 
       - id: ReviewCenter-Identity-Session
         title: >-

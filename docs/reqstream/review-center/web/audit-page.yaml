@@ -1,7 +1,9 @@
 ---
 # Software Unit Requirements for the AuditPage Component
 #
-# The AuditPage component shows the whole audit trail to system administrators and verifies its hash chain.
+# The AuditPage unit holds the page that shows the whole audit trail to system administrators and verifies its hash
+# chain, and the page at /projects/{project}/audit that shows the audit trail of one project to whoever administers
+# that project. Both pages share the AuditEntryTable component, which renders the entries.
 
 sections:
   - title: AuditPage Unit Requirements
@@ -57,3 +59,26 @@ sections:
           - AuditPage_Verify_UserDemotedAfterOpening_IsRefusedWithoutReadingTrail
           - Routes_Render_ReviewerOpensAuditRoute_ShowsAccessDeniedNotTrail
           - Routes_Render_AdminOpensAuditRoute_ShowsAuditPage
+
+      - id: ReviewCenter-AuditPage-ProjectView
+        title: >-
+          The AuditPage unit shall provide the page /projects/{project}/audit, which shows whoever administers the
+          project (a system administrator or a project admin of it) the audit trail of that project only, newest
+          first, 50 entries to a page, with links to the older and newer page and a message when nothing was recorded,
+          using the same table as the whole audit trail, and shall show the not-found message and no entries to a
+          plain member, a user who is no member, and for a missing project, and, when the right is lost while the page
+          is open, drop the entries.
+        justification: |
+          Project admins are accountable for who joined their project and what was done in it, so they need the trail
+          of their project, but the whole trail names every user and action of the installation and stays for system
+          administrators. The right is checked on every load, because an open page keeps its state after a membership
+          is revoked or a user is demoted.
+        tests:
+          - ProjectAuditPage_Render_ProjectAdmin_ShowsOnlyThisProjectsEvents
+          - ProjectAuditPage_Render_SystemAdmin_ShowsTheProjectsEvents
+          - ProjectAuditPage_Render_NoAdministerRight_ShowsNotFoundAndNoEntries
+          - ProjectAuditPage_Render_ManyEvents_PagesByFiftyNewestFirst
+          - ProjectAuditPage_Render_ProjectWithoutEvents_SaysNothingWasRecorded
+          - ProjectAuditPage_Load_MembershipRevokedWhileOpen_DropsTheEntries
+          - ProjectAuditPage_Load_DemotedOrSessionEndedWhileOpen_DropsTheEntries
+          - ProjectAuditPage_AfterRender_Interactive_SetsMarker

@@ -4,8 +4,9 @@
 
 `ReviewStore` is verified with unit tests defined in `ReviewStoreTests.cs` (projects, reviews, threads, and
 checklists), `ReviewStoreSigningTests.cs` (reviewer slots, the record, and signatures), and
-`ReviewStoreRepositoryTests.cs` (reviews from a repository), and `ReviewStoreMembershipTests.cs` (project
-memberships). The tests use the real
+`ReviewStoreRepositoryTests.cs` (reviews from a repository), `ReviewStoreMembershipTests.cs` (project
+memberships), and `ProjectMembersStoreTests.cs` (the last project administrator rule, including two changes made at
+the same time). The tests use the real
 store over a real
 SQLite database file that each test class instance creates in a private temporary folder and deletes afterward.
 Real SQLite is used because ordering, keys, constraints, transactions, and binary content are the behavior under test.
@@ -56,6 +57,10 @@ be loadable on the test platform.
   project only once; changing a role and removing report whether a membership was there; every change that affected a
   row is audited with the project, and one that found nothing is not; the database refuses a membership for an
   unknown project.
+- When told to require another administrator, the store refuses to remove or demote the last enabled project
+  administrator with the rule `LastProjectAdmin`, stores nothing and no audit entry for the refusal, does not count a
+  disabled administrator as the other one, lets exactly one of two administrators who remove each other at the same
+  time succeed, and applies the same change without the check when it is not told to require one.
 
 #### Test Scenarios
 
@@ -252,6 +257,25 @@ identity, so the removal that found nothing writes no event. This scenario is te
 **ReviewStore_AddMembershipAsync_UnknownProject_IsRefusedByTheDatabase**: A membership for a project that does not
 exist is added; the database refuses it through the foreign key. This scenario is tested by
 `ReviewStore_AddMembershipAsync_UnknownProject_IsRefusedByTheDatabase`.
+
+**ReviewStore_RemoveMembershipAsync_TwoAdminsRemoveEachOther_ExactlyOneSucceeds**: A project has two administrators,
+and both are removed at the same time, each call requiring another administrator; exactly one call succeeds, the
+other throws the rule `LastProjectAdmin`, one administrator remains, and only one `project.member-removed` event is
+stored. This scenario is tested by `ReviewStore_RemoveMembershipAsync_TwoAdminsRemoveEachOther_ExactlyOneSucceeds`.
+
+**ReviewStore_MembershipChanges_RemoveRacesDemote_LeavesAnAdministrator**: One administrator is removed while the
+other is demoted to user, at the same time and with the check required; exactly one call is refused and one project
+administrator remains. This scenario is tested by
+`ReviewStore_MembershipChanges_RemoveRacesDemote_LeavesAnAdministrator`.
+
+**ReviewStore_RemoveMembershipAsync_LastAdmin_RefusedAndRolledBackUnlessExempt**: The only administrator is removed
+and demoted with the check required; both calls throw `LastProjectAdmin`, the role is unchanged, and no further event
+is stored. The same removal without the check then succeeds and the project has no memberships. This scenario is
+tested by `ReviewStore_RemoveMembershipAsync_LastAdmin_RefusedAndRolledBackUnlessExempt`.
+
+**ReviewStore_RemoveMembershipAsync_OtherAdminDisabled_IsRefused**: The other administrator is disabled, so the
+removal of the remaining one with the check required throws `LastProjectAdmin` and both memberships remain. This
+scenario is tested by `ReviewStore_RemoveMembershipAsync_OtherAdminDisabled_IsRefused`.
 
 **Audit drafts**: Every mutation of the store takes an audit draft, and the tests of this unit pass one through
 the real `AuditAppender`; the helper `TestStore` builds the store and an `AuditStore` over the same database. The

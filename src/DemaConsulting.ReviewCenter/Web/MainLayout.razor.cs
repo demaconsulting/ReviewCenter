@@ -22,6 +22,7 @@ using DemaConsulting.ReviewCenter.Core;
 using DemaConsulting.ReviewCenter.Identity;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Authorization;
+using Microsoft.AspNetCore.Components.Routing;
 
 namespace DemaConsulting.ReviewCenter.Web;
 
@@ -31,15 +32,29 @@ namespace DemaConsulting.ReviewCenter.Web;
 /// <remarks>
 ///     The layout is rendered statically for every request, so the user is read once from the authentication
 ///     state of that request. Nothing here changes state; signing out is a form post handled by an endpoint.
-///     A layout instance serves one render, so it needs no synchronization.
+///     A user with a temporary password is confined to a few pages: the check runs when the layout starts and again
+///     on every navigation, because an interactive page keeps the layout alive while the user clicks on. A layout
+///     instance serves one render, so it needs no synchronization.
 /// </remarks>
-public partial class MainLayout : LayoutComponentBase
+public partial class MainLayout : LayoutComponentBase, IDisposable
 {
+    /// <summary>
+    ///     Whether <see cref="OnLocationChanged"/> is subscribed to the navigation manager.
+    /// </summary>
+    private bool _subscribed;
+
     /// <summary>
     ///     Gets or sets the authentication state of the current request, supplied by dependency injection.
     /// </summary>
     [Inject]
     private AuthenticationStateProvider AuthenticationState { get; set; } = null!;
+
+    /// <summary>
+    ///     Gets or sets the navigation manager, supplied by dependency injection; used to confine an account with a
+    ///     temporary password to the pages it may use.
+    /// </summary>
+    [Inject]
+    private NavigationManager Navigation { get; set; } = null!;
 
     /// <summary>
     ///     Gets the signed-in user, or <c>null</c> when nobody is signed in.
@@ -50,6 +65,18 @@ public partial class MainLayout : LayoutComponentBase
     ///     Gets a value indicating whether the signed-in user is an administrator.
     /// </summary>
     private bool IsAdmin { get; set; }
+
+    /// <summary>
+    ///     Gets a value indicating whether the signed-in user still has to change a temporary password; such a user
+    ///     sees no navigation tabs and is sent to the account page from every other page.
+    /// </summary>
+    private bool MustChangePassword { get; set; }
+
+    /// <summary>
+    ///     Gets the first segments of the pages a user with a temporary password may open: the page that changes the
+    ///     password, the sign-in page, and the static explanations.
+    /// </summary>
+    private static readonly string[] PagesOpenDuringPasswordChange = ["account", "login", "help", "about"];
 
     /// <summary>
     ///     Gets the version shown in the footer: the informational version up to the <c>+</c>, then <c>+</c> and the
@@ -79,6 +106,73 @@ public partial class MainLayout : LayoutComponentBase
         {
             Actor = await AuthenticationState.GetActorAsync();
             IsAdmin = state.User.IsInRole(SignIn.AdminRole);
+            MustChangePassword = SignIn.IsPasswordChangeRequired(state.User);
+
+            // One redirect confines the user to the page that replaces the temporary password; the claim is
+            // enough, so no service is called per navigation (the data is refused by the access rules anyway)
+            if (MustChangePassword)
+            {
+                RedirectUnlessOpenDuringPasswordChange(Navigation.Uri);
+
+                // The layout lives on while the user navigates inside the circuit, so every later navigation is
+                // checked too; the handler is removed again in Dispose
+                Navigation.LocationChanged += OnLocationChanged;
+                _subscribed = true;
+            }
         }
+    }
+
+    /// <inheritdoc />
+    public void Dispose()
+    {
+        Dispose(disposing: true);
+        GC.SuppressFinalize(this);
+    }
+
+    /// <summary>
+    ///     Stops watching the navigation, so a layout that is gone is not kept alive and does not redirect.
+    /// </summary>
+    /// <param name="disposing"><c>true</c> when called from <see cref="Dispose()"/> rather than a destructor.</param>
+    protected virtual void Dispose(bool disposing)
+    {
+        if (disposing && _subscribed)
+        {
+            Navigation.LocationChanged -= OnLocationChanged;
+            _subscribed = false;
+        }
+    }
+
+    /// <summary>
+    ///     Checks the page the user navigated to while the password is still temporary.
+    /// </summary>
+    /// <param name="sender">The navigation manager.</param>
+    /// <param name="e">The new location.</param>
+    private void OnLocationChanged(object? sender, LocationChangedEventArgs e)
+    {
+        RedirectUnlessOpenDuringPasswordChange(e.Location);
+    }
+
+    /// <summary>
+    ///     Sends the user to the account page unless the address is one that stays open during a password change.
+    /// </summary>
+    /// <param name="uri">The absolute address the user is on or is going to.</param>
+    private void RedirectUnlessOpenDuringPasswordChange(string uri)
+    {
+        if (MustChangePassword && !IsOpenDuringPasswordChange(Navigation.ToBaseRelativePath(uri)))
+        {
+            Navigation.NavigateTo(SignIn.AccountPath, forceLoad: true);
+        }
+    }
+
+    /// <summary>
+    ///     Decides whether a page may be opened while the password is still temporary.
+    /// </summary>
+    /// <param name="relativePath">The path relative to the base address, possibly with a query or fragment.</param>
+    /// <returns><c>true</c> when its first segment is one of <see cref="PagesOpenDuringPasswordChange"/>.</returns>
+    private static bool IsOpenDuringPasswordChange(string relativePath)
+    {
+        var end = relativePath.IndexOfAny(['/', '?', '#']);
+        var first = end < 0 ? relativePath : relativePath[..end];
+        return PagesOpenDuringPasswordChange.Contains(first, StringComparer.OrdinalIgnoreCase);
     }
 }

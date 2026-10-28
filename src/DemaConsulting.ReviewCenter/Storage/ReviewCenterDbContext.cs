@@ -257,6 +257,7 @@ internal sealed class ReviewCenterDbContext : DbContext
             user.HasIndex(u => u.Username).IsUnique();
             user.Property(u => u.DisplayName).IsRequired().HasMaxLength(ReviewLimits.MaxDisplayNameLength);
             user.Property(u => u.IsSystemAdmin);
+            user.Property(u => u.MustChangePassword);
             user.Property(u => u.PasswordHash).IsRequired();
         });
 

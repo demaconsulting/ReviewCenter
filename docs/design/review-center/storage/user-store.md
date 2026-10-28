@@ -6,8 +6,9 @@
 
 `UserStore` implements the Core interface `IUserStore` on top of `ReviewCenterDbContext`. Its single responsibility is
 to persist users and read them back, translating the unique user name constraint of the database into the terms of the
-domain. The system administrator flag of a user is an ordinary stored column that `AddAsync` stores and `UpdateAsync`
-replaces; a user has no role of any other kind, because the project roles are memberships (see `ReviewStore`).
+domain. The system administrator flag and the must-change-password flag of a user are ordinary stored columns that
+`AddAsync` stores and `UpdateAsync` replaces; a user has no role of any other kind, because the project roles are
+memberships (see `ReviewStore`). `AddToProjectAsync` creates a user and a membership together.
 
 #### Data Model
 
@@ -24,10 +25,17 @@ index on it uses that collation, so the same collation also makes every lookup b
 #### Key Methods
 
 **AddAsync**: Stores a user and returns it with the identity assigned by the database. The unit copies the fields of
-the argument into a new entity, so an identity supplied by the caller is ignored and can neither be persisted nor
+the argument (including the must-change-password flag) into a new entity through the private `InsertAsync`, so an
+identity supplied by the caller is ignored and can neither be persisted nor
 collide with an existing user; the returned user is the stored entity. The audit draft is built from the stored user (so
 it can name the assigned identity) and saved in the same transaction. A user name that already exists, in any
 capitalization, is reported as a `DomainRuleException` for `UserNameTaken`, and nothing is stored.
+
+**AddToProjectAsync**: Stores a user and the membership of that user in a project, with the audit entry built from the
+stored user, in one audit transaction: the user is inserted and saved (so the identity is known), the membership is
+added to the same context, and both are committed with the entry. When the user name exists the whole transaction is
+rolled back and `UserNameTaken` is reported; when the project does not exist the foreign key of the membership refuses
+it and nothing is stored either. A user therefore never exists without the membership it was created for.
 
 **GetByUsernameAsync**: Reads one user by user name, without regard to case; null when absent.
 
@@ -55,5 +63,5 @@ but never logged.
 
 #### Callers
 
-- **UserService** — through the Core interface.
+- **ProjectService** and **UserService** — through the Core interface.
 - **ServerHost** — registers the store as the implementation of the Core interface.

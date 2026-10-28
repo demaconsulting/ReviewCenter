@@ -68,28 +68,98 @@ sections:
 
       - id: ReviewCenter-ProjectService-Members
         title: >-
-          The ProjectService class shall let a system administrator add a user to a project with a project role,
-          change the role of a member, and remove a member, shall let a project administrator and a system
-          administrator list the members of the project ordered by user name, and shall refuse every other actor.
+          The ProjectService class shall let an administrator of a project and a system administrator add an
+          existing user to the project with a project role, change the role of a member, remove a member, and list
+          the members of the project ordered by user name, and shall refuse every other actor: a plain member of
+          the project with an actor-not-allowed rule, and an actor who cannot see the project as if the project
+          did not exist.
         justification: |
-          Membership decides who may see a project, so changing it is reserved to the people who run the
-          installation. The administrator of a project may see who belongs to it, so that the project can be
-          managed, but not widen or narrow it.
+          Membership decides who may see a project. The administrators of a project know best who belongs on it,
+          so they manage its members without waiting for a system administrator. A person outside the project
+          learns nothing about it, not even that it exists.
         tests:
           - ProjectService_Members_SystemAdminManages_OthersAreRefused
           - ProjectService_ListMembersAsync_ProjectAdminOwnProjectOnly
+          - ProjectService_MemberActions_ActorKinds_AreAllowedOrRefused
 
       - id: ReviewCenter-ProjectService-MemberRules
         title: >-
           The ProjectService class shall refuse, with a domain rule exception that names the rule, to add a user
-          who is already a member, to change or remove a membership that does not exist, to add a user or change
-          a membership of a user that does not exist, and to act on a project that does not exist, and shall
-          change nothing in each case.
+          who is already a member, to change or remove a membership that does not exist, to add a user that does
+          not exist, and to act on a project that does not exist, and shall change nothing in each case.
         justification: |
           A repeated or mistaken request must fail visibly and leave the access rights as they were, and a role
           outside the defined roles must never be stored.
         tests:
           - ProjectService_Members_UnknownDoubledAndMissing_ViolateTheirRules
+
+      - id: ReviewCenter-ProjectService-MemberLookup
+        title: >-
+          The ProjectService class shall add a member only by the exact user name, ignoring surrounding white
+          space and letter case, shall offer no way to search or list users, and shall answer a name that does
+          not exist and the name of a disabled user with the same rule and the same message, and a removal or
+          role change for an unknown name and for a user who is not a member with the same rule and the same
+          message.
+        justification: |
+          A project administrator is not a system administrator and must not be able to browse the user base or
+          to find out which accounts exist by trying names. One answer for every unusable name leaves a
+          misspelled name as the only thing the administrator can learn from a failure.
+        tests:
+          - ProjectService_AddMemberAsync_UnknownAndDisabledName_AreIndistinguishable
+          - ProjectService_RemoveAndSetRole_UnknownNameAndNonMember_AreIndistinguishable
+
+      - id: ReviewCenter-ProjectService-AddThrottle
+        title: >-
+          The ProjectService class shall refuse an actor who is not a system administrator with a too-many-attempts
+          rule once the actor has failed ten times within ten minutes to add or create a member, counting each
+          actor separately and reserving each attempt atomically before the user is looked up, so that attempts
+          made at the same time cannot exceed the limit, shall accept attempts again when the ten minutes have
+          passed, and shall never refuse a system administrator for this reason.
+        justification: |
+          Trying names one after the other is the only way left to find out which accounts exist. A limit on
+          failures per actor makes that slow and visible, while system administrators, who may list the users
+          anyway, are not hindered. Reserving the attempt before the lookup closes the gap in which many parallel
+          attempts would all pass a check that has not yet seen their failures.
+        tests:
+          - ProjectService_AddMemberAsync_TooManyFailures_ThrottlesPerActorUntilTheWindowEnds
+          - ProjectService_AddMemberAsync_ConcurrentAttempts_AreAdmittedUpToTheLimitOnly
+          - ProjectService_AddMemberAsync_ConcurrentAttemptsOfSystemAdministrator_AreNeverThrottled
+          - ProjectService_AddMemberAsync_LookupThrows_KeepsTheAttemptCounted
+          - ProjectService_CreateMemberAccountAsync_Successes_DoNotCountAgainstTheLimit
+
+      - id: ReviewCenter-ProjectService-LastAdmin
+        title: >-
+          The ProjectService class shall refuse, with a last-project-administrator rule, to let an administrator
+          of a project remove or demote the last enabled administrator of the project, including the actor
+          themselves, shall not count a disabled administrator as another administrator, shall let a system
+          administrator do it, and shall change and audit nothing when it refuses.
+        justification: |
+          A project without an administrator can no longer be managed except by a system administrator, and a
+          project administrator who removes the last administrator, perhaps by mistake, would lock the project
+          members out of their own team. System administrators remain responsible for every project, so the rule
+          does not bind them.
+        tests:
+          - ProjectService_RemoveAndDemote_LastProjectAdmin_IsRefusedForAProjectAdmin
+          - ProjectService_RemoveMemberAsync_SystemAdminAndDisabledTarget_AreNotBlocked
+
+      - id: ReviewCenter-ProjectService-CreateMemberAccount
+        title: >-
+          The ProjectService class shall let an administrator of a project and a system administrator create a
+          local account together with its membership of the project in one step, shall never make the account a
+          system administrator, shall give it a random temporary password of sixteen characters that must be
+          changed at the first sign-in, shall return that password only to the caller and never include it in the
+          text of the returned value, and shall refuse a taken or
+          invalid user name or display name without creating an account or a membership.
+        justification: |
+          A project administrator who needs to bring a new person onto the project should not depend on a system
+          administrator, but the power to create accounts must not become a way to gain system rights. A password
+          chosen by the system cannot be weak or reused, and one that the person must replace is known to nobody
+          else afterwards.
+        tests:
+          - ProjectService_CreateMemberAccountAsync_ProjectAdmin_CreatesNoSystemAdministrator
+          - ProjectService_CreateMemberAccountAsync_TemporaryPassword_IsRandomHashedAndNeverAudited
+          - ProjectService_CreateMemberAccountAsync_TakenAndInvalidInput_CreatesNothing
+          - NewMemberAccount_ToString_DoesNotContainTemporaryPassword
 
       - id: ReviewCenter-ProjectService-Audit
         title: >-
@@ -103,12 +173,17 @@ sections:
 
       - id: ReviewCenter-ProjectService-MemberAudit
         title: >-
-          The ProjectService class shall record the adding of a member, the change of the role of a member, and
-          the removal of a member in the audit trail, in the same transaction as the change, naming the actor, the
-          user, and the role, and carrying the identifier of the project.
+          The ProjectService class shall record the adding of a member, the change of the role of a member, the
+          removal of a member, and the creation of an account for a project in the audit trail, in the same
+          transaction as the change, naming the actor, the user, and the role, and carrying the identifier of the
+          project, shall never record a temporary password, and shall record every failed attempt to add or create
+          a member, also of a system administrator, with the user name that was tried and the project.
         justification: |
           Who may see a project is the most important fact about its confidentiality, so every change to it must
           be in the history, found by project, and must be true: no change without its entry and no entry without
-          its change.
+          its change. A trail that holds a password would be a leak, and the failed attempts are the trace of
+          somebody searching for user names.
         tests:
           - ProjectService_Members_SystemAdminManages_OthersAreRefused
+          - ProjectService_AddMemberAsync_FailedAttempts_AreAuditedWithTheProject
+          - ProjectService_CreateMemberAccountAsync_TemporaryPassword_IsRandomHashedAndNeverAudited

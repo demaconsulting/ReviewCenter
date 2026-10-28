@@ -23,7 +23,8 @@ N/A - standard test environment (a temporary database and key folder are created
 - A review is created from uploaded files or from the changes of a repository, answered with 201, flagged as created
   through the API, and the audit entry names the token.
 - An invalid body is a 400 problem that names the field, a body that is not JSON of the right shape is a 400 problem, a
-  body that is not declared as JSON is a 415 problem, and the rules of the services answer with their status.
+  body that is not declared as JSON is a 415 problem, and the rules of the services answer with their status; the rule
+  for the last project administrator is 409, too many attempts 429, and a required password change 403.
 - A file count, file size or total size beyond the review limits is a 400 problem, a body over the limit of the endpoint
   is a 413, and no review is created in these cases.
 - The attestation of a complete review is a PDF, of a review that is not complete a 409 problem.
@@ -105,6 +106,10 @@ in-memory test server does not enforce the limit), and a body one byte over the 
 and an
 unknown project are sent. The answers are 409, 400, 400, and 404, each a problem document with the status and a detail.
 This scenario is tested by `ApiEndpoints_CreateReview_ServiceRules_AnswerTheirStatus`.
+
+**ApiProblems_StatusOf_MemberRules_MapsToDocumentedStatus**: The status for each of the rules `LastProjectAdmin`,
+`TooManyAttempts`, and `PasswordChangeRequired` is asked of `ApiProblems`; the answers are 409, 429, and 403. This
+scenario is tested by `ApiProblems_StatusOf_MemberRules_MapsToDocumentedStatus`.
 
 **ApiEndpoints_GetAttestation_Token_ReturnsPdfOrProblem**: The attestation of a complete review and of a review that
 does

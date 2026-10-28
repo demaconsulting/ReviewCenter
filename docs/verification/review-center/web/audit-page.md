@@ -2,12 +2,16 @@
 
 #### Verification Approach
 
-`AuditPage` is verified with component tests defined in `AuditPageTests.cs`, which use the bUnit test context to render
-the real component over a real `AuditService` with the in-memory fake audit store (`FakeAuditStore`, which can also
-alter a stored entry to break the chain) and a real `UserService` with an in-memory fake user store. The signed-in user
+`AuditPage` and `ProjectAuditPage` are verified with component tests defined in `AuditPageTests.cs` and
+`ProjectAuditPageTests.cs`, which use the bUnit test context to render
+the real components over a real `AuditService` with the in-memory fake audit store (`FakeAuditStore`, which can also
+alter a stored entry to break the chain) and a real `UserService` with an in-memory fake user store; the tests of the
+project page also use a real `ProjectService` and `ProjectAccess` over the in-memory fake review store
+(`FakeReviewStore`). The signed-in user
 of the tests is set by the test authentication state of the shared helper `PageTestBase`; the tests sign in as a
 system administrator stored in the fake user store, because the page re-checks the stored user. The restriction of the
-route to system administrators is verified through the router in `Routes_Render_*` tests of the same file. Tests locate
+route to system administrators is verified through the router in `Routes_Render_*` tests of the same file. The page of
+a project is rendered at its address, so that the query values of the paging reach it as in the browser. Tests locate
 elements by their
 `data-testid` attributes. The real database and hashing are covered by the `Storage` and `AuditChain` units.
 
@@ -33,6 +37,11 @@ N/A - standard test environment.
 - A user who is not a system administrator and opens the route is shown the access denied message and no entries; a
   system administrator who opens the
   route is shown the page.
+- A project administrator or a system administrator who opens the audit page of a project sees the events of that
+  project only, newest first, in pages of 50 with links, in the table of the whole audit trail, and a message when
+  nothing was recorded; a plain member, a user who is no member, and a missing project give the not-found message and no
+  entries; a user who lost the right after the page was opened, by revoked membership, demotion, or the end of the
+  session, sees the not-found message and no entries.
 
 #### Test Scenarios
 
@@ -85,3 +94,35 @@ access denied message is shown and no entry. This scenario is tested by
 **Routes_Render_AdminOpensAuditRoute_ShowsAuditPage**: A system administrator opens `/audit` through the router; the
 page is
 shown. This scenario is tested by `Routes_Render_AdminOpensAuditRoute_ShowsAuditPage`.
+
+**ProjectAuditPage_Render_ProjectAdmin_ShowsOnlyThisProjectsEvents**: A project administrator of Apollo opens the audit
+page of Apollo; the events of Apollo are shown, with the link back to the project, and neither the events of Gemini nor
+the event without a project. This scenario is tested by
+`ProjectAuditPage_Render_ProjectAdmin_ShowsOnlyThisProjectsEvents`.
+
+**ProjectAuditPage_Render_SystemAdmin_ShowsTheProjectsEvents**: A system administrator opens the audit page of Gemini;
+the events of Gemini are shown and the events of Apollo are not. This scenario is tested by
+`ProjectAuditPage_Render_SystemAdmin_ShowsTheProjectsEvents`.
+
+**ProjectAuditPage_Render_NoAdministerRight_ShowsNotFoundAndNoEntries**: A plain member, a user who is no member, and a
+missing project each give the not-found message, no table, and no event or project name. This scenario is tested by
+`ProjectAuditPage_Render_NoAdministerRight_ShowsNotFoundAndNoEntries`.
+
+**ProjectAuditPage_Render_ManyEvents_PagesByFiftyNewestFirst**: More than 50 events are recorded for the project; the
+first page shows 50 rows with the newest on top and a link to the older page, and no link to a newer one; the older
+page, opened at the address of that link, shows the remaining rows, none of the first page, and the Newer link. This
+scenario is tested by `ProjectAuditPage_Render_ManyEvents_PagesByFiftyNewestFirst`.
+
+**ProjectAuditPage_Render_ProjectWithoutEvents_SaysNothingWasRecorded**: A project without events shows the empty
+message. This scenario is tested by `ProjectAuditPage_Render_ProjectWithoutEvents_SaysNothingWasRecorded`.
+
+**ProjectAuditPage_Load_MembershipRevokedWhileOpen_DropsTheEntries**: The membership of the project administrator is
+revoked while the page is open and the page is loaded again; the not-found message is shown with no table, no row, and
+no event or project name. This scenario is tested by `ProjectAuditPage_Load_MembershipRevokedWhileOpen_DropsTheEntries`.
+
+**ProjectAuditPage_Load_DemotedOrSessionEndedWhileOpen_DropsTheEntries**: The project administrator is demoted, or the
+sign-in state ends without the page knowing, and the page is loaded again; the not-found message is shown and no
+entries. This scenario is tested by `ProjectAuditPage_Load_DemotedOrSessionEndedWhileOpen_DropsTheEntries`.
+
+**ProjectAuditPage_AfterRender_Interactive_SetsMarker**: The page is rendered; its root element has `data-interactive`
+equal to `true`. This scenario is tested by `ProjectAuditPage_AfterRender_Interactive_SetsMarker`.

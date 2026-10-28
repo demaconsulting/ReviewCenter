@@ -31,8 +31,8 @@ a project checklist, and sign the review with their password. Every action is re
 - 🔗 **Tamper-Evident Audit Trail** - Every change is chained by SHA-256 hashes and can be verified at any time
 - 📄 **Signed PDF Attestation** - Approved reviews download as a digitally signed PDF that any reader can verify
 - 🔐 **Local Accounts** - Sign-in lockout and throttling, and password changes
-- 🛡️ **Project-Based Access Control** - System administrators, project administrators, and project members; a project
-  you are not a member of looks like a project that does not exist
+- 🛡️ **Project-Based Access Control** - System administrators, project administrators, and project members; project
+  administrators manage their own members; a project you are not a member of looks like a project that does not exist
 - 🔑 **API Tokens** - Personal access tokens for automation, with a REST API, an OpenAPI document, and an evidence index
   for ReviewMark
 - 🌗 **Light and Dark Theme** - Follows the system setting, or choose a theme in your account

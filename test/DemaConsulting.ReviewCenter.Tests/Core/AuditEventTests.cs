@@ -90,7 +90,8 @@ public class AuditEventTests
             ids[username] = (await userService.CreateAsync(username, name, UserRole.Reviewer, Password, Actor.CommandLine, TestContext.Current.CancellationToken)).Id;
         }
 
-        var projects = new ProjectService(reviews, users, new AllowAllProjectAccess(reviews), clock);
+        var projects = new ProjectService(
+            reviews, users, new AllowAllProjectAccess(reviews), new FakePasswordHasher(), clock);
         var project = await projects.CreateAsync("Apollo", "Moon", TestActors.Ann, TestContext.Current.CancellationToken);
         var auditCount = reviews.Audits.Count;
         foreach (var userId in ids.Values)

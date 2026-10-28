@@ -22,7 +22,8 @@ N/A - standard test environment.
   survives a failing or missing hook, and lets cancellation propagate.
 - The first page shows the newest 50 entries with only an Older link; paging older covers every entry once; paging newer
   returns the page before; a trail of exactly one page has no links; an empty trail gives an empty page; a review filter
-  returns only that review, also over more than one page; when both positions are given the older one wins.
+  returns only that review, also over more than one page; a project filter without a review returns every event of that
+  project and none of another project or without a project; when both positions are given the older one wins.
 - Verification of an untouched trail is intact and reads in batches; an empty trail is intact; a tampered entry in a
   later batch is reported with its sequence.
 - The coalescing record stores the first event of a key in a minute and does not store the repeats; the first event of
@@ -110,6 +111,11 @@ gives an empty page. This scenario is tested by `AuditService_ListAsync_ExactlyO
 **AuditService_ListAsync_ReviewFilter_ReturnsOnlyThatReview**: A review filter shows the entries of that review only,
 also across pages. This scenario is tested by `AuditService_ListAsync_ReviewFilter_ReturnsOnlyThatReview` and
 `AuditService_ListAsync_ReviewFilterOverFiftyEntries_Pages`.
+
+**AuditService_ListAsync_ProjectOnly_ReturnsOnlyThatProjectsEvents**: A trail holds four events of project 1 in
+several reviews, one event of project 2, and one event of no project. Listing project 1 without a review returns the
+four events newest first, and none of the others. This scenario is tested by
+`AuditService_ListAsync_ProjectOnly_ReturnsOnlyThatProjectsEvents`.
 
 **AuditService_ListAsync_BothPositions_BeforeWins**: With both positions given the older page is returned. This scenario
 is tested by `AuditService_ListAsync_BothPositions_BeforeWins`.

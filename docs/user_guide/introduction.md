@@ -147,7 +147,12 @@ The server provides these routes:
 - `/audit` - the audit trail (system administrators only).
 - `/projects` - the list of the projects you can see.
 - `/projects/new` - the form that creates a project (system administrators only).
-- `/projects/{id}` - one project, with its reviews (and, for system administrators, its members).
+- `/projects/{id}` - one project, with its reviews (and, for project and system administrators, its members).
+- `/projects/{id}/members/new` - the form that adds an existing user to the project by the exact user name (project
+  and system administrators).
+- `/projects/{id}/members/account` - the form that creates a local account and adds it to the project (project and
+  system administrators).
+- `/projects/{id}/audit` - the audit trail of the project (project and system administrators).
 - `/projects/{id}/repositories` - the git repositories of the project (project and system administrators).
 - `/projects/{id}/repositories/new` - the form that adds a repository to the project (project and system
   administrators).
@@ -323,7 +328,10 @@ it and is remembered in this browser only: it is not an account setting, so anot
 
 To change your password, enter the current password and the new
 password, and press the change button. A wrong current password counts as a failed sign-in for the lockout. The
-fields are cleared afterwards.
+fields are cleared afterwards. If you signed in with a temporary password (an account that a project administrator
+created for you), the page shows only this form, asks for the temporary password as the current one, and sends you to
+the sign-in page with a notice when the password is changed; see
+[Managing Project Members](#managing-project-members).
 
 The **API tokens** card creates and revokes the personal access tokens that let a script or tool use the API as you
 (see [Automation and API Tokens](#automation-and-api-tokens)):
@@ -348,8 +356,8 @@ a **System admin** badge for system administrators. A system administrator can:
 
 1. Create a user: press **+ New user**, which opens the form at `/users/new`, enter a user name, display name, and
    password, tick **System administrator** if the user is to be one, and create the user. **Cancel** goes back to the
-   list, and so does a successful creation. A new user is a member of no project until a system administrator adds
-   the user to one (see [Access and Visibility](#access-and-visibility)).
+   list, and so does a successful creation. A new user is a member of no project until a project administrator or a
+   system administrator adds the user to one (see [Access and Visibility](#access-and-visibility)).
 2. Disable a user, which stops the user from signing in without deleting the record of what the user did, and enable
    the user again.
 3. Make a user a system administrator (**Make system admin**) or take that away (**Remove system admin**).
@@ -378,12 +386,14 @@ ReviewCenter controls access by project. There are three roles:
 
 - **System administrator**: a flag on a local user account. A system administrator creates projects, manages users and
   project membership, reads the audit trail, and can see and manage every project.
-- **Project administrator**: a member of one project who also manages the git repositories of that project.
+- **Project administrator**: a member of one project who also manages the members and the git repositories of that
+  project.
 - **Member**: a user who belongs to a project (a project member, role "Member" on the project page). A member works on
   the reviews of that project.
 
 A user who is neither a member of a project nor a system administrator has no access to it. A new project has no
-members; a system administrator adds them (see [Projects and Reviews](#projects-and-reviews)). Accounts are local
+members; a project administrator or a system administrator adds them (see
+[Managing Project Members](#managing-project-members)). Accounts are local
 database accounts only.
 
 | Action                                               | Member | Project admin | System admin |
@@ -394,9 +404,10 @@ database accounts only.
 | Sign a review as the assigned reviewer               | yes    | yes           | if a member  |
 | Download the attestation PDF of an approved review   | yes    | yes           | yes          |
 | Manage the repositories and credentials of a project | no     | yes           | yes          |
-| Add and remove members, change member roles          | no     | no            | yes          |
+| Add and remove members, change member roles          | no     | yes           | yes          |
 | Create projects                                      | no     | no            | yes          |
 | Manage users; read the audit page                    | no     | no            | yes          |
+| Read the audit trail of the project                  | no     | yes           | yes          |
 
 **Hidden means missing.** A project you cannot see looks exactly like a project that does not exist. The project
 pages say "Project N does not exist.", and the API and the PDF routes answer **404**, never 403, so a refused request
@@ -416,8 +427,60 @@ review.
 **Evidence.** The signed attestation PDF of a review and the evidence index of a project are visible only to project
 members and system administrators.
 
-This release has no member management for project administrators: a system administrator manages the members of
-every project, while a project administrator manages the repositories of the project.
+This release lets a project administrator manage the members of that project (see
+[Managing Project Members](#managing-project-members)); a system administrator manages the members of every project.
+
+### Managing Project Members
+
+A project administrator or a system administrator manages the members on the project page, in the **Members**
+section. It lists each member with a role badge (**Member** or **Project admin**), a role button (**Make project
+admin** or **Make member**), and a **Remove** button. Ordinary members do not see the section.
+
+**Add someone who has an account.** Press **+ Add member**, which opens `/projects/{id}/members/new`. Type the exact
+user name, tick **Project admin** if the person is to manage the members and repositories of the project, and press
+**Add member** (or **Cancel**). There is no list of users to choose from, so nobody can browse the accounts of other
+projects: ask the person for the user name. If the name cannot be added you get one message, whatever the reason (a
+misspelled name, an account that does not exist, or a disabled account). Every such failure is recorded in the audit
+trail as `project.member-add-failed`, and after 10 failures in 10 minutes the page refuses further attempts until time
+has passed. System administrators are not limited, and the count is kept in memory, so it starts again at a restart.
+Each attempt is counted when it starts, so many attempts made at the same time cannot get past the limit.
+
+**Create an account for someone new.** On the same page, **Create a new account** opens
+`/projects/{id}/members/account`. Enter a user name and a display name, choose whether the person is a project admin,
+and press **Create account**. The account exists only together with its membership in this project (recorded as
+`project.account-created`). ReviewCenter generates a **temporary password** and shows it **once**, with a **Copy**
+button; nobody types or chooses it, and it is never written to the audit trail or a log. Give it to the person right
+away: it cannot be shown again. **Done** removes it from the page.
+
+**First sign-in with a temporary password.** The person signs in with the temporary password and is taken to the
+Account page, which asks for a new password. Until the password is changed, the account can only use the Account,
+Help, and About pages: it has no access to any project, cannot sign a review (the password confirmation is refused),
+and cannot create, list, or use API tokens (an existing token of that user is refused like an unknown token). The new
+password must differ from the temporary one. After the change the person signs in again with the new password.
+Accounts made by a system administrator on the Users page do not have this rule.
+
+**Change a role or remove a member.** Use **Make project admin**, **Make member**, or **Remove** on a member. A
+project always keeps at least one project administrator: a project administrator cannot remove or demote the last
+one, not even themselves, and the page explains why. A system administrator can. The rule holds even when two people
+act at the same moment.
+
+**Reviewers who are removed.** A reviewer slot keeps its reviewer when the person is removed from the project. The
+review page marks the reviewer as **No longer a project member**, and that reviewer cannot sign until added again.
+
+**Limits of member management.**
+
+- The rights of the person who changes the members are checked just before the change is stored, and not again inside
+  it. If someone takes away a project administrator's right (removes, demotes, or disables the person) in the same few
+  milliseconds in which that administrator changes a member, that one change can still go through; the next one is
+  refused. This is the same kind of limit as the access rules in general (see
+  [Access and Visibility](#access-and-visibility)).
+- Adding a person by the exact user name necessarily tells a project administrator whether an enabled account with
+  that name exists, because the add then works. This is accepted: every successful add is visible in the member list,
+  is recorded in the audit trail, and can be undone by removing the member; failed attempts are limited and recorded
+  as described above; and system administrators and project administrators can already create accounts, which also
+  shows whether a name is taken. There is still no list or search of users.
+
+Every member change is recorded in the audit trail (see [Recorded Actions](#recorded-actions)).
 
 ## Projects and Reviews
 
@@ -430,10 +493,8 @@ unchanged, together with a fingerprint of that content.
    a project name (up to 100 characters) and an optional description (up to 1000 characters), and press the create
    button. The new project opens, with no members. **Cancel** goes back to the list; select a project to open its page.
    A project that you cannot see is reported as "Project N does not exist."
-2. A system administrator manages the members on the project page, in the **Members** section. It lists each member
-   with a role badge (**Member** or **Project admin**), a role button (**Make project admin** or **Make member**),
-   and a **Remove** button. **+ Add member** reveals an inline form: choose a user, tick **Project admin** if the
-   member is to administer the project's repositories, and press **Add member** (or **Cancel**). The project page also
+2. A project administrator (or a system administrator) manages the members on the project page, in the **Members**
+   section; see [Managing Project Members](#managing-project-members). The project page also
    has a **Repositories** button for the project's git repositories (see
    [Repositories and Credentials](#repositories-and-credentials)).
 3. On the project page, press **+ New review**. On the form at `/projects/{id}/reviews/new`, enter a review
@@ -1064,6 +1125,15 @@ refused. Events of a project carry the project.
 The page has a **Verify chain** button. It reads the whole trail once and shows either that the chain is intact, with
 the number of entries and the **head hash**, or the first entry at which the chain is broken.
 
+### The Audit Trail of a Project (Project Administrators)
+
+A project administrator (and a system administrator) sees an **Audit trail** button on the project page. It opens
+`/projects/{id}/audit`, a read-only list of the entries recorded for that project only: its reviews, members, and
+account creations, and nothing of other projects, sign-ins, or user administration. The list is newest first, 50 at a
+time, with **Older** and **Newer** buttons. It has no **Verify chain** button; verification covers the whole trail
+and stays with the system administrator. Ordinary members do not get the button, and the page looks like a missing
+project to them.
+
 ### The Chain
 
 Each entry stores the SHA-256 hash of the entry before it and its own hash, which is calculated from the previous hash
@@ -1101,6 +1171,7 @@ head hash is a manual step, and it is most useful after important events such as
 | --------- | ------------------------------------------------------------------------------------ |
 | Projects  | `project.created`, `review.created`                                                  |
 | Members   | `project.member-added`, `project.member-role-changed`, `project.member-removed`      |
+| Members   | `project.account-created`, `project.member-add-failed`                               |
 | Slots     | `slot.added`, `slot.updated`, `slot.removed`, `signature.added`                      |
 | Threads   | `thread.started`, `thread.replied`, `thread.resolved`, `thread.reopened`             |
 | Checklist | `checklist.answered`, `checklist.applicability-changed`                              |
@@ -1177,7 +1248,8 @@ database created before them must be recreated in the same way. The personal acc
 review has new columns that tell who created it and whether it was created with an API token, so a development database
 created before them must be recreated as well. Project-based access control adds the project memberships, replaces the
 role of a user with a system administrator flag, and ties every repository to one project, so a development database
-created before it must be recreated too.
+created before it must be recreated too. Project member management adds the must-change-password flag of a user
+(`Users.MustChangePassword`), so a development database created before it must be recreated as well.
 
 ## Repositories and Credentials
 

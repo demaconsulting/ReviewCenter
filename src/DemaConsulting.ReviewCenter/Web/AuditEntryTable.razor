@@ -1,0 +1,55 @@
+@* AuditEntryTable: one page of audit entries with the Older / Newer buttons (part of the AuditPage unit).
+
+   It is shared by the whole-trail page at "/audit" and the project page at "/projects/{id}/audit", so both show
+   entries the same way. Presentation only; formatting helpers live in AuditEntryTable.razor.cs. The entries come
+   from the parent, newest first; the paging buttons are plain links that carry the position in the address, built
+   on the BasePath of the parent. All text comes from the audit trail and is rendered as plain text (Razor encodes
+   it; no raw markup). Every key value carries a stable kebab-case data-testid. *@
+@if (Page.Entries.Count == 0)
+{
+    <p class="muted" data-testid="audit-empty">@EmptyText</p>
+}
+else
+{
+    <div class="audit-scroll">
+        <table class="audit-table" data-testid="audit-table">
+            <thead>
+                <tr>
+                    <th scope="col">No.</th>
+                    <th scope="col">Time (UTC)</th>
+                    <th scope="col">Actor</th>
+                    <th scope="col">Action</th>
+                    <th scope="col">Review</th>
+                    <th scope="col">Detail</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var entry in Page.Entries)
+                {
+                    <tr data-testid="audit-row">
+                        <td data-testid="audit-sequence">@entry.Sequence</td>
+                        <td class="audit-time" data-testid="audit-time">@FormatTime(entry)</td>
+                        <td class="nowrap" data-testid="audit-actor">@entry.ActorName</td>
+                        <td class="nowrap" data-testid="audit-action">@entry.Action</td>
+                        <td class="nowrap" data-testid="audit-review">@ReviewLabel(entry)</td>
+                        <td class="audit-detail" data-testid="audit-detail">@DetailContent(entry.Detail)</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+@if (Page.HasNewer || Page.HasOlder)
+{
+    <p class="audit-paging">
+        @if (Page.HasNewer)
+        {
+            <a class="action outline" href="@PageLink("after", Page.NewerAfter)" data-testid="audit-newer">Newer</a>
+        }
+        @if (Page.HasOlder)
+        {
+            <a class="action outline" href="@PageLink("before", Page.OlderBefore)" data-testid="audit-older">Older</a>
+        }
+    </p>
+}

@@ -56,8 +56,11 @@ used by the `Web`, `Identity`, and `Api` subsystems and by the `Hosting` subsyst
   of it, and list the projects an actor can see (`ProjectAccess`); require a right and fail with
   `DomainRuleException`, where a project the actor may not see fails exactly like a project that does not exist. Create
   a project (system administrators only; a new project has no members); list and read the projects the actor can see;
-  list the members of a project, and add a member, change the role of a member, or remove a member (system
-  administrators only); create a draft review from uploaded files, or from the files
+  list the members of a project, and add an existing user as a member by the exact user name, create a local account
+  as a member of the project (with a generated temporary password, returned once), change the role of a member, or
+  remove a member (system administrators and the project admins of that project; removing or demoting the last project
+  admin is refused for a project admin; a failed add is throttled and audited); create a draft review from uploaded
+  files, or from the files
   that changed between an optional baseline revision and a head revision of a registered repository of the same
   project, restricted by a
   selection (the changes are fetched once and frozen in the review; nothing reads the repository again, and a selection
@@ -70,7 +73,9 @@ used by the `Web`, `Identity`, and `Api` subsystems and by the `Hosting` subsyst
   checklist of a review with its progress, set whether a section applies, and answer a check; create a user, check a
   user name and password, list and read users, enable and disable a user, make a user a system administrator or take
   the right away, and change a
-  password. Posting a comment or saving a checklist decision takes the signed-in user (an `Actor`), never free text.
+  password (a user with a temporary password must choose a different one; it clears the flag). A user with a temporary
+  password has no project access, cannot sign, and cannot use personal access tokens. Posting a comment or saving a
+  checklist decision takes the signed-in user (an `Actor`), never free text.
   Add, change, and remove a reviewer slot of a review (only for members of the project), sign a slot with the password
   entered again (members only), read the
   approval status of a review (its slots, blockers, record digest, and next step), and list the enabled members of a
@@ -95,7 +100,8 @@ used by the `Web`, `Identity`, and `Api` subsystems and by the `Hosting` subsyst
   with their comments; read the checklist snapshot, the section states, and the answers of a review; set the
   state of a section and the answer to a check; read the whole record of a review in one operation; add, list,
   update, and remove reviewer slots; add and list signatures; and add, read, list (of a project, and of a user), change
-  the role of, and remove the memberships of users in projects. Every operation that changes data takes an
+  the role of, and remove the memberships of users in projects (removing or demoting can require that another project
+  admin remains, checked inside the transaction). Every operation that changes data takes an
   `AuditDraft` (or a function that builds one from the stored entity) that the store appends to the audit trail in the
   same transaction.
 - *Constraints*: A review is added with all its files, and its checklist snapshot, in one operation, and an attempt
@@ -293,6 +299,9 @@ message and keep the entered values, and there is a single, easily tested path f
 | `LastAdmin` | A change would disable or demote the last enabled system administrator |
 | `MembershipExists` | The user is already a member of the project |
 | `MembershipNotFound` | A change or removal names a user who is not a member of the project |
+| `LastProjectAdmin` | A project admin would remove or demote the last project admin of the project |
+| `TooManyAttempts` | A user who is not a system administrator failed to add a member too often in a short time |
+| `PasswordChangeRequired` | The user must change the temporary password first (for example before creating a token) |
 | `ReviewNotFound` | A slot or signature names a review that does not exist in the project |
 | `SlotNotFound` | A slot change or signature names a slot that is not part of the review |
 | `SlotUserInvalid` | A reviewer is not an enabled project member, primary and alternate are the same, or in two slots |
@@ -365,11 +374,16 @@ created by a token. See the `PersonalAccessTokenService` unit.
 Access to projects is decided in one place, `ProjectAccess`, and is based on membership. A user is a system
 administrator (the flag `User.IsSystemAdmin`) or a member of a project with the role `User` or `ProjectAdmin`
 (`ProjectMembership`). A system administrator sees and administers every project, creates projects, and manages the
-members; a project administrator administers the repositories of the own project; a member sees the project and works
+members; a project administrator administers the own project (the repositories, the members, and the audit view of the
+project); a member sees the project and works
 in it (creates reviews, comments, answers the checklist, and takes a reviewer slot). A user outside a project, an
-anonymous actor, the command line actor, a disabled user, and an unknown user get nothing. `ProjectAccess` looks the
+anonymous actor, the command line actor, a disabled user, an unknown user, and a user who still has a temporary
+password get nothing. `ProjectAccess` looks the
 user up by the name of the `Actor` and reads the memberships on every call, with no cache, so a revocation takes
-effect on the next call; an actor that came in with a token has the rights of its owner. A project that an actor may
+effect on the next call; an actor that came in with a token has the rights of its owner. The check of one operation
+happens before its store transaction and is not repeated inside it, so a revocation that lands within the few
+milliseconds of one handler is not caught for that operation (the same limitation applies to the membership
+operations of `ProjectService`). A project that an actor may
 not see fails exactly like a project that does not exist (`ProjectNotFound`), so the existence of a project is not
 revealed. The system administrator right is not a membership: it does not let a user be chosen for a slot or sign a
 review.

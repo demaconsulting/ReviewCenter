@@ -47,18 +47,21 @@ application; the rest of the system sees only the Core store interfaces.
   and listed by project and by user; a second membership of the same user in the same project raises a
   `DomainRuleException` for `MembershipExists`, a membership of an unknown project or user is refused by the foreign
   keys of the database, and every change is audited with the project (`project.member-added`,
-  `project.member-role-changed`, and `project.member-removed`) in the same transaction.
+  `project.member-role-changed`, and `project.member-removed`) in the same transaction. A removal or a demotion can be
+  made to require that another enabled project administrator remains: the check and the change are one step in the
+  serialized transaction, and a violation raises a `DomainRuleException` for `LastProjectAdmin` and stores nothing.
 - *Constraints*: Every operation uses its own short-lived database context, so it is safe for concurrent use.
 
 **UserStore (as IUserStore)**: The persistence operations for users.
 
 - *Type*: In-process .NET class implementing the Core interface.
 - *Role*: Provider.
-- *Contract*: Stores a user with its system administrator flag, reads a user by user name without regard to case,
-  lists the users, and replaces the
+- *Contract*: Stores a user with its system administrator and must-change-password flags, reads a user by user name
+  without regard to case, lists the users, and replaces the
   stored state of a user. An attempt to store a user whose name exists, in any capitalization, raises a
   `DomainRuleException` for `UserNameTaken`. A new user, and an update that carries an audit draft, are stored together
-  with their audit entry in one transaction.
+  with their audit entry in one transaction. A new user can also be stored together with a project membership in one
+  transaction (`AddToProjectAsync`); neither exists when either fails.
 - *Constraints*: Every operation uses its own short-lived database context, so it is safe for concurrent use.
 
 **PersonalAccessTokenStore (as IPersonalAccessTokenStore)**: The persistence operations for personal access tokens.
@@ -75,8 +78,10 @@ application; the rest of the system sees only the Core store interfaces.
 
 - *Type*: In-process .NET class implementing the Core interface.
 - *Role*: Provider.
-- *Contract*: Appends one entry (for events that change no data), lists entries newest first, optionally of one review,
-  before or after a sequence, and reads entries in ascending batches. Each entry gets the next sequence number and
+- *Contract*: Appends one entry (for events that change no data), lists entries newest first, optionally of one
+  project, of one review of it,
+  before or after a sequence, and reads entries in ascending batches. A project filter alone returns every entry of
+  that project and never an entry without a project. Each entry gets the next sequence number and
   the hash of its predecessor. There is no operation to update or delete an entry.
 - *Constraints*: Appends from every store are serialized by one process-wide gate and by the database write lock.
 
@@ -128,18 +133,20 @@ with migrations. This is adequate while there is no released schema to upgrade: 
 tables, and an existing database is left alone. The cost is that a database created by an earlier version is
 never altered, so a change of the schema needs a migration strategy before the first release that must keep
 data. This is a known limitation, recorded as an open decision in `architecture.md` and not yet resolved. It
-already matters nine times: the tables for comment threads were added after the first schema, the tables for review
+already matters ten times: the tables for comment threads were added after the first schema, the tables for review
 checklists after those, the users table and the user name columns of comments, answers, and section decisions
 after those, the tables of reviewer slots and signatures after those, the audit table after those, the
 `Repositories` table after that, the source and change columns of reviews from a repository after that, and the
 `PersonalAccessTokens` table with the creator columns of reviews after that, and the `ProjectMemberships` table with
-the project of a repository and the system administrator flag of a user after that, so a database
+the project of a repository and the system administrator flag of a user after that, and the `MustChangePassword` column
+of a user after that, so a database
 created before them does not
 have them and the pages fail until the
 database file is deleted (or a new one is
 named) and created again. Databases created before the identity slice must be deleted and recreated, and so must
 databases created before the signature slice, before the audit trail, before the repository registry, before
-reviews from a repository, before the personal access tokens, and before the project access control; there is no
+reviews from a repository, before the personal access tokens, before the project access control, and before the
+project members management (the `MustChangePassword` column); there is no
 migration of their data, and no data of a released version is
 affected. A
 second limitation is that two processes starting at the same moment on a brand-new database file can collide

@@ -37,13 +37,14 @@ value is still the one the caller read, returns whether it wrote, and writes no 
 entry). It is implemented by `PersonalAccessTokenStore` in the `Storage` subsystem.
 
 **TokenFailure**: the reason a presented token was refused, for the audit trail only: `None` (accepted), `Malformed`,
-`Unknown`, `Expired`, `Revoked`, `OwnerDisabled`, and `OwnerLockedOut`. **TokenValidation** carries the failure, the token
+`Unknown`, `Expired`, `Revoked`, `OwnerDisabled`, `OwnerLockedOut`, and `OwnerMustChangePassword`. **TokenValidation**
+carries the failure, the token
 that matched (if any), and the owner; `Succeeded` is true when the failure is `None`.
 
 **ReviewLimits constants** added for tokens: `MaxActiveTokensPerUser` (20), `MaxTokenNameLength` (100),
 `TokenExpiryChoicesInDays` (30, 90, and 365), `DefaultTokenExpiryDays` (90), and `TokenLastUsedGranularity`
 (5 minutes). **DomainRule values** added: `TokenNameInvalid`, `TokenExpiryInvalid`, `TokenLimitReached`, and
-`TokenNotFound`.
+`TokenNotFound`; `PasswordChangeRequired` (see below) is shared with the member management rules.
 
 **Serialization**: Creating and revoking run one at a time under a semaphore, so the limit of active tokens cannot be
 passed by two requests racing. This holds for one instance, so the service is a singleton.
@@ -60,11 +61,14 @@ passed by two requests racing. This holds for one instance, so the service is a 
 The checks are in this order, and the first violation is reported: an actor that came in with an API token is refused
 (`ActorNotAllowed`, so a token cannot mint another token); the name is trimmed and must have 1 to 100 characters without
 control characters (`TokenNameInvalid`); the expiry must be one of the choices (`TokenExpiryInvalid`); the owner is read
-by user name and must exist and be enabled (`ActorNotAllowed`); and the owner must have fewer than 20 active tokens
-(`TokenLimitReached`). Revoked and expired tokens do not count towards the limit.
+by user name and must exist and be enabled (`ActorNotAllowed`) and must not have a temporary password
+(`PasswordChangeRequired`, "Choose a new password before you create or manage API tokens."); and the owner must have
+fewer than 20 active tokens
+(`TokenLimitReached`). Revoked and expired tokens do not count towards the limit. Listing and revoking read the owner
+the same way, so an account with a temporary password cannot list, create, or revoke tokens either.
 
 **ListAsync**: Lists the tokens of the actor, newest first, with the state they have. The owner must exist
-(`ActorNotAllowed`). No value is ever returned.
+(`ActorNotAllowed`) and must not have a temporary password (`PasswordChangeRequired`). No value is ever returned.
 
 **RevokeAsync**: Revokes a token of the actor.
 
@@ -84,7 +88,9 @@ The order of the checks is: the text has the shape of a token (the prefix, a tot
 characters, otherwise `Malformed` and nothing is read); the token is found by the hash of the text (`Unknown`); the
 stored hash is compared once more with the computed one in constant time, so the decision does not rest on the database
 comparison alone; the token is not revoked (`Revoked`); it has not expired (`Expired`); the owner is enabled
-(`OwnerDisabled`); and the owner is not locked out (`OwnerLockedOut`). The role of the owner is the one in the owner
+(`OwnerDisabled`); the owner is not locked out (`OwnerLockedOut`); and the owner has no temporary password
+(`OwnerMustChangePassword`, so a token of an owner who still has to change a temporary password gets the same generic
+refusal as any other bad token). The role of the owner is the one in the owner
 object that was just read, so a changed role applies at once. When the token is accepted and its last-used time is
 older than 5 minutes, the store is asked to update it, passing the last-used time that was read, so a busy script does
 not write on every request and a burst of requests that read the same value writes once (the store applies the update

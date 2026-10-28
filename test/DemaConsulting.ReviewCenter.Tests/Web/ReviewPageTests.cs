@@ -1193,6 +1193,34 @@ public class ReviewPageTests : PageTestBase
     }
 
     /// <summary>
+    ///     Test that a slot whose primary and alternate were removed from the project shows the indicator for each,
+    ///     and that a slot whose people are still members shows none.
+    /// </summary>
+    [Fact]
+    public async Task ReviewPage_Render_AssigneesNoLongerMembers_ShowsIndicatorOnlyForThem()
+    {
+        // Arrange: a slot of ann (primary) and bob (alternate), and the page rendered while both are members
+        var (projectId, slotId, _) = await CreateSignableAsync();
+        var members = RenderPage(projectId);
+        await RevokeMembershipAsync(projectId, "bob");
+
+        // Act: render the page again, after bob left the project
+        var afterBob = RenderPage(projectId);
+        await RevokeMembershipAsync(projectId, "ann");
+        await Users.CreateAsync("root", "Root", UserRole.Admin, SigningPassword, TestContext.Current.CancellationToken);
+        SignInAs("root", "Root", UserRole.Admin);
+        var afterAnn = RenderPage(projectId);
+
+        // Assert: the indicator appears for exactly the people who left
+        Assert.Empty(members.FindAll("[data-testid^='slot-'][data-testid*='-not-member-']"));
+        Assert.Empty(afterBob.FindAll($"[data-testid='slot-primary-not-member-{slotId}']"));
+        Assert.NotNull(afterBob.Find($"[data-testid='slot-alternate-not-member-{slotId}']"));
+        Assert.NotNull(afterAnn.Find($"[data-testid='slot-primary-not-member-{slotId}']"));
+        Assert.NotNull(afterAnn.Find($"[data-testid='slot-alternate-not-member-{slotId}']"));
+        Assert.NotNull(afterAnn.Find($"[data-testid='slot-not-member-hint-{slotId}']"));
+    }
+
+    /// <summary>
     ///     Test that an unsigned slot can be changed and removed through the page.
     /// </summary>
     [Fact]

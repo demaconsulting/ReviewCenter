@@ -2,10 +2,14 @@
 
 #### Verification Approach
 
-`ProjectPage` and `NewReviewPage` are verified with component tests defined in `ProjectPageTests.cs`, which holds the
-tests of both pages, `NewReviewPageRepositoryTests.cs`, and `ProjectAccessPageTests.cs` (what a member, a non-member,
-and a system administrator see and do), which use the bUnit test context
-to render the real components over real Core services and an in-memory fake store. File selection is simulated the
+`ProjectPage`, `NewReviewPage`, `NewMemberPage`, and `NewMemberAccountPage` are verified with component tests defined
+in `ProjectPageTests.cs`, which holds the tests of the first two pages and the member changes of the project page,
+`NewReviewPageRepositoryTests.cs`, `ProjectAccessPageTests.cs` (what a member, a non-member,
+and a system administrator see and do), `NewMemberPageTests.cs`, and `NewMemberAccountPageTests.cs`, which use the
+bUnit test context
+to render the real components over real Core services and an in-memory fake store (`FakeReviewStore`, `FakeUserStore`
+connected to it, and `FakeAuditStore`, with `FakePasswordHasher` for the passwords of the created accounts). File
+selection is simulated the
 way a browser does it, by setting the files of the file input in the test context. Tests locate elements by their
 `data-testid` attributes (the page units share the helper `PageTestBase`) and wait for the asynchronous file
 reading with bUnit's wait helpers. The real database is covered by the `Storage` subsystem and the integration
@@ -24,14 +28,28 @@ N/A - standard test environment.
   its reviews as rows with link, title, state, and an Approved or In review badge, or an empty message. A review
   whose every slot has a current signature is Approved; a review without slots or with an unsigned slot is In review.
 - A member who is no administrator sees the reviews and the New review button, but no Members section, no add member
-  button, and no Repositories button.
-- A system administrator sees the Members section with each member, the role badge, a button that switches the role,
-  and a Remove button, and says so when the project has no members; the + Add member button reveals an inline form that
-  offers only users who are not members yet, and adds the chosen user with the chosen role; the role button and Remove
-  change the membership. The Repositories button is shown to whoever manages the project.
-- A system administrator who lost the flag after the page was opened changes nothing when acting, and the members, the
-  candidates, and the add form are dropped, while the reviews stay for a user who still is a member; a user who also
-  has no membership is shown the not-found message and none of the project.
+  button, no Audit trail button, and no Repositories button.
+- A system administrator or a project admin sees the Members section with each member, the role badge, a button that
+  switches the role, and a Remove button, and says so when the project has no members, the + Add member button, which is
+  a link to the page for a new member, and the Audit trail button; no list of users is on the page. The role button and
+  Remove change the membership. The Repositories button is shown to whoever manages the project.
+- The last project admin cannot remove or demote the own membership: the explanation of the refusal is shown next to
+  the list, and the membership is unchanged; with a second project admin the first may remove the own membership.
+- A system administrator or a project admin who lost the right after the page was opened changes nothing when acting,
+  and the members and the administration buttons are dropped, while the reviews stay for a user who still is a member;
+  a user who also has no membership is shown the not-found message and none of the project.
+- The page for a new member shows whoever administers the project a form with a user name field, the project admin
+  choice, a Cancel button, and a Create a new account button, and no list of users; the exact name of an existing user
+  is added with the chosen role and the page returns to the project; a missing, a disabled, and an unknown name give the
+  same message and add nothing, and keep what was typed; a user who is a member already gets a message and keeps the
+  role; anybody else, and a user who lost the right while the page was open, gets no form and the not-found message, and
+  nothing is added.
+- The page for a new account shows the same people a form with a user name, a display name, and the project admin
+  choice; the account is stored with its membership and the must-change-password flag, the temporary password is shown
+  once with the user name, Copy reports whether the copy worked, and Done hides the password for good and returns to
+  the project; a taken or an invalid name shows a message and creates nothing; anybody else, and a user who lost the
+  right while the page was open (also while the password is shown), gets no form, no password, and the not-found
+  message, and nothing is created. Loading either page for another project drops the typed names and the password.
 - Selected files are listed with names and sizes, and a new selection replaces the previous one; reusing the form
   page for another project shows that project and discards the previous form values and selection.
 - A valid form creates the review with the exact bytes and the correct fingerprint and opens the review page.
@@ -120,15 +138,49 @@ and another has no members. For the system administrator the first lists "Member
 buttons "Make project admin" and "Make member", and a Remove button, and has the Repositories button; the second says
 that it has no members. This scenario is tested by `ProjectPage_Render_SystemAdmin_ListsMembersWithRolesAndActions`.
 
-**ProjectPage_AddMember_ChosenUser_BecomesMemberWithTheRole**: The system administrator opens the add member form,
-which is not on the page before; the drop-down offers the user who is no member and not the member; the user is chosen
-as a project administrator and added; the membership is stored with that role, the row shows "Project admin", and the
-form is closed. This scenario is tested by `ProjectPage_AddMember_ChosenUser_BecomesMemberWithTheRole`.
+**ProjectPage_AddMember_ButtonLeadsToNewMemberPage_WhichAddsTheNamedUser**: The system administrator opens the page of
+a project; the + Add member button is a link to the page for a new member, and the project page has no add form and
+no list of users. The page for a new member adds the user typed with the exact name as a project administrator, and
+the membership is stored with that role. This scenario is tested by
+`ProjectPage_AddMember_ButtonLeadsToNewMemberPage_WhichAddsTheNamedUser`.
+
+**ProjectPage_Render_ProjectAdmin_ShowsMembersAndButtons**: A project administrator opens the page of the project; the
+members are listed with the role and Remove buttons, the add member button and the Audit trail button are shown, and
+no other user is listed. This scenario is tested by `ProjectPage_Render_ProjectAdmin_ShowsMembersAndButtons`.
+
+**ProjectPage_Render_PlainMember_ShowsNoMembersAndNoAuditLink**: A plain member sees the reviews, but no members
+section, no add button, and no Audit trail button. This scenario is tested by
+`ProjectPage_Render_PlainMember_ShowsNoMembersAndNoAuditLink`.
 
 **ProjectPage_MemberActions_ToggleRoleAndRemove_ChangeTheMembership**: The role button of a member is pressed; the
 stored role becomes project administrator and the button reads "Make member". Remove is then pressed; the membership is
 gone, the row is gone, and the empty message is shown. This scenario is tested by
 `ProjectPage_MemberActions_ToggleRoleAndRemove_ChangeTheMembership`.
+
+**ProjectPage_MemberChange_ProjectAdmin_ChangesRoleAndRemoves**: A project administrator makes a member a project admin
+and removes a member; both changes are stored. This scenario is tested by
+`ProjectPage_MemberChange_ProjectAdmin_ChangesRoleAndRemoves`.
+
+**ProjectPage_MemberChange_LastProjectAdminSelf_ShowsExplanationAndChangesNothing**: The only project administrator
+presses Remove on the own row and, in a second run, the role button of the own row. The explanation of the last
+project admin rule is shown as the error of the section, the row still reads "Project admin", and the stored role is
+unchanged. This scenario is tested by
+`ProjectPage_MemberChange_LastProjectAdminSelf_ShowsExplanationAndChangesNothing`.
+
+**ProjectPage_MemberChange_SecondAdminExists_AdminMayRemoveSelf**: With a second project administrator, the first one
+removes the own membership and the membership is gone. This scenario is tested by
+`ProjectPage_MemberChange_SecondAdminExists_AdminMayRemoveSelf`.
+
+**ProjectPage_MemberChange_ProjectAdminMembershipRevoked_ShowsNotFoundAndChangesNothing**: A project administrator has
+the page open and another administrator removes the membership; pressing Remove or the role button of a member shows
+only the not-found message, with no members, reviews, or member names on the page, and the role of the member is
+unchanged. This scenario is tested by
+`ProjectPage_MemberChange_ProjectAdminMembershipRevoked_ShowsNotFoundAndChangesNothing`.
+
+**ProjectPage_MemberChange_ProjectAdminDemoted_DropsMembersKeepsReviews**: A project administrator is demoted to a
+plain member while the page is open; the next member action changes nothing, and the members section and the Audit
+trail button are gone while the reviews are still listed. This scenario is tested by
+`ProjectPage_MemberChange_ProjectAdminDemoted_DropsMembersKeepsReviews`.
 
 **ProjectPage_MemberChange_SystemAdminDemotedButStillMember_DropsMembersSectionKeepsReviews**: A system administrator
 who also is a plain member of the project has the page open with the Members section, and a second administrator
@@ -141,15 +193,87 @@ administrator who is no member of the project. After the demotion, Remove shows 
 member, review, or project name on the page, and the membership of the member is unchanged. This scenario is tested by
 `ProjectPage_MemberChange_SystemAdminDemotedAndNotMember_ShowsNotFoundAndNoData`.
 
-**ProjectPage_OpenAddForm_SystemAdminDemoted_DropsCandidatesAndForm**: A system administrator who is a plain member
-is demoted while the page is open, and the + Add member button is pressed. No form and no Members section are
-rendered, and no candidate user is in the markup. This scenario is tested by
-`ProjectPage_OpenAddForm_SystemAdminDemoted_DropsCandidatesAndForm`.
+**ProjectPage_ToggleRole_SystemAdminDemoted_ChangesNothingAndDropsMembers**: A system administrator who is a plain
+member is demoted while the page is open, and the role button of a member is pressed. The role is not changed and the
+members section is dropped. This scenario is tested by
+`ProjectPage_ToggleRole_SystemAdminDemoted_ChangesNothingAndDropsMembers`.
 
 **ProjectPage_MemberChange_SessionEndedBeforePageKnows_ShowsNotFoundAndChangesNothing**: The sign-in state ends without
 the page being told, and Remove is pressed. The page shows the not-found message and no members, and the membership is
 unchanged. This scenario is tested by
 `ProjectPage_MemberChange_SessionEndedBeforePageKnows_ShowsNotFoundAndChangesNothing`.
+
+**NewMemberPage_Render_Administrator_ShowsFormWithoutUserList**: The page for a new member is rendered for a project
+administrator; the user name field, the project admin choice, the Cancel button, and the Create a new account button
+are shown, and there is no list of users. This scenario is tested by
+`NewMemberPage_Render_Administrator_ShowsFormWithoutUserList`.
+
+**NewMemberPage_Render_NoAdministerRight_ShowsNotFoundAndNoForm**: A plain member, a user who is no member, and a
+missing project each give the not-found message and no form. This scenario is tested by
+`NewMemberPage_Render_NoAdministerRight_ShowsNotFoundAndNoForm`.
+
+**NewMemberPage_Submit_ExistingUser_AddsWithRoleAndReturnsToTheProject**: The exact name of an existing user is
+submitted with the project admin choice; the membership is stored with that role and the page navigates to the
+project. This scenario is tested by `NewMemberPage_Submit_ExistingUser_AddsWithRoleAndReturnsToTheProject`.
+
+**NewMemberPage_Submit_UnusableNames_GiveOneGenericMessageAndAddNothing**: A name that does not exist and the name of a
+disabled account are submitted; the message is the same each time and says that the name cannot be added, the form
+keeps what was typed, and no membership is added. This scenario is tested by
+`NewMemberPage_Submit_UnusableNames_GiveOneGenericMessageAndAddNothing`.
+
+**NewMemberPage_Submit_AlreadyMember_ShowsMessageAndKeepsTheRole**: A user who already is a member is submitted; a
+message is shown and the role of the membership is unchanged. This scenario is tested by
+`NewMemberPage_Submit_AlreadyMember_ShowsMessageAndKeepsTheRole`.
+
+**NewMemberPage_Submit_RightLostWhileOpen_AddsNothingAndDropsTheForm**: The membership is revoked, the user is demoted
+to plain member, or the session ends without the page knowing, and the form is submitted; nothing is added and the page
+shows the not-found message with no form, no error, and nothing typed. This scenario is tested by
+`NewMemberPage_Submit_RightLostWhileOpen_AddsNothingAndDropsTheForm`.
+
+**NewMemberPage_Load_OtherProject_DropsWhatWasTypedAndTheProject**: The page is loaded again for another project the
+user may not administer; the typed name and the first project do not follow. This scenario is tested by
+`NewMemberPage_Load_OtherProject_DropsWhatWasTypedAndTheProject`.
+
+**NewMemberPage_AfterRender_Interactive_SetsMarker**: The page for a new member is rendered; its root element has
+`data-interactive` equal to `true`. This scenario is tested by `NewMemberPage_AfterRender_Interactive_SetsMarker`.
+
+**NewMemberAccountPage_Render_Administrator_ShowsTheForm**: The page for a new account is rendered for whoever
+administers the project; the form and the button back to the page for a new member are shown. This scenario is tested
+by `NewMemberAccountPage_Render_Administrator_ShowsTheForm`.
+
+**NewMemberAccountPage_Render_NoAdministerRight_ShowsNotFoundAndNoForm**: A plain member, a user who is no member, and a
+missing project each give the not-found message and no form. This scenario is tested by
+`NewMemberAccountPage_Render_NoAdministerRight_ShowsNotFoundAndNoForm`.
+
+**NewMemberAccountPage_Submit_ValidNames_CreatesAccountShowsPasswordOnceAndDoneHidesIt**: The form is submitted with
+valid names; the account is stored with its membership and the must-change-password flag, the temporary password is
+shown once with the user name, and Done hides it for good and returns to the project. This scenario is tested by
+`NewMemberAccountPage_Submit_ValidNames_CreatesAccountShowsPasswordOnceAndDoneHidesIt`.
+
+**NewMemberAccountPage_Copy_Password_CopiesAndReportsTheResult**: Copy hands the password to the browser and says so;
+when the browser refuses, the page says how to go on. This scenario is tested by
+`NewMemberAccountPage_Copy_Password_CopiesAndReportsTheResult`.
+
+**NewMemberAccountPage_Submit_TakenOrInvalidName_ShowsMessageAndCreatesNothing**: A taken name and an invalid name each
+show a message next to the form, keep what was typed, and create nothing. This scenario is tested by
+`NewMemberAccountPage_Submit_TakenOrInvalidName_ShowsMessageAndCreatesNothing`.
+
+**NewMemberAccountPage_Submit_RightLostWhileOpen_CreatesNothingAndDropsTheForm**: The membership is revoked, the user
+is demoted to plain member, or the session ends without the page knowing, and the form is submitted; nothing is
+created and the page shows the not-found message with no form, no error, and nothing typed. This scenario is tested by
+`NewMemberAccountPage_Submit_RightLostWhileOpen_CreatesNothingAndDropsTheForm`.
+
+**NewMemberAccountPage_Copy_RightLostWhilePasswordShown_DropsThePasswordAndCopiesNothing**: The right is lost while the
+password is shown and Copy is pressed; the password is dropped at once and is not handed to the browser. This scenario
+is tested by `NewMemberAccountPage_Copy_RightLostWhilePasswordShown_DropsThePasswordAndCopiesNothing`.
+
+**NewMemberAccountPage_Load_OtherProject_DropsNamesAndPassword**: The page is loaded again for a project the user may
+not administer; the typed names and the password of the previous project are dropped. This scenario is tested by
+`NewMemberAccountPage_Load_OtherProject_DropsNamesAndPassword`.
+
+**NewMemberAccountPage_AfterRender_Interactive_SetsMarker**: The page for a new account is rendered; its root element
+has `data-interactive` equal to `true`. This scenario is tested by
+`NewMemberAccountPage_AfterRender_Interactive_SetsMarker`.
 
 **ProjectPage_Render_ProjectWithoutReviews_ShowsNameAndEmptyMessage**: The page is rendered for a project without
 reviews; the name, the description, the empty message, and the New review button, which links to the review creation

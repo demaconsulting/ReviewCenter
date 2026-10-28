@@ -21,6 +21,8 @@ N/A - standard test environment (temporary SQLite databases are created by the t
   and the generic message is not.
 - The hidden return URL field carries only a local path, and `/` for any other value.
 - A failed sign-in comes back to this page with the error flag and the return URL kept.
+- The notice to sign in with the new password is shown when the address carries `changed=1`, and not without the flag
+  or with another value.
 
 #### Test Scenarios
 
@@ -39,3 +41,8 @@ is redirected to this page with the error flag and the same return URL. This sce
 **SignIn_LoginPage_ThrottledError_ShowsTooManyAttemptsMessage**: The page is requested with the error flag
 `throttled`; it shows the "too many attempts" message and not the generic error. This scenario is tested by
 `SignIn_LoginPage_ThrottledError_ShowsTooManyAttemptsMessage`.
+
+**LoginPage_Render_ChangedQuery_ShowsNoticeOnlyAfterPasswordChange**: A theory over the addresses `/login?changed=1`,
+`/login`, and `/login?changed=0`, rendered as a component with nobody signed in (the one test of this unit that does not
+start the server, in `AppTests.cs`); the notice is shown only for `changed=1`. This scenario is tested by
+`LoginPage_Render_ChangedQuery_ShowsNoticeOnlyAfterPasswordChange`.

@@ -32,3 +32,13 @@ sections:
           - SignIn_Login_WrongPasswordWithReturnUrl_KeepsReturnUrlOnLoginPage
           - SignIn_LoginPage_ErrorAndReturnUrl_AreShownSafely
           - SignIn_LoginPage_ThrottledError_ShowsTooManyAttemptsMessage
+
+      - id: ReviewCenter-LoginPage-PasswordChanged
+        title: >-
+          The LoginPage unit shall show a notice to sign in with the new password only when the address carries the
+          changed flag set to 1, which the account page sets after a temporary password was replaced.
+        justification: |
+          Replacing a temporary password ends the session that carried it, so the user must sign in again, and the
+          notice tells why the sign-in page is shown instead of the next page. It must not appear on a plain visit.
+        tests:
+          - LoginPage_Render_ChangedQuery_ShowsNoticeOnlyAfterPasswordChange

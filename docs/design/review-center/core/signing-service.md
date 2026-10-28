@@ -33,8 +33,11 @@ comments. See `RecordDigest` for what the digest covers.
 
 **ReviewApproval**: the computed status of a review: `IsApproved`, the current `Digest`, the `Slots` (one `SlotStatus`
 each), the `Blockers`, and the `NextStep` sentence. A `SlotStatus` holds the slot identity, its number, the primary and
-alternate as `SlotMember` (identity, user name, display name), the state, and, for a signed slot, the name of the
-signer and the signing time. `SlotSignatureState` has the values `NotSigned`, `Signed`, and `OutOfDate`.
+alternate as `SlotMember` (identity, user name, display name, and `IsMember`), the state, and, for a signed slot, the name
+of the signer and the signing time. `IsMember` is `false` when the user is no longer a member of the project (a slot
+keeps its assignee after a removal, so the status says who can no longer sign; step 1 of signing refuses such a user);
+the candidates of `ListCandidatesAsync` are members by definition. A placeholder for an unknown user keeps the flag too.
+`SlotSignatureState` has the values `NotSigned`, `Signed`, and `OutOfDate`.
 
 **Status is computed, never stored.** A slot is `Signed` when it has a signature whose digest equals the digest of the
 record now, `OutOfDate` when it has signatures but none of them is current, and `NotSigned` otherwise. A review is
@@ -111,15 +114,16 @@ changes or deletes a signature. `UpdateSlotAsync` and `RemoveSlotAsync` return `
 - *Parameters*: project identity, review identifier, and a cancellation token.
 - *Returns*: `Task<ReviewApproval?>` — the status, or `null` when the review does not exist.
 - *Postconditions*: Nothing is stored. The record, slots, and signatures come from one `GetSnapshotAsync` read, so a
-  concurrent change cannot make the digest, the blockers, and the signature status describe different states.
+  concurrent change cannot make the digest, the blockers, and the signature status describe different states. The
+  members of the project are read through `ListMembershipsAsync` to fill `SlotMember.IsMember`.
 
 **GetApprovalsAsync**: Computes the status of several reviews of a project.
 
 - *Parameters*: project identity, the review identifiers, and a cancellation token.
 - *Returns*: `Task<IReadOnlyDictionary<string, ReviewApproval>>` — the status of each review that exists, by review
   identifier; a review that does not exist is absent. Each status equals the one `GetApprovalAsync` gives.
-- *Postconditions*: The user list is loaded once for the whole batch, not once for each review, and not at all when
-  there are no review identifiers; each review has its own snapshot read.
+- *Postconditions*: The user list and the identities of the current project members are loaded once for the whole batch,
+  not once for each review, and not at all when there are no review identifiers; each review has its own snapshot read.
 
 **ListCandidatesAsync**: Lists the users that can be chosen for a slot.
 

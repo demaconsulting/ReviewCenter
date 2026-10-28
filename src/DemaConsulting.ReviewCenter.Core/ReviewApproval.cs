@@ -30,7 +30,11 @@ namespace DemaConsulting.ReviewCenter.Core;
 /// <param name="UserId">The identity of the user.</param>
 /// <param name="Username">The user name.</param>
 /// <param name="DisplayName">The display name.</param>
-public sealed record SlotMember(int UserId, string Username, string DisplayName);
+/// <param name="IsMember">
+///     <c>false</c> when the user is no longer a member of the project of the review (so the user cannot sign until
+///     added again); <c>true</c> for a current member and for the candidates of a slot, who are members by definition.
+/// </param>
+public sealed record SlotMember(int UserId, string Username, string DisplayName, bool IsMember = true);
 
 /// <summary>
 ///     Whether a reviewer slot holds a signature for the record as it is now.

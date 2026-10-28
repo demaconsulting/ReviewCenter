@@ -58,7 +58,10 @@ public enum TokenFailure
     OwnerDisabled,
 
     /// <summary>The owner is locked out of signing in.</summary>
-    OwnerLockedOut
+    OwnerLockedOut,
+
+    /// <summary>The owner still has a temporary password and must change it first.</summary>
+    OwnerMustChangePassword
 }
 
 /// <summary>
@@ -357,6 +360,12 @@ public sealed class PersonalAccessTokenService
             return new TokenValidation(TokenFailure.OwnerLockedOut, token, null);
         }
 
+        // A temporary password gives no API access until the owner has chosen a new one
+        if (token.User.MustChangePassword)
+        {
+            return new TokenValidation(TokenFailure.OwnerMustChangePassword, token, null);
+        }
+
         // Record the use, but not more often than the granularity. The store applies the change only if the last-used
         // moment is still the one read above, so a burst of requests writes once
         if (token.LastUsed is not { } lastUsed || now - lastUsed >= ReviewLimits.TokenLastUsedGranularity)
@@ -435,13 +444,23 @@ public sealed class PersonalAccessTokenService
     /// <param name="actor">The signed-in user.</param>
     /// <param name="cancellationToken">Cancels the operation.</param>
     /// <returns>The enabled user.</returns>
-    /// <exception cref="DomainRuleException">Thrown with <see cref="DomainRule.ActorNotAllowed"/> when the account is gone or disabled.</exception>
+    /// <exception cref="DomainRuleException">
+    ///     Thrown with <see cref="DomainRule.ActorNotAllowed"/> when the account is gone or disabled, or with
+    ///     <see cref="DomainRule.PasswordChangeRequired"/> when the account still has a temporary password.
+    /// </exception>
     private async Task<User> LoadOwnerAsync(Actor actor, CancellationToken cancellationToken)
     {
         var user = await _users.GetByUsernameAsync(actor.Username, cancellationToken);
         if (user is null || !user.Enabled)
         {
             throw new DomainRuleException(DomainRule.ActorNotAllowed, "Your account is not available, so nothing was saved.");
+        }
+
+        if (user.MustChangePassword)
+        {
+            throw new DomainRuleException(
+                DomainRule.PasswordChangeRequired,
+                "Choose a new password before you create or manage API tokens.");
         }
 
         return user;

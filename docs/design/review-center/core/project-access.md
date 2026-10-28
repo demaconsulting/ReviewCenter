@@ -11,8 +11,8 @@ administrator flag itself, so one rule holds on every page, route, and service.
 #### Data Model
 
 **ProjectRole**: an enumeration of what a member may do in one project: `User` (a member: sees the project, creates
-reviews, comments, answers checklists, and signs) and `ProjectAdmin` (a member who also manages the repositories of
-the project).
+reviews, comments, answers checklists, and signs) and `ProjectAdmin` (a member who also manages the members and the
+repositories of the project and reads its audit trail).
 
 **ProjectMembership**: an immutable record of `UserId`, `ProjectId`, and `Role`. A user has at most one membership
 per project; the pair (user, project) is its identity.
@@ -29,7 +29,7 @@ The rules are:
 
 | Actor | View | Administer |
 | ----- | ---- | ---------- |
-| missing, the command line, an unknown user name, a disabled user | nothing | nothing |
+| missing, the command line, an unknown user, a disabled user, a user with a temporary password | nothing | nothing |
 | enabled system administrator | every existing project | every existing project |
 | member with role `User` | the projects of the memberships | nothing |
 | member with role `ProjectAdmin` | the projects of the memberships | the projects of those memberships |
@@ -74,7 +74,9 @@ to check the reviewers of a slot and the signer, where the system administrator 
 **RequireSystemAdminAsync**: Throws `ActorNotAllowed` unless the actor is an enabled system administrator.
 
 **Decision**: The private `ResolveAsync` returns the enabled user behind an actor, or nothing for a missing actor, the
-command line, a user name that no user has, and a disabled user. The private `RoleOfAsync` returns `Administer` for
+command line, a user name that no user has, a disabled user, and a user that still has a temporary password
+(`User.MustChangePassword`): such a user has no access to anything, a system administrator flag included, until the
+password is changed. The private `RoleOfAsync` returns `Administer` for
 an enabled system administrator when the project exists, otherwise the level given by the membership, or nothing when
 there is none. An actor that came through a personal access token carries the user name of the token owner, so it
 gets the access of the owner by this lookup and needs no rule of its own.
@@ -96,5 +98,6 @@ failure leaves nothing to clean up.
 - **ProjectService**, **RepositoryService**, **ReviewService**, **SigningService**, **ThreadService**,
   **ChecklistService**, and **ReviewPlanner** — require access before they act, or filter what they return.
 - **EvidenceIndexService** and **AttestationService** — require that the actor may see the project they read.
-- **ProjectPage**, **RepositoriesPage**, and **NewRepositoryPage** — decide what to offer to the signed-in user.
+- **ProjectPage**, **NewMemberPage**, **NewMemberAccountPage**, **ProjectAuditPage**, **RepositoriesPage**, and
+  **NewRepositoryPage** — decide what to offer to the signed-in user.
 - **ServerHost** — registers the unit as a singleton for the pages and the API.

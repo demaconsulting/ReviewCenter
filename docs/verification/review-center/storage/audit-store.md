@@ -28,6 +28,8 @@ N/A - standard test environment (temporary SQLite databases are created by the t
 - Concurrent appends, also from different stores, produce one linear chain without gap or fork.
 - A second entry with an existing sequence is refused by the database key.
 - The newest-first listing honors the review filter and both cursors; the batch read is ascending and bounded.
+- The listing for a project returns only that project's entries, none of another project or without a project, and the
+  chain over all entries still verifies.
 - An edited or a deleted row is found by verification, at its sequence.
 - The store offers no update or delete operation.
 
@@ -75,6 +77,11 @@ This scenario is tested by
 **AuditStore_ListAsync_FilterAndCursors_ReturnExpectedEntriesNewestFirst**: Entries of several reviews are listed with
 and without the review filter and with both cursors; the result is newest first. This scenario is tested by
 `AuditStore_ListAsync_FilterAndCursors_ReturnExpectedEntriesNewestFirst`.
+
+**AuditStore_ListAsync_ProjectOnly_IsIsolatedAndTheChainStillVerifies**: Entries of project one (one with a review),
+of project two, and without a project are appended; the listing for project one returns its two entries newest
+first, project two returns its one, a project without entries returns none, and the chain over all four entries
+verifies. This scenario is tested by `AuditStore_ListAsync_ProjectOnly_IsIsolatedAndTheChainStillVerifies`.
 
 **AuditStore_ReadAfterAsync_Batches_AreAscendingAndBounded**: Entries are read in batches after a sequence; each batch is
 ascending and not larger than requested. This scenario is tested by

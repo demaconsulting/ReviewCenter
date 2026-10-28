@@ -49,7 +49,12 @@ surfaces as the SQLite exception, unchanged.
 **RemoveMembershipAsync** and **SetMembershipRoleAsync**: Delete the membership of a user in a project, or replace its
 project role, with one statement each, and return whether a membership was found. The audit entry
 (`project.member-removed` or `project.member-role-changed`, carrying the project) is stored only when a row was
-affected, so a change that has no effect stores no entry.
+affected, so a change that has no effect stores no entry. Both take `requireAnotherAdmin`. When it is set, the private
+`EnsureAnotherAdminAsync` runs first, inside the same serialized audit transaction (so two concurrent changes of two
+administrators cannot both pass it): when the target is an enabled project administrator (a plain member, a disabled
+administrator, and a non-member do not count) and no OTHER enabled project administrator exists, the change is refused
+with `DomainRuleException` (`LastProjectAdmin`), nothing is stored and no entry is written. A role change checks only
+when it is a demotion (the new role is not `ProjectAdmin`).
 
 **GetMembershipAsync**, **ListMembershipsAsync**, and **ListMembershipsForUserAsync**: Read one membership by user and
 project (null when absent), the memberships of a project ordered by user, and the memberships of a user ordered by
@@ -164,7 +169,8 @@ begun a `Serializable` transaction, a write from a second connection fails with 
 A duplicate review identifier is detected from the SQLite primary key and unique constraint error codes (1555 and
 2067) and reported as the domain rule; this is the one provider-specific piece of knowledge in the unit. The same
 detection turns the violation of the unique index on a slot and a digest into `SigningNotAllowed`, and the violation of
-the key of a membership into `MembershipExists`. `AddSignatureAsync`
+the key of a membership into `MembershipExists`. The last-project-administrator check raises `LastProjectAdmin` inside
+the transaction, which rolls back. `AddSignatureAsync`
 maps its other failures to domain rules: a digest that differs from the digest of the stored record is
 `RecordChanged`, a review that does not exist is `ReviewNotFound`, and a slot that does not exist in the review is
 `SlotNotFound`. In every failure the transaction is rolled back, so nothing is stored. Any other database failure

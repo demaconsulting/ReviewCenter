@@ -124,7 +124,25 @@
                     <div class="slot" data-testid="slot-@slotId">
                         <h3 data-testid="slot-label-@slotId">Slot @slot.Number</h3>
                         <p class="muted">Primary: <span data-testid="slot-primary-@slotId">@slot.Primary.DisplayName</span>
-                            &middot; Alternate: <span data-testid="slot-alternate-@slotId">@(slot.Alternate?.DisplayName ?? "None")</span></p>
+                            @if (!slot.Primary.IsMember)
+                            {
+                                <span class="badge"
+                                      data-testid="slot-primary-not-member-@slotId">No longer a project member</span>
+                            }
+                            &middot; Alternate:
+                            <span data-testid="slot-alternate-@slotId">@(slot.Alternate?.DisplayName ?? "None")</span>
+                            @if (slot.Alternate is { IsMember: false })
+                            {
+                                <span class="badge"
+                                      data-testid="slot-alternate-not-member-@slotId">No longer a project member</span>
+                            }</p>
+                        @if (!slot.Primary.IsMember || slot.Alternate is { IsMember: false })
+                        {
+                            <p class="muted hint" data-testid="slot-not-member-hint-@slotId">
+                                A reviewer who is no longer a project member cannot sign until added to the project
+                                again.
+                            </p>
+                        }
                         <p><span class="badge @SlotBadgeClass(slot)" data-testid="slot-status-@slotId">@SlotStatusLabel(slot)</span></p>
 
                         @if (slot.State == SlotSignatureState.NotSigned)

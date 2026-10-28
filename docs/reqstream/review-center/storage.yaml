@@ -78,14 +78,17 @@ sections:
       - id: ReviewCenter-Storage-Users
         title: >-
           The Storage subsystem shall keep users, with their system administrator flags, enabled states, password
-          hashes, and lockout state, in the database file, so that they are all still there, unchanged, when the
-          database is opened again, and shall keep user names unique regardless of letter case.
+          hashes, must-change-password flags, and lockout state, in the database file, so that they are all still
+          there, unchanged, when the database is opened again, and shall keep user names unique regardless of letter
+          case.
         justification: |
           Users must survive a restart, or nobody could sign in again. The lockout state is kept with the user so
-          that a restart does not give an attacker a fresh set of tries.
+          that a restart does not give an attacker a fresh set of tries, and the flag of a temporary password is kept
+          so that a restart does not lift its confinement.
         children:
           - ReviewCenter-UserStore-Persist
           - ReviewCenter-UserStore-Unique
+          - ReviewCenter-UserStore-AddToProject
           - ReviewCenter-DbContext-Users
         tests:
           - StorageSubsystem_Users_PersistAcrossReopen
@@ -127,7 +130,8 @@ sections:
           The Storage subsystem shall store every audited change together with its audit entry in one Serializable
           transaction, through one process-wide gate shared by all stores, so that both or neither are stored and
           the sequence of entries has no gap and no fork, refuse a second entry with the same sequence number,
-          offer no way to update or delete an entry, and read the entries in pages and in ordered batches.
+          offer no way to update or delete an entry, and read the entries in pages and in ordered batches, also for
+          one project only.
         justification: |
           The hash chain is only as good as the order of its entries. Appending inside the transaction of the
           change, under one gate, keeps the chain linear and the history true even when several users act at the
@@ -172,13 +176,18 @@ sections:
           administrator or user, in the database file, so that it is still there, unchanged, when the database is
           opened again, allow a user at most one membership in a project, refuse a membership for a project or a user
           that does not exist, change the role and remove a membership, report whether it existed, and store each
-          change together with its audit entry, which names the project, in one transaction.
+          change together with its audit entry, which names the project, in one transaction, and, when told to, refuse
+          to remove or demote the last enabled project administrator in that same transaction, and store a new
+          account with its membership and its audit entry together.
         justification: |
           Memberships decide which projects a user may see, so they must outlive the process that created them and
           must stay true when two requests overlap. A change that is stored without its audit entry, or the other way
-          round, would leave the history of who had access untrue.
+          round, would leave the history of who had access untrue. Only a check inside the transaction keeps two
+          administrators who act at the same moment from leaving a project without an administrator.
         children:
           - ReviewCenter-ReviewStore-Memberships
+          - ReviewCenter-ReviewStore-LastAdmin
+          - ReviewCenter-UserStore-AddToProject
           - ReviewCenter-DbContext-Memberships
         tests:
           - ReviewStore_AddMembershipAsync_Membership_RoundTripsAndIsListed
@@ -186,6 +195,8 @@ sections:
           - ReviewStore_SetAndRemoveMembershipAsync_ChangeRoleAndRemove_ReportWhetherFound
           - ReviewStore_Membership_Changes_AreAuditedWithTheProject
           - ReviewStore_AddMembershipAsync_UnknownProject_IsRefusedByTheDatabase
+          - ReviewStore_RemoveMembershipAsync_TwoAdminsRemoveEachOther_ExactlyOneSucceeds
+          - UserStore_AddToProjectAsync_StoresAccountMembershipAndOneEventTogether
 
       - id: ReviewCenter-Storage-RepositoryReviews
         title: >-

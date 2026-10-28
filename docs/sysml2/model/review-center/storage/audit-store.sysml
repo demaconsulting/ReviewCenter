@@ -1,6 +1,6 @@
 package ReviewCenter {
     part def AuditStore {
-        doc /* Persists the audit trail: appends every entry with the next sequence number and the hash of its predecessor under a process-wide gate, stores a change of data and its entry in one Serializable transaction, and offers paged and batched reads but no update or delete. Includes the AuditAppender shared by all stores. */
+        doc /* Persists the audit trail: appends every entry with the next sequence number and the hash of its predecessor under a process-wide gate, stores a change of data and its entry in one Serializable transaction, and offers paged and batched reads (the whole trail, one project, or one review) but no update or delete. Includes the AuditAppender shared by all stores. */
 
         comment sourceRef /* Source: src/DemaConsulting.ReviewCenter/Storage/AuditStore.cs and AuditAppender.cs */
         comment testRef /* Test: test/DemaConsulting.ReviewCenter.Tests/Storage/AuditStoreTests.cs */

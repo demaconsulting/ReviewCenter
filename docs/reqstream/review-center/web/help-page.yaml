@@ -82,3 +82,19 @@ sections:
           be said plainly so that nobody expects a pipeline to sign a review.
         tests:
           - HelpApiTokensPage_Render_ExplainsTokensCurlEndpointsAndErrors
+
+      - id: ReviewCenter-HelpPage-MembersTopic
+        title: >-
+          The HelpPage unit shall serve a topic, Project members, at /help/project-members, that explains how a project
+          admin adds an existing user with the + Add member button by the exact user name, how a new account is
+          created as part of adding it, with a temporary password that is shown once and must be replaced at the first
+          sign-in, that the last project admin cannot be removed or demoted, that a person who is no longer a member is
+          marked as such on the reviews assigned to them, and that the Audit trail button shows the trail of the
+          project.
+        justification: |
+          Managing members is new to project admins and has rules that look like errors when met without
+          explanation: no list of users, one message for any name that cannot be added, a password that cannot be
+          shown again, and a last administrator that cannot leave. One place explains them.
+        tests:
+          - HelpMembersPage_Render_ExplainsAddingAccountsAndTheLastAdminRule
+          - HelpTopicPages_Render_EveryTopicHasAPageWithValidNavigation

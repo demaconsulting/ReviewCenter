@@ -120,6 +120,9 @@ words:
   - Cquoted
   - rcpat
   - ABCDEFGHJKMNPQRSTVWXYZ
+  - ABCDEFGHJKLMNPQRSTUVWXY
+  - Zabcdefghijkmnopqrstuvwxyz
+  - datalist
 
 # Exclude common build artifacts, dependencies, and vendored third-party code
 ignorePaths:

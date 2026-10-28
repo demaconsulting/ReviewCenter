@@ -55,33 +55,77 @@ internal sealed class UserStore(IDbContextFactory<ReviewCenterDbContext> factory
             factory,
             async context =>
             {
-                // Insert a fresh entity so that the database always assigns the identity, whatever the caller supplied
-                var entity = new User
-                {
-                    Username = user.Username,
-                    DisplayName = user.DisplayName,
-                    IsSystemAdmin = user.IsSystemAdmin,
-                    Enabled = user.Enabled,
-                    PasswordHash = user.PasswordHash,
-                    FailedLoginCount = user.FailedLoginCount,
-                    LockoutUntil = user.LockoutUntil,
-                    Created = user.Created
-                };
-                context.Users.Add(entity);
-                try
-                {
-                    await context.SaveChangesAsync(cancellationToken);
-                }
-                catch (DbUpdateException ex) when (ex.InnerException is SqliteException { SqliteExtendedErrorCode: SqliteUniqueViolation })
-                {
-                    throw new DomainRuleException(
-                        DomainRule.UserNameTaken,
-                        $"A user with the name '{user.Username}' already exists.");
-                }
-
+                var entity = await InsertAsync(context, user, cancellationToken);
                 return (entity, audit(entity));
             },
             cancellationToken);
+    }
+
+    /// <inheritdoc />
+    public async Task<User> AddToProjectAsync(
+        User user,
+        int projectId,
+        ProjectRole role,
+        Func<User, AuditDraft> audit,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(user);
+        ArgumentNullException.ThrowIfNull(audit);
+
+        // The user and the membership share one transaction: when either fails, neither is stored
+        return await appender.ExecuteAsync<User>(
+            factory,
+            async context =>
+            {
+                var entity = await InsertAsync(context, user, cancellationToken);
+                context.ProjectMemberships.Add(new ProjectMembership(entity.Id, projectId, role));
+                return (entity, audit(entity));
+            },
+            cancellationToken);
+    }
+
+    /// <summary>
+    ///     Inserts a fresh user row and saves it, so the assigned identity is known.
+    /// </summary>
+    /// <param name="context">The context of the open transaction.</param>
+    /// <param name="user">The user to copy; <see cref="User.Id"/> is ignored.</param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <returns>The stored entity.</returns>
+    /// <exception cref="DomainRuleException">
+    ///     Thrown with <see cref="DomainRule.UserNameTaken"/> when the name exists.
+    /// </exception>
+    private static async Task<User> InsertAsync(
+        ReviewCenterDbContext context,
+        User user,
+        CancellationToken cancellationToken)
+    {
+        // Insert a fresh entity so that the database always assigns the identity, whatever the caller supplied
+        var entity = new User
+        {
+            Username = user.Username,
+            DisplayName = user.DisplayName,
+            IsSystemAdmin = user.IsSystemAdmin,
+            Enabled = user.Enabled,
+            PasswordHash = user.PasswordHash,
+            FailedLoginCount = user.FailedLoginCount,
+            LockoutUntil = user.LockoutUntil,
+            MustChangePassword = user.MustChangePassword,
+            Created = user.Created
+        };
+        context.Users.Add(entity);
+        try
+        {
+            await context.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException ex)
+            when (ex.InnerException is SqliteException { SqliteExtendedErrorCode: SqliteUniqueViolation })
+        {
+            throw new DomainRuleException(
+                DomainRule.UserNameTaken,
+                $"A user with the name '{user.Username}' already exists.");
+        }
+
+        return entity;
     }
 
     /// <inheritdoc />

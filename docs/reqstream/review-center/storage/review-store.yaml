@@ -195,3 +195,22 @@ sections:
           - ReviewStore_AddMembershipAsync_SecondMembership_IsRejected
           - ReviewStore_SetAndRemoveMembershipAsync_ChangeRoleAndRemove_ReportWhetherFound
           - ReviewStore_Membership_Changes_AreAuditedWithTheProject
+
+      - id: ReviewCenter-ReviewStore-LastAdmin
+        title: >-
+          The ReviewStore class shall, when it is told to require another administrator, refuse to remove or demote
+          the membership of an enabled project administrator unless another enabled project administrator of the
+          project remains, reporting the refusal as a last project administrator rule violation, shall make the
+          check and the change one atomic step so that two changes made at the same time cannot leave the project
+          without an enabled administrator, shall store nothing and no audit entry for a refused change, and shall
+          apply the change without the check when it is not told to require one.
+        justification: |
+          A check made before the change is not enough when two administrators act at the same moment: each would
+          see the other and both would go. Only the store, inside the transaction that also writes the audit entry,
+          can keep a project from losing its last administrator. A system administrator is exempt from the rule, so
+          the store must also be able to apply the change without it.
+        tests:
+          - ReviewStore_RemoveMembershipAsync_TwoAdminsRemoveEachOther_ExactlyOneSucceeds
+          - ReviewStore_MembershipChanges_RemoveRacesDemote_LeavesAnAdministrator
+          - ReviewStore_RemoveMembershipAsync_LastAdmin_RefusedAndRolledBackUnlessExempt
+          - ReviewStore_RemoveMembershipAsync_OtherAdminDisabled_IsRefused

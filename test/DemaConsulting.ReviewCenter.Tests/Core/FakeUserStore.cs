@@ -86,9 +86,38 @@ internal sealed class FakeUserStore : IUserStore
     private readonly List<User> _users = [];
 
     /// <summary>
+    ///     The store that receives the membership of <see cref="AddToProjectAsync"/>, or <c>null</c> when no test
+    ///     needs the membership.
+    /// </summary>
+    private readonly FakeReviewStore? _reviews;
+
+    /// <summary>
+    ///     Initializes a new instance of the <see cref="FakeUserStore"/> class.
+    /// </summary>
+    /// <param name="reviews">
+    ///     The store that keeps the memberships; <see cref="AddToProjectAsync"/> adds its membership there. May be
+    ///     <c>null</c> for tests that never add a user to a project.
+    /// </param>
+    public FakeUserStore(FakeReviewStore? reviews = null)
+    {
+        _reviews = reviews;
+        reviews?.IsUserEnabled = IsEnabled;
+    }
+
+    /// <summary>
     ///     Gets the audit drafts received so far, in the order the changes were made; unaudited updates add none.
     /// </summary>
     public List<AuditDraft> Audits { get; } = [];
+
+    /// <summary>
+    ///     Gets a value indicating whether the stored user with the identity is enabled.
+    /// </summary>
+    /// <param name="userId">The identity of the user.</param>
+    /// <returns><c>true</c> when the user exists and is enabled.</returns>
+    private bool IsEnabled(int userId)
+    {
+        return _users.Any(user => user.Id == userId && user.Enabled);
+    }
 
     /// <inheritdoc />
     public Task<User> AddAsync(
@@ -105,6 +134,20 @@ internal sealed class FakeUserStore : IUserStore
         var stored = Copy(_users[^1], _users[^1].Id);
         Audits.Add(audit(stored));
         return Task.FromResult(stored);
+    }
+
+    /// <inheritdoc />
+    public async Task<User> AddToProjectAsync(
+        User user,
+        int projectId,
+        ProjectRole role,
+        Func<User, AuditDraft> audit,
+        CancellationToken cancellationToken = default)
+    {
+        // The user, the membership and the one audit entry are stored together or not at all
+        var stored = await AddAsync(user, audit, cancellationToken);
+        _reviews?.AddMembershipWithoutAudit(new ProjectMembership(stored.Id, projectId, role));
+        return stored;
     }
 
     /// <inheritdoc />
@@ -156,6 +199,7 @@ internal sealed class FakeUserStore : IUserStore
             PasswordHash = user.PasswordHash,
             FailedLoginCount = user.FailedLoginCount,
             LockoutUntil = user.LockoutUntil,
+            MustChangePassword = user.MustChangePassword,
             Created = user.Created
         };
     }

@@ -80,6 +80,16 @@ internal static class SignIn
     public const string DisplayNameClaimType = "display_name";
 
     /// <summary>
+    ///     The claim type that marks an account that must change its temporary password before anything else.
+    /// </summary>
+    public const string MustChangePasswordClaimType = "must_change_password";
+
+    /// <summary>
+    ///     The page where the user changes the own password; the only page a user with a temporary password may use.
+    /// </summary>
+    public const string AccountPath = "/account";
+
+    /// <summary>
     ///     The role name that is required for the pages only a system administrator may use.
     /// </summary>
     public const string AdminRole = "SystemAdmin";
@@ -243,7 +253,9 @@ internal static class SignIn
                 await audit.TryRecordAsync(
                     AuditDraft.By(new Actor(user.Username, user.DisplayName), "auth.sign-in", "signed in"),
                     http.RequestAborted);
-                return Results.LocalRedirect(target);
+
+                // A temporary password leads straight to the page that replaces it, whatever the user asked for
+                return Results.LocalRedirect(user.MustChangePassword ? AccountPath : target);
             });
 
         // This endpoint binds no form field, so the framework does not check the token by itself
@@ -388,9 +400,10 @@ internal static class SignIn
     /// </summary>
     /// <param name="user">The authenticated user.</param>
     /// <returns>
-    ///     A principal with the user name and display name, and the system administrator role when the user has it;
-    ///     never the password or its hash. Project roles are not in the cookie: they are read when needed, so a
-    ///     change of membership takes effect at once.
+    ///     A principal with the user name and display name, and the system administrator role when the user has it
+    ///     (and no temporary password); a user with a temporary password gets the must-change-password claim
+    ///     instead; never the password or its hash. Project roles are not in the cookie: they are read when needed,
+    ///     so a change of membership takes effect at once.
     /// </returns>
     private static ClaimsPrincipal BuildPrincipal(User user)
     {
@@ -399,7 +412,11 @@ internal static class SignIn
             new(ClaimTypes.Name, user.Username),
             new(DisplayNameClaimType, user.DisplayName)
         };
-        if (user.IsSystemAdmin)
+        if (user.MustChangePassword)
+        {
+            claims.Add(new Claim(MustChangePasswordClaimType, "true"));
+        }
+        else if (user.IsSystemAdmin)
         {
             claims.Add(new Claim(ClaimTypes.Role, AdminRole));
         }
@@ -442,19 +459,39 @@ internal static class SignIn
     /// <param name="principal">The signed-in principal; may be null.</param>
     /// <param name="user">The user as stored now, or <c>null</c> when there is no such user.</param>
     /// <returns>
-    ///     <c>true</c> only when both are present, the user is enabled, and the system administrator role and display
-    ///     name in the principal are equal to the stored ones; otherwise <c>false</c>.
+    ///     <c>true</c> only when both are present, the user is enabled, and the system administrator role, the
+    ///     must-change-password marker and the display name in the principal are equal to the stored ones;
+    ///     otherwise <c>false</c>.
     /// </returns>
     /// <remarks>
     ///     This is the single rule behind both the cookie check on each request and the periodic check of an open
-    ///     page, so the two cannot drift apart. A changed administrator flag or display name counts as not current so
-    ///     that the user signs in again and gets the current values. The method is pure and thread-safe.
+    ///     page, so the two cannot drift apart. A changed administrator flag, temporary-password state or display name
+    ///     counts as not current so that the user signs in again and gets the current values. The method is pure and
+    ///     thread-safe.
     /// </remarks>
     internal static bool IsCurrent(ClaimsPrincipal? principal, User? user)
     {
+        // A user with a temporary password gets no administrator role in the principal, whatever the stored flag says
         return principal is not null
             && user is { Enabled: true }
-            && principal.FindAll(ClaimTypes.Role).Any(claim => claim.Value == AdminRole) == user.IsSystemAdmin
+            && principal.FindAll(ClaimTypes.Role).Any(claim => claim.Value == AdminRole)
+            == (user.IsSystemAdmin && !user.MustChangePassword)
+            && IsPasswordChangeRequired(principal) == user.MustChangePassword
             && principal.FindFirstValue(DisplayNameClaimType) == user.DisplayName;
+    }
+
+    /// <summary>
+    ///     Tells whether a principal was issued for an account that still has to change its temporary password.
+    /// </summary>
+    /// <param name="principal">The signed-in principal; may be null.</param>
+    /// <returns><c>true</c> when the principal carries the must-change-password claim.</returns>
+    /// <remarks>
+    ///     The claim is the only thing the layout reads to confine such a user to the account page, so no service
+    ///     call is needed per navigation. It is part of <see cref="IsCurrent"/>: once the password is changed the
+    ///     old cookie is stale and the user signs in again.
+    /// </remarks>
+    public static bool IsPasswordChangeRequired(ClaimsPrincipal? principal)
+    {
+        return principal?.FindFirstValue(MustChangePasswordClaimType) == "true";
     }
 }

@@ -70,7 +70,8 @@ of the token, which is not secret).
 #### Error Handling
 
 A refusal is an ordinary answer, not an exception. The reason is for the audit trail only: no header, a malformed token,
-an unknown token, an expired token, a revoked token, a disabled owner, and a locked-out owner all give the same 401. The
+an unknown token, an expired token, a revoked token, a disabled owner, a locked-out owner, and an owner who must change
+the password (audited as "owner must change password") all give the same 401. The
 audit write is best effort: a failure is logged by `AuditService` and does not change the answer. An exception of the
 token
 service or the store is the generic error of the host. No token value, secret part, or text with the token prefix is

@@ -30,7 +30,7 @@ N/A - standard test environment.
   the known answer for the files, every file keeps its own size and SHA-256 hash, and file bytes are returned
   exactly.
 - The same file contents give the same fingerprint when submitted in another order or under other names.
-- Every domain rule (all fifty-four values of `DomainRule`) is reported as a domain rule exception that names it, and
+- Every domain rule (all fifty-eight values of `DomainRule`) is reported as a domain rule exception that names it, and
   nothing is stored. The four rules that only a real git can raise (`RevisionNotFound`, `GitUnavailable`,
   `GitAccessFailed`, and `GitTimeout`) are exercised in the `ContentSources` subsystem tests instead.
 - A thread started on a file, with replies, resolved and reopened, is read back with its comments in posting order.
@@ -41,9 +41,13 @@ N/A - standard test environment.
   be demoted.
 - Access follows the membership of a project: a system administrator sees and administers every project, a member
   sees the own project, and anyone else, including a disabled, unknown, anonymous, or command line actor, gets the
-  same answer as for a missing project; only a system administrator creates projects and manages members, every
-  membership change is audited with the project, and reviewer slots and signing are limited to members (see the
-  unit tests of `ProjectAccess`, `ProjectService`, `SigningService`, and `UserService`).
+  same answer as for a missing project; a system administrator creates projects, and a system administrator and the
+  administrator of a project manage its members, add an existing user only by the exact user name, are stopped after
+  ten failed attempts in ten minutes (a system administrator is not), create an account only together with its
+  membership, and may not remove or demote the last project administrator (a system administrator may); a user with a
+  temporary password has no access to any project; every membership change is audited with the project; and reviewer
+  slots and signing are limited to members (see the unit tests of `ProjectAccess`, `ProjectService`, `SigningService`,
+  and `UserService`).
 - A review with a reviewer slot, answered completely and without open threads, is signed with the password; the
   signature makes the review approved, a later change of the record makes it out of date and not approved, and the
   slot can be signed again.
@@ -89,7 +93,10 @@ anchor on a missing file or beyond the end of the file, or a reply to a thread t
 checklist answer for a missing checklist, for a check that is not in the checklist, or a failed
 check without a justification; a user with an invalid or taken user name, a blank display name, or a too short
 password, a wrong current password, a change of a user that does not exist, or disabling the last enabled
-system administrator; a member added twice or a change of a user who is not a member; a slot for a missing review,
+system administrator; a member added twice, a change of a user who is not a member, removing the last project
+administrator, a project administrator who fails ten adds in a row, and a user with a temporary password who creates a
+token (these use the real `ProjectAccess` and `PersonalAccessTokenService`, over `FakeUserStore` connected to
+`FakeReviewStore`); a slot for a missing review,
 a slot with an unknown reviewer or one that does not exist or is not a member, a change of a
 signed slot, a signing by a user who is not in the slot, a signing that is blocked, a wrong password at a signing, or
 a signing of a record that changed; a token with an invalid name, an invalid lifetime, or beyond the limit of 20 active

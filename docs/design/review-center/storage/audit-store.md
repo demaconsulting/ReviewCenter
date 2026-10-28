@@ -58,9 +58,12 @@ whatever happens to the rows it describes.
 `AppendAsync`, save, commit, release. Used through `AuditService.TryRecordAsync` for sign-in, sign-out, failed sign-in,
 and lockout.
 
-**AuditStore.ListAsync**: Reads entries newest first, optionally of one review (project and review together), before or
-after a sequence, at most a given number. The newer direction reads the nearest entries above the position in ascending
-order and returns them newest first. Reads are untracked and never take the gate.
+**AuditStore.ListAsync**: Reads entries newest first, optionally of one project, of one review of it (project and review
+together), before or after a sequence, at most a given number. A review filter is always inside one project; a project
+filter alone returns every event of that project, whether or not it names a review, and never an entry without a
+project, which is what the project audit view relies on. The newer direction reads the nearest entries above the
+position in ascending order and returns them newest first. Reads are untracked and never take the gate; the existing
+index on project, review, and sequence serves both filters.
 
 **AuditStore.ReadAfterAsync**: Reads entries in ascending order after a sequence, at most a given number, so that
 verification can stream the trail in batches.

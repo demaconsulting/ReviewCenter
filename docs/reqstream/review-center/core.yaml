@@ -31,27 +31,37 @@ sections:
       - id: ReviewCenter-Core-ProjectAccess
         title: >-
           The Core subsystem shall give access to a project by membership: a system administrator sees and
-          administers every project and manages the members, a project administrator administers the repositories
-          of the own project, a member sees the own project and works in it, and every other actor, including a
-          disabled, unknown, anonymous, or command line actor, gets the answer for a project that does not exist.
-          It shall decide on the current state of the user and the memberships at every call, treat an actor that
-          came through a token as its owner, limit reviewer slots and signing to members, and audit every change of
-          a membership with the project.
+          administers every project and manages the members, a project administrator manages the members and the
+          repositories of the own project, a member sees the own project and works in it, and every other actor,
+          including a disabled, unknown, anonymous, or command line actor, gets the answer for a project that does
+          not exist. A user who still has a temporary password has no access to any project. The subsystem shall
+          decide on the current state of the user and the memberships at every call, treat an actor that came
+          through a token as its owner, limit reviewer slots and signing to members, let a project administrator
+          add an existing user only by the exact user name, with a limit on failed attempts and no way to list
+          users, create an account only together with its membership, and not remove or demote the last
+          project administrator, and audit every change of a membership with the project.
         justification: |
           Reviews of different bodies of work must be separated, and the separation must not reveal which projects
           exist. Deciding in one place, from the current data, keeps the rule the same for every page, route, and
-          service, and makes a revoked right take effect at once.
+          service, and makes a revoked right take effect at once. The people who work on a project manage who
+          belongs to it, which only works if that power cannot be turned into a way to browse the users of the
+          installation or to leave the project without anybody to manage it.
         children:
           - ReviewCenter-ProjectAccess-Visibility
           - ReviewCenter-ProjectAccess-SystemAdmin
           - ReviewCenter-ProjectAccess-NoAccount
           - ReviewCenter-ProjectAccess-NotFound
+          - ReviewCenter-ProjectAccess-TemporaryPassword
           - ReviewCenter-ProjectAccess-Revocation
           - ReviewCenter-ProjectAccess-TokenOwner
           - ReviewCenter-ProjectAccess-List
           - ReviewCenter-ProjectAccess-Dependencies
           - ReviewCenter-ProjectService-Members
           - ReviewCenter-ProjectService-MemberRules
+          - ReviewCenter-ProjectService-MemberLookup
+          - ReviewCenter-ProjectService-AddThrottle
+          - ReviewCenter-ProjectService-LastAdmin
+          - ReviewCenter-ProjectService-CreateMemberAccount
           - ReviewCenter-ProjectService-MemberAudit
           - ReviewCenter-RepositoryService-Ownership
           - ReviewCenter-ThreadService-Access
@@ -181,11 +191,13 @@ sections:
         title: >-
           The Core subsystem shall create users with a user name, a display name, a system administrator flag, and a
           password, keeping only a hash of the password, check a sign-in with a lockout after repeated failures,
-          enable and disable users, set the system administrator flag, change and set passwords, and never leave
-          the system without an enabled system administrator.
+          enable and disable users, set the system administrator flag, change and set passwords, never leave
+          the system without an enabled system administrator, and let an account that has a temporary password sign
+          in but do nothing except choose a new password, which cannot be confirmed as a signature.
         justification: |
           Accountability in a review needs verified users. The rules must hold whichever user interface or store
-          is used, and keeping only a hash of the password protects the passwords if the database is copied.
+          is used, and keeping only a hash of the password protects the passwords if the database is copied. A
+          password handed over by somebody else proves little, so it only opens the way to replacing it.
         children:
           - ReviewCenter-UserService-Username
           - ReviewCenter-UserService-DisplayName
@@ -199,6 +211,7 @@ sections:
           - ReviewCenter-UserService-SetPassword
           - ReviewCenter-UserService-SetSystemAdmin
           - ReviewCenter-UserService-NotFound
+          - ReviewCenter-UserService-TemporaryPassword
         tests:
           - CoreSubsystem_UsersWorkflow_CreateSignInLockoutAndLastAdmin
 
@@ -235,7 +248,8 @@ sections:
           The Core subsystem shall record every change of projects, reviews, threads, checklists, reviewer slots,
           signatures, and users, and every sign-in event, as an entry of a hash-chained audit trail that names the
           actor, the action, and a short detail without passwords or free text, read the trail back newest first
-          in pages, and verify the chain by streaming, so that an edit, a deletion, an insertion, or a reordering
+          in pages, for the whole trail, for one project, or for one review, and verify the chain by streaming, so
+          that an edit, a deletion, an insertion, or a reordering
           in the middle of the history is detected.
         justification: |
           A review record is only trustworthy if its history can be checked. Hash chaining makes tampering with
@@ -359,9 +373,9 @@ sections:
         title: >-
           The Core subsystem shall let a user create personal access tokens with a name and an expiry, up to a limit,
           show the value only when it is created, authenticate a request from a token as its owner for as long as the
-          owner is allowed to sign in, let the owner revoke a token, record the creation and the revocation in the
-          audit trail, mark a review created through a token, and refuse that an actor that came through a token signs
-          a review or arranges the reviewers.
+          owner is allowed to sign in and has no temporary password, let the owner revoke a token, record the
+          creation and the revocation in the audit trail, mark a review created through a token, and refuse that an
+          actor that came through a token signs a review or arranges the reviewers.
         justification: |
           Scripts need a credential of their own, and it must give less than a person has. Keeping only a hash, a
           limit, an expiry, and a revocation that works at once keep a leaked token small in effect, and refusing a
@@ -373,6 +387,7 @@ sections:
           - ReviewCenter-PersonalAccessTokenService-Authenticate
           - ReviewCenter-PersonalAccessTokenService-LastUsed
           - ReviewCenter-PersonalAccessTokenService-Revoke
+          - ReviewCenter-PersonalAccessTokenService-TemporaryPassword
           - ReviewCenter-PersonalAccessTokenService-Audit
           - ReviewCenter-SigningService-ApiToken
           - ReviewCenter-ReviewService-CreatedVia

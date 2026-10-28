@@ -45,7 +45,9 @@ The native SQLite library must be loadable on the test platform (it is supplied 
   still present after the database is closed and opened again, and a disabled repository is not offered for selection.
 - An unsupported provider is refused with an error that names it, and no database is created.
 - Project memberships are stored, kept unique per user and project, audited with the project, and refused for an
-  unknown project; these are verified in the unit tests of `ReviewStore` on the real database.
+  unknown project; the last enabled project administrator cannot be removed or demoted when the caller requires another
+  administrator, also when two changes race; and an account is stored with its membership and its audit entry together
+  or not at all; these are verified in the unit tests of `ReviewStore` and `UserStore` on the real database.
 - Personal access tokens written through the service, with one of them revoked, are still present after the database is
   closed and opened again: the value of the kept token still authenticates its owner, the revoked token is refused,
   and no
@@ -124,6 +126,15 @@ the refusal of an unknown project are tested by `ReviewStore_AddMembershipAsync_
 `ReviewStore_SetAndRemoveMembershipAsync_ChangeRoleAndRemove_ReportWhetherFound`,
 `ReviewStore_Membership_Changes_AreAuditedWithTheProject`, and
 `ReviewStore_AddMembershipAsync_UnknownProject_IsRefusedByTheDatabase`, all defined in `ReviewStoreMembershipTests.cs`.
+The last project administrator rule, including two removals made at the same time, is tested by
+`ReviewStore_RemoveMembershipAsync_TwoAdminsRemoveEachOther_ExactlyOneSucceeds`,
+`ReviewStore_MembershipChanges_RemoveRacesDemote_LeavesAnAdministrator`,
+`ReviewStore_RemoveMembershipAsync_LastAdmin_RefusedAndRolledBackUnlessExempt`, and
+`ReviewStore_RemoveMembershipAsync_OtherAdminDisabled_IsRefused`, and the atomic storing of an account with its
+membership and its audit entry by `UserStore_AddToProjectAsync_StoresAccountMembershipAndOneEventTogether` and
+`UserStore_AddToProjectAsync_Failure_StoresNothing`, all defined in `ProjectMembersStoreTests.cs`. The listing of the
+audit trail for one project only is tested by `AuditStore_ListAsync_ProjectOnly_IsIsolatedAndTheChainStillVerifies`
+in the same file.
 
 **Audit trail transaction**: Changes are made at the same moment through different stores that share the
 process-wide gate; the sequence numbers are consecutive and the chain is intact. This scenario is tested by

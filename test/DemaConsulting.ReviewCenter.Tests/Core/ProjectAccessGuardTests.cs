@@ -213,7 +213,7 @@ public class ProjectAccessGuardTests
         }
 
         var access = new ProjectAccess(userStore, store);
-        var projects = new ProjectService(store, userStore, access, clock);
+        var projects = new ProjectService(store, userStore, access, new FakePasswordHasher(), clock);
         var root = new Actor("root", "root");
         var own = await projects.CreateAsync("Own", null, root, cancellationToken);
         var other = await projects.CreateAsync("Other", null, root, cancellationToken);

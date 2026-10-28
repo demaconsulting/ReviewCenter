@@ -225,7 +225,9 @@ public sealed class UserService
     /// <remarks>
     ///     A failure is recorded as <c>signature.reauth-failed</c> (with the reason in the detail) instead of
     ///     <c>auth.sign-in-failed</c>, so the trail shows where the wrong password was typed. A refusal for a
-    ///     locked or disabled account is recorded too, once per minute, account and reason.
+    ///     locked or disabled account is recorded too, once per minute, account and reason. An account that still
+    ///     has a temporary password (<see cref="User.MustChangePassword"/>) is refused with the reason
+    ///     "password change pending".
     /// </remarks>
     public Task<User?> ReauthenticateAsync(
         string? username,
@@ -288,6 +290,14 @@ public sealed class UserService
                     reauthentication ? ReauthFailedAction : "auth.sign-in-failed",
                     "account disabled",
                     cancellationToken);
+                return null;
+            }
+
+            // A temporary password proves identity only well enough to reach the password-change page: it can not
+            // confirm a signature, whoever knows it
+            if (reauthentication && user.MustChangePassword)
+            {
+                await RecordCoalescedAsync(user, ReauthFailedAction, "password change pending", cancellationToken);
                 return null;
             }
 
@@ -397,7 +407,8 @@ public sealed class UserService
     /// <returns>A task that completes when the new hash is stored.</returns>
     /// <remarks>
     ///     A wrong current password counts as a failed sign-in (so this operation is no free way to guess
-    ///     passwords), and a locked-out account is refused like a wrong password.
+    ///     passwords), and a locked-out account is refused like a wrong password. A successful change clears
+    ///     <see cref="User.MustChangePassword"/>; while it is set, the new password must differ from the current one.
     /// </remarks>
     /// <exception cref="DomainRuleException">
     ///     Thrown with <see cref="DomainRule.PasswordInvalid"/> when the new password breaks the policy,
@@ -427,7 +438,16 @@ public sealed class UserService
                 throw CurrentPasswordIncorrect();
             }
 
+            // A temporary password must really be replaced, not typed in again
+            if (user.MustChangePassword && newPassword == currentPassword)
+            {
+                throw new DomainRuleException(
+                    DomainRule.PasswordInvalid,
+                    "Choose a password different from the temporary one.");
+            }
+
             user.PasswordHash = _hasher.Hash(newPassword!);
+            user.MustChangePassword = false;
             user.FailedLoginCount = 0;
             user.LockoutUntil = null;
 
@@ -685,7 +705,7 @@ public sealed class UserService
     /// </summary>
     /// <param name="username">The candidate user name.</param>
     /// <exception cref="DomainRuleException">Thrown with <see cref="DomainRule.UserNameInvalid"/> when the name breaks the rules.</exception>
-    private static void ValidateUsername(string? username)
+    internal static void ValidateUsername(string? username)
     {
         if (username is null
             || username.Length < ReviewLimits.MinUsernameLength
@@ -705,7 +725,7 @@ public sealed class UserService
     /// <param name="displayName">The candidate display name.</param>
     /// <returns>The name without leading and trailing white space.</returns>
     /// <exception cref="DomainRuleException">Thrown with <see cref="DomainRule.DisplayNameInvalid"/> when the name is empty or too long.</exception>
-    private static string ValidateDisplayName(string? displayName)
+    internal static string ValidateDisplayName(string? displayName)
     {
         var trimmed = displayName?.Trim() ?? string.Empty;
         if (trimmed.Length == 0 || trimmed.Length > ReviewLimits.MaxDisplayNameLength)

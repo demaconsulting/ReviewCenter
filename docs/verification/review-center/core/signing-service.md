@@ -42,6 +42,8 @@ N/A - standard test environment.
   kept.
 - A review is approved only when it has at least one slot and every slot has a current signature.
 - The candidates for a slot are the enabled members of the project.
+- The status of a slot says for the primary and the alternate reviewer whether the user is still a member of the
+  project, and a removed user stays assigned to the slot.
 - An actor that came through a personal access token cannot sign, and cannot add, change, or remove a slot; the refusal
   is `ActorNotAllowed` and comes before every other check, so that a request with everything right and one with
   everything wrong give the same answer.
@@ -157,6 +159,12 @@ never read. This scenario is tested by `SigningService_GetApprovalsAsync_NoRevie
 **SigningService_ListCandidatesAsync_ReturnsEnabledMembersOnly**: With one member disabled and one user who is not a
 member of the project, the candidates are the other enabled members. This scenario is tested by
 `SigningService_ListCandidatesAsync_ReturnsEnabledMembersOnly`.
+
+**SigningService_GetApprovalAsync_AssigneeRemovedFromProject_IsMarkedNotAMember**: A slot has a primary and an
+alternate reviewer who are both members; a control read marks both as members. After both memberships are removed
+from the fake store, the single read and the batch read keep the slot assigned to the same users and mark the primary
+and the alternate as no longer members. This scenario is tested by
+`SigningService_GetApprovalAsync_AssigneeRemovedFromProject_IsMarkedNotAMember`.
 
 **SigningService_AddSlotAsync_NonMember_ThrowsSlotUserInvalid**: A user who is not a member of the project, even a
 system administrator, is refused as primary and as alternate with `SlotUserInvalid`, and no slot is stored. This

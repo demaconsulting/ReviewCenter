@@ -138,16 +138,21 @@ sections:
           not signed, signed with a current signature (naming the signer and time), or out of date because it was
           signed only for an earlier record, whether the review is approved, which requires at least one slot and
           every slot to have a current signature, the blockers, and one sentence naming the next step, and shall
-          give nothing for a review that does not exist.
+          give nothing for a review that does not exist. The status shall also say for the primary and for the alternate
+          reviewer of each slot whether that user is still a member of the project, and shall keep the slot assigned
+          to a user who has been removed from the project.
         justification: |
           Approval has to follow the record. Computing it from the signatures and the record each time means a
           change to the record can never leave a review looking approved, and nothing about the status can be
-          stored out of step with the record.
+          stored out of step with the record. A reviewer who was removed from the project cannot sign, so the
+          people who arrange the review must be able to see that a slot needs another reviewer, while the history of
+          the slot stays intact.
         tests:
           - SigningService_GetApprovalAsync_TwoSlots_ApprovedOnlyWhenBothSigned
           - SigningService_SignAsync_RecordChangedAfterSigning_OutOfDateThenResignable
           - SigningService_GetApprovalAsync_NoSlots_NotApprovedAndAsksForSlot
           - SigningService_GetApprovalAsync_MissingReview_ReturnsNull
+          - SigningService_GetApprovalAsync_AssigneeRemovedFromProject_IsMarkedNotAMember
           - SigningService_GetApprovalsAsync_SeveralReviews_EqualsSingleReadsAndLoadsUsersOnce
           - SigningService_GetApprovalsAsync_NoReviews_ReturnsEmptyWithoutReadingUsers
 

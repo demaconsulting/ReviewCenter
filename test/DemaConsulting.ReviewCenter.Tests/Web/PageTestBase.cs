@@ -71,7 +71,7 @@ public abstract class PageTestBase : BunitContext
         Services.AddSingleton<TimeProvider>(Time);
         AuditStore = new FakeAuditStore(clock);
         Audit = new AuditService(AuditStore);
-        var userStore = new FakeUserStore();
+        var userStore = new FakeUserStore(store);
         UserStore = userStore;
         Users = new UserService(userStore, new FakePasswordHasher(), clock, Audit);
         TokenStore = new FakePersonalAccessTokenStore(userStore);
@@ -85,7 +85,7 @@ public abstract class PageTestBase : BunitContext
         // uses to arrange data (the properties below) share the stores but allow everything, so that a test does
         // not have to be a member of a project to prepare it.
         var allowAll = new AllowAllProjectAccess(store);
-        Projects = new ProjectService(store, userStore, allowAll, clock);
+        Projects = new ProjectService(store, userStore, allowAll, new FakePasswordHasher(), clock, Audit);
         Threads = new ThreadService(store, allowAll, clock);
         Checklists = new ChecklistService(store, allowAll, clock);
         Repositories = new RepositoryService(RepositoryStore, new FakeCredentialProtector(), allowAll, clock);
@@ -95,7 +95,7 @@ public abstract class PageTestBase : BunitContext
 
         Access = new SignedInUserAccess(new ProjectAccess(userStore, store), userStore, () => _revalidating ? null : _authentication.Current);
         Services.AddSingleton<IProjectAccess>(Access);
-        var pageProjects = new ProjectService(store, userStore, Access, clock);
+        var pageProjects = new ProjectService(store, userStore, Access, new FakePasswordHasher(), clock, Audit);
         var pageRepositories = new RepositoryService(RepositoryStore, new FakeCredentialProtector(), Access, clock);
         var pageReviews = new ReviewService(store, Access, clock, pageRepositories, Git);
         var pageSigning = new SigningService(store, Users, Access, clock);
@@ -252,6 +252,17 @@ public abstract class PageTestBase : BunitContext
     }
 
     /// <summary>
+    ///     Makes the pages see a user who signed in with a temporary password and has not replaced it yet: the
+    ///     session carries the must-change-password claim and no administrator role.
+    /// </summary>
+    /// <param name="username">The user name.</param>
+    /// <param name="displayName">The display name.</param>
+    protected void SignInAsTemporaryPassword(string username, string displayName)
+    {
+        _authentication.Change(username, displayName, false, mustChangePassword: true);
+    }
+
+    /// <summary>
     ///     Makes the pages see nobody signed in.
     /// </summary>
     protected void SignOut()
@@ -286,7 +297,7 @@ public abstract class PageTestBase : BunitContext
         var cancellationToken = TestContext.Current.CancellationToken;
         var user = await UserStore.GetByUsernameAsync(username, cancellationToken)
                    ?? throw new InvalidOperationException($"The user '{username}' does not exist.");
-        await Store.RemoveMembershipAsync(projectId, user.Id, AuditTestExtensions.Draft(), cancellationToken);
+        await Store.RemoveMembershipAsync(projectId, user.Id, AuditTestExtensions.Draft(), false, cancellationToken);
     }
 
     /// <summary>
@@ -302,7 +313,8 @@ public abstract class PageTestBase : BunitContext
         var cancellationToken = TestContext.Current.CancellationToken;
         var user = await UserStore.GetByUsernameAsync(username, cancellationToken)
                    ?? throw new InvalidOperationException($"The user '{username}' does not exist.");
-        var changed = await Store.SetMembershipRoleAsync(projectId, user.Id, role, AuditTestExtensions.Draft(), cancellationToken);
+        var changed = await Store.SetMembershipRoleAsync(
+            projectId, user.Id, role, AuditTestExtensions.Draft(), false, cancellationToken);
         if (!changed)
         {
             throw new InvalidOperationException($"The user '{username}' is no member of the project.");
@@ -333,14 +345,24 @@ public abstract class PageTestBase : BunitContext
     /// <param name="username">The user name.</param>
     /// <param name="displayName">The display name.</param>
     /// <param name="isSystemAdmin">Whether the user is a system administrator.</param>
+    /// <param name="mustChangePassword">Whether the session carries the must-change-password claim.</param>
     /// <returns>The state.</returns>
-    private static AuthenticationState Create(string username, string displayName, bool isSystemAdmin)
+    private static AuthenticationState Create(
+        string username,
+        string displayName,
+        bool isSystemAdmin,
+        bool mustChangePassword = false)
     {
         var claims = new List<Claim>
         {
             new(ClaimTypes.Name, username),
             new(SignIn.DisplayNameClaimType, displayName)
         };
+        if (mustChangePassword)
+        {
+            claims.Add(new Claim(SignIn.MustChangePasswordClaimType, "true"));
+        }
+
         if (isSystemAdmin)
         {
             claims.Add(new Claim(ClaimTypes.Role, SignIn.AdminRole));
@@ -405,9 +427,10 @@ public abstract class PageTestBase : BunitContext
         /// <param name="username">The user name.</param>
         /// <param name="displayName">The display name.</param>
         /// <param name="isSystemAdmin">Whether the user is a system administrator.</param>
-        public void Change(string username, string displayName, bool isSystemAdmin)
+        /// <param name="mustChangePassword">Whether the session carries the must-change-password claim.</param>
+        public void Change(string username, string displayName, bool isSystemAdmin, bool mustChangePassword = false)
         {
-            _state = Create(username, displayName, isSystemAdmin);
+            _state = Create(username, displayName, isSystemAdmin, mustChangePassword);
             NotifyAuthenticationStateChanged(Task.FromResult(_state));
         }
     }

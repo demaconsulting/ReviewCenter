@@ -347,6 +347,7 @@ internal sealed class ApiTokenHandler : AuthenticationHandler<AuthenticationSche
             TokenFailure.Revoked => "token revoked",
             TokenFailure.OwnerDisabled => "owner disabled",
             TokenFailure.OwnerLockedOut => "owner locked out",
+            TokenFailure.OwnerMustChangePassword => "owner must change password",
             _ => "unknown token"
         };
     }

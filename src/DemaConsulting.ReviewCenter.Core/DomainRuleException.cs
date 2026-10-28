@@ -201,7 +201,18 @@ public enum DomainRule
     TokenLimitReached,
 
     /// <summary>The personal access token does not exist for the user, or it is already revoked.</summary>
-    TokenNotFound
+    TokenNotFound,
+
+    /// <summary>The change would leave the project without an enabled project administrator.</summary>
+    LastProjectAdmin,
+
+    /// <summary>Too many failed attempts to add or create a member in a short time; try again later.</summary>
+    TooManyAttempts,
+
+    /// <summary>
+    ///     The account has a temporary password; the password must be changed before anything else is allowed.
+    /// </summary>
+    PasswordChangeRequired
 }
 
 /// <summary>

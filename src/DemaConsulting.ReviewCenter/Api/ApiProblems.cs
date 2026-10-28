@@ -38,8 +38,9 @@ internal static class ApiProblems
     /// </summary>
     /// <param name="rule">The rule that failed.</param>
     /// <returns>
-    ///     404 for a missing thing, 409 for a conflict with the current state, 502, 503 or 504 when git cannot be
-    ///     used, 403 when the caller is not allowed, 500 when a stored credential cannot be read, otherwise 400.
+    ///     404 for a missing thing, 409 for a conflict with the current state, 429 when too many attempts were made,
+    ///     502, 503 or 504 when git cannot be used, 403 when the caller is not allowed, 500 when a stored credential
+    ///     cannot be read, otherwise 400.
     /// </returns>
     public static int StatusOf(DomainRule rule)
     {
@@ -58,12 +59,16 @@ internal static class ApiProblems
                 or DomainRule.TokenNotFound => StatusCodes.Status404NotFound,
             DomainRule.ReviewIdDuplicate
                 or DomainRule.MembershipExists
+                or DomainRule.LastProjectAdmin
                 or DomainRule.RepositoryDisabled
                 or DomainRule.RecordChanged => StatusCodes.Status409Conflict,
+            DomainRule.TooManyAttempts => StatusCodes.Status429TooManyRequests,
             DomainRule.GitUnavailable => StatusCodes.Status503ServiceUnavailable,
             DomainRule.GitAccessFailed => StatusCodes.Status502BadGateway,
             DomainRule.GitTimeout => StatusCodes.Status504GatewayTimeout,
-            DomainRule.ActorNotAllowed or DomainRule.SigningNotAllowed => StatusCodes.Status403Forbidden,
+            DomainRule.ActorNotAllowed
+                or DomainRule.SigningNotAllowed
+                or DomainRule.PasswordChangeRequired => StatusCodes.Status403Forbidden,
             DomainRule.CredentialsUnreadable => StatusCodes.Status500InternalServerError,
             _ => StatusCodes.Status400BadRequest
         };
@@ -142,6 +147,7 @@ internal static class ApiProblems
             StatusCodes.Status404NotFound => "Not Found",
             StatusCodes.Status409Conflict => "Conflict",
             StatusCodes.Status415UnsupportedMediaType => "Unsupported Media Type",
+            StatusCodes.Status429TooManyRequests => "Too Many Requests",
             StatusCodes.Status500InternalServerError => "Internal Server Error",
             StatusCodes.Status502BadGateway => "Bad Gateway",
             StatusCodes.Status503ServiceUnavailable => "Service Unavailable",

@@ -41,6 +41,17 @@ internal sealed class CountingUserStore(IUserStore inner) : IUserStore
     }
 
     /// <inheritdoc/>
+    public Task<User> AddToProjectAsync(
+        User user,
+        int projectId,
+        ProjectRole role,
+        Func<User, AuditDraft> audit,
+        CancellationToken cancellationToken = default)
+    {
+        return inner.AddToProjectAsync(user, projectId, role, audit, cancellationToken);
+    }
+
+    /// <inheritdoc/>
     public Task<User?> GetByUsernameAsync(string username, CancellationToken cancellationToken = default)
     {
         return inner.GetByUsernameAsync(username, cancellationToken);

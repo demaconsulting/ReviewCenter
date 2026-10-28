@@ -344,6 +344,29 @@ public class AuditServiceTests
     }
 
     /// <summary>
+    ///     Test that a project filter without a review returns the events of that project only: not another
+    ///     project's, and not the events that belong to no project.
+    /// </summary>
+    [Fact]
+    public async Task AuditService_ListAsync_ProjectOnly_ReturnsOnlyThatProjectsEvents()
+    {
+        // Arrange: events of project 1 (with reviews), one of project 2 and one of no project
+        var (service, _) = Create();
+        await Fill(service, 4);
+        await service.RecordAsync(
+            AuditDraft.By(TestActors.Ann, "test.other", "other project", 2), TestContext.Current.CancellationToken);
+        await service.RecordAsync(
+            AuditDraft.By(TestActors.Ann, "test.global", "no project"), TestContext.Current.CancellationToken);
+
+        // Act
+        var page = await service.ListAsync(1, null, null, null, TestContext.Current.CancellationToken);
+
+        // Assert: the four events of project 1 in all its reviews, newest first
+        Assert.Equal([4L, 3L, 2L, 1L], page.Entries.Select(e => e.Sequence));
+        Assert.All(page.Entries, e => Assert.Equal(1, e.ProjectId));
+    }
+
+    /// <summary>
     ///     Test that the page the filter returns is still limited to 50 entries with working links.
     /// </summary>
     [Fact]

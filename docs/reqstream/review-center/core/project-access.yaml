@@ -56,6 +56,19 @@ sections:
           - ReviewOperations_NotAMember_AreRefusedAsAMissingProjectAndChangeNothing
           - Repositories_OfAnotherProject_CannotBeUsedOrChanged
 
+      - id: ReviewCenter-ProjectAccess-TemporaryPassword
+        title: >-
+          The ProjectAccess class shall give no access at all to a user whose password is still a temporary one,
+          even when that user has a membership or the system administrator right, until the user has chosen a new
+          password.
+        justification: |
+          A temporary password has been handed over by somebody else and may be known to more than one person.
+          It may prove who is signing in only well enough to reach the page that replaces it, so until then the
+          account must neither see nor change anything in any project.
+        tests:
+          - ProjectAccess_TemporaryPassword_GivesNoAccessAtAll
+          - UserService_ChangeOwnPasswordAsync_NewPassword_ClearsTheFlagAndGivesAccess
+
       - id: ReviewCenter-ProjectAccess-Revocation
         title: >-
           The ProjectAccess class shall look the user and the membership up again on every call and keep nothing

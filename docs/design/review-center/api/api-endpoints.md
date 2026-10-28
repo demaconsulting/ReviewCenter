@@ -98,9 +98,11 @@ pass the `Host` header on. Every answer of the handler, including the 404 of an 
 `Cache-Control: no-store`. An empty list is a normal answer.
 
 **ApiProblems.StatusOf**: Maps a rule to a status: the not-found rules (including a missing token) to 404; a duplicate
-review identifier, a disabled repository, and a changed record to 409; an unavailable git to 503, a git access failure
+review identifier, an existing membership, the removal or demotion of the last project admin, a disabled repository,
+and a changed record to 409; too many attempts to 429; an unavailable git to 503, a git access failure
 to
-502, and a git timeout to 504; a not allowed actor and a signing that is not allowed to 403; unreadable credentials to
+502, and a git timeout to 504; a not allowed actor, a signing that is not allowed, and a token action of a user who
+must change the password first to 403; unreadable credentials to
 500; and every other rule to 400. **ToResult** builds the problem description with the message of the rule as the
 detail;
 **NotFound** builds a 404; **ActorOf** builds the actor from a token principal (the user name, the display name, and the

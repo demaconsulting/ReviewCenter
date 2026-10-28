@@ -259,8 +259,10 @@ to use it, `ProjectsPage`, `ProjectPage`, `PlanPage`,
 checklists, `LoginPage`,
 `AccountPage`, and `UsersPage` are the pages for signing in, changing one's own password and creating personal access
 tokens, and managing users, and
-`HistoryPage` and `AuditPage` show the audit trail of a review and of the whole system, and `RepositoriesPage` lets an
-administrator of a project register git repositories with it. A browser
+`HistoryPage`, `AuditPage`, and `ProjectAuditPage` show the audit trail of a review, of the whole system, and of one
+project (through the shared `AuditEntryTable`), `RepositoriesPage` lets an
+administrator of a project register git repositories with it, and `NewMemberPage` and `NewMemberAccountPage` let an
+administrator of a project add an existing user or create a new account for it. A browser
 connects to the server,
 receives a server-rendered page, and then upgrades to a live connection over which user
 actions are handled on the server.
@@ -272,7 +274,9 @@ in; `SignInThrottle` limits the failed sign-in attempts per client address and t
 as the cookie check and ends the sign-in state of the page when the user is no longer valid; `PasswordHasher` hashes and
 verifies passwords with the password hasher of the ASP.NET Core shared framework. The cookie carries the user name, the
 display name, and, only for a system administrator, the role claim `SystemAdmin`; it never carries a project role,
-because which projects a user may see is decided by the `Core` rule `ProjectAccess` at every request.
+because which projects a user may see is decided by the `Core` rule `ProjectAccess` at every request. A user whose
+account still has a temporary password gets the claim `must_change_password` instead of the role: the layout confines
+such a user to the account page, and the `Core` rules refuse everything else.
 
 The `Core` subsystem holds the domain: projects, reviews of uploaded files or of the changes in a git repository,
 users, the rules that
@@ -339,8 +343,14 @@ requires a signed-in user, and the users page, the new project page, and the aud
 administrator. Project access is by membership: a user sees a project only as a member (with the project role `User`
 or `ProjectAdmin`), a system administrator sees every project, and a project that a user may not see does not exist for
 that user. The repositories of a project are registered by its administrators (project administrators and system
-administrators) on the repositories page of the project, and a system administrator manages the members on the project
-page. The first system administrator is created with the `user add --system-admin` verb. A review can be created (in
+administrators) on the repositories page of the project, and the members of a project are managed on the project page by
+the same administrators. A project administrator adds an existing user by typing the exact user name (there is no list
+of users to browse, one generic failure message, and failed attempts are throttled in memory and audited), or creates a
+local account only as part of adding it to the project: the application generates a temporary password that is shown
+once, and the new user must choose a new password at the first sign-in before anything else is allowed (no project
+access, no API token, no signature). A project always keeps at least one project administrator: removing or demoting
+the last one is refused for a project administrator, themselves included, and allowed for a system administrator. The
+first system administrator is created with the `user add --system-admin` verb. A review can be created (in
 the Draft state) from uploaded files or from a registered git repository; a review from a repository covers the files
 that changed between a baseline and a head revision that match a selection,
 with their baseline and head content frozen, and its record digest binds to the repository, both commits, the
@@ -366,7 +376,9 @@ audit trail. Each entry carries the hash of the entry before it, so the entries 
 entry are stored in one transaction, so a change without an entry (or the reverse) cannot occur through the application.
 Anyone who is signed in can read the history of a review of a project that the user may see; a system administrator can
 read the whole trail and verify the
-chain on the audit page or with the `audit verify` verb. The chain detects an edit, a deletion, an insertion, or a
+chain on the audit page or with the `audit verify` verb; an administrator of a project can read everything recorded for
+that project (a filtered view of the same chain, which still verifies as a whole) on the project audit page. The chain
+detects an edit, a deletion, an insertion, or a
 reordering of entries in the middle of the history. It does not detect the removal of the newest entries, or a complete
 rewrite of the chain by someone with write access to the database, unless the head hash, which the audit page and the
 verification show, was recorded somewhere else. There is no external anchoring in this version. The design of the unit
@@ -388,8 +400,10 @@ before the identity slice, before the signature slice (it has no reviewer slot a
 audit trail (it has no audit table), before the repository registry (it has no `Repositories` table), before reviews
 from a repository (its reviews have no source columns), before personal access tokens (it has no token table and
 its reviews have no creator columns), or before project access control (it has no `ProjectMemberships` table, its
-users have no system administrator flag, and its repositories have no project) must be
-deleted and created again, because there are no migrations.
+users have no system administrator flag, and its repositories have no project), or before project members management (its
+users have no `MustChangePassword` column) must be
+deleted and created again, because there are no migrations (the schema is created with `EnsureCreated`, so a
+development database must be deleted and recreated whenever the schema changes).
 The limitations of the audit trail are also deliberate: the throttle and the coalescing of repeated failure entries
 (one entry per key and minute, with a count of the suppressed repeats) are kept in memory, so they are per process and
 start again at a restart, and the count of the last window of a key is lost when the key does not recur; when the
@@ -447,6 +461,9 @@ is running.
   administrator
   manages users. `GET /projects` returns the projects page (it lists the projects that the user may see),
   `GET /projects/{id}` the page of one project,
+  `GET /projects/{id}/members/new` the page where an administrator of the project adds an existing user,
+  `GET /projects/{id}/members/account` the page where that administrator creates a local account for the project, and
+  `GET /projects/{id}/audit` the audit trail of the project (administrators of the project only),
   and `GET /projects/{id}/reviews/{reviewId}` the page of one review, and
   `GET /projects/{id}/reviews/{reviewId}/history` the history of one review; these pages show a "does not exist"
   message when the project or review is unknown, and the same message when the user may not see the project.
@@ -502,13 +519,17 @@ is running.
   (200 with `application/pdf`). `GET /api/openapi.json` returns the OpenAPI description of these endpoints and needs no
   token. Errors are `application/problem+json` documents: 400 for a rejected request (with the field that is wrong), 401
   for a missing or refused token (always the same answer, with `WWW-Authenticate` headers for `Bearer` and `Basic`),
-  403 for an action that is not allowed, 404 for an unknown project, review, or address (a project that the owner of the
-  token may not see answers exactly like an unknown project), 409 for a conflict or an
-  attestation of a review that is not complete, 429 when too many tokens were refused from one address, and 5xx for
+  403 for an action that is not allowed (including any token action of an owner who still has to change a temporary
+  password), 404 for an unknown project, review, or address (a project that the owner of the
+  token may not see answers exactly like an unknown project), 409 for a conflict (including the removal or demotion of
+  the last administrator of a project) or an
+  attestation of a review that is not complete, 429 when too many tokens were refused from one address or too many
+  member additions failed, and 5xx for
   repository or key failures.
 - *Constraints*: A token acts with the current memberships and system administrator flag of its owner, read again at
   every request, and stops working when it expires, is revoked, or its
-  owner is disabled or locked out. A token cannot sign, change reviewer slots, or reach any page, and a session cookie
+  owner is disabled or locked out, or when its owner still has to change a temporary password (the answer is the same
+  generic 401). A token cannot sign, change reviewer slots, or reach any page, and a session cookie
   cannot reach the API. The token is only a bearer secret: the server must not be exposed to untrusted networks
   without TLS, because it is sent in every request. A request is counted by the sign-in throttle with the client
   address (the same limits and the same forwarded-headers caveat as the sign-in). The limit of one request body is
@@ -533,9 +554,11 @@ is running.
   has no reviewer slot and signature tables), before the audit trail (it has no audit table), before the repository
   registry (it has no `Repositories` table), before reviews from a repository (its reviews and files lack the
   source and change columns), before personal access tokens (it has no token table and its reviews lack the
-  creator columns), or before project access control (it has no `ProjectMemberships` table, its users lack the system
-  administrator flag, and its repositories lack the project) must be deleted and
-  created again. The audit table is append-only for the application, but anyone with write access to the database file
+  creator columns), before project access control (it has no `ProjectMemberships` table, its users lack the system
+  administrator flag, and its repositories lack the project), or before project members management (its users lack the
+  `MustChangePassword` column) must be deleted and
+  created again; development databases are simply deleted and recreated. The audit table is append-only for the
+  application, but anyone with write access to the database file
   can still change it; the hash chain makes such a change detectable only in the way the design of `AuditChain`
   describes.
 

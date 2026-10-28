@@ -348,13 +348,16 @@ sections:
           ("Not signed", "Signed by {name} on {UTC time}", or "Signature out of date"); let a signed-in user add a
           slot by choosing enabled users as primary and alternate, and change or remove a slot that has no
           signature, showing the reason next to the control when a change is refused; offer no change or removal
-          for a slot that has a signature; show the display names as plain text; and show next to the review title
-          a badge that reads Approved or In review.
+          for a slot that has a signature; show the display names as plain text; mark an assignee who is no longer a
+          member of the project with the badge "No longer a project member" and, for the slot, the hint that such a
+          reviewer cannot sign until added again, and no such marker for assignees who are members; and show next to
+          the review title a badge that reads Approved or In review.
         justification: |
           Approval of a review is by named people. The reviewer must see who has to sign, who has signed and
           whether a signature still covers the current record. A slot that carries a signature is part of the
           approval history and must not be edited away from the page. Display names are chosen by users, so they
-          must never be able to change the page.
+          must never be able to change the page. A person who left the project keeps the slot but can no longer
+          sign, so the page says why a slot cannot make progress.
         tests:
           - ReviewPage_Render_NoSlots_ShowsEmptyReviewersCardAndInReviewBadge
           - ReviewPage_AddSlot_PrimaryAndAlternate_ShowsSlotNotSigned
@@ -363,6 +366,7 @@ sections:
           - ReviewPage_Sign_CorrectPassword_ApprovesReviewAndLocksSlot
           - ReviewPage_Render_RecordChangedAfterSigning_ShowsOutOfDateAndInReview
           - ReviewPage_Render_SlotDisplayName_IsShownAsPlainText
+          - ReviewPage_Render_AssigneesNoLongerMembers_ShowsIndicatorOnlyForThem
 
       - id: ReviewCenter-ReviewPage-Sign
         title: >-

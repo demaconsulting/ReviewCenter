@@ -9,7 +9,8 @@ to list the projects the user may see (every project for a system administrator,
 for anybody else), each as a clickable row, to lead a system administrator to the page that creates a project, and to
 report when it is interactive. `NewProjectPage` is the page at `/projects/new`: it holds only the form that creates a
 project, and reports when it is interactive. Both require a signed-in user, and `NewProjectPage` also the role
-`SystemAdmin`. A new project has no members until a system administrator adds some on the page of the project. Each is
+`SystemAdmin`. A new project has no members until a system administrator or a project admin adds some on the
+page of the project. Each is
 a Razor component split into presentation
 (`ProjectsPage.razor`, `NewProjectPage.razor`) and behavior (`ProjectsPage.razor.cs`, `NewProjectPage.razor.cs`).
 

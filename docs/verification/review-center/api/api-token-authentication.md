@@ -23,7 +23,8 @@ N/A - standard test environment (a temporary database is created by each test).
 - A request with no token, another kind of credential, an incomplete bearer header, or Basic credentials that cannot be
   read or have no password is answered with 401, the bearer and Basic challenges, and a problem document.
 - A wrong Basic password is answered, throttled, and audited exactly like a wrong bearer token.
-- An unknown, malformed, revoked, expired, or disabled-owner token is answered with the same 401 body.
+- An unknown, malformed, revoked, expired, disabled-owner, or temporary-password-owner token is answered with the same
+  401 body.
 - The session cookie does not authenticate the API, and a token, sent either way, does not sign in a web page, the
   sign-in and sign-out
   endpoints or the web socket negotiation.
@@ -67,6 +68,11 @@ is 401 and all the bodies are the same; a good token still works. This scenario 
 **ApiTokenAuthentication_Request_ExpiredToken_Answers401**: A token of 30 days is accepted, the clock is moved by 30
 days, and the same token is answered with 401. This scenario is tested by
 `ApiTokenAuthentication_Request_ExpiredToken_Answers401`.
+
+**ApiTokenAuthentication_Request_OwnerMustChangePassword_GetsTheGenericAnswerUntilChanged**: The owner of a good token
+is flagged as having to change a temporary password; the token is answered with 401 and a body that equals the body for
+an unknown token. After the flag is cleared the same token is answered with 200. This scenario is tested by
+`ApiTokenAuthentication_Request_OwnerMustChangePassword_GetsTheGenericAnswerUntilChanged`.
 
 **ApiTokenAuthentication_Request_SessionCookie_IsNotAccepted**: A browser that is signed in requests the API with its
 cookie only, and with its cookie and Basic credentials that are not a token. Each answer is 401 with both the

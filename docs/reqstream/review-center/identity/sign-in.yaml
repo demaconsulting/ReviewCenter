@@ -10,7 +10,8 @@ sections:
       - id: ReviewCenter-SignIn-Login
         title: >-
           The SignIn unit shall, on a sign-in request with the user name and password of an enabled account, sign
-          the user in with a session cookie and redirect to the requested local address or to the home page.
+          the user in with a session cookie and redirect to the requested local address or to the home page, or to
+          the account page when the account has a temporary password.
         justification: |
           Signing in must lead the user back to where they were going, and nowhere else.
         tests:
@@ -138,8 +139,9 @@ sections:
       - id: ReviewCenter-SignIn-AdminClaim
         title: >-
           The SignIn unit shall put the system administrator role into the principal of a session only for a user
-          who is a system administrator, and no role for a project, and shall consider the principal current only
-          when it has that role exactly when the stored user is a system administrator.
+          who is a system administrator and has no temporary password to change, and no role for a project, and shall
+          consider the principal current only
+          when it has that role exactly when the stored user is such a system administrator.
         justification: |
           A project role copied into the cookie would stay true after a member was removed from the project, so
           memberships are always read from the database when they are needed. The system administrator role is
@@ -148,6 +150,23 @@ sections:
         tests:
           - SignIn_IsCurrent_StoredUserVersusPrincipal_FollowsTheRule
           - SignIn_Session_RoleChangedAfterLogin_IsRejected
+
+      - id: ReviewCenter-SignIn-TemporaryPassword
+        title: >-
+          The SignIn unit shall, for an account that has to change its temporary password, sign the user in and
+          redirect to the account page instead of the requested address, put a must-change-password claim and no
+          system administrator role into the principal, even for a system administrator, and consider the principal
+          current only when the claim is present exactly when the stored user has to change the password, so that
+          the session of that user ends when the password is changed and the user signs in again.
+        justification: |
+          A temporary password was handed over by somebody else, so it may only be used to choose a new one. The
+          claim lets the layout confine the user to the account page without a call per navigation, withholding the
+          administrator role keeps the rights of a system administrator out of reach until the password is replaced,
+          and comparing the claim with the stored flag makes the confinement end, and the old session stop, at the
+          moment the password is changed.
+        tests:
+          - SignIn_Login_TemporaryPassword_GoesToAccountPageWithoutAdminRoleAndStaleWhenFlagChanges
+          - SignIn_IsCurrent_TemporaryPasswordFlag_MustMatchTheClaim
 
       - id: ReviewCenter-SignIn-SessionValidation
         title: >-

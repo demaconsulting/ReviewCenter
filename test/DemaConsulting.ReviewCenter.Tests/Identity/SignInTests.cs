@@ -513,6 +513,91 @@ public class SignInTests
     }
 
     /// <summary>
+    ///     Test that a flagged user (temporary password) is signed in without the system administrator role, is sent
+    ///     to the account page whatever the return URL says, and that the session stops working once the flag
+    ///     changes after the session was issued.
+    /// </summary>
+    [Fact]
+    public async Task SignIn_Login_TemporaryPassword_GoesToAccountPageWithoutAdminRoleAndStaleWhenFlagChanges()
+    {
+        // Arrange: a system administrator who has to change the password
+        await using var app = await StartAsync();
+        await CreateUserAsync(app, "ann", UserRole.Admin);
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var userStore = app.Services.GetRequiredService<IUserStore>();
+        var ann = (await userStore.GetByUsernameAsync("ann", cancellationToken))!;
+        ann.MustChangePassword = true;
+        await userStore.UpdateAsync(ann, null, cancellationToken);
+        using var browser = new TestBrowser(app);
+
+        // Act: log in with a return URL, then ask for a page that needs the administrator role
+        var login = await browser.LoginAsync("ann", TestBrowser.Password, "/projects");
+        var cookies = AuthCookies(browser);
+        var users = await browser.Client.GetAsync("/users", cancellationToken);
+        ann = (await userStore.GetByUsernameAsync("ann", cancellationToken))!;
+        ann.MustChangePassword = false;
+        await userStore.UpdateAsync(ann, null, cancellationToken);
+        var stale = await browser.Client.GetAsync("/projects", cancellationToken);
+
+        // Assert: the account page is the destination, the role is not granted, the old session is stale
+        Assert.Equal(HttpStatusCode.Redirect, login.StatusCode);
+        Assert.Equal(SignIn.AccountPath, login.Headers.Location?.OriginalString);
+        Assert.Single(cookies);
+        Assert.NotEqual(HttpStatusCode.OK, users.StatusCode);
+        Assert.Equal(HttpStatusCode.Redirect, stale.StatusCode);
+    }
+
+    /// <summary>
+    ///     Test that the shared rule ties the temporary-password claim to the stored flag in both directions, and
+    ///     that a flagged system administrator is current only without the administrator claim.
+    /// </summary>
+    [Theory]
+    [InlineData(true, false, true, true)]
+    [InlineData(true, false, false, false)]
+    [InlineData(false, false, true, false)]
+    [InlineData(false, false, false, true)]
+    [InlineData(true, true, true, true)]
+    [InlineData(true, true, false, false)]
+    public void SignIn_IsCurrent_TemporaryPasswordFlag_MustMatchTheClaim(
+        bool flagged, bool storedAdmin, bool claimFlag, bool expected)
+    {
+        // Arrange: a stored user, and a principal that carries the flag claim and never the admin claim when flagged
+        var user = new User
+        {
+            Id = 1,
+            Username = "ann",
+            DisplayName = "Ann",
+            Enabled = true,
+            IsSystemAdmin = storedAdmin,
+            MustChangePassword = flagged
+        };
+        List<System.Security.Claims.Claim> claims =
+        [
+            new(System.Security.Claims.ClaimTypes.Name, "ann"),
+            new(SignIn.DisplayNameClaimType, "Ann")
+        ];
+        if (claimFlag)
+        {
+            claims.Add(new(SignIn.MustChangePasswordClaimType, "true"));
+        }
+
+        if (storedAdmin && !flagged)
+        {
+            claims.Add(new(System.Security.Claims.ClaimTypes.Role, SignIn.AdminRole));
+        }
+
+        var principal = new System.Security.Claims.ClaimsPrincipal(
+            new System.Security.Claims.ClaimsIdentity(claims, "test"));
+
+        // Act
+        var current = SignIn.IsCurrent(principal, user);
+
+        // Assert
+        Assert.Equal(expected, current);
+        Assert.Equal(claimFlag, SignIn.IsPasswordChangeRequired(principal));
+    }
+
+    /// <summary>
     ///     Test that the check interval of open pages defaults to 30 seconds and that its minimum is 5.
     /// </summary>
     [Fact]

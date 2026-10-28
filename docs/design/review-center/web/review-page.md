@@ -72,7 +72,10 @@ record digest, the slots with their signature state, the blockers that prevent s
 It is `null` until loaded. **Candidates**: the members of the project that can be chosen for a slot (`SlotMember` values
 from
 `SigningService.ListCandidatesAsync(actor, projectId)`, so a user who is no member is never offered, and no password
-hash ever reaches the page). **CurrentUsername**: the user name
+hash ever reaches the page). Each assignee of a slot (a `SlotMember` of the approval) also carries `IsMember`, whether
+that user is still a member of the project; the page shows a badge "No longer a project member" next to a primary or
+alternate who is not, with a hint under the names that such a reviewer cannot sign until added to the project again.
+**CurrentUsername**: the user name
 of the signed-in user, from the authentication state, used to tell which slots the user occupies.
 
 **AttestationKeys**: the `IAttestationKeyProvider` of the `Evidence` subsystem, injected so that the page can ask for the
@@ -99,7 +102,8 @@ Test identifiers: `review-page` (root), `breadcrumb-projects-link`, `project-lin
 `review-not-found`, `review-title`, `review-approval`, `next-step`, `review-summary` (the summary strip),
 `checklist-card` (its checklist cell), `checklist-progress-summary`, `checklist-link`, `summary-reviewers`,
 `summary-threads`, `reviewers-card`, `slots-empty`, `slot-{id}`, `slot-label-{id}`, `slot-primary-{id}`,
-`slot-alternate-{id}`, `slot-status-{id}`, `slot-primary-select-{id}`, `slot-alternate-select-{id}`,
+`slot-alternate-{id}`, `slot-primary-not-member-{id}`, `slot-alternate-not-member-{id}`, `slot-not-member-hint-{id}`,
+`slot-status-{id}`, `slot-primary-select-{id}`, `slot-alternate-select-{id}`,
 `slot-save-{id}`, `slot-remove-{id}`, `slot-error-{id}`, `sign-blockers-{id}`, `sign-form-{id}`, `sign-meaning-{id}`,
 `sign-password-{id}`, `sign-error-{id}`, `sign-button-{id}` (all by slot identity), `slot-add-form`,
 `new-slot-primary-select`, `new-slot-alternate-select`, `new-slot-add-button`, `new-slot-error`,
@@ -287,7 +291,9 @@ signature (`SigningService.MeaningText`) and a password field. On submit the pag
 with the signed-in user, the slot, the password typed, and the record digest it displayed (`Approval.Digest`), so what
 is signed is exactly what the reader saw; a record that changed in the meantime is refused by Core, and the page shows
 that message. A `DomainRuleException` (wrong password, a user who is not in the slot, a locked-out user, a changed
-record) is shown in `sign-error-{id}`; the wrong-password message is the generic one Core produces. The password is
+record) is shown in `sign-error-{id}`; the wrong-password message is the generic one Core produces. A reviewer who is no
+longer a member of the project (`SlotMember.IsMember` false) cannot sign: Core refuses, and the page shows that message
+and the badge and hint described above. The password is
 only held in the component field `SignPasswords` while it is typed: the `finally` block removes it after every
 attempt, whatever the outcome, and increments `PasswordKey`, which is part of the `@key` of the field so that the
 browser builds a new, empty input. It is never rendered as a value, logged, or kept. After the attempt the page calls

@@ -69,12 +69,14 @@ sections:
 
       - id: ReviewCenter-AuditService-List
         title: >-
-          The AuditService class shall list the audit trail newest first, 50 entries to a page, for the whole trail
-          or for one review, with cursors for the older and the newer page that are offered only when entries exist
+          The AuditService class shall list the audit trail newest first, 50 entries to a page, for the whole trail,
+          for one project (every entry of the project, and no entry of another project or without a project), or
+          for one review, with cursors for the older and the newer page that are offered only when entries exist
           behind them, and with the older position winning when both are given.
         justification: |
-          The history of a review and the audit page must show a trail of any length in bounded pages, and every
-          entry must appear exactly once while paging.
+          The history of a review, the audit history of a project, and the audit page must show a trail of any
+          length in bounded pages, and every entry must appear exactly once while paging. The administrators of a
+          project may see the history of their project and must see nothing of any other project.
         tests:
           - AuditService_ListAsync_FirstPage_IsNewestFirstWithOlderOnly
           - AuditService_ListAsync_PagingOlder_CoversEveryEntryOnce
@@ -82,6 +84,7 @@ sections:
           - AuditService_ListAsync_ExactlyOnePage_HasNoLinks
           - AuditService_ListAsync_EmptyTrail_GivesEmptyPage
           - AuditService_ListAsync_ReviewFilter_ReturnsOnlyThatReview
+          - AuditService_ListAsync_ProjectOnly_ReturnsOnlyThatProjectsEvents
           - AuditService_ListAsync_ReviewFilterOverFiftyEntries_Pages
           - AuditService_ListAsync_BothPositions_BeforeWins
 

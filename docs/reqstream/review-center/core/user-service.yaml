@@ -199,3 +199,23 @@ sections:
           - UserService_ReauthenticateAsync_WrongPasswordAndLockedAccount_RecordSignatureReauthFailed
           - UserService_ReauthenticateAsync_DisabledAccountRepeated_RecordsOneSignatureReauthFailedPerWindow
           - UserService_ReauthenticateAsync_DisabledThenLockedInOneMinute_RecordsBothReasons
+
+      - id: ReviewCenter-UserService-TemporaryPassword
+        title: >-
+          The UserService class shall let a user whose password is a temporary one sign in, so that the user can
+          reach the page that replaces it, shall refuse that user a re-authentication for a signature and record the
+          refusal in the audit trail with the reason that a password change is pending, shall refuse a new password
+          that is the same as the temporary one and keep the temporary state in that case, shall end the temporary
+          state when the user changes the own password, and shall leave the temporary state unchanged when an
+          administrator sets a password.
+        justification: |
+          A temporary password has been handed over by somebody else, so it is good enough to prove who arrives at
+          the password page but not to confirm a signature, which is a personal statement. The state must end only
+          when the person has really chosen a password of their own, and an administrator who sets a password is
+          not that person.
+        tests:
+          - UserService_AuthenticateAsync_TemporaryPassword_SignsIn
+          - UserService_ReauthenticateAsync_TemporaryPassword_IsRefusedAndAudited
+          - UserService_ChangeOwnPasswordAsync_NewPassword_ClearsTheFlagAndGivesAccess
+          - UserService_ChangeOwnPasswordAsync_SameAsTemporary_IsRefusedAndKeepsTheFlag
+          - UserService_SetPasswordAsync_ByAdministrator_LeavesTheFlagAlone

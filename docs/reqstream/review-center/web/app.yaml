@@ -186,3 +186,18 @@ sections:
           The link must not invite other users to a page they cannot open.
         tests:
           - MainLayout_Render_SignedInUser_ShowsNameAccountAndLogout
+
+      - id: ReviewCenter-App-TemporaryPassword
+        title: >-
+          The App unit shall, while the signed-in session carries the must-change-password claim, show no navigation
+          tabs in the header and send the browser to the account page from every page except the account, login,
+          help, and about pages, on the first request and on every later navigation inside the same session.
+        justification: |
+          A user who signed in with a temporary password may do nothing but replace it. The layout wraps every page,
+          so confining the user there keeps all pages out of reach without each page having to know; the layout lives
+          on while the user clicks from page to page, so the check is repeated on every navigation; the server side
+          refuses the same user as well, so the confinement is a convenience and not the only barrier.
+        tests:
+          - MainLayout_Render_TemporaryPassword_ConfinesUserToAccountPage
+          - MainLayout_Navigate_TemporaryPassword_RedirectsLaterNavigationAndStopsAfterDispose
+          - MainLayout_Navigate_OrdinaryUser_IsNotRedirected

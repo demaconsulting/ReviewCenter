@@ -158,7 +158,10 @@ public sealed class ProjectAccess : IProjectAccess
     /// </summary>
     /// <param name="actor">The actor; may be null.</param>
     /// <param name="cancellationToken">Cancels the operation.</param>
-    /// <returns>The user, or <c>null</c> for no actor, the command line, an unknown user and a disabled user.</returns>
+    /// <returns>
+    ///     The user, or <c>null</c> for no actor, the command line, an unknown user, a disabled user and a user that
+    ///     still has a temporary password (such a user has no access to anything until the password is changed).
+    /// </returns>
     private async Task<User?> ResolveAsync(Actor? actor, CancellationToken cancellationToken)
     {
         if (actor is null || string.IsNullOrEmpty(actor.Username) || actor.Username == Actor.CommandLine.Username)
@@ -167,7 +170,7 @@ public sealed class ProjectAccess : IProjectAccess
         }
 
         var user = await _users.GetByUsernameAsync(actor.Username, cancellationToken);
-        return user is { Enabled: true } ? user : null;
+        return user is { Enabled: true, MustChangePassword: false } ? user : null;
     }
 
     /// <summary>

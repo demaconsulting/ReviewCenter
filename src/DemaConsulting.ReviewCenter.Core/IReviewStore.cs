@@ -81,12 +81,21 @@ public interface IReviewStore
     /// <param name="projectId">The project identity.</param>
     /// <param name="userId">The identity of the user.</param>
     /// <param name="audit">The audit draft of the change, saved in the same transaction. Must not be null.</param>
+    /// <param name="requireAnotherAdmin">
+    ///     When <c>true</c> and the membership is that of an enabled project administrator, the removal is refused
+    ///     unless another enabled project administrator remains; the check and the removal are one atomic step.
+    /// </param>
     /// <param name="cancellationToken">Cancels the operation.</param>
     /// <returns><c>true</c> when the membership was removed; <c>false</c> (and nothing recorded) when there was none.</returns>
+    /// <exception cref="DomainRuleException">
+    ///     Thrown with <see cref="DomainRule.LastProjectAdmin"/> when <paramref name="requireAnotherAdmin"/> is set
+    ///     and the removal would leave the project without an enabled project administrator; nothing is stored then.
+    /// </exception>
     Task<bool> RemoveMembershipAsync(
         int projectId,
         int userId,
         AuditDraft audit,
+        bool requireAnotherAdmin,
         CancellationToken cancellationToken = default);
 
     /// <summary>
@@ -96,13 +105,22 @@ public interface IReviewStore
     /// <param name="userId">The identity of the user.</param>
     /// <param name="role">The new role.</param>
     /// <param name="audit">The audit draft of the change, saved in the same transaction. Must not be null.</param>
+    /// <param name="requireAnotherAdmin">
+    ///     When <c>true</c> and the change demotes an enabled project administrator, the change is refused unless
+    ///     another enabled project administrator remains; the check and the change are one atomic step.
+    /// </param>
     /// <param name="cancellationToken">Cancels the operation.</param>
     /// <returns><c>true</c> when the role was changed; <c>false</c> (and nothing recorded) when there is no membership.</returns>
+    /// <exception cref="DomainRuleException">
+    ///     Thrown with <see cref="DomainRule.LastProjectAdmin"/> when <paramref name="requireAnotherAdmin"/> is set
+    ///     and the change would leave the project without an enabled project administrator; nothing is stored then.
+    /// </exception>
     Task<bool> SetMembershipRoleAsync(
         int projectId,
         int userId,
         ProjectRole role,
         AuditDraft audit,
+        bool requireAnotherAdmin,
         CancellationToken cancellationToken = default);
 
     /// <summary>

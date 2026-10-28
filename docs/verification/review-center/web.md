@@ -68,6 +68,11 @@ N/A - standard test environment (temporary SQLite databases are created by the t
   each token, and the revocation) and the help topic on the API tokens need a live connection for the actions, so they
   are verified at unit level by the component tests of `AccountPage` and `HelpPage` (see the children of the requirement
   `ReviewCenter-Web-AccessTokens` in `web.yaml`).
+- The management of project members (the member list and its actions, the pages for a new member and a new account,
+  the temporary password and its confinement, the audit page of a project, and the help topic on project members) needs
+  a live connection, so it is verified at unit level by the component tests of `ProjectPage`, `AuditPage`,
+  `AccountPage`, `LoginPage`, `App`, and `HelpPage` (see the children of the requirements
+  `ReviewCenter-Web-ProjectAccess`, `ReviewCenter-Web-SignIn`, and `ReviewCenter-Web-AuditPage` in `web.yaml`).
 
 ### Test Scenarios
 
@@ -175,9 +180,17 @@ is no system administrator is refused when creating a project, which is tested b
 missing one, which is tested by `ProjectPage_Render_NonMember_LooksLikeAMissingProject`, a member sees the reviews but
 no Members section, which is tested by `ProjectPage_Render_Member_SeesReviewsButNoMembersSection`, and a system
 administrator sees the members with their roles and actions, which is tested by
-`ProjectPage_Render_SystemAdmin_ListsMembersWithRolesAndActions`. Adding, removing, and changing the role of a member
-are tested by `ProjectPage_AddMember_ChosenUser_BecomesMemberWithTheRole` and
-`ProjectPage_MemberActions_ToggleRoleAndRemove_ChangeTheMembership`. The review creation form offers only the
+`ProjectPage_Render_SystemAdmin_ListsMembersWithRolesAndActions`; a project admin sees the same, with the audit trail
+button, which is tested by `ProjectPage_Render_ProjectAdmin_ShowsMembersAndButtons`. Removing and changing the role of a
+member are tested by `ProjectPage_MemberActions_ToggleRoleAndRemove_ChangeTheMembership`, the refusal to remove or
+demote the last project admin by `ProjectPage_MemberChange_LastProjectAdminSelf_ShowsExplanationAndChangesNothing`. A
+member is added on the pages for a new member, by the exact user name with no list of users, which is tested by
+`NewMemberPage_Submit_ExistingUser_AddsWithRoleAndReturnsToTheProject`, or as a new account with a temporary password
+that is shown once, which is tested by
+`NewMemberAccountPage_Submit_ValidNames_CreatesAccountShowsPasswordOnceAndDoneHidesIt`; both pages show the not-found
+message to anybody who does not administer the project, which is tested by
+`NewMemberPage_Render_NoAdministerRight_ShowsNotFoundAndNoForm` and
+`NewMemberAccountPage_Render_NoAdministerRight_ShowsNotFoundAndNoForm`. The review creation form offers only the
 repositories of its project, which is tested by `NewReviewPage_RepositorySelect_OffersOnlyRepositoriesOfThisProject`.
 
 **Access on an open page**: The pages of a project check the view access again at the start of every action, through
@@ -200,7 +213,8 @@ none of the data it had loaded, which is tested by `ReviewPage_SelectFile_Member
 `PlanPage_ShowPlan_MembershipRevoked_ShowsNotFoundAndNoPlan` and
 `NewReviewPage_CreateForm_MembershipRevoked_ShowsNotFoundAndCreatesNothing`; the other actions are covered in the
 verification of each page. The pages that show data for administrators only clear it in the same way: the repositories
-pages, the members section of the project page, and the users page. A revocation that lands inside a single action,
+pages, the members section and the pages for a new member, and the users page. A revocation that lands inside a single
+action,
 after its check, and data that is already in
 the browser until the next action are not covered; the rule is checked per action, not pushed to the browser.
 
@@ -212,6 +226,10 @@ shows the entry count and the full head hash of an intact chain, which is tested
 `AuditPage_Verify_IntactChain_ShowsCountAndFullHeadHash`, and a user who is no system administrator and opens the
 audit route gets an access
 denied message and no entries, which is tested by `Routes_Render_ReviewerOpensAuditRoute_ShowsAccessDeniedNotTrail`.
+The audit page of a project shows a project admin the events of that project only, which is tested by
+`ProjectAuditPage_Render_ProjectAdmin_ShowsOnlyThisProjectsEvents`, and anybody who does not administer the project
+the not-found message and no entries, which is tested by
+`ProjectAuditPage_Render_NoAdministerRight_ShowsNotFoundAndNoEntries`.
 The subsystem test of all pages does not include the two new routes; their `data-testid` attributes are checked in
 the unit tests.
 
@@ -232,3 +250,12 @@ revocation are verified by the `AccountPage` unit tests, which render the page w
 `AccountPage_RevokeToken_ActiveToken_MarksRevokedAndRemovesButton` trace the subsystem requirement, and the help topic is
 verified by `HelpApiTokensPage_Render_ExplainsTokensCurlEndpointsAndErrors`. The end-to-end journey from the card
 to a call of the API is verified in the `Api` subsystem.
+
+**Temporary password**: A user who signed in with a temporary password is confined to the account page. The layout
+shows no navigation tabs and sends the browser to `/account` from every page except the account, help, and about pages,
+which is tested by `MainLayout_Render_TemporaryPassword_ConfinesUserToAccountPage`; the account page shows a banner and
+the password form only, which is tested by `AccountPage_Render_TemporaryPassword_ShowsBannerAndOnlyPasswordForm`;
+replacing the password sends the browser to the login page with the notice, which is tested by
+`AccountPage_ChangePassword_TemporaryPassword_RedirectsToLoginWithNotice` and
+`LoginPage_Render_ChangedQuery_ShowsNoticeOnlyAfterPasswordChange`. The refusals on the server side (signatures, access
+tokens, project access) are verified in the `Core` and `Api` subsystems.
