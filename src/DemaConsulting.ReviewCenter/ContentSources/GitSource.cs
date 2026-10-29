@@ -47,6 +47,11 @@ namespace DemaConsulting.ReviewCenter.ContentSources;
 internal sealed class GitSource : IGitRepositoryProvider
 {
     /// <summary>
+    ///     The git option that selects the repository folder, the first argument of every command.
+    /// </summary>
+    private const string GitDirOption = "--git-dir";
+
+    /// <summary>
     ///     The mode of a symbolic link in a git tree.
     /// </summary>
     private const string SymlinkMode = "120000";
@@ -143,7 +148,7 @@ internal sealed class GitSource : IGitRepositoryProvider
         if (Directory.Exists(folder))
         {
             var current = await _runner.RunAsync(
-                ["--git-dir", folder, "config", "--get", "remote.origin.url"],
+                [GitDirOption, folder, "config", "--get", "remote.origin.url"],
                 null,
                 4096,
                 cancellationToken);
@@ -151,7 +156,7 @@ internal sealed class GitSource : IGitRepositoryProvider
             if (current.ExitCode == 0 && string.Equals(url, access.Location, StringComparison.Ordinal))
             {
                 await _runner.RunCheckedAsync(
-                    ["--git-dir", folder, "fetch", "--prune", "--force", "origin"],
+                    [GitDirOption, folder, "fetch", "--prune", "--force", "origin"],
                     access,
                     GitRunner.DefaultMaxOutputBytes,
                     cancellationToken);
@@ -257,7 +262,7 @@ internal sealed class GitSource : IGitRepositoryProvider
         {
             RevisionValidator.Validate(revision);
             var result = await _runner.RunAsync(
-                ["--git-dir", _folder, "rev-parse", "--verify", "--end-of-options", revision + "^{commit}"],
+                [GitDirOption, _folder, "rev-parse", "--verify", "--end-of-options", revision + "^{commit}"],
                 _access,
                 4096,
                 cancellationToken);
@@ -284,7 +289,7 @@ internal sealed class GitSource : IGitRepositoryProvider
             // Exit code 0 means "is an ancestor", 1 means "is not"; any other code is a real failure (unknown
             // commit, damaged mirror), so RunAsync is used and the code is inspected here
             var result = await _runner.RunAsync(
-                ["--git-dir", _folder, "merge-base", "--is-ancestor", ancestorSha, descendantSha],
+                [GitDirOption, _folder, "merge-base", "--is-ancestor", ancestorSha, descendantSha],
                 _access,
                 4096,
                 cancellationToken);
@@ -308,7 +313,7 @@ internal sealed class GitSource : IGitRepositoryProvider
             if (baselineSha is null)
             {
                 var output = await _runner.RunCheckedAsync(
-                    ["--git-dir", _folder, "ls-tree", "-r", "-z", "--full-tree", headSha],
+                    [GitDirOption, _folder, "ls-tree", "-r", "-z", "--full-tree", headSha],
                     _access,
                     MaxListingBytes,
                     cancellationToken);
@@ -318,7 +323,7 @@ internal sealed class GitSource : IGitRepositoryProvider
             {
                 RequireObjectId(baselineSha);
                 var output = await _runner.RunCheckedAsync(
-                    ["--git-dir", _folder, "diff-tree", "-r", "-z", "--raw", "--no-renames", "--no-abbrev", baselineSha, headSha, "--"],
+                    [GitDirOption, _folder, "diff-tree", "-r", "-z", "--raw", "--no-renames", "--no-abbrev", baselineSha, headSha, "--"],
                     _access,
                     MaxListingBytes,
                     cancellationToken);
@@ -335,7 +340,7 @@ internal sealed class GitSource : IGitRepositoryProvider
         {
             RequireObjectId(blobSha);
             var output = await _runner.RunCheckedAsync(
-                ["--git-dir", _folder, "cat-file", "-s", blobSha],
+                [GitDirOption, _folder, "cat-file", "-s", blobSha],
                 _access,
                 4096,
                 cancellationToken);
@@ -359,7 +364,7 @@ internal sealed class GitSource : IGitRepositoryProvider
             }
 
             return await _runner.RunCheckedAsync(
-                ["--git-dir", _folder, "cat-file", "blob", blobSha],
+                [GitDirOption, _folder, "cat-file", "blob", blobSha],
                 _access,
                 maxBytes,
                 cancellationToken);

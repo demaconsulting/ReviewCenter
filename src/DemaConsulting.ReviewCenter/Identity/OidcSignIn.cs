@@ -229,118 +229,146 @@ internal static class OidcSignIn
 
         endpoints.MapGet(
             CompleteEndpoint,
-            async (
-                string? returnUrl,
-                HttpContext http,
-                UserService users,
-                IOptions<OidcOptions> options) =>
-            {
-                var target = SignIn.SafeReturnUrl(returnUrl);
-                var retry = target == "/" ? string.Empty : $"&ReturnUrl={Uri.EscapeDataString(target)}";
-                var failure = Results.Redirect($"{SignIn.LoginPath}?error={ErrorValue}{retry}");
-
-                // The hand-over cookie is used once: it is removed whatever happens next
-                var handOver = await http.AuthenticateAsync(ExternalCookieScheme);
-                await http.SignOutAsync(ExternalCookieScheme);
-                if (!handOver.Succeeded || handOver.Principal is null)
-                {
-                    await users.RecordExternalSignInFailureAsync(
-                        "no-hand-over",
-                        SignIn.ClientAddress(http),
-                        http.RequestAborted);
-                    return failure;
-                }
-
-                var claims = handOver.Principal;
-                if (options.Value.RequireEmailVerified
-                    && !string.Equals(claims.FindFirstValue("email_verified"), "true", StringComparison.OrdinalIgnoreCase))
-                {
-                    await users.RecordExternalSignInFailureAsync(
-                        "email-not-verified",
-                        SignIn.ClientAddress(http),
-                        http.RequestAborted);
-                    return failure;
-                }
-
-                var candidate = UsernameCandidate(claims, options.Value.UsernameClaim);
-                var displayName = claims.FindFirstValue("name") ?? candidate;
-                var result = await users.SignInExternalAsync(
-                    claims.FindFirstValue("iss"),
-                    claims.FindFirstValue("sub"),
-                    candidate,
-                    displayName,
-                    http.RequestAborted);
-
-                // One answer for every refusal, so a disabled account is not revealed (the audit trail says why)
-                if (result.User is null)
-                {
-                    if (result.Refusal == ExternalSignInRefusal.Invalid)
-                    {
-                        await users.RecordExternalSignInFailureAsync(
-                            "invalid-identity",
-                            SignIn.ClientAddress(http),
-                            http.RequestAborted);
-                    }
-
-                    return failure;
-                }
-
-                await http.SignInAsync(
-                    CookieAuthenticationDefaults.AuthenticationScheme,
-                    SignIn.BuildPrincipal(result.User),
-                    new AuthenticationProperties { IsPersistent = false });
-                return Results.LocalRedirect(target);
-            });
+            (string? returnUrl, HttpContext http, UserService users, IOptions<OidcOptions> options) =>
+                CompleteAsync(returnUrl, http, users, options));
 
         endpoints.MapPost(
             ReauthEndpoint,
-            async (
+            (
                 [FromForm] int projectId,
                 [FromForm] string? reviewId,
                 [FromForm] int slotId,
                 [FromForm] string? returnUrl,
                 HttpContext http,
-                SigningService signing) =>
-            {
-                var target = SignIn.SafeReturnUrl(returnUrl);
-                var username = http.User.Identity?.Name;
-                var displayName = http.User.FindFirstValue(SignIn.DisplayNameClaimType);
-                if (string.IsNullOrEmpty(username)
-                    || string.IsNullOrEmpty(displayName)
-                    || string.IsNullOrEmpty(reviewId)
-                    || reviewId.Length > ReviewLimits.MaxReviewIdLength)
-                {
-                    return Results.LocalRedirect(WithReauth(target, ReauthFailed));
-                }
-
-                // The same rules as the signature itself, so no confirmation is asked for one the user could not make
-                User user;
-                try
-                {
-                    user = await signing.RequireConfirmableAsync(
-                        new Actor(username, displayName),
-                        projectId,
-                        reviewId,
-                        slotId,
-                        http.RequestAborted);
-                }
-                catch (DomainRuleException)
-                {
-                    return Results.LocalRedirect(WithReauth(target, ReauthFailed));
-                }
-
-                // The properties travel in the protected state of the request, so the provider and the browser
-                // cannot change them
-                var properties = new AuthenticationProperties { RedirectUri = target };
-                properties.Items[ReauthItem] = "1";
-                properties.Items[UserItem] = user.Id.ToString(CultureInfo.InvariantCulture);
-                properties.Items[ProjectItem] = projectId.ToString(CultureInfo.InvariantCulture);
-                properties.Items[ReviewItem] = reviewId;
-                properties.Items[SlotItem] = slotId.ToString(CultureInfo.InvariantCulture);
-                return Results.Challenge(properties, [ProviderScheme]);
-            }).RequireAuthorization();
+                SigningService signing) => ReauthAsync(projectId, reviewId, slotId, returnUrl, http, signing))
+            .RequireAuthorization();
 
         return endpoints;
+    }
+
+    /// <summary>
+    ///     Finishes a normal sign-in at the provider: reads the hand-over cookie once, checks the claims and issues
+    ///     the session cookie.
+    /// </summary>
+    /// <param name="returnUrl">The requested return address; reduced to a local address.</param>
+    /// <param name="http">The request context.</param>
+    /// <param name="users">The user service that signs the external identity in.</param>
+    /// <param name="options">The sign-in settings.</param>
+    /// <returns>The redirect to the requested page, or to the login page with one generic error.</returns>
+    private static async Task<IResult> CompleteAsync(
+        string? returnUrl,
+        HttpContext http,
+        UserService users,
+        IOptions<OidcOptions> options)
+    {
+        var target = SignIn.SafeReturnUrl(returnUrl);
+        var retry = target == "/" ? string.Empty : $"&ReturnUrl={Uri.EscapeDataString(target)}";
+        var failure = Results.Redirect($"{SignIn.LoginPath}?error={ErrorValue}{retry}");
+
+        // The hand-over cookie is used once: it is removed whatever happens next
+        var handOver = await http.AuthenticateAsync(ExternalCookieScheme);
+        await http.SignOutAsync(ExternalCookieScheme);
+        if (!handOver.Succeeded || handOver.Principal is null)
+        {
+            await users.RecordExternalSignInFailureAsync("no-hand-over", SignIn.ClientAddress(http), http.RequestAborted);
+            return failure;
+        }
+
+        var claims = handOver.Principal;
+        if (options.Value.RequireEmailVerified
+            && !string.Equals(claims.FindFirstValue("email_verified"), "true", StringComparison.OrdinalIgnoreCase))
+        {
+            await users.RecordExternalSignInFailureAsync(
+                "email-not-verified",
+                SignIn.ClientAddress(http),
+                http.RequestAborted);
+            return failure;
+        }
+
+        var candidate = UsernameCandidate(claims, options.Value.UsernameClaim);
+        var displayName = claims.FindFirstValue("name") ?? candidate;
+        var result = await users.SignInExternalAsync(
+            claims.FindFirstValue("iss"),
+            claims.FindFirstValue("sub"),
+            candidate,
+            displayName,
+            http.RequestAborted);
+
+        // One answer for every refusal, so a disabled account is not revealed (the audit trail says why)
+        if (result.User is null)
+        {
+            if (result.Refusal == ExternalSignInRefusal.Invalid)
+            {
+                await users.RecordExternalSignInFailureAsync(
+                    "invalid-identity",
+                    SignIn.ClientAddress(http),
+                    http.RequestAborted);
+            }
+
+            return failure;
+        }
+
+        await http.SignInAsync(
+            CookieAuthenticationDefaults.AuthenticationScheme,
+            SignIn.BuildPrincipal(result.User),
+            new AuthenticationProperties { IsPersistent = false });
+        return Results.LocalRedirect(target);
+    }
+
+    /// <summary>
+    ///     Starts a confirmation of identity at the provider for the signature in one slot.
+    /// </summary>
+    /// <param name="projectId">The project identity.</param>
+    /// <param name="reviewId">The review identifier; may be null or too long, which is refused.</param>
+    /// <param name="slotId">The slot to sign in.</param>
+    /// <param name="returnUrl">The requested return address; reduced to a local address.</param>
+    /// <param name="http">The request context of the signed-in user.</param>
+    /// <param name="signing">The signing service that decides whether the user may confirm.</param>
+    /// <returns>The challenge to the provider, or a redirect back with the failure marker.</returns>
+    private static async Task<IResult> ReauthAsync(
+        int projectId,
+        string? reviewId,
+        int slotId,
+        string? returnUrl,
+        HttpContext http,
+        SigningService signing)
+    {
+        var target = SignIn.SafeReturnUrl(returnUrl);
+        var username = http.User.Identity?.Name;
+        var displayName = http.User.FindFirstValue(SignIn.DisplayNameClaimType);
+        if (string.IsNullOrEmpty(username)
+            || string.IsNullOrEmpty(displayName)
+            || string.IsNullOrEmpty(reviewId)
+            || reviewId.Length > ReviewLimits.MaxReviewIdLength)
+        {
+            return Results.LocalRedirect(WithReauth(target, ReauthFailed));
+        }
+
+        // The same rules as the signature itself, so no confirmation is asked for one the user could not make
+        User user;
+        try
+        {
+            user = await signing.RequireConfirmableAsync(
+                new Actor(username, displayName),
+                projectId,
+                reviewId,
+                slotId,
+                http.RequestAborted);
+        }
+        catch (DomainRuleException)
+        {
+            return Results.LocalRedirect(WithReauth(target, ReauthFailed));
+        }
+
+        // The properties travel in the protected state of the request, so the provider and the browser
+        // cannot change them
+        var properties = new AuthenticationProperties { RedirectUri = target };
+        properties.Items[ReauthItem] = "1";
+        properties.Items[UserItem] = user.Id.ToString(CultureInfo.InvariantCulture);
+        properties.Items[ProjectItem] = projectId.ToString(CultureInfo.InvariantCulture);
+        properties.Items[ReviewItem] = reviewId;
+        properties.Items[SlotItem] = slotId.ToString(CultureInfo.InvariantCulture);
+        return Results.Challenge(properties, [ProviderScheme]);
     }
 
     /// <summary>

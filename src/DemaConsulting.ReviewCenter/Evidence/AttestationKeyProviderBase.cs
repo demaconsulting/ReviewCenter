@@ -84,12 +84,15 @@ internal abstract class AttestationKeyProviderBase(AttestationOptions options, T
                 }
 
 #pragma warning disable CA1848 // Logged once when the key is found
-                Log.LogInformation(
-                    "Attestation signing key from provider {Provider}: subject {Subject}, thumbprint {Thumbprint}, self-signed {SelfSigned}.",
-                    key.Info.Provider,
-                    key.Info.Subject,
-                    key.Info.Thumbprint,
-                    key.Info.IsSelfSigned);
+                if (Log.IsEnabled(LogLevel.Information))
+                {
+                    Log.LogInformation(
+                        "Attestation signing key from provider {Provider}: subject {Subject}, thumbprint {Thumbprint}, self-signed {SelfSigned}.",
+                        key.Info.Provider,
+                        key.Info.Subject,
+                        key.Info.Thumbprint,
+                        key.Info.IsSelfSigned);
+                }
 #pragma warning restore CA1848
                 if (key.Info.IsSelfSigned)
                 {

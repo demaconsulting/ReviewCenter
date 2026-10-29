@@ -99,42 +99,52 @@ public sealed record ChecklistDefinition(string Version, IReadOnlyList<Checklist
 
         foreach (var section in definition.Sections)
         {
-            if (section is null)
+            ValidateSection(section);
+        }
+    }
+
+    /// <summary>
+    ///     Checks one section of a deserialized definition and the items in it.
+    /// </summary>
+    /// <param name="section">The deserialized section; null when the text had an empty entry.</param>
+    /// <exception cref="JsonException">Thrown when a required part of the section or of an item is missing.</exception>
+    private static void ValidateSection(ChecklistSection? section)
+    {
+        if (section is null)
+        {
+            throw new JsonException("The checklist definition has an empty section.");
+        }
+
+        if (section.Id is null)
+        {
+            throw new JsonException("A section of the checklist definition has no identifier.");
+        }
+
+        if (section.Title is null)
+        {
+            throw new JsonException($"Section '{section.Id}' of the checklist definition has no title.");
+        }
+
+        if (section.Items is null)
+        {
+            throw new JsonException($"Section '{section.Id}' of the checklist definition has no items.");
+        }
+
+        foreach (var item in section.Items)
+        {
+            if (item is null)
             {
-                throw new JsonException("The checklist definition has an empty section.");
+                throw new JsonException($"Section '{section.Id}' of the checklist definition has an empty item.");
             }
 
-            if (section.Id is null)
+            if (item.Id is null)
             {
-                throw new JsonException("A section of the checklist definition has no identifier.");
+                throw new JsonException($"An item of section '{section.Id}' of the checklist definition has no identifier.");
             }
 
-            if (section.Title is null)
+            if (item.Text is null)
             {
-                throw new JsonException($"Section '{section.Id}' of the checklist definition has no title.");
-            }
-
-            if (section.Items is null)
-            {
-                throw new JsonException($"Section '{section.Id}' of the checklist definition has no items.");
-            }
-
-            foreach (var item in section.Items)
-            {
-                if (item is null)
-                {
-                    throw new JsonException($"Section '{section.Id}' of the checklist definition has an empty item.");
-                }
-
-                if (item.Id is null)
-                {
-                    throw new JsonException($"An item of section '{section.Id}' of the checklist definition has no identifier.");
-                }
-
-                if (item.Text is null)
-                {
-                    throw new JsonException($"Item '{item.Id}' of the checklist definition has no text.");
-                }
+                throw new JsonException($"Item '{item.Id}' of the checklist definition has no text.");
             }
         }
     }

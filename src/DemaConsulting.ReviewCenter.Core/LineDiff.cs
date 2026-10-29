@@ -284,26 +284,47 @@ public static class LineDiff
 
             // A block of changes: the removed run first, then the added run, paired row by row
             var removedStart = i;
-            while (i < end && lines[i].Kind == DiffLineKind.Removed)
-            {
-                i++;
-            }
-
-            var removed = i - removedStart;
+            i = SkipKind(lines, i, end, DiffLineKind.Removed);
             var addedStart = i;
-            while (i < end && lines[i].Kind == DiffLineKind.Added)
-            {
-                i++;
-            }
-
-            var added = i - addedStart;
-            for (var k = 0; k < Math.Max(removed, added); k++)
-            {
-                rows.Add(new DiffRow(k < removed ? removedStart + k : null, k < added ? addedStart + k : null));
-            }
+            i = SkipKind(lines, i, end, DiffLineKind.Added);
+            AddPairedRows(rows, removedStart, addedStart - removedStart, addedStart, i - addedStart);
         }
 
         return rows;
+    }
+
+    /// <summary>
+    ///     Skips a run of rows of one kind.
+    /// </summary>
+    /// <param name="lines">The rows of the diff.</param>
+    /// <param name="index">The index of the first row to look at.</param>
+    /// <param name="end">The index after the last row that may be skipped.</param>
+    /// <param name="kind">The kind of row to skip.</param>
+    /// <returns>The index of the first row of another kind, or <paramref name="end"/>.</returns>
+    private static int SkipKind(IReadOnlyList<DiffLine> lines, int index, int end, DiffLineKind kind)
+    {
+        while (index < end && lines[index].Kind == kind)
+        {
+            index++;
+        }
+
+        return index;
+    }
+
+    /// <summary>
+    ///     Adds the side-by-side rows of one block of changes, pairing the removed and the added rows one by one.
+    /// </summary>
+    /// <param name="rows">The rows to add to.</param>
+    /// <param name="removedStart">The index of the first removed row.</param>
+    /// <param name="removed">The number of removed rows.</param>
+    /// <param name="addedStart">The index of the first added row.</param>
+    /// <param name="added">The number of added rows.</param>
+    private static void AddPairedRows(List<DiffRow> rows, int removedStart, int removed, int addedStart, int added)
+    {
+        for (var k = 0; k < Math.Max(removed, added); k++)
+        {
+            rows.Add(new DiffRow(k < removed ? removedStart + k : null, k < added ? addedStart + k : null));
+        }
     }
 
     /// <summary>
@@ -342,17 +363,8 @@ public static class LineDiff
     {
         // Map every distinct line to a number so that equal lines have equal numbers
         var ids = new Dictionary<string, int>(StringComparer.Ordinal);
-        var a = new int[oldCount];
-        var b = new int[newCount];
-        for (var i = 0; i < oldCount; i++)
-        {
-            a[i] = Identify(ids, oldLines[offset + i]);
-        }
-
-        for (var i = 0; i < newCount; i++)
-        {
-            b[i] = Identify(ids, newLines[offset + i]);
-        }
+        var a = MapLines(ids, oldLines, offset, oldCount);
+        var b = MapLines(ids, newLines, offset, newCount);
 
         // The furthest x reached on each diagonal k = x - y; index k + center. Points may run one past the
         // end of a list, which is harmless because they can never come back to the exact end point
@@ -366,19 +378,9 @@ public static class LineDiff
         {
             for (var k = -d; k <= d; k += 2)
             {
-                // Step down (add a head line) from the neighbor that got further, otherwise step right (remove)
-                var x = k == -d || (k != d && v[center + k - 1] < v[center + k + 1])
-                    ? v[center + k + 1]
-                    : v[center + k - 1] + 1;
+                // Follow the diagonal from the start point for as long as the lines are equal
+                var x = Slide(a, b, StartX(v, center, d, k), k);
                 var y = x - k;
-
-                // Follow the diagonal for as long as the lines are equal
-                while (x < oldCount && y < newCount && a[x] == b[y])
-                {
-                    x++;
-                    y++;
-                }
-
                 v[center + k] = x;
                 if (x == oldCount && y == newCount)
                 {
@@ -402,6 +404,61 @@ public static class LineDiff
     }
 
     /// <summary>
+    ///     Maps a part of a line list to numbers, so that equal lines have equal numbers.
+    /// </summary>
+    /// <param name="ids">The numbers assigned so far; shared between both lists.</param>
+    /// <param name="lines">The lines.</param>
+    /// <param name="offset">The index of the first line of the part.</param>
+    /// <param name="count">The number of lines of the part.</param>
+    /// <returns>The numbers of the lines of the part.</returns>
+    private static int[] MapLines(Dictionary<string, int> ids, IReadOnlyList<string> lines, int offset, int count)
+    {
+        var numbers = new int[count];
+        for (var i = 0; i < count; i++)
+        {
+            numbers[i] = Identify(ids, lines[offset + i]);
+        }
+
+        return numbers;
+    }
+
+    /// <summary>
+    ///     Finds where the search on a diagonal starts: below the neighbor that got further, otherwise right of it.
+    /// </summary>
+    /// <param name="v">The furthest x of each diagonal so far.</param>
+    /// <param name="center">The index of diagonal zero in <paramref name="v"/>.</param>
+    /// <param name="d">The current edit distance.</param>
+    /// <param name="k">The diagonal.</param>
+    /// <returns>The x at which the diagonal is entered.</returns>
+    private static int StartX(int[] v, int center, int d, int k)
+    {
+        // Step down (add a head line) from the neighbor that got further, otherwise step right (remove)
+        return k == -d || (k != d && v[center + k - 1] < v[center + k + 1])
+            ? v[center + k + 1]
+            : v[center + k - 1] + 1;
+    }
+
+    /// <summary>
+    ///     Follows a diagonal for as long as the lines are equal.
+    /// </summary>
+    /// <param name="a">The numbers of the baseline lines.</param>
+    /// <param name="b">The numbers of the head lines.</param>
+    /// <param name="x">The x at which the diagonal is entered.</param>
+    /// <param name="k">The diagonal, <c>x - y</c>.</param>
+    /// <returns>The x at which the equal lines end.</returns>
+    private static int Slide(int[] a, int[] b, int x, int k)
+    {
+        var y = x - k;
+        while (x < a.Length && y < b.Length && a[x] == b[y])
+        {
+            x++;
+            y++;
+        }
+
+        return x;
+    }
+
+    /// <summary>
     ///     Recovers the edit script from the recorded diagonals.
     /// </summary>
     /// <param name="trace">For each distance d, the furthest x of the diagonals -d..d after that distance.</param>
@@ -420,7 +477,7 @@ public static class LineDiff
             // Which neighbor did this point come from? The same rule as the forward search, on the previous distance
             var previous = trace[d - 1];
             var k = x - y;
-            var down = k == -d || (k != d && previous[k - 1 + d - 1] < previous[k + 1 + d - 1]);
+            var down = IsStepDown(previous, k, d);
             var previousK = down ? k + 1 : k - 1;
             var previousX = previous[previousK + d - 1];
             var previousY = previousX - previousK;
@@ -441,15 +498,24 @@ public static class LineDiff
         }
 
         // Distance zero is a pure diagonal from the start
-        while (x > 0 && y > 0)
-        {
-            reversed.Add(DiffLineKind.Context);
-            x--;
-            y--;
-        }
-
+        reversed.AddRange(Enumerable.Repeat(DiffLineKind.Context, Math.Min(x, y)));
         reversed.Reverse();
         return reversed;
+    }
+
+    /// <summary>
+    ///     Tells whether the point on a diagonal was reached by a step down (a head line was added).
+    /// </summary>
+    /// <remarks>
+    ///     This is the same rule as the forward search, applied to the recorded diagonals of the previous distance.
+    /// </remarks>
+    /// <param name="previous">The recorded diagonals of the previous distance, from <c>-(d - 1)</c> up.</param>
+    /// <param name="k">The diagonal of the point.</param>
+    /// <param name="d">The edit distance of the point.</param>
+    /// <returns><c>true</c> for a step down; <c>false</c> for a step right.</returns>
+    private static bool IsStepDown(int[] previous, int k, int d)
+    {
+        return k == -d || (k != d && previous[k - 1 + d - 1] < previous[k + 1 + d - 1]);
     }
 
     /// <summary>

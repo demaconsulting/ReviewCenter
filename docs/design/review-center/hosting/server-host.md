@@ -230,9 +230,10 @@ whose key is in a hardware module that is not present does not start.
 
 **RunAsync**: Builds and runs the web server until it is stopped.
 
-- *Parameters*: `Context context` — parsed context; `CancellationToken cancellationToken` —
-  requests a graceful shutdown; `ServerHostOptions? options` — optional build adjustments, passed on to
-  `CreateApplication` (tests use it to select a temporary database).
+- *Parameters*: `Context context` — parsed context; `ServerHostOptions? options` — optional build
+  adjustments, passed on to `CreateApplication` (tests use it to select a temporary database);
+  `CancellationToken cancellationToken` — requests a graceful shutdown. An overload without `options`
+  takes the context and the cancellation token and uses the production defaults.
 - *Returns*: `Task<int>` — 0 for a clean stop, 1 when the server could not start.
 - *Preconditions*: `context` is not null.
 - *Postconditions*: The application is stopped and disposed; a start-up failure has been

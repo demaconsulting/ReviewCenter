@@ -315,9 +315,9 @@ Identity Providers chapter of the user guide)." (the same text for an `auth_time
 present but not a whole number of seconds or out of range);
 `reauth=stale-auth-time` shows "Your sign-in at {provider} was not recent enough. Try again and sign in when asked.";
 any other value shows nothing, so the address cannot put text on the page. On submit the page
-calls `SigningService.SignAsync`
+calls `SigningService.SignWithCredentialsAsync`
 with the signed-in user, the slot, the password typed (empty for an external user, whose proof is held by Core), the
-code typed (`totpCode`, null without a second factor), and the
+code typed (`SignerCredentials.TotpCode`, null without a second factor), and the
 record digest it displayed (`Approval.Digest`), so what
 is signed is exactly what the reader saw; a record that changed in the meantime is refused by Core, and the page shows
 that message. A `DomainRuleException` (wrong password, a user who is not in the slot, a locked-out user, a changed

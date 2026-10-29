@@ -248,9 +248,8 @@
             </div>
             <p id="token-expiry-heading" class="muted hint">Expires after</p>
             <div class="option-cards three" role="radiogroup" aria-labelledby="token-expiry-heading">
-                @foreach (var days in ReviewLimits.TokenExpiryChoicesInDays)
+                @foreach (var choice in ReviewLimits.TokenExpiryChoicesInDays)
                 {
-                    var choice = days;
                     <label class="option-card">
                         <input type="radio" name="token-expiry" value="@choice" data-testid="token-expiry-@choice"
                                checked="@(TokenExpiryDays == choice)" @onchange="@(() => TokenExpiryDays = choice)" />

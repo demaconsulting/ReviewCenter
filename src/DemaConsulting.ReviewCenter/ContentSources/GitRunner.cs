@@ -228,9 +228,8 @@ internal sealed class GitRunner
             }
         }
 
-        foreach (var form in bases)
+        foreach (var trimmed in bases.Select(form => form.TrimEnd('/', '\\')))
         {
-            var trimmed = form.TrimEnd('/', '\\');
             var withoutGit = trimmed.EndsWith(".git", StringComparison.OrdinalIgnoreCase) ? trimmed[..^4] : trimmed;
             foreach (var variant in new[] { trimmed, withoutGit, withoutGit + ".git" })
             {

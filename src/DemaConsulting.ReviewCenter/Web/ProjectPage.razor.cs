@@ -171,7 +171,8 @@ public partial class ProjectPage : ComponentBase
         ApprovedReviews.Clear();
         foreach (var id in Reviews.Select(review => review.Id))
         {
-            if ((await SigningService.GetApprovalAsync(ProjectId, id))?.IsApproved == true)
+            var approval = await SigningService.GetApprovalAsync(ProjectId, id);
+            if (approval?.IsApproved == true)
             {
                 ApprovedReviews.Add(id);
             }
@@ -243,7 +244,7 @@ public partial class ProjectPage : ComponentBase
     /// </summary>
     /// <param name="member">The member as shown.</param>
     /// <returns>A task that completes when the member is removed or the problem is shown.</returns>
-    private Task RemoveMemberAsync(ProjectMember member)
+    private Task<bool> RemoveMemberAsync(ProjectMember member)
     {
         return RunMemberChangeAsync(
             actor => ProjectService.RemoveMemberAsync(actor, ProjectId, member.Username),
@@ -255,7 +256,7 @@ public partial class ProjectPage : ComponentBase
     /// </summary>
     /// <param name="member">The member as shown.</param>
     /// <returns>A task that completes when the role is changed or the problem is shown.</returns>
-    private Task ToggleRoleAsync(ProjectMember member)
+    private Task<bool> ToggleRoleAsync(ProjectMember member)
     {
         var role = member.Role == ProjectRole.ProjectAdmin ? ProjectRole.User : ProjectRole.ProjectAdmin;
         return RunMemberChangeAsync(

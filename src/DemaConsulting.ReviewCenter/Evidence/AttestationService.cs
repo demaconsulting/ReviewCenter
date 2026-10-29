@@ -106,6 +106,9 @@ internal sealed class AttestationService
     /// <param name="signer">The signer. Must not be null.</param>
     /// <param name="time">The clock. Must not be null.</param>
     /// <exception cref="ArgumentNullException">Thrown when an argument is null.</exception>
+    // The service is built by dependency injection, which supplies each collaborator as its own parameter;
+    // bundling them in an artificial parameter object would only hide what the service depends on
+#pragma warning disable S107
     public AttestationService(
         IReviewStore store,
         SigningService signing,
@@ -115,6 +118,7 @@ internal sealed class AttestationService
         IAttestationRenderer renderer,
         IAttestationSigner signer,
         TimeProvider time)
+#pragma warning restore S107
     {
         ArgumentNullException.ThrowIfNull(store);
         ArgumentNullException.ThrowIfNull(signing);
@@ -177,7 +181,7 @@ internal sealed class AttestationService
         var project = await _store.GetProjectAsync(projectId, cancellationToken);
         if (project is null || !await MayAskAsync(actor, project, cancellationToken))
         {
-            return new AttestationResult(AttestationStatus.NotFound, null, null, "The review was not found.");
+            return NotFoundResult();
         }
 
         var settings = project.Evidence;
@@ -185,7 +189,7 @@ internal sealed class AttestationService
         var approval = await _signing.GetApprovalAsync(projectId, reviewId, cancellationToken);
         if (approval is null)
         {
-            return new AttestationResult(AttestationStatus.NotFound, null, null, "The review was not found.");
+            return NotFoundResult();
         }
 
         // An anonymous caller must not learn which review identifiers exist or whether they are complete, so an
@@ -193,7 +197,7 @@ internal sealed class AttestationService
         if (!approval.IsApproved)
         {
             return actor is null
-                ? new AttestationResult(AttestationStatus.NotFound, null, null, "The review was not found.")
+                ? NotFoundResult()
                 : new AttestationResult(AttestationStatus.NotApproved, null, null, "The review is not complete: not every reviewer slot has signed the current record.");
         }
 
@@ -213,7 +217,7 @@ internal sealed class AttestationService
         var review = await _store.GetReviewAsync(projectId, reviewId, cancellationToken);
         if (snapshot is null || review is null)
         {
-            return new AttestationResult(AttestationStatus.NotFound, null, null, "The review was not found.");
+            return NotFoundResult();
         }
 
         // The approval and the snapshot are two reads: they must describe the same record and the same slots
@@ -226,7 +230,8 @@ internal sealed class AttestationService
         // linear in the number of audit entries
         var chain = await _audit.VerifyAsync(cancellationToken);
         var now = _time.GetUtcNow();
-        var document = BuildDocument(project, review, snapshot, approval, chain, key.Info, actor, settings, now);
+        var document = BuildDocument(
+            project, review, snapshot, approval, new GenerationContext(actor, key.Info, chain, now));
         var unsigned = _renderer.Render(document);
 
         // The reads above and the render take time, so check again that the review is still what was rendered
@@ -279,6 +284,15 @@ internal sealed class AttestationService
         return actor is null
             ? project.Evidence.AnonymousAttestations
             : await _access.CanViewAsync(actor, project.Id, cancellationToken);
+    }
+
+    /// <summary>
+    ///     Builds the answer for a review that does not exist, or that the asker may not know about.
+    /// </summary>
+    /// <returns>The result with the status <see cref="AttestationStatus.NotFound"/>.</returns>
+    private static AttestationResult NotFoundResult()
+    {
+        return new AttestationResult(AttestationStatus.NotFound, null, null, "The review was not found.");
     }
 
     /// <summary>
@@ -387,23 +401,17 @@ internal sealed class AttestationService
     /// <param name="review">The review with its files.</param>
     /// <param name="snapshot">The record, slots and signatures.</param>
     /// <param name="approval">The approval status, which names the slot members.</param>
-    /// <param name="chain">The result of verifying the audit chain.</param>
-    /// <param name="key">The description of the signing key.</param>
-    /// <param name="actor">The user who asked, or <c>null</c> for a request without signing in.</param>
-    /// <param name="settings">The evidence settings in effect.</param>
-    /// <param name="now">The time of generation.</param>
+    /// <param name="context">Who asked, the signing key, the audit chain result and the time of generation.</param>
     /// <returns>The document.</returns>
     private static AttestationDocument BuildDocument(
         Project project,
         Review review,
         ReviewSnapshot snapshot,
         ReviewApproval approval,
-        AuditVerificationResult chain,
-        AttestationKeyInfo key,
-        Actor? actor,
-        EvidenceSettings settings,
-        DateTimeOffset now)
+        GenerationContext context)
     {
+        var settings = project.Evidence;
+        var (actor, key, chain, now) = context;
         var record = snapshot.Record;
         var digestVersion = RecordDigest.Canonicalize(record).Split('\n', 2)[0];
         var threads = record.Threads.ToList();
@@ -564,6 +572,23 @@ internal sealed class AttestationService
 
         return result;
     }
+
+    /// <summary>
+    ///     What a document is built with besides the review itself: who asked, the signing key, the result of
+    ///     verifying the audit chain and the time of generation.
+    /// </summary>
+    /// <remarks>
+    ///     Groups the values that are fixed once per request so that <c>BuildDocument</c> keeps a short parameter list.
+    /// </remarks>
+    /// <param name="Actor">The user who asked, or <c>null</c> for a request without signing in.</param>
+    /// <param name="Key">The description of the signing key.</param>
+    /// <param name="Chain">The result of verifying the audit chain.</param>
+    /// <param name="Now">The time of generation.</param>
+    private sealed record GenerationContext(
+        Actor? Actor,
+        AttestationKeyInfo Key,
+        AuditVerificationResult Chain,
+        DateTimeOffset Now);
 
     /// <summary>
     ///     Writes the names of the people a document mentions, or the labels that stand in for them when the

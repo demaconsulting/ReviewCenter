@@ -86,6 +86,7 @@ public sealed class ThreadService
     /// <returns>The stored thread in the <see cref="ReviewThreadState.Open"/> state, with its first comment.</returns>
     /// <exception cref="ArgumentNullException">Thrown when <paramref name="actor"/> is null.</exception>
     /// <exception cref="DomainRuleException">Thrown when a rule is violated (see <see cref="DomainRule"/>); nothing is stored then.</exception>
+#pragma warning disable S107 // One distinct fact of the request per parameter; a public service API with many callers
     public Task<ReviewThread> StartThreadAsync(
         int projectId,
         string reviewId,
@@ -95,6 +96,7 @@ public sealed class ThreadService
         Actor actor,
         string? text,
         CancellationToken cancellationToken = default)
+#pragma warning restore S107
     {
         return StartThreadAsync(
             projectId, reviewId, filePath, startLine, endLine, actor, text, ThreadSide.Head, cancellationToken);
@@ -132,6 +134,7 @@ public sealed class ThreadService
     /// <exception cref="DomainRuleException">
     ///     Thrown when a rule is violated (see <see cref="DomainRule"/>); nothing is stored then.
     /// </exception>
+#pragma warning disable S107 // One distinct fact of the request per parameter; a public service API with many callers
     public async Task<ReviewThread> StartThreadAsync(
         int projectId,
         string reviewId,
@@ -142,6 +145,7 @@ public sealed class ThreadService
         string? text,
         ThreadSide side,
         CancellationToken cancellationToken = default)
+#pragma warning restore S107
     {
         // Validate everything that needs no I/O first so a bad request fails fast and cheaply
         ArgumentNullException.ThrowIfNull(actor);
@@ -399,17 +403,7 @@ public sealed class ThreadService
         // Without a checklist the sentence depends on the threads alone
         if (checklist is null)
         {
-            if (all.Count == 0)
-            {
-                return "No discussion yet - select a file and comment on a line.";
-            }
-
-            return open switch
-            {
-                0 => "All threads resolved.",
-                1 => "1 open thread to resolve.",
-                _ => $"{open} open threads to resolve."
-            };
+            return ThreadsOnlyStep(all.Count, open);
         }
 
         // With a checklist the unanswered checks come first, then failed checks, then the open threads
@@ -417,17 +411,17 @@ public sealed class ThreadService
         var parts = new List<string>();
         if (unanswered > 0)
         {
-            parts.Add(unanswered == 1 ? "1 checklist check unanswered" : $"{unanswered} checklist checks unanswered");
+            parts.Add(Counted(unanswered, "checklist check unanswered", "checklist checks unanswered"));
         }
 
         if (failedChecks > 0)
         {
-            parts.Add(failedChecks == 1 ? "1 check answered Fail" : $"{failedChecks} checks answered Fail");
+            parts.Add(Counted(failedChecks, "check answered Fail", "checks answered Fail"));
         }
 
         if (open > 0)
         {
-            parts.Add(open == 1 ? "1 open thread to resolve" : $"{open} open threads to resolve");
+            parts.Add(Counted(open, "open thread to resolve", "open threads to resolve"));
         }
 
         if (parts.Count > 0)
@@ -437,6 +431,39 @@ public sealed class ThreadService
         }
 
         return all.Count > 0 ? "Checklist complete and all threads resolved." : "Checklist complete.";
+    }
+
+    /// <summary>
+    ///     Words the next action for a review that has no checklist.
+    /// </summary>
+    /// <param name="threadCount">The number of threads of the review.</param>
+    /// <param name="open">The number of open threads.</param>
+    /// <returns>One short sentence about the threads.</returns>
+    private static string ThreadsOnlyStep(int threadCount, int open)
+    {
+        if (threadCount == 0)
+        {
+            return "No discussion yet - select a file and comment on a line.";
+        }
+
+        return open switch
+        {
+            0 => "All threads resolved.",
+            1 => "1 open thread to resolve.",
+            _ => $"{open} open threads to resolve."
+        };
+    }
+
+    /// <summary>
+    ///     Words a count with the singular or plural form of a phrase.
+    /// </summary>
+    /// <param name="count">The count.</param>
+    /// <param name="singular">The phrase for exactly one.</param>
+    /// <param name="plural">The phrase for any other count.</param>
+    /// <returns>The count followed by the matching phrase.</returns>
+    private static string Counted(int count, string singular, string plural)
+    {
+        return count == 1 ? $"1 {singular}" : $"{count} {plural}";
     }
 
     /// <summary>

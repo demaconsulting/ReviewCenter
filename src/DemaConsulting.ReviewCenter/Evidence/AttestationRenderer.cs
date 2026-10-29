@@ -239,34 +239,57 @@ internal sealed class AttestationRenderer : IAttestationRenderer
 
         foreach (var section in document.Sections)
         {
-            writer.Paragraph(wording ? section.Title : section.Id, PdfFont.HelveticaBold, 10, 0, 8);
-            if (!section.IsApplicable)
-            {
-                writer.Paragraph($"Not applicable: {section.Reason}", PdfFont.HelveticaOblique, 9, 12);
-                continue;
-            }
+            WriteChecklistSection(writer, section, wording);
+        }
+    }
 
-            foreach (var item in section.Items)
-            {
-                if (wording)
-                {
-                    writer.Row($"{item.Id}  {item.Outcome}", item.Text, PdfFont.Helvetica, 12, 110);
-                }
-                else
-                {
-                    writer.Paragraph($"{item.Id}  {item.Outcome}", PdfFont.Helvetica, 10, 12, 3);
-                }
-                if (!string.IsNullOrWhiteSpace(item.Comment))
-                {
-                    // The full comment: it is the reviewer's own words, and the paragraph wraps and breaks pages
-                    writer.Paragraph($"Comment: {item.Comment}", PdfFont.HelveticaOblique, 9, 122, 1);
-                }
+    /// <summary>
+    ///     Writes one section of the checklist: its heading, then its checks or the reason it does not apply.
+    /// </summary>
+    /// <param name="writer">The writer.</param>
+    /// <param name="section">The section.</param>
+    /// <param name="wording">Whether the wording of the section and its checks is included.</param>
+    private static void WriteChecklistSection(PdfDocumentWriter writer, AttestationSection section, bool wording)
+    {
+        writer.Paragraph(wording ? section.Title : section.Id, PdfFont.HelveticaBold, 10, 0, 8);
+        if (!section.IsApplicable)
+        {
+            writer.Paragraph($"Not applicable: {section.Reason}", PdfFont.HelveticaOblique, 9, 12);
+            return;
+        }
 
-                if (item.AnsweredBy is not null)
-                {
-                    writer.Paragraph($"Answered by {item.AnsweredBy}", PdfFont.HelveticaOblique, 8, 122, 1);
-                }
-            }
+        foreach (var item in section.Items)
+        {
+            WriteChecklistItem(writer, item, wording);
+        }
+    }
+
+    /// <summary>
+    ///     Writes one check with its outcome, the reviewer's comment and who answered it.
+    /// </summary>
+    /// <param name="writer">The writer.</param>
+    /// <param name="item">The check.</param>
+    /// <param name="wording">Whether the wording of the check is included.</param>
+    private static void WriteChecklistItem(PdfDocumentWriter writer, AttestationCheck item, bool wording)
+    {
+        if (wording)
+        {
+            writer.Row($"{item.Id}  {item.Outcome}", item.Text, PdfFont.Helvetica, 12, 110);
+        }
+        else
+        {
+            writer.Paragraph($"{item.Id}  {item.Outcome}", PdfFont.Helvetica, 10, 12, 3);
+        }
+
+        if (!string.IsNullOrWhiteSpace(item.Comment))
+        {
+            // The full comment: it is the reviewer's own words, and the paragraph wraps and breaks pages
+            writer.Paragraph($"Comment: {item.Comment}", PdfFont.HelveticaOblique, 9, 122, 1);
+        }
+
+        if (item.AnsweredBy is not null)
+        {
+            writer.Paragraph($"Answered by {item.AnsweredBy}", PdfFont.HelveticaOblique, 8, 122, 1);
         }
     }
 

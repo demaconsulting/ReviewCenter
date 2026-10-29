@@ -866,7 +866,7 @@ public class ServerHostTests
         using var context = Context.Create(["serve", "--silent"]);
 
         // Act: run the server
-        var exitCode = await ServerHost.RunAsync(context, TestContext.Current.CancellationToken, UnsupportedProviderOptions());
+        var exitCode = await ServerHost.RunAsync(context, UnsupportedProviderOptions(), TestContext.Current.CancellationToken);
 
         // Assert: exit code 1, and the context recorded the error
         Assert.Equal(1, exitCode);
@@ -900,7 +900,7 @@ public class ServerHostTests
         try
         {
             // Act: run the server
-            var exitCode = await ServerHost.RunAsync(context, TestContext.Current.CancellationToken, options);
+            var exitCode = await ServerHost.RunAsync(context, options, TestContext.Current.CancellationToken);
 
             // Assert: exit code 1 rather than an unhandled exception
             Assert.Equal(1, exitCode);

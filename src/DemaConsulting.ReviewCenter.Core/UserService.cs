@@ -100,6 +100,11 @@ public sealed class UserService
     private const string OidcSignInFailedAction = "auth.oidc-sign-in-failed";
 
     /// <summary>
+    ///     The audit action code of a failed password sign-in.
+    /// </summary>
+    private const string SignInFailedAction = "auth.sign-in-failed";
+
+    /// <summary>
     ///     The audit action code of a failed re-authentication (for example at signature time).
     /// </summary>
     private const string ReauthFailedAction = "signature.reauth-failed";
@@ -407,7 +412,7 @@ public sealed class UserService
 
         await RecordCoalescedAsync(
             step.User,
-            reauthentication ? ReauthFailedAction : "auth.sign-in-failed",
+            reauthentication ? ReauthFailedAction : SignInFailedAction,
             "second factor required",
             cancellationToken);
         return null;
@@ -449,7 +454,7 @@ public sealed class UserService
                 VerifyDummy(password);
                 await RecordCoalescedAsync(
                     user,
-                    reauthentication ? ReauthFailedAction : "auth.sign-in-failed",
+                    reauthentication ? ReauthFailedAction : SignInFailedAction,
                     "external account has no password",
                     cancellationToken);
                 return failed;
@@ -478,7 +483,7 @@ public sealed class UserService
             {
                 await RecordCoalescedAsync(
                     user,
-                    reauthentication ? ReauthFailedAction : "auth.sign-in-failed",
+                    reauthentication ? ReauthFailedAction : SignInFailedAction,
                     "account disabled",
                     cancellationToken);
                 return failed;
@@ -1207,7 +1212,7 @@ public sealed class UserService
     {
         await RegisterFailureAsync(
             user,
-            reauthentication ? ReauthFailedAction : "auth.sign-in-failed",
+            reauthentication ? ReauthFailedAction : SignInFailedAction,
             "wrong password",
             cancellationToken);
     }
@@ -1263,7 +1268,7 @@ public sealed class UserService
         var name = AuditText.Clean(typedName, ReviewLimits.MaxUsernameLength);
         return RecordCoalescedAsync(
             null,
-            reauthentication ? ReauthFailedAction : "auth.sign-in-failed",
+            reauthentication ? ReauthFailedAction : SignInFailedAction,
             $"unknown user, name '{name}'",
             cancellationToken,
             name);

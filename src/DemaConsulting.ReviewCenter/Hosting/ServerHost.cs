@@ -379,15 +379,27 @@ internal static class ServerHost
     }
 
     /// <summary>
-    ///     Builds and runs the web server until it is stopped.
+    ///     Builds and runs the web server with the production defaults until it is stopped.
     /// </summary>
     /// <param name="context">Parsed command-line context. Must not be null.</param>
     /// <param name="cancellationToken">
     ///     Requests a graceful shutdown when cancelled; Ctrl+C / SIGTERM also stop the server.
     /// </param>
+    /// <returns>0 when the server shut down cleanly; 1 when it could not start.</returns>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="context"/> is null.</exception>
+    public static Task<int> RunAsync(Context context, CancellationToken cancellationToken) =>
+        RunAsync(context, null, cancellationToken);
+
+    /// <summary>
+    ///     Builds and runs the web server until it is stopped.
+    /// </summary>
+    /// <param name="context">Parsed command-line context. Must not be null.</param>
     /// <param name="options">
     ///     Optional build adjustments passed to <see cref="CreateApplication"/>; <c>null</c> selects the
     ///     production defaults. Tests use it to point the server at a temporary database.
+    /// </param>
+    /// <param name="cancellationToken">
+    ///     Requests a graceful shutdown when cancelled; Ctrl+C / SIGTERM also stop the server.
     /// </param>
     /// <returns>
     ///     0 when the server ran and shut down cleanly; 1 when it could not start (for example
@@ -404,8 +416,8 @@ internal static class ServerHost
     /// </remarks>
     public static async Task<int> RunAsync(
         Context context,
-        CancellationToken cancellationToken = default,
-        ServerHostOptions? options = null)
+        ServerHostOptions? options = null,
+        CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(context);
 
@@ -755,7 +767,10 @@ internal static class ServerHost
         // A message template with a named placeholder (not string interpolation) keeps the URL
         // available as a structured property for any log sink that understands them
 #pragma warning disable CA1848 // Single start-up entry; a LoggerMessage delegate adds no value here
-        logger.LogInformation("ReviewCenter server started and listening on {Urls}", urls);
+        if (logger.IsEnabled(LogLevel.Information))
+        {
+            logger.LogInformation("ReviewCenter server started and listening on {Urls}", urls);
+        }
 #pragma warning restore CA1848
     }
 
