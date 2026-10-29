@@ -28,7 +28,8 @@ N/A - standard test environment (a temporary database and key folder are created
   body that is not declared as JSON is a 415 problem, and the rules of the services answer with their status; the rule
   for the last project administrator is 409, too many attempts 429, and a required password change 403.
 - A file count, file size or total size beyond the review limits is a 400 problem, a body over the limit of the endpoint
-  is a 413, and no review is created in these cases.
+  is a 413, and no review is created in these cases. A file count above the limit, or a Base64 text longer than that of
+  the largest file, is a 400 validation problem that is answered before anything is decoded.
 - The attestation of a complete review is a PDF, of a review that is not complete a 409 problem (for a request without a
   token a 404 problem, as for a review that does not exist).
 - The evidence index of a project is a JSON document with the complete reviews that have a review-set id, each with an
@@ -97,6 +98,12 @@ entry is added. This scenario is tested by `ApiEndpoints_CreateReview_NotJsonCon
 file one byte over the size limit of a file, and a review of files that together are one byte over the total limit are
 sent; the sizes are built from `ReviewLimits`. Each answer is a 400 problem document whose detail names the limit, and
 no review is created. This scenario is tested by `ApiEndpoints_CreateReview_FileLimits_Answer400Problem`.
+
+**ApiEndpoints_CreateReview_DecodeBounds_Answer400NamingTheField**: A review with one file more than the limit, and a
+review whose second file has a Base64 text four characters longer than the Base64 text of the largest file, are sent.
+Each answer is a 400 validation problem that names the field (`files`, or `files[1].contentBase64`), the text of the
+content is not in the answer, and no review is created. This scenario is tested by
+`ApiEndpoints_CreateReview_DecodeBounds_Answer400NamingTheField`.
 
 **ApiEndpoints_CreateReview_Endpoint_HasDerivedBodySizeLimit**: The endpoint that creates a review is found in the
 endpoint data source. Its request size limit is the derived limit of `ApiEndpoints`, above the Base64 size of the

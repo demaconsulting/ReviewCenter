@@ -75,6 +75,12 @@ step.
   - A request with no body, or with both or neither of `files` and `repository`, is a 400 problem that names the
     field (`body` or `source`). A file whose content is not valid Base64 is a 400 that names the position
     (`files[i].contentBase64`) and never echoes the content.
+  - The caller's numbers are bounded before they are used: more than `ReviewLimits.MaxFileCount` files is a 400
+    validation problem for the field `files`, and a Base64 text longer than the Base64 length of
+    `ReviewLimits.MaxFileSizeBytes` is a 400 validation problem that names `files[i].contentBase64`, both before
+    anything is decoded or allocated for the files. The detail of the problem repeats the message. These checks only
+    keep the request from sizing allocations and loops; the exact size of every decoded file and the total stay with
+    the service.
   - A project that does not exist, or that the owner may not see, is a 404.
   - With `files`, `ReviewService.CreateDraftAsync` is called; with `repository`,
     `ReviewService.CreateFromRepositoryAsync`

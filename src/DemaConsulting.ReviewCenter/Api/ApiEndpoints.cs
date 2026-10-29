@@ -67,6 +67,18 @@ internal static class ApiEndpoints
         + (64 * 1024);
 
     /// <summary>
+    ///     The validation field of the list of uploaded files.
+    /// </summary>
+    private const string FilesField = "files";
+
+    /// <summary>
+    ///     The longest Base64 text accepted for one uploaded file: four characters for every three bytes of
+    ///     <see cref="ReviewLimits.MaxFileSizeBytes"/>, rounded up. It is checked before decoding; the services check the
+    ///     decoded size exactly.
+    /// </summary>
+    private const long MaxFileBase64Length = 4 * ((ReviewLimits.MaxFileSizeBytes + 2) / 3);
+
+    /// <summary>
     ///     The standard HTTP methods (GET, HEAD, POST, PUT, PATCH, DELETE, OPTIONS) the catch-all route answers with a 404.
     /// </summary>
     private static readonly string[] AllMethods = ["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"];
@@ -385,7 +397,8 @@ internal static class ApiEndpoints
             var files = DecodeFiles(request.Files, out var decodeErrors);
             if (decodeErrors is not null)
             {
-                return Results.ValidationProblem(decodeErrors);
+                // The detail repeats the first message, as the problem of a failed limit in the services does
+                return Results.ValidationProblem(decodeErrors, detail: decodeErrors.Values.First()[0]);
             }
 
             review = await reviews.CreateDraftAsync(projectId, request.Id, request.Title, files, actor, cancellationToken);
@@ -513,6 +526,13 @@ internal static class ApiEndpoints
     /// <summary>
     ///     Decodes the Base64 content of uploaded files.
     /// </summary>
+    /// <remarks>
+    ///     The request body is already capped, but the number of files and the size of each one come from the caller, so
+    ///     they are bounded here before anything is allocated or decoded: more than
+    ///     <see cref="ReviewLimits.MaxFileCount"/> files, or a Base64 text longer than <see cref="MaxFileBase64Length"/>
+    ///     (the Base64 length of <see cref="ReviewLimits.MaxFileSizeBytes"/>), is a validation error. The services stay
+    ///     authoritative for the exact limits (they still check the size of every decoded file and the total).
+    /// </remarks>
     /// <param name="files">The files of the request.</param>
     /// <param name="errors">The validation errors by field, or <c>null</c> when every file could be decoded.</param>
     /// <returns>The files with their bytes.</returns>
@@ -520,11 +540,34 @@ internal static class ApiEndpoints
         IReadOnlyList<UploadFileDto> files,
         out Dictionary<string, string[]>? errors)
     {
-        var decoded = new List<UploadedFile>(files.Count);
+        // The count is checked before the list is created or walked: it is the caller's number, not a trusted one
+        var decoded = new List<UploadedFile>();
         errors = null;
+        if (files.Count > ReviewLimits.MaxFileCount)
+        {
+            errors = new Dictionary<string, string[]>
+            {
+                [FilesField] = [$"A review can have at most {ReviewLimits.MaxFileCount} files."]
+            };
+            return decoded;
+        }
+
         for (var index = 0; index < files.Count; index++)
         {
             var file = files[index];
+
+            // The text is measured before it is decoded, so an oversized entry never allocates its bytes
+            if (file?.ContentBase64 is { } text && text.Length > MaxFileBase64Length)
+            {
+                // Only the position is named: the content itself is never echoed
+                errors = new Dictionary<string, string[]>
+                {
+                    [$"files[{index}].contentBase64"] =
+                        [$"The content is larger than the limit of {ReviewLimits.MaxFileSizeBytes / 1024 / 1024} MiB."]
+                };
+                return decoded;
+            }
+
             try
             {
                 decoded.Add(new UploadedFile(file?.Path ?? string.Empty, Convert.FromBase64String(file?.ContentBase64 ?? string.Empty)));

@@ -135,7 +135,9 @@ Limits to know about:
 repository of that project, a `headRevision`, and optionally a `baselineRevision` and a `selection`, one pattern per
 line).
 The same rules as on the web pages apply: the identifier and title rules, the upload limits, and the repository rules
-(see Projects and Reviews and Reviews from a Repository in the Reviewing chapter).
+(see Projects and Reviews and Reviews from a Repository in the Reviewing chapter). The API refuses more than 200 `files`,
+or a `contentBase64` longer than the Base64 text of 2 MiB, with a **400** that names `files` or `files[i].contentBase64`,
+before it decodes anything.
 
 ```bash
 curl -X POST -H "Authorization: Bearer rcpat_YOUR_TOKEN" -H "Content-Type: application/json" \
