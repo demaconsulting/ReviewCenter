@@ -113,8 +113,14 @@ public class SigningServiceTotpTests
     private static async Task<ReviewSignature> SignAsync(World world, Actor actor, int slotId, string? password, string? code)
     {
         var approval = (await world.Signing.GetApprovalAsync(world.ProjectId, ReviewId, TestContext.Current.CancellationToken))!;
-        return await world.Signing.SignAsync(
-            actor, world.ProjectId, ReviewId, slotId, approval.Digest, password, TestContext.Current.CancellationToken, code);
+        return await world.Signing.SignWithCredentialsAsync(
+            actor,
+            world.ProjectId,
+            ReviewId,
+            slotId,
+            approval.Digest,
+            new SignerCredentials(password, code),
+            TestContext.Current.CancellationToken);
     }
 
     /// <summary>

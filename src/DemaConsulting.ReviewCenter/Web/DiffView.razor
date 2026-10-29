@@ -41,19 +41,16 @@
                         @Cell(pair.LeftIndex, true, rows[0])
                         @Cell(pair.RightIndex, false, rows[0])
                     </div>
-                    @foreach (var row in rows)
+                    @foreach (var row in rows.Where(r => ThreadTemplate is not null && _threadsByRow.ContainsKey(r)))
                     {
-                        @if (_threadsByRow.TryGetValue(row, out var threadsHere) && ThreadTemplate is not null)
-                        {
-                            <div class="diff-inline" data-testid="diff-threads-@row">
-                                <ul class="item-list threads">
-                                    @foreach (var thread in threadsHere)
-                                    {
-                                        @ThreadTemplate(thread)
-                                    }
-                                </ul>
-                            </div>
-                        }
+                        <div class="diff-inline" data-testid="diff-threads-@row">
+                            <ul class="item-list threads">
+                                @foreach (var thread in _threadsByRow[row])
+                                {
+                                    @ThreadTemplate!(thread)
+                                }
+                            </ul>
+                        </div>
                     }
 
                     @if (rows.Contains(composerRow) && Composer is not null)
@@ -71,36 +68,40 @@
 @code {
     // One cell of a row: the left cell shows the baseline version of a line, the right cell the head version.
     // "anchor" is the row index that names an empty placeholder.
-    private RenderFragment Cell(int? index, bool isLeft, int anchor) => __builder =>
+    private RenderFragment Cell(int? index, bool isLeft, int anchor) =>
+        index is { } row ? FilledCell(row, isLeft) : EmptyCell(isLeft, anchor);
+
+    // The placeholder of a row that has no line on this side.
+    private static RenderFragment EmptyCell(bool isLeft, int anchor) => __builder =>
     {
         var position = isLeft ? "left" : "right";
-        if (index is not { } row)
-        {
-            <div class="diff-row empty @position" aria-hidden="true" data-testid="diff-empty-@position-@anchor"></div>
-        }
-        else
-        {
-            var line = Result.Lines[row];
-            var side = isLeft ? ThreadSide.Baseline : ThreadSide.Head;
-            var key = CellKey(line, row, isLeft);
-            <div class="diff-row @KindClass(line) @position @(IsAnchored(line, side) ? "anchored" : null) @(IsSelected(line, side) ? "selected" : null) @(IsFocused(line, side) ? "focused" : null)"
-                 data-testid="diff-row-@key" data-kind="@KindClass(line)">
-                <span class="gutter">
-                    <button type="button" class="line-comment" data-testid="diff-comment-@key"
-                            aria-label="@CommentLabel(line, side)" title="@CommentLabel(line, side)"
-                            @onclick="e => CommentAsync(row, side, e)">+</button>
-                    @if (isLeft)
-                    {
-                        <span class="line-no" data-testid="diff-old-no-@row">@line.OldNumber</span>
-                    }
-                    else
-                    {
-                        <span class="line-no" data-testid="diff-new-no-@row">@line.NewNumber</span>
-                    }
-                </span>
-                <span class="diff-sign" aria-hidden="true">@Sign(line)</span>
-                <span class="line-text" data-testid="diff-text-@key">@line.Text</span>
-            </div>
-        }
+        <div class="diff-row empty @position" aria-hidden="true" data-testid="diff-empty-@position-@anchor"></div>
+    };
+
+    // The cell of a line: its comment button, line number, mark and text.
+    private RenderFragment FilledCell(int row, bool isLeft) => __builder =>
+    {
+        var position = isLeft ? "left" : "right";
+        var line = Result.Lines[row];
+        var side = isLeft ? ThreadSide.Baseline : ThreadSide.Head;
+        var key = CellKey(line, row, isLeft);
+        <div class="diff-row @KindClass(line) @position @(IsAnchored(line, side) ? "anchored" : null) @(IsSelected(line, side) ? "selected" : null) @(IsFocused(line, side) ? "focused" : null)"
+             data-testid="diff-row-@key" data-kind="@KindClass(line)">
+            <span class="gutter">
+                <button type="button" class="line-comment" data-testid="diff-comment-@key"
+                        aria-label="@CommentLabel(line, side)" title="@CommentLabel(line, side)"
+                        @onclick="e => CommentAsync(row, side, e)">+</button>
+                @if (isLeft)
+                {
+                    <span class="line-no" data-testid="diff-old-no-@row">@line.OldNumber</span>
+                }
+                else
+                {
+                    <span class="line-no" data-testid="diff-new-no-@row">@line.NewNumber</span>
+                }
+            </span>
+            <span class="diff-sign" aria-hidden="true">@Sign(line)</span>
+            <span class="line-text" data-testid="diff-text-@key">@line.Text</span>
+        </div>
     };
 }

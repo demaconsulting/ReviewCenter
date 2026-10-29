@@ -201,16 +201,16 @@ public sealed class ReviewPlanner
         var existing = (await _store.ListReviewsAsync(projectId, cancellationToken))
             .Where(review => review.RepositoryId == repositoryId)
             .ToList();
+        var context = new PlanContext(existing, headSha, mode);
 
         // Pass 1: selection and baseline of every set
         var candidates = new List<Candidate>();
-        foreach (var definition in definitions)
+        foreach (var candidate in definitions.Select(Candidate.For))
         {
-            var candidate = Candidate.For(definition);
             if (candidate.Problem is null)
             {
                 await ChooseBaselineAsync(
-                    candidate, session, projectId, existing, headSha, mode, explicitRevision, explicitSha, cancellationToken);
+                    candidate, session, projectId, context, explicitRevision, explicitSha, cancellationToken);
             }
 
             candidates.Add(candidate);
@@ -227,7 +227,7 @@ public sealed class ReviewPlanner
             var candidate = candidates[index];
             if (candidate.Problem is not null || candidate.Unchanged)
             {
-                rows[index] = ToRow(candidate, null, existing, headSha, mode);
+                rows[index] = ToRow(candidate, null, context);
                 continue;
             }
 
@@ -245,13 +245,13 @@ public sealed class ReviewPlanner
         // The head listing is already loaded; it serves the full reviews and is released before any other list is read
         if (groups.TryGetValue(string.Empty, out var fullMembers))
         {
-            ClassifyGroup(fullMembers, headBox.Value!, candidates, rows, existing, headSha, mode);
+            ClassifyGroup(fullMembers, headBox.Value!, candidates, rows, context);
         }
 
         headBox.Value = null;
         foreach (var key in order.Where(key => key.Length > 0))
         {
-            await ClassifyBaselineAsync(session, key, headSha, groups[key], candidates, rows, existing, mode, cancellationToken);
+            await ClassifyBaselineAsync(session, key, groups[key], candidates, rows, context, cancellationToken);
         }
 
         return new ReviewPlan(
@@ -488,9 +488,7 @@ public sealed class ReviewPlanner
     /// <param name="candidate">The set; its baseline, note and unchanged flag are set.</param>
     /// <param name="session">The open session, for the ancestor check.</param>
     /// <param name="projectId">The project identity.</param>
-    /// <param name="existing">The reviews of the project made from this repository.</param>
-    /// <param name="headSha">The head commit.</param>
-    /// <param name="mode">The baseline mode.</param>
+    /// <param name="context">The reviews of the repository, the head commit and the baseline mode.</param>
     /// <param name="explicitRevision">The baseline revision as entered, for explicit mode.</param>
     /// <param name="explicitSha">The baseline commit, for explicit mode.</param>
     /// <param name="cancellationToken">Cancels the operation.</param>
@@ -499,13 +497,12 @@ public sealed class ReviewPlanner
         Candidate candidate,
         IGitRepository session,
         int projectId,
-        IReadOnlyList<Review> existing,
-        string headSha,
-        BaselineMode mode,
+        PlanContext context,
         string? explicitRevision,
         string? explicitSha,
         CancellationToken cancellationToken)
     {
+        var (existing, headSha, mode) = context;
         switch (mode)
         {
             case BaselineMode.None:
@@ -625,27 +622,23 @@ public sealed class ReviewPlanner
     /// </remarks>
     /// <param name="session">The open session.</param>
     /// <param name="baselineSha">The baseline commit of the group.</param>
-    /// <param name="headSha">The head commit.</param>
     /// <param name="members">The positions in <paramref name="candidates"/> of the sets of the group.</param>
     /// <param name="candidates">All sets, in configuration order.</param>
     /// <param name="rows">The rows by position of their set; filled for the members.</param>
-    /// <param name="existing">The reviews of the project made from this repository.</param>
-    /// <param name="mode">The baseline mode.</param>
+    /// <param name="context">The reviews of the repository, the head commit and the baseline mode.</param>
     /// <param name="cancellationToken">Cancels the operation.</param>
     /// <returns>A task that completes when the group is classified.</returns>
     private static async Task ClassifyBaselineAsync(
         IGitRepository session,
         string baselineSha,
-        string headSha,
         List<int> members,
         List<Candidate> candidates,
         PlanRow?[] rows,
-        IReadOnlyList<Review> existing,
-        BaselineMode mode,
+        PlanContext context,
         CancellationToken cancellationToken)
     {
-        var changes = await session.ListChangesAsync(baselineSha, headSha, cancellationToken);
-        ClassifyGroup(members, changes, candidates, rows, existing, headSha, mode);
+        var changes = await session.ListChangesAsync(baselineSha, context.HeadSha, cancellationToken);
+        ClassifyGroup(members, changes, candidates, rows, context);
     }
 
     /// <summary>
@@ -655,21 +648,17 @@ public sealed class ReviewPlanner
     /// <param name="changes">The changes between the baseline of the group and the head.</param>
     /// <param name="candidates">All sets, in configuration order.</param>
     /// <param name="rows">The rows by position of their set; filled for the members.</param>
-    /// <param name="existing">The reviews of the project made from this repository.</param>
-    /// <param name="headSha">The head commit.</param>
-    /// <param name="mode">The baseline mode.</param>
+    /// <param name="context">The reviews of the repository, the head commit and the baseline mode.</param>
     private static void ClassifyGroup(
         List<int> members,
         GitChangeSet changes,
         List<Candidate> candidates,
         PlanRow?[] rows,
-        IReadOnlyList<Review> existing,
-        string headSha,
-        BaselineMode mode)
+        PlanContext context)
     {
         foreach (var index in members)
         {
-            rows[index] = ToRow(candidates[index], changes, existing, headSha, mode);
+            rows[index] = ToRow(candidates[index], changes, context);
         }
     }
 
@@ -678,17 +667,14 @@ public sealed class ReviewPlanner
     /// </summary>
     /// <param name="candidate">The set.</param>
     /// <param name="changeSet">The changes for the baseline of the set; <c>null</c> when the set has a problem or is unchanged.</param>
-    /// <param name="existing">The reviews of the project made from this repository.</param>
-    /// <param name="headSha">The head commit.</param>
-    /// <param name="mode">The baseline mode.</param>
+    /// <param name="context">The reviews of the repository, the head commit and the baseline mode.</param>
     /// <returns>The row.</returns>
     private static PlanRow ToRow(
         Candidate candidate,
         GitChangeSet? changeSet,
-        IReadOnlyList<Review> existing,
-        string headSha,
-        BaselineMode mode)
+        PlanContext context)
     {
+        var (existing, headSha, mode) = context;
         var definition = candidate.Definition;
         PlanRow Row(PlanRowStatus status, int added = 0, int modified = 0, int deleted = 0, string? reviewId = null, string? problem = null) =>
             new(
@@ -809,15 +795,16 @@ public sealed class ReviewPlanner
                         session,
                         access,
                         projectId,
-                        id,
-                        title,
-                        headSha,
-                        request.BaselineSha,
-                        patterns,
-                        selectionText,
-                        request.SetId,
-                        Short(headSha),
-                        request.BaselineSha is null ? null : Short(request.BaselineSha),
+                        new SessionReviewRequest(
+                            id,
+                            title,
+                            headSha,
+                            request.BaselineSha,
+                            patterns,
+                            selectionText,
+                            request.SetId,
+                            Short(headSha),
+                            request.BaselineSha is null ? null : Short(request.BaselineSha)),
                         actor,
                         cancellationToken);
                     return new PlanCreateResult(request.SetId, PlanCreateOutcome.Created, created.Review.Id, $"Review '{created.Review.Id}' was created.");
@@ -853,6 +840,14 @@ public sealed class ReviewPlanner
     /// </remarks>
     private static string SafeMessage(DomainRuleException exception) =>
         exception.Rule == DomainRule.GitAccessFailed ? GitAccessFailedMessage : exception.Message;
+
+    /// <summary>
+    ///     What every set of one plan is classified against: the reviews that exist, the head commit and the mode.
+    /// </summary>
+    /// <param name="Existing">The reviews of the project made from this repository.</param>
+    /// <param name="HeadSha">The head commit.</param>
+    /// <param name="Mode">The baseline mode.</param>
+    private sealed record PlanContext(IReadOnlyList<Review> Existing, string HeadSha, BaselineMode Mode);
 
     /// <summary>
     ///     The working data of one review-set while the plan is made.

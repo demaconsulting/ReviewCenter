@@ -37,6 +37,11 @@ public static class DefaultChecklist
     public const string Version = "default-1";
 
     /// <summary>
+    ///     The applicability hint shared by the sections that only concern source code.
+    /// </summary>
+    private const string SkipWithoutSourceCode = "Skip this section if the review contains no source code files.";
+
+    /// <summary>
     ///     Gets the default checklist.
     /// </summary>
     public static ChecklistDefinition Current { get; } = new(Version,
@@ -67,7 +72,7 @@ public static class DefaultChecklist
             new ChecklistItem("DOC-03", "All referenced external documents and dependencies are correctly identified"),
             new ChecklistItem("DOC-04", "Documentation is free of spelling and grammar errors")
         ]),
-        new ChecklistSection("CODE", "Code Checks", "Skip this section if the review contains no source code files.",
+        new ChecklistSection("CODE", "Code Checks", SkipWithoutSourceCode,
         [
             new ChecklistItem("CODE-01", "Code conforms to the project coding standards and style guide"),
             new ChecklistItem("CODE-02", "No obvious resource leaks are present (file handles, connections, memory)"),
@@ -76,13 +81,13 @@ public static class DefaultChecklist
             new ChecklistItem("CODE-05", "Code is written at the appropriate level of abstraction"),
             new ChecklistItem("CODE-06", "Code has an appropriate amount of extensibility for its context")
         ]),
-        new ChecklistSection("LOGIC", "Logic Error Checks", "Skip this section if the review contains no source code files.",
+        new ChecklistSection("LOGIC", "Logic Error Checks", SkipWithoutSourceCode,
         [
             new ChecklistItem("LOGIC-01", "Code does only what is intended (no unintended side effects or behaviors)"),
             new ChecklistItem("LOGIC-02", "All significant inputs and boundary conditions are handled correctly"),
             new ChecklistItem("LOGIC-03", "Concurrency and threading concerns are identified and addressed")
         ]),
-        new ChecklistSection("ERR", "Error Handling & Logging Checks", "Skip this section if the review contains no source code files.",
+        new ChecklistSection("ERR", "Error Handling & Logging Checks", SkipWithoutSourceCode,
         [
             new ChecklistItem("ERR-01", "Error handling follows the approach described in the design documentation"),
             new ChecklistItem("ERR-02", "The logging volume and level of detail are appropriate"),
@@ -108,7 +113,7 @@ public static class DefaultChecklist
             new ChecklistItem("SEC-02", "Authentication and authorization are handled correctly (see design documentation)"),
             new ChecklistItem("SEC-03", "Sensitive data is stored and transmitted securely")
         ]),
-        new ChecklistSection("READ", "Code Readability Checks", "Skip this section if the review contains no source code files.",
+        new ChecklistSection("READ", "Code Readability Checks", SkipWithoutSourceCode,
         [
             new ChecklistItem("READ-01", "Code is easy to understand"),
             new ChecklistItem("READ-02", "Methods and functions are small enough to be easily understood"),

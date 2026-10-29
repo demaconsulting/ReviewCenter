@@ -478,8 +478,9 @@ of each slot, and the digest in the Details section), to offer the controls that
 changes only for a slot without a signature; the sign form only to a user who occupies a slot that is not currently
 signed, or the list of blockers while the review cannot be signed), and to pass the user's input to Core.
 Signing re-authenticates the user: the form asks for the password, which the page holds only in a component field
-while it is typed, passes to `SigningService.SignAsync`, and clears in a `finally` block after every attempt; it is
-never rendered back into the page. The page also passes the record digest it displayed, so a signature always covers
+while it is typed, passes to `SigningService.SignWithCredentialsAsync`, and clears in a `finally` block after every
+attempt; it is never rendered back into the page. The page also passes the record digest it displayed, so a
+signature always covers
 the record the reader saw, and a record that changed since the page was drawn is refused. For a local user with a second
 factor the form also asks for the current code (see *Two-factor sign-in* below). For a user who signs in with
 an identity provider there is no password: the page offers a button that posts to the confirmation endpoint of the
@@ -537,8 +538,9 @@ card then shows how many recovery codes are left and offers new recovery codes (
 factor off (password, and a code or a recovery code). Every field is cleared after every attempt, and a refusal is shown
 as the message of the rule next to the card. `ReviewPage` asks `TotpService.IsEnrolledAsync` and shows a code field
 beside the password field for a local user with a second factor, with the hint to wait for the next code when the code
-was just used to sign in; the code is passed to `SigningService.SignAsync` and cleared in the same `finally` block as
-the password. `UsersPage` lists the users with a confirmed factor (`ListEnrolledUserIdsAsync`), shows a badge for each,
+was just used to sign in; the code is passed to `SigningService.SignWithCredentialsAsync` and cleared in the same
+`finally` block as the password. `UsersPage` lists the users with a confirmed factor (`ListEnrolledUserIdsAsync`),
+shows a badge for each,
 and offers a Reset two-factor button that calls `TotpService.ResetAsync`. The Help topic `two-factor` explains the setup,
 the sign-in, the recovery codes, and what to do after losing a phone.
 

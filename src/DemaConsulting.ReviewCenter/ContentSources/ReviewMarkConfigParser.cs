@@ -160,9 +160,8 @@ internal sealed class ReviewMarkConfigParser : IReviewSetParser
         }
 
         var cleaned = new List<string>();
-        foreach (var path in paths)
+        foreach (var trimmed in paths.Select(path => path?.Trim()))
         {
-            var trimmed = path?.Trim();
             if (string.IsNullOrEmpty(trimmed) || trimmed.Any(char.IsControl) || trimmed.Length > SelectionMatcher.MaxPatternLength)
             {
                 throw Invalid(
@@ -188,7 +187,8 @@ internal sealed class ReviewMarkConfigParser : IReviewSetParser
     /// <exception cref="YamlException">Thrown when the text is not valid YAML.</exception>
     private static void RejectAliases(string text)
     {
-        var parser = new Parser(new StringReader(text));
+        using var reader = new StringReader(text);
+        var parser = new Parser(reader);
         while (parser.MoveNext())
         {
             if (parser.Current is AnchorAlias alias)

@@ -212,70 +212,11 @@ internal static class SignIn
         // The login form fields are bound with [FromForm], which makes the framework require the antiforgery token
         endpoints.MapPost(
             LoginEndpoint,
-            async (
+            (
                 [FromForm] string? username,
                 [FromForm] string? password,
                 [FromForm] string? returnUrl,
-                HttpContext http,
-                UserService users,
-                TotpService totp,
-                AuditService audit,
-                SignInThrottle throttle) =>
-            {
-                var target = SafeReturnUrl(returnUrl);
-                var retry = target == "/" ? string.Empty : $"&ReturnUrl={Uri.EscapeDataString(target)}";
-
-                // Over the limit: nothing is checked (even a right password is refused), so the answer is the same
-                // for every name; the refusal is recorded once per minute and name
-                var address = ClientAddress(http);
-                var reservation = throttle.TryBegin(address, username);
-                if (reservation is null)
-                {
-                    var typed = AuditText.Clean(username, ReviewLimits.MaxUsernameLength);
-                    await audit.TryRecordCoalescedAsync(
-                        new AuditDraft("auth.sign-in-throttled", null, "not signed in", null, null, $"too many attempts, name '{typed}'"),
-                        $"auth.sign-in-throttled|{typed.ToLowerInvariant()}",
-                        http.RequestAborted);
-                    return Results.Redirect($"{LoginPath}?error={ThrottledError}{retry}");
-                }
-
-                var step = await users.AuthenticatePasswordAsync(username, password, http.RequestAborted);
-                var user = step.User;
-
-                // One generic answer for every failure; the query keeps the (safe) place the user wanted to go to
-                if (user is null)
-                {
-                    return Results.Redirect($"{LoginPath}?error=1{retry}");
-                }
-
-                // The password was right but the account has a second factor: no session yet. The browser gets a
-                // short-lived challenge cookie and is sent to the code page; the failure counter stays as it is
-                // until the code is right too. The attempt gives its address slot back (a correct password must not
-                // use up the quota of the client); the name counter stays
-                if (step.SecondFactorRequired)
-                {
-                    throttle.ReleaseAddress(reservation);
-                    var token = totp.BeginSignIn(user, address, target);
-                    http.Response.Cookies.Append(TotpSignIn.CookieName, token, TotpSignIn.CookieOptions(http));
-                    return Results.Redirect(TotpSignIn.LoginPath);
-                }
-
-                // The attempt does not count against the client any more
-                throttle.Succeeded(reservation);
-
-                await http.SignInAsync(
-                    CookieAuthenticationDefaults.AuthenticationScheme,
-                    BuildPrincipal(user),
-                    new AuthenticationProperties { IsPersistent = false });
-
-                // Best effort: a failure to record is logged by the service and never stops the sign-in
-                await audit.TryRecordAsync(
-                    AuditDraft.By(new Actor(user.Username, user.DisplayName), "auth.sign-in", "signed in"),
-                    http.RequestAborted);
-
-                // A temporary password leads straight to the page that replaces it, whatever the user asked for
-                return Results.LocalRedirect(user.MustChangePassword ? AccountPath : target);
-            });
+                HttpContext http) => LoginAsync(username, password, returnUrl, http));
 
         // This endpoint binds no form field, so the framework does not check the token by itself
         endpoints.MapPost(
@@ -307,6 +248,79 @@ internal static class SignIn
             });
 
         return endpoints;
+    }
+
+    /// <summary>
+    ///     Handles a posted login form: throttles, checks the password and either issues the session, starts the
+    ///     second-factor step or redirects back with one generic error.
+    /// </summary>
+    /// <remarks>
+    ///     The services are taken from the request scope instead of the endpoint parameters, which keeps the
+    ///     endpoint to the form fields and the context. The antiforgery token is still required because the form
+    ///     fields of the endpoint are bound with <c>[FromForm]</c>.
+    /// </remarks>
+    /// <param name="username">The typed user name; may be null.</param>
+    /// <param name="password">The typed password; may be null. Never stored or logged.</param>
+    /// <param name="returnUrl">The requested return address; may be null or hostile.</param>
+    /// <param name="http">The request context.</param>
+    /// <returns>The redirect for the outcome.</returns>
+    private static async Task<IResult> LoginAsync(string? username, string? password, string? returnUrl, HttpContext http)
+    {
+        var users = http.RequestServices.GetRequiredService<UserService>();
+        var throttle = http.RequestServices.GetRequiredService<SignInThrottle>();
+        var target = SafeReturnUrl(returnUrl);
+        var retry = target == "/" ? string.Empty : $"&ReturnUrl={Uri.EscapeDataString(target)}";
+
+        // Over the limit: nothing is checked (even a right password is refused), so the answer is the same
+        // for every name; the refusal is recorded once per minute and name
+        var address = ClientAddress(http);
+        var reservation = throttle.TryBegin(address, username);
+        if (reservation is null)
+        {
+            var typed = AuditText.Clean(username, ReviewLimits.MaxUsernameLength);
+            await http.RequestServices.GetRequiredService<AuditService>().TryRecordCoalescedAsync(
+                new AuditDraft("auth.sign-in-throttled", null, "not signed in", null, null, $"too many attempts, name '{typed}'"),
+                $"auth.sign-in-throttled|{typed.ToLowerInvariant()}",
+                http.RequestAborted);
+            return Results.Redirect($"{LoginPath}?error={ThrottledError}{retry}");
+        }
+
+        var step = await users.AuthenticatePasswordAsync(username, password, http.RequestAborted);
+        var user = step.User;
+
+        // One generic answer for every failure; the query keeps the (safe) place the user wanted to go to
+        if (user is null)
+        {
+            return Results.Redirect($"{LoginPath}?error=1{retry}");
+        }
+
+        // The password was right but the account has a second factor: no session yet. The browser gets a
+        // short-lived challenge cookie and is sent to the code page; the failure counter stays as it is
+        // until the code is right too. The attempt gives its address slot back (a correct password must not
+        // use up the quota of the client); the name counter stays
+        if (step.SecondFactorRequired)
+        {
+            throttle.ReleaseAddress(reservation);
+            var token = http.RequestServices.GetRequiredService<TotpService>().BeginSignIn(user, address, target);
+            http.Response.Cookies.Append(TotpSignIn.CookieName, token, TotpSignIn.CookieOptions(http));
+            return Results.Redirect(TotpSignIn.LoginPath);
+        }
+
+        // The attempt does not count against the client any more
+        throttle.Succeeded(reservation);
+
+        await http.SignInAsync(
+            CookieAuthenticationDefaults.AuthenticationScheme,
+            BuildPrincipal(user),
+            new AuthenticationProperties { IsPersistent = false });
+
+        // Best effort: a failure to record is logged by the service and never stops the sign-in
+        await http.RequestServices.GetRequiredService<AuditService>().TryRecordAsync(
+            AuditDraft.By(new Actor(user.Username, user.DisplayName), "auth.sign-in", "signed in"),
+            http.RequestAborted);
+
+        // A temporary password leads straight to the page that replaces it, whatever the user asked for
+        return Results.LocalRedirect(user.MustChangePassword ? AccountPath : target);
     }
 
     /// <summary>

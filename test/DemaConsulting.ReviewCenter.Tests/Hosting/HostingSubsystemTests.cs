@@ -141,7 +141,7 @@ public class HostingSubsystemTests
         };
 
         // Act: run the server
-        var exitCode = await ServerHost.RunAsync(context, TestContext.Current.CancellationToken, options);
+        var exitCode = await ServerHost.RunAsync(context, options, TestContext.Current.CancellationToken);
 
         // Assert: the run failed with exit code 1 and the context holds the failure
         Assert.Equal(1, exitCode);

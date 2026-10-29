@@ -107,9 +107,8 @@ public static class SelectionMatcher
         ArgumentNullException.ThrowIfNull(text);
 
         var patterns = new List<SelectionPattern>();
-        foreach (var rawLine in text.Split('\n'))
+        foreach (var line in text.Split('\n').Select(rawLine => rawLine.Trim()))
         {
-            var line = rawLine.Trim();
             if (line.Length == 0)
             {
                 continue;
@@ -209,15 +208,22 @@ public static class SelectionMatcher
             segments[^1] = GlobStar;
         }
 
-        foreach (var segment in segments)
-        {
-            if (segment.Length == 0 || segment == "." || segment == "..")
-            {
-                throw Invalid($"The pattern '{body}' has an empty, '.' or '..' path segment.");
-            }
-        }
-
+        ValidateSegments(segments, body);
         return new SelectionPattern(body, exclude, segments);
+    }
+
+    /// <summary>
+    ///     Refuses a pattern that has an empty, <c>.</c> or <c>..</c> path segment.
+    /// </summary>
+    /// <param name="segments">The segments of the pattern.</param>
+    /// <param name="body">The pattern without its leading marks, for the message.</param>
+    /// <exception cref="DomainRuleException">Thrown with <see cref="DomainRule.SelectionInvalid"/> when a segment is not valid.</exception>
+    private static void ValidateSegments(IReadOnlyList<string> segments, string body)
+    {
+        if (segments.Any(segment => segment.Length == 0 || segment == "." || segment == ".."))
+        {
+            throw Invalid($"The pattern '{body}' has an empty, '.' or '..' path segment.");
+        }
     }
 
     /// <summary>

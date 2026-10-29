@@ -98,8 +98,9 @@ is one.
    `signature.reauth-failed` (detail `oidc: no-proof`), and nothing is signed.
 
    **Second factor**: a local signer whose account has a confirmed second factor (`TotpService.IsEnrolledAsync`) must
-   also give the current authenticator code (`totpCode`). The password is checked first, then the code through the
-   internal `TotpService.VerifyForSignatureAsync`; a recovery code is never accepted here. A wrong password, a wrong
+   also give the current authenticator code (`SignerCredentials.TotpCode`). The password is checked first, then the
+   code through the internal `TotpService.VerifyForSignatureAsync`; a recovery code is never accepted here. A wrong
+   password, a wrong
    code, or a code that was already used (also one used a moment ago to sign in: the signer waits for the next code)
    gives `ReauthenticationFailed` with the one message "The password or the code is incorrect." for a signer with a
    second factor, so the message never tells which of the two was wrong. A wrong code counts toward the lockout and is
@@ -179,13 +180,23 @@ changes or deletes a signature. `UpdateSlotAsync` and `RemoveSlotAsync` return `
 - *Parameters*: the actor, project identity, review identifier, and slot identity.
 - *Postconditions*: Nothing is removed when a rule fails.
 
-**SignAsync**: Signs the review in a slot as described above.
+**SignAsync**: Signs the review in a slot as described above. A signer with a second factor uses
+`SignWithCredentialsAsync`, which has the same rules and takes the password and the code together.
 
 - *Parameters*: the actor, project identity, review identifier, slot identity, the expected digest, the password
-  (ignored for a user of an external identity provider), a cancellation token, and the optional current authenticator
-  code `totpCode` (only used for a signer who has a second factor; never stored, logged, or put into a message).
+  (ignored for a user of an external identity provider), and a cancellation token.
 - *Returns*: `Task<ReviewSignature>` — the stored signature.
 - *Preconditions*: The actor and the expected digest are not null.
+- *Postconditions*: Nothing is stored when a rule fails.
+
+**SignWithCredentialsAsync**: Signs the review in a slot, taking what the signer typed as a `SignerCredentials` (the
+password, and the optional current authenticator code `TotpCode`, which is only used for a signer who has a second
+factor; never stored, logged, or put into a message). `SignAsync` calls it with a password only.
+
+- *Parameters*: the actor, project identity, review identifier, slot identity, the expected digest, the credentials,
+  and a cancellation token.
+- *Returns*: `Task<ReviewSignature>` — the stored signature.
+- *Preconditions*: The actor, the expected digest and the credentials are not null.
 - *Postconditions*: Nothing is stored when a rule fails.
 
 **API tokens cannot sign**: The first statement of `SignAsync`, `AddSlotAsync`, `UpdateSlotAsync`, and

@@ -236,26 +236,46 @@ public partial class DiffView : ComponentBase
         // Every thread keeps its line visible, so no thread is ever hidden inside a collapsed run
         _threadsByRow = [];
         _pins = [];
+        PinSelectedRows();
+        PinHighlightedRow();
+        PinThreadRows();
+        RebuildSegments();
+    }
 
-        // The row being commented on stays visible with its context, so the form is never inside a collapsed run
-        if (SelectedSide is { } selectedSide)
+    /// <summary>
+    ///     Pins the rows of the line being commented on, so the form is never inside a collapsed run.
+    /// </summary>
+    private void PinSelectedRows()
+    {
+        if (SelectedSide is not { } selectedSide)
         {
-            foreach (var number in new[] { SelectedStart, SelectedEnd })
-            {
-                if (number is { } selected && RowIndex(selectedSide, selected) is var selectedRow and >= 0)
-                {
-                    _pins.Add(selectedRow);
-                }
-            }
+            return;
         }
 
-        // The line a link points at stays visible too
+        // The row being commented on stays visible with its context
+        _pins.UnionWith(new[] { SelectedStart, SelectedEnd }
+            .OfType<int>()
+            .Select(number => RowIndex(selectedSide, number))
+            .Where(row => row >= 0));
+    }
+
+    /// <summary>
+    ///     Pins the row of the line that a link points at.
+    /// </summary>
+    private void PinHighlightedRow()
+    {
         if (HighlightSide is { } highlightSide && HighlightLine is { } highlighted
             && RowIndex(highlightSide, highlighted) is var highlightRow and >= 0)
         {
             _pins.Add(highlightRow);
         }
+    }
 
+    /// <summary>
+    ///     Pins the rows of the threads and groups the threads by the row where they are shown.
+    /// </summary>
+    private void PinThreadRows()
+    {
         foreach (var thread in Threads.Where(t => t.StartLine is not null))
         {
             var side = thread.Side;
@@ -281,8 +301,6 @@ public partial class DiffView : ComponentBase
             here.Add(thread);
             _pins.Add(row);
         }
-
-        RebuildSegments();
     }
 
     /// <summary>

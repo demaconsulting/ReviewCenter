@@ -1332,10 +1332,6 @@ button:disabled {
     padding: 0.15rem 0.6rem;
 }
 
-.user-controls {
-    margin-top: 0.5rem;
-}
-
 .card > .notice,
 .card form .notice {
     margin-bottom: 0.75rem;

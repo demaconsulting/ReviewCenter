@@ -122,9 +122,8 @@
             else
             {
                 <ul class="row-list" data-testid="members-list">
-                    @foreach (var member in Members)
+                    @foreach (var current in Members)
                     {
-                        var current = member;
                         <li class="row-card static-row" data-testid="member-row-@current.Username">
                             <div class="row-main">
                                 <strong class="row-title" data-testid="member-name-@current.Username">@current.Username</strong>

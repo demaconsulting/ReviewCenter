@@ -207,6 +207,7 @@ public sealed class ReviewService
     ///     again. The fingerprint covers the files that exist at the head (added and modified), so it equals the
     ///     ReviewMark fingerprint of those files.
     /// </remarks>
+#pragma warning disable S107 // One distinct fact of the request per parameter; a public service API with many callers
     public async Task<RepositoryReviewResult> CreateFromRepositoryAsync(
         int projectId,
         string? id,
@@ -217,6 +218,7 @@ public sealed class ReviewService
         string? selection,
         Actor actor,
         CancellationToken cancellationToken = default)
+#pragma warning restore S107
     {
         ArgumentNullException.ThrowIfNull(actor);
         if (_repositories is null || _git is null)
@@ -244,15 +246,7 @@ public sealed class ReviewService
             session,
             access,
             projectId,
-            id!,
-            trimmedTitle,
-            headSha,
-            baselineSha,
-            patterns,
-            selectionText,
-            null,
-            head,
-            baseline,
+            new SessionReviewRequest(id!, trimmedTitle, headSha, baselineSha, patterns, selectionText, null, head, baseline),
             actor,
             cancellationToken);
     }
@@ -271,15 +265,7 @@ public sealed class ReviewService
     /// <param name="session">The open repository session. Must not be null.</param>
     /// <param name="access">The repository the session reads. Must not be null.</param>
     /// <param name="projectId">The identity of the owning project.</param>
-    /// <param name="id">The validated review identifier.</param>
-    /// <param name="trimmedTitle">The validated, trimmed title.</param>
-    /// <param name="headSha">The full head commit identifier.</param>
-    /// <param name="baselineSha">The full baseline commit identifier, or <c>null</c> to review every file at the head.</param>
-    /// <param name="patterns">The parsed selection.</param>
-    /// <param name="selectionText">The normalized selection text stored with the review.</param>
-    /// <param name="reviewSetId">The review-set the review is planned from, or <c>null</c>.</param>
-    /// <param name="headLabel">How the head is named in the "nothing to review" message.</param>
-    /// <param name="baselineLabel">How the baseline is named in that message, or <c>null</c> for none.</param>
+    /// <param name="request">What to create: the validated identifier, title, commits and selection of the review.</param>
     /// <param name="actor">The signed-in user creating the review. Must not be null.</param>
     /// <param name="cancellationToken">Cancels the operation.</param>
     /// <returns>The created review and the entries that were skipped.</returns>
@@ -290,18 +276,12 @@ public sealed class ReviewService
         IGitRepository session,
         RepositoryAccess access,
         int projectId,
-        string id,
-        string trimmedTitle,
-        string headSha,
-        string? baselineSha,
-        IReadOnlyList<SelectionPattern> patterns,
-        string selectionText,
-        string? reviewSetId,
-        string headLabel,
-        string? baselineLabel,
+        SessionReviewRequest request,
         Actor actor,
         CancellationToken cancellationToken)
     {
+        var (id, trimmedTitle, headSha, baselineSha, patterns, selectionText, reviewSetId, headLabel, baselineLabel) = request;
+
         // The set id is stored, bound by signatures and written to the audit trail, so it is bounded here
         if (reviewSetId is not null && (reviewSetId.Length == 0 || reviewSetId.Length > ReviewLimits.MaxReviewSetIdLength))
         {
@@ -769,3 +749,27 @@ public sealed class ReviewService
         }
     }
 }
+
+/// <summary>
+///     What <see cref="ReviewService.CreateFromSessionAsync"/> creates: the validated identity, commits and selection
+///     of one review, grouped so that the method keeps a short parameter list.
+/// </summary>
+/// <param name="Id">The validated review identifier.</param>
+/// <param name="TrimmedTitle">The validated, trimmed title.</param>
+/// <param name="HeadSha">The full head commit identifier.</param>
+/// <param name="BaselineSha">The full baseline commit identifier, or <c>null</c> to review every file at the head.</param>
+/// <param name="Patterns">The parsed selection.</param>
+/// <param name="SelectionText">The normalized selection text stored with the review.</param>
+/// <param name="ReviewSetId">The review-set the review is planned from, or <c>null</c>.</param>
+/// <param name="HeadLabel">How the head is named in the "nothing to review" message.</param>
+/// <param name="BaselineLabel">How the baseline is named in that message, or <c>null</c> for none.</param>
+internal sealed record SessionReviewRequest(
+    string Id,
+    string TrimmedTitle,
+    string HeadSha,
+    string? BaselineSha,
+    IReadOnlyList<SelectionPattern> Patterns,
+    string SelectionText,
+    string? ReviewSetId,
+    string HeadLabel,
+    string? BaselineLabel);

@@ -88,21 +88,20 @@ internal sealed class CertificateStoreKeyProvider(AttestationOptions options, Ti
         }
 
         var where = $"{location}\\{Options.StoreName}";
-        X509Certificate2? certificate = null;
+        var certificate = Find(thumbprint, location, where);
         try
         {
-            certificate = Find(thumbprint, location, where);
             var privateKey = GetPrivateKey(certificate);
             var chain = BuildChain(certificate);
-            var key = AttestationSigningKey.Create(Name, certificate, chain, privateKey, Options.RequireTrustedKey);
 
-            // Ownership of the certificate has passed to the key
-            certificate = null;
-            return key;
+            // Ownership of the certificate passes to the key
+            return AttestationSigningKey.Create(Name, certificate, chain, privateKey, Options.RequireTrustedKey);
         }
-        finally
+        catch
         {
-            certificate?.Dispose();
+            // The key was not created, so the certificate is still owned here
+            certificate.Dispose();
+            throw;
         }
     }
 

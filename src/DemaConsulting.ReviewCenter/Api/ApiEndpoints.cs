@@ -72,6 +72,20 @@ internal static class ApiEndpoints
     private const string FilesField = "files";
 
     /// <summary>
+    ///     The problem text of a project that does not exist or is not visible to the caller.
+    /// </summary>
+    private const string ProjectNotFoundMessage = "The project does not exist.";
+
+    /// <summary>
+    ///     The services that build the details of a review, bound together from the container by the framework so
+    ///     that the endpoints that return a review keep a short parameter list.
+    /// </summary>
+    /// <param name="Signing">The signing service.</param>
+    /// <param name="Threads">The thread service.</param>
+    /// <param name="Checklists">The checklist service.</param>
+    private sealed record DetailServices(SigningService Signing, ThreadService Threads, ChecklistService Checklists);
+
+    /// <summary>
     ///     The longest Base64 text accepted for one uploaded file: four characters for every three bytes of
     ///     <see cref="ReviewLimits.MaxFileSizeBytes"/>, rounded up. It is checked before decoding; the services check the
     ///     decoded size exactly.
@@ -160,7 +174,8 @@ internal static class ApiEndpoints
         // A body that is not declared as JSON does not match the route above, which accepts JSON only; this route
         // (with a lower priority than that one, and a higher one than the catch-all below) answers it with 415
         // instead of letting the catch-all answer 404
-        group.MapPost("/projects/{projectId:int}/reviews", () => ApiProblems.UnsupportedMediaType())
+        // The route parameter is declared though it is not used, so that the pattern and the handler agree
+        group.MapPost("/projects/{projectId:int}/reviews", (int projectId) => ApiProblems.UnsupportedMediaType())
             .WithOrder(1)
             .ExcludeFromDescription();
 
@@ -287,7 +302,7 @@ internal static class ApiEndpoints
     {
         if (await projects.GetAsync(ApiProblems.ActorOf(http.User), projectId, cancellationToken) is null)
         {
-            return ApiProblems.NotFound("The project does not exist.");
+            return ApiProblems.NotFound(ProjectNotFoundMessage);
         }
 
         var list = await reviews.ListAsync(projectId, cancellationToken);
@@ -302,9 +317,7 @@ internal static class ApiEndpoints
     /// <param name="http">The request context; supplies the token actor.</param>
     /// <param name="projects">The project service.</param>
     /// <param name="reviews">The review service.</param>
-    /// <param name="signing">The signing service.</param>
-    /// <param name="threads">The thread service.</param>
-    /// <param name="checklists">The checklist service.</param>
+    /// <param name="detail">The services that build the details of a review.</param>
     /// <param name="cancellationToken">Cancels the request.</param>
     /// <returns>The review, or 404 when it does not exist or its project is not visible to the token's owner.</returns>
     private static async Task<IResult> GetReviewAsync(
@@ -313,14 +326,12 @@ internal static class ApiEndpoints
         HttpContext http,
         ProjectService projects,
         ReviewService reviews,
-        SigningService signing,
-        ThreadService threads,
-        ChecklistService checklists,
+        [AsParameters] DetailServices detail,
         CancellationToken cancellationToken)
     {
         if (await projects.GetAsync(ApiProblems.ActorOf(http.User), projectId, cancellationToken) is null)
         {
-            return ApiProblems.NotFound("The project does not exist.");
+            return ApiProblems.NotFound(ProjectNotFoundMessage);
         }
 
         var review = await reviews.GetAsync(projectId, reviewId, cancellationToken);
@@ -329,8 +340,7 @@ internal static class ApiEndpoints
             return ApiProblems.NotFound("The review does not exist.");
         }
 
-        var detail = await BuildDetailAsync(review, signing, threads, checklists, cancellationToken);
-        return TypedResults.Ok(detail);
+        return TypedResults.Ok(await BuildDetailAsync(review, detail, cancellationToken));
     }
 
     /// <summary>
@@ -340,9 +350,7 @@ internal static class ApiEndpoints
     /// <param name="http">The request context; supplies the body and the token actor.</param>
     /// <param name="projects">The project service.</param>
     /// <param name="reviews">The review service.</param>
-    /// <param name="signing">The signing service.</param>
-    /// <param name="threads">The thread service.</param>
-    /// <param name="checklists">The checklist service.</param>
+    /// <param name="detail">The services that build the details of a review.</param>
     /// <param name="cancellationToken">Cancels the request.</param>
     /// <returns>
     ///     201 with the review and its address; a problem document when the body is not JSON (415), is not JSON of the
@@ -353,16 +361,14 @@ internal static class ApiEndpoints
         HttpContext http,
         ProjectService projects,
         ReviewService reviews,
-        SigningService signing,
-        ThreadService threads,
-        ChecklistService checklists,
+        [AsParameters] DetailServices detail,
         CancellationToken cancellationToken)
     {
         // Whoever may not see the project gets the answer for a missing one, before anything of the body is read
         var actor = ApiProblems.ActorOf(http.User);
         if (await projects.GetAsync(actor, projectId, cancellationToken) is null)
         {
-            return ApiProblems.NotFound("The project does not exist.");
+            return ApiProblems.NotFound(ProjectNotFoundMessage);
         }
 
         // The body is read here, not bound by the framework, so that a body that is not JSON of the right shape
@@ -420,9 +426,9 @@ internal static class ApiEndpoints
             skipped = result.Skipped.Select(s => new SkippedFileDto(s.Path, s.Reason)).ToList();
         }
 
-        var detail = await BuildDetailAsync(review, signing, threads, checklists, cancellationToken);
+        var created = await BuildDetailAsync(review, detail, cancellationToken);
         var location = $"{Prefix}/projects/{projectId}/reviews/{Uri.EscapeDataString(review.Id)}";
-        return TypedResults.Created(location, new CreatedReviewDto(detail, skipped));
+        return TypedResults.Created(location, new CreatedReviewDto(created, skipped));
     }
 
     /// <summary>
@@ -470,7 +476,7 @@ internal static class ApiEndpoints
         // not-found as a project that does not exist
         if (actor is not null && await projects.GetAsync(actor, projectId, http.RequestAborted) is null)
         {
-            return ApiProblems.NotFound("The project does not exist.");
+            return ApiProblems.NotFound(ProjectNotFoundMessage);
         }
 
         var entries = await index.BuildAsync(actor, projectId, http.RequestAborted);
@@ -612,21 +618,17 @@ internal static class ApiEndpoints
     ///     Builds the details of a review from the services that own each part.
     /// </summary>
     /// <param name="review">The review, with its files.</param>
-    /// <param name="signing">The signing service.</param>
-    /// <param name="threads">The thread service.</param>
-    /// <param name="checklists">The checklist service.</param>
+    /// <param name="services">The services that own the parts of the details.</param>
     /// <param name="cancellationToken">Cancels the work.</param>
     /// <returns>The details.</returns>
     private static async Task<ReviewDetailDto> BuildDetailAsync(
         Review review,
-        SigningService signing,
-        ThreadService threads,
-        ChecklistService checklists,
+        DetailServices services,
         CancellationToken cancellationToken)
     {
-        var approval = await signing.GetApprovalAsync(review.ProjectId, review.Id, cancellationToken);
-        var threadList = await threads.ListAsync(review.ProjectId, review.Id, cancellationToken);
-        var checklist = await checklists.GetAsync(review.ProjectId, review.Id, cancellationToken);
+        var approval = await services.Signing.GetApprovalAsync(review.ProjectId, review.Id, cancellationToken);
+        var threadList = await services.Threads.ListAsync(review.ProjectId, review.Id, cancellationToken);
+        var checklist = await services.Checklists.GetAsync(review.ProjectId, review.Id, cancellationToken);
 
         // The checklist counts follow the screen: only items of applicable sections count
         var items = 0;

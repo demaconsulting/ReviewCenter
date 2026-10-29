@@ -99,9 +99,14 @@ public partial class ReviewPage : ComponentBase, IDisposable
     private string? _scrollTarget;
 
     /// <summary>
+    ///     The scroll position that puts the element in the middle of the window.
+    /// </summary>
+    private const string ScrollCenter = "center";
+
+    /// <summary>
     ///     Where the element of <see cref="_scrollTarget"/> lands in the window: <c>start</c> or <c>center</c>.
     /// </summary>
-    private string _scrollBlock = "center";
+    private string _scrollBlock = ScrollCenter;
 
     /// <summary>
     ///     The address to show in the browser's address bar after the next render, or <c>null</c>.
@@ -759,34 +764,11 @@ public partial class ReviewPage : ComponentBase, IDisposable
         // When the diff is not available (too large) the line is looked up in the text of the version it names
         if (!HasLineDiff && CanCompare)
         {
-            if (side == ThreadSide.Baseline)
-            {
-                await ShowBaselineAsync();
-            }
-            else if (HasHeadVersion)
-            {
-                ShowHead();
-            }
+            await ShowVersionOfAsync(side);
         }
 
         // Look the line up in the version it names; a file that was deleted has no head lines
-        var row = -1;
-        bool exists;
-        if (HasLineDiff)
-        {
-            row = DiffView.RowOf(Diff!.Result!, side, line);
-            exists = row >= 0;
-        }
-        else if (side == ThreadSide.Baseline)
-        {
-            exists = BaselineView && line <= (BaselineLines?.Count ?? 0);
-        }
-        else
-        {
-            exists = CurrentView == FileView.Head && line <= (SelectedLines?.Count ?? 0);
-        }
-
-        if (!exists)
+        if (!TryLocateLine(side, line, out var row))
         {
             DeepLinkMessage = $"Line {line} doesn't exist in this file.";
             return;
@@ -794,15 +776,65 @@ public partial class ReviewPage : ComponentBase, IDisposable
 
         HighlightLine = line;
         HighlightSide = side;
-        _scrollBlock = "center";
+        _scrollBlock = ScrollCenter;
+        _scrollTarget = ScrollTargetOf(row, line);
+    }
+
+    /// <summary>
+    ///     Shows the text of the version of the selected file that a line link names, when the file can show it.
+    /// </summary>
+    /// <param name="side">The version the link names.</param>
+    /// <returns>A task that completes when the version is shown.</returns>
+    private async Task ShowVersionOfAsync(ThreadSide side)
+    {
+        if (side == ThreadSide.Baseline)
+        {
+            await ShowBaselineAsync();
+        }
+        else if (HasHeadVersion)
+        {
+            ShowHead();
+        }
+    }
+
+    /// <summary>
+    ///     Looks a line up in the version of the file that it names.
+    /// </summary>
+    /// <param name="side">The version the line number refers to.</param>
+    /// <param name="line">The line number, at least 1.</param>
+    /// <param name="row">Receives the row of the line in the diff; <c>-1</c> when there is no diff.</param>
+    /// <returns><c>true</c> when the line exists in that version of the file.</returns>
+    private bool TryLocateLine(ThreadSide side, int line, out int row)
+    {
+        row = -1;
         if (HasLineDiff)
         {
-            _scrollTarget = $"diff-row-{row}";
+            row = DiffView.RowOf(Diff!.Result!, side, line);
+            return row >= 0;
         }
-        else
+
+        if (side == ThreadSide.Baseline)
         {
-            _scrollTarget = BaselineView ? $"baseline-line-{line}" : $"code-line-{line}";
+            return BaselineView && line <= (BaselineLines?.Count ?? 0);
         }
+
+        return CurrentView == FileView.Head && line <= (SelectedLines?.Count ?? 0);
+    }
+
+    /// <summary>
+    ///     Gets the element that the page scrolls to for a line that was looked up.
+    /// </summary>
+    /// <param name="row">The row of the line in the diff; used only when the page shows the diff.</param>
+    /// <param name="line">The line number.</param>
+    /// <returns>The value of the <c>data-testid</c> of the element to scroll to.</returns>
+    private string ScrollTargetOf(int row, int line)
+    {
+        if (HasLineDiff)
+        {
+            return $"diff-row-{row}";
+        }
+
+        return BaselineView ? $"baseline-line-{line}" : $"code-line-{line}";
     }
 
     /// <summary>
@@ -867,7 +899,8 @@ public partial class ReviewPage : ComponentBase, IDisposable
 
         foreach (var slotId in Approval.Slots.Where(IsOccupant).Select(slot => slot.SlotId))
         {
-            if (await SigningService.HasReauthProofAsync(actor, ProjectId, ReviewId, slotId))
+            var proven = await SigningService.HasReauthProofAsync(actor, ProjectId, ReviewId, slotId);
+            if (proven)
             {
                 ConfirmedSlots.Add(slotId);
             }
@@ -1075,7 +1108,7 @@ public partial class ReviewPage : ComponentBase, IDisposable
         if (HasLineDiff && DiffView.FirstChangeRow(Diff!.Result!) is > LineDiff.DefaultContextLines and var firstChange)
         {
             _scrollTarget = $"diff-row-{firstChange}";
-            _scrollBlock = "center";
+            _scrollBlock = ScrollCenter;
         }
     }
 
@@ -1331,7 +1364,7 @@ public partial class ReviewPage : ComponentBase, IDisposable
         }
 
         _scrollTarget = ThreadScrollTarget(thread);
-        _scrollBlock = "center";
+        _scrollBlock = ScrollCenter;
     }
 
     /// <summary>
@@ -1366,7 +1399,7 @@ public partial class ReviewPage : ComponentBase, IDisposable
         NewStartLine = line.ToString(CultureInfo.InvariantCulture);
         NewEndLine = NewStartLine;
         _scrollTarget = "new-thread-form";
-        _scrollBlock = "center";
+        _scrollBlock = ScrollCenter;
     }
 
     /// <summary>
@@ -1394,7 +1427,7 @@ public partial class ReviewPage : ComponentBase, IDisposable
 
         NewThreadError = null;
         _scrollTarget = "new-thread-form";
-        _scrollBlock = "center";
+        _scrollBlock = ScrollCenter;
     }
 
     /// <summary>
@@ -1412,7 +1445,7 @@ public partial class ReviewPage : ComponentBase, IDisposable
     {
         ClearAnchor();
         _scrollTarget = "new-thread-form";
-        _scrollBlock = "center";
+        _scrollBlock = ScrollCenter;
     }
 
     /// <summary>
@@ -1658,14 +1691,13 @@ public partial class ReviewPage : ComponentBase, IDisposable
 
         try
         {
-            await SigningService.SignAsync(
+            await SigningService.SignWithCredentialsAsync(
                 await AuthenticationState.GetActorAsync(),
                 ProjectId,
                 ReviewId,
                 slotId,
                 Approval!.Digest,
-                SignPasswords.GetValueOrDefault(slotId),
-                totpCode: SignTotpCodes.GetValueOrDefault(slotId));
+                new SignerCredentials(SignPasswords.GetValueOrDefault(slotId), SignTotpCodes.GetValueOrDefault(slotId)));
             SignErrors.Remove(slotId);
         }
         catch (DomainRuleException ex)

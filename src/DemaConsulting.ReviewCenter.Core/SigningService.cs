@@ -256,12 +256,17 @@ public sealed class SigningService
             .Select(membership => membership.UserId)
             .ToHashSet();
         var members = (await _users.ListAsync(cancellationToken)).ToDictionary(user => user.Id);
+
+        // A review that does not exist is absent from the result
+        var read = new List<(string ReviewId, ReviewApproval? Approval)>();
         foreach (var reviewId in ids)
         {
-            if (await ReadApprovalAsync(projectId, reviewId, members, memberIds, cancellationToken) is { } approval)
-            {
-                approvals[reviewId] = approval;
-            }
+            read.Add((reviewId, await ReadApprovalAsync(projectId, reviewId, members, memberIds, cancellationToken)));
+        }
+
+        foreach (var (reviewId, approval) in read.Where(r => r.Approval is not null))
+        {
+            approvals[reviewId] = approval!;
         }
 
         return approvals;
@@ -524,16 +529,12 @@ public sealed class SigningService
     ///     should discard it as soon as this call returns. Ignored for a user of an external identity provider.
     /// </param>
     /// <param name="cancellationToken">Cancels the operation.</param>
-    /// <param name="totpCode">
-    ///     The current authenticator code of a signer who has a second factor; ignored for everyone else. It is never
-    ///     stored, logged or put in a message. A wrong or already used code fails the signing like a wrong password.
-    /// </param>
     /// <returns>The stored signature.</returns>
     /// <remarks>
     ///     The slot, the seat and the signing rules are all checked before the password is asked for, so a
     ///     refused signing never counts as a failed password attempt. Every password failure (wrong, locked,
     ///     disabled or unknown) gives the same generic message and signs nothing. A signer with a second factor
-    ///     needs the password and a fresh code.
+    ///     cannot use this overload; <see cref="SignWithCredentialsAsync"/> takes the code too.
     /// </remarks>
     /// <exception cref="ArgumentNullException">Thrown when <paramref name="actor"/> is null.</exception>
     /// <exception cref="DomainRuleException">
@@ -542,18 +543,65 @@ public sealed class SigningService
     ///     blocked by the checklist or threads), <see cref="DomainRule.ReauthenticationFailed"/> or
     ///     <see cref="DomainRule.RecordChanged"/> when a rule is violated; nothing is stored then.
     /// </exception>
-    public async Task<ReviewSignature> SignAsync(
+    public Task<ReviewSignature> SignAsync(
         Actor actor,
         int projectId,
         string reviewId,
         int slotId,
         string expectedDigest,
         string? password,
-        CancellationToken cancellationToken = default,
-        string? totpCode = null)
+        CancellationToken cancellationToken = default)
+    {
+        return SignWithCredentialsAsync(
+            actor, projectId, reviewId, slotId, expectedDigest, new SignerCredentials(password), cancellationToken);
+    }
+
+    /// <summary>
+    ///     Signs the review in a slot, after the signer has confirmed their password and, when they have a second
+    ///     factor, a fresh authenticator code.
+    /// </summary>
+    /// <param name="actor">The signed-in user who signs. Must not be null; the account must exist and be enabled.</param>
+    /// <param name="projectId">The project identity.</param>
+    /// <param name="reviewId">The review identifier.</param>
+    /// <param name="slotId">The slot to sign in; the actor must be its primary or alternate reviewer.</param>
+    /// <param name="expectedDigest">
+    ///     The record digest the signer was looking at (see <see cref="ReviewApproval.Digest"/>); the signature is
+    ///     refused when the record has changed since, so nobody signs something they have not seen.
+    /// </param>
+    /// <param name="credentials">
+    ///     What the signer typed to confirm their identity: the password and, optionally, the authenticator code.
+    ///     Must not be null. Nothing in it is stored, logged or put in a message.
+    /// </param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <returns>The stored signature.</returns>
+    /// <remarks>
+    ///     The slot, the seat and the signing rules are all checked before the password is asked for, so a
+    ///     refused signing never counts as a failed password attempt. Every password failure (wrong, locked,
+    ///     disabled or unknown) gives the same generic message and signs nothing. A signer with a second factor
+    ///     needs the password and a fresh code. A wrong or already used code fails the signing like a wrong password.
+    /// </remarks>
+    /// <exception cref="ArgumentNullException">
+    ///     Thrown when <paramref name="actor"/>, <paramref name="expectedDigest"/> or <paramref name="credentials"/>
+    ///     is null.
+    /// </exception>
+    /// <exception cref="DomainRuleException">
+    ///     Thrown with <see cref="DomainRule.ActorNotAllowed"/>, <see cref="DomainRule.ReviewNotFound"/>,
+    ///     <see cref="DomainRule.SlotNotFound"/>, <see cref="DomainRule.SigningNotAllowed"/> (already signed, or
+    ///     blocked by the checklist or threads), <see cref="DomainRule.ReauthenticationFailed"/> or
+    ///     <see cref="DomainRule.RecordChanged"/> when a rule is violated; nothing is stored then.
+    /// </exception>
+    public async Task<ReviewSignature> SignWithCredentialsAsync(
+        Actor actor,
+        int projectId,
+        string reviewId,
+        int slotId,
+        string expectedDigest,
+        SignerCredentials credentials,
+        CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(actor);
         ArgumentNullException.ThrowIfNull(expectedDigest);
+        ArgumentNullException.ThrowIfNull(credentials);
         RejectApiToken(actor);
         await _gate.WaitAsync(cancellationToken);
         try
@@ -561,88 +609,16 @@ public sealed class SigningService
             // The signer must be a live account, a member of the project (an administrator who is not a member
             // cannot sign), and one of the two people of the slot
             var user = await EnsureActorAsync(actor, projectId, cancellationToken);
-            if (!await _access.IsMemberAsync(user.Id, projectId, cancellationToken))
-            {
-                throw new DomainRuleException(
-                    DomainRule.ActorNotAllowed,
-                    "Only a member of the project can sign its reviews.");
-            }
-            var record = await _store.GetRecordAsync(projectId, reviewId, cancellationToken)
-                         ?? throw ReviewNotFound(reviewId);
-            var slot = (await _store.ListSlotsAsync(projectId, reviewId, cancellationToken))
-                .FirstOrDefault(s => s.Id == slotId) ?? throw SlotNotFound(slotId);
-            if (user.Id != slot.PrimaryUserId && user.Id != slot.AlternateUserId)
-            {
-                throw new DomainRuleException(
-                    DomainRule.ActorNotAllowed,
-                    "You are not a reviewer of this slot.");
-            }
-
-            var role = user.Id == slot.PrimaryUserId ? SlotRole.Primary : SlotRole.Alternate;
+            var (record, role) = await EnsureSignerOfSlotAsync(user, projectId, reviewId, slotId, cancellationToken);
 
             // The record must be the one the signer saw, and must be signable; both are refused before the
             // password is asked for
-            var digest = RecordDigest.Compute(record);
-            if (digest != expectedDigest)
-            {
-                throw RecordChangedException();
-            }
+            var digest = await EnsureSignableAsync(
+                record, projectId, reviewId, slotId, expectedDigest, cancellationToken);
 
-            var signatures = await _store.ListSignaturesAsync(projectId, reviewId, cancellationToken);
-            if (signatures.Any(s => s.SlotId == slotId && s.RecordDigest == digest))
-            {
-                throw new DomainRuleException(
-                    DomainRule.SigningNotAllowed,
-                    "This slot already has a signature of the current record.");
-            }
-
-            var (_, blockers, _) = Assess(record);
-            if (blockers.Count > 0)
-            {
-                throw new DomainRuleException(
-                    DomainRule.SigningNotAllowed,
-                    "The review cannot be signed yet: " + string.Join("; ", blockers) + ".");
-            }
-
-            // Re-authenticate. A local account goes through the login path (same hasher, lockout and generic
-            // failure; a failure is recorded as a failed re-authentication, not as a failed sign-in). An external
-            // account has no password: its proof is the fresh sign-in at the provider that the callback issued for
-            // exactly this user, review and slot, spent here and only here, after every other check passed
-            User verified;
-            if (user.IsExternal)
-            {
-                if (_proofs is null || !_proofs.TryConsume(user.Id, projectId, reviewId, slotId))
-                {
-                    await _users.RecordExternalReauthFailureAsync(user, "no-proof", cancellationToken);
-                    throw new DomainRuleException(
-                        DomainRule.ReauthenticationFailed,
-                        "Your identity is not confirmed. Confirm it again, then sign.");
-                }
-
-                verified = user;
-            }
-            else
-            {
-                // A user with a confirmed second factor must also present a fresh code; the message then names both,
-                // and never tells which of the two was wrong
-                var failure = _totp is not null && await _totp.IsEnrolledAsync(actor.Username, cancellationToken)
-                    ? "The password or the code is incorrect."
-                    : "The password is incorrect.";
-                var step = await _users.ReauthenticatePasswordAsync(actor.Username, password, cancellationToken);
-                if (step.User is null || step.User.Id != user.Id)
-                {
-                    throw new DomainRuleException(DomainRule.ReauthenticationFailed, failure);
-                }
-
-                // Without the code service a required second factor can not be satisfied: fail closed
-                if (step.SecondFactorRequired
-                    && (_totp is null || !await _totp.VerifyForSignatureAsync(step.User, totpCode, cancellationToken)))
-                {
-                    throw new DomainRuleException(DomainRule.ReauthenticationFailed, failure);
-                }
-
-                verified = step.User;
-            }
+            // Re-authenticate, after every other check passed
+            var verified = await ReauthenticateAsync(
+                actor, user, projectId, reviewId, slotId, credentials, cancellationToken);
 
             // The store recomputes the digest inside its transaction and refuses the signature if it changed
             return await _store.AddSignatureAsync(
@@ -670,6 +646,156 @@ public sealed class SigningService
         {
             _gate.Release();
         }
+    }
+
+    /// <summary>
+    ///     Checks that the signer is a project member and one of the two people of the slot.
+    /// </summary>
+    /// <param name="user">The signer's account.</param>
+    /// <param name="projectId">The project identity.</param>
+    /// <param name="reviewId">The review identifier.</param>
+    /// <param name="slotId">The slot to sign in.</param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <returns>The record of the review and the role the signer has in the slot.</returns>
+    /// <exception cref="DomainRuleException">
+    ///     Thrown when the signer is not a member, the review or slot does not exist, or the signer is not a reviewer
+    ///     of the slot.
+    /// </exception>
+    private async Task<(ReviewRecord Record, SlotRole Role)> EnsureSignerOfSlotAsync(
+        User user,
+        int projectId,
+        string reviewId,
+        int slotId,
+        CancellationToken cancellationToken)
+    {
+        if (!await _access.IsMemberAsync(user.Id, projectId, cancellationToken))
+        {
+            throw new DomainRuleException(
+                DomainRule.ActorNotAllowed,
+                "Only a member of the project can sign its reviews.");
+        }
+
+        var record = await _store.GetRecordAsync(projectId, reviewId, cancellationToken)
+                     ?? throw ReviewNotFound(reviewId);
+        var slot = (await _store.ListSlotsAsync(projectId, reviewId, cancellationToken))
+            .FirstOrDefault(s => s.Id == slotId) ?? throw SlotNotFound(slotId);
+        if (user.Id != slot.PrimaryUserId && user.Id != slot.AlternateUserId)
+        {
+            throw new DomainRuleException(
+                DomainRule.ActorNotAllowed,
+                "You are not a reviewer of this slot.");
+        }
+
+        return (record, user.Id == slot.PrimaryUserId ? SlotRole.Primary : SlotRole.Alternate);
+    }
+
+    /// <summary>
+    ///     Checks that the record is the one the signer saw, is not already signed in the slot and has no blockers.
+    /// </summary>
+    /// <param name="record">The record as it is now.</param>
+    /// <param name="projectId">The project identity.</param>
+    /// <param name="reviewId">The review identifier.</param>
+    /// <param name="slotId">The slot to sign in.</param>
+    /// <param name="expectedDigest">The digest the signer saw.</param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <returns>The digest of the record, which the signature will point to.</returns>
+    /// <exception cref="DomainRuleException">
+    ///     Thrown when the record changed, the slot already has a current signature or a blocker remains.
+    /// </exception>
+    private async Task<string> EnsureSignableAsync(
+        ReviewRecord record,
+        int projectId,
+        string reviewId,
+        int slotId,
+        string expectedDigest,
+        CancellationToken cancellationToken)
+    {
+        var digest = RecordDigest.Compute(record);
+        if (digest != expectedDigest)
+        {
+            throw RecordChangedException();
+        }
+
+        var signatures = await _store.ListSignaturesAsync(projectId, reviewId, cancellationToken);
+        if (signatures.Any(s => s.SlotId == slotId && s.RecordDigest == digest))
+        {
+            throw new DomainRuleException(
+                DomainRule.SigningNotAllowed,
+                "This slot already has a signature of the current record.");
+        }
+
+        var (_, blockers, _) = Assess(record);
+        if (blockers.Count > 0)
+        {
+            throw new DomainRuleException(
+                DomainRule.SigningNotAllowed,
+                "The review cannot be signed yet: " + string.Join("; ", blockers) + ".");
+        }
+
+        return digest;
+    }
+
+    /// <summary>
+    ///     Confirms the signer's identity again, the way their kind of account requires.
+    /// </summary>
+    /// <remarks>
+    ///     A local account goes through the login path (same hasher, lockout and generic failure; a failure is
+    ///     recorded as a failed re-authentication, not as a failed sign-in). An external account has no password: its
+    ///     proof is the fresh sign-in at the provider that the callback issued for exactly this user, review and
+    ///     slot, spent here and only here, after every other check passed.
+    /// </remarks>
+    /// <param name="actor">The signed-in principal.</param>
+    /// <param name="user">The signer's account.</param>
+    /// <param name="projectId">The project identity.</param>
+    /// <param name="reviewId">The review identifier.</param>
+    /// <param name="slotId">The slot to sign in.</param>
+    /// <param name="credentials">What the signer typed.</param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <returns>The account that was confirmed.</returns>
+    /// <exception cref="DomainRuleException">
+    ///     Thrown with <see cref="DomainRule.ReauthenticationFailed"/> when the identity is not confirmed.
+    /// </exception>
+    private async Task<User> ReauthenticateAsync(
+        Actor actor,
+        User user,
+        int projectId,
+        string reviewId,
+        int slotId,
+        SignerCredentials credentials,
+        CancellationToken cancellationToken)
+    {
+        if (user.IsExternal)
+        {
+            if (_proofs is null || !_proofs.TryConsume(user.Id, projectId, reviewId, slotId))
+            {
+                await _users.RecordExternalReauthFailureAsync(user, "no-proof", cancellationToken);
+                throw new DomainRuleException(
+                    DomainRule.ReauthenticationFailed,
+                    "Your identity is not confirmed. Confirm it again, then sign.");
+            }
+
+            return user;
+        }
+
+        // A user with a confirmed second factor must also present a fresh code; the message then names both,
+        // and never tells which of the two was wrong
+        var failure = _totp is not null && await _totp.IsEnrolledAsync(actor.Username, cancellationToken)
+            ? "The password or the code is incorrect."
+            : "The password is incorrect.";
+        var step = await _users.ReauthenticatePasswordAsync(actor.Username, credentials.Password, cancellationToken);
+        if (step.User is null || step.User.Id != user.Id)
+        {
+            throw new DomainRuleException(DomainRule.ReauthenticationFailed, failure);
+        }
+
+        // Without the code service a required second factor can not be satisfied: fail closed
+        if (step.SecondFactorRequired
+            && (_totp is null || !await _totp.VerifyForSignatureAsync(step.User, credentials.TotpCode, cancellationToken)))
+        {
+            throw new DomainRuleException(DomainRule.ReauthenticationFailed, failure);
+        }
+
+        return step.User;
     }
 
     /// <summary>
@@ -983,3 +1109,18 @@ public sealed class SigningService
             "The record changed while you were signing. Review it and try again.");
     }
 }
+
+/// <summary>
+///     What a signer types to confirm their identity when signing.
+/// </summary>
+/// <remarks>
+///     A parameter object, so that <see cref="SigningService.SignWithCredentialsAsync"/> stays within a readable
+///     number of parameters. Nothing in it is ever stored, logged or put in a message.
+/// </remarks>
+/// <param name="Password">
+///     The signer's password, checked like a login; ignored for a user of an external identity provider.
+/// </param>
+/// <param name="TotpCode">
+///     The current authenticator code of a signer who has a second factor; ignored for everyone else.
+/// </param>
+public sealed record SignerCredentials(string? Password, string? TotpCode = null);

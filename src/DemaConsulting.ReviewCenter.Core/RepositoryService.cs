@@ -594,32 +594,7 @@ public sealed class RepositoryService
             || trimmed.StartsWith("file://", StringComparison.OrdinalIgnoreCase);
         if (isUrl)
         {
-            if (trimmed.Any(char.IsWhiteSpace) || !Uri.TryCreate(trimmed, UriKind.Absolute, out var uri))
-            {
-                throw LocationInvalid($"The location is not a valid URL. {forms}");
-            }
-
-            if (uri.UserInfo.Length > 0)
-            {
-                throw LocationInvalid("The location must not contain a user name or password; enter the credentials in their own fields.");
-            }
-
-            if (trimmed.Contains('?') || trimmed.Contains('#'))
-            {
-                throw LocationInvalid("The location must not contain a query string or fragment; enter the credentials in their own fields.");
-            }
-
-            if (uri.Scheme != Uri.UriSchemeFile && uri.Host.Length == 0)
-            {
-                throw LocationInvalid($"The location has no host name. {forms}");
-            }
-
-            if (uri.Scheme == Uri.UriSchemeHttp && !IsLoopbackHost(uri.Host))
-            {
-                throw LocationInvalid("Plain http:// locations are only allowed for localhost; use https://.");
-            }
-
-            isHttps = uri.Scheme == Uri.UriSchemeHttps;
+            isHttps = ValidateUrl(trimmed, forms);
             return trimmed;
         }
 
@@ -629,6 +604,43 @@ public sealed class RepositoryService
         }
 
         return trimmed;
+    }
+
+    /// <summary>
+    ///     Validates a repository location that is a URL.
+    /// </summary>
+    /// <param name="trimmed">The trimmed location, which starts with a supported scheme.</param>
+    /// <param name="forms">The sentence that names the supported forms, appended to some messages.</param>
+    /// <returns><c>true</c> when the URL is an https URL.</returns>
+    /// <exception cref="DomainRuleException">Thrown with <see cref="DomainRule.RepositoryLocationInvalid"/> when it is not valid.</exception>
+    private static bool ValidateUrl(string trimmed, string forms)
+    {
+        if (trimmed.Any(char.IsWhiteSpace) || !Uri.TryCreate(trimmed, UriKind.Absolute, out var uri))
+        {
+            throw LocationInvalid($"The location is not a valid URL. {forms}");
+        }
+
+        if (uri.UserInfo.Length > 0)
+        {
+            throw LocationInvalid("The location must not contain a user name or password; enter the credentials in their own fields.");
+        }
+
+        if (trimmed.Contains('?') || trimmed.Contains('#'))
+        {
+            throw LocationInvalid("The location must not contain a query string or fragment; enter the credentials in their own fields.");
+        }
+
+        if (uri.Scheme != Uri.UriSchemeFile && uri.Host.Length == 0)
+        {
+            throw LocationInvalid($"The location has no host name. {forms}");
+        }
+
+        if (uri.Scheme == Uri.UriSchemeHttp && !IsLoopbackHost(uri.Host))
+        {
+            throw LocationInvalid("Plain http:// locations are only allowed for localhost; use https://.");
+        }
+
+        return uri.Scheme == Uri.UriSchemeHttps;
     }
 
     /// <summary>
