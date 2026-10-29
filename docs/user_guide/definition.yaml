@@ -8,6 +8,7 @@ input-files:
   - docs/user_guide/installation.md
   - docs/user_guide/deployment.md
   - docs/user_guide/sign-in.md
+  - docs/user_guide/identity-providers.md
   - docs/user_guide/administration.md
   - docs/user_guide/reviewing.md
   - docs/user_guide/automation.md

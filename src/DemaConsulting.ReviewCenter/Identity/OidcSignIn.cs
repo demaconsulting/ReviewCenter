@@ -105,6 +105,18 @@ internal static class OidcSignIn
     public const string ReauthFailed = "failed";
 
     /// <summary>
+    ///     The value of <see cref="ReauthQuery"/> after a confirmation that failed because the provider did not report
+    ///     a usable moment of sign-in (<c>auth_time</c>).
+    /// </summary>
+    public const string ReauthMissingAuthTime = "missing-auth-time";
+
+    /// <summary>
+    ///     The value of <see cref="ReauthQuery"/> after a confirmation that failed because the reported moment of
+    ///     sign-in (<c>auth_time</c>) was not recent enough.
+    /// </summary>
+    public const string ReauthStaleAuthTime = "stale-auth-time";
+
+    /// <summary>
     ///     The property that marks a challenge as a confirmation of identity for a signature.
     /// </summary>
     private const string ReauthItem = "rc_reauth";
@@ -511,7 +523,11 @@ internal static class OidcSignIn
         if (reason is not null)
         {
             await users.RecordExternalReauthFailureAsync(user, reason, http.RequestAborted);
-            context.Response.Redirect(WithReauth(target, ReauthFailed));
+
+            // Only the two causes about the moment of sign-in reach the page, because an administrator can fix
+            // them; every other reason stays the generic failure. The audit reason is the same either way
+            var shown = reason is ReauthMissingAuthTime or ReauthStaleAuthTime ? reason : ReauthFailed;
+            context.Response.Redirect(WithReauth(target, shown));
             return;
         }
 
@@ -660,13 +676,13 @@ internal static class OidcSignIn
             || seconds < DateTimeOffset.MinValue.ToUnixTimeSeconds()
             || seconds > DateTimeOffset.MaxValue.ToUnixTimeSeconds())
         {
-            return "missing-auth-time";
+            return ReauthMissingAuthTime;
         }
 
         var age = now - DateTimeOffset.FromUnixTimeSeconds(seconds);
         return age <= TimeSpan.FromSeconds(options.ReauthMaxAgeSeconds) && age >= -FutureTolerance
             ? null
-            : "stale-auth-time";
+            : ReauthStaleAuthTime;
     }
 
     /// <summary>

@@ -158,13 +158,15 @@ tested by `OidcReauth_FreshSignInOfSamePerson_AllowsExactlyOneSignature`.
 scenario is tested by `OidcReauth_Success_KeepsTheSession`.
 
 **OidcReauth_AuthTimeNotInWindow_IsRefusedFailClosed**: An `auth_time` that is too old, in the future or missing is
-refused with `stale-auth-time` or `missing-auth-time`, and no proof is issued. This scenario is tested by
-`OidcReauth_AuthTimeNotInWindow_IsRefusedFailClosed`.
+refused with `stale-auth-time` or `missing-auth-time`, and no proof is issued; the person returns to the review with
+`reauth=stale-auth-time` or `reauth=missing-auth-time` (not `reauth=failed`), while the recorded reason class is
+unchanged. This scenario is tested by `OidcReauth_AuthTimeNotInWindow_IsRefusedFailClosed`.
 
 **OidcReauth_AuthTimeOutsideTheRangeOfDates_IsRefusedWithoutError**: An `auth_time` of 9223372036854775807, of
 -9223372036854775808, of -1, and of 253402300800 (one second past the last date that can be represented) is refused
 with `missing-auth-time`, and 253402300799 (representable, but far in the future) with `stale-auth-time`. In each case
-the person returns to the review with `reauth=failed`, exactly one `signature.reauth-failed` entry holds the reason
+the person returns to the review with `reauth=missing-auth-time` or `reauth=stale-auth-time` respectively, exactly one
+`signature.reauth-failed` entry holds the reason
 class, no proof is issued, signing is refused, and the server raises no error (the account page still answers 200).
 This scenario is tested by `OidcReauth_AuthTimeOutsideTheRangeOfDates_IsRefusedWithoutError`.
 

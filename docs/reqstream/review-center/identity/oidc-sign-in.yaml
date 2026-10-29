@@ -152,16 +152,21 @@ sections:
           issue the confirmation only when the answer has an authentication time that is not older than the allowed
           age and not in the future, the same subject as the account, and the same issuer; and shall in every other
           case (an authentication time that is missing, not a whole number, negative or outside the range of dates
-          included) fail closed, issue nothing, and record the reason class.
+          included) fail closed, issue nothing, and record the reason class; and shall send the browser back to the
+          review with a distinct answer when the authentication time was missing and when it was not recent enough
+          (and the general answer for every other reason), while the recorded reason class stays the same.
         justification: |
           A person who is signed in on a shared computer must not be able to sign for somebody else, and a provider
           that does not ask for the password again would make the confirmation a click. Only a login that happened
           now, by the same person, at the same provider, proves that the person at the keyboard is the user. Anything
-          that cannot be checked is refused, because a signature that was not confirmed would be worthless.
+          that cannot be checked is refused, because a signature that was not confirmed would be worthless. An
+          administrator can fix a provider that does not send the authentication time only if the person is told that
+          this is the cause, and the cause says nothing that helps an attacker.
         tests:
           - OidcReauth_FreshSignInOfSamePerson_AllowsExactlyOneSignature
           - OidcReauth_AuthTimeNotInWindow_IsRefusedFailClosed
           - OidcReauth_AuthTimeOutsideTheRangeOfDates_IsRefusedWithoutError
+          - OidcReauth_MissingOrStaleAuthTime_ReviewPageNamesTheCause
           - OidcReauth_OtherSubject_IsRefusedAndCreatesNoAccount
           - OidcReauth_ProviderRefuses_ReturnsToReviewWithoutProof
           - OidcReauth_WrongIssuerAudienceOrNonce_IsRefusedFailClosed

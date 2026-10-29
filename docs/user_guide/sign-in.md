@@ -150,6 +150,10 @@ provider must use `https`; `http` is accepted only for a provider on the same ma
 tried. `ReauthMaxAgeSeconds` is the age that the login at the provider may have when a signature is confirmed (default
 120; 10 to 900).
 
+The provider must also send the moment of the login (`auth_time`) for a signature to be confirmed. Step-by-step
+recipes for Microsoft Entra ID, AD FS, Okta and Keycloak, a comparison of what each provider sends, and a list of
+failures with their causes are in the Identity Providers chapter.
+
 **What happens at the first sign-in.** ReviewCenter identifies the person by the **issuer and the subject** that the
 provider gives, and by nothing else. A name or an e-mail address is never used to find an account, and an account at a
 provider is **never linked to a local account**, even when the user names are the same. The first time, ReviewCenter
@@ -174,6 +178,10 @@ setting above), by the same person as the account (the same subject at the same 
 for this reviewer slot. The confirmation is used up by one signature and cannot be used for another slot, another
 review, or another person. When anything is missing or does not match, nothing is signed. A token of the API still
 cannot sign.
+
+A confirmation fails closed when the provider does not report when the person signed in, or reports a login that is
+not recent enough. The review page then says so (the provider did not report the time, or the login was not recent
+enough) instead of the general message, so an administrator knows what to fix; see the Identity Providers chapter.
 
 **When it fails.** Every failure at the sign-in page gives one general message (the provider failed or refused, the
 account is disabled, the answer could not be checked), so the page does not tell an attacker which. The cause is

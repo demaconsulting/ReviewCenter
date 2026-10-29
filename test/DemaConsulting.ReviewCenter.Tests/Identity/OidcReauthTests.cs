@@ -381,6 +381,13 @@ public class OidcReauthTests : IClassFixture<IdentityProviderFixture>
         var failed = await browser.GetPageAsync($"{world.Route}?reauth=failed");
         Assert.NotNull(failed.QuerySelector($"[data-testid='sign-error-{slot}']"));
         Assert.NotNull(failed.QuerySelector($"[data-testid='sign-reauth-{slot}']"));
+        Assert.Contains(
+            "We could not confirm your identity",
+            failed.QuerySelector($"[data-testid='sign-error-{slot}']")?.TextContent);
+
+        // Act, Assert: a value that is none of the known ones shows nothing
+        var bogus = await browser.GetPageAsync($"{world.Route}?reauth=bogus");
+        Assert.Null(bogus.QuerySelector($"[data-testid='sign-error-{slot}']"));
 
         // Act, Assert: after the confirmation, the sign button
         await OidcTestApp.ReauthAsync(browser, _idp, world.ProjectId, ReviewId, slot, world.Route);
@@ -388,6 +395,46 @@ public class OidcReauthTests : IClassFixture<IdentityProviderFixture>
         Assert.NotNull(after.QuerySelector($"[data-testid='sign-button-{slot}']"));
         Assert.NotNull(after.QuerySelector($"[data-testid='sign-confirmed-{slot}']"));
         Assert.Null(after.QuerySelector($"[data-testid='sign-reauth-{slot}']"));
+    }
+
+    /// <summary>
+    ///     Test that after a refused confirmation the review page says why when the provider did not report when the
+    ///     person signed in (and that an administrator must set it up), and when the sign-in was not recent enough,
+    ///     and that the general text is not shown for those two causes.
+    /// </summary>
+    [Fact]
+    public async Task OidcReauth_MissingOrStaleAuthTime_ReviewPageNamesTheCause()
+    {
+        // Arrange
+        await using var app = await OidcTestApp.StartAsync(_idp);
+        using var browser = new TestBrowser(app);
+        var world = await ArrangeAsync(app, browser);
+        var errorSelector = $"[data-testid='sign-error-{world.SlotId}']";
+
+        // Act: the provider sends no auth_time, and the person follows the redirect back to the review
+        _idp.Scenario = new IdpScenario { AuthenticatedAgo = null };
+        var missing = await OidcTestApp.ReauthAsync(
+            browser, _idp, world.ProjectId, ReviewId, world.SlotId, world.Route);
+        var missingPage = await browser.GetPageAsync(missing.Headers.Location!.OriginalString);
+
+        // Assert
+        var missingText = missingPage.QuerySelector(errorSelector)?.TextContent;
+        Assert.Contains("did not report when you signed in", missingText);
+        Assert.Contains("auth_time", missingText);
+        Assert.Contains("administrator", missingText);
+        Assert.DoesNotContain("We could not confirm your identity", missingText);
+
+        // Act: the provider sends an auth_time that is too old
+        _idp.Scenario = new IdpScenario { AuthenticatedAgo = TimeSpan.FromSeconds(600) };
+        var stale = await OidcTestApp.ReauthAsync(
+            browser, _idp, world.ProjectId, ReviewId, world.SlotId, world.Route);
+        var stalePage = await browser.GetPageAsync(stale.Headers.Location!.OriginalString);
+
+        // Assert
+        var staleText = stalePage.QuerySelector(errorSelector)?.TextContent;
+        Assert.Contains("not recent enough", staleText);
+        Assert.DoesNotContain("auth_time", staleText);
+        Assert.DoesNotContain("We could not confirm your identity", staleText);
     }
 
     /// <summary>
@@ -593,7 +640,9 @@ public class OidcReauthTests : IClassFixture<IdentityProviderFixture>
         /// <returns>A task that completes when everything is checked.</returns>
         public async Task AssertRefusedAsync(HttpResponseMessage landing, string reason)
         {
-            Assert.Equal($"{Route}?reauth=failed", landing.Headers.Location?.OriginalString);
+            Assert.Equal(
+                $"{Route}?reauth={(reason is "missing-auth-time" or "stale-auth-time" ? reason : "failed")}",
+                landing.Headers.Location?.OriginalString);
             var entry = Assert.Single(await OidcTestApp.AuditAsync(_app, "signature.reauth-failed"));
             Assert.Equal($"oidc: {reason}", entry.Detail);
             Assert.False(await Signing.HasReauthProofAsync(
