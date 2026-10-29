@@ -107,6 +107,19 @@ Actions fail after about 5 seconds so a wrong selector costs little.
    `puppet eval "getComputedStyle(document.querySelector('[data-testid=projects-link]')).color"` or
    `puppet eval "document.documentElement.scrollWidth > innerWidth"` for horizontal overflow.
 
+## Refreshing guide screenshots
+
+The screenshots in `docs/user_guide/images/` are taken with Puppet against a throwaway instance, never against real
+data. Point `Database__ConnectionString`, `DataProtection__KeysPath`, `Attestation__SelfSignedFolder`, and
+`Git__CachePath` at a temporary folder outside the repository, create two or three users with `user add`, run `serve`,
+and start Puppet with `--viewport 1280x800`. Seed a small project with a repository (or an upload), threaded comments,
+a partly answered checklist, and a signed review through the UI, then take each picture with
+`puppet screenshot <file> --full` in the light theme (plus one review with `puppet theme dark`). Crop each picture to
+its content and shrink it, for example
+`magick raw.png -crop 1280x700+0+120 +repage -strip -colors 256 +dither PNG8:out.png`
+(at most about 150 KB each, 1280 pixels wide), leave the page footer out, and stop the server and Puppet by process ID
+afterward.
+
 ## Known limitation
 
 If the daemon or Chromium is killed or crashes, a Chromium process or a stale control file

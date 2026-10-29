@@ -1,0 +1,502 @@
+# Deployment
+
+This chapter describes how to run ReviewCenter for a team: where it keeps its data, how to configure it, how to
+reach it over the network, how to keep it running, and how to back it up and upgrade it. It is written for the
+person who operates the server. The other chapters describe how people use it.
+
+ReviewCenter is one self-contained process. It serves the web pages and the API, keeps its data in a SQLite file, and
+runs the `git` program to read repositories. It has no separate database server, no worker process, and no
+installer.
+
+## What Has Been Verified
+
+The project verified the commands and outputs in this chapter by running a win-x64 build on Windows (with a
+throwaway database in a temporary folder). The Linux build is exercised by the project's continuous integration
+(health check, self-validation, and a smoke test of the pages), but the Linux-specific recipes in this chapter
+(systemd, nginx, file permissions) were **not run** by the project. Wherever a recipe is a generic approach that was
+not run on your platform, the text says so. Treat such recipes as a starting point and test them on a copy first.
+
+ReviewCenter does not integrate with the Windows Service Control Manager or with systemd. It is a console process that
+you start with `reviewcenter serve`, and anything that keeps it running has to be an outside tool that starts that
+process (see Keep It Running).
+
+## System Requirements
+
+- **Platform.** The released builds are win-x64 and linux-x64. No .NET runtime needs to be installed, because the
+  executable carries its own.
+- **git.** Reading a repository needs the `git` program on the `PATH` of the account that runs the server, version
+  2.31 or later. An operation that needs git fails with a message that says so if git is missing or too old. Check
+  it with `reviewcenter --validate` (see Check an Installation below).
+- **Disk space.** The executable is about 110 MB. The database grows with the content that is stored: the files of
+  reviews, the comments, and the audit trail. The git cache (see Where the Data Lives) holds one bare mirror per
+  repository, so plan for the size of those repositories.
+- **A user account for the service.** Run the server under an account of its own that can write to the data folder
+  and nothing else. It needs no administrator rights when it listens on a port above 1023 (the default port is 5000).
+
+## Download and Verify
+
+Download the archive of your platform and its `.sha256` file from the project's GitHub Releases page, verify the
+checksum, and extract the archive. The archive holds one folder, named like the archive, with the executable and the
+files that must stay beside it. The commands are in the Installation chapter; the files in the folder are (leave
+them all in place):
+
+| File                                                         | Purpose                                          |
+| ------------------------------------------------------------ | ------------------------------------------------ |
+| `reviewcenter.exe` (`reviewcenter` on Linux)                 | The server and the command-line tool             |
+| `e_sqlite3.dll` (`libe_sqlite3.so` on Linux)                 | The native SQLite library; keep it in the folder |
+| `appsettings.json`                                           | The default settings (see Configuration)         |
+| `wwwroot` folder                                             | The static web assets                            |
+| `DemaConsulting.ReviewCenter.staticwebassets.endpoints.json` | Endpoint map of the static web assets            |
+| `aspnetcorev2_inprocess.dll` (Windows only)                  | IIS hosting module; not used by `serve`          |
+
+The native SQLite library and the endpoint map must stay beside the executable. The `aspnetcorev2_inprocess.dll` file
+is the ASP.NET Core module for hosting under IIS; `reviewcenter serve` does not use it, and it is safe to ignore.
+
+Extract the archive to a stable folder instead of a download folder, for example `C:\Program Files\ReviewCenter`
+(Windows) or `/opt/reviewcenter` (Linux), and make the folder read-only for the service account. On Linux, make sure
+that the `reviewcenter` file is executable.
+
+No release has been published yet. Until one is, publish the server from source with the .NET 10 SDK, for example
+`dotnet publish src/DemaConsulting.ReviewCenter -c Release -r win-x64 --self-contained -p:PublishSingleFile=true`
+(use `linux-x64` for Linux). The release archives are built the same way.
+
+## Where the Data Lives
+
+All state is in one data folder. Nothing is written beside the executable unless the account has no application data
+folder (see below). The folder holds these items:
+
+| Item                             | Default location                         | Setting that moves it          |
+| -------------------------------- | ---------------------------------------- | ------------------------------ |
+| Database `reviewcenter.db`       | The `ReviewCenter` folder of the account | `Database:ConnectionString`    |
+| Write-ahead log (`-wal`, `-shm`) | Beside the database file                 | Moves with the database        |
+| Data Protection key ring         | `keys` folder beside the database        | `DataProtection:KeysPath`      |
+| Self-signed attestation key      | `keys/attestation-selfsigned` folder     | `Attestation:SelfSignedFolder` |
+| Git mirrors                      | `git-cache` folder beside the database   | `Git:CachePath`                |
+
+The default `ReviewCenter` folder is `%LOCALAPPDATA%\ReviewCenter` on Windows and `~/.local/share/ReviewCenter` on
+Linux. When the account has no such folder (for example a Linux service account without a home folder), the data goes
+to `data` beside the executable. **For a service, set `Database:ConnectionString` to an explicit file, so that the
+location does not depend on the account.** The keys, the attestation key, and the git cache then sit beside that
+file. A relative path is resolved against the working directory of the process, so use an absolute path.
+
+On a Windows machine the following was observed with a new database, a running server, and a graceful stop:
+
+- While the server runs, the data folder holds the database file (named `rc.db` in the test through
+  `Database:ConnectionString`), its `-wal` and `-shm` files, the `keys` folder with one `key-<guid>.xml` file, and
+  `keys\attestation-selfsigned\attestation-selfsigned.pfx`. The server log shows that it switches the database to the
+  write-ahead log mode.
+- After a graceful stop (Ctrl+C on Windows; SIGTERM from systemd is also a stop request of ASP.NET Core, but the
+  project did not run that) the `-wal` and `-shm` files are gone and the database file is complete. After a crash or
+  a killed process they stay, and the next start reads them. **Never delete the `-wal` file of a database that was
+  not stopped cleanly**: it can hold committed changes that are not yet in the database file.
+
+The git cache can be rebuilt (the server fetches the repositories again). The database and the keys cannot be
+rebuilt; see Back Up and Restore.
+
+## Configuration
+
+The server reads its settings from these sources; a later source wins:
+
+1. `appsettings.json` beside the executable, with the defaults.
+2. `appsettings.<Environment>.json` beside the executable, when it exists. The environment is the value of
+   `ASPNETCORE_ENVIRONMENT` (or `DOTNET_ENVIRONMENT`), and `Production` when neither is set. The project verified
+   on Windows that an `appsettings.Production.json` with an invalid value stopped the server without any variable
+   set, and that an `appsettings.Staging.json` was read when `ASPNETCORE_ENVIRONMENT` was `Staging`.
+3. Environment variables. A setting `Section:Key` is the variable `Section__Key` (two underscores).
+
+There is no command-line option for a setting other than `--urls`. The verbs `user add` and `audit verify`, and the
+option `--check-config`, read the same sources, so set the same environment for them as for `serve`.
+
+Edit `appsettings.json` only for values that stay the same for the installation; a new release replaces that file.
+Put the settings of an installation in environment variables of the service, or in an `appsettings.Production.json`
+that is not part of the release archive. The defaults are:
+
+| Setting                                   | Default                        | Described in                            |
+| ----------------------------------------- | ------------------------------ | --------------------------------------- |
+| `Database:Provider`                       | `Sqlite`                       | Database (Administration)               |
+| `Database:ConnectionString`               | empty (the default location)   | Database (Administration)               |
+| `Auth:SessionHours`                       | 8 hours                        | Users and Sign-in                       |
+| `Auth:RevalidationSeconds`                | 30 seconds (at least 5)        | Users and Sign-in                       |
+| `Identity:Throttle:MaxFailuresPerName`    | 5 attempts for one user name   | Password Rules and Lockout (Sign-in)    |
+| `Identity:Throttle:MaxFailuresPerAddress` | 20 attempts for all user names | Password Rules and Lockout (Sign-in)    |
+| `Identity:Throttle:WindowSeconds`         | 300 seconds (1 to 86400)       | Password Rules and Lockout (Sign-in)    |
+| `Identity:Totp:Enabled`                   | true                           | Two-Factor Sign-in (Sign-in)            |
+| `Identity:Oidc:*`                         | off                            | Sign In with an OpenID Connect Provider |
+| `DataProtection:KeysPath`                 | `keys` in the data folder      | Repositories and Credentials            |
+| `Attestation:*`                           | a self-signed key              | The Signing Key (Reviewing)             |
+| `Git:CachePath`                           | `git-cache` in the data folder | Repositories and Credentials            |
+| `Git:TimeoutSeconds`                      | 120 seconds (1 to 3600)        | Repositories and Credentials            |
+
+The two attempt limits and the window belong together: one client address may make at most the given number of
+sign-in attempts (a successful sign-in gives its attempt back) within one window.
+
+Changes take effect when the server is restarted. The server checks its settings at start, and an invalid value stops
+it with a message that names the setting (see Troubleshooting). Which settings are checked depends on the group:
+
+- **Always checked**: `Auth` (`SessionHours` above 0, `RevalidationSeconds` at least 5), `Identity:Throttle` (both
+  limits above 0, the address limit not below the name limit, the window 1 to 86400 seconds), `Identity:Totp` (the
+  issuer must be 1 to 64 characters without a colon or control character, also while `Enabled` is `false`; a value of
+  `Enabled` that is not a boolean also stops the server), `Git:TimeoutSeconds`, the database provider and connection
+  string, the Data Protection folder (it must be writable), and the attestation key (the provider name, and the
+  settings of the provider that you chose, must give a usable key).
+- **Checked only when switched on**: `Identity:Oidc`. While `Identity:Oidc:Enabled` is `false` (the default), nothing
+  else of that section is read or checked, so a wrong value there shows up only when you turn the sign-in on. The
+  project observed that with `Enabled` set to `true` and no `Authority`, the server stopped with `Invalid OpenID
+  Connect sign-in settings: Identity:Oidc:Authority is required when sign-in with OpenID Connect is enabled.`
+
+A disabled feature is therefore not checked until you enable it. Start the server by hand with the feature enabled to
+check its settings before you rely on them.
+
+Set an environment variable for one run like this:
+
+```powershell
+# Windows PowerShell
+$env:Database__ConnectionString = 'D:\ReviewCenterData\reviewcenter.db'
+.\reviewcenter.exe serve --urls http://localhost:8080
+```
+
+```bash
+# Linux
+Database__ConnectionString=/var/lib/reviewcenter/reviewcenter.db reviewcenter serve --urls http://127.0.0.1:8080
+```
+
+The Linux command was not run by the project; the Windows form was.
+
+## Choose the Address and Port
+
+By default the server listens on `http://localhost:5000`, which only the same machine can reach. Choose the address
+with the option `--urls`, which takes an absolute `http` or `https` URL:
+
+| Goal                                                | Option                          |
+| --------------------------------------------------- | ------------------------------- |
+| Only this machine (behind a reverse proxy)          | `--urls http://127.0.0.1:5000`  |
+| Another port, only this machine                     | `--urls http://localhost:8080`  |
+| Every network interface of the machine (all IPv4)   | `--urls http://0.0.0.0:8080`    |
+
+Use only `--urls` for this. **The environment variable `ASPNETCORE_URLS` is ignored**: with it set to another port,
+the server still listened on `http://localhost:5000` (the server always applies the `--urls` value or its default).
+A startup message `ReviewCenter server started and listening on <address>` in the log shows the address that is in
+use.
+
+If the port is taken, the server writes `Failed to start the server on <url>: Failed to bind to address <url>:
+address already in use.` and exits with code 1.
+
+When the server listens on an address that other machines can reach, put TLS in front of it (see TLS and Reverse
+Proxy). Open the port in the firewall of the host only for the machines that need it; the project did not test any
+firewall configuration.
+
+The path `/health` answers `200` with the text `Healthy` and needs no sign-in. Use it as the check of a load
+balancer, a proxy, or a monitoring system.
+
+## Keep It Running
+
+The server runs until it is stopped, and it does not restart itself. In production, use a tool that starts it at
+boot, restarts it when it stops, captures its output, and stops it with a termination request (Ctrl+C, or SIGTERM on
+Linux) so that the database is closed cleanly.
+
+**ReviewCenter has no built-in Windows service or systemd support.** The executable does not talk to the Service
+Control Manager, so registering `reviewcenter.exe` directly with `sc.exe create` does not give a working service. The
+recipes below are generic approaches for tools that run any console program as a service. **The project did not test
+any of them.**
+
+### Logging
+
+The server writes its log to the console (standard output and standard error), and nothing else. By default it logs
+at the `Information` level, including every HTTP request, and on the first start of a new database also the statements
+that create the tables. Capture the output with the service tool: the journal of systemd, or the log file settings of
+a Windows service wrapper. To log only warnings and errors, set `Logging__LogLevel__Default=Warning`; with that
+setting, the log of a normal start held only the version banner and a warning that the attestation key is
+self-signed (see the hardening checklist).
+
+### Linux with systemd (generic, not verified)
+
+A unit file like the following runs the server under its own account. Replace the paths, the account, and the port.
+
+```ini
+[Unit]
+Description=ReviewCenter
+After=network.target
+
+[Service]
+Type=simple
+User=reviewcenter
+WorkingDirectory=/opt/reviewcenter
+ExecStart=/opt/reviewcenter/reviewcenter serve --urls http://127.0.0.1:5000
+Environment=Database__ConnectionString=/var/lib/reviewcenter/reviewcenter.db
+Environment=Logging__LogLevel__Default=Warning
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
+```
+
+Create the account and the data folder first, and let only that account use the folder (`chown reviewcenter` and mode
+`0700`). Keep secrets, such as the password of a certificate, out of the unit file when the file is readable by other
+people; use a file with restricted permissions that you name with `EnvironmentFile=` instead.
+
+### Windows (generic, not verified)
+
+Use a tool that runs a console program as a service (a service wrapper for console programs) or the Task
+Scheduler. Whatever you use, it has to:
+
+- run `reviewcenter.exe serve --urls <address>` with the installation folder as the working directory;
+- run it under an account that can write to the data folder (an account of its own is better than `LocalSystem`),
+  and set `Database__ConnectionString` explicitly, because the default folder depends on the account profile;
+- set the environment variables of the settings you use;
+- capture standard output and standard error to a file with rotation;
+- start it at boot and restart it when it exits;
+- stop it with a Ctrl+C style request (not by killing the process) so that the database is closed cleanly.
+
+Follow the documentation of the tool for the commands. In the project's experiment on Windows, a process that
+received a Ctrl+C logged `Application is shutting down...` and exited, and removed the `-wal` and `-shm` files.
+
+## TLS and Reverse Proxy
+
+Anyone who can reach the server over a network sees the passwords and the session cookies of the people who sign in,
+unless the traffic is encrypted. Use HTTPS whenever the server can be reached from other machines. There are two
+ways to do it.
+
+### Terminate TLS in a Reverse Proxy (Recommended)
+
+Run the server on the loopback address (`--urls http://127.0.0.1:5000`) and let a reverse proxy (for example nginx,
+Caddy, or a load balancer) end TLS and forward plain HTTP to it. The proxy must do all of the following,
+and Secure Cookie Behind a Reverse Proxy below explains why:
+
+- Forward the original scheme in the `X-Forwarded-Proto` header and the client address in `X-Forwarded-For`, and
+  **overwrite** these headers with its own values instead of passing on what the client sent.
+- Keep the `Host` header of the client request (the addresses of the attestation PDFs in the evidence index of the API
+  are built from it).
+- Allow WebSocket connections, because the pages are interactive and keep a connection to the server open, and do not
+  close idle connections early.
+- Be the only route to the server (the server listens on the loopback address, or a firewall allows only the proxy).
+
+Set `ASPNETCORE_FORWARDEDHEADERS_ENABLED=true` in the environment of the server, so that it reads the forwarded
+scheme and client address. The project verified the effect on Windows: with that variable and a request that carried
+`X-Forwarded-Proto: https`, the sign-in cookie was marked `secure`, also when the request came from an address that
+was not the loopback address; without the variable, the same request produced a cookie without `secure`.
+
+The following nginx server block is a generic example **that was not run by the project**. It assumes that the
+certificate files exist, and it must be adapted:
+
+```nginx
+server {
+    listen 443 ssl;
+    server_name reviewcenter.example.com;
+    ssl_certificate     /etc/ssl/reviewcenter.example.com.pem;
+    ssl_certificate_key /etc/ssl/reviewcenter.example.com.key;
+
+    location / {
+        proxy_pass http://127.0.0.1:5000;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Forwarded-For $remote_addr;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection $connection_upgrade;
+        proxy_read_timeout 1h;
+    }
+}
+```
+
+The variable `$connection_upgrade` comes from a `map` block in the `http` section of the nginx configuration (see the
+nginx documentation for WebSocket proxying). `X-Forwarded-For $remote_addr` replaces the header instead of adding to
+what the client sent.
+
+### Terminate TLS in the Server
+
+The server can serve HTTPS itself. Give it an `https` address and a certificate file with the standard Kestrel
+settings, here as environment variables:
+
+```powershell
+# Windows PowerShell
+$env:Kestrel__Certificates__Default__Path = 'C:\ReviewCenter\tls\reviewcenter.pfx'
+$env:Kestrel__Certificates__Default__Password = '<the password of the pfx file>'
+.\reviewcenter.exe serve --urls https://0.0.0.0:8443
+```
+
+The project verified this on Windows with a generated test certificate: the server logged that it listened on the
+`https` address, answered `/health` with `200`, and presented that certificate (TLS 1.3). It did not verify other
+certificate formats (for example PEM files with a separate key file), certificate renewal, or Linux. A certificate
+file with a password in the environment is readable by anybody who can read the environment of the process, so protect
+the service definition. Reload a renewed certificate by restarting the server. In this mode the request itself is
+HTTPS, so the sign-in cookie is marked Secure without further settings, and `ASPNETCORE_FORWARDEDHEADERS_ENABLED`
+is not needed.
+
+### Host Filtering, HTTPS Redirection, and HSTS
+
+In both ways of terminating TLS, the server itself does none of the following, so the reverse proxy or the front end
+has to do them where you need them:
+
+- **No host filtering.** The shipped settings do not set `AllowedHosts`, and the server code does not add a host
+  check. The server answers a request with any `Host` header: in the project's test, a request to `/health` with the
+  host `evil.test` got `200`. This matters because the addresses of the attestation PDFs in the evidence index of the
+  API are built from the scheme and the `Host` header of the request (see the nginx example above). Let the proxy
+  accept only the host names of your installation, and refuse every other name. The ASP.NET Core setting
+  `AllowedHosts` is not a documented ReviewCenter setting; in a quick test, setting it as an environment variable did
+  make the server refuse other host names, but the project did not test that further.
+- **No HTTP-to-HTTPS redirection.** The server does not redirect a plain `http` request to `https`. In the project's
+  test, a plain request got its answer directly, without a `Location` header. Let the proxy redirect port 80 to HTTPS,
+  or do not offer plain HTTP to other machines at all.
+- **No HSTS.** The responses of the server carry no `Strict-Transport-Security` header. If you want browsers to use
+  only HTTPS for your host name, let the proxy add that header (to its HTTPS responses only).
+
+## Secure Cookie Behind a Reverse Proxy
+
+The sign-in cookie is marked Secure when the request reaches the server over HTTPS. When a reverse proxy ends TLS and
+forwards plain HTTP to ReviewCenter, set the environment variable `ASPNETCORE_FORWARDEDHEADERS_ENABLED=true` for the
+server, so that it trusts the forwarded scheme of the proxy and still marks the cookie Secure. Use HTTPS whenever the
+server can be reached from other machines.
+
+The sign-in throttle (see Sign In and Out in the Users and Sign-in chapter) uses the client address, and the same
+setting makes the server take that address from the `X-Forwarded-For` header. The server then accepts that header from
+any sender and does not restrict which proxies it trusts. Keeping the header trustworthy is the responsibility of the
+deployment: the proxy must overwrite it and be the only route to the server. If the server can be reached directly, a
+client can choose its own address and avoid the per-address and per-name limits (the lockout of the user name still
+applies). Without the setting, behind a proxy, every user appears with the address of the proxy and shares one set of
+limits.
+
+## Check an Installation
+
+Before you let people use a new installation, set the same environment as the service will have, and run the
+self-validation with the configured database check:
+
+```powershell
+$env:Database__ConnectionString = 'D:\ReviewCenterData\reviewcenter.db'
+.\reviewcenter.exe --validate --check-config
+```
+
+The run takes a few seconds. It checks that git is available (and its version), runs a review workflow, a signed
+attestation, and a short start of the web server on a free loopback port, and last opens the configured database
+**read-only** and compares its tables and columns with what this version expects. On the Windows machine of the
+project it ended with `Passed: 10` and exit code 0, and the last line read `ReviewCenter_ConfiguredDatabase - Passed
+(...): provider Sqlite; opened read-only; schema matches (17 tables, 138 columns)`. A non-zero exit code means that a
+check failed; the message names the check (see Self-Validation in the Command-Line Reference chapter).
+
+Then start the server and check `/health`. A first start with a new database creates the data folder, the database,
+the key ring, and the attestation key. Create the first system administrator before anyone signs in, with the command
+that Create the First Administrator in the Users and Sign-in chapter describes; run it with the same environment as
+the service. After that, sign in and add the users and projects that Manage Users and Access and Visibility in the
+Administration chapter describe.
+
+## Back Up and Restore
+
+Everything that matters is in the database file and the key folder. Back up both, and back them up together.
+
+1. Stop the server (a graceful stop closes the database and removes the `-wal` and `-shm` files).
+2. Copy the database file, and its `-wal` and `-shm` files when they exist, to the backup location.
+3. Copy the whole `keys` folder (the Data Protection key ring and `attestation-selfsigned`). If you moved them with
+   `DataProtection:KeysPath` or `Attestation:SelfSignedFolder`, copy those folders. If the signing key is in the
+   certificate store of the machine (`Attestation:Provider` set to `CertificateStore`), back up that certificate
+   and its private key by the means of your organization.
+4. Start the server again.
+
+The `git-cache` folder is optional: the server rebuilds it from the repositories.
+
+Why the keys matter, and what was observed on Windows:
+
+- **Restoring all of it works.** A copy of the stopped data folder, started with `Database:ConnectionString` pointing
+  at the copy, accepted the password sign-in of the existing user.
+- **Restoring only the database file also starts and accepts passwords**, but when the old keys are not there it
+  silently creates a new Data Protection key ring. The stored repository tokens and the two-factor secrets are
+  encrypted with the old key ring and cannot be read any more (they must be entered again). The attestation key is
+  affected only with the default `SelfSigned` provider: when its pfx file is missing, the server generates a new key,
+  so the signatures of new attestation PDFs come from a new key, and a verifier that trusts the old key does not trust
+  them. A key of the `CertificateStore` provider is not in the data folder; it stays in the certificate store, and the
+  server does not generate one (a missing certificate stops the start with a message).
+- The keys and the pfx file are not encrypted at rest. Protect the backup like the live data, and let only the service
+  account and the backup operator read the files.
+
+A plain copy of a database that is in use (the server running) may be inconsistent, because recent changes can be
+in the `-wal` file that the copy does not take together with the database file. Back up a stopped server, or use a
+backup method that understands SQLite; the project did not test any online backup.
+
+To check a restored database, run `reviewcenter audit verify` (exit code 0 when the audit chain is intact, 1 when it is
+broken) with the same environment as the server. The project's test on a new database printed
+`Audit chain intact: 1 entries`.
+
+## Upgrade
+
+**This release has no database migrations.** The server creates the tables when the database file is new, and it does
+not change the tables of an existing file (the guide chapter Database in the Administration chapter says the same).
+So the database that a new version needs may differ from the one of the old version, and the server does not detect
+and does not repair a difference: in the project's experiment, a server started normally against a database that
+lacked a table, and `/health` answered `200`. Only `--validate --check-config` reported the difference, with the
+message `The database schema does not match this version of ReviewCenter: table 'UserTotps' is missing.` and exit
+code 1. Planned Work in the Introduction lists a migration command as future work.
+
+The supported upgrade procedure is therefore:
+
+1. Read the release notes of the new version for changes of the database, and of the settings.
+2. Stop the server, and take a backup (see Back Up and Restore).
+3. Replace the folder of the executable with the folder of the new release (keep your `appsettings.<Environment>.json`
+   or the environment of the service).
+4. Run `reviewcenter --validate --check-config` with the environment of the service. If the check of the database
+   fails, do not start the server on that file: the file does not fit the new version. Restore the old version and the
+   backup, or, **for development data only**, start with a new database file as the Database section describes.
+5. Start the server and check `/health` and a sign-in.
+
+To go back, stop the server, restore the old executable folder and the backup that you took in step 2 (restore the
+database file and the keys together), and start it again. The project did not test an upgrade between two releases,
+because no release has been published yet.
+
+## Hardening Checklist
+
+- Use HTTPS (see TLS and Reverse Proxy), and keep the server on the loopback address when a proxy is in front of it.
+- Behind a proxy, set `ASPNETCORE_FORWARDEDHEADERS_ENABLED=true`, and make the proxy overwrite `X-Forwarded-For` and
+  keep `Host` (see Secure Cookie Behind a Reverse Proxy).
+- Let the proxy accept only your host names, redirect HTTP to HTTPS, and add HSTS where you need it; the server does
+  none of these (see Host Filtering, HTTPS Redirection, and HSTS).
+- Run the server under an account of its own that can write only to the data folder, and let only that account read the
+  database, the `keys` folder, and the attestation pfx file. These files are not encrypted at rest.
+- Back up the database and the key folder together, and test a restore.
+- Keep the built-in protections on: the sign-in throttle (5 attempts per user name and 20 per address in 300 seconds by
+  default), passwords of 12 to 128 characters, the optional two-factor sign-in, and the limit of 30 requests a minute
+  for each address on anonymous evidence downloads (see Password Rules and Lockout in the Users and Sign-in chapter,
+  and Anonymous Access in the Administration chapter).
+- Replace the default self-signed attestation key. The server logs a warning at every start that the self-signed key
+  is for development and test only. Use `Attestation:Provider` `CertificateStore` with a certificate of your
+  organization, and consider `Attestation:RequireTrustedKey` (see The Signing Key in the Reviewing chapter).
+- Prefer an account at your identity provider where one exists (see Sign In with an OpenID Connect Provider in the
+  Users and Sign-in chapter), and turn anonymous evidence access on only for projects that need it.
+- The server checks its settings when it starts, and refuses to start when an enabled setting is invalid, when the
+  key folder cannot be written, or when the attestation key is not usable (the `Identity:Oidc` settings are not checked
+  while that sign-in is off; see Configuration). Start it once by hand after every change of the
+  settings, and run `--validate --check-config` (see Check an Installation).
+- Review the audit trail regularly (see Audit Trail in the Administration chapter), and verify its chain from the
+  command line.
+- Keep the server and `git` up to date with the releases.
+
+## Troubleshooting
+
+When the server cannot start, it writes one line to the console and exits with code 1. These are the messages that
+the project produced on purpose with a wrong setting, and what to do:
+
+- `Error: Unsupported argument '--unknown'`: a wrong option. See `reviewcenter --help`.
+- `Failed to start the server on <url>: Failed to bind to address <url>: address already in use.`: the port is taken.
+  Stop the other program or use another port with `--urls`.
+- `Failed to prepare the database: The database provider 'X' is not supported. Supported providers: Sqlite.`: set
+  `Database:Provider` to `Sqlite`.
+- `Failed to prepare the database: An in-memory SQLite database is not supported ...`: give a database file path
+  instead of `:memory:`.
+- `Invalid sign-in settings: Auth:SessionHours must be greater than 0.`: correct the `Auth` or `Identity` setting that
+  the message names.
+- `Invalid git settings: Git:TimeoutSeconds must be between 1 and 3600 seconds.`: correct the `Git` setting that the
+  message names.
+- `The Data Protection key ring folder '<folder>' is not writable: ...`: set `DataProtection:KeysPath` to a folder that
+  the account can write and that is kept. The message was produced with a path that is an existing file.
+- `The attestation signing key is not usable: Attestation:Provider 'X' is not supported. Use SelfSigned or
+  CertificateStore.`: correct `Attestation:Provider` (see The Signing Key in the Reviewing chapter).
+
+Other things to check:
+
+- **The sign-in cookie has no Secure flag behind a proxy.** Check that the proxy forwards `X-Forwarded-Proto` and that
+  `ASPNETCORE_FORWARDEDHEADERS_ENABLED=true` is set (see Secure Cookie Behind a Reverse Proxy).
+- **Every user seems to come from one address, and shares one set of sign-in limits.** The server sees the address of
+  the proxy for every client; see Secure Cookie Behind a Reverse Proxy.
+- **The pages load but are not interactive, or are disconnected after a short time, behind a proxy.** The proxy must
+  allow WebSocket connections and must not close idle connections quickly (not verified by the project).
+- **A repository cannot be read.** Check that `git` is on the `PATH` of the service account and is version 2.31 or
+  later; see Repositories and Credentials in the Administration chapter.
+- **Stored repository tokens or two-factor secrets cannot be used after a restore.** The key ring of the old
+  installation was not restored; see Back Up and Restore.
+- **The setting `ASPNETCORE_URLS` has no effect.** It is ignored; use `--urls`.
