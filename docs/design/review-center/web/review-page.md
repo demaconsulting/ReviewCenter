@@ -85,7 +85,10 @@ status of the signing key (`Describe`) without ever reading the key.
 for nobody) and its message. **SlotPrimaryChoices**, **SlotAlternateChoices**, **SlotErrors**: the choices made in
 the edit fields and the message of each slot, by slot identity; until the reader changes a choice the stored
 primary and alternate are shown. **SignPasswords**, **SignErrors**: the password typed into the sign form and the
-message of each slot, by slot identity. **PasswordKey**: a counter that makes the browser build a fresh, empty
+message of each slot, by slot identity. **SignTotpCodes**: the one-time code typed into the sign form of a slot, by
+slot identity, and **CurrentHasTotp**: whether the signed-in local user has a second factor, asked with
+`TotpService.IsEnrolledAsync` when the page loads (it is false for an account of an identity provider).
+**PasswordKey**: a counter that makes the browser build a fresh, empty
 password field after every signing attempt. **CurrentIsExternal**, **ConfirmedSlots**, **ReauthText**,
 **ReauthReportDismissed**: whether the signed-in user signs in with an identity provider, the slots that have a live
 confirmation (asked from `SigningService` when the page loads and after each change, never spent by the page), the
@@ -110,7 +113,8 @@ Test identifiers: `review-page` (root), `breadcrumb-projects-link`, `project-lin
 `slot-alternate-{id}`, `slot-primary-not-member-{id}`, `slot-alternate-not-member-{id}`, `slot-not-member-hint-{id}`,
 `slot-status-{id}`, `slot-primary-select-{id}`, `slot-alternate-select-{id}`,
 `slot-save-{id}`, `slot-remove-{id}`, `slot-error-{id}`, `sign-blockers-{id}`, `sign-form-{id}`, `sign-meaning-{id}`,
-`sign-password-{id}`, `sign-error-{id}`, `sign-button-{id}` (all by slot identity), and for an external user
+`sign-password-{id}`, `sign-totp-{id}` (only for a user with a second factor), `sign-error-{id}`, `sign-button-{id}`
+(all by slot identity), and for an external user
 `sign-reauth-form-{id}`, `sign-reauth-{id}`, `sign-reauth-hint-{id}`, `sign-reauth-off-{id}`, and `sign-confirmed-{id}`,
 `slot-add-form`,
 `new-slot-primary-select`, `new-slot-alternate-select`, `new-slot-add-button`, `new-slot-error`,
@@ -294,7 +298,10 @@ change as well.
 alternate of a slot that is not currently signed (decided from the user name in the authentication state). While the
 review has blockers (no checklist, unanswered or failed checks, open threads), the page draws the list of blockers
 headed "This review cannot be signed yet:" instead of the form. Otherwise the form shows the meaning text of the
-signature (`SigningService.MeaningText`) and a password field. For a user who signs in with an identity provider
+signature (`SigningService.MeaningText`) and a password field. For a local user with a second factor (`CurrentHasTotp`)
+the form also has a field "Current code from your authenticator app" with the hint "If you just signed in with this
+code, wait for the next one.", because Core refuses a code that was already used in the same time step. For a user who
+signs in with an identity provider
 (`CurrentIsExternal`, from `UserService.GetAsync`) the password field is replaced: until a confirmation exists for the
 slot (`ConfirmedSlots`, from `SigningService.HasReauthProofAsync`, which spends nothing) the page draws a form that
 posts to `/auth/oidc/reauth` with the project, review, slot, and the address of this review, and the button "Confirm
@@ -303,14 +310,17 @@ After the confirmation the page shows "Identity confirmed. Review the record, th
 with no password field; a failed confirmation (`reauth=failed` in the address, until the user acts) is shown as "We
 could not confirm your identity. Sign in again at {provider} when asked." next to the button. On submit the page
 calls `SigningService.SignAsync`
-with the signed-in user, the slot, the password typed (empty for an external user, whose proof is held by Core), and the
+with the signed-in user, the slot, the password typed (empty for an external user, whose proof is held by Core), the
+code typed (`totpCode`, null without a second factor), and the
 record digest it displayed (`Approval.Digest`), so what
 is signed is exactly what the reader saw; a record that changed in the meantime is refused by Core, and the page shows
 that message. A `DomainRuleException` (wrong password, a user who is not in the slot, a locked-out user, a changed
-record) is shown in `sign-error-{id}`; the wrong-password message is the generic one Core produces. A reviewer who is no
+record) is shown in `sign-error-{id}`; the wrong-password message is the generic one Core produces, and a wrong or
+missing code gets the same message ("The password or the code is incorrect."). A reviewer who is no
 longer a member of the project (`SlotMember.IsMember` false) cannot sign: Core refuses, and the page shows that message
 and the badge and hint described above. The password is
-only held in the component field `SignPasswords` while it is typed: the `finally` block removes it after every
+only held in the component field `SignPasswords` while it is typed (and the code in `SignTotpCodes`): the `finally`
+block removes both after every
 attempt, whatever the outcome, and increments `PasswordKey`, which is part of the `@key` of the field so that the
 browser builds a new, empty input. It is never rendered as a value, logged, or kept. After the attempt the page calls
 `RefreshAsync`, so a signature shows as signed, locks the slot, and may turn the badge to Approved.
@@ -418,6 +428,7 @@ page.
   fill a slot, adds, changes, and removes slots, and signs; it holds every signing rule. It also tells
   (`HasReauthProofAsync`) whether an external user has confirmed the identity for a slot.
 - **UserService** — tells whether the signed-in user is an account of an identity provider.
+- **TotpService** — tells whether the signed-in user has a second factor, so that the sign form asks for a code.
 - **OidcSignIn** and **OidcOptions** (Identity) — the endpoint `/auth/oidc/reauth` that the confirmation form posts to,
   the `reauth` query values, and the display name and state of the provider.
 - **FileText** — decides whether a file is text and splits it into lines.

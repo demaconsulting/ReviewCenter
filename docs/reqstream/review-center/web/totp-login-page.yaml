@@ -1,0 +1,24 @@
+---
+# Software Unit Requirements for the TotpLoginPage Unit
+#
+# The TotpLoginPage unit is the page at /login/totp (TotpLoginPage.razor with its code-behind): the second step of the
+# sign-in of an account with a second factor, where the person types the code of the authenticator app or a recovery
+# code.
+
+sections:
+  - title: TotpLoginPage Unit Requirements
+    requirements:
+      - id: ReviewCenter-TotpLoginPage-SecondStepForm
+        title: >-
+          The TotpLoginPage unit shall show, only while a valid pending sign-in for the client exists, a form with one
+          code field that posts to the endpoint of the second step with the antiforgery token and that does not show
+          the user name, shall show a message that does not tell the cause for a wrong code and a message for too many
+          attempts, and shall send everybody else to the login page with the notice that the sign-in has ended.
+        justification: |
+          The page is reached with a cookie only, so it must not open for somebody without a pending sign-in, and it
+          must not tell anybody whose account is being signed in or why a code failed.
+        tests:
+          - TotpLoginPage_Render_PendingSignIn_ShowsCodeFormAndNoUserName
+          - TotpLoginPage_Render_ErrorFlag_ShowsMatchingMessage
+          - TotpLoginPage_Render_NoValidChallenge_RedirectsToLoginWithExpiredFlag
+          - TotpLoginPage_Render_ChallengeFromOtherAddress_RedirectsToLogin

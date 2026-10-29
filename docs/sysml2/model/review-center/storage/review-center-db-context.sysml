@@ -1,6 +1,6 @@
 package ReviewCenter {
     part def ReviewCenterDbContext {
-        doc /* Entity Framework Core model that maps users (with the external issuer and subject columns and a unique index over the pair), projects (with the seven boolean columns of their evidence settings), project memberships, reviews, review files, threads, comments, and checklist snapshots, section states, and answers, reviewer slots and signatures, git repositories, and personal access tokens (with the creator of a review) to database tables, keys, and relationships. */
+        doc /* Entity Framework Core model that maps users (with the external issuer and subject columns and a unique index over the pair), projects (with the seven boolean columns of their evidence settings), project memberships, reviews, review files, threads, comments, and checklist snapshots, section states, and answers, reviewer slots and signatures, git repositories, and personal access tokens (with the creator of a review) and the enrollments of the second factor with their recovery codes (a table each, with a unique index over the user and the hash of a code) to database tables, keys, and relationships. */
 
         comment sourceRef /* Source: src/DemaConsulting.ReviewCenter/Storage/ReviewCenterDbContext.cs */
         comment testRef /* Test: test/DemaConsulting.ReviewCenter.Tests/Storage/ReviewStoreTests.cs, ReviewStoreRepositoryTests.cs, ReviewStoreMembershipTests.cs, EvidenceSettingsStoreTests.cs, RepositoryStoreTests.cs, and DatabaseSetupTests.cs */

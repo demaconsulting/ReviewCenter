@@ -54,6 +54,14 @@ N/A - standard test environment.
   is `ActorNotAllowed` and comes before every other check, so that a request with everything right and one with
   everything wrong give the same answer.
 - Null arguments are rejected with an `ArgumentNullException`.
+- A user with a second factor signs with the password and a fresh code of the authenticator, which the signature
+  spends; a missing, empty, wrong, malformed, recovery, or already used code is refused with the one message that
+  names the password and the code, nothing is signed, and a recovery code is not spent; a wrong password is refused
+  with the same message and does not spend the code; wrong codes count toward the lockout shared with the password;
+  a service without the second factor service refuses an enrolled user (fail closed).
+- A user without a second factor signs with the password alone and gets the message that names only the password; an
+  external user is not affected; an actor that came through a token is refused and does not spend the code; after an
+  administrator reset the user signs with the password alone again.
 
 #### Test Scenarios
 
@@ -229,3 +237,25 @@ and then with the right password (met by the lock) are both refused with `Reauth
 contains the typed password. This
 scenario is tested by `SigningService_SignAsync_WrongPasswordThenLocked_RecordsReauthFailedEntriesWithoutPassword`,
 defined in `AuditEventTests.cs`.
+
+**SigningService second factor scenarios**: These tests are defined in `SigningServiceTotpTests.cs`. They use the real
+`SigningService` with the real `TotpService` from `TotpTestWorld`, a review with a slot for an enrolled user and a
+slot for an external user, and a clock moved to the next time step so that the enrollment code is no longer fresh.
+The right password and a fresh code sign, the signature shows the display name, and the code is spent (one step
+advance and a later verification fails), which is tested by
+`SigningService_SignAsync_EnrolledUserWithPasswordAndFreshCode_Signs`. A theory over a missing, empty, wrong,
+malformed, recovery, and already used code is refused with `ReauthenticationFailed` and the message "The password or
+the code is incorrect.", nothing is signed, all ten recovery codes remain, and no step is spent; this is tested by
+`SigningService_SignAsync_EnrolledUserWithoutRightCode_IsRefused`. A wrong password with a right code is refused with
+the same message and the code still works afterwards, which is tested by
+`SigningService_SignAsync_WrongPasswordRightCode_IsRefusedAndKeepsTheCode`. Five wrong codes lock the account, the
+right password and code are then refused, the sign-in password step is locked as well, and `signature.reauth-failed`
+entries exist; this is tested by `SigningService_SignAsync_WrongCodes_LockTheAccountForSigningAndSignIn`. A signing
+service without the second factor service refuses an enrolled user, which is tested by
+`SigningService_SignAsync_EnrolledUserWithoutTotpService_FailsClosed`. A user without a second factor signs with the
+password alone and a wrong password gets the message "The password is incorrect.", which is tested by
+`SigningService_SignAsync_UserWithoutSecondFactor_NeedsNoCode`. An external user signs with a proof, with no password
+and no code, which is tested by `SigningService_SignAsync_ExternalUser_IsNotAffectedByTheSecondFactor`. An actor that
+came through a token is refused with `ActorNotAllowed` and the code is still good for the person, which is tested by
+`SigningService_SignAsync_ApiTokenActorWithPasswordAndCode_IsRefusedAndKeepsTheCode`. After an administrator reset the
+user signs with the password alone, which is tested by `SigningService_SignAsync_AfterAdministratorReset_NeedsNoCode`.

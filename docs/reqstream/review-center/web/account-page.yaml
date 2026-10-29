@@ -112,3 +112,31 @@ sections:
           The account has no password, so a form for it would only fail, and the sentence tells the person where to go.
         tests:
           - AccountPage_Render_ExternalUser_ShowsNoPasswordForm
+
+      - id: ReviewCenter-AccountPage-Totp
+        title: >-
+          The AccountPage unit shall show, for a local account while the second factor is on, a card with the status
+          and the steps: start the setup with the password, show the secret and its address as text, confirm with a code
+          and show the ten recovery codes once until dismissed, give up a setup, show how many recovery codes are left,
+          and remove the second factor or replace the recovery codes only with the password and a code, emptying the
+          fields after each attempt and answering a wrong code with a general message. It shall show no card while the
+          feature is off or the password is temporary, and a sentence for an account of a provider.
+        justification: |
+          The person manages their own second factor here, and the page must make the safe way the easy way: the secret
+          and the codes appear once, a mistake does not tell an observer anything, and nothing that cannot work is
+          offered.
+        tests:
+          - AccountPage_Render_LocalUserNotEnrolled_ShowsStatusOffAndStartForm
+          - AccountPage_Render_FeatureDisabled_HidesCard
+          - AccountPage_Render_ExternalUser_ShowsNoteAndNoControls
+          - AccountPage_Render_TemporaryPassword_HidesCard
+          - AccountPage_Start_WrongPassword_ShowsErrorAndNoSecret
+          - AccountPage_Start_RightPassword_ShowsSecretAndAddress
+          - AccountPage_Confirm_WrongCode_ShowsGenericErrorAndStaysPending
+          - AccountPage_Confirm_RightCode_ShowsTenRecoveryCodesOnceAndNoSecret
+          - AccountPage_Cancel_PendingEnrollment_RemovesSecretAndShowsStartForm
+          - AccountPage_Render_Enrolled_ShowsOnAndRecoveryCodesLeft
+          - AccountPage_Disable_WrongCode_ShowsGenericErrorKeepsItOnAndClearsFields
+          - AccountPage_Disable_RecoveryCode_TurnsItOff
+          - AccountPage_Regenerate_RightPasswordAndCode_ShowsNewCodesOnce
+          - AccountPage_Regenerate_WrongCode_ShowsGenericErrorAndNoCodes

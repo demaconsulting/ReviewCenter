@@ -25,6 +25,7 @@ The following OTS items have integration design documentation:
 - Microsoft.AspNetCore.Authentication.OpenIdConnect (_openidconnect.md_) — OpenID Connect sign-in handler used by the
   Identity subsystem
 - OpenIddict (_openiddict.md_) — OpenID Connect server library used by the tests as a fake identity provider
+- Otp.NET (_otpnet.md_) — one-time password library used by the Identity subsystem for the second factor
 - Pandoc (_pandoc.md_) — Markdown-to-HTML conversion tool
 - System.Security.Cryptography.Pkcs (_pkcs.md_) — CMS signing library used to sign the PDF attestations
 - Playwright (_playwright.md_) — browser automation library used by the Puppet developer tool

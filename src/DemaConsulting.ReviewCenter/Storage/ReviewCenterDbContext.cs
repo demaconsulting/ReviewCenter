@@ -34,8 +34,9 @@ namespace DemaConsulting.ReviewCenter.Storage;
 ///     migrations yet, so a database created before users, threads, checklists, slots or signatures existed does
 ///     not gain their tables or columns and must be deleted and recreated (this includes the repository registry and
 ///     the repository source columns of reviews and review files, the personal access token table and the creator
-///     columns of reviews). Instances are short-lived and not thread-safe: create one per operation
-///     through <see cref="IDbContextFactory{TContext}"/>.
+///     columns of reviews). The same is true for the second factor tables (<c>UserTotps</c> and
+///     <c>TotpRecoveryCodes</c>): a database from before them must be deleted and recreated. Instances are
+///     short-lived and not thread-safe: create one per operation through <see cref="IDbContextFactory{TContext}"/>.
 /// </remarks>
 internal sealed class ReviewCenterDbContext : DbContext
 {
@@ -163,6 +164,16 @@ internal sealed class ReviewCenterDbContext : DbContext
     ///     Gets the table of personal access tokens.
     /// </summary>
     public DbSet<PersonalAccessToken> PersonalAccessTokens => Set<PersonalAccessToken>();
+
+    /// <summary>
+    ///     Gets the table of second factor enrollments (at most one per user).
+    /// </summary>
+    public DbSet<UserTotp> UserTotps => Set<UserTotp>();
+
+    /// <summary>
+    ///     Gets the table of recovery codes of the second factor.
+    /// </summary>
+    public DbSet<TotpRecoveryCode> TotpRecoveryCodes => Set<TotpRecoveryCode>();
 
     /// <summary>
     ///     Configures keys, relationships, length limits and conversions.
@@ -293,7 +304,27 @@ internal sealed class ReviewCenterDbContext : DbContext
             token.Property(t => t.TokenHash).IsRequired().HasMaxLength(Sha256HexColumnLength);
             token.HasIndex(t => t.TokenHash).IsUnique();
             token.HasIndex(t => t.UserId);
-            token.HasOne(t => t.User).WithMany().HasForeignKey(t => t.UserId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // Second factor: one enrollment per user (the user id is the key, so a second row cannot exist), kept apart
+        // from the user row because the user store rewrites every column of a user and a stale copy must never move
+        // the last accepted step backwards. The secret is stored encrypted. Recovery codes are stored as hashes; the
+        // unique index per user makes a duplicate hash impossible. Both go away with the user
+        modelBuilder.Entity<UserTotp>(totp =>
+        {
+            totp.HasKey(t => t.UserId);
+            totp.Property(t => t.UserId).ValueGeneratedNever();
+            totp.Property(t => t.ProtectedSecret).IsRequired().HasMaxLength(EncryptedTokenColumnLength);
+            totp.Ignore(t => t.IsActive);
+            totp.HasOne<User>().WithMany().HasForeignKey(t => t.UserId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<TotpRecoveryCode>(code =>
+        {
+            code.HasKey(c => c.Id);
+            code.Property(c => c.CodeHash).IsRequired().HasMaxLength(Sha256HexColumnLength);
+            code.HasIndex(c => new { c.UserId, c.CodeHash }).IsUnique();
+            code.HasOne<User>().WithMany().HasForeignKey(c => c.UserId).OnDelete(DeleteBehavior.Cascade);
         });
 
         // Repositories: identity assigned by the database; every repository belongs to exactly one project (and goes

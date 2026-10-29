@@ -34,6 +34,9 @@ flowchart TD
         SignInThrottle
         OidcSignIn
         RevalidatingAuthenticationStateProvider
+        TotpAlgorithm
+        TotpSecretProtector
+        TotpSignIn
     end
     subgraph Web
         App
@@ -46,6 +49,7 @@ flowchart TD
         ReviewPage
         ChecklistPage
         LoginPage
+        TotpLoginPage
         AccountPage
         UsersPage
         HistoryPage
@@ -64,6 +68,8 @@ flowchart TD
         RecordDigest
         SigningService
         ReauthProofStore
+        TotpService
+        TotpChallengeStore
         AuditChain
         AuditService
         RepositoryService
@@ -78,6 +84,7 @@ flowchart TD
         PersonalAccessTokenStore
         AuditStore
         RepositoryStore
+        TotpStore
         DatabaseSetup
     end
     subgraph ContentSources
@@ -107,6 +114,7 @@ flowchart TD
     Validation --> ValidationChecks
     ValidationChecks --> TemporaryDirectory
     ValidationChecks --> ServerHost
+    ValidationChecks --> TotpAlgorithm
     TemporaryDirectory --> PathHelpers
     Context --> UserService
     ServerHost --> Context
@@ -118,6 +126,12 @@ flowchart TD
     ServerHost --> PasswordHasher
     ServerHost --> SignIn
     ServerHost --> OidcSignIn
+    ServerHost --> TotpSignIn
+    ServerHost --> TotpAlgorithm
+    ServerHost --> TotpSecretProtector
+    ServerHost --> TotpStore
+    ServerHost --> TotpService
+    ServerHost --> TotpChallengeStore
     ServerHost --> ReauthProofStore
     ServerHost --> ProjectService
     ServerHost --> EvidenceSettingsService
@@ -149,6 +163,14 @@ flowchart TD
     SignIn --> UserService
     SignIn --> SignInThrottle
     SignIn --> AuditService
+    SignIn --> TotpService
+    SignIn --> TotpSignIn
+    TotpSignIn --> SignIn
+    TotpSignIn --> SignInThrottle
+    TotpSignIn --> TotpService
+    TotpSignIn --> AuditService
+    TotpAlgorithm --> TotpService
+    TotpSecretProtector --> TotpService
     OidcSignIn --> SignIn
     OidcSignIn --> SignInThrottle
     OidcSignIn --> UserService
@@ -166,6 +188,7 @@ flowchart TD
     App --> ReviewPage
     App --> ChecklistPage
     App --> LoginPage
+    App --> TotpLoginPage
     App --> AccountPage
     App --> UsersPage
     App --> HistoryPage
@@ -174,12 +197,17 @@ flowchart TD
     App --> SignIn
     LoginPage --> SignIn
     LoginPage --> OidcSignIn
+    LoginPage --> TotpSignIn
+    TotpLoginPage --> TotpService
+    TotpLoginPage --> TotpSignIn
     AccountPage --> SignIn
     AccountPage --> OidcSignIn
     AccountPage --> UserService
     AccountPage --> PersonalAccessTokenService
+    AccountPage --> TotpService
     UsersPage --> UserService
     UsersPage --> OidcSignIn
+    UsersPage --> TotpService
     ProjectsPage --> ProjectService
     ProjectPage --> ProjectService
     ProjectPage --> ReviewService
@@ -197,6 +225,7 @@ flowchart TD
     ReviewPage --> SignIn
     ReviewPage --> OidcSignIn
     ReviewPage --> UserService
+    ReviewPage --> TotpService
     ReviewPage --> AttestationKeyProvider
     ReviewPage --> HistoryPage
     ChecklistPage --> ReviewService
@@ -213,19 +242,25 @@ flowchart TD
     ThreadService --> ReviewStore
     ChecklistService --> ReviewStore
     UserService --> UserStore
+    UserService --> TotpStore
     UserService --> AuditService
+    TotpService --> TotpStore
+    TotpService --> TotpChallengeStore
+    TotpService --> UserService
     PersonalAccessTokenService --> PersonalAccessTokenStore
     PersonalAccessTokenService --> UserService
     SigningService --> ReviewStore
     SigningService --> UserService
     SigningService --> RecordDigest
     SigningService --> ReauthProofStore
+    SigningService --> TotpService
     AuditService --> AuditChain
     AuditService --> AuditStore
     ReviewStore --> RecordDigest
     ReviewStore --> ReviewCenterDbContext
     UserStore --> ReviewCenterDbContext
     PersonalAccessTokenStore --> ReviewCenterDbContext
+    TotpStore --> ReviewCenterDbContext
     AuditStore --> AuditChain
     AuditStore --> ReviewCenterDbContext
     RepositoryService --> RepositoryStore
@@ -293,6 +328,8 @@ The `Identity` subsystem is the web side of local accounts: `SignIn` configures 
 authorization, checks a password through `UserService`, signs the user in and out, and tells the pages who is signed
 in; `SignInThrottle` limits the failed sign-in attempts per client address and typed name, in memory;
 `OidcSignIn` is the optional sign-in with an OpenID Connect provider and the confirmation of identity for a signature;
+`TotpSignIn` is the second step of a sign-in with a one-time code, `TotpAlgorithm` computes and checks the codes with
+the Otp.NET package, and `TotpSecretProtector` encrypts the stored secrets with Data Protection;
 `RevalidatingAuthenticationStateProvider` re-checks the user of every open page at a fixed interval with the same rule
 as the cookie check and ends the sign-in state of the page when the user is no longer valid; `PasswordHasher` hashes and
 verifies passwords with the password hasher of the ASP.NET Core shared framework. The cookie carries the user name, the
@@ -366,6 +403,10 @@ Connect provider: the account is matched only by the issuer and the subject of t
 sign-in without any project membership or administrator right, and has no password at all. Such a user confirms their
 identity for a signature by signing in again at the provider, and `SigningService` accepts one such proof (kept in
 memory by `ReauthProofStore`, bound to the user, the slot, and a short time, and spent once) for one signature. A user
+with a local password can also turn on an optional second factor, a time-based one-time code from an authenticator app
+(`TotpService`, with its secret encrypted and its state in `TotpStore`): the sign-in then takes a second step and every
+signature needs a current code in addition to the password; ten single-use recovery codes cover a lost phone, and a
+system administrator can reset the factor of a user. A user
 signs in on the login page and stays signed in through a cookie; every page except the home page and the login page
 requires a signed-in user, and the users page, the new project page, and the audit page require a system
 administrator. Project access is by membership: a user sees a project only as a member (with the project role `User`
@@ -682,6 +723,9 @@ is running.
 - **Microsoft.AspNetCore.Authentication.OpenIdConnect**: the protocol handler of the optional sign-in with an OpenID
   Connect provider in the `Identity` subsystem. It is a package of its own; see the OpenIdConnect integration design in
   the OTS chapter.
+- **Otp.NET**: computes and checks the time-based one-time codes of the second factor and codes the Base32 secret; it
+  is used only by `TotpAlgorithm` in the `Identity` subsystem, so `Core` stays free of libraries; see the Otp.NET
+  integration design in the OTS chapter.
 - **OpenIddict** (test only): provides a fake identity provider for the tests of the sign-in with a provider; it is
   not part of the shipped product.
 
@@ -716,7 +760,10 @@ connection back to the server, after which clicks are sent to the server, handle
 parts are sent back. A request for `/health` is answered directly by `ServerHost`. A request for any other page
 passes the authorization of the `Identity` subsystem: an anonymous visitor is redirected to `/login`; the
 form of `LoginPage` is posted to `/auth/login`, where `SignIn` asks `UserService` to check the password and, on
-success, sets the authentication cookie. With sign-in with a provider enabled, `OidcSignIn` instead sends the user to the
+success, sets the authentication cookie; for a user with a second factor `SignIn` instead sets a short-lived challenge
+cookie through `TotpService` and redirects to `TotpLoginPage` (`/login/totp`), whose form is posted to
+`/auth/login-totp`, where `TotpSignIn` asks `TotpService` to check the code or a recovery code and, on success, sets
+the authentication cookie. With sign-in with a provider enabled, `OidcSignIn` instead sends the user to the
 provider and, on the return, asks `UserService` to match or create the account by issuer and subject. On every later
 request `SignIn` validates the cookie against the stored user,
 so a disabled or changed user is signed out. A page that stays open makes no request, so the scoped
@@ -735,11 +782,13 @@ stores the threads through `ReviewStore`. `ReviewPage` and `ChecklistPage` call 
 the checklist rules and stores answers, saved on behalf of the signed-in user, through `ReviewStore`. `ReviewPage`
 calls `SigningService` to add, change, and remove reviewer slots and to sign: the service checks the rules, asks
 `UserService` to check the password again (for a user of a provider, `OidcSignIn` puts a proof of a new sign-in at the
-provider into `ReauthProofStore`, and `SigningService` spends it), takes the digest of the record from `RecordDigest`,
+provider into `ReauthProofStore`, and `SigningService` spends it; for a user with a second factor `SigningService` also
+checks the code through `TotpService`), takes the digest of the record from `RecordDigest`,
 and stores the
 signature through `ReviewStore`, which checks the digest once more inside the database transaction. `ProjectPage`
 calls `SigningService` to show whether each review is Approved. `AccountPage` and
-`UsersPage` call `UserService`, which stores users through `UserStore`. A request for the attestation of a review is
+`UsersPage` call `UserService`, which stores users through `UserStore`; they also call `TotpService`, which keeps the
+second factor of a user through `TotpStore`. A request for the attestation of a review is
 answered by `AttestationEndpoint` after the same authorization: `AttestationService` checks through `SigningService`
 that the review is approved, reads the record, has `AttestationRenderer` and `PdfDocumentWriter` produce the PDF, has
 `AttestationSigner` sign it with the key from `AttestationKeyProvider`, records the generation through `AuditService`,

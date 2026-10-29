@@ -84,6 +84,11 @@ public sealed class SigningService
     private readonly ReauthProofStore? _proofs;
 
     /// <summary>
+    ///     The second factor service, or <c>null</c> when the deployment has none (a local signer then needs the password only).
+    /// </summary>
+    private readonly TotpService? _totp;
+
+    /// <summary>
     ///     Initializes a new instance of the <see cref="SigningService"/> class.
     /// </summary>
     /// <param name="store">The store that persists slots and signatures. Must not be null.</param>
@@ -94,13 +99,18 @@ public sealed class SigningService
     ///     The proofs of identity that users of an external identity provider obtain by signing in again; <c>null</c>
     ///     means there are none, so such a user can not sign.
     /// </param>
+    /// <param name="totp">
+    ///     Checks the code of a signer with a second factor; <c>null</c> means the deployment has none, and a signer
+    ///     whose account requires a code then can not sign (fail closed).
+    /// </param>
     /// <exception cref="ArgumentNullException">Thrown when a required argument is null.</exception>
     public SigningService(
         IReviewStore store,
         UserService users,
         IProjectAccess access,
         TimeProvider timeProvider,
-        ReauthProofStore? proofs = null)
+        ReauthProofStore? proofs = null,
+        TotpService? totp = null)
     {
         ArgumentNullException.ThrowIfNull(store);
         ArgumentNullException.ThrowIfNull(users);
@@ -111,6 +121,7 @@ public sealed class SigningService
         _access = access;
         _timeProvider = timeProvider;
         _proofs = proofs;
+        _totp = totp;
     }
 
     /// <summary>
@@ -513,11 +524,16 @@ public sealed class SigningService
     ///     should discard it as soon as this call returns. Ignored for a user of an external identity provider.
     /// </param>
     /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <param name="totpCode">
+    ///     The current authenticator code of a signer who has a second factor; ignored for everyone else. It is never
+    ///     stored, logged or put in a message. A wrong or already used code fails the signing like a wrong password.
+    /// </param>
     /// <returns>The stored signature.</returns>
     /// <remarks>
     ///     The slot, the seat and the signing rules are all checked before the password is asked for, so a
     ///     refused signing never counts as a failed password attempt. Every password failure (wrong, locked,
-    ///     disabled or unknown) gives the same generic message and signs nothing.
+    ///     disabled or unknown) gives the same generic message and signs nothing. A signer with a second factor
+    ///     needs the password and a fresh code.
     /// </remarks>
     /// <exception cref="ArgumentNullException">Thrown when <paramref name="actor"/> is null.</exception>
     /// <exception cref="DomainRuleException">
@@ -533,7 +549,8 @@ public sealed class SigningService
         int slotId,
         string expectedDigest,
         string? password,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        string? totpCode = null)
     {
         ArgumentNullException.ThrowIfNull(actor);
         ArgumentNullException.ThrowIfNull(expectedDigest);
@@ -606,12 +623,25 @@ public sealed class SigningService
             }
             else
             {
-                verified = await _users.ReauthenticateAsync(actor.Username, password, cancellationToken)
-                           ?? throw new DomainRuleException(DomainRule.ReauthenticationFailed, "The password is incorrect.");
-                if (verified.Id != user.Id)
+                // A user with a confirmed second factor must also present a fresh code; the message then names both,
+                // and never tells which of the two was wrong
+                var failure = _totp is not null && await _totp.IsEnrolledAsync(actor.Username, cancellationToken)
+                    ? "The password or the code is incorrect."
+                    : "The password is incorrect.";
+                var step = await _users.ReauthenticatePasswordAsync(actor.Username, password, cancellationToken);
+                if (step.User is null || step.User.Id != user.Id)
                 {
-                    throw new DomainRuleException(DomainRule.ReauthenticationFailed, "The password is incorrect.");
+                    throw new DomainRuleException(DomainRule.ReauthenticationFailed, failure);
                 }
+
+                // Without the code service a required second factor can not be satisfied: fail closed
+                if (step.SecondFactorRequired
+                    && (_totp is null || !await _totp.VerifyForSignatureAsync(step.User, totpCode, cancellationToken)))
+                {
+                    throw new DomainRuleException(DomainRule.ReauthenticationFailed, failure);
+                }
+
+                verified = step.User;
             }
 
             // The store recomputes the digest inside its transaction and refuses the signature if it changed

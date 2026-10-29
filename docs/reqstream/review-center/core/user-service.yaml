@@ -274,3 +274,31 @@ sections:
           somebody who does not pass the rules of the provider.
         tests:
           - UserService_ExternalAccount_EveryPasswordPathIsRefused
+
+      - id: ReviewCenter-UserService-SecondFactorRequired
+        title: >-
+          The UserService class shall check the password of an account with a second factor without opening a session
+          and report that the code is still required, shall refuse a disabled account, shall not clear the counter of
+          wrong attempts for the password alone, and shall let the older sign-in and confirmation paths fail for such
+          an account, so that no path can sign in with the password alone.
+        justification: |
+          A password step that signs in would make the second factor optional for the attacker. The step is split so
+          that the page can ask for the code, and the old paths are closed so that they cannot be used to avoid it.
+        tests:
+          - UserService_AuthenticatePasswordAsync_EnrolledUser_AsksForTheSecondFactorAndKeepsTheCounter
+          - UserService_AuthenticateAndReauthenticate_EnrolledUser_FailClosed
+          - UserService_AuthenticateAsync_NoSecondFactorOrFeatureOff_SignsInWithThePassword
+          - UserService_AuthenticatePasswordAsync_WithoutTotpStore_NeverAsksForTheSecondFactor
+          - UserService_AuthenticatePasswordAsync_WrongPassword_LooksTheSameWithAndWithoutSecondFactor
+          - UserService_AuthenticatePasswordAsync_DisabledEnrolledUser_IsRefused
+
+      - id: ReviewCenter-UserService-SecondFactorLockout
+        title: >-
+          The UserService class shall count a wrong code with the wrong passwords in one counter with one lockout, let
+          the second factor ask whether an account is locked, and refuse the check of a password for a locked account.
+        justification: |
+          The counter is kept with the user, so the codes and the passwords share the five attempts, and a locked
+          account must not even have its password checked.
+        tests:
+          - UserService_ConfirmPasswordAsync_ChecksThePasswordOnly
+          - UserService_ConfirmPasswordAsync_LockedAccount_IsRefused

@@ -7,10 +7,11 @@
 The `SelfTest` subsystem provides the self-validation framework for the ReviewCenter.
 It is invoked when the user passes `--validate` on the command line. The subsystem runs a
 built-in suite of real, hermetic checks of the tool's own capabilities (git, a complete review
-workflow, the content fingerprint, password hashing, the audit chain, the signed attestation PDF
+workflow, the content fingerprint, password hashing, the one-time password algorithm, the audit chain, the signed
+attestation PDF
 and the web host), prints a pass/fail summary with the elapsed time of every check, and
 optionally writes the results to a TRX or JUnit XML file for CI/CD integration. With
-`--check-config` it adds a ninth, read-only check of the configured database. The
+`--check-config` it adds a tenth, read-only check of the configured database. The
 `SelfTest` subsystem contains two units: `Validation` (the runner, the report and the results
 file) and `ValidationChecks` (the checks themselves).
 
@@ -22,8 +23,8 @@ results file.
 - *Type*: In-process .NET static method.
 - *Role*: Provider.
 - *Contract*: Accepts a `Context` argument. Prints a Markdown-formatted heading (depth
-  controlled by `context.HeadingDepth`) and a table of environment metadata, runs the eight
-  default checks (nine with `context.CheckConfig`), prints one line per check with its outcome and
+  controlled by `context.HeadingDepth`) and a table of environment metadata, runs the nine
+  default checks (ten with `context.CheckConfig`), prints one line per check with its outcome and
   elapsed time, prints aggregate totals (`Total Tests:`, `Passed:`, `Skipped:`, `Failed:`,
   `Total Time:`), and writes a results file if `context.ResultsFile` is set. Calls
   `context.WriteError` for each failed check and for unsupported results file extensions,

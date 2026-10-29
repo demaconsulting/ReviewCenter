@@ -202,3 +202,26 @@ sections:
           - SigningService_HasReauthProofAsync_AnswersWithoutSpending
           - SigningService_RequireConfirmableAsync_AcceptsOnlyAReviewerOfTheSlot
           - SigningService_RequireConfirmableAsync_NotAReviewerOfTheSlot_IsRefused
+
+      - id: ReviewCenter-SigningService-TotpReauth
+        title: >-
+          The SigningService class shall require, for a signer with a second factor, a fresh code of the authenticator
+          app in addition to the password, check the password first and keep the code when the password is wrong,
+          refuse a recovery code, an API token, and a code that was already used in the current step with the same
+          message as a wrong password, count wrong codes toward the lockout, fail closed when the second factor cannot
+          be checked, and need no code for a user without a second factor, for a user of a provider, or after an
+          administrator reset.
+        justification: |
+          A signature is the strongest statement in the product and the person must prove that they are there. A code
+          that was used to sign in cannot be used again, so the person waits for the next one, which is the cost of
+          the replay protection. A recovery code must not sign, as it is for getting back in.
+        tests:
+          - SigningService_SignAsync_EnrolledUserWithPasswordAndFreshCode_Signs
+          - SigningService_SignAsync_EnrolledUserWithoutRightCode_IsRefused
+          - SigningService_SignAsync_WrongPasswordRightCode_IsRefusedAndKeepsTheCode
+          - SigningService_SignAsync_WrongCodes_LockTheAccountForSigningAndSignIn
+          - SigningService_SignAsync_EnrolledUserWithoutTotpService_FailsClosed
+          - SigningService_SignAsync_UserWithoutSecondFactor_NeedsNoCode
+          - SigningService_SignAsync_ExternalUser_IsNotAffectedByTheSecondFactor
+          - SigningService_SignAsync_ApiTokenActorWithPasswordAndCode_IsRefusedAndKeepsTheCode
+          - SigningService_SignAsync_AfterAdministratorReset_NeedsNoCode

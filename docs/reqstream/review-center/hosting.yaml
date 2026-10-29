@@ -240,3 +240,16 @@ sections:
         tests:
           - ServerHost_CreateApplication_InvalidOidcSettings_ThrowsClearErrorWithoutSecret
           - ServerHost_CreateApplication_OidcOffOrValid_BuildsTheApplication
+
+      - id: ReviewCenter-Hosting-TotpSecondFactor
+        title: >-
+          The Hosting subsystem shall connect the second factor of the sign-in to the server, stopping the start with
+          a clear error when its settings are wrong, and mapping the endpoint of the second step only while the feature
+          is on.
+        justification: |
+          A server must not start with settings that cannot work, and a feature that is off must not leave a way in.
+        children:
+          - ReviewCenter-ServerHost-TotpWiring
+        tests:
+          - ServerHost_CreateApplication_InvalidTotpSettings_ThrowsClearError
+          - ServerHost_CreateApplication_ValidTotpSettings_ProvideTheSettings

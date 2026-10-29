@@ -19,7 +19,7 @@ skip by throwing `ValidationSkippedException`. The checks hold no state. The hel
 
 #### Key Methods
 
-The default run has eight checks:
+The default run has nine checks:
 
 - **GitAvailableCheck** (`ReviewCenter_GitAvailable`): runs one `git --version` through the production
   `GitRunner.CheckVersionAsync`, which enforces the minimum version and returns the version text; the same
@@ -40,6 +40,12 @@ The default run has eight checks:
   difference is noticed.
 - **PasswordHashCheck** (`ReviewCenter_PasswordHash`): the production `PasswordHasher` accepts the right password
   and refuses a wrong one.
+- **TotpCheck** (`ReviewCenter_Totp`): the production `TotpAlgorithm` produces the one-time codes of the SHA-1
+  test vectors of RFC 6238 (the secret `12345678901234567890`, eight digits, six times from 59 to 20000000000) and the
+  six-digit code of the first vector. It requires that a code one time step away is accepted and one two steps away is
+  refused, that a wrong or malformed code is refused, that the secret has the expected Base32 form, and that the
+  `otpauth://totp/` address starts as expected. The check needs no database and no clock; its detail text names the
+  vectors, the window of one step, and the replay step that the algorithm returns.
 - **AuditChainCheck** (`ReviewCenter_AuditChain`): appends entries through the production `AuditService`, verifies
   the chain, changes one stored entry with a direct SQL statement, and requires the production verifier to report
   it.
@@ -55,7 +61,7 @@ The default run has eight checks:
   static asset, expects HTTP 200 for both, and stops the host cleanly before the temporary folder is disposed. The
   host is started once.
 
-The opt-in ninth check is run only with `--validate --check-config`:
+The opt-in tenth check is run only with `--validate --check-config`:
 
 - **ConfiguredDatabaseCheck** (`ReviewCenter_ConfiguredDatabase`): loads the configuration the way the server does
   (`appsettings.json` and the environment variables), recognizes the provider, opens the database read-only, and
@@ -90,7 +96,7 @@ so a hung git process or host ends as a failure instead of hanging the run.
 - **TemporaryDirectory** — one per check; holds every file the check creates and deletes it at the end.
 - **ValidationRunner** — the types `ValidationFailedException` and `ValidationSkippedException`.
 - **Core, Storage, ContentSources, Evidence and the web host** — the production services the checks call; the
-  checks never reimplement the production logic.
+  checks never reimplement the production logic. `TotpCheck` calls `TotpAlgorithm` of the `Identity` subsystem.
 - **System.Security.Cryptography.Pkcs** — the independent verification of the attestation signature.
 
 #### Callers

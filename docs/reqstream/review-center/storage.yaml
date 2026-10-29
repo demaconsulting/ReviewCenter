@@ -267,3 +267,25 @@ sections:
         tests:
           - UserStore_GetByExternalAsync_FindsOnlyTheExactPair
           - UserStore_AddAsync_SameExternalIdentityTwice_IsRefused
+
+      - id: ReviewCenter-Storage-TotpSecondFactor
+        title: >-
+          The Storage subsystem shall keep the enrollment of the second factor and the recovery codes of a user in the
+          database file, decide every race between requests (the next time step, the spending of a recovery code, the
+          confirmation of a setup) with one conditional change so that exactly one request wins, write the audit entry
+          with each change, and delete everything of a user with the user.
+        justification: |
+          The replay protection and the single use of a recovery code are only as strong as the store that decides
+          them. Keeping the decision in the database makes it right for any number of requests, and the audit entry
+          in the same transaction keeps the history true.
+        children:
+          - ReviewCenter-TotpStore-Pending
+          - ReviewCenter-TotpStore-ConfirmAtomic
+          - ReviewCenter-TotpStore-AtomicStep
+          - ReviewCenter-TotpStore-RecoverySingleUse
+          - ReviewCenter-TotpStore-Remove
+          - ReviewCenter-TotpStore-Cascade
+          - ReviewCenter-DbContext-TotpTables
+        tests:
+          - TotpStore_TryAdvanceStepAsync_ThirtyTwoParallelRequests_HaveExactlyOneWinner
+          - TotpStore_TryConsumeRecoveryCodeAsync_ParallelRequests_HaveExactlyOneWinner

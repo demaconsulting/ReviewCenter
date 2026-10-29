@@ -1352,6 +1352,129 @@ public class ReviewPageTests : PageTestBase
     }
 
     /// <summary>
+    ///     Test that a signer without a second factor sees no code field in the sign form.
+    /// </summary>
+    [Fact]
+    public async Task ReviewPage_Render_SignerNotEnrolled_ShowsNoCodeField()
+    {
+        // Arrange: a signable review viewed by ann, who has no second factor
+        var (projectId, slotId, _) = await CreateSignableAsync();
+
+        // Act: render the page
+        var cut = RenderPage(projectId);
+
+        // Assert: the password is asked for, the code is not
+        Assert.NotNull(cut.Find($"[data-testid='sign-password-{slotId}']"));
+        Assert.Empty(cut.FindAll($"[data-testid='sign-totp-{slotId}']"));
+    }
+
+    /// <summary>
+    ///     Test that an enrolled signer sees the code field, and that the password and a fresh code sign.
+    /// </summary>
+    [Fact]
+    public async Task ReviewPage_Sign_EnrolledSignerWithPasswordAndFreshCode_SignsAndClearsFields()
+    {
+        // Arrange: a signable review viewed by ann, who has a second factor; her enrollment code is from an earlier step
+        var (projectId, slotId, _) = await CreateSignableAsync();
+        var (secret, _) = await EnrollTotpAsync("ann", SigningPassword);
+        Time.Advance(TimeSpan.FromSeconds(30));
+        var cut = RenderPage(projectId);
+        var code = TotpOracle.CodeAt(secret, Time.GetUtcNow());
+        Assert.Equal("one-time-code", cut.Find($"[data-testid='sign-totp-{slotId}']").GetAttribute("autocomplete"));
+        await cut.Find($"[data-testid='sign-password-{slotId}']").InputAsync(SigningPassword);
+        await cut.Find($"[data-testid='sign-totp-{slotId}']").InputAsync(code);
+
+        // Act: sign
+        await cut.Find($"[data-testid='sign-form-{slotId}']").SubmitAsync();
+
+        // Assert: signed, and neither the password nor the code is left in the page
+        Assert.StartsWith("Signed by Ann", cut.Find($"[data-testid='slot-status-{slotId}']").TextContent, StringComparison.Ordinal);
+        Assert.Single(await Store.ListSignaturesAsync(projectId, "REV-1", TestContext.Current.CancellationToken));
+        Assert.DoesNotContain(SigningPassword, cut.Markup, StringComparison.Ordinal);
+        Assert.DoesNotContain($"value=\"{code}\"", cut.Markup, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    ///     Test that a missing or wrong code is refused with the message that does not say which of the two was
+    ///     wrong, signs nothing, and leaves both fields empty.
+    /// </summary>
+    /// <param name="code">The code typed.</param>
+    [Theory]
+    [InlineData("")]
+    [InlineData("000000")]
+    public async Task ReviewPage_Sign_EnrolledSignerWithWrongCode_ShowsGenericErrorAndSignsNothing(string code)
+    {
+        // Arrange: a signable review viewed by ann, who has a second factor and types the right password
+        var (projectId, slotId, _) = await CreateSignableAsync();
+        await EnrollTotpAsync("ann", SigningPassword);
+        Time.Advance(TimeSpan.FromSeconds(30));
+        var cut = RenderPage(projectId);
+        await cut.Find($"[data-testid='sign-password-{slotId}']").InputAsync(SigningPassword);
+        await cut.Find($"[data-testid='sign-totp-{slotId}']").InputAsync(code);
+
+        // Act: sign
+        await cut.Find($"[data-testid='sign-form-{slotId}']").SubmitAsync();
+
+        // Assert: the generic message, no signature, and both fields are empty
+        Assert.Equal("The password or the code is incorrect.", cut.Find($"[data-testid='sign-error-{slotId}']").TextContent);
+        Assert.Empty(await Store.ListSignaturesAsync(projectId, "REV-1", TestContext.Current.CancellationToken));
+        Assert.Empty(cut.Find($"[data-testid='sign-password-{slotId}']").GetAttribute("value") ?? string.Empty);
+        Assert.Empty(cut.Find($"[data-testid='sign-totp-{slotId}']").GetAttribute("value") ?? string.Empty);
+    }
+
+    /// <summary>
+    ///     Test that a code that was already used in its 30-second step is refused, and that the next code works.
+    /// </summary>
+    [Fact]
+    public async Task ReviewPage_Sign_CodeAlreadyUsedInStep_IsRefusedUntilTheNextCode()
+    {
+        // Arrange: a signable review viewed by ann; the code of the step in which she enrolled was already used
+        var (projectId, slotId, _) = await CreateSignableAsync();
+        var (secret, _) = await EnrollTotpAsync("ann", SigningPassword);
+        var cut = RenderPage(projectId);
+        await cut.Find($"[data-testid='sign-password-{slotId}']").InputAsync(SigningPassword);
+        await cut.Find($"[data-testid='sign-totp-{slotId}']").InputAsync(TotpOracle.CodeAt(secret, Time.GetUtcNow()));
+
+        // Act: sign with the used code
+        await cut.Find($"[data-testid='sign-form-{slotId}']").SubmitAsync();
+
+        // Assert: refused
+        Assert.NotNull(cut.Find($"[data-testid='sign-error-{slotId}']"));
+        Assert.Empty(await Store.ListSignaturesAsync(projectId, "REV-1", TestContext.Current.CancellationToken));
+
+        // Act: wait for the next step and sign with its code
+        Time.Advance(TimeSpan.FromSeconds(30));
+        await cut.Find($"[data-testid='sign-password-{slotId}']").InputAsync(SigningPassword);
+        await cut.Find($"[data-testid='sign-totp-{slotId}']").InputAsync(TotpOracle.CodeAt(secret, Time.GetUtcNow()));
+        await cut.Find($"[data-testid='sign-form-{slotId}']").SubmitAsync();
+
+        // Assert: signed
+        Assert.StartsWith("Signed by Ann", cut.Find($"[data-testid='slot-status-{slotId}']").TextContent, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    ///     Test that signing with the right password and a recovery code in place of the code is refused.
+    /// </summary>
+    [Fact]
+    public async Task ReviewPage_Sign_RecoveryCodeInsteadOfCode_IsRefused()
+    {
+        // Arrange: a signable review viewed by ann, who types a recovery code
+        var (projectId, slotId, _) = await CreateSignableAsync();
+        var (_, recovery) = await EnrollTotpAsync("ann", SigningPassword);
+        Time.Advance(TimeSpan.FromSeconds(30));
+        var cut = RenderPage(projectId);
+        await cut.Find($"[data-testid='sign-password-{slotId}']").InputAsync(SigningPassword);
+        await cut.Find($"[data-testid='sign-totp-{slotId}']").InputAsync(recovery[0]);
+
+        // Act: sign
+        await cut.Find($"[data-testid='sign-form-{slotId}']").SubmitAsync();
+
+        // Assert: refused, nothing signed
+        Assert.NotNull(cut.Find($"[data-testid='sign-error-{slotId}']"));
+        Assert.Empty(await Store.ListSignaturesAsync(projectId, "REV-1", TestContext.Current.CancellationToken));
+    }
+
+    /// <summary>
     ///     Test that a change to the record after signing shows the signature as out of date, takes the approval
     ///     away and offers to sign again.
     /// </summary>

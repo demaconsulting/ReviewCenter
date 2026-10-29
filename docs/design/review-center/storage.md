@@ -5,18 +5,19 @@
 ### Overview
 
 The `Storage` subsystem keeps projects (with their evidence settings), project memberships, reviews, review comment
-threads, review checklists, users,
+threads, review checklists, users, second factor enrollments,
 reviewer slots,
 signatures, personal access tokens, and the hash-chained audit trail in a relational
 database through Entity
 Framework Core. It
 implements the store interfaces of the `Core` subsystem and owns everything about the database: the schema, the
-choice of provider, the location of the data, and the creation of the database. It contains seven units:
+choice of provider, the location of the data, and the creation of the database. It contains eight units:
 `ReviewCenterDbContext`, the mapping of the domain types to tables; `ReviewStore`, the implementation of the
 review store interface; `UserStore`, the implementation of the user store interface; `AuditStore`, the implementation
 of the audit store interface together with the `AuditAppender` that serializes and chains the entries;
 `RepositoryStore`, the implementation of the repository store interface; `PersonalAccessTokenStore`, the implementation
-of the personal access token store interface; and `DatabaseSetup`, the
+of the personal access token store interface; `TotpStore`, the implementation of the second factor store interface; and
+`DatabaseSetup`, the
 provider selection, connection string resolution, and database
 creation, together with its options type `DatabaseOptions`. The types of the subsystem are internal to the
 application; the rest of the system sees only the Core store interfaces.
@@ -82,6 +83,18 @@ application; the rest of the system sees only the Core store interfaces.
   and so is a revocation; a revocation of an unknown or already revoked token stores nothing, and a use is not audited.
 - *Constraints*: Every operation uses its own short-lived database context, so it is safe for concurrent use. The store
   holds and returns only the hash of a token value; the value itself never reaches it.
+
+**TotpStore (as ITotpStore)**: The persistence operations for second factor enrollments.
+
+- *Type*: In-process .NET class implementing the Core interface.
+- *Role*: Provider.
+- *Contract*: Reads an enrollment, lists the users with a confirmed one, saves a pending enrollment, confirms it with
+  its recovery code hashes, advances the replay step, spends a recovery code, replaces the recovery codes, counts the
+  unused ones, and removes an enrollment or a pending one. Confirming, spending a code, replacing the codes, and removing
+  are stored together with their audit entry; advancing the step is not audited.
+- *Constraints*: Every operation uses its own short-lived database context, so it is safe for concurrent use. Each
+  decision with one winner is one conditional update. The store holds only the encrypted secret and the hashes of the
+  recovery codes; a plain secret or a plain code never reaches it.
 
 **AuditStore (as IAuditStore)**: The persistence operations for the audit trail.
 
@@ -198,6 +211,15 @@ API; the value is never stored. A token has a separate, random display id for th
 the value is stored. The use of a token is recorded with a single-column update that is not audited, because it happens
 on every request and the audit trail records only changes that matter. The `Reviews` table gains the creator columns
 (`CreatedBy` and `CreatedViaApi`).
+
+**Second factor**: The `UserTotps` table holds one enrollment per user (the secret encrypted by the Identity subsystem,
+never in plain text) and the `TotpRecoveryCodes` table holds the SHA-256 hashes of the recovery codes; both are deleted
+with the user. They are separate tables, not columns of `Users`, because `UserStore` rewrites every column of a user
+from a copy it read earlier, and such a stale copy must never move the last accepted time step backwards (which would
+make a used code valid again). `TotpStore` decides every race with one conditional update: the replay step is advanced
+only when it is greater than the stored one, a recovery code is spent only while it is unused, and an enrollment is
+confirmed only while it is pending. Audited changes are stored with their entry in one transaction. The tables have no
+migration: a development database that was created before them is recreated.
 
 **Context lifetime and concurrency**: Blazor Server connections are long-lived and concurrent, and a database
 context is not thread-safe. The store therefore obtains a new context from a context factory for every

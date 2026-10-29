@@ -35,6 +35,17 @@ N/A - standard test environment.
   button and lists the token without the value; an empty name and the twenty-first active token are each shown as an
   error and create nothing; the copy button hands the value to the browser and shows a hint when the browser refuses; and
   an active token is revoked from the list while an expired one has no revoke button.
+- When the feature is on, a local user (without a temporary password) sees a card for the second factor with the
+  status Off and a start form with a password field and a link to the help topic; the card is absent when the feature is
+  off or the password is temporary, and an account of an identity provider sees only a note that names the provider.
+- Starting with a wrong password shows an error and no secret; the right password shows the secret as grouped text and
+  the `otpauth` address as text, with a field for the code, and empties the password field.
+- A wrong confirmation code shows one generic message, keeps the set-up open, and turns nothing on; the right code turns
+  it on, shows ten recovery codes once with a notice that they cannot be shown again, and the secret, the address, and
+  the codes are gone from the page afterwards; cancelling removes the secret and shows the start form.
+- An enrolled user sees the status On, the number of recovery codes left, the forms to turn it off and to get new
+  recovery codes, and no secret; a wrong code in either form shows the generic message, keeps the state, and empties the
+  fields; a recovery code and the password turn it off; the right password and code show ten new codes once.
 
 #### Test Scenarios
 
@@ -114,3 +125,31 @@ flag. This scenario is tested by `AccountPage_ChangePassword_TemporaryPassword_R
 the provider is on (in `OidcPageTests.cs`); the page shows the sentence that names the provider, and has no current
 password field and no change button. This scenario is tested by
 `AccountPage_Render_ExternalUser_ShowsNoPasswordForm`.
+
+**AccountPage second factor scenarios**: The tests of the card are in `AccountTotpPageTests.cs`, rendered with bUnit over
+the real `TotpService` of `TotpTestWorld`-style in-memory stores, with codes computed by the independent `TotpOracle`.
+A local user without two-factor sign-in sees status "Off", the password field and button of the start form, and the
+link `/help/two-factor`, and no secret and no turn-off form; this is tested by
+`AccountPage_Render_LocalUserNotEnrolled_ShowsStatusOffAndStartForm`. With the feature off the card is absent, which is
+tested by `AccountPage_Render_FeatureDisabled_HidesCard`. An account of an identity provider sees a note that names the
+provider and no start form and no status, which is tested by `AccountPage_Render_ExternalUser_ShowsNoteAndNoControls`.
+A user who signed in with a temporary password does not see the card, which is tested by
+`AccountPage_Render_TemporaryPassword_HidesCard`. A wrong password shows an error, no secret, and an empty password
+field, which is tested by `AccountPage_Start_WrongPassword_ShowsErrorAndNoSecret`. The right password shows a secret of
+32 characters and an address that starts with `otpauth://totp/` and holds the secret, the field for the code, and no
+start form and no error, which is tested by `AccountPage_Start_RightPassword_ShowsSecretAndAddress`. A wrong code shows
+"The code is not valid or was already used.", keeps the secret on the page, shows no recovery codes, empties the code
+field, and the user is not enrolled, which is tested by
+`AccountPage_Confirm_WrongCode_ShowsGenericErrorAndStaysPending`. The right code shows status "On", "10 recovery codes
+left", ten distinct codes and the notice that they cannot be shown again, and no secret, no address, and no secret text
+in the page; after the box is dismissed the codes are gone; this is tested by
+`AccountPage_Confirm_RightCode_ShowsTenRecoveryCodesOnceAndNoSecret`. Cancelling removes the secret from the page and
+the user is not enrolled, which is tested by `AccountPage_Cancel_PendingEnrollment_RemovesSecretAndShowsStartForm`. An
+enrolled user sees status "On", the number of codes left, the turn-off and renewal forms, and no secret, no codes, and
+no start form, which is tested by `AccountPage_Render_Enrolled_ShowsOnAndRecoveryCodesLeft`. A wrong code when turning it
+off shows the generic message, keeps the status "On", empties both fields, and the user stays enrolled, which is tested
+by `AccountPage_Disable_WrongCode_ShowsGenericErrorKeepsItOnAndClearsFields`. A recovery code and the password turn it
+off, which is tested by `AccountPage_Disable_RecoveryCode_TurnsItOff`. The right password and code show ten new codes
+that differ from the old ones, empty the fields, and the codes are gone after dismissal, which is tested by
+`AccountPage_Regenerate_RightPasswordAndCode_ShowsNewCodesOnce`. A wrong code shows the generic message and no codes,
+which is tested by `AccountPage_Regenerate_WrongCode_ShowsGenericErrorAndNoCodes`.

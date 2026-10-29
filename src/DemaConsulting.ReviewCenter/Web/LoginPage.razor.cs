@@ -55,7 +55,13 @@ public partial class LoginPage : ComponentBase
     /// <summary>
     ///     Gets a value indicating whether the previous attempt failed.
     /// </summary>
-    private bool Failed => !string.IsNullOrEmpty(Error);
+    private bool Failed => !string.IsNullOrEmpty(Error) && !TotpExpired;
+
+    /// <summary>
+    ///     Gets a value indicating whether the second step of a sign-in could not be completed because the first
+    ///     step has expired or is unknown, so that the user has to sign in again.
+    /// </summary>
+    private bool TotpExpired => Error == TotpSignIn.ErrorExpired;
 
     /// <summary>
     ///     Gets or sets the settings of sign-in with an identity provider, supplied by dependency injection.

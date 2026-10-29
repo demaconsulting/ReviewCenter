@@ -38,6 +38,7 @@ OTS items:
   Connect provider).
 - **Microsoft.AspNetCore.OpenApi**: integration and usage design (used to generate the OpenAPI document of the API).
 - **OpenIddict**: integration and usage design (used only by the tests as a fake identity provider).
+- **Otp.NET**: integration and usage design (used to compute and check the one-time codes of the second factor).
 - **Pandoc**: integration and usage design.
 - **Playwright**: integration and usage design (used by ReviewCenterPuppet).
 - **System.Security.Cryptography.Pkcs**: integration and usage design (used to sign the PDF attestations).
@@ -76,28 +77,32 @@ The ReviewCenter system is divided as follows:
   `user add` verb, and verifies the audit trail for the `audit verify` verb; contains the ServerHost, UserCommand, and
   AuditCommand units
 - **Identity** (subsystem): the web side of local accounts, cookie sign-in and authorization, and the periodic re-check
-  of the user of an open page, the in-memory limit on failed sign-in attempts, and sign-in with an OpenID Connect
-  provider; contains the PasswordHasher, SignIn, SignInThrottle, OidcSignIn, and
-  RevalidatingAuthenticationStateProvider units
+  of the user of an open page, the in-memory limit on failed sign-in attempts, sign-in with an OpenID Connect
+  provider, and the optional one-time password second factor of local accounts; contains the PasswordHasher, SignIn,
+  SignInThrottle, OidcSignIn, RevalidatingAuthenticationStateProvider, TotpAlgorithm, TotpSecretProtector, and
+  TotpSignIn units
 - **Web** (subsystem): the Blazor Server user interface; contains the App unit (HTML shell, router, page frame with
   the menu bar and the footer, and the SessionGate that replaces an open page when its user is no longer signed in),
   the HomePage, AboutPage, and HelpPage units, the ProjectsPage, ProjectPage (with the new review and member pages),
   PlanPage, ReviewPage, and ChecklistPage
-  units, the LoginPage,
+  units, the LoginPage, TotpLoginPage,
   AccountPage, and UsersPage units, the HistoryPage and AuditPage (with the project audit page) units, and the
   RepositoriesPage unit
 - **Core** (subsystem): the domain model and rules for projects, reviews, review comments, review checklists,
-  users, personal access tokens, reviewer signatures, the hash-chained audit trail, and the registry of git
+  users, personal access tokens, second factor enrollments, reviewer signatures, the hash-chained audit trail, and the
+  registry of git
   repositories, free of web and database technology; contains the Fingerprint, RecordDigest, AuditChain, AuditService,
   ProjectService, EvidenceSettingsService, ReviewService, ThreadService, ChecklistService, UserService,
   PersonalAccessTokenService,
-  SigningService, ReauthProofStore, RepositoryService, SelectionMatcher, RevisionValidator, ReviewPlanner, and LineDiff
+  SigningService, ReauthProofStore, TotpService, TotpChallengeStore, RepositoryService, SelectionMatcher,
+  RevisionValidator, ReviewPlanner, and LineDiff
   units
 - **Storage** (subsystem): persistence of projects, reviews, comment threads, checklists, users, personal access
-  tokens, reviewer slots, signatures, the audit trail, and the registered repositories in a database
+  tokens, second factor enrollments, reviewer slots, signatures, the audit trail, and the registered repositories in a
+  database
   through Entity
   Framework Core; contains the ReviewCenterDbContext, ReviewStore, UserStore, PersonalAccessTokenStore, AuditStore,
-  RepositoryStore, and DatabaseSetup units
+  RepositoryStore, TotpStore, and DatabaseSetup units
 - **ContentSources** (subsystem): reads content from outside the system, currently from git repositories, and protects
   the access tokens of private repositories; contains the GitRunner, GitSource, ReviewSetParser, and CredentialProtector
   units

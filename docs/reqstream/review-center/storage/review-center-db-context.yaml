@@ -186,6 +186,18 @@ sections:
         tests:
           - ReviewCenterDbContext_Model_HasTokenTableAndReviewCreatorColumns
 
+      - id: ReviewCenter-DbContext-TotpTables
+        title: >-
+          The ReviewCenterDbContext class shall map the enrollment of the second factor to a table with one row for each
+          user and the recovery codes to a table with a unique index on the user and the hash of the code, and shall
+          delete both with the user.
+        justification: |
+          The database is the last defense against two equal recovery codes of one user, and against an enrollment that
+          outlives its user.
+        tests:
+          - TotpStore_ConfirmAsync_DuplicateHash_IsRefusedByTheDatabaseAndRolledBack
+          - TotpStore_DeletingTheUser_DeletesTheEnrollmentAndCodes
+
       - id: ReviewCenter-DbContext-ExternalIdentity
         title: >-
           The ReviewCenterDbContext class shall map the issuer and the subject of the identity of a user at a provider

@@ -84,6 +84,11 @@ N/A - standard test environment (temporary SQLite databases are created by the t
   pages are verified at unit level by their component tests (`OidcPageTests.cs`) and the review page by the
   integration test of the `Identity` subsystem (see the children of the requirement `ReviewCenter-Web-OidcSignIn` in
   `web.yaml`).
+- Optional second factor: the code is asked for in a page of its own after the password and shows no user name, the
+  account page sets up, confirms (with ten recovery codes shown once and never the secret), and turns off the second
+  factor, the users page shows who has it and lets a system administrator reset it, the sign form of a review asks for
+  the code beside the password, and the help topic explains it; the pages are verified at unit level by their
+  component tests (see the children of the requirement `ReviewCenter-Web-TotpSecondFactor` in `web.yaml`).
 
 ### Test Scenarios
 
@@ -287,3 +292,9 @@ who signs in at the provider sees, on the review page, the button to confirm the
 after the confirmation the Sign button, which is tested by `OidcReauth_ReviewPage_OffersConfirmationThenSigning`. The
 other states of the pages (the failure message, the missing button, the account and user pages, and the help topics)
 are tested in the unit tests of `LoginPage`, `UsersPage`, `AccountPage`, and `HelpPage`.
+
+**Second factor**: A pending sign-in shows the code form and no user name, which is tested by
+`TotpLoginPage_Render_PendingSignIn_ShowsCodeFormAndNoUserName`, and a right code on the account page shows ten recovery
+codes once and no secret, which is tested by `AccountPage_Confirm_RightCode_ShowsTenRecoveryCodesOnceAndNoSecret`. The
+other states of the pages are tested in the unit tests of `TotpLoginPage`, `LoginPage`, `AccountPage`, `UsersPage`,
+`ReviewPage`, and `HelpPage`.

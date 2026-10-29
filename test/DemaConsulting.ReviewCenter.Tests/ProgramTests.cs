@@ -101,7 +101,7 @@ public class ProgramTests
         var run = RealValidationRun.Result;
 
         // Assert: the validation ran its checks, printed the summary and succeeded
-        Assert.Contains("Total Tests: 8", run.Log);
+        Assert.Contains("Total Tests: 9", run.Log);
         Assert.Equal(0, run.ExitCode);
     }
 

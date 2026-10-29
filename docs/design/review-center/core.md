@@ -11,7 +11,7 @@ that protect them, the content fingerprint that identifies a review's files and 
 hash-chained audit trail of everything that happens. It
 is
 deliberately free of web and database technology so that the rules can be reviewed and tested on their own. It
-It contains nineteen units: `Fingerprint`, the content fingerprint algorithm; `RecordDigest`, the digest of a review
+It contains twenty-one units: `Fingerprint`, the content fingerprint algorithm; `RecordDigest`, the digest of a review
 record that a signature binds to; `AuditChain`, the audit entry types, their hash, and the verifier of the chain;
 `AuditService`, the recording, reading, and verification of the audit trail; `ProjectAccess`, the one place that
 decides who can see and administer which project; `ProjectService`, the rules
@@ -21,7 +21,10 @@ access to the evidence and the content of the attestation PDFs); `ReviewService`
 `ChecklistService`, the rules for the review checklist; `UserService`, the rules for users, including the accounts that
 sign in with an external identity provider; `SigningService`, the
 rules for reviewer slots and signatures; `ReauthProofStore`, the in-memory, single-use proofs that a user of an
-identity provider has just confirmed their identity for one signature; `RepositoryService`, the registry of git
+identity provider has just confirmed their identity for one signature; `TotpService`, the rules for the optional second
+factor of local accounts (a one-time password from an authenticator app, with recovery codes); `TotpChallengeStore`,
+the in-memory challenges between the two steps of a sign-in with a second factor; `RepositoryService`, the registry of
+git
 repositories that reviews can be
 created from, with their credentials; `SelectionMatcher`, the file pattern language that selects the files of a
 repository; `RevisionValidator`, the check that a revision name cannot be taken for an option or an expression;
@@ -40,13 +43,16 @@ and `AuditVerificationResult`, and the repository types `SourceRepository`, `Rep
 `RepositoryReviewResult`, and the diff types `FileDiff`, `FileDiffStatus`, `DiffLine`, `DiffLineKind`,
 `LineDiffResult`, `DiffSegment`, and `DiffRow`, and the planning types `BaselineMode`, `PlanRowStatus`, `PlanRow`, `ReviewPlan`,
 `PlanCreateRequest`, `PlanCreateOutcome`, `PlanCreateResult`, and `ReviewSetDefinition`), the personal access token
-types (`PersonalAccessToken`, `CreatedPersonalAccessToken`, `TokenFailure`, `TokenValidation`), the text and line
+types (`PersonalAccessToken`, `CreatedPersonalAccessToken`, `TokenFailure`, `TokenValidation`), the second factor types
+(`UserTotp`, `TotpRecoveryCode`, `TotpSettings`, `TotpEnrollment`, `TotpStatus`, `TotpSignInOutcome`,
+`TotpSignInResult`, `PasswordStep`, and `TotpChallenge`), the text and line
 definition
 (`FileText`), the limits
 (`ReviewLimits`), the rule failure type
 (`DomainRuleException` with the `DomainRule` enumeration), and the interfaces (`IProjectAccess`, `IReviewStore`,
 `IUserStore`,
-`IAuditStore`, `IRepositoryStore`, `IPersonalAccessTokenStore`, `ICredentialProtector`, `IGitRepositoryProvider`, `IGitRepository`,
+`IAuditStore`, `IRepositoryStore`, `IPersonalAccessTokenStore`, `ITotpStore`, `ITotpAlgorithm`, `ITotpSecretProtector`,
+`ICredentialProtector`, `IGitRepositoryProvider`, `IGitRepository`,
 `IReviewSetParser`, and `IPasswordHasher`) are
 supporting types, documented with the unit that owns them.
 
@@ -97,7 +103,10 @@ used by the `Web`, `Identity`, and `Api` subsystems and by the `Hosting` subsyst
   data takes
   the `Actor` and records the change in the audit trail; `AuditService` lists the trail newest first in pages
   and verifies its hash chain. Create a personal access token for the actor (the value is returned once), list the
-  tokens of the actor, revoke one, and authenticate a presented token value into a token and its owner.
+  tokens of the actor, revoke one, and authenticate a presented token value into a token and its owner. Set up a second
+  factor for the signed-in local user (with the password, and a first code that proves the authenticator works; ten
+  recovery codes are returned once), turn it off, issue new recovery codes, let a system administrator reset the factor
+  of another user, start and complete the second step of a sign-in, and check the code that a signature needs.
   Posted comments are
   immutable: there is no operation to edit or delete one. Rule violations are reported as a
   `DomainRuleException` that carries a `DomainRule` value and a message suitable for display to the user.
@@ -170,6 +179,26 @@ used by the `Web`, `Identity`, and `Api` subsystems and by the `Hosting` subsyst
 - *Role*: Consumer (implemented by `PasswordHasher` in the `Identity` subsystem).
 - *Contract*: Hash a password and verify a password against a hash.
 - *Constraints*: The hash is not reversible and contains its own salt.
+
+**ITotpStore**: The store interface the subsystem requires for second factor enrollments and recovery codes.
+
+- *Type*: In-process .NET interface.
+- *Role*: Consumer (implemented by `TotpStore` in the `Storage` subsystem).
+- *Contract*: Read an enrollment, list the users with a confirmed one, save a pending enrollment, confirm it with its
+  recovery code hashes and audit entry, record the time step of an accepted code, spend a recovery code, replace the
+  recovery codes, count the unused ones, and remove an enrollment or a pending one.
+- *Constraints*: Every decision with one winner (confirming, advancing the step, spending a code) is one conditional
+  change whose result says whether this caller made it, so two requests can never both succeed. A change that is
+  audited is stored in the same transaction as its entry. Every read returns a new object.
+
+**ITotpAlgorithm and ITotpSecretProtector**: The ports the subsystem requires for the one-time password algorithm
+(secrets, Base32 text, the `otpauth://` address, codes, and verification) and for the encryption of the secret.
+
+- *Type*: In-process .NET interfaces.
+- *Role*: Consumer (implemented by `TotpAlgorithm` and `TotpSecretProtector` in the `Identity` subsystem).
+- *Contract*: As described in the `TotpService` unit.
+- *Constraints*: Safe for concurrent use. They keep `Core` free of the Otp.NET library and of the cryptography
+  framework.
 
 **RepositoryService**: The operations used by the `Web` subsystem to administer the registry of git repositories, and
 by the `Hosting` subsystem to hand a registered repository to the git source.
@@ -348,6 +377,12 @@ message and keep the entered values, and there is a single, easily tested path f
 | `TokenNameInvalid` | The name of a personal access token is empty, too long, or has control characters |
 | `TokenExpiryInvalid` | The lifetime of a personal access token is not one of the choices of 30, 90, or 365 days |
 | `TokenLimitReached` | The user already has 20 active personal access tokens |
+| `TotpNotAvailable` | The account cannot use a second factor (external, temporary password, API token, feature off) |
+| `TotpAlreadyEnrolled` | A second factor is already set up for the account |
+| `TotpNotEnrolled` | No second factor is set up, or no setup was started |
+| `TotpCodeIncorrect` | A code is wrong, was already used, or the account is locked out |
+| `TotpEnrollmentExpired` | The setup was started more than 15 minutes ago |
+| `TotpSecretUnreadable` | A stored secret cannot be decrypted, for example after the key ring changed |
 
 The checklist of a review is the copy of the default checklist that the review received when it was created, so
 changing the default never changes an existing review (see `ChecklistService`). The name saved with an answer or
@@ -401,6 +436,18 @@ confirmation at the provider instead of a password: the `Identity` subsystem iss
 (bound to user, project, review, and slot, single use, short-lived, in memory) and `SigningService` spends it when it
 signs. The proof is held in the memory of one process and is lost on restart, which only means that the user confirms
 again. See the `UserService`, `SigningService`, and `ReauthProofStore` units.
+
+A seventh kind of fact is the optional second factor of a local account: a time-based one-time password (RFC 6238, SHA-1,
+6 digits, 30 seconds) from an authenticator app, with ten single-use recovery codes. `TotpService` owns the rules.
+The secret is encrypted before it is stored (`ITotpSecretProtector`), the algorithm is behind `ITotpAlgorithm`, and
+the state lives in tables of its own, not in the user, so a stale copy of a user can never move the replay state
+backwards. A code is accepted once: the time step of an accepted code is stored by a compare-and-set statement, so a
+reused code and a race between two requests both fail. Recovery codes are stored as hashes and are never accepted for a
+signature. A wrong code counts toward the same lockout as a wrong password. With a second factor, the password alone
+signs nobody in: `UserService.AuthenticatePasswordAsync` reports that a code is required, the older password-only
+methods fail closed, and a signature needs the password and a current code. The audited changes are stored with their
+entry by the store, which is why `TotpService` takes no `AuditService`. See the `TotpService`, `TotpChallengeStore`,
+`UserService`, and `SigningService` units.
 
 Access to projects is decided in one place, `ProjectAccess`, and is based on membership. A user is a system
 administrator (the flag `User.IsSystemAdmin`) or a member of a project with the role `User` or `ProjectAdmin`

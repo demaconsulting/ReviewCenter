@@ -96,3 +96,15 @@ sections:
           - SignInThrottle_TryBeginAddressOnly_NoNameLimit_RefusesOnlyAtAddressLimit
           - SignInThrottle_Succeeded_AddressOnlyReservation_ReturnsTheSlotOnce
           - SignInThrottle_TryBeginAddressOnly_TableFull_EvictsOldestAndStaysAtCap
+
+      - id: ReviewCenter-SignInThrottle-ReleaseAddress
+        title: >-
+          The SignInThrottle unit shall, on request, give back only the address slot of a reservation and keep the
+          counter of the name, give it back only once, and refuse a missing reservation.
+        justification: |
+          A right password that still owes a second factor must not use up the quota of the client address, but the
+          attempts on the name must stay counted until the whole sign-in has succeeded, so that guessing codes with a
+          known password stays bounded.
+        tests:
+          - SignInThrottle_ReleaseAddress_GivesBackTheAddressSlotButKeepsTheNameCounter
+          - SignInThrottle_ReleaseAddress_NullReservation_Throws

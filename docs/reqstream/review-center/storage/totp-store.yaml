@@ -1,0 +1,78 @@
+---
+# Software Unit Requirements for the TotpStore Class
+#
+# The TotpStore class keeps the enrollments of the second factor and the recovery codes in the database. Every
+# decision that must have exactly one winner is one conditional update.
+
+sections:
+  - title: TotpStore Unit Requirements
+    requirements:
+      - id: ReviewCenter-TotpStore-Pending
+        title: >-
+          The TotpStore class shall keep one enrollment for each user, store a pending enrollment and replace an
+          earlier pending one, refuse to replace a confirmed one, and remove only a pending one when asked to.
+        justification: |
+          A person who starts the setup again must get a new secret, and starting it must never be a way to remove or
+          replace a second factor that already works.
+        tests:
+          - TotpStore_SavePendingAsync_RoundTripsAndReplacesAPendingEnrollment
+          - TotpStore_RemovePendingAsync_RemovesPendingOnly
+
+      - id: ReviewCenter-TotpStore-ConfirmAtomic
+        title: >-
+          The TotpStore class shall turn a pending enrollment on, store the hashes of the recovery codes, set the step
+          of the confirming code as the last accepted one, and write the audit entry in one transaction, so that all
+          of it happens exactly once or none of it, also when the same hash is given twice.
+        justification: |
+          A second factor that is on without its recovery codes, or without the record of it, would leave the person
+          locked out or the history untrue.
+        tests:
+          - TotpStore_ConfirmAsync_ActivatesStoresCodesAndAuditsOnce
+          - TotpStore_ConfirmAsync_NothingPending_ReturnsFalseAndStoresNothing
+          - TotpStore_ConfirmAsync_DuplicateHash_IsRefusedByTheDatabaseAndRolledBack
+          - TotpStore_ConfirmAsync_SameHashForDifferentUsers_IsAllowed
+
+      - id: ReviewCenter-TotpStore-AtomicStep
+        title: >-
+          The TotpStore class shall move the last accepted step of a confirmed enrollment forward with one conditional
+          update that succeeds for exactly one of any number of simultaneous callers, and shall refuse a step that is
+          not later than the stored one or an enrollment that is only pending.
+        justification: |
+          The replay protection is only as good as this step. Reading the step and writing it later would let two
+          requests with the same code both pass.
+        tests:
+          - TotpStore_TryAdvanceStepAsync_OnlyForwardAndOnlyWhenConfirmed
+          - TotpStore_TryAdvanceStepAsync_ThirtyTwoParallelRequests_HaveExactlyOneWinner
+
+      - id: ReviewCenter-TotpStore-RecoverySingleUse
+        title: >-
+          The TotpStore class shall spend a recovery code with one conditional update that succeeds for exactly one of
+          any number of simultaneous callers and writes one audit entry, shall replace all codes of a user in one
+          transaction with an audit entry, and shall count the codes that are left.
+        justification: |
+          A recovery code that works twice is a second way in for somebody who saw it once.
+        tests:
+          - TotpStore_TryConsumeRecoveryCodeAsync_SpendsOnceAndAuditsOnce
+          - TotpStore_TryConsumeRecoveryCodeAsync_ParallelRequests_HaveExactlyOneWinner
+          - TotpStore_ReplaceRecoveryCodesAsync_ReplacesAllOldCodes
+
+      - id: ReviewCenter-TotpStore-Remove
+        title: >-
+          The TotpStore class shall remove the enrollment and all recovery codes of a user together with one audit
+          entry, and shall keep the audit chain intact through all changes.
+        justification: |
+          A removal that leaves recovery codes behind, or that is not in the history, would leave a way in that nobody
+          can see.
+        tests:
+          - TotpStore_RemoveAsync_DeletesEverythingOnceWithOneAuditEntry
+          - TotpStore_Changes_KeepTheAuditChainIntact
+          - TotpStore_NullArguments_Throw
+
+      - id: ReviewCenter-TotpStore-Cascade
+        title: >-
+          The TotpStore class shall remove the enrollment and the recovery codes of a user when the user is deleted.
+        justification: |
+          Nothing of a person may stay in the database, and a left-over enrollment would apply to a new user that gets
+          the same identity.
+        tests:
+          - TotpStore_DeletingTheUser_DeletesTheEnrollmentAndCodes

@@ -101,13 +101,19 @@ administrator is not throttled but is a trusted actor).
 | `repository.created` | `repository 'name', location 'L', user name set` (or `none`), `token set` (or `none`) |
 | `repository.updated` | `repository 'name'`, a colon, then the changes, such as `location`, `token replaced` |
 | `repository.enabled`, `repository.disabled` | `repository 'name'` |
-| `auth.sign-in` | `signed in` |
+| `auth.sign-in` | `signed in`, or after step two `second factor: authenticator code` or `... recovery code` |
 | `auth.sign-out` | `signed out` |
-| `auth.sign-in-failed` | `wrong password`, `account disabled`, or `unknown user, name '<typed>'` |
+| `auth.sign-in-failed` | `wrong password`, `account disabled`, `second factor required`, `unknown user, name 'X'` |
 | `auth.sign-in-locked` | `account locked` (an attempt on an account that is already locked) |
-| `auth.sign-in-throttled` | `too many attempts, name '<typed>'` (the sign-in throttle refused the attempt) |
-| `signature.reauth-failed` | as for sign-in (wrong password, disabled, locked, unknown), or `password change pending` |
+| `auth.sign-in-throttled` | `too many attempts, name '<typed>'`, or `too many attempts, second step, name '<typed>'` |
+| `signature.reauth-failed` | as for sign-in, `password change pending`, `second factor required`, or `wrong code` |
 | `auth.locked-out` | `locked for 5 minutes after 5 failed attempts` |
+| `auth.totp-enrolled` | `second factor set up, 10 recovery codes issued` (same transaction as the change) |
+| `auth.totp-disabled` | `second factor removed by its owner` (same transaction as the change) |
+| `auth.totp-reset` | `second factor of user 'bob' reset` (actor is the administrator; same transaction) |
+| `auth.totp-recovery-used` | `recovery code used to sign in`, or `... to remove the second factor` (same transaction) |
+| `auth.totp-recovery-regenerated` | `10 new recovery codes issued` (same transaction as the change) |
+| `auth.totp-failed` | `wrong or reused code (sign-in)`, `(enrollment)`, or `(account page)` (fixed text; best-effort) |
 | `audit.events-suppressed` | `tracking table full, events of new keys are not recorded` (see below) |
 
 An overflow entry (`audit.events-suppressed`) has the actor text `audit service`. It is written at most once per
@@ -137,9 +143,13 @@ entry: the entry has no field for it, and adding one would change the hash chain
 server log. `thread.resolved` and `thread.reopened` are recorded for
 every successful call, even when the thread already had that state.
 
-Changes are recorded in the same transaction as the change; sign-in, sign-out, failed sign-in, attempts on a locked
-account, refusals by the throttle, failed re-authentication, and lockout are recorded on the best-effort path in their
-own transaction.
+Changes are recorded in the same transaction as the change (this includes the second factor: `TotpService` takes no
+`AuditService`, and the entries `auth.totp-enrolled`, `auth.totp-disabled`, `auth.totp-reset`,
+`auth.totp-recovery-used`, and `auth.totp-recovery-regenerated` are built as drafts and saved by `TotpStore`);
+sign-in, sign-out, failed sign-in, attempts on a locked
+account, refusals by the throttle, failed re-authentication, a wrong second factor code (`auth.totp-failed`), and
+lockout are recorded on the best-effort path in their
+own transaction. A code, a secret, a recovery code, and a challenge token are never part of an entry.
 
 #### Key Methods
 

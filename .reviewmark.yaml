@@ -333,6 +333,56 @@ reviews:
       - "src/**/Identity/SignInThrottleOptions.cs"
       - "test/**/Identity/SignInThrottleTests.cs"
 
+  - id: ReviewCenter-Identity-TotpAlgorithm
+    title: Review of ReviewCenter TotpAlgorithm unit implementation
+    context:
+      - docs/design/review-center.md
+      - docs/reqstream/review-center.yaml
+      - docs/design/review-center/identity.md
+      - docs/reqstream/review-center/identity.yaml
+    paths:
+      - "docs/reqstream/review-center/identity/totp-algorithm.yaml"
+      - "docs/design/review-center/identity/totp-algorithm.md"
+      - "docs/verification/review-center/identity/totp-algorithm.md"
+      - "docs/sysml2/model/review-center/identity/totp-algorithm.sysml"
+      - "src/**/Identity/TotpAlgorithm.cs"
+      - "src/DemaConsulting.ReviewCenter.Core/ITotpAlgorithm.cs"
+      - "test/**/Identity/TotpAlgorithmTests.cs"
+      - "test/**/Core/TotpOracle.cs"
+
+  - id: ReviewCenter-Identity-TotpSecretProtector
+    title: Review of ReviewCenter TotpSecretProtector unit implementation
+    context:
+      - docs/design/review-center.md
+      - docs/reqstream/review-center.yaml
+      - docs/design/review-center/identity.md
+      - docs/reqstream/review-center/identity.yaml
+    paths:
+      - "docs/reqstream/review-center/identity/totp-secret-protector.yaml"
+      - "docs/design/review-center/identity/totp-secret-protector.md"
+      - "docs/verification/review-center/identity/totp-secret-protector.md"
+      - "docs/sysml2/model/review-center/identity/totp-secret-protector.sysml"
+      - "src/**/Identity/TotpSecretProtector.cs"
+      - "src/DemaConsulting.ReviewCenter.Core/ITotpSecretProtector.cs"
+      - "test/**/Identity/TotpSecretProtectorTests.cs"
+
+  - id: ReviewCenter-Identity-TotpSignIn
+    title: Review of ReviewCenter TotpSignIn unit implementation
+    context:
+      - docs/design/review-center.md
+      - docs/reqstream/review-center.yaml
+      - docs/design/review-center/identity.md
+      - docs/reqstream/review-center/identity.yaml
+    paths:
+      - "docs/reqstream/review-center/identity/totp-sign-in.yaml"
+      - "docs/design/review-center/identity/totp-sign-in.md"
+      - "docs/verification/review-center/identity/totp-sign-in.md"
+      - "docs/sysml2/model/review-center/identity/totp-sign-in.sysml"
+      - "src/**/Identity/TotpSignIn.cs"
+      - "src/**/Identity/TotpOptions.cs"
+      - "test/**/Identity/TotpSignInTests.cs"
+      - "test/**/Identity/TotpOptionsTests.cs"
+
   - id: ReviewCenter-Identity-OidcSignIn
     title: Review of ReviewCenter OidcSignIn unit implementation
     context:
@@ -558,6 +608,22 @@ reviews:
       - "src/**/Web/LoginPage.razor"
       - "src/**/Web/LoginPage.razor.cs"
       - "test/**/Web/OidcPageTests.cs"
+      - "test/**/Web/TotpLoginPageTests.cs"
+
+  - id: ReviewCenter-Web-TotpLoginPage
+    title: Review of ReviewCenter TotpLoginPage unit implementation
+    context:
+      - docs/design/review-center.md
+      - docs/reqstream/review-center.yaml
+      - docs/design/review-center/web.md
+      - docs/reqstream/review-center/web.yaml
+    paths:
+      - "docs/reqstream/review-center/web/totp-login-page.yaml"
+      - "docs/design/review-center/web/totp-login-page.md"
+      - "docs/verification/review-center/web/totp-login-page.md"
+      - "src/**/Web/TotpLoginPage.razor"
+      - "src/**/Web/TotpLoginPage.razor.cs"
+      - "test/**/Web/TotpLoginPageTests.cs"
 
   - id: ReviewCenter-Web-AccountPage
     title: Review of ReviewCenter AccountPage unit implementation
@@ -573,6 +639,7 @@ reviews:
       - "src/**/Web/AccountPage.razor"
       - "src/**/Web/AccountPage.razor.cs"
       - "test/**/Web/AccountPageTests.cs"
+      - "test/**/Web/AccountTotpPageTests.cs"
       - "test/**/Web/OidcPageTests.cs"
 
   - id: ReviewCenter-Web-UsersPage
@@ -591,6 +658,7 @@ reviews:
       - "src/**/Web/NewUserPage.razor"
       - "src/**/Web/NewUserPage.razor.cs"
       - "test/**/Web/UsersPageTests.cs"
+      - "test/**/Web/UsersTotpPageTests.cs"
       - "test/**/Web/OidcPageTests.cs"
 
   - id: ReviewCenter-Web-HistoryPage
@@ -819,6 +887,7 @@ reviews:
       - "src/DemaConsulting.ReviewCenter.Core/IPasswordHasher.cs"
       - "test/**/Core/UserServiceTests.cs"
       - "test/**/Core/UserServiceExternalTests.cs"
+      - "test/**/Core/UserServiceTotpTests.cs"
       - "test/**/Core/MustChangePasswordTests.cs"
       - "test/**/Core/AuditEventTests.cs"
 
@@ -855,6 +924,7 @@ reviews:
       - "src/DemaConsulting.ReviewCenter.Core/ReviewApproval.cs"
       - "test/**/Core/SigningServiceTests.cs"
       - "test/**/Core/SigningServiceExternalTests.cs"
+      - "test/**/Core/SigningServiceTotpTests.cs"
       - "test/**/Core/CountingUserStore.cs"
       - "test/**/Core/AuditEventTests.cs"
 
@@ -871,6 +941,43 @@ reviews:
       - "docs/verification/review-center/core/reauth-proof-store.md"
       - "src/DemaConsulting.ReviewCenter.Core/ReauthProofStore.cs"
       - "test/**/Core/ReauthProofStoreTests.cs"
+
+  - id: ReviewCenter-Core-TotpService
+    title: Review of ReviewCenter TotpService unit implementation
+    context:
+      - docs/design/review-center.md
+      - docs/reqstream/review-center.yaml
+      - docs/design/review-center/core.md
+      - docs/reqstream/review-center/core.yaml
+    paths:
+      - "docs/reqstream/review-center/core/totp-service.yaml"
+      - "docs/design/review-center/core/totp-service.md"
+      - "docs/verification/review-center/core/totp-service.md"
+      - "docs/sysml2/model/review-center/core/totp-service.sysml"
+      - "src/DemaConsulting.ReviewCenter.Core/TotpService.cs"
+      - "src/DemaConsulting.ReviewCenter.Core/TotpSettings.cs"
+      - "src/DemaConsulting.ReviewCenter.Core/ITotpStore.cs"
+      - "src/DemaConsulting.ReviewCenter.Core/UserTotp.cs"
+      - "src/DemaConsulting.ReviewCenter.Core/TotpRecoveryCode.cs"
+      - "test/**/Core/TotpServiceTests.cs"
+      - "test/**/Core/TotpTestWorld.cs"
+      - "test/**/Core/FakeTotpStore.cs"
+      - "test/**/Core/TotpOracle.cs"
+
+  - id: ReviewCenter-Core-TotpChallengeStore
+    title: Review of ReviewCenter TotpChallengeStore unit implementation
+    context:
+      - docs/design/review-center.md
+      - docs/reqstream/review-center.yaml
+      - docs/design/review-center/core.md
+      - docs/reqstream/review-center/core.yaml
+    paths:
+      - "docs/reqstream/review-center/core/totp-challenge-store.yaml"
+      - "docs/design/review-center/core/totp-challenge-store.md"
+      - "docs/verification/review-center/core/totp-challenge-store.md"
+      - "docs/sysml2/model/review-center/core/totp-challenge-store.sysml"
+      - "src/DemaConsulting.ReviewCenter.Core/TotpChallengeStore.cs"
+      - "test/**/Core/TotpChallengeStoreTests.cs"
 
   # ReviewCenter - Core audit trail
   - id: ReviewCenter-Core-AuditChain
@@ -1130,6 +1237,21 @@ reviews:
       - "docs/sysml2/model/review-center/storage/personal-access-token-store.sysml"
       - "src/**/Storage/PersonalAccessTokenStore.cs"
       - "test/**/Storage/PersonalAccessTokenStoreTests.cs"
+
+  - id: ReviewCenter-Storage-TotpStore
+    title: Review of ReviewCenter TotpStore unit implementation
+    context:
+      - docs/design/review-center.md
+      - docs/reqstream/review-center.yaml
+      - docs/design/review-center/storage.md
+      - docs/reqstream/review-center/storage.yaml
+    paths:
+      - "docs/reqstream/review-center/storage/totp-store.yaml"
+      - "docs/design/review-center/storage/totp-store.md"
+      - "docs/verification/review-center/storage/totp-store.md"
+      - "docs/sysml2/model/review-center/storage/totp-store.sysml"
+      - "src/**/Storage/TotpStore.cs"
+      - "test/**/Storage/TotpStoreTests.cs"
 
   # ReviewCenter - ContentSources
   - id: ReviewCenter-ContentSources
@@ -1591,6 +1713,13 @@ reviews:
       - "docs/reqstream/ots/openiddict.yaml"
       - "docs/design/ots/openiddict.md"
       - "docs/verification/ots/openiddict.md"
+
+  - id: OTS-OtpNet
+    title: Review of Otp.NET OTS verification evidence
+    paths:
+      - "docs/reqstream/ots/otpnet.yaml"
+      - "docs/design/ots/otpnet.md"
+      - "docs/verification/ots/otpnet.md"
 
   - id: OTS-Pandoc
     title: Review of Pandoc OTS verification evidence

@@ -48,6 +48,21 @@ public enum ExternalSignInRefusal
 public sealed record ExternalSignInResult(User? User, ExternalSignInRefusal Refusal, bool Created);
 
 /// <summary>
+///     Why a password is checked; decides which extra rules apply.
+/// </summary>
+internal enum PasswordCheckPurpose
+{
+    /// <summary>A sign-in.</summary>
+    SignIn,
+
+    /// <summary>A fresh proof of identity for an action such as signing.</summary>
+    Reauthentication,
+
+    /// <summary>A confirmation before a change of the second factor.</summary>
+    Confirmation
+}
+
+/// <summary>
 ///     Creates users, checks passwords and manages accounts, enforcing the user rules.
 /// </summary>
 /// <remarks>
@@ -126,6 +141,16 @@ public sealed class UserService
     private string? _dummyHash;
 
     /// <summary>
+    ///     Tells whether a user has a confirmed second factor, or <c>null</c> when the deployment has none.
+    /// </summary>
+    private readonly ITotpStore? _totpStore;
+
+    /// <summary>
+    ///     The settings of the second factor, or <c>null</c> for the defaults (on).
+    /// </summary>
+    private readonly TotpSettings? _totpSettings;
+
+    /// <summary>
     ///     Initializes a new instance of the <see cref="UserService"/> class.
     /// </summary>
     /// <param name="store">The store that persists users. Must not be null.</param>
@@ -135,8 +160,19 @@ public sealed class UserService
     ///     Records failed sign-ins and lockouts in the audit trail on a best-effort basis; <c>null</c> to record
     ///     nothing. Changes of users are audited by the store regardless.
     /// </param>
+    /// <param name="totpStore">
+    ///     The store of the second factor enrollments; <c>null</c> when the deployment has none, in which case no
+    ///     account ever requires a second factor.
+    /// </param>
+    /// <param name="totpSettings">The second factor settings; <c>null</c> for the defaults (enabled).</param>
     /// <exception cref="ArgumentNullException">Thrown when a required argument is null.</exception>
-    public UserService(IUserStore store, IPasswordHasher hasher, TimeProvider timeProvider, AuditService? audit = null)
+    public UserService(
+        IUserStore store,
+        IPasswordHasher hasher,
+        TimeProvider timeProvider,
+        AuditService? audit = null,
+        ITotpStore? totpStore = null,
+        TotpSettings? totpSettings = null)
     {
         ArgumentNullException.ThrowIfNull(store);
         ArgumentNullException.ThrowIfNull(hasher);
@@ -145,6 +181,8 @@ public sealed class UserService
         _hasher = hasher;
         _timeProvider = timeProvider;
         _audit = audit;
+        _totpStore = totpStore;
+        _totpSettings = totpSettings;
     }
 
     /// <summary>
@@ -234,7 +272,10 @@ public sealed class UserService
     ///     The user when the account is enabled, not locked out and the password is right; otherwise <c>null</c>
     ///     for every failure, so the cause is not revealed. A right password resets the failure counter; a
     ///     wrong one counts, and the fifth consecutive failure locks the account for 5 minutes. While the
-    ///     account is locked, attempts are refused without counting, even with the right password.
+    ///     account is locked, attempts are refused without counting, even with the right password. An account with a
+    ///     confirmed second factor is refused here too (fail closed, recorded as "second factor required"): a caller
+    ///     that can only check a password must never let such an account in; use
+    ///     <see cref="AuthenticatePasswordAsync"/> when a code can follow.
     /// </returns>
     /// <remarks>
     ///     Every failure is recorded in the audit trail as <c>auth.sign-in-failed</c> (wrong password, disabled
@@ -245,12 +286,76 @@ public sealed class UserService
     ///     <see cref="AuditService.TryRecordCoalescedAsync"/>), because nothing else limits how often they can be
     ///     triggered; wrong passwords are bounded by the lockout and recorded every time.
     /// </remarks>
-    public Task<User?> AuthenticateAsync(
+    public async Task<User?> AuthenticateAsync(
         string? username,
         string? password,
         CancellationToken cancellationToken = default)
     {
-        return AuthenticateCoreAsync(username, password, false, cancellationToken);
+        return await FailClosedAsync(
+            await AuthenticateCoreAsync(username, password, PasswordCheckPurpose.SignIn, cancellationToken),
+            false,
+            cancellationToken);
+    }
+
+    /// <summary>
+    ///     Checks a user name and password for sign-in when a second factor may follow.
+    /// </summary>
+    /// <param name="username">The user name; compared without regard to case.</param>
+    /// <param name="password">The password to check.</param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <returns>
+    ///     <see cref="PasswordStep.User"/> is <c>null</c> for every failure, exactly as for
+    ///     <see cref="AuthenticateAsync"/> (a wrong password looks the same for an account with and without a second
+    ///     factor). When the password is right and the account has a confirmed second factor that applies,
+    ///     <see cref="PasswordStep.SecondFactorRequired"/> is set and the failure counter is deliberately
+    ///     <b>not</b> reset: only a complete sign-in (<see cref="ClearFailuresAsync"/>) resets it, so an attacker who
+    ///     knows the password still runs into the lockout while guessing codes.
+    /// </returns>
+    public Task<PasswordStep> AuthenticatePasswordAsync(
+        string? username,
+        string? password,
+        CancellationToken cancellationToken = default)
+    {
+        return AuthenticateCoreAsync(username, password, PasswordCheckPurpose.SignIn, cancellationToken);
+    }
+
+    /// <summary>
+    ///     Checks the password of a signed-in user for an action that needs a fresh proof, when a code may also be
+    ///     needed (signing a review).
+    /// </summary>
+    /// <param name="username">The user name of the signed-in user; compared without regard to case.</param>
+    /// <param name="password">The password to check.</param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <returns>
+    ///     The rules are those of <see cref="ReauthenticatePasswordAsync"/> and <see cref="AuthenticatePasswordAsync"/>:
+    ///     <see cref="PasswordStep.SecondFactorRequired"/> tells the caller to check a code too.
+    /// </returns>
+    public Task<PasswordStep> ReauthenticatePasswordAsync(
+        string? username,
+        string? password,
+        CancellationToken cancellationToken = default)
+    {
+        return AuthenticateCoreAsync(username, password, PasswordCheckPurpose.Reauthentication, cancellationToken);
+    }
+
+    /// <summary>
+    ///     Checks the password of a signed-in user before a change of the second factor.
+    /// </summary>
+    /// <param name="username">The user name of the signed-in user; compared without regard to case.</param>
+    /// <param name="password">The password to check.</param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <returns>
+    ///     The user when the account is local, enabled, not locked out and the password is right; otherwise
+    ///     <c>null</c>. A wrong password counts toward the lockout like at sign-in. Unlike sign-in, a right password
+    ///     does not reset the failure counter and a temporary password is accepted (the caller decides whether the
+    ///     account may use the feature).
+    /// </returns>
+    public async Task<User?> ConfirmPasswordAsync(
+        string? username,
+        string? password,
+        CancellationToken cancellationToken = default)
+    {
+        return (await AuthenticateCoreAsync(username, password, PasswordCheckPurpose.Confirmation, cancellationToken)).User;
     }
 
     /// <summary>
@@ -272,28 +377,58 @@ public sealed class UserService
     ///     has a temporary password (<see cref="User.MustChangePassword"/>) is refused with the reason
     ///     "password change pending".
     /// </remarks>
-    public Task<User?> ReauthenticateAsync(
+    public async Task<User?> ReauthenticateAsync(
         string? username,
         string? password,
         CancellationToken cancellationToken = default)
     {
-        return AuthenticateCoreAsync(username, password, true, cancellationToken);
+        return await FailClosedAsync(
+            await AuthenticateCoreAsync(username, password, PasswordCheckPurpose.Reauthentication, cancellationToken),
+            true,
+            cancellationToken);
     }
 
     /// <summary>
-    ///     Checks a user name and password; the shared path of sign-in and re-authentication.
+    ///     Refuses an account whose second factor is required, for the callers that can only check a password.
+    /// </summary>
+    /// <param name="step">The answer of the password check.</param>
+    /// <param name="reauthentication"><c>true</c> for a re-authentication; <c>false</c> for a sign-in.</param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <returns>
+    ///     The user when no second factor is required; otherwise <c>null</c> (fail closed), so a caller that does
+    ///     not know about the second factor can never let a password alone through.
+    /// </returns>
+    private async Task<User?> FailClosedAsync(PasswordStep step, bool reauthentication, CancellationToken cancellationToken)
+    {
+        if (!step.SecondFactorRequired)
+        {
+            return step.User;
+        }
+
+        await RecordCoalescedAsync(
+            step.User,
+            reauthentication ? ReauthFailedAction : "auth.sign-in-failed",
+            "second factor required",
+            cancellationToken);
+        return null;
+    }
+
+    /// <summary>
+    ///     Checks a user name and password; the shared path of sign-in, re-authentication and confirmation.
     /// </summary>
     /// <param name="username">The user name; compared without regard to case.</param>
     /// <param name="password">The password to check.</param>
-    /// <param name="reauthentication"><c>true</c> when the check is a re-authentication; <c>false</c> for a sign-in.</param>
+    /// <param name="purpose">Why the password is checked.</param>
     /// <param name="cancellationToken">Cancels the operation.</param>
-    /// <returns>The user, or <c>null</c> for every failure.</returns>
-    private async Task<User?> AuthenticateCoreAsync(
+    /// <returns>The user (or <c>null</c> for every failure) and whether a second factor is required.</returns>
+    private async Task<PasswordStep> AuthenticateCoreAsync(
         string? username,
         string? password,
-        bool reauthentication,
+        PasswordCheckPurpose purpose,
         CancellationToken cancellationToken)
     {
+        var reauthentication = purpose == PasswordCheckPurpose.Reauthentication;
+        var failed = new PasswordStep(null, false);
         await _gate.WaitAsync(cancellationToken);
         try
         {
@@ -304,7 +439,7 @@ public sealed class UserService
             {
                 VerifyDummy(password);
                 await RecordUnknownUserAsync(username, reauthentication, cancellationToken);
-                return null;
+                return failed;
             }
 
             // An account of an identity provider has no password to check: a password never signs it in or confirms
@@ -317,7 +452,7 @@ public sealed class UserService
                     reauthentication ? ReauthFailedAction : "auth.sign-in-failed",
                     "external account has no password",
                     cancellationToken);
-                return null;
+                return failed;
             }
 
             // A locked account refuses every attempt, without counting it
@@ -329,13 +464,13 @@ public sealed class UserService
                     reauthentication ? ReauthFailedAction : "auth.sign-in-locked",
                     "account locked",
                     cancellationToken);
-                return null;
+                return failed;
             }
 
             if (!_hasher.Verify(user.PasswordHash, password ?? string.Empty))
             {
                 await RegisterFailureAsync(user, reauthentication, cancellationToken);
-                return null;
+                return failed;
             }
 
             // A disabled account never signs in, however right the password is
@@ -346,7 +481,7 @@ public sealed class UserService
                     reauthentication ? ReauthFailedAction : "auth.sign-in-failed",
                     "account disabled",
                     cancellationToken);
-                return null;
+                return failed;
             }
 
             // A temporary password proves identity only well enough to reach the password-change page: it can not
@@ -354,16 +489,124 @@ public sealed class UserService
             if (reauthentication && user.MustChangePassword)
             {
                 await RecordCoalescedAsync(user, ReauthFailedAction, "password change pending", cancellationToken);
-                return null;
+                return failed;
+            }
+
+            // A password confirmation only proves the password: it neither asks for a code nor clears the counter
+            if (purpose == PasswordCheckPurpose.Confirmation)
+            {
+                return new PasswordStep(user, false);
+            }
+
+            // With a second factor the password alone is not enough, and the counter is left as it is: only a
+            // complete sign-in resets it, so guessing codes with a known password still ends in the lockout
+            if (await HasActiveSecondFactorAsync(user, cancellationToken))
+            {
+                return new PasswordStep(user, true);
             }
 
             await ResetFailuresAsync(user, cancellationToken);
-            return user;
+            return new PasswordStep(user, false);
         }
         finally
         {
             _gate.Release();
         }
+    }
+
+    /// <summary>
+    ///     Tells whether the user has a confirmed second factor that applies right now.
+    /// </summary>
+    /// <param name="user">The user.</param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <returns>
+    ///     <c>true</c> when the feature is on and the enrollment is confirmed; <c>false</c> when there is no
+    ///     enrollment store (a deployment without the feature), the feature is switched off or nothing is confirmed.
+    /// </returns>
+    private async Task<bool> HasActiveSecondFactorAsync(User user, CancellationToken cancellationToken)
+    {
+        if (_totpStore is null || !(_totpSettings?.Enabled ?? true))
+        {
+            return false;
+        }
+
+        return (await _totpStore.GetAsync(user.Id, cancellationToken))?.IsActive == true;
+    }
+
+    /// <summary>
+    ///     Counts a wrong second factor (code) toward the same lockout as a wrong password.
+    /// </summary>
+    /// <param name="username">The user name; compared without regard to case.</param>
+    /// <param name="action">The audit action code of the failure.</param>
+    /// <param name="detail">A fixed detail text; never a code, secret or token.</param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <returns><c>true</c> when this failure locked the account.</returns>
+    /// <remarks>
+    ///     The user is read again under the gate, so a counter changed meanwhile is never overwritten with a stale
+    ///     copy. An unknown or external account is ignored.
+    /// </remarks>
+    internal async Task<bool> RegisterSecondFactorFailureAsync(
+        string username,
+        string action,
+        string detail,
+        CancellationToken cancellationToken = default)
+    {
+        await _gate.WaitAsync(cancellationToken);
+        try
+        {
+            var user = await _store.GetByUsernameAsync(username, cancellationToken);
+            if (user is null || user.IsExternal)
+            {
+                return false;
+            }
+
+            return await RegisterFailureAsync(user, action, detail, cancellationToken);
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
+
+    /// <summary>
+    ///     Clears the failure counter after a complete sign-in with a second factor.
+    /// </summary>
+    /// <param name="username">The user name; compared without regard to case.</param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <returns>A task that completes when the counter is cleared; an unknown user is ignored.</returns>
+    internal async Task ClearFailuresAsync(string username, CancellationToken cancellationToken = default)
+    {
+        await _gate.WaitAsync(cancellationToken);
+        try
+        {
+            var user = await _store.GetByUsernameAsync(username, cancellationToken);
+            if (user is not null)
+            {
+                await ResetFailuresAsync(user, cancellationToken);
+            }
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
+
+    /// <summary>
+    ///     Tells whether an account is locked out right now, recording a refusal.
+    /// </summary>
+    /// <param name="username">The user name; compared without regard to case.</param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <returns><c>true</c> while the lockout lasts; <c>false</c> for an unlocked or unknown account.</returns>
+    internal async Task<bool> IsLockedOutAsync(string username, CancellationToken cancellationToken = default)
+    {
+        var user = await _store.GetByUsernameAsync(username, cancellationToken);
+        if (user is null || !IsLockedOut(user))
+        {
+            return false;
+        }
+
+        await RecordCoalescedAsync(user, "auth.sign-in-locked", "account locked", cancellationToken);
+        return true;
     }
 
     /// <summary>
@@ -902,6 +1145,27 @@ public sealed class UserService
     /// <returns>A task that completes when the state is stored.</returns>
     private async Task RegisterFailureAsync(User user, bool reauthentication, CancellationToken cancellationToken)
     {
+        await RegisterFailureAsync(
+            user,
+            reauthentication ? ReauthFailedAction : "auth.sign-in-failed",
+            "wrong password",
+            cancellationToken);
+    }
+
+    /// <summary>
+    ///     Counts a failed credential check (password or second factor) and starts the lockout when the limit is reached.
+    /// </summary>
+    /// <param name="user">The user, as read from the store.</param>
+    /// <param name="action">The audit action code of the failure.</param>
+    /// <param name="detail">A fixed detail text.</param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <returns><c>true</c> when this failure started the lockout.</returns>
+    private async Task<bool> RegisterFailureAsync(
+        User user,
+        string action,
+        string detail,
+        CancellationToken cancellationToken)
+    {
         user.FailedLoginCount++;
         var lockedOut = user.FailedLoginCount >= MaxFailedAttempts;
         if (lockedOut)
@@ -913,8 +1177,8 @@ public sealed class UserService
 
         // The counter and the lockout are state, not events: the events below are recorded separately
         await _store.UpdateAsync(user, null, cancellationToken);
-        // Wrong passwords are bounded by the lockout, so every one of them is recorded
-        await RecordAsync(user, reauthentication ? ReauthFailedAction : "auth.sign-in-failed", "wrong password", cancellationToken);
+        // Wrong credentials are bounded by the lockout, so every one of them is recorded
+        await RecordAsync(user, action, detail, cancellationToken);
         if (lockedOut)
         {
             await RecordAsync(
@@ -923,6 +1187,8 @@ public sealed class UserService
                 $"locked for {LockoutDuration.TotalMinutes:0} minutes after {MaxFailedAttempts} failed attempts",
                 cancellationToken);
         }
+
+        return lockedOut;
     }
 
     /// <summary>

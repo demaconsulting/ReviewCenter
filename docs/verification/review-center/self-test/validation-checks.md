@@ -8,7 +8,7 @@ the whole of them by the real default validation, which is run once in the test 
 check is exercised at most once by the suite, because the real checks are the slow part of the
 suite (they start git, a database, a signer and a web host):
 
-- The light checks (`Fingerprint`, `PasswordHash`) are run directly.
+- The light checks (`Fingerprint`, `PasswordHash`, `Totp`) are run directly.
 - The checks that start git, a complete review workflow, a signer, or the web host, and the `AuditChain` check, are
   verified by the real run, whose log and results file must show each of them passed with the detail it
   reports (for example `embedded SQLite` for the review workflow and `stopped cleanly` for the
@@ -39,10 +39,11 @@ every supported platform provides, and no network beyond it.
 #### Acceptance Criteria
 
 - All unit tests pass with zero failures.
-- The real default run reports eight passed tests, with elapsed times, and none skipped or failed.
+- The real default run reports nine passed tests, with elapsed times, and none skipped or failed.
 - The `Fingerprint` check passes and compares with the literal
   `13e028da06299fcedffff47b2b55cca46a68111f3124d77d355364339c4215f2`.
 - The `PasswordHash` check accepts the right password and rejects a wrong one.
+- The `Totp` check passes with the published RFC 6238 vectors and reports them in its detail.
 - The `AuditChain` check reports that a changed entry was detected.
 - `ConfiguredDatabase` is skipped when nothing is configured, passes for a database with the
   current schema without changing the file, fails naming the missing table for a database with a
@@ -66,6 +67,11 @@ holds as a literal. This scenario is tested by
 is run; it passes, which means the production hasher accepted the right password and rejected a
 wrong one. This scenario is tested by
 `ValidationChecks_PasswordHash_Run_AcceptsRightAndRejectsWrongPassword`.
+
+**ValidationChecks_Totp_Run_PassesWithRfcVectors**: The two-factor check is run; it is named `ReviewCenter_Totp`,
+it passes, and its detail mentions "RFC 6238", which means the production algorithm gave the published codes for the
+vector times, accepted the window, and handled the Base32 text and the `otpauth` address. This scenario is tested by
+`ValidationChecks_Totp_Run_PassesWithRfcVectors`.
 
 **ValidationChecks_AuditChain_Run_DetectsTamperedEntry**: The log of the real run is read; the audit chain check shows
 a passed line that reports that the change of an entry was detected by the verifier. This scenario is tested by
@@ -104,7 +110,7 @@ The hermetic behavior of the default run is verified at the subsystem level by
 `SelfTestSubsystem_ValidationWorkflow_DefaultRun_IsHermetic`.
 
 **ValidationChecks_HostStart_HostileEnvironment_PassesOnLoopbackAndTouchesNothingAmbient**: The child process
-described above runs the default validation in the hostile environment; it exits with 0 and reports eight passed
+described above runs the default validation in the hostile environment; it exits with 0 and reports nine passed
 checks, the `HostStart` line names a loopback address and a port that differs from the poisoned one, the sentinel
 folder and the private temporary folder are empty. This scenario is tested by
 `ValidationChecks_HostStart_HostileEnvironment_PassesOnLoopbackAndTouchesNothingAmbient`.

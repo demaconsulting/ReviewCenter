@@ -3,7 +3,7 @@
 #
 # The checks are the tests that `--validate` runs: each one exercises a real part of ReviewCenter (git, a
 # complete review workflow, the content fingerprint, password hashing, the audit chain, the signed attestation
-# PDF and the web host) against throw-away data in a temporary folder. The ninth check, opt-in through
+# PDF and the web host) against throw-away data in a temporary folder. The tenth check, opt-in through
 # `--check-config`, compares the configured database with the schema of this build, read-only.
 
 sections:
@@ -66,6 +66,16 @@ sections:
           that it works on this platform.
         tests:
           - ValidationChecks_PasswordHash_Run_AcceptsRightAndRejectsWrongPassword
+
+      - id: ReviewCenter-ValidationChecks-Totp
+        title: >-
+          The Totp check shall compute the codes of the published test vectors of RFC 6238 with the production
+          algorithm, accept the right code and refuse a wrong one, and fail when a vector does not match.
+        justification: |
+          The second factor of a person depends on the computation of the code to be the same as that of every
+          authenticator app. The published vectors are the proof that the library and its use work on this platform.
+        tests:
+          - ValidationChecks_Totp_Run_PassesWithRfcVectors
 
       - id: ReviewCenter-ValidationChecks-AuditChain
         title: >-

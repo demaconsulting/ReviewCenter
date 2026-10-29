@@ -9,7 +9,8 @@
    account page sends the user here with "changed=1", which shows a notice to sign in with the new password.
    When sign-in with an OpenID Connect provider is enabled, a second card offers a "Sign in with ..." button (a
    form that posts to /auth/oidc/login with its own antiforgery token); "error=oidc" shows one generic message
-   next to that button, whatever went wrong at the provider. *@
+   next to that button, whatever went wrong at the provider. "error=totp-expired" shows a notice that the second
+   sign-in step (see TotpLoginPage) took too long or lost its challenge, and asks to sign in again. *@
 @page "/login"
 
 <PageTitle>Sign in - ReviewCenter</PageTitle>
@@ -21,6 +22,13 @@
     {
         <p class="notice" role="status" data-testid="login-password-changed">
             Password changed. Sign in with your new password.
+        </p>
+    }
+
+    @if (TotpExpired)
+    {
+        <p class="notice" role="status" data-testid="login-totp-expired">
+            That sign-in step has expired. Sign in again.
         </p>
     }
 

@@ -29,6 +29,7 @@ sections:
           - ReviewCenter-ValidationChecks-ReviewWorkflow
           - ReviewCenter-ValidationChecks-Fingerprint
           - ReviewCenter-ValidationChecks-PasswordHash
+          - ReviewCenter-ValidationChecks-Totp
           - ReviewCenter-ValidationChecks-AuditChain
           - ReviewCenter-ValidationChecks-AttestationPdf
           - ReviewCenter-ValidationChecks-HostStart

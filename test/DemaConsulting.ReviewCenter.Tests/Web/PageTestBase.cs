@@ -73,7 +73,11 @@ public abstract class PageTestBase : BunitContext
         Audit = new AuditService(AuditStore);
         var userStore = new FakeUserStore(store);
         UserStore = userStore;
-        Users = new UserService(userStore, new FakePasswordHasher(), clock, Audit);
+        TotpStore = new FakeTotpStore();
+        Users = new UserService(userStore, new FakePasswordHasher(), clock, Audit, TotpStore);
+        Challenges = new TotpChallengeStore(Time);
+        Totp = new TotpService(TotpStore, new TotpAlgorithm(), new FakeTotpSecretProtector(), Users, Challenges, Time);
+        Services.AddSingleton(Totp);
         TokenStore = new FakePersonalAccessTokenStore(userStore);
         Proofs = new ReauthProofStore(Time);
         Tokens = new PersonalAccessTokenService(TokenStore, userStore, Time);
@@ -91,7 +95,7 @@ public abstract class PageTestBase : BunitContext
         Checklists = new ChecklistService(store, allowAll, clock);
         Repositories = new RepositoryService(RepositoryStore, new FakeCredentialProtector(), allowAll, clock);
         Reviews = new ReviewService(store, allowAll, clock, Repositories, Git);
-        Signing = new SigningService(store, Users, allowAll, clock, Proofs);
+        Signing = new SigningService(store, Users, allowAll, clock, Proofs, Totp);
         Planner = new ReviewPlanner(store, Reviews, Repositories, Git, Signing, SetParser, allowAll);
 
         Access = new SignedInUserAccess(new ProjectAccess(userStore, store), userStore, () => _revalidating ? null : _authentication.Current);
@@ -99,7 +103,7 @@ public abstract class PageTestBase : BunitContext
         var pageProjects = new ProjectService(store, userStore, Access, new FakePasswordHasher(), clock, Audit);
         var pageRepositories = new RepositoryService(RepositoryStore, new FakeCredentialProtector(), Access, clock);
         var pageReviews = new ReviewService(store, Access, clock, pageRepositories, Git);
-        var pageSigning = new SigningService(store, Users, Access, clock, Proofs);
+        var pageSigning = new SigningService(store, Users, Access, clock, Proofs, Totp);
         Services.AddSingleton(Audit);
         Services.AddSingleton(pageProjects);
         Services.AddSingleton(pageReviews);
@@ -156,6 +160,54 @@ public abstract class PageTestBase : BunitContext
     ///     Gets the in-memory user store behind the user service.
     /// </summary>
     internal FakeUserStore UserStore { get; }
+
+    /// <summary>
+    ///     Gets the in-memory store of the second factor behind the services, for inspecting enrollments.
+    /// </summary>
+    internal FakeTotpStore TotpStore { get; }
+
+    /// <summary>
+    ///     Gets the pending sign-in challenges behind the second factor service.
+    /// </summary>
+    internal TotpChallengeStore Challenges { get; }
+
+    /// <summary>
+    ///     Gets the second factor service the pages use (the feature is switched on).
+    /// </summary>
+    protected TotpService Totp { get; private set; }
+
+    /// <summary>
+    ///     Switches the second factor feature off for the pages, as the server setting does.
+    /// </summary>
+    /// <remarks>Call it before the first render; the enrollments stay in the store.</remarks>
+    protected void SwitchTotpOff()
+    {
+        Totp = new TotpService(
+            TotpStore,
+            new TotpAlgorithm(),
+            new FakeTotpSecretProtector(),
+            Users,
+            Challenges,
+            Time,
+            new TotpSettings(false, TotpSettings.DefaultIssuer));
+        Services.RemoveAll<TotpService>();
+        Services.AddSingleton(Totp);
+    }
+
+    /// <summary>
+    ///     Enrolls a user in the second factor and returns the secret the authenticator app would hold.
+    /// </summary>
+    /// <param name="username">The user name of an existing local user.</param>
+    /// <param name="password">The password of the user.</param>
+    /// <returns>The secret and the recovery codes shown once.</returns>
+    protected async Task<(byte[] Secret, IReadOnlyList<string> RecoveryCodes)> EnrollTotpAsync(string username, string password)
+    {
+        var actor = new Actor(username, username);
+        var enrollment = await Totp.BeginEnrollmentAsync(actor, password);
+        var secret = TotpOracle.FromBase32(enrollment.SecretBase32);
+        var recovery = await Totp.ConfirmEnrollmentAsync(actor, TotpOracle.CodeAt(secret, Time.GetUtcNow()));
+        return (secret, recovery);
+    }
 
     /// <summary>
     ///     Gets the store of the confirmations of identity behind the signing services, for arranging that an

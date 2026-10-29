@@ -212,7 +212,25 @@ public enum DomainRule
     /// <summary>
     ///     The account has a temporary password; the password must be changed before anything else is allowed.
     /// </summary>
-    PasswordChangeRequired
+    PasswordChangeRequired,
+
+    /// <summary>The second factor can not be used: it is switched off, the account is external or has a temporary password, or the request came with an API token.</summary>
+    TotpNotAvailable,
+
+    /// <summary>The user already has a confirmed second factor.</summary>
+    TotpAlreadyEnrolled,
+
+    /// <summary>The user has no (confirmed or pending) second factor to confirm, use or remove.</summary>
+    TotpNotEnrolled,
+
+    /// <summary>The code is wrong, was already used, or has the wrong form.</summary>
+    TotpCodeIncorrect,
+
+    /// <summary>The pending enrollment was started too long ago; start it again.</summary>
+    TotpEnrollmentExpired,
+
+    /// <summary>The stored secret of a user cannot be decrypted, for example because the key ring was lost; an administrator must reset the second factor.</summary>
+    TotpSecretUnreadable
 }
 
 /// <summary>

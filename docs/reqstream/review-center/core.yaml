@@ -451,3 +451,37 @@ sections:
         tests:
           - UserService_SignInExternalAsync_FirstThenSecond_CreatesOnceAndMatches
           - SigningService_SignAsync_ExternalUserWithProof_SignsOnce
+
+      - id: ReviewCenter-Core-TotpSecondFactor
+        title: >-
+          The Core subsystem shall let a user of a local account turn on a second factor with a code of an authenticator
+          app and ten recovery codes, ask for the code after the password at sign-in and at every signature, accept
+          each code only once, count wrong codes toward the lockout of the password, let the user and, for a lost
+          phone, a system administrator turn it off, record every change in the audit trail, and never keep or show a
+          secret or a code anywhere but in the answer that creates it.
+        justification: |
+          A password alone is the weakest link of a review tool that holds signatures. The rules sit in the services so
+          that every page and route that is ever added gets them, and so that the code cannot be avoided by a path
+          that was written earlier.
+        children:
+          - ReviewCenter-TotpService-Enrollment
+          - ReviewCenter-TotpService-Availability
+          - ReviewCenter-TotpService-Verify
+          - ReviewCenter-TotpService-Replay
+          - ReviewCenter-TotpService-RecoveryCodes
+          - ReviewCenter-TotpService-Disable
+          - ReviewCenter-TotpService-AdminReset
+          - ReviewCenter-TotpService-Lockout
+          - ReviewCenter-TotpService-Audit
+          - ReviewCenter-TotpService-NoSecretLeak
+          - ReviewCenter-TotpChallengeStore-SingleUse
+          - ReviewCenter-TotpChallengeStore-Binding
+          - ReviewCenter-TotpChallengeStore-Expiry
+          - ReviewCenter-TotpChallengeStore-Bounded
+          - ReviewCenter-TotpChallengeStore-Invalidate
+          - ReviewCenter-UserService-SecondFactorRequired
+          - ReviewCenter-UserService-SecondFactorLockout
+          - ReviewCenter-SigningService-TotpReauth
+        tests:
+          - TotpService_CompleteSignInAsync_ConcurrentSameCode_ExactlyOneSucceeds
+          - SigningService_SignAsync_EnrolledUserWithPasswordAndFreshCode_Signs

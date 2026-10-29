@@ -1,0 +1,29 @@
+---
+# OtpNet OTS Software Requirements
+#
+# Requirements for Otp.NET, which computes the time-based one-time passwords (RFC 6238) of the optional second factor
+# of local accounts and converts the shared secret to and from Base32.
+
+sections:
+  - title: OTS Software Requirements
+    sections:
+      - title: OtpNet Requirements
+        requirements:
+          - id: ReviewCenter-OTS-OtpNet-Totp
+            title: >-
+              Otp.NET shall compute the time-based one-time password of RFC 6238 with HMAC-SHA-1, the same code that
+              every authenticator app shows for the same secret and time, shall report which time step a verified
+              code belongs to, and shall convert a secret to and from Base32.
+            justification: |
+              The second factor is only useful when the codes of the authenticator apps of the users match the codes
+              that the server expects, so the library must reproduce the published test vectors of the RFC. The step
+              of an accepted code is what the replay protection stores, so it must be the real time step. Passing
+              tests that compare the library, through the product code, with the published vectors and with an
+              independent implementation written in the tests confirm all of this.
+            tags: [ots]
+            tests:
+              - TotpAlgorithm_ComputeCode_Rfc6238Vectors_MatchThePublishedTable
+              - TotpAlgorithm_ComputeCode_ManyRandomSecrets_MatchTheReference
+              - TotpAlgorithm_TryVerify_MatchedStep_IsFloorOfUnixTimeOverThirty
+              - TotpAlgorithm_GenerateSecret_Is160BitsAndRoundTripsThroughBase32
+              - ValidationChecks_Totp_Run_PassesWithRfcVectors

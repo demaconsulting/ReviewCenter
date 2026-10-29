@@ -33,7 +33,7 @@ N/A - standard test environment.
   and a late exception of an abandoned check is observed.
 - TRX and JUnit XML result files are created with the correct XML root elements.
 - An unsupported result file extension produces no file and an error message on the context.
-- `Validation.CreateChecks` lists the eight default checks, and adds the configured-database
+- `Validation.CreateChecks` lists the nine default checks, and adds the configured-database
   check last only for `--check-config`.
 
 #### Test Scenarios
@@ -95,12 +95,12 @@ This scenario is tested by `Validation_Run_SlowCheck_ReportsElapsedTime`.
 others; the report still lists the checks in the listed order. This scenario is tested by
 `Validation_Run_SlowFirstCheck_ReportsInListedOrder`.
 
-**Validation_CreateChecks_Default_ListsEightHermeticChecks**: `Validation.CreateChecks(false)`
-returns the eight default checks, in order, with the `ReviewCenter_` names. This scenario is
-tested by `Validation_CreateChecks_Default_ListsEightHermeticChecks`.
+**Validation_CreateChecks_Default_ListsNineHermeticChecks**: `Validation.CreateChecks(false)`
+returns the nine default checks, in order, with the `ReviewCenter_` names (`ReviewCenter_Totp` follows
+`ReviewCenter_PasswordHash`). This scenario is tested by `Validation_CreateChecks_Default_ListsNineHermeticChecks`.
 
 **Validation_CreateChecks_CheckConfig_AddsConfiguredDatabaseLast**: `Validation.CreateChecks(true)`
-returns nine checks with `ReviewCenter_ConfiguredDatabase` last. This scenario is tested by
+returns ten checks with `ReviewCenter_ConfiguredDatabase` last. This scenario is tested by
 `Validation_CreateChecks_CheckConfig_AddsConfiguredDatabaseLast`.
 
 **ValidationRunner_ExecuteAsync_CheckBlocksAndIgnoresToken_FailsAsTimedOutWithoutWaiting**: A check

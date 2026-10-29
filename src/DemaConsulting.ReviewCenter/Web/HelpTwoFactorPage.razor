@@ -1,0 +1,68 @@
+@* HelpTwoFactorPage: help topic "Two-factor sign-in" at "/help/two-factor". Static text and a screenshot of the
+   two-factor card of the Account page. *@
+@page "/help/two-factor"
+
+<HelpTopicFrame Slug="two-factor">
+    <section class="card">
+        <p><strong>Two-factor sign-in</strong> adds a code from an authenticator app on your phone to your password. A
+            stolen or guessed password alone then no longer opens your account. It is optional, and it is for accounts
+            with a ReviewCenter password; an account that signs in with an identity provider is protected by the
+            provider instead.</p>
+        <h2>Turn it on</h2>
+        <ul>
+            <li>Open the <strong>Account</strong> page and find the <strong>Two-factor authentication</strong> card.</li>
+            <li>Type your password and press <strong>Set up two-factor sign-in</strong>.</li>
+            <li>In an authenticator app (any app that makes time-based codes will do), add an account with the key that
+                is shown. Apps that accept an address can use the <code>otpauth://</code> address below the key. The key
+                is shown only now, while you set up; it is not shown again.</li>
+            <li>Type the 6-digit code the app shows and press <strong>Turn on</strong>.</li>
+            <li>ReviewCenter then shows <strong>10 recovery codes</strong>, <strong>once</strong>. Save them somewhere
+                safe, apart from your password (a password manager or a printout). Press
+                <strong>I have saved them</strong> when you have.</li>
+        </ul>
+        <figure class="help-figure">
+            <img class="help-shot" src="/help/two-factor-1.png" loading="lazy"
+                 alt="The Two-factor authentication card of the Account page with two-factor sign-in on, the number of recovery codes left, and the Get new recovery codes and Turn off sections." />
+            <figcaption>The Two-factor authentication card of the Account page, with two-factor sign-in on.</figcaption>
+        </figure>
+        <h2>Sign in</h2>
+        <p>Sign in with your user name and password as always. A second page then asks for a code: type the current
+            code from the app and press <strong>Sign in</strong>. A code works once. The second step must be finished
+            within 5 minutes; if it takes longer, or the answer is wrong, you are told only that the code is not valid or
+            the sign-in step has expired, and you start again.</p>
+        <h2>If you lose your phone</h2>
+        <p>On the second page you can type one of your <strong>recovery codes</strong> instead of the 6-digit code. Each
+            recovery code works once. After you are in, turn two-factor sign-in off and set it up again with the new
+            phone, or press <strong>Get new recovery codes</strong> when few are left. The card shows how many you have
+            left. If you have neither the phone nor a recovery code, ask a system administrator to reset your two-factor
+            sign-in (see below).</p>
+        <h2>Signing a review</h2>
+        <ul>
+            <li>To sign, you type your password <strong>and</strong> a current code from the app. The code is only for the
+                signature; recovery codes cannot sign.</li>
+            <li>A code works only once, also across sign-in and signing. If you used the code of the current
+                30-second period to sign in, <strong>wait for the next code</strong> before you sign.</li>
+        </ul>
+        <h2>Turn it off, or get new recovery codes</h2>
+        <p>Open the <strong>Turn off two-factor sign-in</strong> section of the card, type your password and a current code
+            (or a recovery code), and press <strong>Turn off</strong>. <strong>Get new recovery codes</strong> needs your
+            password and a current code; the old recovery codes stop working. The new ones are shown once.</p>
+        <h2>An administrator resets it</h2>
+        <p>A system administrator can press <strong>Reset two-factor</strong> next to a user on the <strong>Users</strong>
+            page. That removes the second factor and the recovery codes of that user, who can then sign in with the
+            password alone and set it up again. Project administrators cannot do this.</p>
+        <h2>Good to know</h2>
+        <ul>
+            <li>Wrong codes count like wrong passwords: by default, after 5 failed attempts the account is locked for 5 minutes.</li>
+            <li>Turning two-factor sign-in off, or an administrator resetting it, does not sign anybody out; sessions that
+                are already open stay valid.</li>
+            <li>API tokens are not affected. They never need a code, and they still cannot sign.</li>
+            <li>The server's settings can switch the whole feature off (<code>Identity:Totp:Enabled</code> set to
+                <code>false</code>). Then nobody is asked for a code, so <strong>accounts that had it turned on are
+                protected by the password alone</strong> until it is switched on again. Tell the person who runs the
+                server if you rely on it.</li>
+        </ul>
+        <p class="muted">Setting up, turning off, resetting, new recovery codes, recovery code use, and refused codes are
+            recorded in the audit trail, never the codes themselves.</p>
+    </section>
+</HelpTopicFrame>

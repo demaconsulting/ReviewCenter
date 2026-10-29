@@ -28,8 +28,8 @@ types are in `ValidationRunner.cs`:
 **CreateChecks**: Lists the checks of the run.
 
 - *Parameters*: `bool includeConfiguredDatabase`.
-- *Returns*: the eight default checks in the order `ReviewCenter_GitAvailable`, `ReviewCenter_GitRoundTrip`,
-  `ReviewCenter_ReviewWorkflow`, `ReviewCenter_Fingerprint`, `ReviewCenter_PasswordHash`,
+- *Returns*: the nine default checks in the order `ReviewCenter_GitAvailable`, `ReviewCenter_GitRoundTrip`,
+  `ReviewCenter_ReviewWorkflow`, `ReviewCenter_Fingerprint`, `ReviewCenter_PasswordHash`, `ReviewCenter_Totp`,
   `ReviewCenter_AuditChain`, `ReviewCenter_AttestationPdf`, `ReviewCenter_HostStart`; with the flag set, the
   opt-in `ReviewCenter_ConfiguredDatabase` is appended.
 

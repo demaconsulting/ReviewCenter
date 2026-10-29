@@ -73,13 +73,13 @@ sections:
 
       - id: ReviewCenter-Validation-CheckConfig
         title: >-
-          The Validation class shall run the eight hermetic checks by default and shall add the configured-database
+          The Validation class shall run the nine hermetic checks by default and shall add the configured-database
           check, last, only when `--check-config` was given.
         justification: |
           The default run must give the same answer on every machine and must never read or touch the deployment's
           configuration; the check of the configured database is for the operator who asks for it.
         tests:
-          - Validation_CreateChecks_Default_ListsEightHermeticChecks
+          - Validation_CreateChecks_Default_ListsNineHermeticChecks
           - Validation_CreateChecks_CheckConfig_AddsConfiguredDatabaseLast
 
       - id: ReviewCenter-Validation-TrxResults

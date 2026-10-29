@@ -520,3 +520,18 @@ sections:
           the person knows that the next step records it.
         tests:
           - OidcReauth_ReviewPage_OffersConfirmationThenSigning
+
+      - id: ReviewCenter-ReviewPage-SignTotpCode
+        title: >-
+          The ReviewPage unit shall show a code field beside the password field of the sign form only for a signer with
+          a second factor, pass the typed code with the password to the signing service, empty both fields after each
+          attempt, and answer a wrong, reused, or recovery code with the same general message as a wrong password.
+        justification: |
+          A signature proves that the person was there, so a person with a second factor must give a fresh code. The
+          field must not be offered to people who cannot use it, and the answer must not tell which part was wrong.
+        tests:
+          - ReviewPage_Render_SignerNotEnrolled_ShowsNoCodeField
+          - ReviewPage_Sign_EnrolledSignerWithPasswordAndFreshCode_SignsAndClearsFields
+          - ReviewPage_Sign_EnrolledSignerWithWrongCode_ShowsGenericErrorAndSignsNothing
+          - ReviewPage_Sign_CodeAlreadyUsedInStep_IsRefusedUntilTheNextCode
+          - ReviewPage_Sign_RecoveryCodeInsteadOfCode_IsRefused

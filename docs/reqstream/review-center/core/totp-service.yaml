@@ -1,0 +1,167 @@
+---
+# Software Unit Requirements for the TotpService Class
+#
+# The TotpService class holds the rules of the optional second factor of local accounts: enrollment, the second step
+# of the sign-in, the code at the time of a signature, recovery codes, removal by the owner, and the reset by a system
+# administrator.
+
+sections:
+  - title: TotpService Unit Requirements
+    requirements:
+      - id: ReviewCenter-TotpService-Enrollment
+        title: >-
+          The TotpService class shall let a signed-in user of a local account start the setup of a second factor only
+          with the current password, create a secret that is stored as pending and replaced when the setup is started
+          again, turn the second factor on only when a right code from the app confirms it within 15 minutes, and
+          give ten recovery codes once at that moment, and shall let the user give up a pending setup.
+        justification: |
+          A second factor that is not proven to work would lock the person out at the next sign-in, and one that a
+          stolen session could set up without the password would let an attacker bind their own app to the account.
+          Confirming with a code proves that the app has the secret, and giving up a setup must leave nothing behind.
+        tests:
+          - TotpService_BeginEnrollmentAsync_ValidPassword_ReturnsSecretAndUriButIsNotActive
+          - TotpService_BeginEnrollmentAsync_Twice_ReplacesThePendingSecret
+          - TotpService_BeginEnrollmentAsync_WrongPassword_ThrowsAndStoresNothing
+          - TotpService_BeginEnrollmentAsync_AlreadyEnrolled_ThrowsTotpAlreadyEnrolled
+          - TotpService_ConfirmEnrollmentAsync_ValidCode_ActivatesAndIssuesTenRecoveryCodes
+          - TotpService_ConfirmEnrollmentAsync_WrongCode_ThrowsAndStaysPending
+          - TotpService_ConfirmEnrollmentAsync_AfterFifteenMinutes_ThrowsTotpEnrollmentExpired
+          - TotpService_ConfirmEnrollmentAsync_NothingStarted_ThrowsTotpNotEnrolled
+          - TotpService_CancelEnrollmentAsync_PendingOnly_RemovesPendingKeepsConfirmed
+
+      - id: ReviewCenter-TotpService-Availability
+        title: >-
+          The TotpService class shall refuse every use of the second factor, with a message that says so, for an
+          account of an identity provider, an account with a temporary password, a request that comes with an API
+          token, and while the feature is switched off, and shall report such a user as having no second factor to
+          set up.
+        justification: |
+          A provider owns the second factor of its accounts, a temporary password must be replaced before anything else
+          is set up, and a token can never act for a person, so none of them may enroll or use a code. Switching the
+          feature off must close the door to new enrollments.
+        tests:
+          - TotpService_BeginEnrollmentAsync_UnavailableAccount_ThrowsTotpNotAvailable
+          - TotpService_BeginEnrollmentAsync_FeatureDisabled_ThrowsTotpNotAvailable
+          - TotpService_GetStatusAsync_ApiTokenActor_IsNotAvailable
+          - TotpService_NullArguments_Throw
+
+      - id: ReviewCenter-TotpService-Verify
+        title: >-
+          The TotpService class shall complete the second step of a sign-in with a code of the current 30 second step
+          or the step before or after it, shall take the user from the pending challenge and not from the request,
+          shall refuse a wrong, reused, empty, or malformed code with the same outcome and without telling which was
+          the case, and shall keep a challenge that was tried from another client address.
+        justification: |
+          Phones run a little fast or slow, so one step either way is accepted. The answer to a bad code must not help
+          somebody guessing, and a challenge that somebody else tries from another address must not be spent.
+        tests:
+          - TotpService_CompleteSignInAsync_WindowAndOrder_AcceptsPlusMinusOneStepOnlyOnceForward
+          - TotpService_CompleteSignInAsync_WrongReusedMalformed_AreIndistinguishable
+          - TotpService_CompleteSignInAsync_BadChallenge_IsChallengeInvalid
+          - TotpService_CompleteSignInAsync_ForeignClient_DoesNotSpendTheChallenge
+          - TotpService_CompleteSignInAsync_FeatureDisabled_IsChallengeInvalidAndPasswordAloneSignsIn
+
+      - id: ReviewCenter-TotpService-Replay
+        title: >-
+          The TotpService class shall accept a code only when its time step is later than the last accepted one, shall
+          record the step of the accepted code in the same atomic step, so that a code works once even when two
+          requests present it at the same moment, and shall not let the code that confirmed the setup be used again to
+          sign in.
+        justification: |
+          A code that is seen by somebody over the shoulder, or typed into a fake page, is good for 90 seconds. Letting
+          it work only once, with a check that two requests cannot both pass, closes that window.
+        tests:
+          - TotpService_CompleteSignInAsync_CodeOfTheEnrollment_IsAReplay
+          - TotpService_CompleteSignInAsync_WindowAndOrder_AcceptsPlusMinusOneStepOnlyOnceForward
+          - TotpService_CompleteSignInAsync_ConcurrentSameCode_ExactlyOneSucceeds
+
+      - id: ReviewCenter-TotpService-RecoveryCodes
+        title: >-
+          The TotpService class shall create ten random recovery codes of 80 bits, store only a hash of each that
+          belongs to the user, accept an unused code in place of an authenticator code at sign-in regardless of case,
+          spaces, and hyphens, let each code work once even when two requests present it at the same moment, refuse
+          the code of another user, record each use, and let the user replace all codes with new ones, which makes the
+          old ones stop working, using the password and a code from the app.
+        justification: |
+          A person who loses the phone must not lose the account, and the recovery codes are the second way in, so they
+          must be unguessable, stored in a form that cannot be used, and spent by use. Replacing them lets a person who
+          suspects that they were seen start again.
+        tests:
+          - TotpService_CompleteSignInAsync_RecoveryCode_WorksOnceAndIsAudited
+          - TotpService_CompleteSignInAsync_ConcurrentSameRecoveryCode_ExactlyOneSucceeds
+          - TotpService_CompleteSignInAsync_RecoveryCodeOfAnotherUser_IsRefused
+          - TotpService_ConfirmEnrollmentAsync_ValidCode_ActivatesAndIssuesTenRecoveryCodes
+          - TotpService_RegenerateRecoveryCodesAsync_PasswordAndCode_ReplacesTheCodes
+          - TotpService_CompleteSignInAsync_UnreadableSecret_RefusesCodesButRecoveryStillWorks
+
+      - id: ReviewCenter-TotpService-Disable
+        title: >-
+          The TotpService class shall let a user remove their own second factor only with the current password and a
+          right code or an unused recovery code, delete the secret and the recovery codes, end every pending sign-in
+          of the user, and leave the sessions that are already open as they are.
+        justification: |
+          Removing the second factor lowers the protection of the account, so it needs the same proofs as signing in
+          plus the password. A pending sign-in that was started before must not be completed against a factor that no
+          longer exists.
+        tests:
+          - TotpService_DisableAsync_PasswordAndCode_RemovesAndInvalidatesPendingSignIns
+          - TotpService_DisableAsync_RecoveryCode_Removes
+          - TotpService_DisableAsync_NotEnrolled_ThrowsTotpNotEnrolled
+
+      - id: ReviewCenter-TotpService-AdminReset
+        title: >-
+          The TotpService class shall let only an enabled system administrator, not one that acts through an API token,
+          remove the second factor of another user who lost the phone and the recovery codes, end every pending
+          sign-in of that user, refuse a project administrator, a reviewer, an unknown user, and a user without a
+          second factor, and keep the sessions that are already open.
+        justification: |
+          Somebody must be able to help a person who has lost both ways in, and that right must be as narrow as
+          creating users: a project administrator can change reviews but not who somebody is. The service checks it
+          again, so that no page can give it to somebody else.
+        tests:
+          - TotpService_ResetAsync_SystemAdministrator_RemovesAndInvalidatesPendingSignIns
+          - TotpService_ResetAsync_NotASystemAdministrator_ThrowsActorNotAllowed
+          - TotpService_ResetAsync_UnknownOrNotEnrolled_Throws
+          - TotpService_ListEnrolledUserIdsAsync_HoldsConfirmedEnrollmentsOnly
+
+      - id: ReviewCenter-TotpService-Lockout
+        title: >-
+          The TotpService class shall count a wrong code, at the setup, the sign-in, the removal, and the signature,
+          toward the lockout that counts wrong passwords, with one counter for both, shall not clear the counter when
+          only the password is right, and shall clear it when the whole sign-in succeeds.
+        justification: |
+          An attacker who knows a password must not be able to guess six digit codes without limit, and the codes and
+          the passwords together must not give more attempts than either alone.
+        tests:
+          - TotpService_CompleteSignInAsync_FiveWrongCodes_LocksTheAccount
+          - TotpService_CompleteSignInAsync_PasswordAndCodeFailures_ShareOneCounter
+          - TotpService_CompleteSignInAsync_RightPasswordBetweenWrongCodes_DoesNotResetTheCounter
+          - TotpService_CompleteSignInAsync_Success_ClearsTheCounter
+
+      - id: ReviewCenter-TotpService-Audit
+        title: >-
+          The TotpService class shall record in the audit trail, in the same transaction as the change, a setup that
+          was completed, a second factor that was removed by its owner or reset by an administrator, a new set of
+          recovery codes, and the use of a recovery code, and shall record a wrong code, with the actor and a fixed
+          text.
+        justification: |
+          Changes to how a person proves who they are belong to the history, and a change that is saved without its
+          record would leave the history untrue.
+        tests:
+          - TotpService_ConfirmEnrollmentAsync_ValidCode_ActivatesAndIssuesTenRecoveryCodes
+          - TotpService_CompleteSignInAsync_RecoveryCode_WorksOnceAndIsAudited
+          - TotpService_DisableAsync_PasswordAndCode_RemovesAndInvalidatesPendingSignIns
+          - TotpService_ResetAsync_SystemAdministrator_RemovesAndInvalidatesPendingSignIns
+          - TotpService_RegenerateRecoveryCodesAsync_PasswordAndCode_ReplacesTheCodes
+          - TotpService_CompleteSignInAsync_FiveWrongCodes_LocksTheAccount
+
+      - id: ReviewCenter-TotpService-NoSecretLeak
+        title: >-
+          The TotpService class shall never put a secret, a code, a recovery code, or a challenge token into the audit
+          trail or an error message, and shall show a secret and the recovery codes only once, in the answer to the
+          request that created them.
+        justification: |
+          What is written to the history or to a message is read by people who must not be able to sign in as the
+          user.
+        tests:
+          - TotpService_WholeLifeCycle_NeverPutsSecretsOrCodesInAuditOrErrors

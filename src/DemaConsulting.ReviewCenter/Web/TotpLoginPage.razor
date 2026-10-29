@@ -1,0 +1,39 @@
+@* TotpLoginPage: the second step of signing in with a second factor, at "/login/totp".
+
+   Static server-side rendered like the sign-in page: an ordinary HTML form that posts to /auth/login-totp (with an
+   antiforgery token), so the endpoint can set the sign-in cookie. The page is reached after the user name and password
+   were accepted; who is signing in is remembered by the server and a cookie of the browser, so the page shows no
+   user name and has no user name field. Without a valid pending sign-in (none, expired, or from another address)
+   the page sends the user back to the sign-in page with "error=totp-expired". A wrong code comes back here with
+   "error=1"; the message is the same whatever went wrong. A client that made too many attempts comes back with
+   "error=throttled". *@
+@page "/login/totp"
+
+<PageTitle>Second step - ReviewCenter</PageTitle>
+
+<main class="page narrow" data-testid="totp-login-page">
+    <h1>Enter your code</h1>
+
+    <section class="card">
+        <form method="post" action="/auth/login-totp" data-testid="totp-login-form">
+            <AntiforgeryToken />
+            <div class="field">
+                <label for="totp-login-code">Code</label>
+                <input id="totp-login-code" name="code" type="text" inputmode="text" maxlength="24"
+                       autocomplete="one-time-code" autocapitalize="characters" spellcheck="false"
+                       data-testid="totp-code-input" />
+                <p class="muted hint">The 6-digit code from your authenticator app, or one of your recovery codes.</p>
+            </div>
+            @if (Throttled)
+            {
+                <p class="error" role="alert" data-testid="totp-login-throttled">Too many attempts. Try again in a few minutes.</p>
+            }
+            else if (Failed)
+            {
+                <p class="error" role="alert" data-testid="totp-login-error">That code is not valid, or it was already used.</p>
+            }
+            <button type="submit" data-testid="totp-login-button">Sign in</button>
+        </form>
+        <p><a href="/login" data-testid="totp-login-cancel">Back to sign in</a></p>
+    </section>
+</main>

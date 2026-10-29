@@ -52,12 +52,14 @@ that its provider replaces the framework default); applies the options callback;
 Connect provider with `OidcSignIn.AddOidcSignIn` after the callback, because only then is the configuration final (it
 registers nothing unless `Identity:Oidc:Enabled` is true); loads static web assets
 when enabled; builds the application; calls `InitializeDatabase`, `ValidateAuthOptions`, `ValidateOidcOptions`,
+`ValidateTotpOptions`,
 `ValidateGitOptions`, and
 `ValidateDataProtection`; adds `UseNotFoundPage` (the not-found middleware, below) and routing; adds authentication,
 authorization, and request forgery protection, in that order, ahead of the endpoints they protect; maps static assets
 when enabled; maps `/health` to a plain-text 200 response; maps the login and logout endpoints with
 `SignIn.MapSignIn`; maps the endpoints of sign-in with a provider with `OidcSignIn.MapOidcSignIn` (only when it is
-enabled); maps the signed attestation download; maps the JSON API with `MapApi` and its OpenAPI document with
+enabled); maps the second step of a sign-in with `TotpSignIn.MapTotpSignIn` (only when `Identity:Totp:Enabled` is
+true); maps the signed attestation download; maps the JSON API with `MapApi` and its OpenAPI document with
 `MapApiDocument` ahead of the user interface, so that an unknown address under `/api` is answered by the API's own JSON
 404; maps `App` with the interactive
 server render mode; and registers the start-up log callback. After the sign-in, it registers the token authentication
@@ -92,14 +94,16 @@ response.
 - *Preconditions*: Neither argument is null.
 - *Postconditions*: The `Database` options, a `ReviewCenterDbContext` factory configured by
   `DatabaseSetup.Configure`, `TimeProvider.System`, one `AuditAppender`, `ReviewStore`, `UserStore`,
-  `PersonalAccessTokenStore`, and `AuditStore` as
-  the Core store interfaces, `PasswordHasher` as the Core hasher interface, `ProjectAccess` as the Core interface
+  `PersonalAccessTokenStore`, `TotpStore`, and `AuditStore` as
+  the Core store interfaces, `PasswordHasher` as the Core hasher interface, `TotpAlgorithm` and `TotpSecretProtector`
+  as the Core second factor interfaces, `ProjectAccess` as the Core interface
   `IProjectAccess` (one singleton that every service and the API share, registered before the services that take it),
   and `ProjectService`, `ReviewService`,
   `ThreadService`, `ChecklistService`, `UserService`, `PersonalAccessTokenService`, `SigningService`, `ReauthProofStore`
-  (the single-use proofs of users of an identity provider, shared by the sign-in and the signing service), and
+  (the single-use proofs of users of an identity provider, shared by the sign-in and the signing service),
+  `TotpChallengeStore` and `TotpService` (the second factor), and
   `AuditService`
-  as singletons are registered.
+  as singletons are registered. `TotpSignIn.AddTotpSignIn` binds the `Identity:Totp` settings.
   `AuditService` gets a hook that logs a warning when an event cannot be recorded, and the registered `TimeProvider`
   (its coalescing of repeated events uses the clock, so tests can move time). The `DataProtection` and `Git`
   settings are bound (an empty `Git:CachePath` becomes a `git-cache` folder beside the database, through
@@ -119,7 +123,8 @@ the server. `UserService` must remain a single instance, because it serializes t
 `PersonalAccessTokenService` must remain a single instance for the same reason, because it serializes the creation and
 revocation of tokens with one gate, which is what keeps the limit of active tokens exact;
 `SigningService` must remain a single instance for the same reason, because it serializes the changes to reviewer
-slots and signatures with one gate. `RepositoryService` must remain a single instance for the same reason, because it
+slots and signatures with one gate. `TotpChallengeStore` must remain a single instance, because it holds the open
+challenges of the process in memory. `RepositoryService` must remain a single instance for the same reason, because it
 serializes the changes to repositories. `AuditAppender` must remain a single instance, because its gate is what
 serializes
 every audited change of all stores in the process (the database write lock serializes other processes).
@@ -163,6 +168,18 @@ The validator (see `OidcSignIn`) does nothing while `Enabled` is false, so a ser
 not changed. Otherwise a wrong value is reported with the setting that is wrong (for example `Identity:Oidc:Authority`)
 and the rule, never the value and never the client secret, so the message can be logged. Reading the options at
 start-up turns a wrong setting into one clear message instead of a failure at the first sign-in.
+
+**ValidateTotpOptions**: Reads the settings of the second factor of a built application once.
+
+- *Parameters*: `WebApplication app` — supplies the options.
+- *Returns*: `void`.
+- *Postconditions*: The `Identity:Totp` settings are valid, or the application is disposed and an
+  `InvalidOperationException` beginning "Invalid two-factor sign-in settings:" is thrown with the validation failure
+  as its inner exception.
+
+The validator (see `TotpSignIn`) rejects an issuer name that is longer than 64 characters or contains a colon or a
+control character, because the name is part of the `otpauth://` address. The message names the setting and never a
+secret.
 
 **ValidateGitOptions**: Reads the git options of a built application once.
 
@@ -236,10 +253,11 @@ This is the mechanism behind the requirement that the listen URL be exposed as a
 handles three environmental conditions locally: an `OperationCanceledException` raised while the
 caller has requested cancellation is treated as a normal stop and returns 0; an
 `InvalidOperationException` from building, which is how a database that cannot be prepared and invalid sign-in, OpenID
-Connect sign-in, or git
+Connect sign-in, two-factor sign-in, or git
 settings are reported, is
 written through `Context.WriteError` as is ("Failed to prepare the database: {detail}", "Invalid sign-in
-settings: {detail}", "Invalid OpenID Connect sign-in settings: {detail}", "Invalid git settings: {detail}", "The Data
+settings: {detail}", "Invalid OpenID Connect sign-in settings: {detail}", "Invalid two-factor sign-in
+settings: {detail}", "Invalid git settings: {detail}", "The Data
 Protection key ring folder '{path}' is not
 writable: ...", or "The attestation signing key is not usable: {detail}") and returns 1; and an
 `IOException`, which Kestrel uses to report an address that is in use or not bindable, is
@@ -252,10 +270,11 @@ always disposed.
 - **Context** — supplies `Urls` and `Silent`, and receives start-up error reports.
 - **App** — the root component mapped as the user interface.
 - **DatabaseSetup**, **ReviewCenterDbContext**, **ReviewStore**, **UserStore**, **PersonalAccessTokenStore**,
+  **TotpStore**,
   **AuditStore**, **AuditAppender**,
   **RepositoryStore** — the database configuration, context, and stores registered for the pages.
 - **ProjectService**, **ReviewService**, **ThreadService**, **ChecklistService**, **UserService**,
-  **PersonalAccessTokenService**, **SigningService**,
+  **PersonalAccessTokenService**, **SigningService**, **TotpService**, **TotpChallengeStore**,
   **AuditService**, **RepositoryService** — the Core services registered for the pages and the API.
 - **ProjectAccess**, **IProjectAccess** — Core; the one place that decides which project a user may see, registered as a
   singleton for the services, the pages, and the API.
@@ -269,6 +288,9 @@ always disposed.
   and login and logout endpoints.
 - **OidcSignIn**, **OidcOptions**, **ReauthProofStore** — sign-in with an OpenID Connect provider (registered, validated
   at the start, and mapped only when enabled) and the proofs of confirmed identity.
+- **TotpSignIn**, **TotpOptions**, **TotpAlgorithm**, **TotpSecretProtector** — the second step of a sign-in
+  (registered, validated at the start, and mapped only when enabled) and the Identity implementations of the second
+  factor interfaces.
 - **ASP.NET Core shared framework** — `WebApplication`, Kestrel, endpoint routing, authentication, authorization,
   request forgery protection, Blazor Server components, and `Microsoft.Extensions.Logging`.
 - **Entity Framework Core** — the database context factory registration.

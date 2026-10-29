@@ -37,6 +37,13 @@ N/A - standard test environment.
 - The display name and user name of a new external account are cleaned and bounded, the user name is made unique by a
   number or a generated name, and every password path refuses an external account.
 - Null arguments are rejected with an `ArgumentNullException`.
+- When a second factor store is present and the feature is on, the right password of an enrolled, enabled, unlocked
+  local user does not sign in: the password step reports that a second factor is required and does not reset the
+  failure counter; wrong passwords, unknown users, and disabled users get the same answers as for a plain account; the
+  password-only checks (`AuthenticateAsync` and `ReauthenticateAsync`) refuse an enrolled account (fail closed) and
+  record why; a plain account, a switched-off feature, and a service without the store behave as before.
+- A password confirmation checks only the password, for an enrolled account too, does not reset the failure counter,
+  and refuses wrong passwords, external accounts, and locked accounts.
 
 #### Test Scenarios
 
@@ -216,3 +223,22 @@ again is refused with `PasswordInvalid` and keeps the flag, which is tested by
 `UserService_ChangeOwnPasswordAsync_SameAsTemporary_IsRefusedAndKeepsTheFlag`. A password set by an administrator
 through `SetPasswordAsync` leaves the flag of a flagged account set and of a normal account clear, which is tested by
 `UserService_SetPasswordAsync_ByAdministrator_LeavesTheFlagAlone`.
+
+**UserService second factor scenarios**: These tests are defined in `UserServiceTotpTests.cs`, over the same fakes with
+`FakeTotpStore` and a switch for the feature (`TotpTestWorld`). The right password of an enrolled account reports that
+a second factor is required, returns no user, and leaves the failure counter as it was, while an account without a
+second factor signs in as before; this is tested by
+`UserService_AuthenticatePasswordAsync_EnrolledUser_AsksForTheSecondFactorAndKeepsTheCounter`. The legacy
+`AuthenticateAsync` and `ReauthenticateAsync` refuse an enrolled account even with the right password and record why,
+which is tested by `UserService_AuthenticateAndReauthenticate_EnrolledUser_FailClosed`. The same checks accept an
+account without a second factor, and an enrolled account when the feature is switched off, which is tested by
+`UserService_AuthenticateAsync_NoSecondFactorOrFeatureOff_SignsInWithThePassword`. A user service built without a
+second factor store never asks for a second factor, which is tested by
+`UserService_AuthenticatePasswordAsync_WithoutTotpStore_NeverAsksForTheSecondFactor`. Wrong passwords and unknown users
+look the same for an enrolled account and a plain one, which is tested by
+`UserService_AuthenticatePasswordAsync_WrongPassword_LooksTheSameWithAndWithoutSecondFactor`. The right password of a
+disabled enrolled account is refused like that of any disabled account, which is tested by
+`UserService_AuthenticatePasswordAsync_DisabledEnrolledUser_IsRefused`. The password confirmation works for an enrolled
+account without a code and without resetting the counter, and refuses wrong passwords and external accounts, which is
+tested by `UserService_ConfirmPasswordAsync_ChecksThePasswordOnly`. A locked account is refused until the lockout ends,
+which is tested by `UserService_ConfirmPasswordAsync_LockedAccount_IsRefused`.

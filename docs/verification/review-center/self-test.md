@@ -19,7 +19,7 @@ N/A - standard test environment. The real run needs `git` on the path, as the to
 ### Acceptance Criteria
 
 - All integration tests pass with zero failures.
-- The real validation completes with exit code 0, eight tests passed, none skipped or failed, each
+- The real validation completes with exit code 0, nine tests passed, none skipped or failed, each
   line showing its elapsed time, within a generous time bound that catches a hung check.
 - The real validation never creates the configured database and never runs or records the opt-in
   `ReviewCenter_ConfiguredDatabase` check.
@@ -31,13 +31,13 @@ N/A - standard test environment. The real run needs `git` on the path, as the to
 
 **SelfTestSubsystem_ValidationWorkflow_NoResultFiles_CompletesSuccessfully**:
 The shared real run completes without error, exit code is 0, the validate flag is set, the
-summary shows eight tests passed, and each of the eight `ReviewCenter_` tests has a passed line
+summary shows nine tests passed, and each of the nine `ReviewCenter_` tests has a passed line
 with its elapsed time. This scenario is tested by
 `SelfTestSubsystem_ValidationWorkflow_NoResultFiles_CompletesSuccessfully`.
 
 **SelfTestSubsystem_ValidationWorkflow_WithTrxFile_GeneratesResults**: The shared real run
-wrote a TRX file containing the `<TestRun` XML element and eight passed results with the names
-of the eight tests, and none failed or not executed. This scenario is tested by
+wrote a TRX file containing the `<TestRun` XML element and nine passed results with the names
+of the nine tests, and none failed or not executed. This scenario is tested by
 `SelfTestSubsystem_ValidationWorkflow_WithTrxFile_GeneratesResults`.
 
 **SelfTestSubsystem_ValidationWorkflow_DefaultRun_IsHermetic**: The real run, in a process whose

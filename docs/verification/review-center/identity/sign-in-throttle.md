@@ -31,6 +31,9 @@ N/A - standard test environment. The tests need no database, no files, and no ne
   is still the current one; a window that has been replaced (after the window passed, an eviction, or `Reset`) is not
   touched, and a reservation gives its slot back only once.
 - A null reservation is refused.
+- Releasing only the address slot of a reservation (used when the password was right and a second factor is still
+  needed) gives back exactly one address slot, keeps the counter of the name, and does nothing the second time or after
+  a success; a null reservation is refused.
 - The settings default to 5 per name, 20 per address, and 300 seconds, under the section `Identity:Throttle`.
 
 #### Test Scenarios
@@ -121,6 +124,14 @@ and the success of a lone attempt removes its counter. This scenario is tested b
 **SignInThrottle_TryBeginAddressOnly_TableFull_EvictsOldestAndStaysAtCap**: With a full table, an address-only attempt
 from a new address is allowed and the table stays at the cap. This scenario is tested by
 `SignInThrottle_TryBeginAddressOnly_TableFull_EvictsOldestAndStaysAtCap`.
+
+**SignInThrottle_ReleaseAddress_GivesBackTheAddressSlotButKeepsTheNameCounter**: With the address full, the address slot
+of one reservation is released twice and then refunded as a success; exactly one address slot comes back, and the name
+counter of that reservation is not cleared (a second throttle shows that only two more attempts for the name are
+allowed). This scenario is tested by `SignInThrottle_ReleaseAddress_GivesBackTheAddressSlotButKeepsTheNameCounter`.
+
+**SignInThrottle_ReleaseAddress_NullReservation_Throws**: Releasing a null reservation raises
+`ArgumentNullException`. This scenario is tested by `SignInThrottle_ReleaseAddress_NullReservation_Throws`.
 
 **SignInThrottle_Reset_DoesNotReuseGenerations**: A reservation is taken, `Reset` is called, and the same keys are
 counted again; the success of the old reservation does not touch the new counters. This scenario is tested by

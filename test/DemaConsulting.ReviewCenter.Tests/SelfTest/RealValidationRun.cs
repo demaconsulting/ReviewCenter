@@ -69,7 +69,7 @@ internal static class RealValidationRun
     public const int HeadingDepth = 3;
 
     /// <summary>
-    ///     The names of the eight checks of the default run, in the order they are reported.
+    ///     The names of the nine checks of the default run, in the order they are reported.
     /// </summary>
     public static readonly string[] CheckNames =
     [
@@ -78,6 +78,7 @@ internal static class RealValidationRun
         "ReviewCenter_ReviewWorkflow",
         "ReviewCenter_Fingerprint",
         "ReviewCenter_PasswordHash",
+        "ReviewCenter_Totp",
         "ReviewCenter_AuditChain",
         "ReviewCenter_AttestationPdf",
         "ReviewCenter_HostStart"
