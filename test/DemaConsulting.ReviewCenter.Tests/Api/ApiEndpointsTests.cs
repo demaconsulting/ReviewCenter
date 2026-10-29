@@ -659,34 +659,44 @@ public class ApiEndpointsTests
     ///     largest file is refused with a validation problem that names only the position of the entry and never
     ///     echoes its content. No review is created.
     /// </summary>
-    /// <param name="bound">The bound to exceed: <c>count</c> or <c>text</c>.</param>
+    /// <param name="bound">The bound to exceed: <c>count</c>, <c>text</c> or <c>text-after-invalid</c>.</param>
     /// <param name="field">The field the problem names.</param>
     [Theory(Timeout = 120000)]
     [InlineData("count", "files")]
     [InlineData("text", "files[1].contentBase64")]
+    [InlineData("text-after-invalid", "files[1].contentBase64")]
     public async Task ApiEndpoints_CreateReview_DecodeBounds_Answer400NamingTheField(string bound, string field)
     {
         // Arrange: a project, a token and a file set that is over the bound before anything is decoded. The long text
-        // is valid Base64 of a recognizable value, one block of four characters over the Base64 size of the largest file
+        // is valid Base64 of a recognizable value, one block of four characters over the Base64 size of the largest
+        // file. In "text-after-invalid" the first entry is not valid Base64: it is only reported when it is decoded,
+        // so naming the second entry proves that no entry is decoded before every text has been measured
         await using var app = await StartAsync();
         var token = await CreateTokenAsync(app);
         var project = await app.Services.GetRequiredService<ProjectService>().CreateAsync("Apollo", null, TestContext.Current.CancellationToken);
         using var client = ClientFor(app, token.Value);
         var longText = new string('Q', (int)(4 * ((ReviewLimits.MaxFileSizeBytes + 2) / 3)) + 4);
+        var first = bound == "text-after-invalid"
+            ? new Dictionary<string, string> { ["path"] = "a.txt", ["contentBase64"] = "!!!not base64!!!" }
+            : UploadOf("a.txt", 1);
         var files = bound == "count"
             ? Enumerable.Range(0, ReviewLimits.MaxFileCount + 1).Select(i => UploadOf($"f{i}.txt", 1)).ToList()
-            : [UploadOf("a.txt", 1), new Dictionary<string, string> { ["path"] = "b.txt", ["contentBase64"] = longText }];
+            : [first, new Dictionary<string, string> { ["path"] = "b.txt", ["contentBase64"] = longText }];
 
         // Act: send the review
         var response = await client.PostAsync(
             $"/api/projects/{project.Id}/reviews", Json(new { id = "REV-D", title = "Bounds", files }), TestContext.Current.CancellationToken);
         var text = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
 
-        // Assert: 400 as a validation problem for the field, no content echoed, and nothing is created
+        // Assert: 400 as a validation problem for the field only, whose detail is its first message, no content
+        // echoed, and nothing is created
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
         using var problem = System.Text.Json.JsonDocument.Parse(text);
-        Assert.True(problem.RootElement.GetProperty("errors").TryGetProperty(field, out _));
+        var errors = problem.RootElement.GetProperty("errors");
+        Assert.True(errors.TryGetProperty(field, out var messages));
+        Assert.Single(errors.EnumerateObject());
+        Assert.Equal(messages[0].GetString(), problem.RootElement.GetProperty("detail").GetString());
         Assert.DoesNotContain("QQQQ", text, StringComparison.Ordinal);
         Assert.Empty(await app.Services.GetRequiredService<ReviewService>().ListAsync(project.Id, TestContext.Current.CancellationToken));
     }

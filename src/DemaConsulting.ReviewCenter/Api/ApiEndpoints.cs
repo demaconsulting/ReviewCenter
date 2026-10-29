@@ -397,7 +397,7 @@ internal static class ApiEndpoints
             var files = DecodeFiles(request.Files, out var decodeErrors);
             if (decodeErrors is not null)
             {
-                // The detail repeats the first message, as the problem of a failed limit in the services does
+                // The detail repeats the first message, as the problem of a failed limit in the services does it
                 return Results.ValidationProblem(decodeErrors, detail: decodeErrors.Values.First()[0]);
             }
 
@@ -552,12 +552,11 @@ internal static class ApiEndpoints
             return decoded;
         }
 
+        // First pass: every text is measured before any of them is decoded, so an oversized entry never allocates
+        // its bytes and no earlier entry is decoded and retained just to be thrown away
         for (var index = 0; index < files.Count; index++)
         {
-            var file = files[index];
-
-            // The text is measured before it is decoded, so an oversized entry never allocates its bytes
-            if (file?.ContentBase64 is { } text && text.Length > MaxFileBase64Length)
+            if (files[index]?.ContentBase64 is { } text && text.Length > MaxFileBase64Length)
             {
                 // Only the position is named: the content itself is never echoed
                 errors = new Dictionary<string, string[]>
@@ -567,7 +566,12 @@ internal static class ApiEndpoints
                 };
                 return decoded;
             }
+        }
 
+        // Second pass: decode, now that every text is known to be within the bound
+        for (var index = 0; index < files.Count; index++)
+        {
+            var file = files[index];
             try
             {
                 decoded.Add(new UploadedFile(file?.Path ?? string.Empty, Convert.FromBase64String(file?.ContentBase64 ?? string.Empty)));
