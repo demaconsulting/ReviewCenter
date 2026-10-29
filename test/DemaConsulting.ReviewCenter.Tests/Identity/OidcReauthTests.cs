@@ -116,11 +116,17 @@ public class OidcReauthTests : IClassFixture<IdentityProviderFixture>
     ///     Test that a sign-in at the provider that is too old, from the future, or without a time is refused, with the
     ///     reason class recorded and no proof given.
     /// </summary>
+    /// <param name="secondsAgo">How long ago the person signed in at the provider; <c>null</c> for no time.</param>
+    /// <param name="reason">The expected reason class.</param>
+    /// <param name="expectedReauth">The expected value of the <c>reauth</c> query parameter of the address.</param>
     [Theory]
-    [InlineData(600, "stale-auth-time")]
-    [InlineData(-600, "stale-auth-time")]
-    [InlineData(null, "missing-auth-time")]
-    public async Task OidcReauth_AuthTimeNotInWindow_IsRefusedFailClosed(int? secondsAgo, string reason)
+    [InlineData(600, "stale-auth-time", "stale-auth-time")]
+    [InlineData(-600, "stale-auth-time", "stale-auth-time")]
+    [InlineData(null, "missing-auth-time", "missing-auth-time")]
+    public async Task OidcReauth_AuthTimeNotInWindow_IsRefusedFailClosed(
+        int? secondsAgo,
+        string reason,
+        string expectedReauth)
     {
         // Arrange
         await using var app = await OidcTestApp.StartAsync(_idp);
@@ -132,7 +138,7 @@ public class OidcReauthTests : IClassFixture<IdentityProviderFixture>
         var landing = await OidcTestApp.ReauthAsync(browser, _idp, world.ProjectId, ReviewId, world.SlotId, world.Route);
 
         // Assert
-        await world.AssertRefusedAsync(landing, reason);
+        await world.AssertRefusedAsync(landing, reason, expectedReauth);
     }
 
     /// <summary>
@@ -142,13 +148,17 @@ public class OidcReauthTests : IClassFixture<IdentityProviderFixture>
     /// </summary>
     /// <param name="seconds">The <c>auth_time</c> the provider sends, in seconds since 1970.</param>
     /// <param name="reason">The expected reason class.</param>
+    /// <param name="expectedReauth">The expected value of the <c>reauth</c> query parameter of the address.</param>
     [Theory]
-    [InlineData(long.MaxValue, "missing-auth-time")]
-    [InlineData(long.MinValue, "missing-auth-time")]
-    [InlineData(-1L, "missing-auth-time")]
-    [InlineData(253402300800L, "missing-auth-time")]
-    [InlineData(253402300799L, "stale-auth-time")]
-    public async Task OidcReauth_AuthTimeOutsideTheRangeOfDates_IsRefusedWithoutError(long seconds, string reason)
+    [InlineData(long.MaxValue, "missing-auth-time", "missing-auth-time")]
+    [InlineData(long.MinValue, "missing-auth-time", "missing-auth-time")]
+    [InlineData(-1L, "missing-auth-time", "missing-auth-time")]
+    [InlineData(253402300800L, "missing-auth-time", "missing-auth-time")]
+    [InlineData(253402300799L, "stale-auth-time", "stale-auth-time")]
+    public async Task OidcReauth_AuthTimeOutsideTheRangeOfDates_IsRefusedWithoutError(
+        long seconds,
+        string reason,
+        string expectedReauth)
     {
         // Arrange
         await using var app = await OidcTestApp.StartAsync(_idp);
@@ -159,9 +169,10 @@ public class OidcReauthTests : IClassFixture<IdentityProviderFixture>
         // Act
         var landing = await OidcTestApp.ReauthAsync(browser, _idp, world.ProjectId, ReviewId, world.SlotId, world.Route);
 
-        // Assert: a normal refusal with its audit entry (AssertRefusedAsync checks the redirect, the single
-        // signature.reauth-failed entry with the reason class, the missing proof and the refused signing)
-        await world.AssertRefusedAsync(landing, reason);
+        // Assert: a normal refusal with its audit entry (AssertRefusedAsync checks the redirect against the fixed
+        // expected value, the single signature.reauth-failed entry with the reason class, the missing proof and
+        // the refused signing)
+        await world.AssertRefusedAsync(landing, reason, expectedReauth);
         using var account = await browser.Client.GetAsync("/account", TestContext.Current.CancellationToken);
         Assert.Equal(HttpStatusCode.OK, account.StatusCode);
     }
@@ -173,11 +184,15 @@ public class OidcReauthTests : IClassFixture<IdentityProviderFixture>
     /// </summary>
     /// <param name="fault">What is wrong with the identity token.</param>
     /// <param name="reason">The expected reason class.</param>
+    /// <param name="expectedReauth">The expected value of the <c>reauth</c> query parameter of the address.</param>
     [Theory]
-    [InlineData(IdTokenFault.WrongIssuer, "token-invalid")]
-    [InlineData(IdTokenFault.WrongAudience, "token-invalid")]
-    [InlineData(IdTokenFault.WrongNonce, "state-or-nonce")]
-    public async Task OidcReauth_WrongIssuerAudienceOrNonce_IsRefusedFailClosed(IdTokenFault fault, string reason)
+    [InlineData(IdTokenFault.WrongIssuer, "token-invalid", "failed")]
+    [InlineData(IdTokenFault.WrongAudience, "token-invalid", "failed")]
+    [InlineData(IdTokenFault.WrongNonce, "state-or-nonce", "failed")]
+    public async Task OidcReauth_WrongIssuerAudienceOrNonce_IsRefusedFailClosed(
+        IdTokenFault fault,
+        string reason,
+        string expectedReauth)
     {
         // Arrange
         var logs = new CapturingLoggerProvider();
@@ -192,7 +207,7 @@ public class OidcReauthTests : IClassFixture<IdentityProviderFixture>
         var landing = await OidcTestApp.ReauthAsync(browser, _idp, world.ProjectId, ReviewId, world.SlotId, world.Route);
 
         // Assert
-        await world.AssertRefusedAsync(landing, reason);
+        await world.AssertRefusedAsync(landing, reason, expectedReauth);
         var users = await app.Services.GetRequiredService<UserService>().ListAsync(TestContext.Current.CancellationToken);
         Assert.Equal(usersBefore, users.Count);
         Assert.Empty(await OidcTestApp.AuditAsync(app, "auth.oidc-sign-in-failed"));
@@ -256,7 +271,7 @@ public class OidcReauthTests : IClassFixture<IdentityProviderFixture>
         var landing = await OidcTestApp.ReauthAsync(browser, _idp, world.ProjectId, ReviewId, world.SlotId, world.Route);
 
         // Assert
-        await world.AssertRefusedAsync(landing, "subject-mismatch");
+        await world.AssertRefusedAsync(landing, "subject-mismatch", "failed");
         var users = await app.Services.GetRequiredService<UserService>().ListAsync(TestContext.Current.CancellationToken);
         Assert.DoesNotContain(users, user => user.ExternalSubject == "somebody-else");
         using var account = await browser.Client.GetAsync("/account", TestContext.Current.CancellationToken);
@@ -279,7 +294,7 @@ public class OidcReauthTests : IClassFixture<IdentityProviderFixture>
         var landing = await OidcTestApp.ReauthAsync(browser, _idp, world.ProjectId, ReviewId, world.SlotId, world.Route);
 
         // Assert
-        await world.AssertRefusedAsync(landing, "provider-error");
+        await world.AssertRefusedAsync(landing, "provider-error", "failed");
     }
 
     /// <summary>
@@ -381,6 +396,13 @@ public class OidcReauthTests : IClassFixture<IdentityProviderFixture>
         var failed = await browser.GetPageAsync($"{world.Route}?reauth=failed");
         Assert.NotNull(failed.QuerySelector($"[data-testid='sign-error-{slot}']"));
         Assert.NotNull(failed.QuerySelector($"[data-testid='sign-reauth-{slot}']"));
+        Assert.Contains(
+            "We could not confirm your identity",
+            failed.QuerySelector($"[data-testid='sign-error-{slot}']")?.TextContent);
+
+        // Act, Assert: a value that is none of the known ones shows nothing
+        var bogus = await browser.GetPageAsync($"{world.Route}?reauth=bogus");
+        Assert.Null(bogus.QuerySelector($"[data-testid='sign-error-{slot}']"));
 
         // Act, Assert: after the confirmation, the sign button
         await OidcTestApp.ReauthAsync(browser, _idp, world.ProjectId, ReviewId, slot, world.Route);
@@ -388,6 +410,55 @@ public class OidcReauthTests : IClassFixture<IdentityProviderFixture>
         Assert.NotNull(after.QuerySelector($"[data-testid='sign-button-{slot}']"));
         Assert.NotNull(after.QuerySelector($"[data-testid='sign-confirmed-{slot}']"));
         Assert.Null(after.QuerySelector($"[data-testid='sign-reauth-{slot}']"));
+    }
+
+    /// <summary>
+    ///     Test that after a refused confirmation the review page says why when the provider did not report a usable
+    ///     sign-in time (<c>auth_time</c> absent, or present but not a whole number of seconds that a date can hold;
+    ///     and that an administrator must check it), and when the sign-in was not recent enough, and that the general
+    ///     text is not shown for those causes.
+    /// </summary>
+    [Fact]
+    public async Task OidcReauth_MissingOrStaleAuthTime_ReviewPageNamesTheCause()
+    {
+        // Arrange
+        await using var app = await OidcTestApp.StartAsync(_idp);
+        using var browser = new TestBrowser(app);
+        var world = await ArrangeAsync(app, browser);
+        var errorSelector = $"[data-testid='sign-error-{world.SlotId}']";
+
+        // Act, Assert: the provider sends no auth_time, or one that is present but unusable (negative)
+        foreach (var scenario in new[]
+        {
+            new IdpScenario { AuthenticatedAgo = null },
+            new IdpScenario { RawAuthTimeSeconds = -1 },
+        })
+        {
+            _idp.Scenario = scenario;
+            var missing = await OidcTestApp.ReauthAsync(
+                browser, _idp, world.ProjectId, ReviewId, world.SlotId, world.Route);
+            var missingPage = await browser.GetPageAsync(missing.Headers.Location!.OriginalString);
+
+            var missingText = missingPage.QuerySelector(errorSelector)?.TextContent;
+            Assert.Contains("did not report a usable sign-in time", missingText);
+            Assert.Contains("auth_time", missingText);
+            Assert.Contains("whole number of seconds since 1970", missingText);
+            Assert.Contains("administrator", missingText);
+            Assert.DoesNotContain("when you signed in", missingText);
+            Assert.DoesNotContain("We could not confirm your identity", missingText);
+        }
+
+        // Act: the provider sends an auth_time that is too old
+        _idp.Scenario = new IdpScenario { AuthenticatedAgo = TimeSpan.FromSeconds(600) };
+        var stale = await OidcTestApp.ReauthAsync(
+            browser, _idp, world.ProjectId, ReviewId, world.SlotId, world.Route);
+        var stalePage = await browser.GetPageAsync(stale.Headers.Location!.OriginalString);
+
+        // Assert
+        var staleText = stalePage.QuerySelector(errorSelector)?.TextContent;
+        Assert.Contains("not recent enough", staleText);
+        Assert.DoesNotContain("auth_time", staleText);
+        Assert.DoesNotContain("We could not confirm your identity", staleText);
     }
 
     /// <summary>
@@ -589,11 +660,15 @@ public class OidcReauthTests : IClassFixture<IdentityProviderFixture>
         ///     failure is recorded with the reason class only, and signing is still refused.
         /// </summary>
         /// <param name="landing">The answer that ended the flow.</param>
-        /// <param name="reason">The reason class.</param>
+        /// <param name="reason">The reason class recorded in the audit trail.</param>
+        /// <param name="expectedReauth">
+        ///     The expected value of the <c>reauth</c> query parameter of the address, given as a literal by the test
+        ///     and never derived from <paramref name="reason" />, so that a wrong mapping fails the test.
+        /// </param>
         /// <returns>A task that completes when everything is checked.</returns>
-        public async Task AssertRefusedAsync(HttpResponseMessage landing, string reason)
+        public async Task AssertRefusedAsync(HttpResponseMessage landing, string reason, string expectedReauth)
         {
-            Assert.Equal($"{Route}?reauth=failed", landing.Headers.Location?.OriginalString);
+            Assert.Equal($"{Route}?reauth={expectedReauth}", landing.Headers.Location?.OriginalString);
             var entry = Assert.Single(await OidcTestApp.AuditAsync(_app, "signature.reauth-failed"));
             Assert.Equal($"oidc: {reason}", entry.Detail);
             Assert.False(await Signing.HasReauthProofAsync(

@@ -150,14 +150,19 @@ provider must use `https`; `http` is accepted only for a provider on the same ma
 tried. `ReauthMaxAgeSeconds` is the age that the login at the provider may have when a signature is confirmed (default
 120; 10 to 900).
 
+The provider must also send the moment of the login (`auth_time`) for a signature to be confirmed. Step-by-step
+recipes for Microsoft Entra ID, AD FS, Okta and Keycloak, a comparison of what each provider sends, and a list of
+failures with their causes are in the Identity Providers chapter.
+
 **What happens at the first sign-in.** ReviewCenter identifies the person by the **issuer and the subject** that the
 provider gives, and by nothing else. A name or an e-mail address is never used to find an account, and an account at a
 provider is **never linked to a local account**, even when the user names are the same. The first time, ReviewCenter
 creates an account that is enabled, is not a system administrator, and has no project, so the person sees nothing until
 a project administrator adds them to a project (see Managing Project Members in the Administration chapter) or a
 system
-administrator changes their role. The display name is taken from the provider and cleaned; the user name is made from
-the claim that you chose and is made unique with a number if it is already taken. The Users page marks these accounts
+administrator changes their role. The display name is the `name` claim of the provider (else the user name), cleaned;
+the user name is made from the claim that you chose (else the part of the e-mail address before the `@`, else the
+subject) and is made unique with a number if it is already taken. The Users page marks these accounts
 with **OIDC**. A system administrator can disable such an account like any other, and a disabled account cannot sign in.
 
 **No password.** An account of a provider has no password: the password sign-in is refused for it, the Account page says
@@ -174,6 +179,12 @@ setting above), by the same person as the account (the same subject at the same 
 for this reviewer slot. The confirmation is used up by one signature and cannot be used for another slot, another
 review, or another person. When anything is missing or does not match, nothing is signed. A token of the API still
 cannot sign.
+
+A confirmation fails closed when the provider does not report a usable sign-in time (`auth_time` is missing, is not a
+whole number of seconds, or is out of range), or reports a login that is not recent enough. The review page then says
+so instead of the general message, so an administrator knows what to fix (for the first cause it names `auth_time` and
+asks an administrator to check that the provider sends it as a whole number of seconds since 1970); see the Identity
+Providers chapter.
 
 **When it fails.** Every failure at the sign-in page gives one general message (the provider failed or refused, the
 account is disabled, the answer could not be checked), so the page does not tell an attacker which. The cause is

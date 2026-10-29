@@ -148,7 +148,8 @@ public partial class ReviewPage : ComponentBase, IDisposable
 
     /// <summary>
     ///     Gets or sets the <c>reauth</c> query value: how the last confirmation of identity at the identity provider
-    ///     ended (<c>ok</c> or <c>failed</c>), put there by the sign-in endpoint when it sends the browser back.
+    ///     ended (<c>ok</c>, <c>failed</c>, <c>missing-auth-time</c> or <c>stale-auth-time</c>), put there by the
+    ///     sign-in endpoint when it sends the browser back.
     /// </summary>
     [SupplyParameterFromQuery(Name = "reauth")]
     public string? ReauthText { get; set; }
@@ -886,6 +887,12 @@ public partial class ReviewPage : ComponentBase, IDisposable
     ///     The message of the last failed signing attempt, or the report of a failed confirmation of identity, or
     ///     <c>null</c> when there is nothing to report.
     /// </returns>
+    /// <remarks>
+    ///     A failed confirmation says why only when the provider did not report a usable sign-in time (the
+    ///     <c>auth_time</c> claim is absent, not a whole number of seconds, or out of the range of dates) or the
+    ///     sign-in was not recent enough; every other failure keeps the general text. A value that is none of the
+    ///     known ones shows nothing, so the address cannot put text on the page.
+    /// </remarks>
     private string? SignMessage(int slotId)
     {
         if (SignErrors.TryGetValue(slotId, out var error))
@@ -893,9 +900,24 @@ public partial class ReviewPage : ComponentBase, IDisposable
             return error;
         }
 
-        return CurrentIsExternal && !ReauthReportDismissed && ReauthText == OidcSignIn.ReauthFailed
-            ? $"We could not confirm your identity. Sign in again at {Oidc.Value.DisplayName} when asked."
-            : null;
+        if (!CurrentIsExternal || ReauthReportDismissed)
+        {
+            return null;
+        }
+
+        var provider = Oidc.Value.DisplayName;
+        return ReauthText switch
+        {
+            OidcSignIn.ReauthFailed =>
+                $"We could not confirm your identity. Sign in again at {provider} when asked.",
+            OidcSignIn.ReauthMissingAuthTime =>
+                $"{provider} did not report a usable sign-in time (auth_time). An administrator must check that it "
+                + "sends auth_time as a whole number of seconds since 1970 (see the Identity Providers chapter of "
+                + "the user guide).",
+            OidcSignIn.ReauthStaleAuthTime =>
+                $"Your sign-in at {provider} was not recent enough. Try again and sign in when asked.",
+            _ => null,
+        };
     }
 
     /// <summary>

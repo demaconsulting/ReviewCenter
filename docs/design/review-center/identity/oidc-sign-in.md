@@ -88,7 +88,11 @@ answered like any unknown address.
 - *Ticket received*: a normal sign-in is handed on to the complete endpoint and gives its throttle slot back. A
   confirmation is answered here, so the claims never replace the session. The stored user of the session cookie is
   read; when it is gone or disabled the reason is `session-ended`. Otherwise `VerifyReauth` decides; on success a proof
-  is issued for the user, project, review and slot and the browser returns to the local address with `reauth=ok`.
+  is issued for the user, project, review and slot and the browser returns to the local address with `reauth=ok`. A
+  refused confirmation is recorded with `UserService.RecordExternalReauthFailureAsync` (the reason class of
+  `VerifyReauth`, unchanged) and the browser returns with `reauth=missing-auth-time` or `reauth=stale-auth-time` for
+  those two reasons, and with `reauth=failed` for every other reason, so the page can say what an administrator has to
+  fix without telling more about any other cause.
 - *Remote failure*: the failure text only selects a reason class, never stored or shown.
 
 **VerifyReauth**: Decides whether a fresh sign-in is a confirmation of the user who asked.
@@ -118,7 +122,9 @@ reach a log. A null options object raises `ArgumentNullException`.
 Settings are validated when the server starts (see the `ServerHost` design), so a wrong value stops the start with a
 message that names the setting. At run time every failure of a sign-in ends the same way for the person: a redirect to
 the login page with one generic message and no cookie. A failed confirmation goes back to the page of the signature
-with `reauth=failed`. Only a fixed reason class is recorded through `UserService`: `auth.oidc-sign-in-failed` with
+with `reauth=missing-auth-time` or `reauth=stale-auth-time` when that is the reason, and with `reauth=failed` for
+every other reason (the recorded reason class is the same in every case). Only a fixed reason class is recorded
+through `UserService`: `auth.oidc-sign-in-failed` with
 `no-hand-over`, `email-not-verified`, `invalid-identity`, `throttled`, `session-ended` or a handler class, and
 `signature.reauth-failed` for a refused confirmation of a known user. Successful sign-ins are recorded as
 `auth.oidc-sign-in` and the first creation of an account as `account.oidc-created` (by `UserService`, with only the
