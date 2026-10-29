@@ -13,7 +13,7 @@ the recipes can be fixed and marked as verified.
 
 ## What ReviewCenter Needs from a Provider
 
-A provider works with ReviewCenter when it gives the following:
+A provider works with ReviewCenter when it gives the first four items below; the fifth item is optional:
 
 1. **A discovery document** at `<Authority>/.well-known/openid-configuration`, where `<Authority>` is the value of
    `Identity:Oidc:Authority`. The `iss` claim of every identity token must be exactly the issuer named in the
@@ -26,11 +26,16 @@ A provider works with ReviewCenter when it gives the following:
    and `max_age=0` and accepts the answer only when the identity token has an `auth_time` that is a whole number of
    seconds, not older than `Identity:Oidc:ReauthMaxAgeSeconds` and not more than 60 seconds in the future. There is
    no fall back to another claim such as `iat`: without `auth_time`, no signature can be confirmed.
-5. **Claims for the display:** `name` for the display name, `email`, and the claim that `Identity:Oidc:UsernameClaim`
-   names (default `preferred_username`) for the user name. The default scopes are `openid profile email`. The claim
-   `email_verified` is read only when `Identity:Oidc:RequireEmailVerified` is `true`. ReviewCenter reads claims from
-   the identity token only and does not call the user info endpoint, so every claim named here, including
-   `auth_time`, must be in the identity token itself.
+5. **Names (optional).** No name claim is required: the only claims that must be present are `iss` and `sub`, and
+   `auth_time` for a signature. The user name of a new account comes from the claim that `Identity:Oidc:UsernameClaim`
+   names (default `preferred_username`); when that claim is missing or blank, ReviewCenter uses the part of the
+   `email` claim before the `@`, and then `sub`. The display name is the `name` claim, or, when that is missing, the
+   same text as the user name. Both are cleaned, and the user name is made unique. ReviewCenter does not read
+   `first_name`, `last_name`, `given_name` or `family_name`. The default scopes are `openid profile email`; keep them
+   so that the provider sends readable names. The claim `email_verified` is read only when
+   `Identity:Oidc:RequireEmailVerified` is `true`. ReviewCenter reads claims from the identity token only and does
+   not call the user info endpoint, so every claim that it uses, including `auth_time`, must be in the identity
+   token itself.
 6. **The redirect address** `https://<server>/signin-oidc` registered exactly as ReviewCenter sends it, where
    `<server>` is the address that people use to reach ReviewCenter.
 
@@ -97,8 +102,8 @@ provider may have when a signature is confirmed (default 120; 10 to 900).
    The same setting in the manifest
    of the application is the list `optionalClaims.idToken` with an entry named `auth_time`; the exact form of that
    JSON is *unverified*.
-4. The delegated permissions `openid`, `profile` and `email` are normally granted already. Do not tick implicit
-   grant or hybrid flow; ReviewCenter does not use them.
+4. The delegated permissions `openid`, `profile` and `email` are normally granted already; they supply the optional
+   names. Do not tick implicit grant or hybrid flow; ReviewCenter does not use them.
 
 **In ReviewCenter.**
 
@@ -126,8 +131,8 @@ Identity__Oidc__DisplayName=Microsoft
 Identity__Oidc__UsernameClaim=preferred_username
 ```
 
-**Test it.** See Testing a Provider. If the confirmation fails with the message that the provider did not report when
-you signed in, the optional claim `auth_time` is not set up.
+**Test it.** See Testing a Provider. If the confirmation fails with the message that the provider did not report a
+usable sign-in time, the optional claim `auth_time` is not set up (or is not sent as a whole number of seconds).
 
 **Pitfalls.**
 
@@ -164,9 +169,10 @@ TLS certificate, the host name of the AD FS farm, and the public `https` address
 3. Choose **Generate a shared secret** and copy it at once; it is shown only once.
 4. On the page for the web API, use the client identifier as the identifier of the API. Choose an access control
    policy that fits (for example permit everyone, or a group), and tick the scopes `openid`, `profile` and `email`.
-5. Add issuance transformation rules that send the claims for the display: send LDAP attributes as claims, for
-   example **E-Mail-Addresses** as `email`, **Display-Name** as `name` and **User-Principal-Name** as `upn`. Which
-   claims AD FS sends without a rule is not confirmed by the author.
+5. Optionally add issuance transformation rules that send the claims for the names: send LDAP attributes as claims,
+   for example **User-Principal-Name** as `upn` (the recipe uses `upn` as the `UsernameClaim`; without it,
+   ReviewCenter falls back to the `email` claim and then to `sub`), **E-Mail-Addresses** as `email` and
+   **Display-Name** as `name`. Which claims AD FS sends without a rule is not confirmed by the author.
 6. Open the discovery document `https://<adfs-host>/adfs/.well-known/openid-configuration` in a browser and check
    that the issuer is the address that you use as the authority.
 
@@ -210,7 +216,8 @@ so use a tool of your own) and check that it has `auth_time`.
   really proves who they are again.
 - Whether AD FS honors `max_age` and `prompt=login` the way ReviewCenter needs is believed from the documentation of
   the protocol (*unverified*).
-- Keep the clocks of the AD FS servers and of ReviewCenter in sync (see Troubleshooting).
+- Keep the clocks of the AD FS servers and of the ReviewCenter server in sync with a time service (see
+  Troubleshooting).
 - The shared secret has the lifetime that you chose at the provider. Note the expiry date.
 
 **Verification status:** Unverified: written from vendor documentation, please report corrections. The default
@@ -283,8 +290,10 @@ claim in the identity token of Okta is *unverified*.
 ## Keycloak
 
 **Prerequisites.** A running Keycloak with a realm for the people, a public host name that is configured in Keycloak
-(see the pitfalls), and the public `https` address of ReviewCenter. People need an e-mail address, a first name and a
-last name in the realm.
+(see the pitfalls), and the public `https` address of ReviewCenter. ReviewCenter does not need an e-mail address, a
+first name or a last name; the user name of the realm is sent as `preferred_username`. Keycloak is believed to build
+`name` from the first and last name when the person has them (*unverified*); without them, the display name falls
+back to the user name.
 
 **At the provider.**
 
@@ -368,13 +377,15 @@ These are the reasons that ReviewCenter records. A failed confirmation of a sign
 reasons below; for every other reason it shows a general message so that it does not help an attacker.
 
 - **`missing-auth-time`.** The identity token has no `auth_time`, or a value that is not a whole number of seconds
-  that a date can hold. The review page says that the provider did not report when the person signed in. The cause
+  since 1970 that a date can hold. The review page says that the provider did not report a usable sign-in time
+  and asks an administrator to check that `auth_time` is sent as a whole number of seconds since 1970. The cause
   is in the settings of the provider: add the optional claim (Entra), check the claims and rules (AD FS), the token
   (Okta), or the mappers and scopes (Keycloak). ReviewCenter does not guess the time from another claim.
 - **`stale-auth-time`.** The login is older than `ReauthMaxAgeSeconds`, or more than 60 seconds in the future.
-  Causes: the provider reused its session instead of asking again (so the login is old); the clocks of the provider
-  and of ReviewCenter differ; the person took longer than the allowed age at the provider. Fix the time on both
-  machines (use a time service), force a new login at the provider, or raise `ReauthMaxAgeSeconds` within 10 to 900.
+  Causes: the provider reused its session instead of asking again (so the login is old); the clock of the provider
+  and the clock of the ReviewCenter server differ; the person took longer than the allowed age at the provider.
+  Synchronize the clocks of the provider and of the ReviewCenter server with a time service, force a new login at
+  the provider, or raise `ReauthMaxAgeSeconds` within 10 to 900.
 - **`subject-mismatch`.** The person signed in at the provider as someone else than the account that asked. Sign out
   at the provider and confirm with the right account.
 - **`issuer-mismatch`.** The issuer of the token is not the issuer stored with the account. The authority, the
@@ -386,8 +397,8 @@ reasons below; for every other reason it shows a general message so that it does
   review page.
 - **`provider-error`, `state-or-nonce`, `token-invalid`.** The provider answered with an error (for example the
   person is not assigned to the application), the answer does not belong to the sign-in that was started (often a
-  lost cookie, see the next item), or the identity token was refused (wrong issuer, audience or lifetime, or a clock
-  that differs much).
+  lost cookie, see the next item), or the identity token was refused (wrong issuer, audience or lifetime, or a large
+  clock difference between the provider and the ReviewCenter server).
 - **A wrong redirect address.** The provider shows its own error page and ReviewCenter never sees the request, so
   there is no audit entry. The address registered at the provider must be exactly
   `https://<server>/signin-oidc`, with the same scheme, host name and port that people use. Behind a reverse proxy
@@ -397,8 +408,10 @@ reasons below; for every other reason it shows a general message so that it does
   (recorded as `provider-error` or `other`). Create a new secret at the provider, set `Identity__Oidc__ClientSecret`
   and restart the server.
 - **The server does not start.** A setting is not valid. The message names the setting and never shows its value.
-- **Clock skew.** The clocks of the provider, of ReviewCenter and of the person's computer should agree to within
-  seconds. A large difference causes `stale-auth-time` or `token-invalid`.
+- **Clock skew.** ReviewCenter compares the `auth_time` of the provider and the lifetime of the identity token with
+  the clock of its own server. The clock of the person's computer or browser is not used. A large difference between
+  the clock of the provider and the clock of the ReviewCenter server causes `stale-auth-time` or `token-invalid`.
+  Keep both synchronized with a time service (NTP, or Windows Time on Windows).
 
 ## Why the Subject Matters
 

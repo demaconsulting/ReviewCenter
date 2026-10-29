@@ -495,10 +495,11 @@ button and the "Identity confirmed" note and no
 confirmation button. This scenario is tested by `OidcReauth_ReviewPage_OffersConfirmationThenSigning`.
 
 **OidcReauth_MissingOrStaleAuthTime_ReviewPageNamesTheCause**: Through the real pipeline with a fake identity
-provider, a confirmation whose identity token has no `auth_time` returns to the review page, which says that the
-provider did not report when the person signed in, names `auth_time` and an administrator, and does not show the
-general text; a confirmation whose `auth_time` is 600 seconds old says that the sign-in was not recent enough, does
-not name `auth_time`, and does not show the general text. This scenario is tested by
+provider, a confirmation whose identity token has no `auth_time`, and one whose `auth_time` is present but unusable
+(-1), return to the review page, which says in both cases that the provider did not report a usable sign-in time,
+names `auth_time`, the whole number of seconds since 1970 and an administrator, and does not show the general text; a
+confirmation whose `auth_time` is 600 seconds old says that the sign-in was not recent enough, does not name
+`auth_time`, and does not show the general text. This scenario is tested by
 `OidcReauth_MissingOrStaleAuthTime_ReviewPageNamesTheCause`.
 
 **ReviewPage_Render_Details_ShowShortDigestWithFullValueInTitle**: Inside the Details element, the record digest

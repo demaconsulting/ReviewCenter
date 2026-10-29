@@ -888,7 +888,8 @@ public partial class ReviewPage : ComponentBase, IDisposable
     ///     <c>null</c> when there is nothing to report.
     /// </returns>
     /// <remarks>
-    ///     A failed confirmation says why only when the provider did not report when the person signed in or the
+    ///     A failed confirmation says why only when the provider did not report a usable sign-in time (the
+    ///     <c>auth_time</c> claim is absent, not a whole number of seconds, or out of the range of dates) or the
     ///     sign-in was not recent enough; every other failure keeps the general text. A value that is none of the
     ///     known ones shows nothing, so the address cannot put text on the page.
     /// </remarks>
@@ -910,8 +911,9 @@ public partial class ReviewPage : ComponentBase, IDisposable
             OidcSignIn.ReauthFailed =>
                 $"We could not confirm your identity. Sign in again at {provider} when asked.",
             OidcSignIn.ReauthMissingAuthTime =>
-                $"{provider} did not report when you signed in. An administrator must set it up to send auth_time "
-                + "(see the Identity Providers chapter of the user guide).",
+                $"{provider} did not report a usable sign-in time (auth_time). An administrator must check that it "
+                + "sends auth_time as a whole number of seconds since 1970 (see the Identity Providers chapter of "
+                + "the user guide).",
             OidcSignIn.ReauthStaleAuthTime =>
                 $"Your sign-in at {provider} was not recent enough. Try again and sign in when asked.",
             _ => null,

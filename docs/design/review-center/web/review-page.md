@@ -309,8 +309,10 @@ identity with {provider}" with a hint; when the provider is switched off it says
 After the confirmation the page shows "Identity confirmed. Review the record, then sign." and the same Sign button,
 with no password field; a failed confirmation is shown next to the button until the user acts, and the text depends on
 the `reauth` value of the address: `reauth=failed` shows "We could not confirm your identity. Sign in again at
-{provider} when asked."; `reauth=missing-auth-time` shows "{provider} did not report when you signed in. An
-administrator must set it up to send auth_time (see the Identity Providers chapter of the user guide).";
+{provider} when asked."; `reauth=missing-auth-time` shows "{provider} did not report a usable sign-in time
+(auth_time). An administrator must check that it sends auth_time as a whole number of seconds since 1970 (see the
+Identity Providers chapter of the user guide)." (the same text for an `auth_time` that is absent and for one that is
+present but not a whole number of seconds or out of range);
 `reauth=stale-auth-time` shows "Your sign-in at {provider} was not recent enough. Try again and sign in when asked.";
 any other value shows nothing, so the address cannot put text on the page. On submit the page
 calls `SigningService.SignAsync`

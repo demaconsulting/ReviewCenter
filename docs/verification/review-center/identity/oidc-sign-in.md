@@ -160,13 +160,15 @@ scenario is tested by `OidcReauth_Success_KeepsTheSession`.
 **OidcReauth_AuthTimeNotInWindow_IsRefusedFailClosed**: An `auth_time` that is too old, in the future or missing is
 refused with `stale-auth-time` or `missing-auth-time`, and no proof is issued; the person returns to the review with
 `reauth=stale-auth-time` or `reauth=missing-auth-time` (not `reauth=failed`), while the recorded reason class is
-unchanged. This scenario is tested by `OidcReauth_AuthTimeNotInWindow_IsRefusedFailClosed`.
+unchanged. Each refusal is asserted against a fixed, literal expected value of the `reauth` query parameter that the
+test supplies, and not against a value computed from the reason class, so a swapped or wrong mapping fails the test.
+This scenario is tested by `OidcReauth_AuthTimeNotInWindow_IsRefusedFailClosed`.
 
 **OidcReauth_AuthTimeOutsideTheRangeOfDates_IsRefusedWithoutError**: An `auth_time` of 9223372036854775807, of
 -9223372036854775808, of -1, and of 253402300800 (one second past the last date that can be represented) is refused
 with `missing-auth-time`, and 253402300799 (representable, but far in the future) with `stale-auth-time`. In each case
-the person returns to the review with `reauth=missing-auth-time` or `reauth=stale-auth-time` respectively, exactly one
-`signature.reauth-failed` entry holds the reason
+the person returns to the review with `reauth=missing-auth-time` or `reauth=stale-auth-time` respectively (fixed
+literal values in the test), exactly one `signature.reauth-failed` entry holds the reason
 class, no proof is issued, signing is refused, and the server raises no error (the account page still answers 200).
 This scenario is tested by `OidcReauth_AuthTimeOutsideTheRangeOfDates_IsRefusedWithoutError`.
 
@@ -175,7 +177,8 @@ This scenario is tested by `OidcReauth_AuthTimeOutsideTheRangeOfDates_IsRefusedW
 `OidcReauth_OtherSubject_IsRefusedAndCreatesNoAccount`.
 
 **OidcReauth_ProviderRefuses_ReturnsToReviewWithoutProof**: An error of the provider returns to the review with
-`reauth=failed` and no proof. This scenario is tested by `OidcReauth_ProviderRefuses_ReturnsToReviewWithoutProof`.
+`reauth=failed` (a fixed literal in the test) and no proof. This scenario is tested by
+`OidcReauth_ProviderRefuses_ReturnsToReviewWithoutProof`.
 
 **OidcReauth_WrongIssuerAudienceOrNonce_IsRefusedFailClosed**: A validly signed identity token with a wrong issuer,
 audience or nonce returns to the review with `reauth=failed`, gives no proof, creates no account, keeps the session,

@@ -515,11 +515,12 @@ sections:
         title: >-
           The ReviewPage unit shall, for a user of a provider, offer a button that confirms identity at the provider
           instead of the password field, and after a successful confirmation offer the signature that uses it; and
-          after a failed confirmation shall say whether the provider did not report when the person signed in or the
-          sign-in was not recent enough, and otherwise give the general message.
+          after a failed confirmation shall say whether the provider did not report a usable sign-in time (`auth_time`
+          absent, or not a whole number of seconds) or the sign-in was not recent enough, and otherwise give the
+          general message.
         justification: |
           A user of a provider has no password to type, and the confirmation must come before the signature so that
-          the person knows that the next step records it. When the provider sends no authentication time, an
+          the person knows that the next step records it. When the provider sends no usable authentication time, an
           administrator must change the provider, and the person who sees the failure is the one who tells them.
         tests:
           - OidcReauth_ReviewPage_OffersConfirmationThenSigning
