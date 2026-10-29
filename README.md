@@ -13,6 +13,12 @@
 
 Web service and command-line tool for formal code reviews with a tamper-evident audit trail
 
+![A review as a side-by-side diff with a discussion thread](docs/user_guide/images/review-diff-thread.png)
+
+![An approved review with the signed attestation PDF download](docs/user_guide/images/review-signed.png)
+
+See the [User Guide][link-guide] for a tour of the screens.
+
 ## Overview
 
 ReviewCenter is a DEMA Consulting ASP.NET Core web service, with a companion command-line interface, for performing
@@ -48,8 +54,8 @@ matching `.sha256` file, and extract it:
 - `reviewcenter-<version>-win-x64.zip` (Windows)
 - `reviewcenter-<version>-linux-x64.tar.gz` (Linux)
 
-Keep the extracted files together: the executable serves the web assets that sit beside it, and the native SQLite
-library is a separate file that must stay in the same folder. No release has been published yet; until one is,
+Keep the extracted files together: the executable needs the `wwwroot` folder, the static-web-assets endpoint file,
+`appsettings.json`, and the native SQLite library in the same folder. No release has been published yet; until one is,
 build from source with the .NET 10 SDK:
 
 ```bash
@@ -57,7 +63,8 @@ dotnet build
 dotnet run --project src/DemaConsulting.ReviewCenter -- serve
 ```
 
-See the [Installation][link-guide-installation] section of the user guide for the verification commands.
+See the [Installation][link-guide-installation] chapter of the user guide for the verification commands, and the
+[Deployment][link-guide-deployment] chapter for running the server for a team.
 
 ## Quick Start
 
@@ -79,6 +86,8 @@ The built-in **Help** in the page header guides you through creating and signing
 
 The [User Guide][link-guide] describes everything in detail, including:
 
+- [Deployment][link-guide-deployment]: where the data lives, configuration, running as a service, TLS and a reverse
+  proxy, backup, and upgrades
 - [Users and Sign-in][link-guide-users]: accounts, system administrators, lockout, and the sign-in throttle
 - [Access and Visibility][link-guide-access]: roles, project membership, and who can see and do what
 - [Projects and Reviews][link-guide-projects]: uploads, reviews from a git repository, and review-sets
@@ -127,17 +136,18 @@ By contributing to this project, you agree that your contributions will be licen
 [link-security]: https://sonarcloud.io/dashboard?id=demaconsulting_ReviewCenter
 [link-releases]: https://github.com/demaconsulting/ReviewCenter/releases
 [link-guide]: https://github.com/demaconsulting/ReviewCenter/blob/main/docs/user_guide/introduction.md
-[link-guide-installation]: https://github.com/demaconsulting/ReviewCenter/blob/main/docs/user_guide/introduction.md#installation
-[link-guide-users]: https://github.com/demaconsulting/ReviewCenter/blob/main/docs/user_guide/introduction.md#users-and-sign-in
-[link-guide-access]: https://github.com/demaconsulting/ReviewCenter/blob/main/docs/user_guide/introduction.md#access-and-visibility
-[link-guide-projects]: https://github.com/demaconsulting/ReviewCenter/blob/main/docs/user_guide/introduction.md#projects-and-reviews
-[link-guide-planning]: https://github.com/demaconsulting/ReviewCenter/blob/main/docs/user_guide/introduction.md#planning-reviews
-[link-guide-signatures]: https://github.com/demaconsulting/ReviewCenter/blob/main/docs/user_guide/introduction.md#review-signatures
-[link-guide-attestation]: https://github.com/demaconsulting/ReviewCenter/blob/main/docs/user_guide/introduction.md#signed-attestation
-[link-guide-evidence-settings]: https://github.com/demaconsulting/ReviewCenter/blob/main/docs/user_guide/introduction.md#evidence-settings
-[link-guide-audit]: https://github.com/demaconsulting/ReviewCenter/blob/main/docs/user_guide/introduction.md#audit-trail
-[link-guide-database]: https://github.com/demaconsulting/ReviewCenter/blob/main/docs/user_guide/introduction.md#database
-[link-guide-repositories]: https://github.com/demaconsulting/ReviewCenter/blob/main/docs/user_guide/introduction.md#repositories-and-credentials
-[link-guide-options]: https://github.com/demaconsulting/ReviewCenter/blob/main/docs/user_guide/introduction.md#command-line-options
+[link-guide-installation]: https://github.com/demaconsulting/ReviewCenter/blob/main/docs/user_guide/installation.md#installation
+[link-guide-deployment]: https://github.com/demaconsulting/ReviewCenter/blob/main/docs/user_guide/deployment.md
+[link-guide-users]: https://github.com/demaconsulting/ReviewCenter/blob/main/docs/user_guide/sign-in.md#users-and-sign-in
+[link-guide-access]: https://github.com/demaconsulting/ReviewCenter/blob/main/docs/user_guide/administration.md#access-and-visibility
+[link-guide-projects]: https://github.com/demaconsulting/ReviewCenter/blob/main/docs/user_guide/reviewing.md#projects-and-reviews
+[link-guide-planning]: https://github.com/demaconsulting/ReviewCenter/blob/main/docs/user_guide/reviewing.md#planning-reviews
+[link-guide-signatures]: https://github.com/demaconsulting/ReviewCenter/blob/main/docs/user_guide/reviewing.md#review-signatures
+[link-guide-attestation]: https://github.com/demaconsulting/ReviewCenter/blob/main/docs/user_guide/reviewing.md#signed-attestation
+[link-guide-evidence-settings]: https://github.com/demaconsulting/ReviewCenter/blob/main/docs/user_guide/administration.md#evidence-settings
+[link-guide-audit]: https://github.com/demaconsulting/ReviewCenter/blob/main/docs/user_guide/administration.md#audit-trail
+[link-guide-database]: https://github.com/demaconsulting/ReviewCenter/blob/main/docs/user_guide/administration.md#database
+[link-guide-repositories]: https://github.com/demaconsulting/ReviewCenter/blob/main/docs/user_guide/administration.md#repositories-and-credentials
+[link-guide-options]: https://github.com/demaconsulting/ReviewCenter/blob/main/docs/user_guide/reference.md#command-line-options
 [link-guide-planned]: https://github.com/demaconsulting/ReviewCenter/blob/main/docs/user_guide/introduction.md#planned-work
-[link-guide-validation]: https://github.com/demaconsulting/ReviewCenter/blob/main/docs/user_guide/introduction.md#self-validation
+[link-guide-validation]: https://github.com/demaconsulting/ReviewCenter/blob/main/docs/user_guide/reference.md#self-validation

@@ -46,8 +46,12 @@ words:
   - tqojqgezdgnbvgy
   - wwwroot
   - aspnetcore
+  - aspnetcorev
+  - inprocess
+  - staticwebassets
   - openidconnect
   - OpenIddict
+  - magick
   - PKCE
   - icdp
   - labelledby
