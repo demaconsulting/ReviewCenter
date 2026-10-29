@@ -304,6 +304,7 @@ internal sealed class ReviewCenterDbContext : DbContext
             token.Property(t => t.TokenHash).IsRequired().HasMaxLength(Sha256HexColumnLength);
             token.HasIndex(t => t.TokenHash).IsUnique();
             token.HasIndex(t => t.UserId);
+            token.HasOne(t => t.User).WithMany().HasForeignKey(t => t.UserId).OnDelete(DeleteBehavior.Cascade);
         });
 
         // Second factor: one enrollment per user (the user id is the key, so a second row cannot exist), kept apart

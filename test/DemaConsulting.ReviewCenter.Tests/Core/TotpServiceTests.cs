@@ -420,7 +420,7 @@ public partial class TotpServiceTests
     [Fact]
     public async Task TotpService_CompleteSignInAsync_ConcurrentSameCode_ExactlyOneSucceeds()
     {
-        // Arrange: an enrolled user and eight pending sign-ins of the same user
+        // Arrange: an enrolled user and four pending sign-ins of the same user
         var world = new TotpTestWorld();
         await world.AddUserAsync("ann");
         var (secret, _) = await world.EnrollAsync("ann");
