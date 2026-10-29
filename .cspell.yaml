@@ -53,6 +53,7 @@ words:
   - OpenIddict
   - magick
   - PKCE
+  - HSTS
   - icdp
   - labelledby
   - bunit

@@ -111,22 +111,41 @@ Edit `appsettings.json` only for values that stay the same for the installation;
 Put the settings of an installation in environment variables of the service, or in an `appsettings.Production.json`
 that is not part of the release archive. The defaults are:
 
-| Setting                     | Default                          | Described in                            |
-| --------------------------- | -------------------------------- | --------------------------------------- |
-| `Database:Provider`         | `Sqlite`                         | Database (Administration)               |
-| `Database:ConnectionString` | empty, which selects the default | Database (Administration)               |
-| `Auth:SessionHours`         | 8                                | Users and Sign-in                       |
-| `Auth:RevalidationSeconds`  | 30 (at least 5)                  | Users and Sign-in                       |
-| `Identity:Throttle:*`       | 5, 20, and 300 seconds           | Password Rules and Lockout (Sign-in)    |
-| `Identity:Totp:Enabled`     | true                             | Two-Factor Sign-in (Sign-in)            |
-| `Identity:Oidc:*`           | off                              | Sign In with an OpenID Connect Provider |
-| `DataProtection:KeysPath`   | `keys` beside the database       | Repositories and Credentials            |
-| `Attestation:*`             | a self-signed key                | The Signing Key (Reviewing)             |
-| `Git:CachePath`             | `git-cache` beside the database  | Repositories and Credentials            |
-| `Git:TimeoutSeconds`        | 120 (1 to 3600)                  | Repositories and Credentials            |
+| Setting                                   | Default                        | Described in                            |
+| ----------------------------------------- | ------------------------------ | --------------------------------------- |
+| `Database:Provider`                       | `Sqlite`                       | Database (Administration)               |
+| `Database:ConnectionString`               | empty (the default location)   | Database (Administration)               |
+| `Auth:SessionHours`                       | 8 hours                        | Users and Sign-in                       |
+| `Auth:RevalidationSeconds`                | 30 seconds (at least 5)        | Users and Sign-in                       |
+| `Identity:Throttle:MaxFailuresPerName`    | 5 attempts for one user name   | Password Rules and Lockout (Sign-in)    |
+| `Identity:Throttle:MaxFailuresPerAddress` | 20 attempts for all user names | Password Rules and Lockout (Sign-in)    |
+| `Identity:Throttle:WindowSeconds`         | 300 seconds (1 to 86400)       | Password Rules and Lockout (Sign-in)    |
+| `Identity:Totp:Enabled`                   | true                           | Two-Factor Sign-in (Sign-in)            |
+| `Identity:Oidc:*`                         | off                            | Sign In with an OpenID Connect Provider |
+| `DataProtection:KeysPath`                 | `keys` in the data folder      | Repositories and Credentials            |
+| `Attestation:*`                           | a self-signed key              | The Signing Key (Reviewing)             |
+| `Git:CachePath`                           | `git-cache` in the data folder | Repositories and Credentials            |
+| `Git:TimeoutSeconds`                      | 120 seconds (1 to 3600)        | Repositories and Credentials            |
 
-Changes take effect when the server is restarted. Every setting is validated at start; an invalid value stops the
-server with a message that names the setting (see Troubleshooting).
+The two attempt limits and the window belong together: one client address may make at most the given number of
+sign-in attempts (a successful sign-in gives its attempt back) within one window.
+
+Changes take effect when the server is restarted. The server checks its settings at start, and an invalid value stops
+it with a message that names the setting (see Troubleshooting). Which settings are checked depends on the group:
+
+- **Always checked**: `Auth` (`SessionHours` above 0, `RevalidationSeconds` at least 5), `Identity:Throttle` (both
+  limits above 0, the address limit not below the name limit, the window 1 to 86400 seconds), `Identity:Totp` (the
+  issuer must be 1 to 64 characters without a colon or control character, also while `Enabled` is `false`; a value of
+  `Enabled` that is not a boolean also stops the server), `Git:TimeoutSeconds`, the database provider and connection
+  string, the Data Protection folder (it must be writable), and the attestation key (the provider name, and the
+  settings of the provider that you chose, must give a usable key).
+- **Checked only when switched on**: `Identity:Oidc`. While `Identity:Oidc:Enabled` is `false` (the default), nothing
+  else of that section is read or checked, so a wrong value there shows up only when you turn the sign-in on. The
+  project observed that with `Enabled` set to `true` and no `Authority`, the server stopped with `Invalid OpenID
+  Connect sign-in settings: Identity:Oidc:Authority is required when sign-in with OpenID Connect is enabled.`
+
+A disabled feature is therefore not checked until you enable it. Start the server by hand with the feature enabled to
+check its settings before you rely on them.
 
 Set an environment variable for one run like this:
 
@@ -245,7 +264,8 @@ and Secure Cookie Behind a Reverse Proxy below explains why:
 
 - Forward the original scheme in the `X-Forwarded-Proto` header and the client address in `X-Forwarded-For`, and
   **overwrite** these headers with its own values instead of passing on what the client sent.
-- Keep the `Host` header of the client request (the evidence address in an attestation is built from it).
+- Keep the `Host` header of the client request (the addresses of the attestation PDFs in the evidence index of the API
+  are built from it).
 - Allow WebSocket connections, because the pages are interactive and keep a connection to the server open, and do not
   close idle connections early.
 - Be the only route to the server (the server listens on the loopback address, or a firewall allows only the proxy).
@@ -301,6 +321,24 @@ file with a password in the environment is readable by anybody who can read the 
 the service definition. Reload a renewed certificate by restarting the server. In this mode the request itself is
 HTTPS, so the sign-in cookie is marked Secure without further settings, and `ASPNETCORE_FORWARDEDHEADERS_ENABLED`
 is not needed.
+
+### Host Filtering, HTTPS Redirection, and HSTS
+
+In both ways of terminating TLS, the server itself does none of the following, so the reverse proxy or the front end
+has to do them where you need them:
+
+- **No host filtering.** The shipped settings do not set `AllowedHosts`, and the server code does not add a host
+  check. The server answers a request with any `Host` header: in the project's test, a request to `/health` with the
+  host `evil.test` got `200`. This matters because the addresses of the attestation PDFs in the evidence index of the
+  API are built from the scheme and the `Host` header of the request (see the nginx example above). Let the proxy
+  accept only the host names of your installation, and refuse every other name. The ASP.NET Core setting
+  `AllowedHosts` is not a documented ReviewCenter setting; in a quick test, setting it as an environment variable did
+  make the server refuse other host names, but the project did not test that further.
+- **No HTTP-to-HTTPS redirection.** The server does not redirect a plain `http` request to `https`. In the project's
+  test, a plain request got its answer directly, without a `Location` header. Let the proxy redirect port 80 to HTTPS,
+  or do not offer plain HTTP to other machines at all.
+- **No HSTS.** The responses of the server carry no `Strict-Transport-Security` header. If you want browsers to use
+  only HTTPS for your host name, let the proxy add that header (to its HTTPS responses only).
 
 ## Secure Cookie Behind a Reverse Proxy
 
@@ -358,10 +396,13 @@ Why the keys matter, and what was observed on Windows:
 
 - **Restoring all of it works.** A copy of the stopped data folder, started with `Database:ConnectionString` pointing
   at the copy, accepted the password sign-in of the existing user.
-- **Restoring only the database file also starts and accepts passwords**, but it silently creates a new key ring and a
-  new attestation key. The stored repository tokens and the two-factor secrets are encrypted with the old key ring and
-  cannot be read any more (they must be entered again), and the signatures of new attestation PDFs come from a new
-  key, so a verifier that trusts the old key does not trust them.
+- **Restoring only the database file also starts and accepts passwords**, but when the old keys are not there it
+  silently creates a new Data Protection key ring. The stored repository tokens and the two-factor secrets are
+  encrypted with the old key ring and cannot be read any more (they must be entered again). The attestation key is
+  affected only with the default `SelfSigned` provider: when its pfx file is missing, the server generates a new key,
+  so the signatures of new attestation PDFs come from a new key, and a verifier that trusts the old key does not trust
+  them. A key of the `CertificateStore` provider is not in the data folder; it stays in the certificate store, and the
+  server does not generate one (a missing certificate stops the start with a message).
 - The keys and the pfx file are not encrypted at rest. Protect the backup like the live data, and let only the service
   account and the backup operator read the files.
 
@@ -403,10 +444,12 @@ because no release has been published yet.
 - Use HTTPS (see TLS and Reverse Proxy), and keep the server on the loopback address when a proxy is in front of it.
 - Behind a proxy, set `ASPNETCORE_FORWARDEDHEADERS_ENABLED=true`, and make the proxy overwrite `X-Forwarded-For` and
   keep `Host` (see Secure Cookie Behind a Reverse Proxy).
+- Let the proxy accept only your host names, redirect HTTP to HTTPS, and add HSTS where you need it; the server does
+  none of these (see Host Filtering, HTTPS Redirection, and HSTS).
 - Run the server under an account of its own that can write only to the data folder, and let only that account read the
   database, the `keys` folder, and the attestation pfx file. These files are not encrypted at rest.
 - Back up the database and the key folder together, and test a restore.
-- Keep the built-in protections on: the sign-in throttle (5 failures per user name and 20 per address in 300 seconds by
+- Keep the built-in protections on: the sign-in throttle (5 attempts per user name and 20 per address in 300 seconds by
   default), passwords of 12 to 128 characters, the optional two-factor sign-in, and the limit of 30 requests a minute
   for each address on anonymous evidence downloads (see Password Rules and Lockout in the Users and Sign-in chapter,
   and Anonymous Access in the Administration chapter).
@@ -415,8 +458,9 @@ because no release has been published yet.
   organization, and consider `Attestation:RequireTrustedKey` (see The Signing Key in the Reviewing chapter).
 - Prefer an account at your identity provider where one exists (see Sign In with an OpenID Connect Provider in the
   Users and Sign-in chapter), and turn anonymous evidence access on only for projects that need it.
-- The server checks its settings when it starts, and refuses to start when a setting is invalid, when the key folder
-  cannot be written, or when the attestation key is not usable. Start it once by hand after every change of the
+- The server checks its settings when it starts, and refuses to start when an enabled setting is invalid, when the
+  key folder cannot be written, or when the attestation key is not usable (the `Identity:Oidc` settings are not checked
+  while that sign-in is off; see Configuration). Start it once by hand after every change of the
   settings, and run `--validate --check-config` (see Check an Installation).
 - Review the audit trail regularly (see Audit Trail in the Administration chapter), and verify its chain from the
   command line.

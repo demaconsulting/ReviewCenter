@@ -13,9 +13,9 @@
 
 Web service and command-line tool for formal code reviews with a tamper-evident audit trail
 
-![A review as a side-by-side diff with a discussion thread](docs/user_guide/images/review-diff-thread.png)
+![A review as a side-by-side diff with a discussion thread][image-review-diff-thread]
 
-![An approved review with the signed attestation PDF download](docs/user_guide/images/review-signed.png)
+![An approved review with the signed attestation PDF download][image-review-signed]
 
 See the [User Guide][link-guide] for a tour of the screens.
 
@@ -125,6 +125,10 @@ By contributing to this project, you agree that your contributions will be licen
 [badge-build]: https://img.shields.io/github/actions/workflow/status/demaconsulting/ReviewCenter/build_on_push.yaml?style=plastic
 [badge-quality]: https://sonarcloud.io/api/project_badges/measure?project=demaconsulting_ReviewCenter&metric=alert_status
 [badge-security]: https://sonarcloud.io/api/project_badges/measure?project=demaconsulting_ReviewCenter&metric=security_rating
+
+<!-- Image References -->
+[image-review-diff-thread]: https://raw.githubusercontent.com/demaconsulting/ReviewCenter/main/docs/user_guide/images/review-diff-thread.png
+[image-review-signed]: https://raw.githubusercontent.com/demaconsulting/ReviewCenter/main/docs/user_guide/images/review-signed.png
 
 <!-- Link References -->
 [link-forks]: https://github.com/demaconsulting/ReviewCenter/network/members

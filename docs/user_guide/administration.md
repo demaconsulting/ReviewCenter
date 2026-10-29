@@ -32,7 +32,7 @@ longer an enabled system administrator, the page shows an error for every action
 
 ReviewCenter controls access by project. There are three roles:
 
-- **System administrator**: a flag on a local user account. A system administrator creates projects, manages users and
+- **System administrator**: a flag on a user account. A system administrator creates projects, manages users and
   project membership, reads the audit trail, and can see and manage every project.
 - **Project administrator**: a member of one project who also manages the members, the git repositories, and the
   evidence settings of that project.
@@ -41,8 +41,11 @@ ReviewCenter controls access by project. There are three roles:
 
 A user who is neither a member of a project nor a system administrator has no access to it. A new project has no
 members; a project administrator or a system administrator adds them (see
-[Managing Project Members](#managing-project-members)). Accounts are local
-database accounts only.
+[Managing Project Members](#managing-project-members)). Every account is a record in the ReviewCenter database. A
+person who signs in with an OpenID Connect provider also has such a record: ReviewCenter creates it at the first
+sign-in and finds it again by the issuer and the subject that the provider gives. It has no password, and it gets
+roles and project membership in ReviewCenter like any other account (see Sign In with an OpenID Connect Provider in
+the Users and Sign-in chapter).
 
 | Action                                               | Member | Project admin | System admin |
 | ---------------------------------------------------- | ------ | ------------- | ------------ |

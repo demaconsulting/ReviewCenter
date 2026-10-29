@@ -1,7 +1,9 @@
 # Users and Sign-in
 
-ReviewCenter has local user accounts. Each user has a user name, a display name (shown next to comments and
-answers), and a password, of which only a salted hash is stored. A user is either an ordinary user or a **system
+ReviewCenter keeps its user accounts in its own database. Each user has a user name, a display name (shown next to
+comments and answers), and a password, of which only a salted hash is stored. An account of a person who signs in with
+an OpenID Connect provider (see Sign In with an OpenID Connect Provider in this chapter) is the exception: it has no
+password and is found by the issuer and the subject of the provider. A user is either an ordinary user or a **system
 administrator**, who manages users, projects, and project membership; what an ordinary user may do depends on the
 projects the user is a member of (see Access and Visibility in the Administration chapter). Every comment, checklist
 answer, and change of section applicability is recorded under the signed-in user, who cannot be chosen or typed in.
@@ -45,7 +47,9 @@ used) it prints an error and exits with a non-zero exit code.
 
 ## Sign In and Out
 
-Open any page, or `/login`, enter your user name and password, and press Sign in. After signing in you are taken to
+Open any page, or `/login`, enter your user name and password, and press Sign in. When an administrator has turned on
+sign-in with an OpenID Connect provider, the page also shows a **Sign in with** button for it (see Sign In with an
+OpenID Connect Provider). After signing in you are taken to
 the page you asked for. A failed sign-in always shows the same message, whatever the reason (unknown user name, wrong
 password, disabled account, or locked account), so the message does not reveal which user names exist. After several
 failed attempts you are asked to wait a few minutes (see Password Rules and Lockout). The page header

@@ -193,12 +193,14 @@ The page never shows text printed by git, the location of the repository, or a c
 
 ### Limitations of Sign-in
 
-- There is no password reset, no email, and no multi-factor sign-in for local accounts. A system
-  administrator sets a new password for a user who forgot it. Only one OpenID Connect provider can be set, an account
-  at it is never linked to a local account, and it is not updated when the person changes at the provider (the name
-  and the state of the account are those of the first sign-in, and a person who is removed at the provider keeps the
-  account here until a system administrator disables it). The sign-in at a provider does not end the session at the
-  provider when you log out.
+- There is no password reset and no email. A system administrator sets a new password for a user who forgot it. A
+  local account can turn on an optional second factor, a one-time code from an authenticator app (see Two-Factor
+  Sign-in in the Users and Sign-in chapter); each account decides for itself, and this release does not enforce it by
+  a policy, neither for system administrators nor for a project. Only one OpenID Connect provider can be set, an
+  account at it is never linked to a local account, and it is not updated when the person changes at the provider (the
+  name and the state of the account are those of the first sign-in, and a person who is removed at the provider keeps
+  the account here until a system administrator disables it). The sign-in at a provider does not end the session at
+  the provider when you log out.
 - The lockout counts failures per user name, so anyone who knows a user name can keep that account locked for 5
   minutes at a time by guessing wrongly on purpose, also from an address that the throttle allows. The sign-in
   throttle (see Sign In and Out in the Users and Sign-in chapter) limits how often one address can try, but it does
@@ -328,7 +330,8 @@ page is made for narrow screens too.
 
 A review is approved when its reviewers have signed it. The review page shows an **Approved** or **In review** badge
 next to the review title, and a **Reviewers** card with the reviewer slots. The project page shows the same badge for
-each review.
+each review, next to a second badge with the state of the review (see the known limitation at the end of this
+section).
 
 **Reviewer slots.** A slot has a primary reviewer and, optionally, an alternate reviewer, chosen from the enabled
 members of the project. Either of the two can sign the slot. A review can have any number of slots, or none; a review
@@ -390,6 +393,14 @@ Approved is computed each time from the record and the signatures; it is not a s
 signature is also recorded in the audit trail, which is described in Audit Trail in the Administration chapter. An
 Approved
 review can be downloaded as a digitally signed PDF; see the next section.
+
+**Known limitation: a Draft badge next to an Approved badge.** Every review row of the project page shows two badges:
+the state of the review and the approval. The state is stored with the review, and `Draft` is the only state in this
+release, so every row shows **Draft**, also the row of a review that is **Approved**. A review can therefore appear as
+"Draft" and "Approved" at once. The two badges mean different things: **Draft** is the stored state, which no action
+changes yet, and **Approved** or **In review** is the signature status that is computed from the record. The review
+page itself shows only the Approved or In review badge in its header; the state `Draft` is listed in its Details
+section. Read **Approved** as the status of the signatures. A later release is planned to add more review states.
 
 ## Signed Attestation
 
