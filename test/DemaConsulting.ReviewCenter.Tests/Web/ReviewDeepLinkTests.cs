@@ -100,7 +100,7 @@ public class ReviewDeepLinkTests : PageTestBase
         ];
         Git.Script(BaseSha, HeadSha, changes);
         await Reviews.CreateFromRepositoryAsync(
-            project.Id, "REV-1", "From git", repository.Id, "main", "v1", "src/**", TestActors.Ann, cancellationToken);
+            project.Id, "REV-1", "From git", new RepositorySource(repository.Id, "main", "v1", "src/**"), TestActors.Ann, cancellationToken);
         return project.Id;
     }
 
@@ -128,7 +128,7 @@ public class ReviewDeepLinkTests : PageTestBase
     private async Task<ReviewThread> StartAsync(int projectId, string path, int? start, ThreadSide side)
     {
         return await Threads.StartThreadAsync(
-            projectId, "REV-1", path, start, start, TestActors.Bob, "Please check", side, TestContext.Current.CancellationToken);
+            projectId, "REV-1", new ThreadAnchor(path, start, start, side), TestActors.Bob, "Please check", TestContext.Current.CancellationToken);
     }
 
     /// <summary>
@@ -403,7 +403,7 @@ public class ReviewDeepLinkTests : PageTestBase
         var big = string.Concat(Enumerable.Repeat("x\n", ReviewLimits.MaxDiffLines + 1));
         var projectId = await CreateReviewAsync(("src/big.txt", ChangeKind.Modified, big, "y\nz\n"));
         var thread = await Threads.StartThreadAsync(
-            projectId, "REV-1", "src/big.txt", 9000, 9002, TestActors.Bob, "Please check", ThreadSide.Baseline, TestContext.Current.CancellationToken);
+            projectId, "REV-1", new ThreadAnchor("src/big.txt", 9000, 9002, ThreadSide.Baseline), TestActors.Bob, "Please check", TestContext.Current.CancellationToken);
 
         // Act: open the thread address
         var cut = Open(ReviewLinks.ForThread(projectId, "REV-1", thread.Id));
@@ -477,7 +477,7 @@ public class ReviewDeepLinkTests : PageTestBase
         await Reviews.CreateDraftAsync(
             projectId, "REV-2", "Other", [new UploadedFile("x.txt", Encoding.UTF8.GetBytes("a\n"))], TestContext.Current.CancellationToken);
         var foreign = await Threads.StartThreadAsync(
-            projectId, "REV-2", "x.txt", 1, 1, TestActors.Bob, "Elsewhere", ThreadSide.Head, TestContext.Current.CancellationToken);
+            projectId, "REV-2", new ThreadAnchor("x.txt", 1, 1, ThreadSide.Head), TestActors.Bob, "Elsewhere", TestContext.Current.CancellationToken);
         var address = what switch
         {
             "unknown-file" => ReviewLinks.ForFile(projectId, "REV-1", "src/nope.txt"),
@@ -889,7 +889,7 @@ public class ReviewDeepLinkTests : PageTestBase
             [new UploadedFile("x.txt", "one\ntwo\n"u8.ToArray()), new UploadedFile("y z.txt", "uno\ndos\n"u8.ToArray())],
             TestContext.Current.CancellationToken);
         var thread = await app.Services.GetRequiredService<ThreadService>().StartThreadAsync(
-            project.Id, "REV-1", "y z.txt", 2, 2, new Actor("ann", "Ann"), "Look", ThreadSide.Head, TestContext.Current.CancellationToken);
+            project.Id, "REV-1", new ThreadAnchor("y z.txt", 2, 2, ThreadSide.Head), new Actor("ann", "Ann"), "Look", TestContext.Current.CancellationToken);
         using var browser = await TestBrowser.SignedInAsync(app, "ann");
 
         // Act: open the thread address

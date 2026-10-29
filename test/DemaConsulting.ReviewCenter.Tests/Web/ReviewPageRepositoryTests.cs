@@ -65,7 +65,7 @@ public class ReviewPageRepositoryTests : PageTestBase
                 ("src/new.txt", ChangeKind.Added, null, "new\n")
             ]);
         await Reviews.CreateFromRepositoryAsync(
-            project.Id, "REV-1", "From git", repository.Id, "main", "v1", "src/**\ndocs/**", TestActors.Ann, cancellationToken);
+            project.Id, "REV-1", "From git", new RepositorySource(repository.Id, "main", "v1", "src/**\ndocs/**"), TestActors.Ann, cancellationToken);
         return project.Id;
     }
 

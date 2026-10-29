@@ -193,9 +193,9 @@ public class AuditEventTests
         var fixture = await CreateAsync();
 
         // Act
-        var thread = await fixture.Threads.StartThreadAsync(fixture.ProjectId, "rev-1", "a.txt", 2, 3, TestActors.Ann, SecretComment, TestContext.Current.CancellationToken);
-        var whole = await fixture.Threads.StartThreadAsync(fixture.ProjectId, "rev-1", "a.txt", null, null, TestActors.Ann, "whole", TestContext.Current.CancellationToken);
-        var single = await fixture.Threads.StartThreadAsync(fixture.ProjectId, "rev-1", "a.txt", 1, 1, TestActors.Ann, "single", TestContext.Current.CancellationToken);
+        var thread = await fixture.Threads.StartThreadAsync(fixture.ProjectId, "rev-1", new ThreadAnchor("a.txt", 2, 3), TestActors.Ann, SecretComment, TestContext.Current.CancellationToken);
+        var whole = await fixture.Threads.StartThreadAsync(fixture.ProjectId, "rev-1", new ThreadAnchor("a.txt"), TestActors.Ann, "whole", TestContext.Current.CancellationToken);
+        var single = await fixture.Threads.StartThreadAsync(fixture.ProjectId, "rev-1", new ThreadAnchor("a.txt", 1, 1), TestActors.Ann, "single", TestContext.Current.CancellationToken);
         var reply = await fixture.Threads.ReplyAsync(fixture.ProjectId, "rev-1", thread.Id, TestActors.Bob, SecretComment, TestContext.Current.CancellationToken);
         await fixture.Threads.ResolveAsync(fixture.ProjectId, "rev-1", thread.Id, TestActors.Bob, TestContext.Current.CancellationToken);
         await fixture.Threads.ReopenAsync(fixture.ProjectId, "rev-1", thread.Id, TestActors.Ann, TestContext.Current.CancellationToken);

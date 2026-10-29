@@ -91,7 +91,7 @@ public class ReviewFromGitTests
 
         // Act: create the review from the tag to the branch, record its digest, then commit more in the origin
         var result = await service.CreateFromRepositoryAsync(
-            project.Id, "rev-1", "Real", repository.Id, "main", "v1", "**/*", _actor, cancellationToken);
+            project.Id, "rev-1", "Real", new RepositorySource(repository.Id, "main", "v1", "**/*"), _actor, cancellationToken);
         var digestBefore = RecordDigest.Compute((await db.Store.GetRecordAsync(project.Id, "rev-1", cancellationToken))!);
         GitTestSupport.Write(origin, "a.txt", "third\n");
         GitTestSupport.Write(origin, "c.txt", "later\n");
@@ -117,7 +117,7 @@ public class ReviewFromGitTests
 
         // Assert: a review made now sees the later commit, so the unchanged result above is not an accident
         var later = await service.CreateFromRepositoryAsync(
-            project.Id, "rev-2", "Later", repository.Id, "main", "v1", "**/*", _actor, cancellationToken);
+            project.Id, "rev-2", "Later", new RepositorySource(repository.Id, "main", "v1", "**/*"), _actor, cancellationToken);
         Assert.Contains(later.Review.Files, file => file.Path == "c.txt");
         Assert.NotEqual(second, later.Review.HeadSha);
     }

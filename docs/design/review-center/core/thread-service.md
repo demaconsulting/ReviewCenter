@@ -47,9 +47,9 @@ a whole; its baseline lines can be commented on the baseline side.
 **Side rules**: the side of a thread decides which content the range is checked against. The `Head` side uses the
 head content of the file. The `Baseline` side uses the baseline content and is allowed only when the review is from a
 repository and has a baseline commit, and the file is `Modified` or `Deleted` (an `Added` file has no baseline). A
-whole-file anchor cannot name the `Baseline` side; whole-file threads are stored as `Head`. A `side` value that no
-member of `ThreadSide` has is a programming error and raises `ArgumentOutOfRangeException` before anything else is
-checked or read.
+whole-file anchor cannot name the `Baseline` side; whole-file threads are stored as `Head`. A side value in the anchor
+that no member of `ThreadSide` has is a programming error and raises `ArgumentOutOfRangeException` before anything else
+is checked or read.
 
 **Immutability**: posted comments are never changed or removed. The service and the store interface offer no way to
 edit or delete a comment or a thread. The only change to an existing thread is its state, which is not attributed
@@ -72,9 +72,11 @@ reads the project as the actor).
 
 **StartThreadAsync**: Starts a thread with its first comment.
 
-- *Parameters*: `int projectId`, `string reviewId`, `string filePath`, `int? startLine`, `int? endLine`,
-  `Actor actor`, `string? text`, `ThreadSide side`, and a cancellation token. An overload without `side` starts a
-  `Head` thread, so callers that do not know about sides keep their call shape.
+- *Parameters*: `int projectId`, `string reviewId`, a `ThreadAnchor anchor` (the file path, the optional start and end
+  lines, and the `ThreadSide`, which is `Head` unless named), `Actor actor`, `string? text`, and a cancellation token.
+  The anchor groups the four values that always travel together (the review page collects them from one selection and
+  `ReviewThread` stores them side by side). A null anchor is a programming error and raises `ArgumentNullException`,
+  and an undefined side raises `ArgumentOutOfRangeException` for the `anchor` parameter.
 - *Returns*: `Task<ReviewThread>` — the stored thread in the `Open` state with its first comment, the side, and the
   creation time from the clock.
 - *Postconditions*: Nothing is stored when a rule fails.

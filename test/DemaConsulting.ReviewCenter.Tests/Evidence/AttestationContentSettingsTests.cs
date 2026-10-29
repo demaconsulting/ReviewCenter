@@ -250,7 +250,7 @@ public class AttestationContentSettingsTests
             fixture.ProjectId, AttestationFixture.ReviewId, firstItem.Id, ChecklistOutcome.Pass, null, cyd, cancellationToken);
         var threads = TestServices.Threads(fixture.Store, fixture.Clock);
         var thread = await threads.StartThreadAsync(
-            fixture.ProjectId, AttestationFixture.ReviewId, "a.txt", null, null, cyd, SampleData.ThreadText, ThreadSide.Head, cancellationToken);
+            fixture.ProjectId, AttestationFixture.ReviewId, new ThreadAnchor("a.txt", null, null, ThreadSide.Head), cyd, SampleData.ThreadText, cancellationToken);
         await threads.ResolveAsync(fixture.ProjectId, AttestationFixture.ReviewId, thread.Id, cyd, cancellationToken);
         await fixture.SignAsync();
         if (settings is not null)

@@ -1491,8 +1491,9 @@ public partial class ReviewPage : ComponentBase, IDisposable
         try
         {
             await ThreadService.StartThreadAsync(
-                ProjectId, ReviewId, SelectedPath, start, end ?? start, await AuthenticationState.GetActorAsync(),
-                NewText, start is null ? ThreadSide.Head : NewSide);
+                ProjectId, ReviewId,
+                new ThreadAnchor(SelectedPath, start, end ?? start, start is null ? ThreadSide.Head : NewSide),
+                await AuthenticationState.GetActorAsync(), NewText);
         }
         catch (DomainRuleException ex)
         {

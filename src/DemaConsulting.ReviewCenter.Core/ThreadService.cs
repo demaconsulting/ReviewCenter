@@ -69,90 +69,52 @@ public sealed class ThreadService
     }
 
     /// <summary>
-    ///     Starts a thread on the head of a file of a review, with its first comment.
+    ///     Starts a thread on a file of a review, with its first comment.
     /// </summary>
     /// <remarks>
-    ///     The overload exists so that callers that do not know about sides (the head is the default) keep their
-    ///     call shape; it is the same as calling the overload with <see cref="ThreadSide.Head"/>.
+    ///     Where the thread goes (file, lines, side) is one <see cref="ThreadAnchor"/>, so that the request reads
+    ///     "this anchor, this author, this text"; a whole-file thread on the head is just
+    ///     <c>new ThreadAnchor(path)</c>.
     /// </remarks>
     /// <param name="projectId">The identity of the owning project.</param>
     /// <param name="reviewId">The review identifier.</param>
-    /// <param name="filePath">The path of the file within the review (ordinal comparison).</param>
-    /// <param name="startLine">The first line of the anchor (1-based), or <c>null</c> for the whole file.</param>
-    /// <param name="endLine">The last line of the anchor (inclusive); <c>null</c> exactly when <paramref name="startLine"/> is <c>null</c>.</param>
-    /// <param name="actor">The signed-in user who writes the comment. Must not be null.</param>
-    /// <param name="text">The comment text; same rules as for the overload with a side.</param>
-    /// <param name="cancellationToken">Cancels the operation.</param>
-    /// <returns>The stored thread in the <see cref="ReviewThreadState.Open"/> state, with its first comment.</returns>
-    /// <exception cref="ArgumentNullException">Thrown when <paramref name="actor"/> is null.</exception>
-    /// <exception cref="DomainRuleException">Thrown when a rule is violated (see <see cref="DomainRule"/>); nothing is stored then.</exception>
-#pragma warning disable S107 // One distinct fact of the request per parameter; a public service API with many callers
-    public Task<ReviewThread> StartThreadAsync(
-        int projectId,
-        string reviewId,
-        string filePath,
-        int? startLine,
-        int? endLine,
-        Actor actor,
-        string? text,
-        CancellationToken cancellationToken = default)
-#pragma warning restore S107
-    {
-        return StartThreadAsync(
-            projectId, reviewId, filePath, startLine, endLine, actor, text, ThreadSide.Head, cancellationToken);
-    }
-
-    /// <summary>
-    ///     Starts a thread on a file of a review, with its first comment.
-    /// </summary>
-    /// <param name="projectId">The identity of the owning project.</param>
-    /// <param name="reviewId">The review identifier.</param>
-    /// <param name="filePath">The path of the file within the review (ordinal comparison).</param>
-    /// <param name="startLine">
-    ///     The first line of the anchor (1-based), or <c>null</c> to anchor the thread to the whole file.
-    /// </param>
-    /// <param name="endLine">
-    ///     The last line of the anchor (inclusive); <c>null</c> exactly when <paramref name="startLine"/> is
-    ///     <c>null</c>. A range requires a text file with at least that many lines (see <see cref="FileText"/>).
+    /// <param name="anchor">
+    ///     Where the thread is anchored; must not be null. A line range (both lines set) requires a text file with at
+    ///     least that many lines (see <see cref="FileText"/>). The side of the anchor is ignored for a whole-file
+    ///     anchor (which is always stored as <see cref="ThreadSide.Head"/>, and rejects
+    ///     <see cref="ThreadSide.Baseline"/>). <see cref="ThreadSide.Baseline"/> needs a repository review with a
+    ///     baseline commit and a file that is <see cref="ChangeKind.Modified"/> or <see cref="ChangeKind.Deleted"/>;
+    ///     the range is then checked against the baseline lines. On the head side a <see cref="ChangeKind.Deleted"/>
+    ///     file accepts no lines.
     /// </param>
     /// <param name="actor">The signed-in user who writes the comment. Must not be null.</param>
     /// <param name="text">
     ///     The comment text; leading and trailing white space is removed. Must not be empty and must not
     ///     exceed <see cref="ReviewLimits.MaxCommentLength"/> characters.
     /// </param>
-    /// <param name="side">
-    ///     The version of the file the line numbers refer to; ignored for a whole-file anchor (which is always
-    ///     stored as <see cref="ThreadSide.Head"/>, and rejects <see cref="ThreadSide.Baseline"/>).
-    ///     <see cref="ThreadSide.Baseline"/> needs a repository review with a baseline commit and a file that is
-    ///     <see cref="ChangeKind.Modified"/> or <see cref="ChangeKind.Deleted"/>; the range is then checked
-    ///     against the baseline lines. On the head side a <see cref="ChangeKind.Deleted"/> file accepts no lines.
-    /// </param>
     /// <param name="cancellationToken">Cancels the operation.</param>
     /// <returns>The stored thread in the <see cref="ReviewThreadState.Open"/> state, with its first comment.</returns>
-    /// <exception cref="ArgumentNullException">Thrown when <paramref name="actor"/> is null.</exception>
-    /// <exception cref="ArgumentOutOfRangeException">Thrown when <paramref name="side"/> is not a defined value.</exception>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="anchor"/> or <paramref name="actor"/> is null.</exception>
+    /// <exception cref="ArgumentOutOfRangeException">Thrown when the side of <paramref name="anchor"/> is not a defined value.</exception>
     /// <exception cref="DomainRuleException">
     ///     Thrown when a rule is violated (see <see cref="DomainRule"/>); nothing is stored then.
     /// </exception>
-#pragma warning disable S107 // One distinct fact of the request per parameter; a public service API with many callers
     public async Task<ReviewThread> StartThreadAsync(
         int projectId,
         string reviewId,
-        string filePath,
-        int? startLine,
-        int? endLine,
+        ThreadAnchor anchor,
         Actor actor,
         string? text,
-        ThreadSide side,
         CancellationToken cancellationToken = default)
-#pragma warning restore S107
     {
         // Validate everything that needs no I/O first so a bad request fails fast and cheaply
+        ArgumentNullException.ThrowIfNull(anchor);
         ArgumentNullException.ThrowIfNull(actor);
         await _access.RequireViewAsync(actor, projectId, cancellationToken);
+        var (filePath, startLine, endLine, side) = anchor;
         if (!Enum.IsDefined(side))
         {
-            throw new ArgumentOutOfRangeException(nameof(side), side, "The side is not a known value.");
+            throw new ArgumentOutOfRangeException(nameof(anchor), side, "The side of the anchor is not a known value.");
         }
 
         var trimmedText = ValidateText(text);

@@ -73,9 +73,10 @@ covers two requests that pass the check at the same time.
 
 **CreateFromRepositoryAsync**: Creates a draft review from the files that changed in a registered repository.
 
-- *Parameters*: `int projectId`, `string? id`, `string? title`, `int repositoryId`, `string? headRevision`,
-  `string? baselineRevision` (null or blank: no baseline, every file at the head counts as added), `string?
-  selection`, an `Actor`, and a cancellation token.
+- *Parameters*: `int projectId`, `string? id`, `string? title`, a `RepositorySource source` (the `RepositoryId`, the
+  `HeadRevision`, the `BaselineRevision` - null or blank: no baseline, every file at the head counts as added - and
+  the `Selection`; the four values of the repository source that the new-review form and the API request carry
+  together), an `Actor`, and a cancellation token. A null `source` or `actor` raises `ArgumentNullException`.
 - *Returns*: `Task<RepositoryReviewResult>`.
 - *Postconditions*: The review is stored with the frozen copies described below, or nothing is stored.
 

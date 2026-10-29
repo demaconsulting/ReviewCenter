@@ -416,10 +416,7 @@ internal static class ApiEndpoints
                 projectId,
                 request.Id,
                 request.Title,
-                source.RepositoryId,
-                source.HeadRevision,
-                source.BaselineRevision,
-                source.Selection,
+                new RepositorySource(source.RepositoryId, source.HeadRevision, source.BaselineRevision, source.Selection),
                 actor,
                 cancellationToken);
             review = result.Review;

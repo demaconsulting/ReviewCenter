@@ -507,7 +507,7 @@ public class CoreSubsystemTests
                 git.Revisions["main"] = "h1";
                 git.Script(null, "h1", [("docs/a.md", ChangeKind.Added, null, "x")]);
                 await TestServices.Reviews(reviewStore, clock, service, git).CreateFromRepositoryAsync(
-                    project.Id, "rev-1", "T", repository.Id, "main", null, "src/**", actor, cancellationToken);
+                    project.Id, "rev-1", "T", new RepositorySource(repository.Id, "main", null, "src/**"), actor, cancellationToken);
                 return;
             case DomainRule.ReviewSetConfigMissing:
             case DomainRule.ReviewSetConfigInvalid:
@@ -692,9 +692,9 @@ public class CoreSubsystemTests
                     .ToList(),
                 cancellationToken),
             DomainRule.CommentTextInvalid => threads.StartThreadAsync(
-                projectId, "rev-1", "a.txt", null, null, TestActors.Ann, " ", cancellationToken),
+                projectId, "rev-1", new ThreadAnchor("a.txt"), TestActors.Ann, " ", cancellationToken),
             DomainRule.ThreadAnchorInvalid => threads.StartThreadAsync(
-                projectId, "rev-1", "a.txt", 1, 99, TestActors.Ann, "Text", cancellationToken),
+                projectId, "rev-1", new ThreadAnchor("a.txt", 1, 99), TestActors.Ann, "Text", cancellationToken),
             DomainRule.ThreadNotFound => threads.ResolveAsync(projectId, "rev-1", 99, cancellationToken),
             DomainRule.ChecklistNotFound => checklists.SetAnswerAsync(
                 projectId, "no-such-review", "REQ-01", ChecklistOutcome.Pass, null, TestActors.Ann, cancellationToken),
@@ -736,7 +736,7 @@ public class CoreSubsystemTests
 
         // Act: start a thread, reply twice, resolve it and read it back, then reopen it and read it again
         var started = await threads.StartThreadAsync(
-            project.Id, "rev-1", "ab.txt", 1, 2, TestActors.Ann, "First", TestContext.Current.CancellationToken);
+            project.Id, "rev-1", new ThreadAnchor("ab.txt", 1, 2), TestActors.Ann, "First", TestContext.Current.CancellationToken);
         await threads.ReplyAsync(project.Id, "rev-1", started.Id, TestActors.Bob, "Second", TestContext.Current.CancellationToken);
         await threads.ReplyAsync(project.Id, "rev-1", started.Id, TestActors.Ann, "Third", TestContext.Current.CancellationToken);
         await threads.ResolveAsync(project.Id, "rev-1", started.Id, TestContext.Current.CancellationToken);
@@ -944,7 +944,7 @@ public class CoreSubsystemTests
 
         // Act: a comment is posted and resolved, so the record changes; the alternate then signs the new record
         var thread = await threads.StartThreadAsync(
-            project.Id, "rev-1", "a.txt", null, null, bobActor, "One more thing", cancellationToken);
+            project.Id, "rev-1", new ThreadAnchor("a.txt"), bobActor, "One more thing", cancellationToken);
         await threads.ResolveAsync(project.Id, "rev-1", thread.Id, cancellationToken);
         var outOfDate = await signing.GetApprovalAsync(project.Id, "rev-1", cancellationToken);
         await signing.SignAsync(bobActor, project.Id, "rev-1", slot.Id, outOfDate!.Digest, ValidPassword, cancellationToken);
