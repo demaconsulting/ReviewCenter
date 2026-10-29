@@ -43,7 +43,7 @@ public class ApiTokenAuthenticationTests
     private static async Task<HttpStatusCode> GetProjectsStatusAsync(Microsoft.AspNetCore.Builder.WebApplication app, string value, bool basic)
     {
         using var client = ClientFor(app, value, basic);
-        var response = await client.GetAsync("/api/projects", TestContext.Current.CancellationToken);
+        using var response = await client.GetAsync("/api/projects", TestContext.Current.CancellationToken);
         return response.StatusCode;
     }
 
@@ -56,7 +56,7 @@ public class ApiTokenAuthenticationTests
     private static async Task<string> ReadUnauthorizedBodyAsync(Microsoft.AspNetCore.Builder.WebApplication app, string value)
     {
         using var client = ClientFor(app, value);
-        var response = await client.GetAsync("/api/projects", TestContext.Current.CancellationToken);
+        using var response = await client.GetAsync("/api/projects", TestContext.Current.CancellationToken);
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
         return await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
     }
@@ -358,8 +358,8 @@ public class ApiTokenAuthenticationTests
         // Act: post to the route with and without the token
         using var contentWith = new FormUrlEncodedContent([]);
         using var contentWithout = new FormUrlEncodedContent([]);
-        var answerWith = await withToken.PostAsync(route, contentWith, TestContext.Current.CancellationToken);
-        var answerWithout = await withoutToken.PostAsync(route, contentWithout, TestContext.Current.CancellationToken);
+        using var answerWith = await withToken.PostAsync(route, contentWith, TestContext.Current.CancellationToken);
+        using var answerWithout = await withoutToken.PostAsync(route, contentWithout, TestContext.Current.CancellationToken);
 
         // Assert: the token changes nothing about the answer
         Assert.Equal(answerWithout.StatusCode, answerWith.StatusCode);

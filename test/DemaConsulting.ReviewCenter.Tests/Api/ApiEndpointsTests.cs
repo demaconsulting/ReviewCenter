@@ -575,7 +575,7 @@ public class ApiEndpointsTests
 
         // Act: request an address that does not exist
         using var request = new HttpRequestMessage(new HttpMethod(method), "/api/nothing/here");
-        var response = await client.SendAsync(request, TestContext.Current.CancellationToken);
+        using var response = await client.SendAsync(request, TestContext.Current.CancellationToken);
 
         // Assert: a JSON 404
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
