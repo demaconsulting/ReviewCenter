@@ -331,7 +331,7 @@ public class SigningServiceTests
         if (outOfDate)
         {
             await fixture.Threads.StartThreadAsync(
-                fixture.ProjectId, "rev-1", "a.txt", null, null, TestActors.Bob, "A late remark", TestContext.Current.CancellationToken);
+                fixture.ProjectId, "rev-1", new ThreadAnchor("a.txt"), TestActors.Bob, "A late remark", TestContext.Current.CancellationToken);
         }
 
         // Act: try to change and to remove the slot
@@ -562,7 +562,7 @@ public class SigningServiceTests
                 break;
             case "thread":
                 await fixture.Threads.StartThreadAsync(
-                    fixture.ProjectId, "rev-1", "a.txt", null, null, TestActors.Bob, "Look at this", TestContext.Current.CancellationToken);
+                    fixture.ProjectId, "rev-1", new ThreadAnchor("a.txt"), TestActors.Bob, "Look at this", TestContext.Current.CancellationToken);
                 break;
         }
 
@@ -616,7 +616,7 @@ public class SigningServiceTests
         var (fixture, slot) = await CreateReadyAsync();
         var seen = (await ApprovalAsync(fixture)).Digest;
         var thread = await fixture.Threads.StartThreadAsync(
-            fixture.ProjectId, "rev-1", "a.txt", null, null, TestActors.Bob, "Remark", TestContext.Current.CancellationToken);
+            fixture.ProjectId, "rev-1", new ThreadAnchor("a.txt"), TestActors.Bob, "Remark", TestContext.Current.CancellationToken);
         await fixture.Threads.ResolveAsync(fixture.ProjectId, "rev-1", thread.Id, TestContext.Current.CancellationToken);
 
         // Act: ann signs what she saw
@@ -662,7 +662,7 @@ public class SigningServiceTests
 
         // Act: a thread is opened and resolved, so the record differs although nothing is open
         var thread = await fixture.Threads.StartThreadAsync(
-            fixture.ProjectId, "rev-1", "a.txt", null, null, TestActors.Bob, "One more thing", TestContext.Current.CancellationToken);
+            fixture.ProjectId, "rev-1", new ThreadAnchor("a.txt"), TestActors.Bob, "One more thing", TestContext.Current.CancellationToken);
         await fixture.Threads.ResolveAsync(fixture.ProjectId, "rev-1", thread.Id, TestContext.Current.CancellationToken);
         var outOfDate = await ApprovalAsync(fixture);
         await fixture.Signing.SignAsync(TestActors.Bob, fixture.ProjectId, "rev-1", slot.Id, outOfDate.Digest, Password, TestContext.Current.CancellationToken);

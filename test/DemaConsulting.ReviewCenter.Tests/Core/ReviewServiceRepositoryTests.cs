@@ -122,10 +122,7 @@ public class ReviewServiceRepositoryTests
             f.ProjectId,
             id,
             "Title",
-            repositoryId ?? f.RepositoryId,
-            "main",
-            baseline,
-            selection,
+            new RepositorySource(repositoryId ?? f.RepositoryId, "main", baseline, selection),
             _actor,
             TestContext.Current.CancellationToken);
     }
@@ -330,7 +327,7 @@ public class ReviewServiceRepositoryTests
 
         // Act: create the review as that actor
         var result = await f.Service.CreateFromRepositoryAsync(
-            f.ProjectId, "rev-1", "Title", f.RepositoryId, "main", "v1", "**/*", viaApi, TestContext.Current.CancellationToken);
+            f.ProjectId, "rev-1", "Title", new RepositorySource(f.RepositoryId, "main", "v1", "**/*"), viaApi, TestContext.Current.CancellationToken);
 
         // Assert: the review records the creator and the API flag, and the audit detail names the token
         Assert.Equal(_actor.Username, result.Review.CreatedBy);
@@ -526,7 +523,7 @@ public class ReviewServiceRepositoryTests
         f.Git.OpenFailure = null;
         var opened = f.Git.Opened.Count;
         var blank = await Assert.ThrowsAsync<DomainRuleException>(() => f.Service.CreateFromRepositoryAsync(
-            f.ProjectId, "rev-2", "Title", f.RepositoryId, " ", null, "**/*", _actor, TestContext.Current.CancellationToken));
+            f.ProjectId, "rev-2", "Title", new RepositorySource(f.RepositoryId, " ", null, "**/*"), _actor, TestContext.Current.CancellationToken));
         Assert.Equal(DomainRule.RevisionInvalid, blank.Rule);
         Assert.Equal(opened, f.Git.Opened.Count);
     }
@@ -546,7 +543,7 @@ public class ReviewServiceRepositoryTests
         var duplicate = await Assert.ThrowsAsync<DomainRuleException>(() => CreateReviewAsync(f));
         Assert.Equal(DomainRule.ReviewIdDuplicate, duplicate.Rule);
         var unknown = await Assert.ThrowsAsync<DomainRuleException>(() => f.Service.CreateFromRepositoryAsync(
-            f.ProjectId + 50, "rev-9", "Title", f.RepositoryId, "main", "v1", "**/*", _actor, TestContext.Current.CancellationToken));
+            f.ProjectId + 50, "rev-9", "Title", new RepositorySource(f.RepositoryId, "main", "v1", "**/*"), _actor, TestContext.Current.CancellationToken));
         Assert.Equal(DomainRule.ProjectNotFound, unknown.Rule);
         Assert.Equal(opened, f.Git.Opened.Count);
     }
@@ -561,9 +558,11 @@ public class ReviewServiceRepositoryTests
         var service = new ReviewService(
             new FakeReviewStore(), new AllowAllProjectAccess(new FakeReviewStore()), new FixedTimeProvider(_now));
 
-        // Act, Assert: the call is refused as a programming error
+        // Act, Assert: the call is refused as a programming error, and a missing source is an argument error
         await Assert.ThrowsAsync<InvalidOperationException>(() => service.CreateFromRepositoryAsync(
-            1, "rev-1", "T", 1, "main", null, "**/*", _actor, TestContext.Current.CancellationToken));
+            1, "rev-1", "T", new RepositorySource(1, "main", null, "**/*"), _actor, TestContext.Current.CancellationToken));
+        await Assert.ThrowsAsync<ArgumentNullException>(() => service.CreateFromRepositoryAsync(
+            1, "rev-1", "T", null!, _actor, TestContext.Current.CancellationToken));
     }
 
     /// <summary>
@@ -588,7 +587,7 @@ public class ReviewServiceRepositoryTests
             ("src/new.txt", ChangeKind.Added, null, "world\n")
         ]);
         await f.Service.CreateFromRepositoryAsync(
-            f.ProjectId, "rev-c", "Title", f.RepositoryId, "other", "v1", "**/*", _actor, cancellationToken);
+            f.ProjectId, "rev-c", "Title", new RepositorySource(f.RepositoryId, "other", "v1", "**/*"), _actor, cancellationToken);
         var second = await f.Repositories.CreateAsync("second", "https://example.com/second.git", null, null, _actor, cancellationToken);
         await CreateReviewAsync(f, "rev-d", repositoryId: second.Id);
 

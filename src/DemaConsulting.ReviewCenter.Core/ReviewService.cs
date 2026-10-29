@@ -182,19 +182,14 @@ public sealed class ReviewService
     /// <param name="projectId">The identity of the owning project.</param>
     /// <param name="id">The review identifier; same rules as for <see cref="CreateDraftAsync"/>.</param>
     /// <param name="title">The title; same rules as for <see cref="CreateDraftAsync"/>.</param>
-    /// <param name="repositoryId">The identity of an enabled registered repository.</param>
-    /// <param name="headRevision">The head revision: a branch, tag or commit name (see <see cref="RevisionValidator"/>).</param>
-    /// <param name="baselineRevision">
-    ///     The baseline revision, or <c>null</c> or white space to review every file at the head as added.
-    /// </param>
-    /// <param name="selection">
-    ///     The file selection: patterns, one per line (see <see cref="SelectionMatcher"/>). Only changed files that
-    ///     match are reviewed.
+    /// <param name="source">
+    ///     The repository, the head and baseline revisions and the file selection to review (see
+    ///     <see cref="RepositorySource"/> for what each value may hold). Must not be null.
     /// </param>
     /// <param name="actor">The signed-in user creating the review; recorded in the audit trail. Must not be null.</param>
     /// <param name="cancellationToken">Cancels the operation.</param>
     /// <returns>The created review and the entries that were skipped (symbolic links, submodules, unusable paths).</returns>
-    /// <exception cref="ArgumentNullException">Thrown when <paramref name="actor"/> is null.</exception>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="source"/> or <paramref name="actor"/> is null.</exception>
     /// <exception cref="InvalidOperationException">Thrown when the service was created without repository access.</exception>
     /// <exception cref="DomainRuleException">
     ///     Thrown when a rule is violated (see <see cref="DomainRule"/>), among them
@@ -207,19 +202,15 @@ public sealed class ReviewService
     ///     again. The fingerprint covers the files that exist at the head (added and modified), so it equals the
     ///     ReviewMark fingerprint of those files.
     /// </remarks>
-#pragma warning disable S107 // One distinct fact of the request per parameter; a public service API with many callers
     public async Task<RepositoryReviewResult> CreateFromRepositoryAsync(
         int projectId,
         string? id,
         string? title,
-        int repositoryId,
-        string? headRevision,
-        string? baselineRevision,
-        string? selection,
+        RepositorySource source,
         Actor actor,
         CancellationToken cancellationToken = default)
-#pragma warning restore S107
     {
+        ArgumentNullException.ThrowIfNull(source);
         ArgumentNullException.ThrowIfNull(actor);
         if (_repositories is null || _git is null)
         {
@@ -231,12 +222,12 @@ public sealed class ReviewService
         // Validate everything that needs no I/O first so a bad request fails fast and cheaply
         ValidateId(id);
         var trimmedTitle = ValidateTitle(title);
-        var head = RevisionValidator.Validate(headRevision?.Trim());
-        var baseline = string.IsNullOrWhiteSpace(baselineRevision) ? null : RevisionValidator.Validate(baselineRevision.Trim());
-        var (patterns, selectionText) = ParseSelection(selection);
+        var head = RevisionValidator.Validate(source.HeadRevision?.Trim());
+        var baseline = string.IsNullOrWhiteSpace(source.BaselineRevision) ? null : RevisionValidator.Validate(source.BaselineRevision.Trim());
+        var (patterns, selectionText) = ParseSelection(source.Selection);
 
         await EnsureFreeIdAsync(projectId, id!, cancellationToken);
-        var access = await _repositories.GetAccessAsync(projectId, repositoryId, cancellationToken);
+        var access = await _repositories.GetAccessAsync(projectId, source.RepositoryId, cancellationToken);
 
         // The session resolves both revisions; everything after that is shared with the planner
         await using var session = await _git.OpenAsync(access, cancellationToken);

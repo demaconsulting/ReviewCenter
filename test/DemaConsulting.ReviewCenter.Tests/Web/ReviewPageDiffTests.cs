@@ -82,7 +82,7 @@ public class ReviewPageDiffTests : PageTestBase
         changes.AddRange(extra);
         Git.Script(BaseSha, HeadSha, changes);
         await Reviews.CreateFromRepositoryAsync(
-            project.Id, "REV-1", "From git", repository.Id, "main", "v1", "src/**", TestActors.Ann, cancellationToken);
+            project.Id, "REV-1", "From git", new RepositorySource(repository.Id, "main", "v1", "src/**"), TestActors.Ann, cancellationToken);
         return project.Id;
     }
 
@@ -138,7 +138,7 @@ public class ReviewPageDiffTests : PageTestBase
     private async Task<ReviewThread> StartAsync(int projectId, int start, int end, ThreadSide side, string text, string path = ModPath)
     {
         return await Threads.StartThreadAsync(
-            projectId, "REV-1", path, start, end, TestActors.Bob, text, side, TestContext.Current.CancellationToken);
+            projectId, "REV-1", new ThreadAnchor(path, start, end, side), TestActors.Bob, text, TestContext.Current.CancellationToken);
     }
 
     /// <summary>
@@ -364,7 +364,7 @@ public class ReviewPageDiffTests : PageTestBase
         var repository = (await Repositories.ListEnabledAsync(TestActors.Ann, projectId, cancellationToken)).Single();
         Git.Script(null, HeadSha, [("src/new.txt", ChangeKind.Added, null, "new\n")]);
         await Reviews.CreateFromRepositoryAsync(
-            projectId, "REV-3", "No baseline", repository.Id, "main", null, "src/**", TestActors.Ann, cancellationToken);
+            projectId, "REV-3", "No baseline", new RepositorySource(repository.Id, "main", null, "src/**"), TestActors.Ann, cancellationToken);
 
         // Act: open the uploaded file
         var upload = RenderPage(projectId, "REV-2");
@@ -827,7 +827,7 @@ public class ReviewPageDiffTests : PageTestBase
         var before = await StartAsync(projectId, 10, 10, ThreadSide.Baseline, "Before");
         var after = await StartAsync(projectId, 11, 13, ThreadSide.Head, "After");
         var whole = await Threads.StartThreadAsync(
-            projectId, "REV-1", ModPath, null, null, TestActors.Bob, "Whole", TestContext.Current.CancellationToken);
+            projectId, "REV-1", new ThreadAnchor(ModPath), TestActors.Bob, "Whole", TestContext.Current.CancellationToken);
         var cut = RenderPage(projectId);
 
         // Assert: the index words the version

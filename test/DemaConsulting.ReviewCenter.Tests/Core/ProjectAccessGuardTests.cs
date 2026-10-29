@@ -63,7 +63,7 @@ public class ProjectAccessGuardTests
             ["create review"] = () => world.Reviews.CreateDraftAsync(
                 project, "rev-2", "Second", [new UploadedFile("a.txt", [1])], actor, cancellationToken),
             ["start thread"] = () => world.Threads.StartThreadAsync(
-                project, "rev-1", "a.txt", null, null, actor, "hello", cancellationToken),
+                project, "rev-1", new ThreadAnchor("a.txt"), actor, "hello", cancellationToken),
             ["reply"] = () => world.Threads.ReplyAsync(project, "rev-1", world.ThreadId, actor, "hello", cancellationToken),
             ["resolve"] = () => world.Threads.ResolveAsync(project, "rev-1", world.ThreadId, actor, cancellationToken),
             ["reopen"] = () => world.Threads.ReopenAsync(project, "rev-1", world.ThreadId, actor, cancellationToken),
@@ -112,7 +112,7 @@ public class ProjectAccessGuardTests
 
         // Act
         var thread = await world.Threads.StartThreadAsync(
-            world.Own, "rev-1", "a.txt", null, null, member, "hello", cancellationToken);
+            world.Own, "rev-1", new ThreadAnchor("a.txt"), member, "hello", cancellationToken);
         await world.Checklists.SetAnswerAsync(
             world.Own, "rev-1", DefaultChecklist.Current.Sections[0].Items[0].Id, ChecklistOutcome.Pass, null, member, cancellationToken);
         var candidates = await world.Signing.ListCandidatesAsync(member, world.Own, cancellationToken);
@@ -140,7 +140,7 @@ public class ProjectAccessGuardTests
 
         // Act
         var create = await Assert.ThrowsAsync<DomainRuleException>(() => world.Reviews.CreateFromRepositoryAsync(
-            world.Own, "rev-3", "Third", foreign.Id, "main", null, "**/*", member, cancellationToken));
+            world.Own, "rev-3", "Third", new RepositorySource(foreign.Id, "main", null, "**/*"), member, cancellationToken));
         var plan = await Assert.ThrowsAsync<DomainRuleException>(() => world.Planner.PlanAsync(
             new Actor("out", "out"), world.Own, foreign.Id, "main", BaselineMode.Explicit, "v1", cancellationToken));
         var planForeign = await Assert.ThrowsAsync<DomainRuleException>(() => world.Planner.PlanAsync(
@@ -230,7 +230,7 @@ public class ProjectAccessGuardTests
 
         var member = new Actor("usr", "usr");
         await reviews.CreateDraftAsync(own.Id, "rev-1", "First", [new UploadedFile("a.txt", [1, 2, 3])], member, cancellationToken);
-        var thread = await threads.StartThreadAsync(own.Id, "rev-1", "a.txt", null, null, member, "first", cancellationToken);
+        var thread = await threads.StartThreadAsync(own.Id, "rev-1", new ThreadAnchor("a.txt"), member, "first", cancellationToken);
         var slot = await signing.AddSlotAsync(member, own.Id, "rev-1", ids["usr"], null, cancellationToken);
         return new World(
             store, users, repositories, reviews, threads, checklists, signing, planner, own.Id, other.Id, thread.Id, slot.Id, ids);

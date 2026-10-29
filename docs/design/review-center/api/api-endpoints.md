@@ -83,8 +83,8 @@ step.
     the service.
   - A project that does not exist, or that the owner may not see, is a 404.
   - With `files`, `ReviewService.CreateDraftAsync` is called; with `repository`,
-    `ReviewService.CreateFromRepositoryAsync`
-    is called with the repository, the head and baseline revisions, and the selection. Every other rule (the number and
+    `ReviewService.CreateFromRepositoryAsync` is called with a `RepositorySource` (the repository, the head and
+    baseline revisions, and the selection). Every other rule (the number and
     size of files, the identifier, the title, the repository state) belongs to the service and arrives as a rule
     exception.
   - The actor is built from the claims of the token principal, so the review records the user and that the API was used.

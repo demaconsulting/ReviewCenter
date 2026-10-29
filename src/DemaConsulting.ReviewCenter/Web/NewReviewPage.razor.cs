@@ -370,10 +370,7 @@ public partial class NewReviewPage : ComponentBase
                         ProjectId,
                         ReviewId,
                         ReviewTitle,
-                        repositoryId,
-                        HeadRevision,
-                        BaselineRevision,
-                        Selection,
+                        new RepositorySource(repositoryId, HeadRevision, BaselineRevision, Selection),
                         actor);
                     review = result.Review;
                     skipped = result.Skipped;

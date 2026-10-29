@@ -32,14 +32,15 @@ repository; `RevisionValidator`, the check that a revision name cannot be taken 
 `ReviewPlanner`, the planning of the reviews that a head revision needs from the review-sets of the repository; and
 `PersonalAccessTokenService`, the rules for the personal access tokens that let a script use the API as its owner. The
 domain types (`Project`, `EvidenceSettings`, `EvidenceSettingChange`, `Review`, `ReviewFile`, `ReviewState`,
-`UploadedFile`, `ReviewThread`, `ThreadSide`,
+`UploadedFile`, `ReviewThread`, `ThreadSide`, `ThreadAnchor`,
 `ReviewComment`,
 `ReviewThreadState`, the checklist types, `User`, `Actor`, the access types `ProjectMembership`, `ProjectRole`, and
 `ProjectMember`, the signing types `ReviewerSlot`,
 `ReviewSignature`, `SlotRole`, `ReviewRecord`, and `ReviewApproval`, the audit types `AuditEntry`, `AuditDraft`,
 and `AuditVerificationResult`, and the repository types `SourceRepository`, `RepositorySummary`, `NewRepository`,
 `RepositoryUpdate`, `TokenChange`, and `TokenAction`, and the git contract types `RepositoryAccess`, `GitChange`,
-`ChangeKind`, `SkippedEntry`, and `GitChangeSet`, and the review-source types `ReviewSource`, `ChangedFile`, and
+`ChangeKind`, `SkippedEntry`, and `GitChangeSet`, and the review-source types `ReviewSource`, `RepositorySource` (the
+revisions and selection a creation request names, before they are resolved), `ChangedFile`, and
 `RepositoryReviewResult`, and the diff types `FileDiff`, `FileDiffStatus`, `DiffLine`, `DiffLineKind`,
 `LineDiffResult`, `DiffSegment`, and `DiffRow`, and the planning types `BaselineMode`, `PlanRowStatus`, `PlanRow`, `ReviewPlan`,
 `PlanCreateRequest`, `PlanCreateOutcome`, `PlanCreateResult`, and `ReviewSetDefinition`), the personal access token

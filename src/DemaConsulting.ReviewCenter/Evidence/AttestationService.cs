@@ -106,8 +106,11 @@ internal sealed class AttestationService
     /// <param name="signer">The signer. Must not be null.</param>
     /// <param name="time">The clock. Must not be null.</param>
     /// <exception cref="ArgumentNullException">Thrown when an argument is null.</exception>
-    // The service is built by dependency injection, which supplies each collaborator as its own parameter;
-    // bundling them in an artificial parameter object would only hide what the service depends on
+    // The service is built by dependency injection, which supplies each collaborator as its own parameter. The eight
+    // are distinct roles that no other class uses together, so there is no concept to name. In particular the renderer
+    // and the signer are not one "PDF pipeline": the review is re-read between rendering and signing (AfterRender), and
+    // the key is fetched before either runs, so a facade over them would hide the steps this service orders
+    // deliberately. Bundling them into a parameter object would only hide what the service depends on
 #pragma warning disable S107
     public AttestationService(
         IReviewStore store,

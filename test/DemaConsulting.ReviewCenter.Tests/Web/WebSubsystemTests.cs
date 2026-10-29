@@ -133,8 +133,8 @@ public partial class WebSubsystemTests
             .CreateAsync("bob", "Bob", UserRole.Reviewer, TestBrowser.Password, TestContext.Current.CancellationToken);
         await app.Services.GetRequiredService<IReviewStore>()
             .AddMembershipAsync(bob.Id, project.Id, TestContext.Current.CancellationToken);
-        await threads.StartThreadAsync(project.Id, "rev-1", "a.txt", null, null, TestActors.Ann, "Open", TestContext.Current.CancellationToken);
-        var resolved = await threads.StartThreadAsync(project.Id, "rev-1", "a.txt", 1, 1, TestActors.Bob, "Done", TestContext.Current.CancellationToken);
+        await threads.StartThreadAsync(project.Id, "rev-1", new ThreadAnchor("a.txt"), TestActors.Ann, "Open", TestContext.Current.CancellationToken);
+        var resolved = await threads.StartThreadAsync(project.Id, "rev-1", new ThreadAnchor("a.txt", 1, 1), TestActors.Bob, "Done", TestContext.Current.CancellationToken);
         await threads.ResolveAsync(project.Id, "rev-1", resolved.Id, TestContext.Current.CancellationToken);
 
         // Act: request the review page
@@ -252,7 +252,7 @@ public partial class WebSubsystemTests
 
         // Act: a new thread changes the record
         await app.Services.GetRequiredService<ThreadService>().StartThreadAsync(
-            project.Id, "rev-1", "a.txt", null, null, TestActors.Ann, "Late remark", TestContext.Current.CancellationToken);
+            project.Id, "rev-1", new ThreadAnchor("a.txt"), TestActors.Ann, "Late remark", TestContext.Current.CancellationToken);
 
         // Assert: the signature is out of date and the review is In review again
         var changed = await ParseAsync(client, route);

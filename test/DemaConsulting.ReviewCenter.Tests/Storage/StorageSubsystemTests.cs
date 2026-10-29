@@ -118,7 +118,7 @@ public class StorageSubsystemTests
                 projectId, "rev-1", "First", [new("a.txt", TestContent.A)], TestContext.Current.CancellationToken);
             var threads = TestServices.Threads(first.Store, new FixedTimeProvider(_now));
             var thread = await threads.StartThreadAsync(
-                projectId, "rev-1", "a.txt", 1, 1, TestActors.Ann, "First", TestContext.Current.CancellationToken);
+                projectId, "rev-1", new ThreadAnchor("a.txt", 1, 1), TestActors.Ann, "First", TestContext.Current.CancellationToken);
             await threads.ReplyAsync(projectId, "rev-1", thread.Id, TestActors.Bob, "Second", TestContext.Current.CancellationToken);
             await threads.ResolveAsync(projectId, "rev-1", thread.Id, TestContext.Current.CancellationToken);
         }

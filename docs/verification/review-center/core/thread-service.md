@@ -100,15 +100,15 @@ file of a repository review that has no baseline commit, and on a file of an upl
 baseline side is rejected with `ThreadAnchorInvalid`; the same anchor on the head side is stored as a head thread.
 This scenario is tested by `ThreadService_StartThreadAsync_WholeFileSide_BaselineRefusedHeadStored`.
 
-**ThreadService_StartThreadAsync_NoSideGiven_IsHeadThread**: A thread started without naming a side is a head
-thread. This scenario is tested by `ThreadService_StartThreadAsync_NoSideGiven_IsHeadThread`.
+**ThreadService_StartThreadAsync_NoSideGiven_IsHeadThread**: An anchor that names no side is a head anchor, so the
+thread is a head thread. This scenario is tested by `ThreadService_StartThreadAsync_NoSideGiven_IsHeadThread`.
 
 **ThreadService_StartThreadAsync_BaselineRange_UsesBaselineLineCount**: A range over four lines is accepted on the
 baseline side of the modified file, which has four baseline lines, and rejected on its head side, which has two. This
 scenario is tested by `ThreadService_StartThreadAsync_BaselineRange_UsesBaselineLineCount`.
 
 **ThreadService_StartThreadAsync_UndefinedSide_ThrowsArgumentOutOfRange**: A side value that no member has is refused
-with an `ArgumentOutOfRangeException` naming the side, before the review is looked up (the same refusal on a review
+with an `ArgumentOutOfRangeException` naming the anchor, before the review is looked up (the same refusal on a review
 that does not exist). This scenario is tested by `ThreadService_StartThreadAsync_UndefinedSide_ThrowsArgumentOutOfRange`.
 
 **ThreadService_StartThreadAsync_Audit_NamesBaselineSideOnly**: The audit detail of a thread on one baseline line, on

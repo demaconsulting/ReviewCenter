@@ -342,7 +342,7 @@ public class ReviewPageTests : PageTestBase
         // Arrange: a page showing REV-1 with its file selected, a thread, typed text and an error, and a second review
         var projectId = await CreateReviewAsync(new UploadedFile("a.txt", TestContent.A));
         await Reviews.CreateDraftAsync(projectId, "REV-2", "Second review", [new("b.txt", TestContent.B)], TestContext.Current.CancellationToken);
-        await Threads.StartThreadAsync(projectId, "REV-1", "a.txt", null, null, TestActors.Ann, "Hello", TestContext.Current.CancellationToken);
+        await Threads.StartThreadAsync(projectId, "REV-1", new ThreadAnchor("a.txt"), TestActors.Ann, "Hello", TestContext.Current.CancellationToken);
         var cut = RenderPage(projectId);
         await cut.Find("[data-testid='file-select-0']").ClickAsync();
         await cut.Find("[data-testid='thread-text-input']").InputAsync("draft text");
@@ -429,12 +429,12 @@ public class ReviewPageTests : PageTestBase
         var projectId = await CreateReviewAsync(
             new UploadedFile("a.txt", "1\n2\n3\n4\n"u8.ToArray()),
             new UploadedFile("b.txt", TestContent.B));
-        var whole = await Threads.StartThreadAsync(projectId, "REV-1", "a.txt", null, null, TestActors.Ann, "Whole", TestContext.Current.CancellationToken);
-        var range = await Threads.StartThreadAsync(projectId, "REV-1", "a.txt", 2, 3, TestActors.Bob, "Range", TestContext.Current.CancellationToken);
+        var whole = await Threads.StartThreadAsync(projectId, "REV-1", new ThreadAnchor("a.txt"), TestActors.Ann, "Whole", TestContext.Current.CancellationToken);
+        var range = await Threads.StartThreadAsync(projectId, "REV-1", new ThreadAnchor("a.txt", 2, 3), TestActors.Bob, "Range", TestContext.Current.CancellationToken);
         await Threads.ReplyAsync(projectId, "REV-1", range.Id, TestActors.Cy, "Reply", TestContext.Current.CancellationToken);
-        var resolved = await Threads.StartThreadAsync(projectId, "REV-1", "a.txt", 4, 4, TestActors.Dee, "Done", TestContext.Current.CancellationToken);
+        var resolved = await Threads.StartThreadAsync(projectId, "REV-1", new ThreadAnchor("a.txt", 4, 4), TestActors.Dee, "Done", TestContext.Current.CancellationToken);
         await Threads.ResolveAsync(projectId, "REV-1", resolved.Id, TestContext.Current.CancellationToken);
-        await Threads.StartThreadAsync(projectId, "REV-1", "b.txt", null, null, TestActors.Eve, "Other file", TestContext.Current.CancellationToken);
+        await Threads.StartThreadAsync(projectId, "REV-1", new ThreadAnchor("b.txt"), TestActors.Eve, "Other file", TestContext.Current.CancellationToken);
         var cut = RenderPage(projectId);
 
         // Act: select the first file
@@ -632,7 +632,7 @@ public class ReviewPageTests : PageTestBase
         // Arrange: a selected file with a thread by Ann, with Bob signed in
         SignInAs("bob", "Bob");
         var projectId = await CreateReviewAsync(new UploadedFile("a.txt", TestContent.A));
-        var thread = await Threads.StartThreadAsync(projectId, "REV-1", "a.txt", null, null, TestActors.Ann, "First", TestContext.Current.CancellationToken);
+        var thread = await Threads.StartThreadAsync(projectId, "REV-1", new ThreadAnchor("a.txt"), TestActors.Ann, "First", TestContext.Current.CancellationToken);
         var cut = RenderPage(projectId);
         await cut.Find("[data-testid='file-select-0']").ClickAsync();
 
@@ -662,7 +662,7 @@ public class ReviewPageTests : PageTestBase
         // Arrange: a selected file with a thread, with Bob signed in
         SignInAs("bob", "Bob");
         var projectId = await CreateReviewAsync(new UploadedFile("a.txt", TestContent.A));
-        var thread = await Threads.StartThreadAsync(projectId, "REV-1", "a.txt", null, null, TestActors.Ann, "First", TestContext.Current.CancellationToken);
+        var thread = await Threads.StartThreadAsync(projectId, "REV-1", new ThreadAnchor("a.txt"), TestActors.Ann, "First", TestContext.Current.CancellationToken);
         var cut = RenderPage(projectId);
         await cut.Find("[data-testid='file-select-0']").ClickAsync();
         await cut.Find($"[data-testid='reply-text-{thread.Id}']").InputAsync("Second");
@@ -684,7 +684,7 @@ public class ReviewPageTests : PageTestBase
     {
         // Arrange: a selected file with an open thread
         var projectId = await CreateReviewAsync(new UploadedFile("a.txt", TestContent.A));
-        var thread = await Threads.StartThreadAsync(projectId, "REV-1", "a.txt", null, null, TestActors.Ann, "First", TestContext.Current.CancellationToken);
+        var thread = await Threads.StartThreadAsync(projectId, "REV-1", new ThreadAnchor("a.txt"), TestActors.Ann, "First", TestContext.Current.CancellationToken);
         var cut = RenderPage(projectId);
         await cut.Find("[data-testid='file-select-0']").ClickAsync();
 
@@ -719,8 +719,8 @@ public class ReviewPageTests : PageTestBase
     {
         // Arrange: an open thread and a resolved thread on the selected file
         var projectId = await CreateReviewAsync(new UploadedFile("a.txt", TestContent.A));
-        var open = await Threads.StartThreadAsync(projectId, "REV-1", "a.txt", null, null, TestActors.Ann, "Open one", TestContext.Current.CancellationToken);
-        var resolved = await Threads.StartThreadAsync(projectId, "REV-1", "a.txt", null, null, TestActors.Ann, "Resolved one", TestContext.Current.CancellationToken);
+        var open = await Threads.StartThreadAsync(projectId, "REV-1", new ThreadAnchor("a.txt"), TestActors.Ann, "Open one", TestContext.Current.CancellationToken);
+        var resolved = await Threads.StartThreadAsync(projectId, "REV-1", new ThreadAnchor("a.txt"), TestActors.Ann, "Resolved one", TestContext.Current.CancellationToken);
         await Threads.ResolveAsync(projectId, "REV-1", resolved.Id, TestContext.Current.CancellationToken);
         var cut = RenderPage(projectId);
         await cut.Find("[data-testid='file-select-0']").ClickAsync();
@@ -747,7 +747,7 @@ public class ReviewPageTests : PageTestBase
         // Arrange: a thread whose author and text contain markup
         var projectId = await CreateReviewAsync(new UploadedFile("a.txt", TestContent.A));
         var thread = await Threads.StartThreadAsync(
-            projectId, "REV-1", "a.txt", null, null, new Actor("ann", "<i>Ann</i>"), "<script>alert(1)</script> & <b>bold</b>", TestContext.Current.CancellationToken);
+            projectId, "REV-1", new ThreadAnchor("a.txt"), new Actor("ann", "<i>Ann</i>"), "<script>alert(1)</script> & <b>bold</b>", TestContext.Current.CancellationToken);
         var cut = RenderPage(projectId);
 
         // Act: select the file
@@ -851,7 +851,7 @@ public class ReviewPageTests : PageTestBase
         }
 
         var thread = await Threads.StartThreadAsync(
-            projectId, "REV-1", "a.txt", null, null, TestActors.Ann, "Done", TestContext.Current.CancellationToken);
+            projectId, "REV-1", new ThreadAnchor("a.txt"), TestActors.Ann, "Done", TestContext.Current.CancellationToken);
         await Threads.ResolveAsync(projectId, "REV-1", thread.Id, TestContext.Current.CancellationToken);
 
         // Act, Assert: one sentence says that only the reviewer slot is missing
@@ -923,9 +923,9 @@ public class ReviewPageTests : PageTestBase
         Assert.Equal("No open threads.", cut.Find("[data-testid='thread-index-empty']").TextContent);
 
         // Arrange: an open thread with a reply on a.txt and a resolved thread on b.txt, loaded by selecting a file
-        var open = await Threads.StartThreadAsync(projectId, "REV-1", "a.txt", 2, 3, TestActors.Ann, "Look", TestContext.Current.CancellationToken);
+        var open = await Threads.StartThreadAsync(projectId, "REV-1", new ThreadAnchor("a.txt", 2, 3), TestActors.Ann, "Look", TestContext.Current.CancellationToken);
         await Threads.ReplyAsync(projectId, "REV-1", open.Id, TestActors.Bob, "Done", TestContext.Current.CancellationToken);
-        var resolved = await Threads.StartThreadAsync(projectId, "REV-1", "b.txt", null, null, TestActors.Cy, "Old", TestContext.Current.CancellationToken);
+        var resolved = await Threads.StartThreadAsync(projectId, "REV-1", new ThreadAnchor("b.txt"), TestActors.Cy, "Old", TestContext.Current.CancellationToken);
         await Threads.ResolveAsync(projectId, "REV-1", resolved.Id, TestContext.Current.CancellationToken);
         await cut.Find("[data-testid='file-select-0']").ClickAsync();
 
@@ -968,7 +968,7 @@ public class ReviewPageTests : PageTestBase
         var projectId = await CreateReviewAsync(
             new UploadedFile("a.txt", TestContent.A),
             new UploadedFile("b.txt", "x\ny\nz\n"u8.ToArray()));
-        var thread = await Threads.StartThreadAsync(projectId, "REV-1", "b.txt", 2, 3, TestActors.Ann, "Check this", TestContext.Current.CancellationToken);
+        var thread = await Threads.StartThreadAsync(projectId, "REV-1", new ThreadAnchor("b.txt", 2, 3), TestActors.Ann, "Check this", TestContext.Current.CancellationToken);
         await Threads.ResolveAsync(projectId, "REV-1", thread.Id, TestContext.Current.CancellationToken);
         var cut = RenderPage(projectId);
         await cut.Find("[data-testid='file-select-0']").ClickAsync();
@@ -1006,10 +1006,10 @@ public class ReviewPageTests : PageTestBase
     {
         // Arrange: a resolved thread with a reply and an open thread on the selected file
         var projectId = await CreateReviewAsync(new UploadedFile("a.txt", "a\nb\n"u8.ToArray()));
-        var done = await Threads.StartThreadAsync(projectId, "REV-1", "a.txt", 1, 1, TestActors.Ann, "Fixed?", TestContext.Current.CancellationToken);
+        var done = await Threads.StartThreadAsync(projectId, "REV-1", new ThreadAnchor("a.txt", 1, 1), TestActors.Ann, "Fixed?", TestContext.Current.CancellationToken);
         await Threads.ReplyAsync(projectId, "REV-1", done.Id, TestActors.Bob, "Yes", TestContext.Current.CancellationToken);
         await Threads.ResolveAsync(projectId, "REV-1", done.Id, TestContext.Current.CancellationToken);
-        var open = await Threads.StartThreadAsync(projectId, "REV-1", "a.txt", 2, 2, TestActors.Cy, "Why?", TestContext.Current.CancellationToken);
+        var open = await Threads.StartThreadAsync(projectId, "REV-1", new ThreadAnchor("a.txt", 2, 2), TestActors.Cy, "Why?", TestContext.Current.CancellationToken);
         var cut = RenderPage(projectId);
 
         // Act: select the file
@@ -1055,8 +1055,8 @@ public class ReviewPageTests : PageTestBase
     {
         // Arrange: a selected file with an open and a resolved thread, and an error shown
         var projectId = await CreateReviewAsync(new UploadedFile("a.txt", "a\nb\n"u8.ToArray()));
-        await Threads.StartThreadAsync(projectId, "REV-1", "a.txt", 1, 2, TestActors.Ann, "First", TestContext.Current.CancellationToken);
-        var done = await Threads.StartThreadAsync(projectId, "REV-1", "a.txt", null, null, TestActors.Bob, "Done", TestContext.Current.CancellationToken);
+        await Threads.StartThreadAsync(projectId, "REV-1", new ThreadAnchor("a.txt", 1, 2), TestActors.Ann, "First", TestContext.Current.CancellationToken);
+        var done = await Threads.StartThreadAsync(projectId, "REV-1", new ThreadAnchor("a.txt"), TestActors.Bob, "Done", TestContext.Current.CancellationToken);
         await Threads.ResolveAsync(projectId, "REV-1", done.Id, TestContext.Current.CancellationToken);
         var cut = RenderPage(projectId);
         await cut.Find("[data-testid='index-filter-all']").ClickAsync();
@@ -1257,7 +1257,7 @@ public class ReviewPageTests : PageTestBase
         // Arrange: a slot of ann and bob on a review with unanswered checks and an open thread
         var ids = await CreateUsersAsync();
         var projectId = await CreateReviewAsync(new UploadedFile("a.txt", TestContent.A));
-        await Threads.StartThreadAsync(projectId, "REV-1", "a.txt", null, null, TestActors.Bob, "Open", TestContext.Current.CancellationToken);
+        await Threads.StartThreadAsync(projectId, "REV-1", new ThreadAnchor("a.txt"), TestActors.Bob, "Open", TestContext.Current.CancellationToken);
         var slot = await Signing.AddSlotAsync(
             TestActors.Ann, projectId, "REV-1", ids["ann"], ids["bob"], TestContext.Current.CancellationToken);
 
@@ -1488,7 +1488,7 @@ public class ReviewPageTests : PageTestBase
         await cut.Find($"[data-testid='sign-form-{slotId}']").SubmitAsync();
 
         // Act: a comment changes the record, and the page is opened again
-        await Threads.StartThreadAsync(projectId, "REV-1", "a.txt", null, null, TestActors.Bob, "Late", TestContext.Current.CancellationToken);
+        await Threads.StartThreadAsync(projectId, "REV-1", new ThreadAnchor("a.txt"), TestActors.Bob, "Late", TestContext.Current.CancellationToken);
         await Threads.ResolveAsync(
             projectId, "REV-1", (await Threads.ListAsync(projectId, "REV-1", TestContext.Current.CancellationToken)).Single().Id, TestContext.Current.CancellationToken);
         var reopened = RenderPage(projectId);
@@ -1509,7 +1509,7 @@ public class ReviewPageTests : PageTestBase
         // Arrange: a signable review drawn for ann, then changed by somebody else
         var (projectId, slotId, _) = await CreateSignableAsync();
         var cut = RenderPage(projectId);
-        await Threads.StartThreadAsync(projectId, "REV-1", "a.txt", null, null, TestActors.Bob, "Late", TestContext.Current.CancellationToken);
+        await Threads.StartThreadAsync(projectId, "REV-1", new ThreadAnchor("a.txt"), TestActors.Bob, "Late", TestContext.Current.CancellationToken);
         await Threads.ResolveAsync(
             projectId, "REV-1", (await Threads.ListAsync(projectId, "REV-1", TestContext.Current.CancellationToken)).Single().Id, TestContext.Current.CancellationToken);
         await cut.Find($"[data-testid='sign-password-{slotId}']").InputAsync(SigningPassword);
@@ -1822,7 +1822,7 @@ public class ReviewPageTests : PageTestBase
             new UploadedFile("b.txt", "bravo-confidential\n"u8.ToArray()));
         await Users.CreateAsync("out", "Out", UserRole.Reviewer, SigningPassword, cancellationToken);
         var thread = await Threads.StartThreadAsync(
-            projectId, "REV-1", "b.txt", 1, 1, TestActors.Ann, "confidential-thread-comment", cancellationToken);
+            projectId, "REV-1", new ThreadAnchor("b.txt", 1, 1), TestActors.Ann, "confidential-thread-comment", cancellationToken);
         await AddReviewerSlotAsync(projectId, member.Id);
         var item = DefaultChecklist.Current.Sections.SelectMany(section => section.Items).First();
         await Checklists.SetAnswerAsync(projectId, "REV-1", item.Id, ChecklistOutcome.Pass, null, TestActors.Ann, cancellationToken);
