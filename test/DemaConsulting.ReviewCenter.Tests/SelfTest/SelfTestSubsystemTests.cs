@@ -29,8 +29,14 @@ namespace DemaConsulting.ReviewCenter.Tests.SelfTest;
 ///     real checks read the one shared real run; the others use fast stand-in checks.
 /// </summary>
 [Collection("Sequential")]
-public class SelfTestSubsystemTests
+public partial class SelfTestSubsystemTests
 {
+    /// <summary>
+    ///     Matches a passed outcome in TRX text.
+    /// </summary>
+    /// <returns>The pattern.</returns>
+    [GeneratedRegex("outcome=\"Passed\"")]
+    private static partial Regex PassedOutcome();
     /// <summary>
     ///     Test that self-test subsystem can run the real validation workflow without result files.
     /// </summary>
@@ -69,7 +75,7 @@ public class SelfTestSubsystemTests
         // Assert: the TRX has the standard format and each of the nine checks, passed, with a duration
         Assert.Equal(0, run.ExitCode);
         Assert.Contains("<TestRun", run.Trx);
-        Assert.Equal(9, Regex.Matches(run.Trx, "outcome=\"Passed\"").Count);
+        Assert.Equal(9, PassedOutcome().Count(run.Trx));
         Assert.DoesNotContain("Failed", run.Trx);
         Assert.DoesNotContain("NotExecuted", run.Trx);
         foreach (var name in RealValidationRun.CheckNames)
@@ -175,18 +181,16 @@ public class SelfTestSubsystemTests
             }
 
             // Act: run validation with JUnit XML output
-            using (var junitContext = Context.Create(junitArgs))
-            {
-                Validation.Run(junitContext, checks);
+            using var junitContext = Context.Create(junitArgs);
+            Validation.Run(junitContext, checks);
 
-                // Assert: verify validation completed and JUnit XML result file was generated with standard format
-                Assert.True(junitContext.Validate, "Context should have validate flag set for JUnit run");
-                Assert.Equal(0, junitContext.ExitCode);
-                Assert.True(File.Exists(junitFile), "JUnit file should be generated");
-                var junitContent = File.ReadAllText(junitFile);
-                Assert.Contains("<testsuites", junitContent);
-                Assert.Contains("<skipped", junitContent);
-            }
+            // Assert: verify validation completed and JUnit XML result file was generated with standard format
+            Assert.True(junitContext.Validate, "Context should have validate flag set for JUnit run");
+            Assert.Equal(0, junitContext.ExitCode);
+            Assert.True(File.Exists(junitFile), "JUnit file should be generated");
+            var junitContent = File.ReadAllText(junitFile);
+            Assert.Contains("<testsuites", junitContent);
+            Assert.Contains("<skipped", junitContent);
         }
         finally
         {

@@ -18,6 +18,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
+using System.Text.RegularExpressions;
 using DemaConsulting.ReviewCenter.Hosting;
 using DemaConsulting.ReviewCenter.SelfTest;
 using DemaConsulting.ReviewCenter.SelfTest.Checks;
@@ -37,8 +38,15 @@ namespace DemaConsulting.ReviewCenter.Tests.SelfTest;
 ///     the default validation (see <see cref="RealValidationRun"/>), so the suite does not pay for them twice.
 /// </summary>
 [Collection("Sequential")]
-public class ValidationChecksTests
+public partial class ValidationChecksTests
 {
+    /// <summary>
+    ///     Matches the line of the host check that reports the loopback port it listened on.
+    /// </summary>
+    /// <returns>The pattern; group 1 is the port.</returns>
+    [GeneratedRegex(@"ReviewCenter_HostStart - Passed \(\d+ ms\): listened on 127\.0\.0\.1:(\d+);")]
+    private static partial Regex HostListeningLine();
+
     /// <summary>
     ///     The pinned fingerprint of the fingerprint check, computed once and independently of the production code.
     /// </summary>
@@ -145,9 +153,7 @@ public class ValidationChecksTests
         // poisoned one
         Assert.Equal(0, run.ExitCode);
         Assert.Contains("Passed: 9", run.Output);
-        var match = System.Text.RegularExpressions.Regex.Match(
-            run.Output,
-            @"ReviewCenter_HostStart - Passed \(\d+ ms\): listened on 127\.0\.0\.1:(\d+);");
+        var match = HostListeningLine().Match(run.Output);
         Assert.True(match.Success, "The host check should report a loopback address:" + Environment.NewLine + run.Output);
         Assert.NotEqual(run.PoisonedPort, int.Parse(match.Groups[1].Value, System.Globalization.CultureInfo.InvariantCulture));
 

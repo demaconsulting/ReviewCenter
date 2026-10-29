@@ -581,8 +581,8 @@ public class ReviewPlannerTests
         // Arrange: a good set, one with an invalid path, one with an id that is too long and one with too many files
         var f = await CreateAsync();
         var files = Enumerable.Range(0, ReviewLimits.MaxFileCount + 1)
-            .Select(index => ($"big/f{index}.txt", ChangeKind.Added, (string?)null, (string?)"x"))
-            .Append((".reviewmark.yaml", ChangeKind.Added, null, ConfigText))
+            .Select(index => (Path: $"big/f{index}.txt", Kind: ChangeKind.Added, Baseline: default(string?), Head: (string?)"x"))
+            .Append((Path: ".reviewmark.yaml", Kind: ChangeKind.Added, Baseline: null, Head: ConfigText))
             .ToList();
         f.Git.Script(null, H2, files);
         f.Parser.Sets =

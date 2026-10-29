@@ -285,7 +285,7 @@ internal static class RealValidationRun
     /// <returns>The port number.</returns>
     private static int FindFreePort()
     {
-        var listener = new System.Net.Sockets.TcpListener(System.Net.IPAddress.Loopback, 0);
+        using var listener = new System.Net.Sockets.TcpListener(System.Net.IPAddress.Loopback, 0);
         listener.Start();
         try
         {

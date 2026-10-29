@@ -117,10 +117,10 @@ public class ReviewServiceTests
         Assert.Equal(_now, review.Created);
         Assert.Equal("First review", review.Title);
         Assert.Equal(TestContent.FingerprintABC, review.ContentFingerprint);
-        Assert.Single(store.Reviews);
+        var storedReview = Assert.Single(store.Reviews);
 
         // Assert: every file carries the size and hash of its own content
-        var stored = store.Reviews.Single().Files.ToDictionary(file => file.Path);
+        var stored = storedReview.Files.ToDictionary(file => file.Path);
         Assert.Equal(TestContent.A.Length, stored["a.txt"].Size);
         Assert.Equal(TestContent.HashA, stored["a.txt"].Sha256);
         Assert.Equal(TestContent.B.Length, stored["b.txt"].Size);

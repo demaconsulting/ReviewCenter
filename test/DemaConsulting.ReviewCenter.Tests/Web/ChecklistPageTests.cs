@@ -32,8 +32,15 @@ namespace DemaConsulting.ReviewCenter.Tests.Web;
 /// <summary>
 ///     Unit tests for the <see cref="ChecklistPage"/> component, rendered in memory with bUnit.
 /// </summary>
-public class ChecklistPageTests : PageTestBase
+public partial class ChecklistPageTests : PageTestBase
 {
+    /// <summary>
+    ///     Matches a kebab-case test identifier.
+    /// </summary>
+    /// <returns>The pattern.</returns>
+    [GeneratedRegex("^[a-z0-9]+(?:[-.][a-z0-9]+)*$")]
+    private static partial Regex KebabCaseTestId();
+
     /// <summary>
     ///     Creates a project with the review <c>REV-1</c>, which gets the default checklist.
     /// </summary>
@@ -507,7 +514,7 @@ public class ChecklistPageTests : PageTestBase
         {
             var testId = element.GetAttribute("data-testid");
             Assert.True(
-                testId is not null && Regex.IsMatch(testId, "^[a-z0-9]+(?:[-.][a-z0-9]+)*$"),
+                testId is not null && KebabCaseTestId().IsMatch(testId),
                 $"A <{element.LocalName}> has no kebab-case data-testid (found '{testId}').");
         }
     }

@@ -78,12 +78,13 @@ public class PuppetProgramTests
 
         foreach (var (commandLine, message) in cases)
         {
-            var error = new StringWriter();
+            using var error = new StringWriter();
+            using var unusedOutput = new StringWriter();
 
             // Act: run it (nothing is started because parsing fails first)
             var exitCode = await PuppetProgram.RunAsync(
                 commandLine.Split(' ', StringSplitOptions.RemoveEmptyEntries),
-                new StringWriter(),
+                unusedOutput,
                 error,
                 NoControlFile(),
                 TestContext.Current.CancellationToken);
@@ -94,8 +95,9 @@ public class PuppetProgramTests
         }
 
         // Assert: help prints the usage and succeeds
-        var output = new StringWriter();
-        Assert.Equal(0, await PuppetProgram.RunAsync(["--help"], output, new StringWriter(), NoControlFile(), TestContext.Current.CancellationToken));
+        using var output = new StringWriter();
+        using var helpError = new StringWriter();
+        Assert.Equal(0, await PuppetProgram.RunAsync(["--help"], output, helpError, NoControlFile(), TestContext.Current.CancellationToken));
         Assert.Contains("puppet screenshot", output.ToString(), StringComparison.Ordinal);
     }
 
@@ -108,13 +110,14 @@ public class PuppetProgramTests
     {
         // Arrange: no control file at all, then a stale one whose port nobody listens on
         var controlFile = NoControlFile();
-        var absent = new StringWriter();
-        var stale = new StringWriter();
+        using var absent = new StringWriter();
+        using var stale = new StringWriter();
+        using var unused = new StringWriter();
 
         // Act: send a command in both situations
-        var absentCode = await PuppetProgram.RunAsync(["snapshot"], new StringWriter(), absent, controlFile, TestContext.Current.CancellationToken);
+        var absentCode = await PuppetProgram.RunAsync(["snapshot"], unused, absent, controlFile, TestContext.Current.CancellationToken);
         ControlChannel.Write(controlFile, new ControlInfo(1, null, null));
-        var staleCode = await PuppetProgram.RunAsync(["snapshot"], new StringWriter(), stale, controlFile, TestContext.Current.CancellationToken);
+        var staleCode = await PuppetProgram.RunAsync(["snapshot"], unused, stale, controlFile, TestContext.Current.CancellationToken);
         File.Delete(controlFile);
 
         // Assert: both exit with 2 and point at 'puppet start'
@@ -133,12 +136,13 @@ public class PuppetProgramTests
         // Arrange: a successful multi-line result with one new error, and a failure
         var ok = new PuppetResponse(true, "line 1\nline 2", "http://x/", "Title", ["console.error: boom"]);
         var failed = new PuppetResponse(false, "click timed out", "http://x/", "Title", []);
-        var output = new StringWriter();
-        var error = new StringWriter();
+        using var output = new StringWriter();
+        using var error = new StringWriter();
+        using var unused = new StringWriter();
 
         // Act: format both
         var okCode = PuppetProgram.Format(ok, output, error);
-        var failedCode = PuppetProgram.Format(failed, new StringWriter(), error);
+        var failedCode = PuppetProgram.Format(failed, unused, error);
 
         // Assert: the result, the footer, and the event line are printed; a failure goes to stderr with exit code 1
         Assert.Equal(0, okCode);

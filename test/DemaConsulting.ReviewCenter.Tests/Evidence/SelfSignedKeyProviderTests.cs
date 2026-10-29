@@ -148,27 +148,21 @@ public sealed class SelfSignedKeyProviderTests : IDisposable
     [Fact]
     public async Task SelfSignedKeyProvider_GetSigningKey_ConcurrentFirstUse_CreatesOneKeyForEveryone()
     {
-        // Arrange: four providers on one empty folder
+        // Arrange: four providers on one empty folder, each created and disposed by the task that uses it
         var folder = NewFolder();
-        var providers = Enumerable.Range(0, 4)
-            .Select(_ => new SelfSignedKeyProvider(Options(folder), TimeProvider.System, Microsoft.Extensions.Logging.Abstractions.NullLogger.Instance))
-            .ToList();
-        try
-        {
-            // Act: all ask at once
-            var thumbprints = await Task.WhenAll(providers.Select(p => Task.Run(() => p.GetSigningKey().Info.Thumbprint, TestContext.Current.CancellationToken)));
 
-            // Assert: one thumbprint, one file, no leftovers
-            Assert.Single(thumbprints.Distinct());
-            Assert.Equal(new[] { SelfSignedKeyProvider.FileName }, Directory.GetFiles(folder).Select(Path.GetFileName));
-        }
-        finally
-        {
-            foreach (var provider in providers)
+        // Act: all ask at once
+        var thumbprints = await Task.WhenAll(Enumerable.Range(0, 4).Select(_ => Task.Run(
+            () =>
             {
-                provider.Dispose();
-            }
-        }
+                using var provider = new SelfSignedKeyProvider(Options(folder), TimeProvider.System, Microsoft.Extensions.Logging.Abstractions.NullLogger.Instance);
+                return provider.GetSigningKey().Info.Thumbprint;
+            },
+            TestContext.Current.CancellationToken)));
+
+        // Assert: one thumbprint, one file, no leftovers
+        Assert.Single(thumbprints.Distinct());
+        Assert.Equal(new[] { SelfSignedKeyProvider.FileName }, Directory.GetFiles(folder).Select(Path.GetFileName));
     }
 
     /// <summary>

@@ -137,7 +137,7 @@ internal sealed class FakeTotpStore : ITotpStore
                 ConfirmedAt = now,
                 LastAcceptedStep = acceptedStep
             };
-            _codes.AddRange(recoveryHashes.Select(hash => (userId, hash, (DateTimeOffset?)null)));
+            _codes.AddRange(recoveryHashes.Select(hash => (userId, hash, default(DateTimeOffset?))));
             Audits.Add(audit);
             return Task.FromResult(true);
         }
@@ -204,7 +204,7 @@ internal sealed class FakeTotpStore : ITotpStore
             }
 
             _codes.RemoveAll(c => c.UserId == userId);
-            _codes.AddRange(hashes.Select(hash => (userId, hash, (DateTimeOffset?)null)));
+            _codes.AddRange(hashes.Select(hash => (userId, hash, default(DateTimeOffset?))));
             Audits.Add(audit);
             return Task.FromResult(true);
         }

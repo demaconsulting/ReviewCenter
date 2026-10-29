@@ -640,9 +640,10 @@ public class TotpSignInTests
         using var browser = new TestBrowser(world.App);
 
         // Act: sign in and post to the code endpoint
-        var login = await browser.LoginAsync("ann", TestBrowser.Password);
-        var code = await browser.Client.PostAsync(
-            "/auth/login-totp", new FormUrlEncodedContent(Code("123456")), Token);
+        using var login = await browser.LoginAsync("ann", TestBrowser.Password);
+        using var codeContent = new FormUrlEncodedContent(Code("123456"));
+        using var code = await browser.Client.PostAsync(
+            "/auth/login-totp", codeContent, Token);
 
         // Assert: password-only sign-in, and the endpoint is not there
         Assert.Equal("/", login.Headers.Location?.OriginalString);

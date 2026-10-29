@@ -120,7 +120,7 @@ public class TemporaryDirectoryTests
     public void TemporaryDirectory_Dispose_DirectoryWithReadOnlyFile_DeletesEverything()
     {
         // Arrange: a directory that holds a read-only file in a nested folder, like a git object file
-        var directory = new TemporaryDirectory();
+        using var directory = new TemporaryDirectory();
         var path = directory.GetFilePath("objects/ab/object");
         File.WriteAllText(path, "content");
         File.SetAttributes(path, FileAttributes.ReadOnly);
@@ -157,7 +157,7 @@ public class TemporaryDirectoryTests
     public void TemporaryDirectory_Dispose_FileInUse_DoesNotThrow()
     {
         // Arrange: a file that stays open, which blocks the delete on Windows
-        var directory = new TemporaryDirectory();
+        using var directory = new TemporaryDirectory();
         var path = directory.GetFilePath("locked.txt");
         using var stream = new FileStream(path, FileMode.Create, FileAccess.ReadWrite, FileShare.None);
 
@@ -182,16 +182,23 @@ public class TemporaryDirectoryTests
         Assert.SkipUnless(OperatingSystem.IsWindows(), "An open file blocks a delete only on Windows");
 
         // Arrange: a file that stays open for about 100 ms, while the directory retries every 50 ms for up to 2 s; the
-        // generous bound keeps the test stable on a machine that is busy, and only a delete that never retries fails it
+        // generous bound keeps the test stable on a machine that is busy, and only a delete that never retries fails it.
+        // A dedicated thread releases the file, so a starved thread pool cannot delay the release past the retries
         var directory = new TemporaryDirectory(40, TimeSpan.FromMilliseconds(50));
         var path = directory.GetFilePath("locked.txt");
-        var stream = new FileStream(path, FileMode.Create, FileAccess.ReadWrite, FileShare.None);
+        using var stream = new FileStream(path, FileMode.Create, FileAccess.ReadWrite, FileShare.None);
         var directoryPath = directory.DirectoryPath;
-        var release = Task.Run(async () =>
-        {
-            await Task.Delay(100, TestContext.Current.CancellationToken);
-            await stream.DisposeAsync();
-        }, TestContext.Current.CancellationToken);
+        var release = Task.Factory.StartNew(
+            () =>
+            {
+                // A timed wait on a gate that is never set pauses this dedicated thread for about 100 ms
+                using var gate = new ManualResetEventSlim(false);
+                gate.Wait(TimeSpan.FromMilliseconds(100));
+                stream.Dispose();
+            },
+            TestContext.Current.CancellationToken,
+            TaskCreationOptions.LongRunning,
+            TaskScheduler.Default);
 
         // Act: dispose while the file is still open
         var exception = Record.Exception(directory.Dispose);
@@ -212,7 +219,7 @@ public class TemporaryDirectoryTests
         Assert.SkipUnless(OperatingSystem.IsWindows(), "An open file blocks a delete only on Windows");
 
         // Arrange: a file that stays open for the whole test and the default policy of 5 attempts, 75 ms apart
-        var directory = new TemporaryDirectory();
+        using var directory = new TemporaryDirectory();
         var path = directory.GetFilePath("locked.txt");
         using var stream = new FileStream(path, FileMode.Create, FileAccess.ReadWrite, FileShare.None);
 
@@ -261,7 +268,7 @@ public class TemporaryDirectoryTests
         Assert.SkipUnless(OperatingSystem.IsWindows(), "An open file blocks a delete only on Windows");
 
         // Arrange: a locked file and a policy of one attempt with a long pause that must never be taken
-        var directory = new TemporaryDirectory(1, TimeSpan.FromSeconds(30));
+        using var directory = new TemporaryDirectory(1, TimeSpan.FromSeconds(30));
         var path = directory.GetFilePath("locked.txt");
         using var stream = new FileStream(path, FileMode.Create, FileAccess.ReadWrite, FileShare.None);
 

@@ -157,16 +157,10 @@ internal sealed class FakeAuditStore(TimeProvider timeProvider) : IAuditStore
             query = query.Where(e => e.Sequence < before);
         }
 
-        IReadOnlyList<AuditEntry> result;
-        if (afterSequence is { } after)
-        {
-            result = query.Where(e => e.Sequence > after).OrderBy(e => e.Sequence).Take(take)
-                .OrderByDescending(e => e.Sequence).ToList();
-        }
-        else
-        {
-            result = query.OrderByDescending(e => e.Sequence).Take(take).ToList();
-        }
+        IReadOnlyList<AuditEntry> result = afterSequence is { } after
+            ? query.Where(e => e.Sequence > after).OrderBy(e => e.Sequence).Take(take)
+                .OrderByDescending(e => e.Sequence).ToList()
+            : query.OrderByDescending(e => e.Sequence).Take(take).ToList();
 
         return Task.FromResult(result);
     }

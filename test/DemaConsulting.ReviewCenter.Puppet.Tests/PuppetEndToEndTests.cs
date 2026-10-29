@@ -71,8 +71,8 @@ public class PuppetEndToEndTests
 
         async Task<(int Code, string Output, string Error)> Run(params string[] args)
         {
-            var output = new StringWriter();
-            var error = new StringWriter();
+            using var output = new StringWriter();
+            using var error = new StringWriter();
             return (await PuppetProgram.RunAsync(args, output, error, controlFile, cancellation), output.ToString(), error.ToString());
         }
 
@@ -190,12 +190,13 @@ public class PuppetEndToEndTests
         await File.WriteAllTextAsync(sample, "alpha\nBETA\ngamma\n", cancellation);
         await RunGitAsync(repository, cancellation, "commit", "-a", "-m", "change");
 
-        var server = await TestServer.StartAsync(cancellation, seedUser: true, gitCachePath: gitCache);
+        using var cleanup = new TemporaryFolder(directory);
+        using var server = await TestServer.StartAsync(cancellation, seedUser: true, gitCachePath: gitCache);
 
         async Task<(int Code, string Output, string Error)> Run(params string[] args)
         {
-            var output = new StringWriter();
-            var error = new StringWriter();
+            using var output = new StringWriter();
+            using var error = new StringWriter();
             return (await PuppetProgram.RunAsync(args, output, error, controlFile, cancellation), output.ToString(), error.ToString());
         }
 
@@ -271,8 +272,6 @@ public class PuppetEndToEndTests
         {
             // A failing test must not leave a browser behind; this is a no-op after a successful stop
             await Run("stop");
-            server.Dispose();
-            DeleteDirectory(directory);
         }
     }
 
@@ -353,23 +352,29 @@ public class PuppetEndToEndTests
     }
 
     /// <summary>
-    ///     Removes a temporary folder, including read-only git objects; errors are ignored (best effort).
+    ///     A temporary folder that is removed, best effort, when disposed.
     /// </summary>
     /// <param name="directory">The folder to remove.</param>
-    private static void DeleteDirectory(DirectoryInfo directory)
+    private sealed class TemporaryFolder(DirectoryInfo directory) : IDisposable
     {
-        try
+        /// <summary>
+        ///     Removes the folder, including read-only git objects; errors are ignored (best effort).
+        /// </summary>
+        public void Dispose()
         {
-            foreach (var file in directory.EnumerateFiles("*", SearchOption.AllDirectories))
+            try
             {
-                file.Attributes = FileAttributes.Normal;
-            }
+                foreach (var file in directory.EnumerateFiles("*", SearchOption.AllDirectories))
+                {
+                    file.Attributes = FileAttributes.Normal;
+                }
 
-            directory.Delete(recursive: true);
-        }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-        {
-            // Ignored: the folder is under the temp directory
+                directory.Delete(recursive: true);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                // Ignored: the folder is under the temp directory
+            }
         }
     }
 
@@ -403,7 +408,7 @@ public class PuppetEndToEndTests
         /// <returns>The running server; disposing it kills the process tree.</returns>
         public static async Task<TestServer> StartAsync(CancellationToken cancellationToken, bool seedUser = false, string? gitCachePath = null)
         {
-            var listener = new TcpListener(IPAddress.Loopback, 0);
+            using var listener = new TcpListener(IPAddress.Loopback, 0);
             listener.Start();
             var url = $"http://127.0.0.1:{((IPEndPoint)listener.LocalEndpoint).Port}";
             listener.Stop();
@@ -455,33 +460,43 @@ public class PuppetEndToEndTests
             info.ArgumentList.Add(url);
             var process = Process.Start(info)!;
             var server = new TestServer(process, url, databaseFile);
-
-            // Drain the output so the server never blocks on a full pipe
-            process.OutputDataReceived += (_, _) => { };
-            process.ErrorDataReceived += (_, _) => { };
-            process.BeginOutputReadLine();
-            process.BeginErrorReadLine();
-
-            using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(2) };
-            for (var attempt = 0; attempt < 300 && !process.HasExited; attempt++)
+            var started = false;
+            try
             {
-                try
+                // Drain the output so the server never blocks on a full pipe
+                process.OutputDataReceived += (_, _) => { };
+                process.ErrorDataReceived += (_, _) => { };
+                process.BeginOutputReadLine();
+                process.BeginErrorReadLine();
+
+                using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(2) };
+                for (var attempt = 0; attempt < 300 && !process.HasExited; attempt++)
                 {
-                    if (await http.GetStringAsync($"{url}/health", cancellationToken) == "Healthy")
+                    try
                     {
-                        return server;
+                        if (await http.GetStringAsync($"{url}/health", cancellationToken) == "Healthy")
+                        {
+                            started = true;
+                            return server;
+                        }
                     }
-                }
-                catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException && !cancellationToken.IsCancellationRequested)
-                {
-                    // Not accepting connections yet
+                    catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException && !cancellationToken.IsCancellationRequested)
+                    {
+                        // Not accepting connections yet
+                    }
+
+                    await Task.Delay(100, cancellationToken);
                 }
 
-                await Task.Delay(100, cancellationToken);
+                throw new InvalidOperationException($"The ReviewCenter server at {url} did not become healthy.");
             }
-
-            server.Dispose();
-            throw new InvalidOperationException($"The ReviewCenter server at {url} did not become healthy.");
+            finally
+            {
+                if (!started)
+                {
+                    server.Dispose();
+                }
+            }
         }
 
         /// <inheritdoc />

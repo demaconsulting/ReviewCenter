@@ -435,7 +435,7 @@ public class ReviewServiceRepositoryTests
         var f = await CreateAsync();
         var piece = new string('x', (int)ReviewLimits.MaxFileSizeBytes);
         var changes = Enumerable.Range(0, 6)
-            .Select(i => ($"f{i}.txt", ChangeKind.Modified, (string?)piece, (string?)piece))
+            .Select(i => (Path: $"f{i}.txt", Kind: ChangeKind.Modified, Baseline: (string?)piece, Head: (string?)piece))
             .ToList();
         f.Git.Script(BaseSha, HeadSha, changes);
 
@@ -457,7 +457,7 @@ public class ReviewServiceRepositoryTests
         // Arrange: one more file than allowed
         var f = await CreateAsync();
         var changes = Enumerable.Range(0, ReviewLimits.MaxFileCount + 1)
-            .Select(i => ($"f{i:D5}.txt", ChangeKind.Added, (string?)null, (string?)"a"))
+            .Select(i => (Path: $"f{i:D5}.txt", Kind: ChangeKind.Added, Baseline: default(string?), Head: (string?)"a"))
             .ToList();
         f.Git.Script(BaseSha, HeadSha, changes);
 

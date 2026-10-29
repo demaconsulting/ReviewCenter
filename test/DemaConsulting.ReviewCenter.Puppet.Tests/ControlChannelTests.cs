@@ -36,7 +36,7 @@ public class ControlChannelTests
     public async Task ControlChannel_SendAsync_RoundTrip_DeliversRequestAndResponse()
     {
         // Arrange: a real loopback listener whose handler echoes the command and arguments
-        var listener = new TcpListener(IPAddress.Loopback, 0);
+        using var listener = new TcpListener(IPAddress.Loopback, 0);
         listener.Start();
         var port = ((IPEndPoint)listener.LocalEndpoint).Port;
         using var stop = new CancellationTokenSource();
@@ -69,7 +69,7 @@ public class ControlChannelTests
     public async Task ControlChannel_IsAnsweringAsync_StaleControlFile_ReturnsFalse()
     {
         // Arrange: a port that was free a moment ago
-        var listener = new TcpListener(IPAddress.Loopback, 0);
+        using var listener = new TcpListener(IPAddress.Loopback, 0);
         listener.Start();
         var port = ((IPEndPoint)listener.LocalEndpoint).Port;
         listener.Stop();

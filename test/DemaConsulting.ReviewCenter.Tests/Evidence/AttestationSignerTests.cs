@@ -22,6 +22,7 @@ using System.Security.Cryptography;
 using System.Security.Cryptography.Pkcs;
 using System.Security.Cryptography.X509Certificates;
 using System.Text;
+using System.Text.RegularExpressions;
 using DemaConsulting.ReviewCenter.Evidence;
 
 namespace DemaConsulting.ReviewCenter.Tests.Evidence;
@@ -30,8 +31,22 @@ namespace DemaConsulting.ReviewCenter.Tests.Evidence;
 ///     Unit tests for <see cref="AttestationSigner"/>: the incremental update, the byte range, and the CMS signature,
 ///     checked with <see cref="PdfInspector"/> and <see cref="SignedCms"/> instead of the signer's own code.
 /// </summary>
-public class AttestationSignerTests
+public partial class AttestationSignerTests
 {
+    /// <summary>
+    ///     Matches the transform method entry of a DocMDP signature reference.
+    /// </summary>
+    /// <returns>The pattern.</returns>
+    [GeneratedRegex("/TransformMethod /DocMDP")]
+    private static partial Regex DocMdpTransform();
+
+    /// <summary>
+    ///     Matches the permissions entry of the document catalog.
+    /// </summary>
+    /// <returns>The pattern.</returns>
+    [GeneratedRegex("/Perms <<")]
+    private static partial Regex PermsEntry();
+
     /// <summary>
     ///     The signing time used by every test.
     /// </summary>
@@ -125,7 +140,7 @@ public class AttestationSignerTests
         var (_, signed, _) = SignAndVerify(key);
 
         // Assert: export is refused, the signature verifies
-        Assert.IsAssignableFrom<CryptographicException>(exportable);
+        Assert.IsType<CryptographicException>(exportable, exactMatch: false);
         Assert.True(signed.ByteRangeCoversEverythingButContents());
     }
 
@@ -199,8 +214,8 @@ public class AttestationSignerTests
         var signature = Assert.Single(signed.SignatureObjectNumbers);
         Assert.Equal(signature, signed.PermsDocMdpObject);
         Assert.Equal(signature, signed.WidgetSignatureObject);
-        Assert.Single(System.Text.RegularExpressions.Regex.Matches(signed.Text, "/TransformMethod /DocMDP"));
-        Assert.Single(System.Text.RegularExpressions.Regex.Matches(signed.Text, "/Perms <<"));
+        Assert.Equal(1, DocMdpTransform().Count(signed.Text));
+        Assert.Equal(1, PermsEntry().Count(signed.Text));
     }
 
     /// <summary>
@@ -249,7 +264,7 @@ public class AttestationSignerTests
 
         // Assert: the file reads as permission 2, but the signature no longer verifies
         Assert.Equal(2, inspector.DocMdpPermission);
-        Assert.IsAssignableFrom<CryptographicException>(exception);
+        Assert.IsType<CryptographicException>(exception, exactMatch: false);
     }
 
     /// <summary>
@@ -292,7 +307,7 @@ public class AttestationSignerTests
 
         // Assert: still has the structure, but the signature does not verify
         Assert.True(inspector.ByteRangeCoversEverythingButContents());
-        Assert.IsAssignableFrom<CryptographicException>(exception);
+        Assert.IsType<CryptographicException>(exception, exactMatch: false);
     }
 
     /// <summary>

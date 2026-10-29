@@ -69,6 +69,11 @@ public class ReviewMarkContractTests
     private static readonly Lazy<Task<string>> SharedIndex = new(() => GenerateIndexAsync(CancellationToken.None));
 
     /// <summary>
+    ///     The options that write the golden file's indented JSON form.
+    /// </summary>
+    private static readonly JsonSerializerOptions IndentedJson = new() { WriteIndented = true };
+
+    /// <summary>
     ///     Test that the index of the fixed project is the committed golden file, byte for byte after the line endings
     ///     are normalized.
     /// </summary>
@@ -77,7 +82,7 @@ public class ReviewMarkContractTests
     {
         // Arrange: the index of the fixed project, as indented JSON, and the golden file
         var text = await SharedIndex.Value.WaitAsync(TestContext.Current.CancellationToken);
-        var generated = Normalize(JsonSerializer.Serialize(JsonDocument.Parse(text).RootElement, new JsonSerializerOptions { WriteIndented = true }));
+        var generated = Normalize(JsonSerializer.Serialize(JsonDocument.Parse(text).RootElement, IndentedJson));
         var path = Path.Combine(FindRepositoryRoot(), "test", "DemaConsulting.ReviewCenter.Tests", "Evidence", "TestData", "evidence-index.golden.json");
 
         // Act: read the golden file

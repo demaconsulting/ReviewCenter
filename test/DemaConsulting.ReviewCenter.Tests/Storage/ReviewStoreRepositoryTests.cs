@@ -124,7 +124,7 @@ public class ReviewStoreRepositoryTests
         Assert.Equal([ChangeKind.Modified, ChangeKind.Added, ChangeKind.Deleted], review.Files.Select(f => f.ChangeKind));
         Assert.Equal([TestContent.HashA, TestContent.HashB, string.Empty], review.Files.Select(f => f.Sha256));
         Assert.Equal([TestContent.HashB, null, TestContent.HashC], review.Files.Select(f => f.BaselineSha256));
-        Assert.Equal([TestContent.B.Length, (long?)null, TestContent.C.Length], review.Files.Select(f => f.BaselineSize));
+        Assert.Equal([TestContent.B.Length, default(long?), TestContent.C.Length], review.Files.Select(f => f.BaselineSize));
         Assert.All(review.Files, file => Assert.Empty(file.Content));
         Assert.All(review.Files, file => Assert.Null(file.BaselineContent));
     }

@@ -29,8 +29,15 @@ namespace DemaConsulting.ReviewCenter.Tests;
 ///     stand-in checks; the real checks run once in the shared real run (see <see cref="RealValidationRun"/>).
 /// </summary>
 [Collection("Sequential")]
-public class ValidationTests
+public partial class ValidationTests
 {
+    /// <summary>
+    ///     Matches the report line of the slow check and captures its elapsed milliseconds.
+    /// </summary>
+    /// <returns>The pattern; group 1 is the elapsed time.</returns>
+    [GeneratedRegex(@"ReviewCenter_Slow - Passed \((\d+) ms\)")]
+    private static partial Regex SlowCheckLine();
+
     /// <summary>
     ///     The text a run left behind.
     /// </summary>
@@ -283,7 +290,7 @@ public class ValidationTests
         var output = Run(checks);
 
         // Assert: the line shows an elapsed time of at least 150 ms
-        var match = Regex.Match(output.Log, @"ReviewCenter_Slow - Passed \((\d+) ms\)");
+        var match = SlowCheckLine().Match(output.Log);
         Assert.True(match.Success, "The line should show the elapsed time");
         Assert.True(int.Parse(match.Groups[1].Value) >= 140, $"Elapsed time {match.Groups[1].Value} ms is too short");
     }
@@ -321,7 +328,7 @@ public class ValidationTests
         using var release = new ManualResetEventSlim(false);
         var check = new ValidationCheck("ReviewCenter_Blocked", _ =>
         {
-            release.Wait();
+            release.Wait(CancellationToken.None);
             return Task.FromResult("never reported");
         });
 
@@ -405,7 +412,7 @@ public class ValidationTests
         using var source = new CancellationTokenSource(TimeSpan.FromMilliseconds(100));
         var check = new ValidationCheck("ReviewCenter_Ignoring", _ =>
         {
-            release.Wait();
+            release.Wait(CancellationToken.None);
             return Task.FromResult("never reported");
         });
 
@@ -461,7 +468,7 @@ public class ValidationTests
         using var finishedWork = new ManualResetEventSlim(false);
         var check = new ValidationCheck("ReviewCenter_ThrowsLater", _ =>
         {
-            release.Wait();
+            release.Wait(CancellationToken.None);
             try
             {
                 throw new InvalidOperationException("late failure of an abandoned check");
@@ -487,10 +494,7 @@ public class ValidationTests
             await Task.Delay(20, TestContext.Current.CancellationToken);
             for (var i = 0; i < 2; i++)
             {
-#pragma warning disable S1215 // A collection is the only way to make the finalizer raise an unobserved exception
-                GC.Collect();
-#pragma warning restore S1215
-                GC.WaitForPendingFinalizers();
+                ForcedGarbageCollection.CollectAndFinalize();
             }
 
             // Assert: nothing was left unobserved
@@ -530,7 +534,7 @@ public class ValidationTests
         using var release = new ManualResetEventSlim(false);
         var hung = new ValidationCheck("ReviewCenter_Hung", _ =>
         {
-            release.Wait();
+            release.Wait(CancellationToken.None);
             return Task.FromResult("never reported");
         });
         var checks = new[]

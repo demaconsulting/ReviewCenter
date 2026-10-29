@@ -19,6 +19,7 @@
 // SOFTWARE.
 
 using System.Text;
+using System.Text.RegularExpressions;
 using Bunit;
 using DemaConsulting.ReviewCenter.Core;
 using DemaConsulting.ReviewCenter.Evidence;
@@ -35,8 +36,15 @@ namespace DemaConsulting.ReviewCenter.Tests.Web;
 /// <summary>
 ///     Unit tests for the <see cref="ReviewPage"/> component, rendered in memory with bUnit.
 /// </summary>
-public class ReviewPageTests : PageTestBase
+public partial class ReviewPageTests : PageTestBase
 {
+    /// <summary>
+    ///     Matches a kebab-case test identifier.
+    /// </summary>
+    /// <returns>The pattern.</returns>
+    [GeneratedRegex("^[a-z0-9]+(?:[-.][a-z0-9]+)*$")]
+    private static partial Regex KebabCaseTestId();
+
     /// <summary>
     ///     Creates a project with one review holding the given files; every user that exists is a member.
     /// </summary>
@@ -1072,7 +1080,7 @@ public class ReviewPageTests : PageTestBase
         {
             var testId = element.GetAttribute("data-testid");
             Assert.True(
-                testId is not null && System.Text.RegularExpressions.Regex.IsMatch(testId, "^[a-z0-9]+(?:[-.][a-z0-9]+)*$"),
+                testId is not null && KebabCaseTestId().IsMatch(testId),
                 $"A <{element.LocalName}> has no kebab-case data-testid (found '{testId}').");
         }
     }
@@ -1587,7 +1595,7 @@ public class ReviewPageTests : PageTestBase
         {
             var testId = element.GetAttribute("data-testid");
             Assert.True(
-                testId is not null && System.Text.RegularExpressions.Regex.IsMatch(testId, "^[a-z0-9]+(?:[-.][a-z0-9]+)*$"),
+                testId is not null && KebabCaseTestId().IsMatch(testId),
                 $"A <{element.LocalName}> has no kebab-case data-testid (found '{testId}').");
         }
     }

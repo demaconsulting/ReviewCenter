@@ -196,7 +196,7 @@ public class GitRunnerTests
         // Arrange: about 200 KiB made of a 1000-character token repeated, so the buffer start lands inside one
         var random = new Random(7);
         var token = new string(Enumerable.Range(0, 1000).Select(_ => (char)('A' + random.Next(26))).ToArray());
-        var stream = new MemoryStream(Encoding.UTF8.GetBytes(string.Join(' ', Enumerable.Repeat(token, 200))));
+        using var stream = new MemoryStream(Encoding.UTF8.GetBytes(string.Join(' ', Enumerable.Repeat(token, 200))));
 
         // Act: read the tail and build the error text
         var captured = await GitRunner.ReadTailAsync(stream, TestContext.Current.CancellationToken);

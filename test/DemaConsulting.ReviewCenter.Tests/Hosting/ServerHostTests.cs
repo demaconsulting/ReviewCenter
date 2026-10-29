@@ -144,14 +144,12 @@ public class ServerHostTests
         try
         {
             // Act: start the pipeline against that database and create a project through the registered service
-            await using (var app = await TestWebApp.StartAsync(logs, $"Data Source={file};Pooling=False", ["serve", "--silent"]))
-            {
-                var project = await TestWebApp.CreateProjectAsync(app, "Apollo");
+            await using var app = await TestWebApp.StartAsync(logs, $"Data Source={file};Pooling=False", ["serve", "--silent"]);
+            var project = await TestWebApp.CreateProjectAsync(app, "Apollo");
 
-                // Assert: the database file exists and the project was stored in it
-                Assert.True(File.Exists(file));
-                Assert.True(project.Id > 0);
-            }
+            // Assert: the database file exists and the project was stored in it
+            Assert.True(File.Exists(file));
+            Assert.True(project.Id > 0);
         }
         finally
         {
@@ -1022,7 +1020,7 @@ public class ServerHostIsolationTests
     /// <returns>The port number.</returns>
     private static int FindFreePort()
     {
-        var listener = new System.Net.Sockets.TcpListener(System.Net.IPAddress.Loopback, 0);
+        using var listener = new System.Net.Sockets.TcpListener(System.Net.IPAddress.Loopback, 0);
         listener.Start();
         try
         {
