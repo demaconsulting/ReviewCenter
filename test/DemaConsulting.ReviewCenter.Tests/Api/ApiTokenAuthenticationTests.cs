@@ -34,6 +34,34 @@ namespace DemaConsulting.ReviewCenter.Tests.Api;
 public class ApiTokenAuthenticationTests
 {
     /// <summary>
+    ///     Asks for the project list with a presented token and returns the status of the answer.
+    /// </summary>
+    /// <param name="app">The application.</param>
+    /// <param name="value">The presented token.</param>
+    /// <param name="basic">Whether the token is presented as the password of a Basic header.</param>
+    /// <returns>The status code.</returns>
+    private static async Task<HttpStatusCode> GetProjectsStatusAsync(Microsoft.AspNetCore.Builder.WebApplication app, string value, bool basic)
+    {
+        using var client = ClientFor(app, value, basic);
+        var response = await client.GetAsync("/api/projects", TestContext.Current.CancellationToken);
+        return response.StatusCode;
+    }
+
+    /// <summary>
+    ///     Asks for the project list with a presented token that must be refused and returns the body of the answer.
+    /// </summary>
+    /// <param name="app">The application.</param>
+    /// <param name="value">The presented token.</param>
+    /// <returns>The body of the 401 answer.</returns>
+    private static async Task<string> ReadUnauthorizedBodyAsync(Microsoft.AspNetCore.Builder.WebApplication app, string value)
+    {
+        using var client = ClientFor(app, value);
+        var response = await client.GetAsync("/api/projects", TestContext.Current.CancellationToken);
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+        return await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
+    }
+
+    /// <summary>
     ///     Test that a valid token authenticates the owner, and that using it records the last-used time.
     /// </summary>
     [Fact(Timeout = 120000)]
@@ -188,10 +216,7 @@ public class ApiTokenAuthenticationTests
         var bodies = new List<string>();
         foreach (var value in presented)
         {
-            using var client = ClientFor(app, value);
-            var response = await client.GetAsync("/api/projects", TestContext.Current.CancellationToken);
-            Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
-            bodies.Add(await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
+            bodies.Add(await ReadUnauthorizedBodyAsync(app, value));
         }
 
         // Assert: one and the same answer, and the control token still works
@@ -331,8 +356,10 @@ public class ApiTokenAuthenticationTests
         using var withoutToken = ClientFor(app, null);
 
         // Act: post to the route with and without the token
-        var answerWith = await withToken.PostAsync(route, new FormUrlEncodedContent([]), TestContext.Current.CancellationToken);
-        var answerWithout = await withoutToken.PostAsync(route, new FormUrlEncodedContent([]), TestContext.Current.CancellationToken);
+        using var contentWith = new FormUrlEncodedContent([]);
+        using var contentWithout = new FormUrlEncodedContent([]);
+        var answerWith = await withToken.PostAsync(route, contentWith, TestContext.Current.CancellationToken);
+        var answerWithout = await withoutToken.PostAsync(route, contentWithout, TestContext.Current.CancellationToken);
 
         // Assert: the token changes nothing about the answer
         Assert.Equal(answerWithout.StatusCode, answerWith.StatusCode);
@@ -367,8 +394,7 @@ public class ApiTokenAuthenticationTests
         {
             foreach (var value in new[] { used.Value, unknown, revoked.Value })
             {
-                using var client = ClientFor(app, value, basic);
-                statuses.Add((await client.GetAsync("/api/projects", TestContext.Current.CancellationToken)).StatusCode);
+                statuses.Add(await GetProjectsStatusAsync(app, value, basic));
             }
         }
 

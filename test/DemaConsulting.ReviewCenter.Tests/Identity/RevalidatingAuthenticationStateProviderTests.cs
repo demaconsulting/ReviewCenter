@@ -311,8 +311,10 @@ public class RevalidatingAuthenticationStateProviderTests
         var users = NewUsers();
         await users.CreateAsync("ann", "Ann", UserRole.Reviewer, Password, TestContext.Current.CancellationToken);
         var provider = NewProvider(users);
-        provider.SetAuthenticationState(Task.FromResult(StateOf("ann", "Ann", UserRole.Reviewer)));
-        ((IDisposable)provider).Dispose();
+        using (IDisposable _ = provider)
+        {
+            provider.SetAuthenticationState(Task.FromResult(StateOf("ann", "Ann", UserRole.Reviewer)));
+        }
 
         // Act: disable the user and let several intervals pass
         await users.SetEnabledAsync("ann", false, TestContext.Current.CancellationToken);

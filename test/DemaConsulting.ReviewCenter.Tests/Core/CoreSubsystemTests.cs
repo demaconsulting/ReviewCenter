@@ -119,7 +119,7 @@ public class CoreSubsystemTests
     ///     fails the test instead of going unnoticed. The rules that only the git content source reports are
     ///     excluded here; the content sources subsystem and git tests cover them.
     /// </summary>
-    public static TheoryData<DomainRule> AllRules => new(Enum.GetValues<DomainRule>().Where(rule => !GitSourceRules.Contains(rule)));
+    public static TheoryData<DomainRule> AllRules => [.. Enum.GetValues<DomainRule>().Where(rule => !GitSourceRules.Contains(rule))];
 
     /// <summary>
     ///     The rules reported only by the git content source (a revision that does not exist, git missing, a failed

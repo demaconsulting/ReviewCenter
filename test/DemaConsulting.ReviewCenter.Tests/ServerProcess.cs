@@ -67,7 +67,7 @@ internal sealed class ServerProcess : IDisposable
     public static int GetFreePort()
     {
         // Bind to port 0 so the OS picks, read it back, then release it for the server to use
-        var listener = new TcpListener(IPAddress.Loopback, 0);
+        using var listener = new TcpListener(IPAddress.Loopback, 0);
         listener.Start();
         try
         {

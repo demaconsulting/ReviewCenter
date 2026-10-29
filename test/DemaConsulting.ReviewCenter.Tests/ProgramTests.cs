@@ -337,7 +337,7 @@ public class ProgramTests
     public void Program_Run_WithServeVerb_PortInUse_ReportsError()
     {
         // Arrange: occupy a port so the server cannot bind it
-        var listener = new System.Net.Sockets.TcpListener(System.Net.IPAddress.Loopback, 0);
+        using var listener = new System.Net.Sockets.TcpListener(System.Net.IPAddress.Loopback, 0);
         listener.Start();
         try
         {

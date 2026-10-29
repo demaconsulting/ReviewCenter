@@ -147,7 +147,8 @@ public class AppTests : PageTestBase
         using var client = app.GetTestClient();
 
         // Act: post to an unknown address
-        var response = await client.PostAsync("/no-such-page", new StringContent(string.Empty), TestContext.Current.CancellationToken);
+        using var content = new StringContent(string.Empty);
+        var response = await client.PostAsync("/no-such-page", content, TestContext.Current.CancellationToken);
         var body = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
 
         // Assert: the 404 is not turned into the not-found page

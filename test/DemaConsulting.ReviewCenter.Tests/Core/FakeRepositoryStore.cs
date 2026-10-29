@@ -302,10 +302,8 @@ internal sealed class FakeGitRepositoryProvider : IGitRepositoryProvider
     private GitChangeSet Track(GitChangeSet set)
     {
         // Collect first so that only sets that are still referenced count as alive
-#pragma warning disable S1215 // The test measures what is still reachable, which needs a deterministic collection
-        GC.Collect();
-        GC.Collect();
-#pragma warning restore S1215
+        ForcedGarbageCollection.CollectAndFinalize();
+        ForcedGarbageCollection.CollectAndFinalize();
         AliveAtListCall.Add(Returned.Count(reference => reference.TryGetTarget(out _)));
         var copy = new GitChangeSet(set.Changes, set.Skipped);
         Returned.Add(new WeakReference<GitChangeSet>(copy));

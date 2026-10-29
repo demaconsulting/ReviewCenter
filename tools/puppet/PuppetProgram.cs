@@ -58,25 +58,40 @@ public sealed class PuppetException : Exception
 internal static class PuppetProgram
 {
     /// <summary>
+    ///     The name of the hidden verb that <c>start</c> spawns.
+    /// </summary>
+    private const string DaemonCommand = "daemon";
+
+    /// <summary>
+    ///     The name of the viewport command and option.
+    /// </summary>
+    private const string ViewportName = "viewport";
+
+    /// <summary>
+    ///     The usage text of a command that takes one selector.
+    /// </summary>
+    private const string SelectorUsage = "<selector>";
+
+    /// <summary>
     ///     The commands: usage text, the minimum and maximum positional arguments, and the allowed options.
     ///     <c>daemon</c> is the hidden verb that <c>start</c> spawns.
     /// </summary>
     private static readonly Dictionary<string, (string Usage, int Min, int Max, string Options)> Commands = new()
     {
         ["start"] = ("[--url <base-url>] [--viewport <WxH>] [--headed]", 0, 0, "url viewport headed"),
-        ["daemon"] = (string.Empty, 0, 0, "url viewport headed control-file"),
+        [DaemonCommand] = (string.Empty, 0, 0, "url viewport headed control-file"),
         ["goto"] = ("<url-or-path>", 1, 1, string.Empty),
         ["reload"] = (string.Empty, 0, 0, string.Empty),
         ["back"] = (string.Empty, 0, 0, string.Empty),
-        ["click"] = ("<selector>", 1, 1, string.Empty),
-        ["dblclick"] = ("<selector>", 1, 1, string.Empty),
-        ["hover"] = ("<selector>", 1, 1, string.Empty),
+        ["click"] = (SelectorUsage, 1, 1, string.Empty),
+        ["dblclick"] = (SelectorUsage, 1, 1, string.Empty),
+        ["hover"] = (SelectorUsage, 1, 1, string.Empty),
         ["fill"] = ("<selector> <text>", 2, 2, string.Empty),
         ["press"] = ("<key> [selector]", 1, 2, string.Empty),
         ["type"] = ("<text>", 1, 1, string.Empty),
         ["select"] = ("<selector> <value>", 2, 2, string.Empty),
-        ["check"] = ("<selector>", 1, 1, string.Empty),
-        ["uncheck"] = ("<selector>", 1, 1, string.Empty),
+        ["check"] = (SelectorUsage, 1, 1, string.Empty),
+        ["uncheck"] = (SelectorUsage, 1, 1, string.Empty),
         ["upload"] = ("<selector> <file>", 2, 2, string.Empty),
         ["mouse-move"] = ("<x> <y>", 2, 2, string.Empty),
         ["mouse-click"] = ("<x> <y>", 2, 2, string.Empty),
@@ -84,7 +99,7 @@ internal static class PuppetProgram
         ["text"] = ("[selector]", 0, 1, string.Empty),
         ["snapshot"] = (string.Empty, 0, 0, string.Empty),
         ["screenshot"] = ("<file.png> [--full] [--selector <selector>]", 1, 1, "full selector"),
-        ["viewport"] = ("<WxH>", 1, 1, string.Empty),
+        [ViewportName] = ("<WxH>", 1, 1, string.Empty),
         ["theme"] = ("<light|dark>", 1, 1, string.Empty),
         ["eval"] = ("<js-expression>", 1, 1, string.Empty),
         ["console"] = (string.Empty, 0, 0, string.Empty),
@@ -130,10 +145,10 @@ internal static class PuppetProgram
             var o = request.Options;
             return request.Command switch
             {
-                "daemon" => await BrowserDaemon.RunAsync(
+                DaemonCommand => await BrowserDaemon.RunAsync(
                     o.GetValueOrDefault("control-file", controlFile),
                     o.GetValueOrDefault("url"),
-                    o.GetValueOrDefault("viewport", PlaywrightBrowser.DefaultViewport),
+                    o.GetValueOrDefault(ViewportName, PlaywrightBrowser.DefaultViewport),
                     o.ContainsKey("headed")),
                 "start" => await StartAsync(request, output, error, controlFile, cancellationToken),
                 _ => await SendAsync(request, output, error, controlFile, cancellationToken)
@@ -226,12 +241,23 @@ internal static class PuppetProgram
     /// <exception cref="PuppetException">Thrown when a value is not valid.</exception>
     private static void Validate(string name, List<string> args, Dictionary<string, string> options)
     {
+        ValidateOptions(options);
+        ValidateArguments(name, args);
+    }
+
+    /// <summary>
+    ///     Checks the values of the options of a parsed command.
+    /// </summary>
+    /// <param name="options">The options; the <c>start</c> URL loses its trailing slash.</param>
+    /// <exception cref="PuppetException">Thrown when a value is not valid.</exception>
+    private static void ValidateOptions(Dictionary<string, string> options)
+    {
         if (options.TryGetValue("timeout", out var timeout) && !(int.TryParse(timeout, out var ms) && ms > 0))
         {
             throw new PuppetException($"--timeout must be a positive number of milliseconds, not '{timeout}'.");
         }
 
-        if (options.TryGetValue("viewport", out var viewport))
+        if (options.TryGetValue(ViewportName, out var viewport))
         {
             PlaywrightBrowser.ParseViewport(viewport);
         }
@@ -242,13 +268,22 @@ internal static class PuppetProgram
                 ? url.TrimEnd('/')
                 : throw new PuppetException($"--url must be an absolute http or https URL, not '{url}'.");
         }
+    }
 
+    /// <summary>
+    ///     Checks the positional arguments of a parsed command and makes its file paths absolute.
+    /// </summary>
+    /// <param name="name">The command name.</param>
+    /// <param name="args">The positional arguments; file paths are replaced by absolute ones.</param>
+    /// <exception cref="PuppetException">Thrown when a value is not valid.</exception>
+    private static void ValidateArguments(string name, List<string> args)
+    {
         if (name is "mouse-move" or "mouse-click" && !args.All(a => float.TryParse(a, CultureInfo.InvariantCulture, out _)))
         {
             throw new PuppetException("The mouse coordinates must be numbers.");
         }
 
-        if (name == "viewport")
+        if (name == ViewportName)
         {
             PlaywrightBrowser.ParseViewport(args[0]);
         }
@@ -289,7 +324,7 @@ internal static class PuppetProgram
 
         // Whatever is left over is stale or an old start-up error
         File.Delete(controlFile);
-        var arguments = new List<string> { typeof(PuppetProgram).Assembly.Location, "daemon", "--control-file", controlFile };
+        var arguments = new List<string> { typeof(PuppetProgram).Assembly.Location, DaemonCommand, "--control-file", controlFile };
         foreach (var (key, value) in request.Options)
         {
             arguments.Add($"--{key}");
@@ -404,7 +439,7 @@ internal static class PuppetProgram
     private static void PrintUsage(TextWriter writer)
     {
         writer.WriteLine("Usage: puppet <command> [arguments]");
-        foreach (var (name, spec) in Commands.Where(c => c.Key != "daemon"))
+        foreach (var (name, spec) in Commands.Where(c => c.Key != DaemonCommand))
         {
             writer.WriteLine($"  puppet {name} {spec.Usage}".TrimEnd());
         }

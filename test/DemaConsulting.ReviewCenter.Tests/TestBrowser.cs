@@ -131,7 +131,8 @@ internal sealed class TestBrowser : IDisposable
             all.Add(new("__RequestVerificationToken", await GetTokenAsync()));
         }
 
-        return await Client.PostAsync(path, new FormUrlEncodedContent(all), TestContext.Current.CancellationToken);
+        using var content = new FormUrlEncodedContent(all);
+        return await Client.PostAsync(path, content, TestContext.Current.CancellationToken);
     }
 
     /// <summary>

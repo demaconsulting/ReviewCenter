@@ -1038,8 +1038,13 @@ public partial class TotpServiceTests
     private static string WrongCode(TotpTestWorld world, byte[] secret)
     {
         var valid = new[] { world.CodeNow(secret, -1), world.CodeNow(secret), world.CodeNow(secret, 1) };
-        return new[] { "000000", "000001" }.First(code => !valid.Contains(code));
+        return WrongCodeCandidates.First(code => !valid.Contains(code));
     }
+
+    /// <summary>
+    ///     The codes tried, in order, when looking for one that is not valid now.
+    /// </summary>
+    private static readonly string[] WrongCodeCandidates = ["000000", "000001"];
 
     /// <summary>
     ///     Reads the failure counter of a user.

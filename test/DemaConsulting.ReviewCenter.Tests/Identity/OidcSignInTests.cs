@@ -19,6 +19,7 @@
 // SOFTWARE.
 
 using System.Net;
+using System.Text.RegularExpressions;
 using DemaConsulting.ReviewCenter.Core;
 using DemaConsulting.ReviewCenter.Identity;
 using Microsoft.AspNetCore.Builder;
@@ -30,8 +31,15 @@ namespace DemaConsulting.ReviewCenter.Tests.Identity;
 ///     Tests of sign-in with an OpenID Connect provider (<see cref="OidcSignIn"/>): the real application, with its
 ///     real OpenID Connect handler, talks to the in-process fake provider over loopback http.
 /// </summary>
-public class OidcSignInTests : IClassFixture<IdentityProviderFixture>
+public partial class OidcSignInTests : IClassFixture<IdentityProviderFixture>
 {
+    /// <summary>
+    ///     Matches the <c>state</c> parameter of an authorization response URL.
+    /// </summary>
+    /// <returns>The pattern.</returns>
+    [GeneratedRegex("state=[^&]+")]
+    private static partial Regex StateParameter();
+
     /// <summary>
     ///     The client secret in the settings of the test application; it must never be logged or recorded.
     /// </summary>
@@ -325,7 +333,7 @@ public class OidcSignInTests : IClassFixture<IdentityProviderFixture>
         var start = await browser.PostFormAsync("/auth/oidc/login", []);
         var answer = await _idp.Client.GetAsync(start.Headers.Location, TestContext.Current.CancellationToken);
         var forged = answer.Headers.Location!.ToString();
-        forged = System.Text.RegularExpressions.Regex.Replace(forged, "state=[^&]+", "state=forged");
+        forged = StateParameter().Replace(forged, "state=forged");
 
         // Act
         var callback = await browser.Client.GetAsync(forged, TestContext.Current.CancellationToken);

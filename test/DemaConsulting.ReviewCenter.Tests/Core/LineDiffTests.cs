@@ -87,7 +87,7 @@ public class LineDiffTests
     /// <param name="a">The first list.</param>
     /// <param name="b">The second list.</param>
     /// <returns>The length of the longest common subsequence.</returns>
-    private static int LongestCommonSubsequence(IReadOnlyList<string> a, IReadOnlyList<string> b)
+    private static int LongestCommonSubsequence(List<string> a, List<string> b)
     {
         var table = new int[a.Count + 1, b.Count + 1];
         for (var i = 1; i <= a.Count; i++)

@@ -44,7 +44,7 @@ internal static class BrowserDaemon
     public static async Task<int> RunAsync(string controlFile, string? baseUrl, string viewport, bool headed)
     {
         using var stopped = new CancellationTokenSource();
-        var listener = new TcpListener(IPAddress.Loopback, 0);
+        using var listener = new TcpListener(IPAddress.Loopback, 0);
         PlaywrightBrowser? browser = null;
         var published = false;
         try

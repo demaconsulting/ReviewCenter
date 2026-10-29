@@ -18,6 +18,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
+using System.Text.RegularExpressions;
 using DemaConsulting.ReviewCenter.Utilities;
 
 namespace DemaConsulting.ReviewCenter.Tests;
@@ -26,9 +27,16 @@ namespace DemaConsulting.ReviewCenter.Tests;
 ///     System-level integration tests that run the ReviewCenter application via dotnet.
 /// </summary>
 [Collection("Sequential")]
-public class IntegrationTests
+public partial class IntegrationTests
 {
     private readonly string _dllPath;
+
+    /// <summary>
+    ///     Matches the start of a JUnit test case element.
+    /// </summary>
+    /// <returns>The pattern.</returns>
+    [GeneratedRegex("<testcase ")]
+    private static partial Regex TestCaseElement();
 
     /// <summary>
     ///     Initialize test by locating the ReviewCenter DLL.
@@ -213,7 +221,7 @@ public class IntegrationTests
         // Assert: results file is created with valid JUnit structure and one test case per check
         Assert.Equal(0, run.ExitCode);
         Assert.Contains("<testsuites", run.ResultsContent);
-        Assert.Equal(9, System.Text.RegularExpressions.Regex.Matches(run.ResultsContent, "<testcase ").Count);
+        Assert.Equal(9, TestCaseElement().Count(run.ResultsContent));
     }
 
     /// <summary>
@@ -488,7 +496,7 @@ public class IntegrationTests
     public void ReviewCenter_ServeVerb_PortInUse_ReturnsError()
     {
         // Arrange: occupy a port
-        var listener = new System.Net.Sockets.TcpListener(System.Net.IPAddress.Loopback, 0);
+        using var listener = new System.Net.Sockets.TcpListener(System.Net.IPAddress.Loopback, 0);
         listener.Start();
         try
         {

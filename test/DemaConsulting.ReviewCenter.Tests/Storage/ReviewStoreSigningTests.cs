@@ -219,7 +219,7 @@ public class ReviewStoreSigningTests
 
         // Assert: only the real slot changed and went away
         Assert.True(updated);
-        Assert.Equal((7, (int?)null), (afterUpdate.PrimaryUserId, afterUpdate.AlternateUserId));
+        Assert.Equal((7, default(int?)), (afterUpdate.PrimaryUserId, afterUpdate.AlternateUserId));
         Assert.False(unknownUpdate);
         Assert.False(otherReviewUpdate);
         Assert.False(unknownRemove);
