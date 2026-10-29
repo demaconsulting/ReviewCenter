@@ -8,14 +8,17 @@ The `Identity` subsystem lets a person sign in to the web server and tells the r
 It owns the connection between the local accounts of the `Core` subsystem and the ASP.NET Core authentication
 framework: how a password is hashed, how the sign-in and sign-out requests are handled, what the authentication
 cookie holds and when it is no longer accepted, and how the signed-in user is turned into the `Actor` that the Core
-services record with a comment or a checklist answer. It contains five units: `PasswordHasher`, the implementation of
+services record with a comment or a checklist answer. It contains eight units: `PasswordHasher`, the implementation of
 the Core password hasher interface on top of the password hasher of the ASP.NET Core shared framework; `SignIn`,
 the cookie authentication setup, the `POST /auth/login` and `POST /auth/logout` endpoints, the return-URL check, the
 rule that decides whether a signed-in user is still valid, and the conversion between the signed-in principal and an
 `Actor`, together with its small options type `AuthOptions`, which is documented with `SignIn` as a supporting type;
 `SignInThrottle`, the in-memory limit on sign-in attempts per client address and user name, with its options type
 `SignInThrottleOptions`; `OidcSignIn`, the optional sign-in with a generic OpenID Connect provider and the
-confirmation of identity for a signature, with its options type `OidcOptions`; and
+confirmation of identity for a signature, with its options type `OidcOptions`; `TotpAlgorithm`, the implementation of the
+Core time-based one-time password port on top of the Otp.NET library; `TotpSecretProtector`, the implementation of
+the Core secret protection port on top of ASP.NET Core Data Protection; `TotpSignIn`, the second step of a sign-in
+for an account with a second factor, with its options type `TotpOptions`; and
 `RevalidatingAuthenticationStateProvider`, which applies that rule to every open
 interactive page at a fixed interval. The types of the subsystem are internal to the application.
 The rules about accounts (the password policy, the lockout, the last system administrator) are not here: they belong to
@@ -50,9 +53,12 @@ that does not depend on a project, the system administrator right.
 - *Role*: Provider.
 - *Contract*: Asks the sign-in throttle first. When the throttle refuses, it checks no password, sets no cookie and
   redirects to `/login?error=throttled` (with the safe return URL when it is not `/`); the answer is the same for every
-  user name. Otherwise it checks the password through `UserService`. On success it issues the authentication cookie
+  user name. Otherwise it checks the password through `UserService.AuthenticatePasswordAsync`. On success it issues the
+  authentication cookie
   and redirects to the return URL when that is a path of this site, otherwise to `/`; a user whose password is
-  temporary is redirected to `/account` whatever address was asked for. On any failure it redirects to
+  temporary is redirected to `/account` whatever address was asked for. When the password is right but the account has
+  a second factor, no session is issued: the endpoint gives back the address quota of the attempt, sets the challenge
+  cookie, and redirects to `/login/totp` (see the login-code endpoint below). On any failure it redirects to
   `/login?error=1` (with the safe return URL when it is not `/`); the failure is the same for an unknown user, a
   wrong password, a disabled account, and a locked account.
 - *Constraints*: The antiforgery token is required; a request without a valid token is refused with HTTP status 400.
@@ -111,6 +117,32 @@ that does not depend on a project, the system administrator right.
   review slot. Every refusal ends with one generic message and no cookie.
 - *Constraints*: The antiforgery token is required on the `POST` endpoints; return addresses are reduced to local ones.
 
+**Identity:Totp settings**: The `Identity:Totp` configuration section, optional; the feature is on by default.
+
+- *Type*: Configuration (`appsettings.json` and environment variables such as `Identity__Totp__Enabled` and
+  `Identity__Totp__Issuer`).
+- *Role*: Consumer.
+- *Contract*: `Enabled` (default true) turns the optional second factor on or off. `Issuer` (default `ReviewCenter`) is
+  the name that an authenticator app shows for the account.
+- *Constraints*: An issuer that is empty, longer than 64 characters, or has a colon or a control character stops the
+  start-up with an error that names the setting and never prints the value. With `Enabled` false no setup is offered,
+  the second step is not mapped, signatures need no code, and an enrolled account signs in with the password alone;
+  this is a documented trade-off. Enrollments are kept and apply again when the feature is switched on.
+
+**Login-code endpoint** (`POST /auth/login-totp`): The second step of a sign-in with a second factor; mapped only when
+the feature is enabled; provided by `TotpSignIn`.
+
+- *Type*: HTTP `POST` of a form with the field `code` and the antiforgery token.
+- *Role*: Provider.
+- *Contract*: Reads the challenge from the cookie `ReviewCenter.TotpChallenge`, asks the sign-in throttle, and lets
+  `TotpService` check the code (an authenticator code or a recovery code). On success it issues the authentication
+  cookie, deletes the challenge cookie, and redirects like the login endpoint. A wrong code redirects to
+  `/login/totp?error=1`, a refusal by the throttle to `/login/totp?error=throttled`, and an ended, used, or foreign
+  challenge to `/login?error=totp-expired`.
+- *Constraints*: The antiforgery token is required. The challenge cookie is `HttpOnly`, `SameSite=Strict`, and `Secure`
+  when the request is https, and lives 5 minutes. A successful second step is recorded as `auth.sign-in` with the
+  detail `second factor: authenticator code` or `second factor: recovery code`.
+
 **RevalidatingAuthenticationStateProvider (as the authentication state provider)**: Used by the framework for every
 open interactive page (circuit).
 
@@ -144,6 +176,22 @@ identity, and reads users.
 - *Type*: In-process .NET class.
 - *Role*: Consumer.
 
+**TotpService (consumed)**: The `Core` service that starts and completes the second step of a sign-in and that owns the
+rules of the second factor.
+
+- *Type*: In-process .NET class.
+- *Role*: Consumer.
+
+**TotpAlgorithm (as ITotpAlgorithm) and TotpSecretProtector (as ITotpSecretProtector)**: The ports used by
+`TotpService`.
+
+- *Type*: In-process .NET classes implementing the Core interfaces.
+- *Role*: Provider.
+- *Contract*: The algorithm creates secrets, writes them as Base32 text and as an `otpauth://` address, computes codes,
+  and checks a six digit code for the current step and one step each side. The protector encrypts the secret of a user
+  with Data Protection and reads it back; unreadable data is reported as `TotpSecretUnreadable`.
+- *Constraints*: Stateless and safe for concurrent use. A secret and a code are never logged.
+
 **SigningService and ReauthProofStore (consumed)**: The `Core` pieces that decide who may confirm a slot and that hold
 the single-use proof of a confirmation.
 
@@ -158,8 +206,9 @@ the single-use proof of a confirmation.
 ### Design
 
 Signing in is plain HTTP, not an event of the Blazor live connection. The login page is a server-rendered form that
-posts to `/auth/login`; the endpoint checks the password with `UserService.AuthenticateAsync`, which applies the
-lockout, and issues the authentication cookie. A cookie can only be set on an HTTP response, and a form post needs no
+posts to `/auth/login`; the endpoint checks the password with `UserService.AuthenticatePasswordAsync`, which applies the
+lockout, and issues the authentication cookie (or, for an account with a second factor, starts the second step). A
+cookie can only be set on an HTTP response, and a form post needs no
 live connection, so signing in works before any connection exists. The two endpoints have their own paths because
 `/login` is answered by the login page, which would otherwise compete with a `POST` endpoint of the same path.
 
@@ -226,6 +275,20 @@ address has attempts left, once per name and once over all names. A refused atte
 gets the throttled answer, which is the same for known and unknown names; the account lockout of `UserService` stays
 in force for the attempts that are let through. Signature re-authentication is not throttled by address: the user is
 already signed in, and the lockout applies.
+
+**Second factor** (optional): A local account can protect its sign-in with a time-based one-time password from an
+authenticator app, with recovery codes (see the `TotpService` design for the rules). The sign-in has two steps. The
+login endpoint checks the password with `UserService.AuthenticatePasswordAsync`; when the account has a confirmed
+second factor the answer says so, and the endpoint issues no session. It gives back the address quota of the attempt
+(`SignInThrottle.ReleaseAddress`, so a person who knows the password does not use up the quota of the address, while the
+counter of the name stays), asks `TotpService` for a challenge bound to the user, the client address, and the return
+address, stores its token in the challenge cookie, and redirects to `/login/totp`. The second page posts the code to
+`/auth/login-totp`, which asks the throttle again (the second step is limited like the first), lets `TotpService` check
+the code, and only then issues the same session cookie as a password sign-in. A person who has only the password
+therefore has no session, and a wrong code counts toward the same account lockout as a wrong password. Sign-in with
+an OpenID Connect provider and with a personal access token is not affected: an external account has its own second
+factor at the provider, and a token is a separate credential. Sessions that are already open stay valid when a second
+factor is turned off or reset. There is no QR code: the setup shows the secret as text and as an `otpauth://` address.
 
 **Audit events of sign-in and sign-out**: The two endpoints record events that change no data in the audit trail
 through `AuditService.TryRecordAsync`: `auth.sign-in` after the cookie has been issued, and `auth.sign-out` before the

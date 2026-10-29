@@ -1,0 +1,77 @@
+---
+# Software Unit Requirements for the TotpChallengeStore Class
+#
+# The TotpChallengeStore class remembers, for a short time and in memory, that a user has typed the right password and
+# still owes the second factor, so that the sign-in can go on in the next request without any session.
+
+sections:
+  - title: TotpChallengeStore Unit Requirements
+    requirements:
+      - id: ReviewCenter-TotpChallengeStore-SingleUse
+        title: >-
+          The TotpChallengeStore class shall issue a random token of 256 bits for each challenge, keep only a hash of
+          it, and give a challenge to exactly one caller at a time, so that two requests can never use one challenge
+          together, and shall let a caller give a challenge back after a wrong code only a limited number of times,
+          dropping it at the fifth wrong code.
+        justification: |
+          The token is the only link between the password step and the code step. It must not be guessable, a copy of
+          the memory must not make it usable, and a challenge must not allow unlimited tries of a code.
+        tests:
+          - TotpChallengeStore_Issue_ReturnsRandomUrlSafeTokens
+          - TotpChallengeStore_Take_Twice_GivesTheChallengeOnlyOnce
+          - TotpChallengeStore_Take_Concurrently_GivesTheChallengeToExactlyOne
+          - TotpChallengeStore_UnknownOrMissingToken_GivesNothing
+          - TotpChallengeStore_Return_CountsFailuresAndEndsAtTheMaximum
+
+      - id: ReviewCenter-TotpChallengeStore-Binding
+        title: >-
+          The TotpChallengeStore class shall give a challenge only to a request from the client address that it was
+          issued to, and shall keep the challenge when another address tries it.
+        justification: |
+          A stolen token must not be good from another place, and an attempt from another place must not use up the
+          challenge of the person who has the right to it.
+        tests:
+          - TotpChallengeStore_PeekAndTake_ForeignAddress_AreRefusedAndLeaveTheChallenge
+          - TotpChallengeStore_NullAddress_MatchesOnlyNullAddress
+
+      - id: ReviewCenter-TotpChallengeStore-Expiry
+        title: >-
+          The TotpChallengeStore class shall treat a challenge as ended five minutes after it was issued, also when it
+          was given back after a wrong code.
+        justification: |
+          The person is at the keyboard now. A challenge that lived for a day could be used by somebody who found the
+          browser later.
+        tests:
+          - TotpChallengeStore_AfterTheLifetime_TheChallengeIsGone
+          - TotpChallengeStore_Return_AfterTheLifetime_EndsTheChallenge
+
+      - id: ReviewCenter-TotpChallengeStore-Bounded
+        title: >-
+          The TotpChallengeStore class shall keep at most 10000 challenges, also when a challenge is given back after a
+          wrong code, and, when it is full, drop the ended ones first and then the oldest, or drop the challenge that
+          is given back and no other, and shall remember the invalidations of users only for a bounded time and in a
+          bounded number.
+        justification: |
+          Anybody who knows a name and password can make a challenge, so the memory that they take must have a limit
+          that a flood cannot pass.
+        tests:
+          - TotpChallengeStore_Issue_BeyondTheCap_StaysWithinTheCapAndDropsTheOldest
+          - TotpChallengeStore_Return_WhenStoreFilledAfterTake_DropsInsteadOfExceedingTheCap
+          - TotpChallengeStore_Return_WhenFullOfEndedEntries_DropsEndedAndStores
+          - TotpChallengeStore_InvalidateUser_TombstonesArePrunedAfterTheLifetime
+          - TotpChallengeStore_InvalidateUser_TombstonesAreBoundedAndOverflowFailsSafe
+
+      - id: ReviewCenter-TotpChallengeStore-Invalidate
+        title: >-
+          The TotpChallengeStore class shall drop every challenge of one user on request, without regard to the case of
+          the name, and leave the challenges of other users, shall not take back a challenge that was taken before the
+          user was invalidated, however long the check took, and shall refuse missing arguments.
+        justification: |
+          When the second factor of a user is removed or reset, a sign-in that was begun before must not be completed,
+          also not by a check that was already running and gives its challenge back afterwards.
+        tests:
+          - TotpChallengeStore_InvalidateUser_DropsOnlyThatUsersChallenges
+          - TotpChallengeStore_Return_AfterInvalidateUser_IsRefusedAndNotStored
+          - TotpChallengeStore_Return_AfterInvalidatingAnotherUser_StillStores
+          - TotpChallengeStore_Return_ChallengeTakenAfterTheInvalidation_IsStored
+          - TotpChallengeStore_NullArguments_Throw

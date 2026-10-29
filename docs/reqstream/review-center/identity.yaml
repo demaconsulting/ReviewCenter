@@ -187,3 +187,37 @@ sections:
           - OidcSignIn_FirstSignIn_CreatesPlainAccountAndSignsIn
           - OidcSignIn_Logout_IsLocalOnly
           - OidcReauth_FreshSignInOfSamePerson_AllowsExactlyOneSignature
+
+      - id: ReviewCenter-Identity-TotpSecondFactor
+        title: >-
+          The Identity subsystem shall, for an account with a second factor and while the feature is on, end the
+          password step of the sign-in without a session, hold the person in a short pending sign-in that is bound
+          to the browser and the client address, open the session only with a right code or a recovery code, count the
+          wrong
+          codes in the same throttle and lockout as wrong passwords, compute and check the codes by RFC 6238 with a
+          secret that is stored encrypted and bound to its user, and leave the sign-in with a provider and with an API
+          token as it was.
+        justification: |
+          The second factor must not be a form that an attacker can skip, so no session exists before the code, the
+          challenge cannot be moved to another browser, and the guessing of codes has the same limits as that of
+          passwords. The secret of a person must be of no use to somebody who copies the database.
+        children:
+          - ReviewCenter-TotpAlgorithm-Rfc6238
+          - ReviewCenter-TotpAlgorithm-Window
+          - ReviewCenter-TotpAlgorithm-Secret
+          - ReviewCenter-TotpSecretProtector-Encrypted
+          - ReviewCenter-TotpSecretProtector-UserBound
+          - ReviewCenter-TotpSecretProtector-Unreadable
+          - ReviewCenter-TotpSignIn-Options
+          - ReviewCenter-TotpSignIn-SecondStep
+          - ReviewCenter-TotpSignIn-Challenge
+          - ReviewCenter-TotpSignIn-Lockout
+          - ReviewCenter-TotpSignIn-Throttle
+          - ReviewCenter-TotpSignIn-Disabled
+          - ReviewCenter-TotpSignIn-NoSecretLeak
+          - ReviewCenter-SignIn-TotpBranch
+          - ReviewCenter-SignInThrottle-ReleaseAddress
+          - ReviewCenter-OTS-OtpNet-Totp
+        tests:
+          - TotpSignIn_CodeStep_RightCode_SignsInAndRedirects
+          - TotpSignIn_PasswordStep_EnrolledAccount_IssuesChallengeCookieAndNoSession

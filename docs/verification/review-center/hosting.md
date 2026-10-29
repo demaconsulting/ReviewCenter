@@ -32,6 +32,8 @@ N/A - standard test environment.
 - Optional sign-in with an OpenID Connect provider: invalid settings stop the start-up with an error that names the
   setting and never shows the secret, and the server starts when the provider is off or its settings are valid; the
   behavior is verified in the unit tests of `ServerHost`.
+- Second factor settings: an invalid setting stops the start-up with an error that names it, and valid settings are
+  provided to the services; the behavior is verified in the unit tests of `ServerHost`.
 
 ### Test Scenarios
 
@@ -100,3 +102,8 @@ valid settings, the application is built, which is tested by
 `ServerHost_CreateApplication_OidcOffOrValid_BuildsTheApplication`; both are unit tests of `ServerHost`. With the
 provider off, its endpoints answer 404, which is tested by `OidcSignIn_Disabled_EndpointsAreNotMappedAndNoButtonIsShown`
 (see the `OidcSignIn` verification).
+
+**Second factor settings**: Starting the real pipeline with an invalid setting of the second factor throws an
+`InvalidOperationException` that names the setting, which is tested by
+`ServerHost_CreateApplication_InvalidTotpSettings_ThrowsClearError`; valid settings are provided to the services, which
+is tested by `ServerHost_CreateApplication_ValidTotpSettings_ProvideTheSettings`; both are unit tests of `ServerHost`.

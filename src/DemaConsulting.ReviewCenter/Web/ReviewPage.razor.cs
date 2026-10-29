@@ -185,6 +185,13 @@ public partial class ReviewPage : ComponentBase, IDisposable
     private UserService Users { get; set; } = null!;
 
     /// <summary>
+    ///     Gets or sets the service of the optional second factor, supplied by dependency injection; it tells whether
+    ///     the signed-in user must give a code to sign.
+    /// </summary>
+    [Inject]
+    private TotpService Totp { get; set; } = null!;
+
+    /// <summary>
     ///     Gets or sets the settings of sign-in with an identity provider, supplied by dependency injection.
     /// </summary>
     [Inject]
@@ -421,6 +428,17 @@ public partial class ReviewPage : ComponentBase, IDisposable
     private Dictionary<int, string> SignPasswords { get; } = [];
 
     /// <summary>
+    ///     Gets the authenticator code typed into each sign form, by slot identity; removed after every attempt.
+    /// </summary>
+    private Dictionary<int, string> SignTotpCodes { get; } = [];
+
+    /// <summary>
+    ///     Gets a value indicating whether the signed-in user has a second factor, so that a signature also needs a
+    ///     current code from the authenticator app.
+    /// </summary>
+    private bool CurrentHasTotp { get; set; }
+
+    /// <summary>
     ///     Gets the message of the last failed signing attempt for each slot, by slot identity.
     /// </summary>
     private Dictionary<int, string> SignErrors { get; } = [];
@@ -634,6 +652,7 @@ public partial class ReviewPage : ComponentBase, IDisposable
         SlotAlternateChoices.Clear();
         SlotErrors.Clear();
         SignPasswords.Clear();
+        SignTotpCodes.Clear();
         SignErrors.Clear();
         ReplyTexts.Clear();
         ReplyErrors.Clear();
@@ -831,6 +850,7 @@ public partial class ReviewPage : ComponentBase, IDisposable
     {
         ConfirmedSlots.Clear();
         CurrentIsExternal = false;
+        CurrentHasTotp = false;
         if (actor is null || Approval is null)
         {
             return;
@@ -839,6 +859,8 @@ public partial class ReviewPage : ComponentBase, IDisposable
         CurrentIsExternal = (await Users.GetAsync(actor.Username))?.IsExternal == true;
         if (!CurrentIsExternal)
         {
+            // A user with a password and a confirmed second factor also gives a code to sign
+            CurrentHasTotp = await Totp.IsEnrolledAsync(actor.Username);
             return;
         }
 
@@ -1620,7 +1642,8 @@ public partial class ReviewPage : ComponentBase, IDisposable
                 ReviewId,
                 slotId,
                 Approval!.Digest,
-                SignPasswords.GetValueOrDefault(slotId));
+                SignPasswords.GetValueOrDefault(slotId),
+                totpCode: SignTotpCodes.GetValueOrDefault(slotId));
             SignErrors.Remove(slotId);
         }
         catch (DomainRuleException ex)
@@ -1630,6 +1653,7 @@ public partial class ReviewPage : ComponentBase, IDisposable
         finally
         {
             SignPasswords.Remove(slotId);
+            SignTotpCodes.Remove(slotId);
             PasswordKey++;
         }
 

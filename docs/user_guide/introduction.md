@@ -33,7 +33,8 @@ These items are planned but not yet implemented:
 
 - The remaining review features of the ReviewCenter web service: review states beyond Draft
 - External anchoring, export, and retention of the audit trail
-- Password reset, multi-factor sign-in of local accounts, and a connection to several identity providers at once
+- Password reset, a required second factor (enforced for system administrators, or by a policy of a project), a QR
+  code for the setup, and a connection to several identity providers at once
 - EF Core database migrations with an explicit `migrate` command, and further database providers (PostgreSQL,
   SQL Server)
 - PDF/A evidence export of review records
@@ -410,10 +411,12 @@ it and is remembered in this browser only: it is not an account setting, so anot
 **System** again.
 
 To change your password, enter the current password and the new
-password, and press the change button. A wrong current password counts as a failed sign-in for the lockout. The
-fields are cleared afterwards. If you signed in with a temporary password (an account that a project administrator
-created for you), the page shows only this form, asks for the temporary password as the current one, and sends you to
-the sign-in page with a notice when the password is changed; see
+password, and press the change button. If your account has a second factor (see
+[Two-Factor Sign-in](#two-factor-sign-in)), the form also asks for a current code of your authenticator app or a
+recovery code, and the password alone is not enough. A wrong current password or a wrong code counts as a failed
+sign-in for the lockout. The fields are cleared afterwards. If you signed in with a temporary password (an account
+that a project administrator created for you), the page shows only this form, asks for the temporary password as the
+current one, and sends you to the sign-in page with a notice when the password is changed; see
 [Managing Project Members](#managing-project-members).
 
 The **API tokens** card creates and revokes the personal access tokens that let a script or tool use the API as you
@@ -431,6 +434,100 @@ The **API tokens** card creates and revokes the personal access tokens that let 
 A user has at most 20 active tokens; expired and revoked tokens do not count. The card has an **About API tokens**
 button that opens the Help topic.
 
+The **Two-factor authentication** card, for an account with a ReviewCenter password, turns on a second factor; see
+[Two-Factor Sign-in](#two-factor-sign-in).
+
+### Two-Factor Sign-in
+
+A local account can have a **second factor** in addition to the password: a 6-digit code from an authenticator app
+(any app that makes time-based one-time passwords, RFC 6238, such as the apps of Microsoft, Google, or a password
+manager). It is optional, and every person decides for their own account. A stolen, guessed, or phished password then
+no longer opens the account or signs a review. An account at an OpenID Connect provider has no password and no second
+factor here; the provider protects it (see
+[Sign In with an OpenID Connect Provider](#sign-in-with-an-openid-connect-provider)). The code is 6 digits of SHA-1,
+changes every 30 seconds, and is accepted one step before and after the current one to allow for a clock that is a
+little off.
+
+| Setting                 | Environment variable      | Meaning                                                   |
+| ----------------------- | ------------------------- | --------------------------------------------------------- |
+| `Identity:Totp:Enabled` | `Identity__Totp__Enabled` | `true` (default) offers the second factor; `false` is off |
+| `Identity:Totp:Issuer`  | `Identity__Totp__Issuer`  | Name shown in the app (default `ReviewCenter`; up to 64)  |
+
+The server does not start when the issuer is not valid (it must not contain a colon or a control character).
+
+> **Security warning.** With `Identity:Totp:Enabled` set to `false`, nobody is asked for a code at sign-in or at a
+> signature, **also not the accounts that have a second factor**: they are protected by the password alone until the
+> setting is `true` again. The stored secrets are kept, so turning the feature on again restores the protection.
+> Do not leave the feature off on a server that people use for approvals.
+
+**Turn it on.** Open the Account page, find the **Two-factor authentication** card, type your password, and press
+**Set up two-factor sign-in**. The card shows a secret key as text and an `otpauth://` address (there is no QR code
+yet): type the key into the authenticator app, or let the app read the address. Type the 6-digit code that the app
+shows and press **Turn on**. A setup that is not confirmed within 15 minutes ends, and **Cancel** gives it up. After
+the code is confirmed, the card shows **10 recovery codes**, once. Save them apart from your password (a password
+manager or a printout) and press **I have saved them**; they cannot be shown again.
+
+**Sign in.** Type the user name and the password as always. Instead of opening your session, ReviewCenter then shows a
+second page that asks for a code. Type the current code of the app and press **Sign in**. A code works only once. The
+second step must be completed within 5 minutes and in the same browser, from the same address; after that, or when
+the answer is not valid, you start again from the first page. Nothing is known about you until the code is right: no
+session exists after the password alone. A wrong code gives one general message, whether it is wrong, expired, or was
+already used.
+
+**Lockout and throttle.** A wrong code counts like a wrong password: both share the same count, so 5 wrong attempts in
+a row lock the account for 5 minutes (see Password Rules and Lockout), and the second step is limited per client
+address like the first. A right password between wrong codes does not reset the count; a completed sign-in does.
+
+**If you lose the phone.** On the second page type one of the **recovery codes** in place of the 6-digit code (they
+look like `abcd-efgh-jkmn-pqrs`; capitals, spaces, and hyphens do not matter). Each recovery code works once and is
+recorded when used. Afterwards turn the second factor off and set it up again, or press **Get new recovery codes** (it
+needs the password and a code of the app); the old codes then stop working. The card shows how many you have left. A
+recovery code is for getting in and never signs a review.
+
+**Signing a review.** A reviewer with a second factor types the password **and** a current code in the signing form.
+The password is checked first. A code works only once, also across the sign-in and the signing, so when you used the
+code of the current 30 second period to sign in you must **wait for the next code** before you sign; the form then
+says only that the password or the code is incorrect. Wrong codes count toward the lockout. A reviewer without a second
+factor, and a reviewer at an identity provider, sign as before.
+
+**Change your password.** With a second factor on, the form on the Account page that changes your password also asks
+for a current code (or a recovery code). A code works only once, also across the sign-in and this form, so after you
+signed in with the code of the current period, wait for the next code. A missing or wrong code is refused with one
+general message, counts toward the lockout like a wrong password, and changes nothing; the count is cleared only when
+the password and the code are both right. A person with a temporary password, and an account without a second factor,
+change the password as before.
+
+**Turn it off.** In the **Turn off two-factor sign-in** section of the card, type your password and a current code (or
+a recovery code) and press **Turn off**. The secret and the recovery codes are deleted.
+
+**Administrator reset.** A system administrator sees a **TOTP** badge on the Users page and can press **Reset
+two-factor** for a person who has neither the phone nor a recovery code. That removes the second factor and the
+recovery codes; the person signs in with the password alone and can set it up again. A project administrator cannot do
+this, and neither can an API token. The reset works also while the feature is off. Setting a new password for a person
+(see [Manage Users](#manage-users-system-administrators)) does **not** turn the second factor off: the person still
+needs a code
+at the next sign-in.
+
+**Good to know.**
+
+- Turning it off or an administrator reset does **not** sign anybody out: sessions that are already open stay valid.
+  A sign-in that was waiting for its code is ended.
+- While the feature is off (`Identity:Totp:Enabled` is `false`), no code is asked for anywhere, also not when you
+  change your password; the stored secrets are kept.
+- The sign-in with an identity provider and the API tokens are not affected: a token never needs a code, and it still
+  cannot sign.
+- The secret of a person is stored encrypted with the Data Protection key ring of the server (the
+  `DataProtection:KeysPath` folder; see [How the Token Is Protected](#how-the-token-is-protected)). Back it up
+  separately from the database. If the keys are lost, the codes of the app can no longer be checked: the
+  recovery codes still work, and an administrator can reset the account.
+- Recovery codes are stored only as hashes. Setting up, turning off, a reset, new recovery codes, the use of a
+  recovery code, and wrong codes are recorded in the audit trail (see [Recorded Actions](#recorded-actions)), never
+  the secrets or the codes.
+- The Help topic **Two-factor sign-in** (`/help/two-factor`) explains the same steps to the users.
+
+**Planned.** Enforcement, so that a second factor is required for system administrators or by a policy of a project,
+is planned and not part of this release: today the choice is the person's own. A QR code for the setup is planned too.
+
 ### Manage Users (System Administrators)
 
 Open `/users` (the Users link in the header); a user who is not a system administrator is refused with an "Access
@@ -444,8 +541,11 @@ a **System admin** badge for system administrators. A system administrator can:
 2. Disable a user, which stops the user from signing in without deleting the record of what the user did, and enable
    the user again.
 3. Make a user a system administrator (**Make system admin**) or take that away (**Remove system admin**).
-4. Set a new password for a user, for example when the user has forgotten it. This also ends a lockout. An account
+4. Set a new password for a user, for example when the user has forgotten it. This also ends a lockout, but it does
+   not turn off the second factor of the user. An account
    of an identity provider (marked **OIDC**) has no password, so there is no such action for it.
+5. Reset the second factor of a user who lost the phone and the recovery codes (**Reset two-factor**; see
+   [Two-Factor Sign-in](#two-factor-sign-in)).
 
 The last enabled system administrator cannot be disabled or demoted; the page shows an error instead. If you are no
 longer an enabled system administrator, the page shows an error for every action.
@@ -896,7 +996,9 @@ changed or removed, even if its signature is out of date; to change the reviewer
 membership of the project and being the assigned reviewer; a system administrator who is not a member cannot sign. The
 form shows
 the statement of the signature, "I have reviewed this record and approve it.", and asks you to confirm your password.
-Enter your password and press **Sign**. The password is checked like at sign-in, so wrong passwords count toward the
+Enter your password and press **Sign**. A reviewer who has turned on the second factor also types a current code of
+the authenticator app (see [Two-Factor Sign-in](#two-factor-sign-in)). The password is checked like at sign-in, so
+wrong passwords count toward the
 same lockout, and it is never stored or shown. A reviewer whose account is at an identity provider has no password; the
 slot offers **Confirm identity with** the provider instead, which sends the person to the provider to sign in again,
 and after that the slot offers **Sign** (see
@@ -1402,6 +1504,8 @@ head hash is a manual step, and it is most useful after important events such as
 | Sign-in   | `auth.sign-in`, `auth.sign-out`, `auth.sign-in-failed`, `auth.locked-out`            |
 | Sign-in   | `auth.sign-in-locked`, `auth.sign-in-throttled`                                      |
 | Sign-in   | `auth.oidc-sign-in`, `auth.oidc-sign-in-failed` (with a short class of the reason)   |
+| TOTP      | `auth.totp-enrolled`, `auth.totp-disabled`, `auth.totp-reset`                        |
+| TOTP      | `auth.totp-recovery-used`, `auth.totp-recovery-regenerated`, `auth.totp-failed`      |
 | Users     | `account.oidc-created` (an account was created at the first sign-in at a provider)   |
 | Auditing  | `audit.events-suppressed` (events of new keys were not recorded; the table was full) |
 | Signing   | `signature.reauth-failed` (a wrong password, or a missing confirmation at a provider)|
@@ -1427,7 +1531,9 @@ head hash is a manual step, and it is most useful after important events such as
 - The trail does not hold the address of the client; only the log of the web server has it.
 - A wrong current password on the account page is recorded as `auth.sign-in-failed`, because it is checked in the same
   way as a sign-in and counts toward the same lockout; an attempt there on a locked account is not recorded. A wrong
-  password at a signature is recorded as `signature.reauth-failed`.
+  password at a signature is recorded as `signature.reauth-failed`. A wrong code at the second step of a sign-in is
+  recorded as `auth.totp-failed`, as is a missing or wrong code when a person with a second factor changes the own
+  password; the codes themselves, the secrets, and the recovery codes are never recorded.
 - Comments, justifications, and the reason for marking a checklist section not applicable are recorded only as a short
   digest, never as text.
 - There is no export and no retention or archiving of the trail, and no external anchoring.
@@ -1480,7 +1586,7 @@ settings add seven columns to the projects (`EvidenceAnonymousIndex`, `EvidenceA
 and `EvidenceIncludeGitContext`), and the record digest is now labeled `ReviewCenter record v1`, a format private to
 ReviewCenter that also covers the wording of the checklist questions and who answered them. The sign-in with an
 OpenID Connect provider adds two columns to the users (`Users.ExternalIssuer` and `Users.ExternalSubject`) with a unique
-index on the pair. There is no migration:
+index on the pair. The two-factor sign-in adds two tables (`UserTotps` and `TotpRecoveryCodes`). There is no migration:
 recreate development databases created before them.
 
 ## Repositories and Credentials
@@ -1647,12 +1753,13 @@ Example validation report:
 ✓ ReviewCenter_ReviewWorkflow - Passed (8128 ms): embedded SQLite; review signed; evidence index read back
 ✓ ReviewCenter_Fingerprint - Passed (28 ms): 3 files, fingerprint 13e028da06299fcedffff47b2b55cca46a68111f3124d77d355364339c4215f2
 ✓ ReviewCenter_PasswordHash - Passed (219 ms): right password accepted, wrong password refused, hashes salted
+✓ ReviewCenter_Totp - Passed (12 ms): RFC 6238 SHA-1 vectors, window +/-1, replay step returned
 ✓ ReviewCenter_AuditChain - Passed (1152 ms): 3 entries intact; change of entry 2 detected
 ✓ ReviewCenter_AttestationPdf - Passed (343 ms): CMS signature and DocMDP verified; changed byte detected (75964 bytes)
 ✓ ReviewCenter_HostStart - Passed (1590 ms): 127.0.0.1:58493; /login and /_framework/blazor.web.js 200; stopped cleanly
 
-Total Tests: 8
-Passed: 8
+Total Tests: 9
+Passed: 9
 Skipped: 0
 Failed: 0
 Total Time: 8.1 s
@@ -1677,6 +1784,11 @@ JUnit files.
   fingerprint and the record digest.
 - **`ReviewCenter_Fingerprint`** - the content fingerprint of fixed files equals a pinned value on every platform.
 - **`ReviewCenter_PasswordHash`** - the password hasher accepts the right password and refuses a wrong one.
+- **`ReviewCenter_Totp`** - the one-time codes of the second factor (see
+  [Two-Factor Sign-in](#two-factor-sign-in)) equal the published test vectors of RFC 6238, the window of one 30
+  second step either side is accepted and two steps are refused, and the secret has the form that authenticator apps
+  read. A library or platform that computed other codes than the authenticator apps would lock people out, so this is
+  checked.
 - **`ReviewCenter_AuditChain`** - the audit trail verifies, and a changed entry is reported by the verifier.
 - **`ReviewCenter_AttestationPdf`** - a signed attestation PDF is produced with a temporary key, its signature and
   its change-prevention certification verify independently, and a changed byte makes the verification fail.
@@ -1700,7 +1812,7 @@ use can be reached and has the schema of this version, add `--check-config`:
 reviewcenter --validate --check-config
 ```
 
-This adds a ninth test, **`ReviewCenter_ConfiguredDatabase`**. It loads the configuration the way `serve` does
+This adds a tenth test, **`ReviewCenter_ConfiguredDatabase`**. It loads the configuration the way `serve` does
 (`appsettings.json` and the environment variables), recognizes the database provider, opens the database
 **read-only**, and compares its tables and columns with the ones this version expects. It never writes to the
 database and never creates it, and it never prints the connection string or other secrets; a problem is reported

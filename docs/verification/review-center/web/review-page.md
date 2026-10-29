@@ -129,6 +129,10 @@ N/A - standard test environment.
   topic; a key
   that cannot be used shows the reason as an alert instead of the download; a review that is not approved shows
   nothing about the attestation; and the download appears as soon as the last signature is made through the page.
+- A signer who has a second factor sees a code field (that asks for a one-time code) next to the password field, and a
+  signer who has none sees no such field; the password and a fresh code sign and both fields are empty afterwards; a
+  missing, wrong, recovery, or already used code shows the one message that names the password and the code, signs
+  nothing, and empties both fields; a code used within its step is refused until the next code.
 
 #### Test Scenarios
 
@@ -667,3 +671,16 @@ name.
 **ReviewLinks_ForAttestation_ProjectAndReview_BuildsAddress**: The address for a review is
 `/projects/3/reviews/REV-1/attestation.pdf`, and an identifier with a space and a slash is escaped once
 (`a%20b%2Fc`). This scenario is tested by the test of that name.
+
+**ReviewPage second factor scenarios**: These tests are in `ReviewPageTests.cs`; the signer is enrolled through the real
+`TotpService`, the clock is moved to the next time step, and the codes are computed by the independent `TotpOracle`. A
+signer without a second factor sees the password field and no code field, which is tested by
+`ReviewPage_Render_SignerNotEnrolled_ShowsNoCodeField`. An enrolled signer sees the code field with the one-time code
+hint; the password and a fresh code sign, the slot shows "Signed by Ann", one signature is stored, and neither the
+password nor the code remains in the page; this is tested by
+`ReviewPage_Sign_EnrolledSignerWithPasswordAndFreshCode_SignsAndClearsFields`. A theory over an empty and a wrong code
+shows "The password or the code is incorrect.", stores no signature, and leaves both fields empty; this is tested by
+`ReviewPage_Sign_EnrolledSignerWithWrongCode_ShowsGenericErrorAndSignsNothing`. The code of the step in which the user
+enrolled is refused, and after the clock moves on the code of the next step signs; this is tested by
+`ReviewPage_Sign_CodeAlreadyUsedInStep_IsRefusedUntilTheNextCode`. A recovery code typed in place of the code is
+refused and nothing is signed, which is tested by `ReviewPage_Sign_RecoveryCodeInsteadOfCode_IsRefused`.

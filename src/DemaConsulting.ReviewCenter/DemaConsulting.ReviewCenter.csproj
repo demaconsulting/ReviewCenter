@@ -47,6 +47,9 @@
          OpenID Connect provider (authorization code flow with PKCE). It is not part of the ASP.NET Core shared
          framework, so the package is needed to compile and to run. -->
     <PackageReference Include="Microsoft.AspNetCore.Authentication.OpenIdConnect" Version="10.0.14" />
+    <!-- Otp.NET (MIT, no dependencies) implements the RFC 6238 time-based one-time password algorithm for the optional
+         second factor of local accounts; only the TotpAlgorithm unit uses it, and Core stays free of it. -->
+    <PackageReference Include="Otp.NET" Version="1.4.1" />
     <!-- System.Security.Cryptography.Pkcs builds the detached CMS signature (adbe.pkcs7.detached) of the PDF
          attestation. It has no reference assembly in the shared framework, so the package is needed to compile. -->
     <PackageReference Include="System.Security.Cryptography.Pkcs" Version="10.0.14" />

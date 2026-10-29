@@ -37,6 +37,11 @@ N/A - standard test environment.
 - An account of an identity provider carries an "OIDC" badge whose title names the provider and shows a note that it
   has no local password, with no password field and no "Set password" button; a local account has neither the badge
   nor the note.
+- An enrolled local account carries a "TOTP" badge and a reset button for its second factor; a plain account and an
+  account of an identity provider have neither; both stay while the feature is switched off, so that a dormant
+  enrollment can be cleared; the reset removes the second factor, says so, and removes the badge and the button; a reset
+  sent after the session ended shows the "no longer signed in" error and keeps the enrollment; the service behind the
+  button refuses a caller who is not a system administrator.
 
 #### Test Scenarios
 
@@ -110,3 +115,17 @@ account exist and the provider is on (in `OidcPageTests.cs`). The row of the pro
 with a title that names the provider and the note "no local password", and has no password field and no "Set
 password" button; the local row has no badge and still has the "Set password" button. This scenario is tested by
 `UsersPage_Render_ExternalUser_ShowsMarkerAndNoPasswordControls`.
+
+**UsersPage second factor scenarios**: These tests are in `UsersTotpPageTests.cs`, rendered with bUnit over the real
+`TotpService` with in-memory stores, with a system administrator signed in. With one enrolled and one plain user, only
+the enrolled user has the badge "TOTP" and the reset button, and there is exactly one badge; this is tested by
+`UsersPage_Render_EnrolledAndPlainUsers_BadgeAndResetOnlyForEnrolled`. An account of an identity provider has neither,
+which is tested by `UsersPage_Render_ExternalUser_HasNoTotpControls`. The reset removes the enrollment, the status says
+the second factor "was reset", the badge and the button are gone, and no error is shown; this is tested by
+`UsersPage_ResetTotp_EnrolledUser_RemovesEnrollmentAndShowsStatus`. With the feature switched off the badge and the
+button are still shown, which is tested by `UsersPage_Render_FeatureDisabled_StillShowsBadgeAndReset`. A reset after the
+session ended shows the error "no longer signed in" and the user stays enrolled, which is tested by
+`UsersPage_ResetTotp_SessionEndedBeforePageKnows_ShowsErrorAndKeepsEnrollment`. The service behind the button refuses a
+caller who is not a system administrator (a project administrator is an ordinary user) with `ActorNotAllowed` and keeps
+the enrollment, which is tested by `TotpService_Reset_NotSystemAdmin_IsRefusedAndKeepsEnrollment`, defined in the same
+file.

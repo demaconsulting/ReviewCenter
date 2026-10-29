@@ -14,6 +14,9 @@ includes:
   - docs/reqstream/review-center/identity/sign-in.yaml
   - docs/reqstream/review-center/identity/sign-in-throttle.yaml
   - docs/reqstream/review-center/identity/oidc-sign-in.yaml
+  - docs/reqstream/review-center/identity/totp-algorithm.yaml
+  - docs/reqstream/review-center/identity/totp-secret-protector.yaml
+  - docs/reqstream/review-center/identity/totp-sign-in.yaml
   - docs/reqstream/review-center/identity/revalidating-authentication-state-provider.yaml
   - docs/reqstream/review-center/api.yaml
   - docs/reqstream/review-center/api/api-token-authentication.yaml
@@ -56,6 +59,7 @@ includes:
   - docs/reqstream/review-center/web/review-page.yaml
   - docs/reqstream/review-center/web/checklist-page.yaml
   - docs/reqstream/review-center/web/login-page.yaml
+  - docs/reqstream/review-center/web/totp-login-page.yaml
   - docs/reqstream/review-center/web/account-page.yaml
   - docs/reqstream/review-center/web/users-page.yaml
   - docs/reqstream/review-center/web/history-page.yaml
@@ -81,6 +85,8 @@ includes:
   - docs/reqstream/review-center/core/line-diff.yaml
   - docs/reqstream/review-center/core/personal-access-token-service.yaml
   - docs/reqstream/review-center/core/reauth-proof-store.yaml
+  - docs/reqstream/review-center/core/totp-service.yaml
+  - docs/reqstream/review-center/core/totp-challenge-store.yaml
   - docs/reqstream/review-center/storage.yaml
   - docs/reqstream/review-center/storage/review-center-db-context.yaml
   - docs/reqstream/review-center/storage/review-store.yaml
@@ -89,6 +95,7 @@ includes:
   - docs/reqstream/review-center/storage/repository-store.yaml
   - docs/reqstream/review-center/storage/database-setup.yaml
   - docs/reqstream/review-center/storage/personal-access-token-store.yaml
+  - docs/reqstream/review-center/storage/totp-store.yaml
   - docs/reqstream/review-center/platform-requirements.yaml
   - docs/reqstream/review-center-puppet.yaml
   - docs/reqstream/review-center-puppet/puppet-program.yaml
@@ -118,3 +125,4 @@ includes:
   - docs/reqstream/ots/openapi.yaml
   - docs/reqstream/ots/openidconnect.yaml
   - docs/reqstream/ots/openiddict.yaml
+  - docs/reqstream/ots/otpnet.yaml

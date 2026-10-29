@@ -76,6 +76,22 @@ public class ValidationChecksTests
     }
 
     /// <summary>
+    ///     Test that the TOTP check passes with the RFC 6238 vectors.
+    /// </summary>
+    [Fact]
+    public async Task ValidationChecks_Totp_Run_PassesWithRfcVectors()
+    {
+        // Arrange: nothing; the check computes codes for the published vectors
+
+        // Act: run the check, which throws when any published code or window rule is violated
+        var detail = await TotpCheck.RunAsync(CancellationToken.None);
+
+        // Assert: the check reports a result and the name is the documented one
+        Assert.Equal("ReviewCenter_Totp", TotpCheck.Name);
+        Assert.Contains("RFC 6238", detail);
+    }
+
+    /// <summary>
     ///     Test that the audit chain check detects a tampered entry.
     /// </summary>
     [Fact]
@@ -128,7 +144,7 @@ public class ValidationChecksTests
         // Assert: every check passed, including the host check, which listened on one loopback port that is not the
         // poisoned one
         Assert.Equal(0, run.ExitCode);
-        Assert.Contains("Passed: 8", run.Output);
+        Assert.Contains("Passed: 9", run.Output);
         var match = System.Text.RegularExpressions.Regex.Match(
             run.Output,
             @"ReviewCenter_HostStart - Passed \(\d+ ms\): listened on 127\.0\.0\.1:(\d+);");

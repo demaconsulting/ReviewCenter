@@ -248,6 +248,51 @@ public sealed class HelpPageTests : PageTestBase
     }
 
     /// <summary>
+    ///     Test that the two-factor topic is listed after the API tokens topic, explains enrolling, signing in, recovery
+    ///     codes, the rules for signing, the reset and the setting that switches the feature off, and shows its
+    ///     screenshot; and that the signing topic links to it.
+    /// </summary>
+    [Fact]
+    public void HelpTwoFactorPage_Render_ExplainsEnrollingSigningInRecoveryAndSigning()
+    {
+        // Assert: the topic follows the API tokens topic in the index
+        var slugs = HelpTopics.All.Select(topic => topic.Slug).ToList();
+        Assert.Equal(slugs.IndexOf("api-tokens") + 1, slugs.IndexOf("two-factor"));
+
+        // Act: render the topic page and the signing topic
+        var page = Render<HelpTwoFactorPage>();
+        var signing = Render<HelpSigningPage>();
+
+        // Assert: the title and the screenshot with alternative text, served from the help folder
+        var text = page.Markup;
+        Assert.Equal("Two-factor sign-in", page.Find("h1").TextContent);
+        Assert.Equal("/help/two-factor-1.png", page.Find("img.help-shot").GetAttribute("src"));
+        Assert.False(string.IsNullOrWhiteSpace(page.Find("img.help-shot").GetAttribute("alt")));
+
+        // Assert: enrolling, recovery codes shown once, signing in, recovery, and signing a review
+        Assert.Contains("<strong>Set up two-factor sign-in</strong>", text, StringComparison.Ordinal);
+        Assert.Contains("<strong>10 recovery codes</strong>", text, StringComparison.Ordinal);
+        Assert.Contains("<strong>once</strong>", text, StringComparison.Ordinal);
+        Assert.Contains("one of your <strong>recovery codes</strong>", text, StringComparison.Ordinal);
+        Assert.Contains("recovery codes cannot sign", text, StringComparison.Ordinal);
+        Assert.Contains("<strong>wait for the next code</strong>", text, StringComparison.Ordinal);
+
+        // Assert: turning off, the administrator reset (not for project administrators), and open sessions
+        Assert.Contains("<strong>Turn off</strong>", text, StringComparison.Ordinal);
+        Assert.Contains("<strong>Reset two-factor</strong>", text, StringComparison.Ordinal);
+        Assert.Contains("Project administrators cannot do this", text, StringComparison.Ordinal);
+        Assert.Contains("stay valid", text, StringComparison.Ordinal);
+
+        // Assert: the warning about the setting that switches the feature off
+        Assert.Contains("Identity:Totp:Enabled", text, StringComparison.Ordinal);
+        Assert.Contains("protected by the password alone", text, StringComparison.Ordinal);
+
+        // Assert: the signing topic points here
+        Assert.Contains("/help/two-factor", signing.Markup, StringComparison.Ordinal);
+        AssertNoAnchorLinks(page);
+    }
+
+    /// <summary>
     ///     Test that an unknown help address shows a friendly message and a link back to the index.
     /// </summary>
     [Fact]

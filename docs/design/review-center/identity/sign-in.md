@@ -8,7 +8,8 @@
 is: it configures cookie authentication and authorization, handles the login and logout requests, makes sure a return
 address stays on this site, validates the authentication cookie on every request, and converts between the signed-in
 principal and the `Actor` that the Core services record. It also owns the small options type `AuthOptions`, and it
-asks `SignInThrottle` before it checks a password.
+asks `SignInThrottle` before it checks a password. For an account with a second factor it also starts the second step
+(the challenge and its cookie); the second step itself is the unit `TotpSignIn`.
 
 #### Data Model
 
@@ -107,7 +108,12 @@ nothing else is checked, even a right password is not looked at, no
 cookie is set, a `auth.sign-in-throttled` entry is recorded (see below), and the response redirects to
 `/login?error=throttled`, with `&ReturnUrl=` as for a failure. The answer is the same for every user name, so it does
 not reveal which names exist. Otherwise the user name and password are checked with
-`UserService.AuthenticateAsync`. On success `SignInThrottle.Succeeded` gives the attempts back (it is given the
+`UserService.AuthenticatePasswordAsync`. When the password is right and the account has a second factor
+(`SecondFactorRequired`), the endpoint is not done: it calls `SignInThrottle.ReleaseAddress` with the reservation (the
+right password gives back the address slot, while the counter of the name stays), asks
+`TotpService.BeginSignIn` for a challenge bound to the user, the client address, and the safe return URL, appends the
+challenge cookie (see `TotpSignIn`), and redirects to `/login/totp`. No session cookie is issued and no `auth.sign-in`
+is recorded at this step. Otherwise, on success `SignInThrottle.Succeeded` gives the attempts back (it is given the
 reservation that `TryBegin` returned, so it only touches the windows that attempt was counted in), the principal (see
 Claims) is signed in with the cookie scheme as a session cookie and the response redirects to the safe return URL, or to
 `AccountPath` when the user has to change a temporary password, whatever address the user asked for. On
@@ -210,9 +216,13 @@ address is only in the web server log.
 
 #### Dependencies
 
-- **UserService** (Core) — checks the password and reads the user for the per-request validation.
+- **UserService** (Core) — checks the password (`AuthenticatePasswordAsync`) and reads the user for the per-request
+  validation.
+- **TotpService** (Core) — starts the second step for an account with a second factor.
 - **AuditService** (Core) — records the sign-in, the sign-out, and the throttled refusals.
-- **SignInThrottle** (Identity) — decides whether an attempt may go on, and takes attempts back after a success.
+- **SignInThrottle** (Identity) — decides whether an attempt may go on, and takes attempts back after a success or
+  gives back the address slot after a right password that needs a code.
+- **TotpSignIn** (Identity) — the cookie options of the challenge cookie and the page and endpoint of the second step.
 - **Actor**, **User**, and **DomainRuleException** (Core) — the type produced for the pages, the user
   that `IsCurrent` compares with (its `IsSystemAdmin` and `MustChangePassword` flags), and the refusal of
   `GetActorAsync`.
@@ -224,6 +234,7 @@ address is only in the web server log.
 
 - **ServerHost** — calls `AddSignIn` while registering the services (after the Razor components) and `MapSignIn`
   while mapping the endpoints, and enables the authentication and authorization middleware.
+- **TotpSignIn** — uses `BuildPrincipal`, `SafeReturnUrl`, `AccountPath`, and `ClientAddress` for the second step.
 - **RevalidatingAuthenticationStateProvider** — calls `IsCurrent`.
 - **ApiTokenAuthentication** — reads the client address of a request with `ClientAddress` (an internal static method of
   this unit that the web login also uses), so that the attempts of the API count per address in the same way.

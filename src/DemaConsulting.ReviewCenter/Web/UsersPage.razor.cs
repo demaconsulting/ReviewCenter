@@ -86,6 +86,17 @@ public partial class UsersPage : ComponentBase
     private IReadOnlyList<User> Users { get; set; } = [];
 
     /// <summary>
+    ///     Gets or sets the service of the optional second factor, supplied by dependency injection.
+    /// </summary>
+    [Inject]
+    private TotpService Totp { get; set; } = null!;
+
+    /// <summary>
+    ///     Gets the identities of the users that have two-factor sign-in turned on.
+    /// </summary>
+    private IReadOnlySet<int> TotpUserIds { get; set; } = new HashSet<int>();
+
+    /// <summary>
     ///     Gets a value indicating whether the signed-in user turned out to be no system administrator any more, so
     ///     that the list and its controls are not rendered.
     /// </summary>
@@ -127,6 +138,7 @@ public partial class UsersPage : ComponentBase
     protected override async Task OnInitializedAsync()
     {
         Users = await UserService.ListAsync();
+        TotpUserIds = await Totp.ListEnrolledUserIdsAsync();
     }
 
     /// <summary>
@@ -186,6 +198,21 @@ public partial class UsersPage : ComponentBase
             user.Id,
             makeAdmin ? $"'{user.Username}' is now a system administrator." : $"'{user.Username}' is no longer a system administrator.",
             actor => UserService.SetSystemAdminAsync(user.Username, makeAdmin, actor));
+    }
+
+    /// <summary>
+    ///     Removes the two-factor sign-in of a user who lost the device and the recovery codes.
+    /// </summary>
+    /// <param name="user">The user as shown.</param>
+    /// <returns>A task that completes when the change is stored or the problem is shown.</returns>
+    /// <remarks>
+    ///     The service checks again that the signed-in user is a system administrator; the sessions of the user
+    ///     stay valid and the user can set up two-factor sign-in again.
+    /// </remarks>
+    private Task ResetTotpAsync(User user)
+    {
+        return RunAsync(user.Id, $"Two-factor sign-in of '{user.Username}' was reset.",
+            actor => Totp.ResetAsync(actor, user.Username));
     }
 
     /// <summary>
@@ -257,6 +284,7 @@ public partial class UsersPage : ComponentBase
 
         // Reload so the rows show what is stored, whether or not the change succeeded
         Users = await UserService.ListAsync();
+        TotpUserIds = await Totp.ListEnrolledUserIdsAsync();
     }
 
     /// <summary>
@@ -283,6 +311,7 @@ public partial class UsersPage : ComponentBase
     private void ShowAccessLost(string message)
     {
         Users = [];
+        TotpUserIds = new HashSet<int>();
         Passwords.Clear();
         MessageUserId = null;
         AccessLost = true;

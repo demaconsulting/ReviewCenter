@@ -17,7 +17,7 @@ database; the real database is verified in the `Storage` subsystem, the real has
 real token protector and git in the `ContentSources` subsystem.
 The tests show that the units cooperate as the
 design describes: the services create, store, and read back what the fingerprint algorithm and the rules require.
-The rules and the algorithm themselves are verified in detail by the unit tests of the nineteen units.
+The rules and the algorithm themselves are verified in detail by the unit tests of the twenty-one units.
 
 ### Test Environment
 
@@ -30,7 +30,7 @@ N/A - standard test environment.
   the known answer for the files, every file keeps its own size and SHA-256 hash, and file bytes are returned
   exactly.
 - The same file contents give the same fingerprint when submitted in another order or under other names.
-- Every domain rule (all fifty-eight values of `DomainRule`) is reported as a domain rule exception that names it, and
+- Every domain rule (all sixty-four values of `DomainRule`) is reported as a domain rule exception that names it, and
   nothing is stored. The four rules that only a real git can raise (`RevisionNotFound`, `GitUnavailable`,
   `GitAccessFailed`, and `GitTimeout`) are exercised in the `ContentSources` subsystem tests instead.
 - A thread started on a file, with replies, resolved and reopened, is read back with its comments in posting order.
@@ -78,6 +78,11 @@ N/A - standard test environment.
   without any project, system administrator right, or password, and refuses every password operation; its user signs a
   slot only with a live single-use proof of a confirmation (see the unit tests of `UserService`, `SigningService`, and
   `ReauthProofStore`).
+- A local account may turn on a second factor: the enrollment is confirmed with a code, a code of a step is accepted
+  once even when many requests present it at the same time, a wrong code counts toward the lockout of the password,
+  recovery codes work once for signing in and never for signing, a signing needs the password and a fresh code, and
+  a system administrator can reset the second factor; each change is audited without a secret or a code (see the unit
+  tests of `TotpService`, `TotpChallengeStore`, `UserService`, and `SigningService`).
 
 ### Test Scenarios
 
@@ -111,7 +116,9 @@ a signing of a record that changed; a token with an invalid name, an invalid lif
 tokens, and an actor that came through a token that signs or names a reviewer; a repository with an invalid name,
 location, or credential, a name already used,
 an unknown or disabled repository, or a token that cannot be decrypted; a revision that is not a safe name; and a
-selection with no valid pattern; and a selection that matches no changed file). Each
+selection with no valid pattern; and a selection that matches no changed file; and, over the real `TotpService` in a
+`TotpTestWorld`, the six second factor rules: not available, already enrolled, not enrolled, code incorrect, enrollment
+expired, and secret unreadable). Each
 fails with a `DomainRuleException` that names the rule, and the store holds only the project, review, and
 administrator created
 first, except that the git-only rules are skipped here. This scenario is tested by `CoreSubsystem_RuleViolation_IsReportedAsDomainRuleAndStoresNothing`.
@@ -169,3 +176,11 @@ second finds it, which is tested by `UserService_SignInExternalAsync_FirstThenSe
 the provider signs a slot once with a live proof of a confirmation, and the proof is then spent, which is tested by
 `SigningService_SignAsync_ExternalUserWithProof_SignsOnce`. The proof store itself is verified by the unit tests of
 `ReauthProofStore`.
+
+**Second factor**: The unit tests of `TotpService`, `UserService`, and `SigningService` verify the subsystem
+requirement for the second factor. A code of a step is accepted once when thirty-two requests present it at the same
+time, which is tested by `TotpService_CompleteSignInAsync_ConcurrentSameCode_ExactlyOneSucceeds`, and a signing of an
+enrolled user needs the password and a fresh code, which is tested by
+`SigningService_SignAsync_EnrolledUserWithPasswordAndFreshCode_Signs`. The six rules of the second factor are
+reported by `CoreSubsystem_RuleViolation_IsReportedAsDomainRuleAndStoresNothing`. The challenge of the sign-in is
+verified by the unit tests of `TotpChallengeStore`.

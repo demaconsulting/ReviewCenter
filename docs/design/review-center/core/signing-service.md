@@ -5,7 +5,8 @@
 #### Purpose
 
 `SigningService` owns the rules for reviewer slots and signatures: it adds, changes, and removes the slots of a review,
-records a signature after the signer has confirmed their identity (with the password, or for a user of an external
+records a signature after the signer has confirmed their identity (with the password and, for an account with a second
+factor, a current code, or for a user of an external
 identity provider with a fresh sign-in at the provider), and computes the approval status of a review. It
 is the one place where these rules live, so every caller (the pages, a later API) gets the same answer. It is also
 the home of the supporting types of signing: `SlotRole`, `ReviewerSlot`, `ReviewSignature`, `ReviewRecord`,
@@ -82,9 +83,9 @@ is one.
    Review it and try again."), so nobody signs something they have not seen.
 5. The slot has no signature of the current digest yet (`SigningNotAllowed`).
 6. There are no blockers (`SigningNotAllowed`, with the blockers in the message).
-7. The password is right: it is checked by `UserService.ReauthenticateAsync`, which is the check the sign-in uses with
-   its own action code, so the hashing, the lockout counting, and the generic failure are the same. Any failure (wrong,
-   locked out, disabled, unknown) gives
+7. The password is right: it is checked by `UserService.ReauthenticatePasswordAsync`, which is the check the sign-in
+   uses with its own action code, so the hashing, the lockout counting, and the generic failure are the same. Any
+   failure (wrong, locked out, disabled, unknown) gives
    `ReauthenticationFailed` with the message "The password is incorrect." and signs nothing. A wrong password at a
    signature counts toward the same lockout as at sign-in, and `UserService` records the failure in the audit trail as
    `signature.reauth-failed` (a wrong password, a locked account, and so on, never the password), so the trail shows
@@ -95,6 +96,16 @@ is one.
    service has no store of proofs) the step gives `ReauthenticationFailed` with the message "Your identity is not
    confirmed. Confirm it again, then sign.", `UserService.RecordExternalReauthFailureAsync` records
    `signature.reauth-failed` (detail `oidc: no-proof`), and nothing is signed.
+
+   **Second factor**: a local signer whose account has a confirmed second factor (`TotpService.IsEnrolledAsync`) must
+   also give the current authenticator code (`totpCode`). The password is checked first, then the code through the
+   internal `TotpService.VerifyForSignatureAsync`; a recovery code is never accepted here. A wrong password, a wrong
+   code, or a code that was already used (also one used a moment ago to sign in: the signer waits for the next code)
+   gives `ReauthenticationFailed` with the one message "The password or the code is incorrect." for a signer with a
+   second factor, so the message never tells which of the two was wrong. A wrong code counts toward the lockout and is
+   recorded as `signature.reauth-failed` (detail `wrong code`); a right code clears the counter. When the service has no
+   `TotpService` a required second factor cannot be satisfied and the signature is refused (fail closed). A user of an
+   external identity provider and a signer without a second factor are not affected, and the code is ignored for them.
 8. The signature is stored by `IReviewStore.AddSignatureAsync`, which recomputes the digest inside a serializable
    transaction and refuses the signature when the record changed since step 4.
 
@@ -171,7 +182,8 @@ changes or deletes a signature. `UpdateSlotAsync` and `RemoveSlotAsync` return `
 **SignAsync**: Signs the review in a slot as described above.
 
 - *Parameters*: the actor, project identity, review identifier, slot identity, the expected digest, the password
-  (ignored for a user of an external identity provider), and a cancellation token.
+  (ignored for a user of an external identity provider), a cancellation token, and the optional current authenticator
+  code `totpCode` (only used for a signer who has a second factor; never stored, logged, or put into a message).
 - *Returns*: `Task<ReviewSignature>` — the stored signature.
 - *Preconditions*: The actor and the expected digest are not null.
 - *Postconditions*: Nothing is stored when a rule fails.
@@ -202,10 +214,12 @@ never contain a password or a hash. An infrastructure failure of the store passe
 
 - **IReviewStore** — reads the record, the slots, and the signatures, and stores slots and signatures.
 - **IProjectAccess** — requires that the actor may see the project and that the signer and the reviewers are members.
-- **UserService** — looks up users, describes the reviewers, re-authenticates the signer (`ReauthenticateAsync`), and
-  records a refused confirmation of an external user.
+- **UserService** — looks up users, describes the reviewers, re-authenticates the signer (`ReauthenticatePasswordAsync`),
+  and records a refused confirmation of an external user.
 - **ReauthProofStore** — holds the single-use proofs of external users (optional, injected; without it an external
   user cannot sign).
+- **TotpService** — tells whether the signer has a second factor and checks the code (optional, injected; without it a
+  signer who needs a code cannot sign).
 - **RecordDigest** — calculates the digest of the record.
 - **ThreadService** — `NextStep` words the next step when signing is blocked.
 - **ChecklistState** — decides which sections apply and what the answers are.

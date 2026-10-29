@@ -41,6 +41,11 @@ N/A - standard test environment.
   content switches, the regulatory warning, the Content scope section, and the audit trail, and contains no link that
   begins with `#`.
 - The Getting started, Reviewers and signing, and API tokens topics each mention the identity provider.
+- The Two-factor sign-in topic follows the API tokens topic in the list, has its title, a screenshot with alternative
+  text from `/help/`, and describes setting it up, the ten recovery codes shown once, signing in, recovery, signing a
+  review (a recovery code cannot sign and a used code needs the next one), turning off, the administrator reset (not for
+  project administrators), that open sessions stay valid, and the setting `Identity:Totp:Enabled` with the warning that
+  accounts are then protected by the password alone; the signing topic links to it.
 
 #### Test Scenarios
 
@@ -101,3 +106,12 @@ The list of topics holds the topic at `/help/evidence-settings`, which
 `reviewers-and-signing`, and `api-tokens` (in `OidcPageTests.cs`); each page is found by its route and rendered, and
 its markup contains the words "identity provider". This scenario is tested by
 `HelpTopicPage_Render_MentionsSignInWithProvider`.
+
+**HelpTwoFactorPage_Render_ExplainsEnrollingSigningInRecoveryAndSigning**: The topic `two-factor` follows `api-tokens`
+in the list; its page is rendered together with the signing topic. The heading is "Two-factor sign-in", the screenshot
+`/help/two-factor-1.png` has alternative text, and the text names the steps to set up, the 10 recovery codes shown
+once, the use of a recovery code, that recovery codes cannot sign, and that a used code needs the next one; it names
+turning off, the reset by an administrator that project administrators cannot do, that open sessions stay valid, and
+the setting `Identity:Totp:Enabled` with the warning about the password alone. The signing topic contains the link
+`/help/two-factor`, and no link begins with `#`. This scenario is tested by
+`HelpTwoFactorPage_Render_ExplainsEnrollingSigningInRecoveryAndSigning`.

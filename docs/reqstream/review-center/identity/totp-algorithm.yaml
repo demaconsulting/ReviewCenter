@@ -1,0 +1,48 @@
+---
+# Software Unit Requirements for the TotpAlgorithm Class
+#
+# The TotpAlgorithm class is the adapter around Otp.NET: it fixes the parameters that every authenticator app supports
+# (HMAC-SHA-1, six digits, 30 second steps), creates secrets, and checks the codes that people type.
+
+sections:
+  - title: TotpAlgorithm Unit Requirements
+    requirements:
+      - id: ReviewCenter-TotpAlgorithm-Rfc6238
+        title: >-
+          The TotpAlgorithm class shall compute the one-time password of RFC 6238 with HMAC-SHA-1 and 30 second steps,
+          giving the published codes for the published times, and shall give six digits to the person.
+        justification: |
+          A code that differs from the one the app of the person shows would lock every enrolled person out. The
+          published vectors and an independent calculation in the tests show that the product computes what the apps
+          compute.
+        tests:
+          - TotpOracle_Hotp_Rfc4226Values_MatchThePublishedTable
+          - TotpAlgorithm_ComputeCode_Rfc6238Vectors_MatchThePublishedTable
+          - TotpAlgorithm_ComputeCode_ManyRandomSecrets_MatchTheReference
+
+      - id: ReviewCenter-TotpAlgorithm-Window
+        title: >-
+          The TotpAlgorithm class shall accept a code only when it is exactly six digits and belongs to the current
+          time step or the one before or after it, shall tell which step matched, and shall refuse every other code.
+        justification: |
+          The clock of the phone of a person is a little off, so one step either way is accepted. A wider window gives
+          an attacker more codes to try, and the matched step is what the replay protection stores, so it must be
+          the real time step.
+        tests:
+          - TotpAlgorithm_TryVerify_MatchedStep_IsFloorOfUnixTimeOverThirty
+          - TotpAlgorithm_TryVerify_OutsideTheWindow_IsRefused
+          - TotpAlgorithm_TryVerify_MalformedCode_IsRefused
+
+      - id: ReviewCenter-TotpAlgorithm-Secret
+        title: >-
+          The TotpAlgorithm class shall create a random secret of 160 bits, convert it to and from Base32 (tolerating
+          spaces, hyphens, and lower case when a person types it), and build the otpauth address with the issuer and
+          the account name that an authenticator app reads.
+        justification: |
+          The secret must be unguessable, and the person must be able to type it or give it to the app as an address.
+          Refusing text that is not a secret keeps nonsense from becoming a key.
+        tests:
+          - TotpAlgorithm_GenerateSecret_Is160BitsAndRoundTripsThroughBase32
+          - TotpAlgorithm_TryFromBase32_TypedText_IsToleratedAndNonsenseIsRefused
+          - TotpAlgorithm_BuildUri_HasTheOtpauthForm
+          - TotpAlgorithm_InvalidArguments_Throw

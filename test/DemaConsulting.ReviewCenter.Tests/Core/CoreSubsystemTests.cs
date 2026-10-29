@@ -164,6 +164,19 @@ public class CoreSubsystemTests
     ];
 
     /// <summary>
+    ///     The rules that the second factor service reports.
+    /// </summary>
+    private static readonly DomainRule[] TotpRules =
+    [
+        DomainRule.TotpNotAvailable,
+        DomainRule.TotpAlreadyEnrolled,
+        DomainRule.TotpNotEnrolled,
+        DomainRule.TotpCodeIncorrect,
+        DomainRule.TotpEnrollmentExpired,
+        DomainRule.TotpSecretUnreadable
+    ];
+
+    /// <summary>
     ///     Test that each domain rule is reported through the services as a domain rule exception that names
     ///     the rule, and that nothing is stored for the violation.
     /// </summary>
@@ -246,6 +259,11 @@ public class CoreSubsystemTests
         if (TokenRules.Contains(rule))
         {
             return ViolateTokenAsync(rule);
+        }
+
+        if (TotpRules.Contains(rule))
+        {
+            return ViolateTotpAsync(rule);
         }
 
         return ViolateAsync(rule, projects, reviews, threads, checklists, users, projectId);
@@ -347,6 +365,56 @@ public class CoreSubsystemTests
                     new FakePersonalAccessTokenStore(userStore), userStore, clock);
                 await tokens.ListAsync(new Actor("temp", "Temp"), cancellationToken);
                 return;
+        }
+    }
+
+    /// <summary>
+    ///     Makes a request that breaks one rule of the second factor service, in a world of its own.
+    /// </summary>
+    /// <param name="rule">The rule to break; one of <see cref="TotpRules"/>.</param>
+    /// <returns>A task that fails with the rule violation.</returns>
+    private static async Task ViolateTotpAsync(DomainRule rule)
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var world = new TotpTestWorld(
+            rule == DomainRule.TotpNotAvailable ? new TotpSettings(false, TotpSettings.DefaultIssuer) : null);
+        await world.AddUserAsync("tot");
+        var actor = new Actor("tot", "Tot");
+        switch (rule)
+        {
+            case DomainRule.TotpNotAvailable:
+                await world.Totp.BeginEnrollmentAsync(actor, TotpTestWorld.Password, cancellationToken);
+                return;
+            case DomainRule.TotpAlreadyEnrolled:
+                await world.EnrollAsync("tot");
+                await world.Totp.BeginEnrollmentAsync(actor, TotpTestWorld.Password, cancellationToken);
+                return;
+            case DomainRule.TotpNotEnrolled:
+                await world.Totp.DisableAsync(actor, TotpTestWorld.Password, "000000", cancellationToken);
+                return;
+            case DomainRule.TotpCodeIncorrect:
+                {
+                    var enrollment = await world.Totp.BeginEnrollmentAsync(actor, TotpTestWorld.Password, cancellationToken);
+                    var secret = TotpOracle.FromBase32(enrollment.SecretBase32);
+                    var right = world.CodeNow(secret);
+                    var wrong = right == "000000" ? "000001" : "000000";
+                    await world.Totp.ConfirmEnrollmentAsync(actor, wrong, cancellationToken);
+                    return;
+                }
+
+            case DomainRule.TotpEnrollmentExpired:
+                await world.Totp.BeginEnrollmentAsync(actor, TotpTestWorld.Password, cancellationToken);
+                world.Clock.Advance(TimeSpan.FromHours(1));
+                await world.Totp.ConfirmEnrollmentAsync(actor, "000000", cancellationToken);
+                return;
+            default:
+                {
+                    var (secret, _) = await world.EnrollAsync("tot");
+                    world.Protector.Unreadable = true;
+                    world.AdvanceSteps(2);
+                    await world.Totp.DisableAsync(actor, TotpTestWorld.Password, world.CodeNow(secret), cancellationToken);
+                    return;
+                }
         }
     }
 

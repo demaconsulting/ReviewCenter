@@ -5,7 +5,7 @@
 ### Overview
 
 The `Web` subsystem is the Blazor Server user interface of ReviewCenter. It owns what a browser
-shows and how it responds to user actions. It contains fifteen units: `App`, the HTML shell with the stored-theme
+shows and how it responds to user actions. It contains sixteen units: `App`, the HTML shell with the stored-theme
 script, the URL router, the page frame (the menu bar with the product name, the primary navigation, the Help link
 and the sign-in controls, and the footer with the version and the link to the About page), and the `SessionGate`
 that replaces an open page when its user is no longer signed in; `HomePage`, the landing page served at the root URL,
@@ -16,8 +16,10 @@ explain how to use it (`HelpPage` includes the index, a page for each topic, and
 the review-sets of a repository, reviews, and review checklists, where `ProjectsPage` includes `NewProjectPage` and
 `ProjectPage` includes `NewReviewPage`, `NewMemberPage`, and `NewMemberAccountPage`, the pages that hold the creation
 and member forms;
-`LoginPage`, `AccountPage`, and `UsersPage`, the pages for signing in (with a password, and, when an administrator has
-turned it on, with an OpenID Connect provider), changing one's own password (the only page a
+`LoginPage`, `TotpLoginPage`, `AccountPage`, and `UsersPage`, the pages for signing in (with a password, and, when an
+administrator has
+turned it on, with an OpenID Connect provider; `TotpLoginPage` is the second step for an account with a second factor),
+changing one's own password (the only page a
 user with a temporary password may use), choosing the
 appearance and managing one's personal access tokens, and managing users and who is a system administrator
 (`UsersPage` includes `NewUserPage`);
@@ -66,8 +68,18 @@ all domain behavior and never access the database.
   `Identity` subsystem, a generic failure message when the query value `error` is present, and a notice to sign in
   with the new password when the query value `changed` is `1`. When sign-in with a provider is enabled it also shows a
   "Sign in with {provider}" button, in a form of its own that posts to `/auth/oidc/login`, and one general message when
-  the query value `error` is `oidc`; with the provider off there is no button.
+  the query value `error` is `oidc`; with the provider off there is no button. The query value `error=totp-expired`
+  shows a notice that the second step ended and the person signs in again.
 - *Constraints*: Open to anonymous visitors.
+
+**Two-factor login route** (`GET /login/totp`): The second page of a sign-in with a second factor.
+
+- *Type*: HTTP `GET`; there is no live connection, because the page is a plain server-rendered form.
+- *Role*: Provider.
+- *Contract*: Shows a form with one code field that posts to `/auth/login-totp`, a generic message when the query value
+  `error` is present, a message about too many attempts when it is `throttled`, and a link back to the sign-in page.
+  Without a live challenge it redirects to `/login?error=totp-expired`.
+- *Constraints*: Open to anonymous visitors, but useful only with the challenge cookie of a right password.
 
 **Project routes** (`GET /projects`, `GET /projects/new`, `GET /projects/{id}`, `GET /projects/{id}/plan`,
 `GET /projects/{id}/reviews/new`, `GET /projects/{id}/reviews/{reviewId}`,
@@ -123,7 +135,8 @@ appearance, and manages their personal access tokens.
   with a copy button, lists the tokens with their state, and revokes one. For a user whose password is temporary the
   page shows a banner and only the password form (labeled with the temporary password), and a successful change leads
   to `/login?changed=1`. For a user who signs in with an identity provider a sentence that names the provider replaces
-  the password form, because such an account has no password.
+  the password form, because such an account has no password. A Two-factor card lets a local user set up, turn off, and
+  renew the recovery codes of a one-time password second factor.
 - *Constraints*: Requires a signed-in user. A user with a temporary password may open no other page of the
   application except the login, help, and About pages (the layout redirects to this page).
 
@@ -134,6 +147,7 @@ appearance, and manages their personal access tokens.
 - *Contract*: `/users` lists the users, with a System admin badge for each system administrator, and offers to
   disable or enable a user, make a user a system administrator or take that away, and set a
   password, and has a New user button; an account of an identity provider has an OIDC badge and no password controls;
+  a user with a TOTP badge and a Reset two-factor button;
   `/users/new` holds the form that creates a user, with a System administrator
   checkbox.
 - *Constraints*: Require the role `SystemAdmin`, which only a system administrator has; a signed-in user without it
@@ -466,7 +480,8 @@ signed, or the list of blockers while the review cannot be signed), and to pass 
 Signing re-authenticates the user: the form asks for the password, which the page holds only in a component field
 while it is typed, passes to `SigningService.SignAsync`, and clears in a `finally` block after every attempt; it is
 never rendered back into the page. The page also passes the record digest it displayed, so a signature always covers
-the record the reader saw, and a record that changed since the page was drawn is refused. For a user who signs in with
+the record the reader saw, and a record that changed since the page was drawn is refused. For a local user with a second
+factor the form also asks for the current code (see *Two-factor sign-in* below). For a user who signs in with
 an identity provider there is no password: the page offers a button that posts to the confirmation endpoint of the
 `Identity` subsystem, which sends the user to the provider to sign in again, and after the return (asked from
 `SigningService.HasReauthProofAsync`, which spends nothing) it shows the same Sign button; Core spends the proof when
@@ -505,6 +520,27 @@ a browser script of `App`, and falls back to a hint to copy it by hand. The list
 id. The Help topic `api-tokens` explains how to use a token and links back to the card; the card links to the topic. A
 token authenticates only the `Api` subsystem: the pages, including this one, accept the session cookie only. A user
 whose password is temporary cannot create, list, or revoke tokens; the card is not shown to that user.
+
+#### Two-factor sign-in
+
+`TotpLoginPage` is the second page of a sign-in with a second factor: a form with one code field that posts to the
+login-code endpoint of the `Identity` subsystem. It peeks the challenge when it opens, and sends the person back to the
+login page when there is none. `LoginPage` shows a notice when the challenge ended (`error=totp-expired`).
+
+The Two-factor card of `AccountPage` only collects input and shows results; the rules are in `TotpService`. The card is
+shown to a local user whose password is not temporary, and only when the feature is on (a user of an identity provider
+sees one sentence that the provider handles it). The setup asks for the password,
+then shows the secret (grouped by four characters) and the `otpauth://` address once, with no QR code; the person types
+the first code to confirm and then sees the ten recovery codes once, with a copy button and a hint to store them safely.
+The pending secret and the recovery codes are held only in the state of the open page and are never shown again. The
+card then shows how many recovery codes are left and offers new recovery codes (password and code) and turning the
+factor off (password, and a code or a recovery code). Every field is cleared after every attempt, and a refusal is shown
+as the message of the rule next to the card. `ReviewPage` asks `TotpService.IsEnrolledAsync` and shows a code field
+beside the password field for a local user with a second factor, with the hint to wait for the next code when the code
+was just used to sign in; the code is passed to `SigningService.SignAsync` and cleared in the same `finally` block as
+the password. `UsersPage` lists the users with a confirmed factor (`ListEnrolledUserIdsAsync`), shows a badge for each,
+and offers a Reset two-factor button that calls `TotpService.ResetAsync`. The Help topic `two-factor` explains the setup,
+the sign-in, the recovery codes, and what to do after losing a phone.
 
 #### History and audit
 

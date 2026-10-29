@@ -100,3 +100,20 @@ sections:
           that cannot work for them, or that could give such an account a password.
         tests:
           - UsersPage_Render_ExternalUser_ShowsMarkerAndNoPasswordControls
+
+      - id: ReviewCenter-UsersPage-TotpReset
+        title: >-
+          The UsersPage unit shall mark the accounts that have a second factor with a badge, offer a button to reset the
+          second factor only for them, also while the feature is off, remove the second factor and show a status when
+          the button is used, show no control for an account of a provider, and show an error and keep the second
+          factor when the signed-in user is no longer a system administrator.
+        justification: |
+          A person who lost the phone and the recovery codes needs an administrator to let them in again, and the
+          administrator must see who has a second factor. The rule that only a system administrator may reset it is
+          the service's, and the page must show what the service decides.
+        tests:
+          - UsersPage_Render_EnrolledAndPlainUsers_BadgeAndResetOnlyForEnrolled
+          - UsersPage_Render_ExternalUser_HasNoTotpControls
+          - UsersPage_ResetTotp_EnrolledUser_RemovesEnrollmentAndShowsStatus
+          - UsersPage_Render_FeatureDisabled_StillShowsBadgeAndReset
+          - UsersPage_ResetTotp_SessionEndedBeforePageKnows_ShowsErrorAndKeepsEnrollment

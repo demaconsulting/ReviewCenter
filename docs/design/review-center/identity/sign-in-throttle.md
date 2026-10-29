@@ -7,7 +7,8 @@
 `SignInThrottle` limits how often one client address may try to sign in, in memory. Its single responsibility is to
 answer, before a password is checked, whether this attempt may go on, and to give the attempts back when a sign-in
 succeeded. It does not check passwords, does not know accounts, and does not record anything. It owns the small
-options type `SignInThrottleOptions`.
+options type `SignInThrottleOptions`. The second step of a sign-in with a second factor (see `TotpSignIn`) is limited by
+the same counters.
 
 #### Data Model
 
@@ -98,6 +99,19 @@ made on other names. Because hashing a password takes time, a window can end and
 and `Succeeded`; the generation keeps such a late success from clearing or reducing counters that belong to later
 attempts.
 
+**ReleaseAddress**: Gives back only the address slot of an attempt, for the first step of a sign-in with a second
+factor.
+
+- *Parameters*: `Reservation reservation` — as returned by `TryBegin`; a null value raises `ArgumentNullException`.
+- *Postconditions*: The reservation is marked as given back, so a later `Succeeded` or `ReleaseAddress` with it changes
+  nothing. The address counter is decreased by one (and removed when it reaches 0), only when the window in the table
+  is still the window the reservation was counted in (same generation). The name counter is left as it is.
+
+A right password on an account with a second factor is not a complete sign-in, so it must not clear the counter of the
+name (that would let a person who knows the password reset it again and again), but it should not use the quota of the
+address either. `ReleaseAddress` does exactly that. Only a complete second step calls `Succeeded`, which clears the name
+counter. A wrong code is not given back.
+
 **Reset**: Forgets every counter. It exists for tests (a test host that is reused can start from nothing); the
 application itself never calls it. Generations are not reused, so reservations from before a reset stay stale.
 
@@ -149,8 +163,11 @@ Documented limitations, all deliberate:
 
 #### Callers
 
-- **SignIn** — the login endpoint calls `TryBegin` before the password is checked and `Succeeded` with the
-  reservation after a successful sign-in; `AddSignIn` registers the options and the singleton.
+- **SignIn** — the login endpoint calls `TryBegin` before the password is checked, `Succeeded` with the
+  reservation after a successful sign-in, and `ReleaseAddress` after a right password that needs a second factor;
+  `AddSignIn` registers the options and the singleton.
+- **TotpSignIn** — the second step calls `TryBegin` for the address and the name of the challenge and `Succeeded`
+  after a complete sign-in.
 - **OidcSignIn** — the callback of an identity provider calls `TryBeginAddressOnly` and `Succeeded` for an accepted
   callback.
 - **ServerHost** — reads the options once at start-up to report invalid settings.

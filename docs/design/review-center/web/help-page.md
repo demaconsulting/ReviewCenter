@@ -15,7 +15,8 @@ source file:
 - `HelpTopicFrame` (`HelpTopicFrame.razor`): the common frame of a topic page.
 - The topic pages `HelpGettingStartedPage`, `HelpCreatingReviewPage`, `HelpReadingReviewPage`, `HelpCommentsPage`,
   `HelpChecklistPage`, `HelpSigningPage`, `HelpAuditPage`, `HelpPlanningPage`, `HelpAttestationPage`,
-  `HelpMembersPage`, `HelpApiTokensPage`, and `HelpEvidenceSettingsPage`: the text of one topic each.
+  `HelpMembersPage`, `HelpApiTokensPage`, `HelpTwoFactorPage`, and `HelpEvidenceSettingsPage`: the text of one topic
+  each.
 - `HelpNotFoundPage` (`HelpNotFoundPage.razor`): the catch-all for an unknown address.
 - `HelpTopics` (`HelpTopics.cs`): the list of topics.
 
@@ -96,7 +97,8 @@ it
 (see the `AccountPage` design). The topic also says that a request without any token may read the evidence index or an
 attestation PDF of a project whose administrators opened that to anonymous readers, that a wrong token is still
 refused, and links to the Evidence settings topic. The topic says that a signature needs a person who confirms it is
-them again, with the password or by signing in again at the identity provider.
+them again, with the password (and the code of the second factor, when there is one) or by signing in again at the
+identity provider.
 
 **Identity provider text**: Three topics mention sign-in with an OpenID Connect provider, in static text that does not
 depend on whether an administrator has turned it on (the pages have no access to the settings): Getting started
@@ -107,8 +109,25 @@ the slot, signs in again at the provider, and returns to press "Sign", and that 
 signature and a few minutes; and the API tokens topic, above. The summary of the Reviewers and signing topic in
 `HelpTopics` reads "Reviewer slots, signing with your password or identity provider, and approval."
 
+**Two-factor topic** (`HelpTwoFactorPage`, slug `two-factor`, title "Two-factor sign-in"): The topic after Automation and
+API tokens and before Evidence settings. It explains, in static text, what the second factor is (a code from an
+authenticator app added to the password, optional, for accounts with a ReviewCenter password only); how to turn it on
+from the Two-factor authentication card of the Account page (the password, the secret shown once and the `otpauth://`
+address, the first code, and the ten recovery codes shown once); how to sign in (a second page asks for the code, a code
+works once, the step must be finished within 5 minutes); what to do after losing the phone (a recovery code instead of
+the code, each works once, new recovery codes, and the reset by a system administrator from the Users page); that
+signing a review needs the password and a current code, that recovery codes cannot sign, and that a code that was just
+used to sign in must be followed by the next code; how to turn it off or renew the recovery codes; that changing the own
+password needs a current code too; that an administrator who only sets a new password leaves the factor on; and that
+wrong codes
+count like wrong passwords for the lockout, that sessions already open stay valid after a turn-off or a reset, that API
+tokens are not affected, that the setting `Identity:Totp:Enabled` can switch the feature off (then accounts that had it
+are protected by the password alone), and that the changes are audited, never the codes. It has one screenshot,
+`two-factor-1.png`, of the card with the factor on. The Account page links to it (see the `AccountPage` design), and
+the Reviewers and signing topic (`HelpSigningPage`) mentions the code.
+
 **Evidence settings topic** (`HelpEvidenceSettingsPage`, slug `evidence-settings`, title "Evidence settings"): The last
-topic, after Automation and API tokens. It explains, in static text, that only a project admin or a system
+topic, after Two-factor sign-in. It explains, in static text, that only a project admin or a system
 administrator can see and change the evidence settings, from the "Evidence settings" button of the project page, and
 that every change is recorded in the audit trail of the project with the old and new values; the two anonymous
 switches (Anonymous evidence index and Anonymous attestation PDFs), that both are off by default and independent, what

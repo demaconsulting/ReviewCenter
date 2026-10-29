@@ -127,3 +127,15 @@ sections:
           for help on those tasks.
         tests:
           - HelpTopicPage_Render_MentionsSignInWithProvider
+
+      - id: ReviewCenter-HelpPage-TwoFactorTopic
+        title: >-
+          The HelpPage unit shall offer a topic on two-factor sign-in that explains how to set it up, sign in with a
+          code, use the recovery codes, sign a review with a code, turn it off, and ask an administrator for a reset,
+          and that notes that the sessions and the API tokens are not affected, and shall link to it from the topic on
+          signing.
+        justification: |
+          A person who is locked out or asked for a code at a signature looks for help on exactly those tasks, and the
+          topic is the place for the reasons and for the warning that a recovery code does not sign.
+        tests:
+          - HelpTwoFactorPage_Render_ExplainsEnrollingSigningInRecoveryAndSigning

@@ -9,7 +9,7 @@ command line, and verifies the audit trail from the command line. It owns
 the composition of the ASP.NET Core application behind the `serve` verb: the listen address,
 the logging configuration, the health endpoint, the sign-in configuration and endpoints of the `Identity`
 subsystem (including the optional sign-in with an OpenID Connect provider, off unless `Identity:Oidc:Enabled` is
-true), the mapping of the user interface provided
+true), the optional second factor for password accounts, the mapping of the user interface provided
 by the `Web` subsystem, the registration and mapping of the JSON API of the `Api` subsystem, and the connection of
 the pages to the database: reading the `Database` settings,
 creating the database, and registering the `Core` services with the `Storage` stores. It also owns the
@@ -97,10 +97,19 @@ the server.
 
 **Identity (consumed)**: `SignIn` (registration of cookie authentication and authorization, and the endpoints
 `/auth/login` and `/auth/logout`), `OidcSignIn` and `OidcOptions` (the optional OpenID Connect sign-in, its endpoints,
-and the settings), and `PasswordHasher` of the `Identity` subsystem.
+and the settings), `TotpSignIn` and `TotpOptions` (the second step of a sign-in, its endpoint, and the settings), and
+`PasswordHasher` of the `Identity` subsystem.
 
 - *Type*: In-process .NET types.
 - *Role*: Consumer.
+
+**Identity:Totp settings**: The `Identity:Totp` configuration section, described in the `Identity` design.
+
+- *Type*: Configuration (`appsettings.json` and environment variables such as `Identity__Totp__Enabled`).
+- *Role*: Consumer.
+- *Contract*: On by default (`Enabled`, and an `Issuer` name for the authenticator apps, `ReviewCenter` by default).
+  The server validates the settings at start-up and maps the login-code endpoint only while it is enabled.
+- *Constraints*: An invalid setting stops the start-up with an error that names it.
 
 **Identity:Oidc settings**: The `Identity:Oidc` configuration section, described in the `Identity` design.
 
@@ -112,9 +121,10 @@ and the settings), and `PasswordHasher` of the `Identity` subsystem.
   secret.
 
 **Storage and Core (consumed)**: `DatabaseSetup`, `ReviewCenterDbContext`, `ReviewStore`, `UserStore`, `AuditStore`,
-`RepositoryStore`, `PersonalAccessTokenStore`, and `AuditAppender` of the
+`RepositoryStore`, `PersonalAccessTokenStore`, `TotpStore`, and `AuditAppender` of the
 `Storage` subsystem, and `ProjectService`, `ReviewService`, `ThreadService`, `ChecklistService`, `UserService`,
-`SigningService`, `AuditService`, `RepositoryService`, `PersonalAccessTokenService`, and the store, hasher, and
+`SigningService`, `AuditService`, `RepositoryService`, `PersonalAccessTokenService`, `TotpService`,
+`TotpChallengeStore`, and the store, hasher, second factor, and
 `IProjectAccess` interfaces
 of the `Core` subsystem, and `PersonalAccessTokenStore` of the `Storage` subsystem.
 
@@ -224,7 +234,15 @@ after them, by reading the options once so that their validator runs: an invalid
 "Invalid OpenID Connect sign-in settings: ...", which names the setting and never a value or the secret, and while the
 provider is off nothing is read. `OidcSignIn.AddOidcSignIn` registers the provider only when it is enabled, and
 `MapOidcSignIn` maps its endpoints next to the sign-in endpoints; `/signin-oidc`, the callback of the handler, is a
-reserved address, so the pages and the API never answer it. The git setting `Git:TimeoutSeconds` is checked the same
+reserved address, so the pages and the API never answer it. The settings of the second factor (`ValidateTotpOptions`)
+are checked next the same way: an invalid `Identity:Totp:Issuer` stops the start-up with "Invalid two-factor sign-in
+settings: ...". `MapTotpSignIn` maps
+`POST /auth/login-totp` only while `Identity:Totp:Enabled` is true (the default); with it off, accounts with a second
+factor sign in with the password alone, which is a documented trade-off for an administrator who lost access. The
+second factor services (`TotpSignIn.AddTotpSignIn` for the settings, `TotpStore`, `TotpAlgorithm`,
+`TotpSecretProtector`, `TotpChallengeStore`, and `TotpService`)
+are registered by `AddServices`, so the command-line verbs get the same services. The git setting `Git:TimeoutSeconds`
+is checked the same
 way and must be from 1 to 3600:
 any other number stops the start-up with "Invalid git settings: Git:TimeoutSeconds must be between 1 and 3600
 seconds."

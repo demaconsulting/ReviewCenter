@@ -27,6 +27,9 @@ N/A - standard test environment (temporary SQLite databases are created by the t
   provider, in a form of its own beside the local form, that carries the local return address; when the address says
   the provider failed (`error=oidc`) it shows one general message next to the button and none in the local form; when
   the provider is off it shows no button.
+- When the address says the second step expired (`error=totp-expired`), the page shows a notice to sign in again and
+  neither the invalid password message nor the throttle message; an ordinary failure shows the password message and
+  no such notice.
 
 #### Test Scenarios
 
@@ -71,3 +74,11 @@ provider on, the page requested over HTTP shows the button with the display name
 message after a failure, and the local return address. This scenario is tested by
 `OidcSignIn_Enabled_SignInPageOffersButtonBesideLocalForm`, defined in `OidcSignInTests.cs` and described with the
 `OidcSignIn` unit.
+
+**LoginPage_Render_TotpExpired_ShowsNoticeAndNoPasswordError**: The page is rendered as a component with nobody signed
+in and the address `/login?error=totp-expired` (in `TotpLoginPageTests.cs`); the notice asks to sign in again, and
+neither the password error nor the throttle message is shown. This scenario is tested by
+`LoginPage_Render_TotpExpired_ShowsNoticeAndNoPasswordError`.
+
+**LoginPage_Render_PasswordFailure_ShowsNoExpiredNotice**: With the address `/login?error=1` the password error is
+shown and the expired notice is not. This scenario is tested by `LoginPage_Render_PasswordFailure_ShowsNoExpiredNotice`.

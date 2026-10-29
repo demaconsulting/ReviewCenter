@@ -29,8 +29,8 @@ the same job must run with the normal environment and must fail under the isolat
 the executable is larger than 20 MiB, which a
 framework-dependent publish is not. The commands run are: `--version`, `--help`,
 `--validate --results validation-<os>-net10.0-<rid>.trx`, and a `serve` smoke test that checks `/health`, the home
-page, and the Blazor script. The self-validation results (the eight `ReviewCenter_` tests:
-`GitAvailable`, `GitRoundTrip`, `ReviewWorkflow`, `Fingerprint`, `PasswordHash`, `AuditChain`,
+page, and the Blazor script. The self-validation results (the nine `ReviewCenter_` tests:
+`GitAvailable`, `GitRoundTrip`, `ReviewWorkflow`, `Fingerprint`, `PasswordHash`, `Totp`, `AuditChain`,
 `AttestationPdf`, and `HostStart`) in those TRX files are the evidence for the platform
 requirements; the platform
 (`windows`, `ubuntu`) and runtime (`net10.0`) in the file name are the source filters.
@@ -101,6 +101,10 @@ loopback TCP ports.
 - With sign-in with an OpenID Connect provider turned on, a new person is created as an account without any right and
   found again by issuer and subject only, a local account is never linked by name, a foreign return address is
   replaced by the home page, and a signature needs one fresh sign-in at the provider as the same person.
+- A local password account may turn on a second factor with an authenticator app: the right password then leads to a
+  second step that needs a code, a code works once even when many requests present it at the same time, wrong codes
+  count toward the same lockout as wrong passwords, a signature needs the password and a fresh code, recovery codes
+  work once for signing in but not for signing, and an administrator can reset it.
 
 ## Test Scenarios
 
@@ -115,12 +119,12 @@ with code 0. This scenario is tested by
 
 **ReviewCenter_ValidateFlag_Provided_RunsValidation**: The `--validate` flag is passed together
 with `--depth 3` and `--result <path>.xml`, as one shared real process run of the whole default
-self-validation; the combined output contains "Total Tests: 8", "Passed: 8" and "Failed: 0" and
+self-validation; the combined output contains "Total Tests: 9", "Passed: 9" and "Failed: 0" and
 the tool exits with code 0, confirming the self-validation suite runs and completes successfully.
 This scenario is tested by `ReviewCenter_ValidateFlag_Provided_RunsValidation`.
 
 **ReviewCenter_ValidateWithXmlResults_Requested_GeneratesJUnitFile**: The shared real process run
-wrote a JUnit XML file containing a `<testsuites` XML element and eight test cases and the tool
+wrote a JUnit XML file containing a `<testsuites` XML element and nine test cases and the tool
 exited with code 0. The TRX format is verified at the subsystem level by
 `SelfTestSubsystem_ValidationWorkflow_WithTrxFile_GeneratesResults`. This scenario is tested by
 `ReviewCenter_ValidateWithXmlResults_Requested_GeneratesJUnitFile`.
@@ -282,6 +286,15 @@ address that is not on this server is replaced by the home page, which is tested
 same person at the provider, and one such sign-in allows exactly one signature. This scenario is tested by
 `OidcReauth_FreshSignInOfSamePerson_AllowsExactlyOneSignature`. The settings, the services, the store, and the pages
 are verified in the `Identity`, `Core`, `Storage`, `Hosting`, and `Web` subsystems.
+
+**Second factor with an authenticator app**: A user with a turned-on second factor enters the right password, gets a
+challenge and no session, and signs in and is sent on with the right code; this scenario is tested by
+`TotpSignIn_CodeStep_RightCode_SignsInAndRedirects`. A signature of such a user needs the password and a fresh code,
+which is tested by `SigningService_SignAsync_EnrolledUserWithPasswordAndFreshCode_Signs`. Thirty-two parallel requests
+with the same code give exactly one success, which is tested by
+`TotpService_CompleteSignInAsync_ConcurrentSameCode_ExactlyOneSucceeds`. The algorithm, the secret protection, the
+rules, the store, the settings, and the pages are verified in the `Identity`, `Core`, `Storage`, `Hosting`, and `Web`
+subsystems.
 
 **Review checklist**: Two checks of a new review are answered through the domain service over the real pipeline, one
 Pass and one Fail with a justification; the checklist page, requested twice, shows the progress, the pressed Pass

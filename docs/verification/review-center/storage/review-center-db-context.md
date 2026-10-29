@@ -4,7 +4,7 @@
 
 `ReviewCenterDbContext` is verified with the unit tests of `ReviewStoreTests.cs`, `ReviewStoreSigningTests.cs`,
 `UserStoreTests.cs`, `RepositoryStoreTests.cs`, `PersonalAccessTokenStoreTests.cs`, `ReviewStoreRepositoryTests.cs`,
-`ReviewStoreMembershipTests.cs`, `EvidenceSettingsStoreTests.cs`, and
+`ReviewStoreMembershipTests.cs`, `EvidenceSettingsStoreTests.cs`, `TotpStoreTests.cs`, and
 `DatabaseSetupTests.cs`, which
 exercise the context through the units that use it. The context has no behavior that can be reached without a
 database, and its job is to produce the right schema, so the tests run against real SQLite database files in a
@@ -44,6 +44,9 @@ be loadable on the test platform.
   as written, with the baseline content as binary data and no value for an uploaded review.
 - The table for personal access tokens has a unique index on the hash and no column for the value of a token, and a
   review keeps its creator and whether it was created through the API.
+- The tables for the second factor hold one enrollment per user and the recovery codes of a user; the database refuses
+  two identical recovery code hashes of one user and allows the same hash for two users, and deleting a user deletes the
+  enrollment and its codes.
 
 #### Test Scenarios
 
@@ -157,3 +160,11 @@ hash, the creation, the expiry, the last use, and the revocation, and none for t
 tested by `ReviewCenterDbContext_Model_HasTokenTableAndReviewCreatorColumns`, defined in
 `PersonalAccessTokenStoreTests.cs`. The display id is not unique at the database (it is only a label that is shown); the
 hash alone identifies a token.
+
+**Second factor tables**: The `UserTotps` and `TotpRecoveryCodes` tables are exercised by the tests of `TotpStore` in
+`TotpStoreTests.cs` over a real database file. The unique index on the user and the recovery code hash refuses a
+duplicate hash of one user, and the confirmation that held it is rolled back including its audit entry, which is tested
+by `TotpStore_ConfirmAsync_DuplicateHash_IsRefusedByTheDatabaseAndRolledBack`; the same hash for two users is allowed,
+which is tested by `TotpStore_ConfirmAsync_SameHashForDifferentUsers_IsAllowed`. Deleting a user removes the enrollment
+and the codes by cascade, which is tested by `TotpStore_DeletingTheUser_DeletesTheEnrollmentAndCodes`. Both tests are
+described with the `TotpStore` unit.

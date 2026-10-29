@@ -48,7 +48,7 @@ internal static class Validation
     /// <param name="includeConfiguredDatabase">
     ///     <c>true</c> to append the opt-in read-only check of the configured database (<c>--check-config</c>).
     /// </param>
-    /// <returns>The checks; the default run has eight, the opt-in run nine.</returns>
+    /// <returns>The checks; the default run has nine, the opt-in run ten.</returns>
     public static IReadOnlyList<ValidationCheck> CreateChecks(bool includeConfiguredDatabase)
     {
         var checks = new List<ValidationCheck>
@@ -58,6 +58,7 @@ internal static class Validation
             new(ReviewWorkflowCheck.Name, ReviewWorkflowCheck.RunAsync),
             new(FingerprintCheck.Name, FingerprintCheck.RunAsync),
             new(PasswordHashCheck.Name, PasswordHashCheck.RunAsync),
+            new(TotpCheck.Name, TotpCheck.RunAsync),
             new(AuditChainCheck.Name, AuditChainCheck.RunAsync),
             new(AttestationPdfCheck.Name, AttestationPdfCheck.RunAsync),
             new(HostStartCheck.Name, HostStartCheck.RunAsync)

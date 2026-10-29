@@ -218,6 +218,7 @@ internal static class SignIn
                 [FromForm] string? returnUrl,
                 HttpContext http,
                 UserService users,
+                TotpService totp,
                 AuditService audit,
                 SignInThrottle throttle) =>
             {
@@ -238,12 +239,25 @@ internal static class SignIn
                     return Results.Redirect($"{LoginPath}?error={ThrottledError}{retry}");
                 }
 
-                var user = await users.AuthenticateAsync(username, password, http.RequestAborted);
+                var step = await users.AuthenticatePasswordAsync(username, password, http.RequestAborted);
+                var user = step.User;
 
                 // One generic answer for every failure; the query keeps the (safe) place the user wanted to go to
                 if (user is null)
                 {
                     return Results.Redirect($"{LoginPath}?error=1{retry}");
+                }
+
+                // The password was right but the account has a second factor: no session yet. The browser gets a
+                // short-lived challenge cookie and is sent to the code page; the failure counter stays as it is
+                // until the code is right too. The attempt gives its address slot back (a correct password must not
+                // use up the quota of the client); the name counter stays
+                if (step.SecondFactorRequired)
+                {
+                    throttle.ReleaseAddress(reservation);
+                    var token = totp.BeginSignIn(user, address, target);
+                    http.Response.Cookies.Append(TotpSignIn.CookieName, token, TotpSignIn.CookieOptions(http));
+                    return Results.Redirect(TotpSignIn.LoginPath);
                 }
 
                 // The attempt does not count against the client any more

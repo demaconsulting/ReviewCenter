@@ -32,6 +32,9 @@ This document covers the verification design for the following software items:
     - **SignIn** — cookie sign-in, authorization, and the signed-in actor
     - **SignInThrottle** — in-memory limit on failed sign-in attempts
     - **OidcSignIn** — sign-in with an OpenID Connect provider and confirmation of identity for a signature
+    - **TotpAlgorithm** — one-time password computation and checking, secret creation, and the setup address
+    - **TotpSecretProtector** — encryption of the secrets of the second factor through Data Protection
+    - **TotpSignIn** — second step of the sign-in with a one-time password and the settings of the second factor
     - **RevalidatingAuthenticationStateProvider** — periodic re-check of the user of an open page
   - **Web** subsystem
     - **App** — HTML shell, router, page frame, and the session gate
@@ -42,6 +45,7 @@ This document covers the verification design for the following software items:
     - **ReviewPage** — review, fingerprint, files, file content, comment threads, reviewers, and signatures page
     - **ChecklistPage** — review checklist page
     - **LoginPage** — sign-in page
+    - **TotpLoginPage** — second step of the sign-in, where the person types a code
     - **AccountPage** — password change, appearance, and personal access token page of the signed-in user
     - **UsersPage** — user administration page
     - **HistoryPage** — audit history of one review
@@ -76,6 +80,8 @@ This document covers the verification design for the following software items:
     - **UserService** — user, password, lockout, and last administrator rules
     - **SigningService** — reviewer slot, re-authenticated signature, and approval rules
     - **ReauthProofStore** — in-memory single-use proof of a confirmation of identity at a provider
+    - **TotpService** — second factor rules: enrollment, second step of the sign-in, recovery codes, and reset
+    - **TotpChallengeStore** — in-memory pending second step of a sign-in, bound to the client address
     - **SelectionMatcher** — include and exclude pattern matching for file selection
     - **RevisionValidator** — git revision name validation
     - **RepositoryService** — repository registry rules
@@ -88,6 +94,7 @@ This document covers the verification design for the following software items:
     - **AuditStore** — database implementation of the audit store interface and the shared audit appender
     - **RepositoryStore** — database implementation of the repository store interface
     - **PersonalAccessTokenStore** — database implementation of the personal access token store interface
+    - **TotpStore** — database implementation of the second factor store interface
     - **DatabaseSetup** — provider selection, connection resolution, and database creation
   - **SelfTest** subsystem
     - **Validation** — self-validation test runner
@@ -112,6 +119,7 @@ This document covers the verification design for the following software items:
 - **Microsoft.AspNetCore.Authentication.OpenIdConnect** — OpenID Connect sign-in handler
 - **Microsoft.AspNetCore.OpenApi** — OpenAPI document generation for the API
 - **OpenIddict** — OpenID Connect server library used by the tests as a fake identity provider
+- **Otp.NET** — one-time password library used for the optional second factor of local accounts
 - **Pandoc** — Markdown-to-HTML conversion tool
 - **Playwright** — browser automation library used by the Puppet developer tool
 - **ReqStream** — requirements traceability tool

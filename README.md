@@ -32,6 +32,7 @@ a project checklist, and sign the review with their credentials. Every action is
 - ⚙️ **Evidence Settings** - Control PDF contents and anonymous evidence access
 - 🛡️ **Access Control** - Project roles, local accounts, and sign-in lockout
 - 🪪 **OpenID Connect Sign-in** - Single sign-on with any provider
+- 🔐 **Two-Factor Sign-in** - Optional authenticator-app codes for local accounts
 - 🔑 **API Tokens** - Personal tokens for REST API and ReviewMark
 - 🌗 **Light and Dark Theme** - Follows system setting or account choice
 - 🤖 **Puppet UI Automation** - Lets AI agents drive and screenshot the UI

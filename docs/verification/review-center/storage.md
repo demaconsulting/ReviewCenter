@@ -64,6 +64,9 @@ The native SQLite library must be loadable on the test platform (it is supplied 
   for is stored with it (`ReviewStore_AddReviewAsync_LongestReviewSetId_RoundTrips`).
 - Every audited change is stored together with its audit entry; changes made at the same moment through different
   stores give one linear, intact chain, and the audit store offers no update or delete.
+- The second factor of a user (the encrypted secret, the accepted step, the recovery code hashes, and the pending
+  enrollment) is stored with its audit entry or not at all; a step is accepted once and a recovery code is consumed
+  once, also when thirty-two requests race; this is verified in the unit tests of `TotpStore` on the real database.
 
 ### Test Scenarios
 
@@ -158,3 +161,7 @@ process-wide gate; the sequence numbers are consecutive and the chain is intact.
 `AuditStore_ConcurrentChangesFromDifferentStores_ProduceLinearChain`. The public surface of the audit store has no
 method that updates or deletes an entry, which is tested by `AuditStore_PublicSurface_OffersNoUpdateOrDelete`. The
 reading and verification of stored entries is verified in the unit tests of `AuditStore`.
+
+**Second factor**: The race of the step is tested by `TotpStore_TryAdvanceStepAsync_ThirtyTwoParallelRequests_HaveExactlyOneWinner`
+and the race of a recovery code by `TotpStore_TryConsumeRecoveryCodeAsync_ParallelRequests_HaveExactlyOneWinner`, both
+defined in `TotpStoreTests.cs` and run on a real SQLite file.

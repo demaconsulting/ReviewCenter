@@ -241,6 +241,17 @@
                                                    data-testid="sign-password-@slotId" @key="@($"{slotId}-{PasswordKey}")"
                                                    @oninput="e => SignPasswords[slotId] = e.Value?.ToString() ?? string.Empty" />
                                         </div>
+                                        @if (CurrentHasTotp)
+                                        {
+                                            <div class="field">
+                                                <label for="sign-totp-@slotId">Current code from your authenticator app</label>
+                                                <input id="sign-totp-@slotId" type="text" inputmode="numeric" maxlength="6"
+                                                       autocomplete="one-time-code"
+                                                       data-testid="sign-totp-@slotId" @key="@($"{slotId}-totp-{PasswordKey}")"
+                                                       @oninput="e => SignTotpCodes[slotId] = e.Value?.ToString() ?? string.Empty" />
+                                                <p class="muted hint">If you just signed in with this code, wait for the next one.</p>
+                                            </div>
+                                        }
                                     }
                                     @if (SignMessage(slotId) is { } signError)
                                     {

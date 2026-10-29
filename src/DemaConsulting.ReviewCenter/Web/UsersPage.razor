@@ -3,7 +3,8 @@
    Presentation only; state and event handling live in UsersPage.razor.cs. A list of all users with, per user,
    the controls to disable or enable the account, to make the user a system administrator (or take that away) and
    to set a new password (not for an account of an identity provider, which has none and carries a badge with the
-   name of the provider); a "+ New user" button leads to the separate form page at "/users/new". Access is limited
+   name of the provider); a user with two-factor sign-in turned on carries a "TOTP" badge and a "Reset two-factor"
+   button for a user who lost the phone and the recovery codes; a "+ New user" button leads to the separate form page at "/users/new". Access is limited
    to system administrators by the attribute below. Which projects a user is a member of is managed on the project
    page, not here. Every interactive element and every key value carries a stable kebab-case data-testid
    (row-level ids carry the user id), and the data-interactive marker on the root flips to "true" once the live
@@ -70,6 +71,11 @@
                             <span class="badge" title="Signs in with @Oidc.Value.DisplayName"
                                   data-testid="user-oidc-@userId">OIDC</span>
                         }
+                        @if (TotpUserIds.Contains(userId))
+                        {
+                            <span class="badge" title="Has two-factor sign-in turned on"
+                                  data-testid="user-totp-@userId">TOTP</span>
+                        }
                     </p>
                 </div>
                 <div class="row-actions">
@@ -77,6 +83,12 @@
                             @onclick="() => ToggleEnabledAsync(user)">@(user.Enabled ? "Disable" : "Enable")</button>
                     <button type="button" class="outline small" data-testid="user-toggle-admin-@userId"
                             @onclick="() => ToggleSystemAdminAsync(user)">@(user.IsSystemAdmin ? "Remove system admin" : "Make system admin")</button>
+                    @if (TotpUserIds.Contains(userId))
+                    {
+                        <button type="button" class="outline small" data-testid="user-reset-totp-@userId"
+                                title="Remove the two-factor sign-in of this user, for example after a lost phone"
+                                @onclick="() => ResetTotpAsync(user)">Reset two-factor</button>
+                    }
                 </div>
                 <div class="user-controls">
                     @if (user.IsExternal)

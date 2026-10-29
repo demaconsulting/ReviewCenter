@@ -46,7 +46,7 @@ sections:
           that the tool functions correctly in its deployment environment before it
           is used to generate compliance artifacts. The validation mode exercises
           the real behaviors the tool relies on (git, a complete review workflow, the
-          fingerprint, password hashing, the audit chain, the signed attestation and
+          fingerprint, password hashing, the second factor codes, the audit chain, the signed attestation and
           the web host), in a hermetic way that never touches the configured database,
           and produces a structured test result file, providing the qualification
           evidence required by quality management systems. `--check-config` adds an
@@ -415,6 +415,29 @@ sections:
           - OidcSignIn_NameOfLocalAccount_NeverLinksToIt
           - OidcSignIn_ForeignReturnUrl_IsReplacedByHome
 
+      - id: ReviewCenter-System-TotpSecondFactor
+        title: >-
+          The tool shall let a user of a local account turn on a second factor, a code of an authenticator app, and
+          then ask for a fresh code after the password at every sign-in and every signature, accept each code only once,
+          give ten recovery codes that get the person back in but cannot sign, count wrong codes toward the lockout of
+          wrong passwords, let the user turn it off and a system administrator reset it for a person who lost the phone,
+          record each change in the audit trail, keep the secret encrypted, and leave the sign-in with a provider and
+          the API tokens as they were.
+        tags: [system]
+        justification: |
+          A password that is guessed, reused, or phished must not be enough to sign in as a person or to put a
+          signature in their name. A code of a phone that changes every thirty seconds is the cheapest second proof, and
+          the rules about replay, lockout, and recovery keep it from becoming a new weak point.
+        children:
+          - ReviewCenter-Identity-TotpSecondFactor
+          - ReviewCenter-Core-TotpSecondFactor
+          - ReviewCenter-Storage-TotpSecondFactor
+          - ReviewCenter-Hosting-TotpSecondFactor
+          - ReviewCenter-Web-TotpSecondFactor
+        tests:
+          - TotpSignIn_CodeStep_RightCode_SignsInAndRedirects
+          - SigningService_SignAsync_EnrolledUserWithPasswordAndFreshCode_Signs
+          - TotpService_CompleteSignInAsync_ConcurrentSameCode_ExactlyOneSucceeds
       - id: ReviewCenter-System-Authorization
         title: >-
           The tool shall send a request without a signed-in user for a project, review, checklist, account, or

@@ -38,6 +38,9 @@ input-files:
   - docs/design/review-center/identity/sign-in.md
   - docs/design/review-center/identity/sign-in-throttle.md
   - docs/design/review-center/identity/oidc-sign-in.md
+  - docs/design/review-center/identity/totp-algorithm.md
+  - docs/design/review-center/identity/totp-secret-protector.md
+  - docs/design/review-center/identity/totp-sign-in.md
   - docs/design/review-center/web.md
   - docs/design/review-center/web/app.md
   - docs/design/review-center/web/home-page.md
@@ -47,6 +50,7 @@ input-files:
   - docs/design/review-center/web/review-page.md
   - docs/design/review-center/web/checklist-page.md
   - docs/design/review-center/web/login-page.md
+  - docs/design/review-center/web/totp-login-page.md
   - docs/design/review-center/web/account-page.md
   - docs/design/review-center/web/users-page.md
   - docs/design/review-center/web/repositories-page.md
@@ -63,6 +67,8 @@ input-files:
   - docs/design/review-center/core/record-digest.md
   - docs/design/review-center/core/signing-service.md
   - docs/design/review-center/core/reauth-proof-store.md
+  - docs/design/review-center/core/totp-service.md
+  - docs/design/review-center/core/totp-challenge-store.md
   - docs/design/review-center/core/selection-matcher.md
   - docs/design/review-center/core/revision-validator.md
   - docs/design/review-center/core/repository-service.md
@@ -73,6 +79,7 @@ input-files:
   - docs/design/review-center/storage/review-store.md
   - docs/design/review-center/storage/user-store.md
   - docs/design/review-center/storage/personal-access-token-store.md
+  - docs/design/review-center/storage/totp-store.md
   - docs/design/review-center/storage/database-setup.md
   - docs/design/review-center/storage/repository-store.md
   - docs/design/review-center/content-sources.md
@@ -109,6 +116,7 @@ input-files:
   - docs/design/ots/openapi.md
   - docs/design/ots/openidconnect.md
   - docs/design/ots/openiddict.md
+  - docs/design/ots/otpnet.md
   - docs/design/ots/pandoc.md
   - docs/design/ots/pkcs.md
   - docs/design/ots/playwright.md

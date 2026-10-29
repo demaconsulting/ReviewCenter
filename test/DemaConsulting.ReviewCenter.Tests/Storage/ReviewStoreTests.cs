@@ -63,8 +63,14 @@ internal sealed class TestStore : IDisposable
         Audit = new AuditStore(factory, appender);
         Users = new UserStore(factory, appender);
         Tokens = new PersonalAccessTokenStore(factory, appender);
+        Totp = new TotpStore(factory, appender);
         Factory = factory;
     }
+
+    /// <summary>
+    ///     Gets the second factor store over the same database.
+    /// </summary>
+    public TotpStore Totp { get; }
 
     /// <summary>
     ///     Gets the personal access token store over the same database.

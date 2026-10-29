@@ -82,6 +82,15 @@
                        maxlength="@ReviewLimits.MaxPasswordLength"
                        data-testid="confirm-password-input" @bind="ConfirmPassword" @bind:event="oninput" />
             </div>
+            @if (TotpInfo is { Enrolled: true })
+            {
+                <div class="field">
+                    <label for="change-password-code">Code from your authenticator app, or a recovery code</label>
+                    <input id="change-password-code" type="text" maxlength="24" autocomplete="one-time-code"
+                           autocapitalize="characters" spellcheck="false"
+                           data-testid="change-password-code-input" @bind="ChangeCode" @bind:event="oninput" />
+                </div>
+            }
             @if (ErrorMessage is not null)
             {
                 <p class="error" role="alert" data-testid="account-error">@ErrorMessage</p>
@@ -97,6 +106,135 @@
 
     @if (!MustChangePassword)
     {
+    @if (Totp.FeatureEnabled && (IsExternal || TotpInfo is { Available: true }))
+    {
+    <section class="card" data-testid="totp-card">
+        <h2>Two-factor authentication</h2>
+        @if (IsExternal)
+        {
+            <p class="muted" data-testid="totp-external">
+                Two-factor sign-in is handled by @Oidc.Value.DisplayName.
+            </p>
+        }
+        else
+        {
+        <p class="muted hint">
+            Ask for a code from an authenticator app when you sign in and when you sign a review.
+            <a href="/help/two-factor" data-testid="totp-help-link">About two-factor authentication</a>
+        </p>
+        <p>
+            Two-factor sign-in is
+            <span class="badge @(TotpInfo!.Enrolled ? "approved" : null)" data-testid="totp-status">@(TotpInfo.Enrolled ? "On" : "Off")</span>
+            @if (TotpInfo.Enrolled)
+            {
+                <span class="muted totp-left" data-testid="totp-recovery-left">@RecoveryLeftText</span>
+            }
+        </p>
+
+        @if (NewRecoveryCodes is not null)
+        {
+            <div class="notice" role="status" data-testid="totp-recovery-box">
+                <p><strong>Save these recovery codes now. They cannot be shown again.</strong></p>
+                <p>Each code works once if you lose your authenticator. Keep them somewhere safe, apart from your password.</p>
+                <ul class="recovery-codes" data-testid="totp-recovery-codes">
+                    @for (var i = 0; i < NewRecoveryCodes.Count; i++)
+                    {
+                        <li><code class="mono" data-testid="totp-recovery-code-@i">@NewRecoveryCodes[i]</code></li>
+                    }
+                </ul>
+                <p>
+                    <button type="button" class="outline small" data-testid="totp-recovery-copy"
+                            @onclick="CopyRecoveryCodesAsync">Copy</button>
+                    <button type="button" class="outline small" data-testid="totp-recovery-dismiss"
+                            @onclick="DismissRecoveryCodes">I have saved them</button>
+                    <span class="muted" role="status" data-testid="totp-copy-status">@TotpCopyStatus</span>
+                </p>
+            </div>
+        }
+
+        @if (TotpError is not null)
+        {
+            <p class="error" role="alert" data-testid="totp-error">@TotpError</p>
+        }
+        @if (TotpMessage is not null)
+        {
+            <p class="notice" role="status" data-testid="totp-message">@TotpMessage</p>
+        }
+
+        @if (TotpInfo.Enrolled)
+        {
+            <details data-testid="totp-regen-details">
+                <summary>Get new recovery codes</summary>
+                <form data-testid="totp-regen-form" @onsubmit="RegenerateRecoveryCodesAsync">
+                    <p class="muted hint">The old codes stop working.</p>
+                    <div class="field">
+                        <label for="totp-regen-password">Your password</label>
+                        <input id="totp-regen-password" type="password" autocomplete="current-password"
+                               maxlength="@ReviewLimits.MaxPasswordLength"
+                               data-testid="totp-regen-password" @bind="TotpRegenPassword" @bind:event="oninput" />
+                    </div>
+                    <div class="field">
+                        <label for="totp-regen-code">Current code from your authenticator app</label>
+                        <input id="totp-regen-code" type="text" inputmode="numeric" maxlength="6" autocomplete="one-time-code"
+                               data-testid="totp-regen-code" @bind="TotpRegenCode" @bind:event="oninput" />
+                    </div>
+                    <button type="submit" class="outline" data-testid="totp-regen-button">Get new recovery codes</button>
+                </form>
+            </details>
+            <details data-testid="totp-disable-details">
+                <summary>Turn off two-factor sign-in</summary>
+                <form data-testid="totp-disable-form" @onsubmit="DisableTotpAsync">
+                    <div class="field">
+                        <label for="totp-disable-password">Your password</label>
+                        <input id="totp-disable-password" type="password" autocomplete="current-password"
+                               maxlength="@ReviewLimits.MaxPasswordLength"
+                               data-testid="totp-disable-password" @bind="TotpDisablePassword" @bind:event="oninput" />
+                    </div>
+                    <div class="field">
+                        <label for="totp-disable-code">Current code, or a recovery code</label>
+                        <input id="totp-disable-code" type="text" maxlength="24" autocomplete="one-time-code"
+                               autocapitalize="characters" spellcheck="false"
+                               data-testid="totp-disable-code" @bind="TotpDisableCode" @bind:event="oninput" />
+                    </div>
+                    <button type="submit" class="outline" data-testid="totp-disable-button">Turn off</button>
+                </form>
+            </details>
+        }
+        else if (PendingEnrollment is not null)
+        {
+            <div data-testid="totp-pending">
+                <p><strong>1.</strong> In your authenticator app, add an account with this key.</p>
+                <p><code class="mono totp-secret" data-testid="totp-secret">@GroupedSecret</code></p>
+                <p class="muted hint">Apps that accept an address can use this one instead:</p>
+                <p><code class="mono totp-secret" data-testid="totp-uri">@PendingEnrollment.OtpauthUri</code></p>
+                <form data-testid="totp-confirm-form" @onsubmit="ConfirmTotpAsync">
+                    <div class="field">
+                        <label for="totp-confirm-code"><strong>2.</strong> Enter the 6-digit code the app shows now</label>
+                        <input id="totp-confirm-code" type="text" inputmode="numeric" maxlength="6" autocomplete="one-time-code"
+                               data-testid="totp-confirm-code" @bind="TotpConfirmCode" @bind:event="oninput" />
+                    </div>
+                    <button type="submit" data-testid="totp-confirm-button">Turn on</button>
+                    <button type="button" class="outline" data-testid="totp-cancel-button"
+                            @onclick="CancelTotpAsync">Cancel</button>
+                </form>
+            </div>
+        }
+        else
+        {
+            <form data-testid="totp-start-form" @onsubmit="StartTotpAsync">
+                <div class="field">
+                    <label for="totp-start-password">Your password</label>
+                    <input id="totp-start-password" type="password" autocomplete="current-password"
+                           maxlength="@ReviewLimits.MaxPasswordLength"
+                           data-testid="totp-start-password" @bind="TotpStartPassword" @bind:event="oninput" />
+                </div>
+                <button type="submit" data-testid="totp-start-button">Set up two-factor sign-in</button>
+            </form>
+        }
+        }
+    </section>
+    }
+
     <section class="card" data-testid="tokens-card">
         <h2 id="tokens-heading">API tokens</h2>
         <p class="muted hint">A token lets a script or tool use the ReviewCenter API as you. It can read projects and reviews and create review drafts; it can never sign. The token is shown once, so copy it right away.</p>

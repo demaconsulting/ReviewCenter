@@ -5,8 +5,9 @@
 #### Purpose
 
 `UsersPage` is the page at `/users`. Its responsibilities are to list the users, to lead to the page that creates a user,
-to let a system administrator disable or enable a user, make a user a system administrator or take that away, and set a
-password, and to report when the page is interactive. Being a system administrator is a flag of the user, not a role
+to let a system administrator disable or enable a user, make a user a system administrator or take that away, set a
+password, and reset the second factor of a user, and to report when the page is interactive. Being a system
+administrator is a flag of the user, not a role
 to choose; what a user may do in a project is set on the page of the project. The page requires the `SystemAdmin`
 role: a signed-in user without it gets HTTP status 403, and an anonymous
 visitor is sent to the login page. It is a Razor component split into presentation (`UsersPage.razor`) and behavior
@@ -20,9 +21,11 @@ a Cancel link back to the list, and returns to the list after a user has been cr
 
 The list page uses the wide page container with a heading row that holds the title and the "+ New user" button, which is
 the single primary button of the page. Each user is a row card: the user name in bold, the display name muted, and
-badges for "System admin" (only for a system administrator), the enabled state, and "OIDC" (only for an account of an
-identity provider; its title names the provider); the Disable or Enable button and the
-button "Make system admin" or "Remove system admin" are small outline buttons at the side of the
+badges for "System admin" (only for a system administrator), the enabled state, "OIDC" (only for an account of an
+identity provider; its title names the provider), and "TOTP" (only for a user with a second factor); the Disable or
+Enable button, the
+button "Make system admin" or "Remove system admin", and, for a user with a second factor, the button "Reset
+two-factor" are small outline buttons at the side of the
 row. Below the row the password field with its "Set password" button is
 kept on one tidy line (it wraps on a narrow screen); an account of an identity provider has no password, so a muted
 note "Signs in with {provider}; no local password." takes the place of that line. `NewUserPage` uses the narrow page
@@ -37,6 +40,10 @@ The page instance is created per browser connection, so its state is per user.
 **Users**: the users shown, loaded when the page is created and reloaded after every change.
 
 **Passwords**: the new password typed in a row, by user identity.
+
+**TotpUserIds**: the identities of the users with a confirmed second factor (`TotpService.ListEnrolledUserIdsAsync`),
+read with the list and after every action, and cleared when access is lost. It decides which rows show the badge and
+the reset button.
 
 **NewUsername**, **NewDisplayName**, **NewSystemAdmin**, **NewPassword**, and an **ErrorMessage** of its own: the
 values typed
@@ -60,7 +67,8 @@ subsystem): `users-page` (root), `new-user-button`, `users-error`, `users-status
 identity) `user-row-{id}`, `user-username-{id}`, `user-display-name-{id}`, `user-admin-{id}` (the badge, only for a
 system administrator), `user-enabled-{id}`,
 `user-toggle-enabled-{id}`, `user-toggle-admin-{id}`, `user-password-input-{id}`, `user-set-password-{id}`,
-`user-oidc-{id}` (the badge, only for an account of an identity provider), and `user-no-password-{id}` (its note).
+`user-oidc-{id}` (the badge, only for an account of an identity provider), `user-no-password-{id}` (its note),
+`user-totp-{id}` (the badge, only for a user with a second factor), and `user-reset-totp-{id}` (its reset button).
 The page of the form has `new-user-page` (root), `breadcrumb-users-link`, `users-error`,
 `new-user-form`, `new-user-username-input`, `new-user-display-name-input`, `new-user-system-admin-checkbox`,
 `new-user-password-input`, `create-user-button`, and `cancel-new-user-link`.
@@ -83,13 +91,20 @@ password typed in the row (`UserService.SetEnabledAsync`, `SetSystemAdminAsync`,
 administrator." or "'{user}' is no longer a system administrator." A change that would remove the last enabled
 system administrator is refused by Core and shown as a message.
 
+**ResetTotpAsync**: Removes the second factor of the user of a row through `TotpService.ResetAsync` (for a user who lost
+the phone and the recovery codes), through the same `RunAsync` step as the other actions. The page shows "Two-factor
+sign-in of '{user}' was reset." Only a system administrator may do it; Core refuses anybody else. The user is not
+signed out: a session that is already open stays valid, and the next sign-in needs only the password until the user
+sets the factor up again.
+
 Every change reloads the list, whether or not it succeeded, so the rows show what is stored. Every change first goes
 through one shared step (`RunAsync`) that reads the signed-in user from the authentication state and then asks
 `ProjectViewGuard.GuardSystemAdminAsync` (through `GuardAsync`, over `IProjectAccess`) whether that user is still an
 enabled system administrator; unless so, the action is not run, nothing is reloaded, and `ShowAccessLost` is called
 with the message "System administrator rights are required." The guard is asked a second time before the reload,
 because the change may have taken the right from the very user who made it; the stored change is then still
-acknowledged, but the list is not shown. `ShowAccessLost` clears `Users`, `Passwords`, and `MessageUserId`, sets
+acknowledged, but the list is not shown. `ShowAccessLost` clears `Users`, `Passwords`, `TotpUserIds`, and
+`MessageUserId`, sets
 `AccessLost`, and shows the message, and the page then renders neither the "+ New user" button nor the list, so the
 names and roles of the users, and the passwords typed into the rows, are no longer readable. This check is kept on
 every action although the page itself is replaced when the sign-in state ends (see `SessionGate`), because an
@@ -118,6 +133,7 @@ a convenience; the service remains the authority. Passwords are never shown or l
 - **SessionGate** (App) — wraps the whole page content, so the page is replaced by a "Session ended" message when the
   sign-in state of the open page ends.
 - **UserService** — lists, creates, and changes users, and looks up the signed-in user.
+- **TotpService** — lists the users with a second factor and resets the second factor of a user.
 - **OidcOptions** (Identity) — the display name of the provider that the badge and the note name (injected options).
 - **IProjectAccess** (Core) — through `ProjectViewGuard.GuardSystemAdminAsync`, tells whether the signed-in user is
   still an enabled system administrator, before and after every action.

@@ -213,6 +213,43 @@ internal sealed class SignInThrottle
     }
 
     /// <summary>
+    ///     Gives only the address slot of a reservation back, leaving the name counter as it is.
+    /// </summary>
+    /// <param name="reservation">The reservation returned by <see cref="TryBegin"/>. Must not be null.</param>
+    /// <remarks>
+    ///     For a sign-in whose password was right but still owes a second factor: the attempt must not use up the
+    ///     quota of a client that is signing in correctly, yet the name counter stays so that the password steps and
+    ///     the code steps of one account together stay bounded; only the complete sign-in
+    ///     (<see cref="Succeeded"/> of the second step) clears it. The reservation is spent: a later
+    ///     <see cref="Succeeded"/> or <see cref="ReleaseAddress"/> with it does nothing.
+    /// </remarks>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="reservation"/> is null.</exception>
+    public void ReleaseAddress(Reservation reservation)
+    {
+        ArgumentNullException.ThrowIfNull(reservation);
+        lock (_lock)
+        {
+            if (reservation.Consumed)
+            {
+                return;
+            }
+
+            reservation.Consumed = true;
+            if (_windows.TryGetValue(reservation.CountedAddressKey, out var address) && address.Generation == reservation.AddressGeneration)
+            {
+                if (address.Count <= 1)
+                {
+                    RemoveWindow(reservation.CountedAddressKey, address);
+                }
+                else
+                {
+                    address.Count--;
+                }
+            }
+        }
+    }
+
+    /// <summary>
     ///     Forgets every counter; for tests. Generations are not reused, so earlier reservations stay stale.
     /// </summary>
     public void Reset()

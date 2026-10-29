@@ -579,3 +579,23 @@ sections:
         tests:
           - LoginPage_Render_ProviderEnabled_ShowsButtonBesideLocalForm
           - OidcReauth_ReviewPage_OffersConfirmationThenSigning
+
+      - id: ReviewCenter-Web-TotpSecondFactor
+        title: >-
+          The Web subsystem shall let a person with a local account set up, use, and turn off the second factor on
+          their own page, ask for the code after the password in a page of its own, ask for the code beside the
+          password in the sign form of a review, show administrators who has a second factor and let a system
+          administrator reset it, and explain all of this in a help topic.
+        justification: |
+          The pages must make the safe way the easy way and must not offer what the rules refuse, so the person finds
+          the way that suits their account without reading a manual.
+        children:
+          - ReviewCenter-TotpLoginPage-SecondStepForm
+          - ReviewCenter-LoginPage-TotpExpiredNotice
+          - ReviewCenter-AccountPage-Totp
+          - ReviewCenter-UsersPage-TotpReset
+          - ReviewCenter-ReviewPage-SignTotpCode
+          - ReviewCenter-HelpPage-TwoFactorTopic
+        tests:
+          - TotpLoginPage_Render_PendingSignIn_ShowsCodeFormAndNoUserName
+          - AccountPage_Confirm_RightCode_ShowsTenRecoveryCodesOnceAndNoSecret

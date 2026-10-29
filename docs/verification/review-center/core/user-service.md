@@ -26,7 +26,8 @@ N/A - standard test environment.
 - Five failures in a row lock the account for five minutes, and a success resets the count.
 - The last enabled system administrator cannot be disabled or demoted.
 - A user changes their own password only with the current password; an administrator sets a new password for any
-  user, which also ends a lockout.
+  user, which also ends a lockout. For a user with a second factor the password-only overload fails closed and keeps
+  the hash and the failure counter.
 - A user with a temporary password signs in but is refused (and audited) at a re-authentication for a signature; the
   change of the own password must differ from the temporary one and ends the temporary state; a password set by an
   administrator leaves the state unchanged.
@@ -37,6 +38,13 @@ N/A - standard test environment.
 - The display name and user name of a new external account are cleaned and bounded, the user name is made unique by a
   number or a generated name, and every password path refuses an external account.
 - Null arguments are rejected with an `ArgumentNullException`.
+- When a second factor store is present and the feature is on, the right password of an enrolled, enabled, unlocked
+  local user does not sign in: the password step reports that a second factor is required and does not reset the
+  failure counter; wrong passwords, unknown users, and disabled users get the same answers as for a plain account; the
+  password-only checks (`AuthenticateAsync` and `ReauthenticateAsync`) refuse an enrolled account (fail closed) and
+  record why; a plain account, a switched-off feature, and a service without the store behave as before.
+- A password confirmation checks only the password, for an enrolled account too, does not reset the failure counter,
+  and refuses wrong passwords, external accounts, and locked accounts.
 
 #### Test Scenarios
 
@@ -106,6 +114,16 @@ replaces the password. This scenario is tested by `UserService_ChangeOwnPassword
 count as failures; a sixth with the right current password is then refused, and the old password does not sign in
 while the account is locked. This scenario is tested by
 `UserService_ChangeOwnPasswordAsync_RepeatedWrongPassword_LocksOut`.
+
+**UserService_ChangeOwnPasswordAsync_EnrolledUser_FailsClosedAndKeepsHashAndCounter**: For an enrolled user the
+password-only overload with the right current password throws `TotpCodeIncorrect`, the stored hash and the failure
+counter are unchanged, and the refusal is recorded. This scenario is tested by
+`UserService_ChangeOwnPasswordAsync_EnrolledUser_FailsClosedAndKeepsHashAndCounter`.
+
+**UserService_ChangeOwnPasswordAsync_EnrolledUser_WrongPasswordCountsAndFeatureOffChanges**: For an enrolled user a
+wrong current password still counts as a failure and is reported as `CurrentPasswordIncorrect`, and with the feature
+switched off the password-only change works. This scenario is tested by
+`UserService_ChangeOwnPasswordAsync_EnrolledUser_WrongPasswordCountsAndFeatureOffChanges`.
 
 **UserService_SetPasswordAsync_NewPassword_WorksAndEndsLockout**: A new password is set for a locked user; the user
 signs in with it at once, and the old password no longer works. This scenario is tested by
@@ -216,3 +234,22 @@ again is refused with `PasswordInvalid` and keeps the flag, which is tested by
 `UserService_ChangeOwnPasswordAsync_SameAsTemporary_IsRefusedAndKeepsTheFlag`. A password set by an administrator
 through `SetPasswordAsync` leaves the flag of a flagged account set and of a normal account clear, which is tested by
 `UserService_SetPasswordAsync_ByAdministrator_LeavesTheFlagAlone`.
+
+**UserService second factor scenarios**: These tests are defined in `UserServiceTotpTests.cs`, over the same fakes with
+`FakeTotpStore` and a switch for the feature (`TotpTestWorld`). The right password of an enrolled account reports that
+a second factor is required, returns no user, and leaves the failure counter as it was, while an account without a
+second factor signs in as before; this is tested by
+`UserService_AuthenticatePasswordAsync_EnrolledUser_AsksForTheSecondFactorAndKeepsTheCounter`. The legacy
+`AuthenticateAsync` and `ReauthenticateAsync` refuse an enrolled account even with the right password and record why,
+which is tested by `UserService_AuthenticateAndReauthenticate_EnrolledUser_FailClosed`. The same checks accept an
+account without a second factor, and an enrolled account when the feature is switched off, which is tested by
+`UserService_AuthenticateAsync_NoSecondFactorOrFeatureOff_SignsInWithThePassword`. A user service built without a
+second factor store never asks for a second factor, which is tested by
+`UserService_AuthenticatePasswordAsync_WithoutTotpStore_NeverAsksForTheSecondFactor`. Wrong passwords and unknown users
+look the same for an enrolled account and a plain one, which is tested by
+`UserService_AuthenticatePasswordAsync_WrongPassword_LooksTheSameWithAndWithoutSecondFactor`. The right password of a
+disabled enrolled account is refused like that of any disabled account, which is tested by
+`UserService_AuthenticatePasswordAsync_DisabledEnrolledUser_IsRefused`. The password confirmation works for an enrolled
+account without a code and without resetting the counter, and refuses wrong passwords and external accounts, which is
+tested by `UserService_ConfirmPasswordAsync_ChecksThePasswordOnly`. A locked account is refused until the lockout ends,
+which is tested by `UserService_ConfirmPasswordAsync_LockedAccount_IsRefused`.

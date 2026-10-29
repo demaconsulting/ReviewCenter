@@ -41,6 +41,10 @@ N/A - standard test environment (temporary SQLite databases are created by the t
   back.
 - Failed sign-ins of unknown users and locked accounts, and the refused attempts, are audited with the cleaned typed
   name, never the password, and at most one entry per key per minute.
+- When the account has a second factor, the right password does not sign in: the answer is a redirect to the code page
+  with a short-lived challenge cookie and no session, and the right password does not use up the address quota of the
+  throttle; an account without a second factor signs in as before. The code step itself is verified by the
+  `TotpSignIn` unit.
 
 #### Test Scenarios
 
@@ -184,3 +188,18 @@ the redirect after the login all equal the link as requested; and the page then 
 highlighted. **SignIn_DeepLink_PlusAndAmpersand_ReturnsToTheSameFileAfterLogin**: the same for a name with `+` and `&`.
 **SignIn_DeepLink_HostileReturnUrl_GoesToTheHomePage**: absolute, protocol-relative and backslash addresses that look
 like deep links are not followed after a login. These scenarios are tested by the tests of those names.
+
+**TotpSignIn_PasswordStep_EnrolledAccount_IssuesChallengeCookieAndNoSession**: An account with a second factor posts
+the right password; the answer is a redirect to the code page with a challenge cookie and no session cookie. This
+scenario is tested by `TotpSignIn_PasswordStep_EnrolledAccount_IssuesChallengeCookieAndNoSession`, defined in
+`TotpSignInTests.cs` and described with the `TotpSignIn` unit.
+
+**TotpSignIn_PasswordStep_AccountWithoutSecondFactor_SignsInAsBefore**: An account without a second factor signs in
+with the password alone, with a session cookie and no challenge cookie. This scenario is tested by
+`TotpSignIn_PasswordStep_AccountWithoutSecondFactor_SignsInAsBefore`, defined in `TotpSignInTests.cs` and described with
+the `TotpSignIn` unit.
+
+**TotpSignIn_PasswordStep_CorrectPassword_DoesNotUseUpTheAddressQuota**: With an address limit of two, three enrolled
+accounts pass the password step from one address and none is throttled. This scenario is tested by
+`TotpSignIn_PasswordStep_CorrectPassword_DoesNotUseUpTheAddressQuota`, defined in `TotpSignInTests.cs` and described
+with the `TotpSignIn` unit.

@@ -29,16 +29,19 @@ namespace DemaConsulting.ReviewCenter.Web;
 
 /// <summary>
 ///     Code-behind for the account page (<c>AccountPage.razor</c>): the signed-in user changes their own
-///     password and manages their personal access tokens for the API.
+///     password, manages their optional second factor (authenticator app) and their personal access tokens for the
+///     API.
 /// </summary>
 /// <remarks>
-///     The page talks to the domain only through <see cref="UserService"/> and <see cref="PersonalAccessTokenService"/>,
+///     The page talks to the domain only through <see cref="UserService"/>, <see cref="TotpService"/> and
+///     <see cref="PersonalAccessTokenService"/>,
 ///     which own the rules; a rule violation is shown next to the form instead of being thrown. Whose password or
 ///     tokens change is decided by the authentication state, never by a field on the page. The repeated new password
-///     is only a typing check, so it is compared here. Passwords are never shown or logged, and the fields are
-///     emptied after every attempt. A new token value is held only in the state of this page instance until it is
-///     dismissed; it is never written to a log or stored. Each browser connection (circuit) gets its own page
-///     instance, so the state here is per-user and needs no synchronization.
+///     is only a typing check, so it is compared here. Passwords and codes are never shown or logged, and the fields are
+///     emptied after every attempt. A new token value, the secret of a second factor set-up and new recovery codes
+///     are held only in the state of this page instance until they are dismissed or the set-up ends; they are never
+///     written to a log or stored. Each browser connection (circuit) gets its own page instance, so the state here
+///     is per-user and needs no synchronization.
 /// </remarks>
 public partial class AccountPage : ComponentBase
 {
@@ -147,6 +150,12 @@ public partial class AccountPage : ComponentBase
     private string ConfirmPassword { get; set; } = string.Empty;
 
     /// <summary>
+    ///     Gets or sets the authenticator code or recovery code typed into the change-password form (shown only
+    ///     while a second factor is on).
+    /// </summary>
+    private string ChangeCode { get; set; } = string.Empty;
+
+    /// <summary>
     ///     Gets the message of the last rejected attempt, or <c>null</c> when there is none.
     /// </summary>
     private string? ErrorMessage { get; set; }
@@ -166,6 +175,91 @@ public partial class AccountPage : ComponentBase
     private string InteractiveMarker => _interactive ? "true" : "false";
 
     /// <summary>
+    ///     Gets or sets the service of the optional second factor, supplied by dependency injection.
+    /// </summary>
+    [Inject]
+    private TotpService Totp { get; set; } = null!;
+
+    /// <summary>
+    ///     Gets what the page shows of the second factor of the signed-in user, or <c>null</c> when it is not loaded
+    ///     (a temporary password, an account of an identity provider, or no account).
+    /// </summary>
+    private TotpStatus? TotpInfo { get; set; }
+
+    /// <summary>
+    ///     Gets the secret of the enrollment in progress, or <c>null</c>; held only in the memory of this page
+    ///     instance and gone once the enrollment is confirmed, cancelled or the page is left.
+    /// </summary>
+    private TotpEnrollment? PendingEnrollment { get; set; }
+
+    /// <summary>
+    ///     Gets the recovery codes that were just issued, or <c>null</c>; held only in the memory of this page
+    ///     instance until dismissed.
+    /// </summary>
+    private IReadOnlyList<string>? NewRecoveryCodes { get; set; }
+
+    /// <summary>
+    ///     Gets the message of the last rejected second factor action, or <c>null</c>.
+    /// </summary>
+    private string? TotpError { get; set; }
+
+    /// <summary>
+    ///     Gets the confirmation of the last second factor action, or <c>null</c>.
+    /// </summary>
+    private string? TotpMessage { get; set; }
+
+    /// <summary>
+    ///     Gets the result of the last attempt to copy the recovery codes, or <c>null</c>.
+    /// </summary>
+    private string? TotpCopyStatus { get; set; }
+
+    /// <summary>
+    ///     Gets or sets the password typed into the set-up form.
+    /// </summary>
+    private string TotpStartPassword { get; set; } = string.Empty;
+
+    /// <summary>
+    ///     Gets or sets the code typed into the confirm form.
+    /// </summary>
+    private string TotpConfirmCode { get; set; } = string.Empty;
+
+    /// <summary>
+    ///     Gets or sets the password typed into the turn-off form.
+    /// </summary>
+    private string TotpDisablePassword { get; set; } = string.Empty;
+
+    /// <summary>
+    ///     Gets or sets the code typed into the turn-off form.
+    /// </summary>
+    private string TotpDisableCode { get; set; } = string.Empty;
+
+    /// <summary>
+    ///     Gets or sets the password typed into the new-recovery-codes form.
+    /// </summary>
+    private string TotpRegenPassword { get; set; } = string.Empty;
+
+    /// <summary>
+    ///     Gets or sets the code typed into the new-recovery-codes form.
+    /// </summary>
+    private string TotpRegenCode { get; set; } = string.Empty;
+
+    /// <summary>
+    ///     Gets the secret of the enrollment in progress in groups of four characters, which are easier to type.
+    /// </summary>
+    private string GroupedSecret => PendingEnrollment is null
+        ? string.Empty
+        : string.Join(' ', PendingEnrollment.SecretBase32.Chunk(4).Select(group => new string(group)));
+
+    /// <summary>
+    ///     Gets the words that tell how many recovery codes are left.
+    /// </summary>
+    private string RecoveryLeftText => TotpInfo?.RecoveryCodesLeft switch
+    {
+        1 => "1 recovery code left",
+        var count => $"{count} recovery codes left"
+    };
+
+    /// <summary>
     ///     Loads the tokens of the signed-in user.
     /// </summary>
     /// <returns>A task that completes when the list is loaded.</returns>
@@ -179,7 +273,190 @@ public partial class AccountPage : ComponentBase
         if (!MustChangePassword)
         {
             await LoadTokensAsync();
+            await LoadTotpAsync();
         }
+    }
+
+    /// <summary>
+    ///     Loads the second factor status of the signed-in user; nothing is shown for an account of an identity
+    ///     provider or when the account cannot be found.
+    /// </summary>
+    /// <returns>A task that completes when the status is loaded.</returns>
+    private async Task LoadTotpAsync()
+    {
+        TotpInfo = null;
+        if (IsExternal || !Totp.FeatureEnabled)
+        {
+            return;
+        }
+
+        try
+        {
+            TotpInfo = await Totp.GetStatusAsync(await AuthenticationState.GetActorAsync());
+        }
+        catch (DomainRuleException)
+        {
+            // The account is gone; SessionGate shows the "session ended" message
+        }
+    }
+
+    /// <summary>
+    ///     Starts the set-up with the typed password and shows the new secret.
+    /// </summary>
+    /// <returns>A task that completes when the attempt has been handled.</returns>
+    private async Task StartTotpAsync()
+    {
+        ClearTotpMessages();
+        try
+        {
+            PendingEnrollment = await Totp.BeginEnrollmentAsync(await AuthenticationState.GetActorAsync(), TotpStartPassword);
+        }
+        catch (DomainRuleException ex)
+        {
+            TotpError = ex.Message;
+        }
+        finally
+        {
+            TotpStartPassword = string.Empty;
+        }
+    }
+
+    /// <summary>
+    ///     Confirms the set-up with the typed code, turns the second factor on and shows the recovery codes once.
+    /// </summary>
+    /// <returns>A task that completes when the attempt has been handled.</returns>
+    private async Task ConfirmTotpAsync()
+    {
+        ClearTotpMessages();
+        try
+        {
+            NewRecoveryCodes = await Totp.ConfirmEnrollmentAsync(await AuthenticationState.GetActorAsync(), TotpConfirmCode);
+
+            // The secret is not needed any more and is never shown again
+            PendingEnrollment = null;
+            TotpMessage = "Two-factor sign-in is on.";
+            await LoadTotpAsync();
+        }
+        catch (DomainRuleException ex)
+        {
+            TotpError = ex.Message;
+
+            // A set-up that is gone or too old cannot be confirmed any more; start again
+            if (ex.Rule is DomainRule.TotpNotEnrolled or DomainRule.TotpEnrollmentExpired)
+            {
+                PendingEnrollment = null;
+            }
+        }
+        finally
+        {
+            TotpConfirmCode = string.Empty;
+        }
+    }
+
+    /// <summary>
+    ///     Gives up the set-up in progress and forgets its secret.
+    /// </summary>
+    /// <returns>A task that completes when the set-up is gone.</returns>
+    private async Task CancelTotpAsync()
+    {
+        ClearTotpMessages();
+        PendingEnrollment = null;
+        TotpConfirmCode = string.Empty;
+        try
+        {
+            await Totp.CancelEnrollmentAsync(await AuthenticationState.GetActorAsync());
+        }
+        catch (DomainRuleException ex)
+        {
+            TotpError = ex.Message;
+        }
+    }
+
+    /// <summary>
+    ///     Turns the second factor off with the typed password and code.
+    /// </summary>
+    /// <returns>A task that completes when the attempt has been handled.</returns>
+    private async Task DisableTotpAsync()
+    {
+        ClearTotpMessages();
+        try
+        {
+            await Totp.DisableAsync(await AuthenticationState.GetActorAsync(), TotpDisablePassword, TotpDisableCode);
+            NewRecoveryCodes = null;
+            TotpMessage = "Two-factor sign-in is off.";
+            await LoadTotpAsync();
+        }
+        catch (DomainRuleException ex)
+        {
+            TotpError = ex.Message;
+        }
+        finally
+        {
+            TotpDisablePassword = string.Empty;
+            TotpDisableCode = string.Empty;
+        }
+    }
+
+    /// <summary>
+    ///     Replaces the recovery codes with new ones, shown once.
+    /// </summary>
+    /// <returns>A task that completes when the attempt has been handled.</returns>
+    private async Task RegenerateRecoveryCodesAsync()
+    {
+        ClearTotpMessages();
+        try
+        {
+            NewRecoveryCodes = await Totp.RegenerateRecoveryCodesAsync(
+                await AuthenticationState.GetActorAsync(),
+                TotpRegenPassword,
+                TotpRegenCode);
+            TotpMessage = "You have new recovery codes. The old ones no longer work.";
+            await LoadTotpAsync();
+        }
+        catch (DomainRuleException ex)
+        {
+            TotpError = ex.Message;
+        }
+        finally
+        {
+            TotpRegenPassword = string.Empty;
+            TotpRegenCode = string.Empty;
+        }
+    }
+
+    /// <summary>
+    ///     Copies the new recovery codes to the clipboard of the browser.
+    /// </summary>
+    /// <returns>A task that completes when the browser has answered.</returns>
+    private async Task CopyRecoveryCodesAsync()
+    {
+        try
+        {
+            var copied = await Js.InvokeAsync<bool>("reviewCenter.copyText", string.Join('\n', NewRecoveryCodes ?? []));
+            TotpCopyStatus = copied ? "Copied." : "Could not copy; select the codes and copy them by hand.";
+        }
+        catch (Exception ex) when (ex is JSException or InvalidOperationException or JSDisconnectedException)
+        {
+            TotpCopyStatus = "Could not copy; select the codes and copy them by hand.";
+        }
+    }
+
+    /// <summary>
+    ///     Hides the new recovery codes for good.
+    /// </summary>
+    private void DismissRecoveryCodes()
+    {
+        NewRecoveryCodes = null;
+        TotpCopyStatus = null;
+    }
+
+    /// <summary>
+    ///     Clears the messages of the second factor card before an action.
+    /// </summary>
+    private void ClearTotpMessages()
+    {
+        TotpError = null;
+        TotpMessage = null;
     }
 
     /// <summary>
@@ -382,7 +659,7 @@ public partial class AccountPage : ComponentBase
             }
 
             var actor = await AuthenticationState.GetActorAsync();
-            await UserService.ChangeOwnPasswordAsync(actor.Username, CurrentPassword, NewPassword);
+            await Totp.ChangeOwnPasswordAsync(actor, CurrentPassword, NewPassword, ChangeCode);
             Message = "Your password was changed.";
 
             // The old session still describes the temporary password, so the user signs in again with the new one
@@ -390,16 +667,27 @@ public partial class AccountPage : ComponentBase
             {
                 Navigation.NavigateTo("/login?changed=1", forceLoad: true);
             }
+            else
+            {
+                // A recovery code may have been used
+                await LoadTotpAsync();
+            }
         }
         catch (DomainRuleException ex)
         {
             ErrorMessage = ex.Message;
+            if (ex.Rule == DomainRule.TotpCodeIncorrect && !MustChangePassword)
+            {
+                // The page state may be stale: show the code field when a second factor was turned on elsewhere
+                await LoadTotpAsync();
+            }
         }
         finally
         {
             CurrentPassword = string.Empty;
             NewPassword = string.Empty;
             ConfirmPassword = string.Empty;
+            ChangeCode = string.Empty;
         }
     }
 }

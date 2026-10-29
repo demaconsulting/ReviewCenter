@@ -240,3 +240,15 @@ sections:
           - ServerHost_CreateApplication_InvalidOidcSettings_ThrowsClearErrorWithoutSecret
           - ServerHost_CreateApplication_OidcOffOrValid_BuildsTheApplication
           - OidcSignIn_Disabled_EndpointsAreNotMappedAndNoButtonIsShown
+
+      - id: ReviewCenter-ServerHost-TotpWiring
+        title: >-
+          The ServerHost class shall check the settings of the second factor at the start and stop with an error that
+          names the setting that is wrong, shall register the services of the second factor, and shall map the endpoint
+          of the second step of the sign-in only when the feature is on.
+        justification: |
+          A wrong setting must be found by the administrator when the server starts, and a switched-off feature must not
+          leave an endpoint behind.
+        tests:
+          - ServerHost_CreateApplication_InvalidTotpSettings_ThrowsClearError
+          - ServerHost_CreateApplication_ValidTotpSettings_ProvideTheSettings

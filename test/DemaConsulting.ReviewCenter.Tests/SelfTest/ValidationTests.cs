@@ -561,17 +561,17 @@ public class ValidationTests
     }
 
     /// <summary>
-    ///     Test that the default check list has the eight hermetic checks in their order, with the opt-in check absent.
+    ///     Test that the default check list has the nine hermetic checks in their order, with the opt-in check absent.
     /// </summary>
     [Fact]
-    public void Validation_CreateChecks_Default_ListsEightHermeticChecks()
+    public void Validation_CreateChecks_Default_ListsNineHermeticChecks()
     {
         // Arrange: no setup; the default list is asked for
 
         // Act: create the default check list
         var checks = Validation.CreateChecks(includeConfiguredDatabase: false);
 
-        // Assert: eight checks, in order, all with the ReviewCenter_ prefix and no configured-database check
+        // Assert: nine checks, in order, all with the ReviewCenter_ prefix and no configured-database check
         Assert.Equal(RealValidationRun.CheckNames, checks.Select(check => check.Name));
     }
 
@@ -586,8 +586,8 @@ public class ValidationTests
         // Act: create the opt-in check list
         var checks = Validation.CreateChecks(includeConfiguredDatabase: true);
 
-        // Assert: nine checks and the configured-database check is the last
-        Assert.Equal(9, checks.Count);
+        // Assert: ten checks and the configured-database check is the last
+        Assert.Equal(10, checks.Count);
         Assert.Equal("ReviewCenter_ConfiguredDatabase", checks[^1].Name);
     }
 }

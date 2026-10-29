@@ -1502,6 +1502,41 @@ button:disabled {
     overflow-wrap: anywhere;
 }
 
+/* The key of a two-factor set-up: easy to read and to type; long addresses wrap instead of overflowing */
+.totp-secret {
+    display: block;
+    padding: 0.5rem 0.75rem;
+    border: 1px solid var(--border);
+    border-radius: 0.375rem;
+    background: var(--code-background);
+    color: var(--text);
+    letter-spacing: 0.08em;
+    overflow-wrap: anywhere;
+    user-select: all;
+}
+
+.totp-left {
+    margin-left: 0.4rem;
+}
+
+/* The recovery codes shown once after a set-up: two columns, one code per cell */
+.recovery-codes {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr));
+    gap: 0.4rem 1rem;
+    margin: 0.5rem 0;
+    padding: 0;
+    list-style: none;
+}
+
+.recovery-codes li {
+    padding: 0.25rem 0.6rem;
+    border: 1px solid var(--border);
+    border-radius: 0.375rem;
+    background: var(--surface);
+    color: var(--text);
+}
+
 a.action.small,
 button.small {
     padding: 0.25rem 0.7rem;

@@ -54,6 +54,10 @@ N/A - standard test environment.
   (`Production`) and its database from the settings and not from the process environment (a poisoned
   `ASPNETCORE_URLS`, Kestrel endpoint variable, `DOTNET_ENVIRONMENT` and `Database__*` settings change nothing), and
   still serves routes with constraints.
+- Invalid settings of the two-factor sign-in (a value of `Identity:Totp:Enabled` that is not a boolean, and an
+  `Identity:Totp:Issuer` that is empty or holds a colon) stop the start with an error that says the two-factor
+  settings are invalid and names the setting; valid settings provide the settings object to the services, with the
+  feature on and the issuer `ReviewCenter` by default, and a switched-off feature with a trimmed issuer when set.
 
 #### Test Scenarios
 
@@ -226,6 +230,17 @@ scenario is tested by `ServerHost_CreateApplication_RequireTrustedKeyWithSelfSig
 **ServerHost_CreateApplication_SelfSignedFolderIsAFile_ThrowsClearError**: A file stands where the folder of the key
 should be; the message names `Attestation:SelfSignedFolder`. This scenario is tested by
 `ServerHost_CreateApplication_SelfSignedFolderIsAFile_ThrowsClearError`.
+
+**ServerHost_CreateApplication_InvalidTotpSettings_ThrowsClearError**: A theory over `Identity:Totp:Enabled` set to
+`maybe`, an empty `Identity:Totp:Issuer`, and an issuer `a:b`, in `TotpOptionsTests.cs`; an
+`InvalidOperationException` with the text "Invalid two-factor sign-in settings" that names `Identity:Totp:` and the
+setting is thrown. This scenario is tested by `ServerHost_CreateApplication_InvalidTotpSettings_ThrowsClearError`,
+described with the `TotpSignIn` unit.
+
+**ServerHost_CreateApplication_ValidTotpSettings_ProvideTheSettings**: With no settings the host provides the settings
+with the feature on and the issuer `ReviewCenter`; with the feature off and an issuer with spaces around it the
+settings carry the feature off and the trimmed issuer, in `TotpOptionsTests.cs`. This scenario is tested by
+`ServerHost_CreateApplication_ValidTotpSettings_ProvideTheSettings`.
 
 **Audit services**: The registration of the audit store, the shared audit appender, and the audit service in
 `AddServices` is exercised by the sign-in audit tests and the `AuditCommand` tests, which resolve them from the real

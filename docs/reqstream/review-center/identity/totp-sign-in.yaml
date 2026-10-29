@@ -1,0 +1,109 @@
+---
+# Software Unit Requirements for the TotpSignIn Class
+#
+# The TotpSignIn class (TotpSignIn.cs with TotpOptions.cs) is the second step of the sign-in with a one-time password:
+# the settings of the second factor, their check at start-up, and the endpoint that receives the code and only then
+# issues the session. The first step, the password, is part of the SignIn unit.
+
+sections:
+  - title: TotpSignIn Unit Requirements
+    requirements:
+      - id: ReviewCenter-TotpSignIn-Options
+        title: >-
+          The TotpSignIn unit shall read the settings Identity:Totp:Enabled (on by default) and Identity:Totp:Issuer
+          (ReviewCenter by default) and shall refuse an issuer that is empty, longer than 64 characters, or contains a
+          colon or a control character, with a message that names the setting.
+        justification: |
+          The issuer is shown by the authenticator app next to the account, and a colon would break the label of the
+          entry. A mistake must be found when the server starts, with a message that tells the administrator which
+          setting is wrong.
+        tests:
+          - TotpOptions_Defaults_AreEnabledWithTheProductIssuer
+          - TotpOptionsValidator_Validate_ValidIssuer_Succeeds
+          - TotpOptionsValidator_Validate_InvalidIssuer_FailsAndNamesTheSetting
+          - TotpOptionsValidator_Validate_TooLongIssuer_Fails
+
+      - id: ReviewCenter-TotpSignIn-SecondStep
+        title: >-
+          The TotpSignIn unit shall, for an account with a second factor, issue no session when the password is right,
+          and shall issue the session only when the second step is completed with a right authenticator code or an
+          unused recovery code, honoring a local return address, and shall answer a wrong, reused, empty, or malformed
+          code with the same redirect and without a session.
+        justification: |
+          A password alone must never open a session of an account that has a second factor, and the answer to a bad
+          code must not tell the person, or somebody guessing, which part was wrong.
+        tests:
+          - TotpSignIn_PasswordStep_EnrolledAccount_IssuesChallengeCookieAndNoSession
+          - TotpSignIn_CodeStep_RightCode_SignsInAndRedirects
+          - TotpSignIn_CodeStep_NeighboringStep_SignsIn
+          - TotpSignIn_CodeStep_EveryKindOfFailure_GivesTheSameAnswerAndNoSession
+          - TotpSignIn_CodeStep_MissingOrEmptyCode_IsAnsweredLikeAWrongCode
+          - TotpSignIn_CodeStep_RecoveryCode_WorksOnce
+          - TotpSignIn_CodeStep_CodeUsedBefore_IsRefusedAndTheNextStepWorks
+
+      - id: ReviewCenter-TotpSignIn-Challenge
+        title: >-
+          The TotpSignIn unit shall carry the pending second step in a cookie that cannot be read by scripts, is not
+          sent from other sites, and is marked secure on an https request, shall refuse a missing, forged, ended, used,
+          or foreign challenge by sending the person back to the login page without issuing a session, shall require
+          the antiforgery token for the code, and shall end the challenge when the second factor is reset.
+        justification: |
+          The cookie is the only thing that links the two steps, so it must be hard to steal, to forge, and to use
+          from another place or twice, and a second factor that an administrator removed must not be completed with
+          an old challenge.
+        tests:
+          - TotpSignIn_PasswordStep_OverHttps_ChallengeCookieIsSecure
+          - TotpSignIn_CodeStep_NoChallenge_RedirectsToLoginAndIssuesNothing
+          - TotpSignIn_CodeStep_ForgedChallengeCookie_IsRefused
+          - TotpSignIn_CodeStep_ChallengeFromAnotherAddress_IsRefusedAndNotConsumed
+          - TotpSignIn_CodeStep_ExpiredChallenge_IsRefused
+          - TotpSignIn_CodeStep_ChallengeAfterSuccess_CannotBeUsedAgain
+          - TotpSignIn_CodeStep_WithoutAntiforgeryToken_IsRefused
+          - TotpSignIn_CodeStep_AfterAdministratorReset_ChallengeIsDead
+
+      - id: ReviewCenter-TotpSignIn-Lockout
+        title: >-
+          The TotpSignIn unit shall count a wrong code toward the same lockout as a wrong password, shall not clear
+          the counter when only the password is right, and shall clear it when the whole sign-in succeeds.
+        justification: |
+          An attacker who knows a password must not get unlimited guesses at a six digit code. One shared counter
+          bounds the password and the code together.
+        tests:
+          - TotpSignIn_CodeStep_FiveWrongCodes_LockTheAccount
+          - TotpSignIn_CodeStep_PasswordAndCodeFailures_ShareOneCounter
+          - TotpSignIn_CodeStep_Success_ResetsTheFailureCounter
+
+      - id: ReviewCenter-TotpSignIn-Throttle
+        title: >-
+          The TotpSignIn unit shall count every attempt of the second step in the sign-in throttle per client address
+          and account, before the code is checked, and shall not let a right password use up the quota of the address.
+        justification: |
+          The second step is another place to guess, so it needs the same limit as the password. A person who types
+          the right password must not use up the attempts of the address that they will need for the code.
+        tests:
+          - TotpSignIn_CodeStep_TooManyAttempts_AreThrottledEvenForARightCode
+          - TotpSignIn_PasswordStep_CorrectPassword_DoesNotUseUpTheAddressQuota
+
+      - id: ReviewCenter-TotpSignIn-Disabled
+        title: >-
+          The TotpSignIn unit shall, when the second factor is switched off, map no endpoint for the code and let an
+          enrolled account sign in with the password alone, shall let an account without a second factor and an
+          account that signs in with an API token be unaffected, and shall let an account sign in with the password
+          alone again after an administrator reset its second factor.
+        justification: |
+          An administrator who switches the feature off must get the behavior of before, and people who never set the
+          second factor up, and scripts that use tokens, must not notice that it exists.
+        tests:
+          - TotpSignIn_FeatureDisabled_NoEndpointAndPasswordOnlySignIn
+          - TotpSignIn_PasswordStep_AccountWithoutSecondFactor_SignsInAsBefore
+          - TotpSignIn_PasswordStep_AfterAdministratorReset_SignsInWithPasswordOnly
+          - TotpSignIn_PersonalAccessToken_EnrolledAccount_IsUnaffected
+
+      - id: ReviewCenter-TotpSignIn-NoSecretLeak
+        title: >-
+          The TotpSignIn unit shall never record a secret, a code, a recovery code, or a challenge token in the audit
+          trail, a log, or an answer during enrollment, sign-in, and removal.
+        justification: |
+          A code or a secret in a log or in the history would give it to everybody who can read that file.
+        tests:
+          - TotpSignIn_FullLifeCycle_NeverRecordsSecretsCodesOrTheChallenge

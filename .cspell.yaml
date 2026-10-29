@@ -24,6 +24,26 @@ words:
   - padm
   - Blazor
   - TOTP
+  - otpnet
+  - otpauth
+  - hmac
+  - hmacsha
+  - hotp
+  - totps
+  - regen
+  - Crockford
+  - Contoso
+  - hjkmnp
+  - efgh
+  - jkmn
+  - pqrs
+  - gezd
+  - gnbv
+  - qojq
+  - tqojq
+  - gezdgnbv
+  - gezdgnbvgy
+  - tqojqgezdgnbvgy
   - wwwroot
   - aspnetcore
   - openidconnect

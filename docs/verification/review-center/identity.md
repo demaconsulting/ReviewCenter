@@ -32,6 +32,9 @@ N/A - standard test environment (temporary SQLite databases are created by the t
 - With a fake OpenID Connect provider, a first sign-in creates a plain account (no project, no administrator right, no
   password) and a session, sign-out is local only, and a fresh sign-in of the same person at the provider allows
   exactly one signature without a password.
+- With the second factor turned on, the right password gives a challenge and no session, the right code gives the
+  session and the return address, and wrong or repeated codes and a lost challenge give no session (see the
+  verification of the `TotpSignIn`, `TotpAlgorithm`, and `TotpSecretProtector` units).
 
 ### Test Scenarios
 
@@ -78,3 +81,10 @@ no request. This scenario is tested by `OidcSignIn_Logout_IsLocalOnly`.
 a slot; the provider is asked with `prompt=login` and `max_age=0`, a proof is issued, one signature without a password
 uses it up, and the slot is signed. This scenario is tested by
 `OidcReauth_FreshSignInOfSamePerson_AllowsExactlyOneSignature`.
+
+**Second factor**: The unit tests of `TotpSignIn`, `TotpAlgorithm`, and `TotpSecretProtector` verify the subsystem
+requirement for the second factor. The right password of an enrolled account issues a challenge cookie and no session,
+which is tested by `TotpSignIn_PasswordStep_EnrolledAccount_IssuesChallengeCookieAndNoSession`, and the right code
+then signs the person in and sends the person on, which is tested by
+`TotpSignIn_CodeStep_RightCode_SignsInAndRedirects`. The algorithm is cross-checked against an independent HOTP/TOTP
+implementation in the tests, and the encryption of the secret has its own unit tests.

@@ -558,6 +558,53 @@ public class SignInThrottleTests
     }
 
     /// <summary>
+    ///     Test that releasing the address slot of a reservation gives only the address quota back: the name counter
+    ///     stays, and the reservation is spent.
+    /// </summary>
+    [Fact]
+    public void SignInThrottle_ReleaseAddress_GivesBackTheAddressSlotButKeepsTheNameCounter()
+    {
+        // Arrange: four other names and one attempt for ann fill the address (5 of 5); ann has used 1 of 3
+        var throttle = Create(out _);
+        for (var i = 0; i < 4; i++)
+        {
+            Assert.True(Allowed(throttle, "10.0.0.1", "user" + i));
+        }
+
+        var reservation = throttle.TryBegin("10.0.0.1", "ann");
+        Assert.NotNull(reservation);
+
+        // Act: release the address slot, twice, and then try to refund it as a success
+        throttle.ReleaseAddress(reservation);
+        throttle.ReleaseAddress(reservation);
+        throttle.Succeeded(reservation);
+
+        // Assert: exactly one address slot came back; ann's name counter was not cleared (two more attempts, then full)
+        Assert.True(Allowed(throttle, "10.0.0.1", "user4"));
+        Assert.False(Allowed(throttle, "10.0.0.1", "user5"));
+        var other = Create(out _);
+        var kept = other.TryBegin("10.0.0.1", "ann");
+        Assert.NotNull(kept);
+        other.ReleaseAddress(kept);
+        Assert.True(Allowed(other, "10.0.0.1", "ann"));
+        Assert.True(Allowed(other, "10.0.0.1", "ann"));
+        Assert.False(Allowed(other, "10.0.0.1", "ann"));
+    }
+
+    /// <summary>
+    ///     Test that releasing with a missing reservation is rejected.
+    /// </summary>
+    [Fact]
+    public void SignInThrottle_ReleaseAddress_NullReservation_Throws()
+    {
+        // Arrange
+        var throttle = Create(out _);
+
+        // Act / Assert
+        Assert.Throws<ArgumentNullException>(() => throttle.ReleaseAddress(null!));
+    }
+
+    /// <summary>
     ///     Test that a missing reservation is rejected.
     /// </summary>
     [Fact]

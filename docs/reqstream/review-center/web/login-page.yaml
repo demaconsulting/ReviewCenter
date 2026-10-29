@@ -56,3 +56,15 @@ sections:
           - LoginPage_Render_ProviderFailed_ShowsGenericMessageNextToButton
           - LoginPage_Render_ProviderOff_ShowsNoButton
           - OidcSignIn_Enabled_SignInPageOffersButtonBesideLocalForm
+
+      - id: ReviewCenter-LoginPage-TotpExpiredNotice
+        title: >-
+          The LoginPage unit shall show a notice that the sign-in with the code has ended and has to be started again
+          when the address carries the totp-expired flag, without a password error, and shall show no such notice for
+          a wrong password.
+        justification: |
+          A person who waited too long for the code is sent back to the first step, and the notice tells why. It must
+          not appear after a wrong password, where it would suggest that the password was right.
+        tests:
+          - LoginPage_Render_TotpExpired_ShowsNoticeAndNoPasswordError
+          - LoginPage_Render_PasswordFailure_ShowsNoExpiredNotice

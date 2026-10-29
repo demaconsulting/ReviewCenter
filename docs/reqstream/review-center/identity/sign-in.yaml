@@ -225,3 +225,17 @@ sections:
           - SignIn_Login_RepeatedFailures_RecordsLockoutOnce
           - SignIn_Login_LockedAccount_RecordsOneSignInLockedEntry
           - SignIn_Flow_LoginFailureAndLogout_FormAnIntactChain
+
+      - id: ReviewCenter-SignIn-TotpBranch
+        title: >-
+          The SignIn unit shall, when the password is right and the account has a second factor, give the browser a
+          challenge cookie, send it to the page that asks for the code without setting the session cookie or the
+          failure counter, give the address slot of the attempt back, and shall sign in an account without a second
+          factor exactly as before.
+        justification: |
+          The password step must not open a session for an account that owes a second factor, and a person who types
+          the right password must not use up the attempts of their address before the code is typed.
+        tests:
+          - TotpSignIn_PasswordStep_EnrolledAccount_IssuesChallengeCookieAndNoSession
+          - TotpSignIn_PasswordStep_AccountWithoutSecondFactor_SignsInAsBefore
+          - TotpSignIn_PasswordStep_CorrectPassword_DoesNotUseUpTheAddressQuota

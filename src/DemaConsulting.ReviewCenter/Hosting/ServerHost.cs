@@ -153,6 +153,7 @@ internal static class ServerHost
         InitializeDatabase(app);
         ValidateAuthOptions(app);
         ValidateOidcOptions(app);
+        ValidateTotpOptions(app);
         ValidateGitOptions(app);
         ValidateDataProtection(app);
         ValidateAttestation(app);
@@ -182,8 +183,11 @@ internal static class ServerHost
         // Login and logout
         app.MapSignIn();
 
-        // Sign-in and confirmation of identity with an OpenID Connect provider (only when it is enabled)
+        // Sign-in with an OpenID Connect provider (only when it is enabled)
         app.MapOidcSignIn();
+
+        // The second step of a sign-in with a one-time password (only when the second factor is enabled)
+        app.MapTotpSignIn();
 
         // The signed PDF attestation of a completed review
         app.MapAttestation();
@@ -273,6 +277,15 @@ internal static class ServerHost
         services.AddSingleton<IReviewStore, ReviewStore>();
         services.AddSingleton<IUserStore, UserStore>();
         services.AddSingleton<IPersonalAccessTokenStore, PersonalAccessTokenStore>();
+
+        // The optional one-time password second factor: its settings (read at start-up), the stores and the
+        // services; registered here so the command line and the self-validation use the same graph
+        services.AddTotpSignIn(configuration);
+        services.AddSingleton<ITotpStore, TotpStore>();
+        services.AddSingleton<ITotpAlgorithm, TotpAlgorithm>();
+        services.AddSingleton<ITotpSecretProtector, TotpSecretProtector>();
+        services.AddSingleton<TotpChallengeStore>();
+        services.AddSingleton<TotpService>();
         services.AddSingleton<IPasswordHasher, PasswordHasher>();
         services.AddSingleton<IProjectAccess, ProjectAccess>();
         services.AddSingleton<ProjectService>();
@@ -583,6 +596,27 @@ internal static class ServerHost
         {
             ((IDisposable)app).Dispose();
             throw new InvalidOperationException($"Invalid OpenID Connect sign-in settings: {ex.Message}", ex);
+        }
+    }
+
+    /// <summary>
+    ///     Reads the settings of the second factor once so an invalid value stops the start-up with a clear message.
+    /// </summary>
+    /// <param name="app">The built application whose services provide the options.</param>
+    /// <exception cref="InvalidOperationException">
+    ///     Thrown when the <c>Identity:Totp</c> settings are invalid (a value that is not a boolean, or a bad issuer);
+    ///     the application is disposed before the exception is thrown. The message names the setting, never a secret.
+    /// </exception>
+    private static void ValidateTotpOptions(WebApplication app)
+    {
+        try
+        {
+            _ = app.Services.GetRequiredService<TotpSettings>();
+        }
+        catch (Exception ex) when (ex is OptionsValidationException or InvalidOperationException)
+        {
+            ((IDisposable)app).Dispose();
+            throw new InvalidOperationException($"Invalid two-factor sign-in settings: {ex.Message}", ex);
         }
     }
 

@@ -7,13 +7,16 @@
 `AccountPage` is the page at `/account`. Its responsibilities are to let the signed-in user choose the appearance of the
 interface, let the user change their own password (a user who signs in with an identity provider has no password, so
 the page says so instead), let the user create, list, and revoke their personal access tokens
-for the API, and report when the page is interactive. It requires a signed-in user. When the account still has a
+for the API, let a local user set up and turn off an optional second factor (a one-time code from an authenticator app,
+with recovery codes), and report when the page is interactive. It requires a signed-in user. When the account still has
+a
 temporary password (the claim `must_change_password`), it is also the only page the user may use: it then shows a
-banner and only the change-password form (no appearance and no tokens), and after the change it sends the user to the
+banner and only the change-password form (no appearance, no tokens, and no second factor), and after the change it
+sends the user to the
 login page. It is a Razor component split into
 presentation (`AccountPage.razor`) and behavior (`AccountPage.razor.cs`). The
-page uses the narrow page container, because it holds forms, and its three cards are headed Appearance, Change password,
-and API tokens.
+page uses the narrow page container, because it holds forms, and its cards are headed Appearance, Change password,
+API tokens, and Two-factor authentication.
 
 #### Data Model
 
@@ -43,6 +46,19 @@ injected `IOptions<OidcOptions>`), and no form. The appearance and tokens cards 
 
 **ErrorMessage**: the message of the last rejected attempt; `null` when there is none.
 
+**Totp** (injected `TotpService`) and the second factor state of the Two-factor authentication card, which exists
+only when the user has no temporary password and the feature is available (`TotpService.FeatureEnabled`; for an account
+of an identity provider the card holds only the sentence "Two-factor sign-in is handled by {provider}."). **TotpInfo**:
+the status read with `TotpService.GetStatusAsync` (whether the factor is on and how many recovery codes are left, shown
+as "N recovery codes left"), read when the page is initialized and after every change. **PendingEnrollment**: the
+enrollment in progress after the password was accepted; it is held only in the memory of this page instance. The page
+shows its secret grouped by four characters and its `otpauth://` address once (there is no QR code, so the user types
+or pastes them into the authenticator app). **NewRecoveryCodes**: the ten recovery codes of a confirmation or a
+renewal, shown once in a box with a copy button (`reviewCenter.copyText`) and an "I have saved them" button that
+removes them. **TotpStartPassword**, **TotpConfirmCode**, **TotpDisablePassword**, **TotpDisableCode**,
+**TotpRegenPassword**, **TotpRegenCode**: the values typed into the forms; **TotpError**, **TotpMessage**, and
+**TotpCopyStatus** hold the last rejected action, the last confirmation, and the answer of the copy button.
+
 **Message**: the confirmation of the last successful change; `null` when there is none.
 
 **InteractiveMarker**: `"true"` or `"false"`, rendered as the `data-interactive` attribute of the root element; it
@@ -70,7 +86,13 @@ in place of the form), and for the tokens card `tokens-card`, `tokens-help-link`
 `new-token-box`, `new-token-value`, `copy-token-button`, `dismiss-token-button`, `token-copy-status`,
 `token-list-empty`, `token-list`, and for each token (by its identity) `token-row-{id}`, `token-name-{id}`,
 `token-display-id-{id}`, `token-status-{id}`, `token-created-{id}`, `token-expires-{id}`, `token-last-used-{id}`, and
-`revoke-token-{id}`.
+`revoke-token-{id}`; and for the two-factor card `totp-card`, `totp-external`, `totp-help-link`, `totp-status`,
+`totp-recovery-left`, `totp-error`, `totp-message`, the forms and buttons `totp-start-form`, `totp-start-password`,
+`totp-start-button`, `totp-pending`, `totp-secret`, `totp-uri`, `totp-confirm-form`, `totp-confirm-code`,
+`totp-confirm-button`, `totp-cancel-button`, `totp-disable-form`, `totp-disable-password`, `totp-disable-code`,
+`totp-disable-button`, `totp-regen-form`, `totp-regen-password`, `totp-regen-code`, `totp-regen-button`, and for the
+recovery codes `totp-recovery-box`, `totp-recovery-codes`, `totp-recovery-code-{index}`, `totp-recovery-copy`,
+`totp-recovery-dismiss`, and `totp-copy-status`.
 
 #### Key Methods
 
@@ -90,9 +112,13 @@ in place of the form), and for the tokens card `tokens-card`, `tokens-help-link`
   case, so a password never stays in the page. For a user with a temporary password the service also refuses a new
   password equal to the temporary one and clears the flag; the page then navigates to `/login?changed=1` with a full
   page load, because the session of the change still carries the claim and is stale (see `SignIn.IsCurrent`), and the
-  login page shows a notice that the password was changed.
+  login page shows a notice that the password was changed. While the second factor is on (`TotpInfo.Enrolled`), the form
+  has a field for a code or a recovery code (`ChangeCode`), which is sent too and emptied in every case; a missing or
+  wrong code is shown as the general message of `TotpCodeIncorrect`, and the card is read again so that the recovery
+  code count and the field are current.
 
-The user name comes from `SignIn.GetActorAsync`, and the change is made by `UserService.ChangeOwnPasswordAsync`.
+The user name comes from `SignIn.GetActorAsync`, and the change is made by `TotpService.ChangeOwnPasswordAsync`, which
+enforces the code in Core and calls `UserService`.
 
 **OnAfterRenderAsync**: Marks the page interactive after the first render on a live connection, as `HomePage` does, and
 then reads the stored appearance with `reviewCenter.getTheme` to show it as selected.
@@ -109,6 +135,33 @@ then reads the stored appearance with `reviewCenter.getTheme` to show it as sele
 copy it by hand, and the value stays in the box.
 
 **DismissToken**: Removes the value of the new token from the page for good.
+
+**StartTotpAsync**: Handles the password form of the set-up: `TotpService.BeginEnrollmentAsync` with the user and the
+typed password.
+
+- *Postconditions*: On success `PendingEnrollment` holds the new secret and the page shows it with the confirmation
+  form. A rule violation (a wrong password, a locked account, a second factor that is already on, or one that is not
+  available) is shown as `TotpError`. The password field is emptied in every case.
+
+**ConfirmTotpAsync**: Handles the confirmation form: `TotpService.ConfirmEnrollmentAsync` with the typed code.
+
+- *Postconditions*: On success the factor is on, the pending secret is removed, and `NewRecoveryCodes` holds the ten
+  recovery codes. A rule violation is shown as `TotpError`; when the enrollment is gone or has expired, the pending
+  secret is removed as well, so the user starts again. The code field is emptied in every case.
+
+**CancelTotpAsync**: Cancels the set-up in progress (`TotpService.CancelEnrollmentAsync`) and removes the secret from
+the page.
+
+**DisableTotpAsync**: Handles the turn-off form: `TotpService.DisableAsync` with the typed password and a code or a
+recovery code. On success the factor is off and the page says so; a rule violation is shown as `TotpError`. Both fields
+are emptied in every case.
+
+**RegenerateRecoveryCodesAsync**: Handles the renewal form: `TotpService.RegenerateRecoveryCodesAsync` with the typed
+password and code. On success the old recovery codes no longer work and the new ones are shown once; a rule violation
+is shown as `TotpError`. Both fields are emptied in every case.
+
+**CopyRecoveryCodesAsync** and **DismissRecoveryCodes**: Copy the recovery codes with `reviewCenter.copyText` and show
+"Copied." (or a hint to copy by hand), and remove the codes from the page for good.
 
 **RevokeTokenAsync**: Revokes one token of the user by its identity and shows "The token was revoked.". The revoke
 button is offered only for a token that is active; a rule violation is shown as the message of the violation.
@@ -133,6 +186,8 @@ the authority.
 - **SessionGate** (App) — wraps the whole page content, so the page is replaced by a "Session ended" message when the
   sign-in state of the open page ends.
 - **UserService** — changes the password, and tells whether the signed-in user is an account of an identity provider.
+- **TotpService** — sets up, confirms, cancels, and turns off the second factor, renews the recovery codes, and reports
+  the status and whether the feature is on.
 - **OidcOptions** (Identity) — the display name of the provider named in the sentence (injected options).
 - **PersonalAccessTokenService** — creates, lists, and revokes the tokens.
 - **TimeProvider** — decides whether a token has expired.
