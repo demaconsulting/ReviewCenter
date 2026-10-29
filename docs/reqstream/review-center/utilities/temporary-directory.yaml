@@ -1,0 +1,60 @@
+---
+# Software Unit Requirements for the TemporaryDirectory Class
+#
+# The TemporaryDirectory class owns a uniquely named directory under the system temporary path for the lifetime of
+# an object: self-validation creates all of its files there, and removes them when it is done.
+
+sections:
+  - title: TemporaryDirectory Unit Requirements
+    requirements:
+      - id: ReviewCenter-TemporaryDirectory-Unique
+        title: >-
+          The TemporaryDirectory class shall create a new directory with a GUID name under the system temporary path
+          for every instance.
+        justification: |
+          Concurrent or repeated runs must never share files, and a name that cannot be guessed or reused keeps a
+          run away from files that already exist.
+        tests:
+          - TemporaryDirectory_Constructor_Default_CreatesGuidNamedDirectoryUnderTempPath
+          - TemporaryDirectory_Constructor_TwoInstances_UseDifferentDirectories
+
+      - id: ReviewCenter-TemporaryDirectory-GetFilePath
+        title: >-
+          The TemporaryDirectory class shall return the full path of a file inside the directory for a relative
+          path, create its parent directories, and reject a path that would escape the directory.
+        justification: |
+          Callers build file names from fixed and generated parts; the check that the result stays inside the
+          directory keeps a mistake in a name from writing, or later deleting, anywhere else.
+        tests:
+          - TemporaryDirectory_GetFilePath_NestedRelativePath_ReturnsPathInsideAndCreatesParents
+          - TemporaryDirectory_GetFilePath_PathEscapesDirectory_ThrowsArgumentException
+          - TemporaryDirectory_GetFilePath_NullPath_ThrowsArgumentNullException
+
+      - id: ReviewCenter-TemporaryDirectory-Dispose
+        title: >-
+          The TemporaryDirectory class shall remove the directory and everything in it when it is disposed, including
+          read-only files, never throw because a file is in use or cannot be deleted, and allow repeated disposal.
+        justification: |
+          Cleanup runs in a finally block or at the end of a run and must not hide the real result with an exception
+          of its own; a file that a virus scanner still holds is left for the operating system's temporary cleanup.
+        tests:
+          - TemporaryDirectory_Dispose_DirectoryWithReadOnlyFile_DeletesEverything
+          - TemporaryDirectory_Dispose_CalledTwice_DoesNotThrow
+          - TemporaryDirectory_Dispose_FileInUse_DoesNotThrow
+
+      - id: ReviewCenter-TemporaryDirectory-BoundedRetry
+        title: >-
+          The TemporaryDirectory class shall, when the directory cannot be deleted because a file is still in use,
+          retry the deletion a bounded number of times (five attempts about 75 ms apart by default), succeed when the
+          lock goes away within that time, give up quietly and without a further wait when it does not, and refuse a
+          retry policy that has no attempt or a negative pause.
+        justification: |
+          A file can stay locked for a moment after the process or database connection that used it was stopped, for
+          example while a virus scanner or the indexer still holds it, and Windows refuses to delete such a file. A
+          single attempt left temporary folders behind and a retry without a limit could hang a run, so the number of
+          attempts and the pause are fixed and small, and the total wait stays under half a second.
+        tests:
+          - TemporaryDirectory_Dispose_FileLockedBriefly_RetriesAndDeletesDirectory
+          - TemporaryDirectory_Dispose_FileLockedPermanently_GivesUpWithoutThrowingInBoundedTime
+          - TemporaryDirectory_Constructor_InvalidRetryPolicy_ThrowsArgumentOutOfRangeException
+          - TemporaryDirectory_Dispose_SingleAttemptPolicy_DoesNotPause

@@ -152,6 +152,44 @@ public class ContextTests
     }
 
     /// <summary>
+    ///     Test creating a context with the check-config flag together with validate.
+    /// </summary>
+    [Fact]
+    public void Context_Create_CheckConfigWithValidate_SetsCheckConfigTrue()
+    {
+        // Act: create the context from the opt-in validation command line
+        using var context = Context.Create(["--validate", "--check-config"]);
+
+        // Assert: both flags are set
+        Assert.True(context.Validate);
+        Assert.True(context.CheckConfig);
+    }
+
+    /// <summary>
+    ///     Test that the check-config flag defaults to false.
+    /// </summary>
+    [Fact]
+    public void Context_Create_ValidateWithoutCheckConfig_LeavesCheckConfigFalse()
+    {
+        // Act: create the context from the default validation command line
+        using var context = Context.Create(["--validate"]);
+
+        // Assert: the opt-in check stays off
+        Assert.False(context.CheckConfig);
+    }
+
+    /// <summary>
+    ///     Test that the check-config flag without validate is rejected.
+    /// </summary>
+    [Fact]
+    public void Context_Create_CheckConfigWithoutValidate_ThrowsArgumentException()
+    {
+        // Act and Assert: the flag only modifies a validation run
+        var exception = Assert.Throws<ArgumentException>(() => Context.Create(["--check-config"]));
+        Assert.Contains("--validate", exception.Message);
+    }
+
+    /// <summary>
     ///     Test creating a context with the results flag.
     /// </summary>
     [Fact]

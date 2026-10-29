@@ -195,7 +195,10 @@ internal static class DatabaseSetup
     /// <exception cref="InvalidOperationException">
     ///     Thrown when the provider is not supported; the message lists the supported providers.
     /// </exception>
-    private static void RequireSupportedProvider(DatabaseOptions options)
+    /// <remarks>
+    ///     Internal so the opt-in configured-database self-check can reuse the provider test instead of repeating it.
+    /// </remarks>
+    internal static void RequireSupportedProvider(DatabaseOptions options)
     {
         if (!string.Equals(options.Provider?.Trim(), SqliteProvider, StringComparison.OrdinalIgnoreCase))
         {

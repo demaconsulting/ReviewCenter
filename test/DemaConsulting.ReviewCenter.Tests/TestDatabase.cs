@@ -18,85 +18,15 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-using System.Data.Common;
 using System.Runtime.CompilerServices;
 using DemaConsulting.ReviewCenter.Evidence;
+using DemaConsulting.ReviewCenter.SelfTest.Checks;
 using DemaConsulting.ReviewCenter.Storage;
-using Microsoft.Data.Sqlite;
-using Microsoft.EntityFrameworkCore.Diagnostics;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 
 namespace DemaConsulting.ReviewCenter.Tests;
-
-/// <summary>
-///     Makes the SQLite databases of the in-process test applications cheap to commit to: the journal is kept in
-///     memory and the commit does not wait for the disk.
-/// </summary>
-/// <remarks>
-///     With the default settings every commit of the product database waits for several disk flushes, which is
-///     the dominant cost of arranging a review in a test (a signed review is about a hundred commits) and is far
-///     slower on a CI runner than on a developer machine. The settings change only how long a commit takes, not
-///     what it stores: the tests read their data back through new connections of the same process, so they see
-///     exactly what they would see with the default settings. A crash of the operating system could lose the file,
-///     which does not matter for a throw-away database in a temporary folder. The product defaults are not touched.
-/// </remarks>
-internal sealed class FastCommitInterceptor : DbConnectionInterceptor
-{
-    /// <summary>
-    ///     The statement that turns the disk waits off for a connection.
-    /// </summary>
-    private const string Pragmas = "PRAGMA synchronous=OFF; PRAGMA journal_mode=MEMORY;";
-
-    /// <summary>
-    ///     Registers the interceptor on the database context of an application under test.
-    /// </summary>
-    /// <param name="services">The services of the application.</param>
-    public static void AddTo(IServiceCollection services)
-    {
-        services.ConfigureDbContext<ReviewCenterDbContext>(builder => builder.AddInterceptors(new FastCommitInterceptor()));
-    }
-
-    /// <inheritdoc />
-    public override void ConnectionOpened(DbConnection connection, ConnectionEndEventData eventData)
-    {
-        if (IsReadOnly(connection))
-        {
-            return;
-        }
-
-        using var command = connection.CreateCommand();
-        command.CommandText = Pragmas;
-        command.ExecuteNonQuery();
-    }
-
-    /// <inheritdoc />
-    public override async Task ConnectionOpenedAsync(
-        DbConnection connection,
-        ConnectionEndEventData eventData,
-        CancellationToken cancellationToken = default)
-    {
-        if (IsReadOnly(connection))
-        {
-            return;
-        }
-
-        await using var command = connection.CreateCommand();
-        command.CommandText = Pragmas;
-        await command.ExecuteNonQueryAsync(cancellationToken);
-    }
-
-    /// <summary>
-    ///     Checks whether a connection is read-only, as the one with which EF Core probes whether the database exists
-    ///     is; the journal mode of such a connection cannot be changed.
-    /// </summary>
-    /// <param name="connection">The connection that was just opened.</param>
-    /// <returns><c>true</c> when the connection was opened read-only.</returns>
-    private static bool IsReadOnly(DbConnection connection)
-    {
-        return new SqliteConnectionStringBuilder(connection.ConnectionString).Mode == SqliteOpenMode.ReadOnly;
-    }
-}
 
 /// <summary>
 ///     Keeps every test that starts the application away from the real per-user application data folder.
@@ -119,6 +49,29 @@ internal static class TestDatabase
     ///     The private folder that holds every database file created by this test run.
     /// </summary>
     private static readonly string _root = Path.Combine(Path.GetTempPath(), "ReviewCenterTests-" + Guid.NewGuid().ToString("N"));
+
+    /// <summary>
+    ///     Gets the private folder that holds every database file created by this test run.
+    /// </summary>
+    internal static string Root => _root;
+
+    /// <summary>
+    ///     Makes the commits of the throw-away test databases cheap: the journal is kept in memory and a commit does
+    ///     not wait for the disk.
+    /// </summary>
+    /// <param name="services">The services of the application under test.</param>
+    /// <remarks>
+    ///     With the default settings every commit of the product database waits for several disk flushes, which is
+    ///     the dominant cost of arranging a review in a test (a signed review is about a hundred commits) and is far
+    ///     slower on a CI runner than on a developer machine. The settings change only how long a commit takes, not
+    ///     what it stores. The one production <see cref="FastCommitInterceptor"/> is used, restricted to
+    ///     <see cref="Root"/>, so a database anywhere else keeps the product defaults.
+    /// </remarks>
+    public static void UseFastCommit(IServiceCollection services)
+    {
+        var interceptor = new FastCommitInterceptor(_root);
+        services.ConfigureDbContext<ReviewCenterDbContext>(builder => builder.AddInterceptors(interceptor));
+    }
 
     /// <summary>
     ///     Creates the self-signed attestation key of the test run once, before the first application that needs it.

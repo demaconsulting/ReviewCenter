@@ -139,8 +139,21 @@ sections:
           Backward compatibility with scripts that use the earlier `--result` spelling
           prevents breakage when upgrading to newer tool versions.
         tests:
-          - CliSubsystem_ResultAliasFlow_ContextAndProgram_WritesResultsFile
+          - CliSubsystem_ResultAliasFlow_ContextAndProgram_ParsesResultsFile
+          - Context_Create_ResultAliasFlag_SetsResultsFile
 
+      - id: ReviewCenter-Cli-CheckConfig
+        title: >-
+          The Cli subsystem shall support the `--check-config` option to add the opt-in configured-database check to a
+          self-validation run, and shall reject the option when `--validate` is not provided.
+        justification: |
+          The default self-validation run is hermetic and never looks at the configured database. Operators who also
+          want to know that the deployment's own database can be opened and has the schema of this build must ask for
+          that explicitly, and the option only has meaning for a validation run.
+        children:
+          - ReviewCenter-Context-CheckConfig
+        tests:
+          - CliSubsystem_CheckConfigFlow_ContextAndProgram_RequiresValidate
       - id: ReviewCenter-Cli-Serve
         title: The Cli subsystem shall support the serve verb to signal that the web server is to be run.
         justification: |

@@ -99,6 +99,23 @@ sections:
           - ServerHost_RunAsync_UnsupportedProvider_ReturnsExitCodeOne
           - ServerHost_RunAsync_UnusableDatabaseLocation_ReturnsExitCodeOne
 
+      - id: ReviewCenter-ServerHost-IsolatedSettings
+        title: >-
+          The ServerHost class shall, when it is given isolated settings, build the application from an empty builder
+          that reads only those settings and the command line address, with the full routing and the Kestrel server
+          but no configuration file, environment variable or host default, so that nothing on the machine can change
+          the address, the environment name or the database it uses.
+        justification: |
+          The self-validation host check must prove the deployed executable on any machine. The default builder reads
+          appsettings.json, the ASPNETCORE and DOTNET variables and a user secrets store, so a broken file or an
+          ambient listen address would fail or redirect the check for reasons that have nothing to do with the
+          build under test. The isolated build removes those inputs while the production routes, including the
+          ones with constraints, still work.
+        tests:
+          - ServerHost_CreateApplication_IsolatedSettings_IgnoresPoisonedEnvironment
+          - ServerHost_CreateApplication_WithoutIsolation_AmbientEndpointWins
+          - ServerHost_CreateApplication_IsolatedSettings_ConstrainedRoutesWork
+
       - id: ReviewCenter-ServerHost-AuditServices
         title: >-
           The ServerHost class shall register the audit appender, the audit store, and the audit service once for the

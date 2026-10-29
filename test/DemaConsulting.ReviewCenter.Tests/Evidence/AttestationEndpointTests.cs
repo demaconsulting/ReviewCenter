@@ -267,7 +267,7 @@ public class AttestationEndpointTests
                     ["Database:ConnectionString"] = TestDatabase.NewConnectionString()
                 });
                 builder.Services.AddSingleton(keys);
-                FastCommitInterceptor.AddTo(builder.Services);
+                TestDatabase.UseFastCommit(builder.Services);
                 TestDatabase.EnsureAttestationKey();
                 configureServices?.Invoke(builder.Services);
             }

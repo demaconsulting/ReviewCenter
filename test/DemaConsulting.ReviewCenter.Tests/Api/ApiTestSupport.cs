@@ -70,7 +70,7 @@ internal static class ApiTestSupport
                 {
                     ["Database:ConnectionString"] = TestDatabase.NewConnectionString()
                 });
-                FastCommitInterceptor.AddTo(builder.Services);
+                TestDatabase.UseFastCommit(builder.Services);
                 TestDatabase.EnsureAttestationKey();
             }
         });

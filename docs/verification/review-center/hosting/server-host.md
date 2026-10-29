@@ -50,8 +50,27 @@ N/A - standard test environment.
 - The personal access token service is one shared instance, the routes under `/api` are mapped, the OpenAPI document is
   served without a token, a protected route without a token is answered 401, and an unknown address under `/api` is
   answered with a JSON problem document instead of a page.
+- A host that is built with `IsolatedSettings` listens only on the address of the context, takes its environment name
+  (`Production`) and its database from the settings and not from the process environment (a poisoned
+  `ASPNETCORE_URLS`, Kestrel endpoint variable, `DOTNET_ENVIRONMENT` and `Database__*` settings change nothing), and
+  still serves routes with constraints.
 
 #### Test Scenarios
+
+**ServerHost_CreateApplication_IsolatedSettings_IgnoresPoisonedEnvironment**: The process environment is poisoned
+(listen address, Kestrel endpoint, environment name, database settings and sentinel paths) and an isolated host is
+started; it listens on one loopback address that is not the poisoned port, reports the `Production` environment,
+creates its database only in the temporary folder, and touches nothing in the sentinel folder. This scenario is
+tested by `ServerHost_CreateApplication_IsolatedSettings_IgnoresPoisonedEnvironment`.
+
+**ServerHost_CreateApplication_WithoutIsolation_AmbientEndpointWins**: The same poisoned environment and a normal host;
+the host listens on the poisoned port. This proves that the poison above is effective, so the isolated test cannot pass
+by accident. This scenario is tested by `ServerHost_CreateApplication_WithoutIsolation_AmbientEndpointWins`.
+
+**ServerHost_CreateApplication_IsolatedSettings_ConstrainedRoutesWork**: An isolated host is started and
+`/api/projects/abc/reviews` and `/api/projects/1/reviews` are requested; the first is 404 (the constraint applies) and
+the second is 401 (the route is reached without a token). This shows that the empty builder has the full routing. This
+scenario is tested by `ServerHost_CreateApplication_IsolatedSettings_ConstrainedRoutesWork`.
 
 **ServerHost_CreateApplication_HealthRoute_Returns200Healthy**: The real pipeline is started on
 an in-memory server and the health route is requested; the response is 200 with the plain-text

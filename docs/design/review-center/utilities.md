@@ -5,10 +5,11 @@
 ### Overview
 
 The `Utilities` subsystem provides shared utility functions for the ReviewCenter. It
-supplies reusable, independently testable helpers consumed by other subsystems. Its primary
-responsibility is safe file-path manipulation, protecting callers from path-traversal
-vulnerabilities when constructing paths from caller-supplied inputs. The `Utilities` subsystem
-contains one unit: `PathHelpers`.
+supplies reusable, independently testable helpers consumed by other subsystems. Its
+responsibilities are safe file-path manipulation, protecting callers from path-traversal
+vulnerabilities when constructing paths from caller-supplied inputs, and uniquely named
+temporary directories that are removed when disposed. The `Utilities` subsystem
+contains two units: `PathHelpers` and `TemporaryDirectory`.
 
 ### Interfaces
 
@@ -26,11 +27,12 @@ that escapes the base directory.
 
 ### Design
 
-The `Utilities` subsystem contains only the `PathHelpers` unit. It has no dependencies on other
-tool units or subsystems; it uses only .NET BCL types (`Path`, `ArgumentNullException`).
+The `Utilities` subsystem contains the `PathHelpers` and `TemporaryDirectory` units. It has no dependencies on
+other tool units or subsystems; it uses only .NET BCL types (`Path`, `Directory`, `ArgumentNullException`).
 
 `PathHelpers.SafePathCombine` is a pure utility method: it performs no file-system I/O, holds
-no state, and throws immediately on invalid input. All calls to `SafePathCombine` in the
-codebase originate from the `SelfTest` subsystem (`Validation`), which uses it to construct
-log and result file paths inside temporary directories created during self-validation test
-execution.
+no state, and throws immediately on invalid input. `TemporaryDirectory` uses it to build the
+path of its directory and of every file inside it, so a caller-supplied name can never reach
+outside the directory that is deleted on disposal. All uses in the codebase originate from the
+`SelfTest` subsystem, whose checks each keep their files in one `TemporaryDirectory` so that
+nothing a check creates outlives it.

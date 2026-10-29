@@ -8,5 +8,6 @@ package ReviewCenter {
         comment reqRef /* Requirements: docs/reqstream/review-center/utilities.yaml */
 
         part pathHelpers : PathHelpers;
+        part temporaryDirectory : TemporaryDirectory;
     }
 }

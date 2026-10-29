@@ -1642,20 +1642,72 @@ Example validation report:
 | DotNet Runtime      | .NET 10.0.0                                        |
 | Time Stamp          | 2024-01-15 10:30:00 UTC                            |
 
-✓ ReviewCenter_VersionDisplay - Passed
-✓ ReviewCenter_HelpDisplay - Passed
+✓ ReviewCenter_GitAvailable - Passed (432 ms): git version 2.51.0.windows.2 (minimum 2.31)
+✓ ReviewCenter_GitRoundTrip - Passed (4363 ms): 2 commits, 2 changes, file read back unchanged
+✓ ReviewCenter_ReviewWorkflow - Passed (8128 ms): embedded SQLite; review signed; evidence index read back
+✓ ReviewCenter_Fingerprint - Passed (28 ms): 3 files, fingerprint 13e028da06299fcedffff47b2b55cca46a68111f3124d77d355364339c4215f2
+✓ ReviewCenter_PasswordHash - Passed (219 ms): right password accepted, wrong password refused, hashes salted
+✓ ReviewCenter_AuditChain - Passed (1152 ms): 3 entries intact; change of entry 2 detected
+✓ ReviewCenter_AttestationPdf - Passed (343 ms): CMS signature and DocMDP verified; changed byte detected (75964 bytes)
+✓ ReviewCenter_HostStart - Passed (1590 ms): 127.0.0.1:58493; /login and /_framework/blazor.web.js 200; stopped cleanly
 
-Total Tests: 2
-Passed: 2
+Total Tests: 8
+Passed: 8
+Skipped: 0
 Failed: 0
+Total Time: 8.1 s
 ```
+
+The detail text after each test and the times are examples; they differ from run to run. The tests run at the
+same time, so their individual times overlap and do not add up to the total time.
 
 ### Validation Tests
 
-Each test proves specific functionality works correctly:
+Each test proves specific functionality works correctly. The default run is hermetic: every test creates its own
+data in a uniquely named temporary folder that is deleted at the end. It never reads or changes the configured
+database or the configuration, never listens on the configured port, uses no network except the loopback
+interface of the machine, and needs neither Docker nor a browser. The names below are the names in the TRX and
+JUnit files.
 
-- **`ReviewCenter_VersionDisplay`** - `--version` outputs a valid version string.
-- **`ReviewCenter_HelpDisplay`** - `--help` outputs usage and options information.
+- **`ReviewCenter_GitAvailable`** - the installed git is found and is recent enough.
+- **`ReviewCenter_GitRoundTrip`** - a local repository can be committed to, mirrored and read back by the git
+  layer of the server.
+- **`ReviewCenter_ReviewWorkflow`** - on an embedded SQLite database, a project and a review are created, the
+  checklist is answered, the review is signed after a password re-authentication, and the evidence index shows the
+  fingerprint and the record digest.
+- **`ReviewCenter_Fingerprint`** - the content fingerprint of fixed files equals a pinned value on every platform.
+- **`ReviewCenter_PasswordHash`** - the password hasher accepts the right password and refuses a wrong one.
+- **`ReviewCenter_AuditChain`** - the audit trail verifies, and a changed entry is reported by the verifier.
+- **`ReviewCenter_AttestationPdf`** - a signed attestation PDF is produced with a temporary key, its signature and
+  its change-prevention certification verify independently, and a changed byte makes the verification fail.
+- **`ReviewCenter_HostStart`** - the real web host starts from temporary settings alone on a free loopback port,
+  answers `/login` and a static asset with 200, and stops cleanly. The host ignores an `appsettings.json`, the
+  `ASPNETCORE_` and `DOTNET_` environment variables and any other ambient configuration, so a broken or unusual
+  configuration of the machine cannot change this test.
+
+Every test has a time limit of 60 seconds that the validation enforces itself. A test that does not finish in
+time is reported as `Failed` with the message `Timed out after 60 s`, the other tests still complete, and the run
+does not hang. The temporary folders are deleted at the end of each test; a file that is still locked for a moment
+(for example by a virus scanner) is retried for a short time and, if it stays locked, left to the operating system's
+temporary cleanup without failing the run.
+
+### Checking the Configured Database
+
+The default run never looks at your configuration. To also check that the database your server is configured to
+use can be reached and has the schema of this version, add `--check-config`:
+
+```bash
+reviewcenter --validate --check-config
+```
+
+This adds a ninth test, **`ReviewCenter_ConfiguredDatabase`**. It loads the configuration the way `serve` does
+(`appsettings.json` and the environment variables), recognizes the database provider, opens the database
+**read-only**, and compares its tables and columns with the ones this version expects. It never writes to the
+database and never creates it, and it never prints the connection string or other secrets; a problem is reported
+by table and column name. If nothing is configured and there is no database at the default location, the test is
+**skipped**: the report shows `SKIPPED`, the summary counts it under `Skipped`, the results file records it as not
+executed (TRX) or skipped (JUnit), and the run does not fail. `--check-config` is only valid together with
+`--validate`.
 
 ## Silent Mode
 
@@ -1702,6 +1754,7 @@ The following command-line options are supported:
 | `-?`, `-h`, `--help`                  | Display help message                                         |
 | `--silent`                            | Suppress console output                                      |
 | `--validate`                          | Run self-validation                                          |
+| `--check-config`                      | With `--validate`, also check the configured database        |
 | `--results <file>`, `--result <file>` | Write validation results to file (TRX or JUnit format)       |
 | `--depth <#>`                         | Set heading depth for markdown output (default: 1)           |
 | `--log <file>`                        | Write output to log file                                     |

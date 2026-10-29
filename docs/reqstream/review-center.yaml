@@ -45,12 +45,18 @@ sections:
           Regulated environments require tool qualification evidence to demonstrate
           that the tool functions correctly in its deployment environment before it
           is used to generate compliance artifacts. The validation mode exercises
-          core behaviors and produces a structured test result file, providing the
-          qualification evidence required by quality management systems.
+          the real behaviors the tool relies on (git, a complete review workflow, the
+          fingerprint, password hashing, the audit chain, the signed attestation and
+          the web host), in a hermetic way that never touches the configured database,
+          and produces a structured test result file, providing the qualification
+          evidence required by quality management systems. `--check-config` adds an
+          opt-in, read-only check of the configured database.
         children:
           - ReviewCenter-Program-Validate
           - ReviewCenter-Cli-Validate
+          - ReviewCenter-Cli-CheckConfig
           - ReviewCenter-SelfTest-Qualification
+          - ReviewCenter-SelfTest-Hermetic
         tests:
           - ReviewCenter_ValidateFlag_Provided_RunsValidation
 
@@ -113,7 +119,7 @@ sections:
           - ReviewCenter-Cli-Results
           - ReviewCenter-SelfTest-ResultsOutput
         tests:
-          - ReviewCenter_ValidateWithTrxResults_Requested_GeneratesTrxFile
+          - SelfTestSubsystem_ValidationWorkflow_WithTrxFile_GeneratesResults
           - ReviewCenter_ValidateWithXmlResults_Requested_GeneratesJUnitFile
 
       - id: ReviewCenter-System-Depth
@@ -140,7 +146,7 @@ sections:
         children:
           - ReviewCenter-SelfTest-InvalidExtension
         tests:
-          - ReviewCenter_ValidateWithBadExtension_ExtensionInvalid_ReturnsNonZero
+          - SelfTestSubsystem_ValidationWorkflow_WithUnsupportedExtension_EmitsErrorAndNoFile
 
       - id: ReviewCenter-System-DefaultBehavior
         title: The tool shall display a banner then run the default tool logic when invoked without any action flags.

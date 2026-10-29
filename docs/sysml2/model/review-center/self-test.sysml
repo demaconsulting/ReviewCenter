@@ -8,5 +8,6 @@ package ReviewCenter {
         comment reqRef /* Requirements: docs/reqstream/review-center/self-test.yaml */
 
         part validation : Validation;
+        part validationChecks : ValidationChecks;
     }
 }

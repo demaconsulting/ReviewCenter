@@ -120,6 +120,40 @@ public class UtilitiesSubsystemTests
     }
 
     /// <summary>
+    ///     Test that the temporary directory keeps a workflow's files inside one folder and removes them all.
+    /// </summary>
+    [Fact]
+    public void UtilitiesSubsystem_TemporaryDirectoryWorkflow_FilesCreated_AreRemovedOnDispose()
+    {
+        // Arrange: a temporary directory and the files a check would create in nested folders
+        string directoryPath;
+        string[] files;
+        using (var directory = new TemporaryDirectory())
+        {
+            directoryPath = directory.DirectoryPath;
+            files =
+            [
+                directory.GetFilePath("selftest.db"),
+                directory.GetFilePath("keys/key.xml"),
+                directory.GetFilePath("git-cache/repo-0/objects/pack/data")
+            ];
+
+            // Act: write the files and let the directory go out of scope
+            foreach (var file in files)
+            {
+                File.WriteAllText(file, "data");
+            }
+
+            // Assert (before disposal): every file is inside the directory
+            Assert.All(files, file => Assert.StartsWith(directoryPath, file, StringComparison.Ordinal));
+            Assert.All(files, file => Assert.True(File.Exists(file)));
+        }
+
+        // Assert (after disposal): nothing is left behind
+        Assert.False(Directory.Exists(directoryPath));
+    }
+
+    /// <summary>
     ///     Test that utilities subsystem can handle directory creation workflows.
     /// </summary>
     [Fact]

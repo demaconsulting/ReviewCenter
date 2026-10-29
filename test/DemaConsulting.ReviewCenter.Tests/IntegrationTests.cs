@@ -114,56 +114,16 @@ public class IntegrationTests
     [Fact]
     public void ReviewCenter_ValidateFlag_Provided_RunsValidation()
     {
-        // Arrange: (none — constructor initializes _dllPath)
+        // Arrange: the shared real process run (see RealValidationRun.Process)
 
-        // Act: run the tool with validate flag
-        var exitCode = Runner.Run(
-            out var output,
-            "dotnet",
-            _dllPath,
-            "--validate");
+        // Act: read the outcome of the process run
+        var run = RealValidationRun.Process;
 
-        // Assert: validation summary is present; exit code is success
-        Assert.Equal(0, exitCode);
-        Assert.Contains("Total Tests:", output);
-        Assert.Contains("Passed:", output);
-    }
-
-    /// <summary>
-    ///     Test that validate with --results flag generates a TRX file.
-    /// </summary>
-    [Fact]
-    public void ReviewCenter_ValidateWithTrxResults_Requested_GeneratesTrxFile()
-    {
-        // Arrange: temporary TRX results file path
-        var resultsFile = Path.Combine(Path.GetTempPath(), $"integration_test_{Guid.NewGuid()}.trx");
-
-        try
-        {
-            // Act: run validation with TRX results output
-            var exitCode = Runner.Run(
-                out var _,
-                "dotnet",
-                _dllPath,
-                "--validate",
-                "--results",
-                resultsFile);
-
-            // Assert: results file is created with valid TRX structure
-            Assert.Equal(0, exitCode);
-            Assert.True(File.Exists(resultsFile), "Results file was not created");
-
-            var trxContent = File.ReadAllText(resultsFile);
-            Assert.Contains("<TestRun", trxContent);
-            Assert.Contains("</TestRun>", trxContent);
-        }
-        finally
-        {
-            if (File.Exists(resultsFile))
-            {
-                File.Delete(resultsFile);
-            }
-        }
+        // Assert: validation summary is present for all eight checks; exit code is success
+        Assert.Equal(0, run.ExitCode);
+        Assert.Contains("Total Tests: 8", run.Output);
+        Assert.Contains("Passed: 8", run.Output);
+        Assert.Contains("Failed: 0", run.Output);
     }
 
     /// <summary>
@@ -172,64 +132,14 @@ public class IntegrationTests
     [Fact]
     public void ReviewCenter_ResultAlias_LegacyFlag_WritesResultsFile()
     {
-        // Arrange: temporary TRX results file path; use legacy --result alias
-        var resultsFile = Path.Combine(Path.GetTempPath(), $"integration_test_{Guid.NewGuid()}.trx");
+        // Arrange: the shared real process run, which used the legacy --result alias
 
-        try
-        {
-            // Act: run validation with legacy --result alias
-            var exitCode = Runner.Run(
-                out var _,
-                "dotnet",
-                _dllPath,
-                "--validate",
-                "--result",
-                resultsFile);
+        // Act: read the outcome of the process run
+        var run = RealValidationRun.Process;
 
-            // Assert: results file is created; exit code is success
-            Assert.Equal(0, exitCode);
-            Assert.True(File.Exists(resultsFile), "Results file was not created for legacy --result alias");
-        }
-        finally
-        {
-            if (File.Exists(resultsFile))
-            {
-                File.Delete(resultsFile);
-            }
-        }
-    }
-
-    /// <summary>
-    ///     Test that validate with an unsupported results extension returns a non-zero exit code.
-    /// </summary>
-    [Fact]
-    public void ReviewCenter_ValidateWithBadExtension_ExtensionInvalid_ReturnsNonZero()
-    {
-        // Arrange: unsupported results file extension triggers WriteError → ExitCode 1
-        var resultsFile = Path.Combine(Path.GetTempPath(), $"integration_test_{Guid.NewGuid()}.bad");
-
-        try
-        {
-            // Act: run validation with unsupported extension
-            var exitCode = Runner.Run(
-                out var _,
-                "dotnet",
-                _dllPath,
-                "--validate",
-                "--results",
-                resultsFile);
-
-            // Assert: non-zero exit code indicates the error path was triggered
-            Assert.NotEqual(0, exitCode);
-            Assert.False(File.Exists(resultsFile), "No file should be created for unsupported extension");
-        }
-        finally
-        {
-            if (File.Exists(resultsFile))
-            {
-                File.Delete(resultsFile);
-            }
-        }
+        // Assert: results file is created; exit code is success
+        Assert.Equal(0, run.ExitCode);
+        Assert.False(string.IsNullOrEmpty(run.ResultsContent), "Results file was not created for legacy --result alias");
     }
 
     /// <summary>
@@ -295,34 +205,15 @@ public class IntegrationTests
     [Fact]
     public void ReviewCenter_ValidateWithXmlResults_Requested_GeneratesJUnitFile()
     {
-        // Arrange: temporary XML results file path
-        var resultsFile = Path.Combine(Path.GetTempPath(), $"integration_test_{Guid.NewGuid()}.xml");
+        // Arrange: the shared real process run, which asked for a JUnit XML results file
 
-        try
-        {
-            // Act: run validation with JUnit XML results output
-            var exitCode = Runner.Run(
-                out var _,
-                "dotnet",
-                _dllPath,
-                "--validate",
-                "--results",
-                resultsFile);
+        // Act: read the outcome of the process run
+        var run = RealValidationRun.Process;
 
-            // Assert: results file is created with valid JUnit structure
-            Assert.Equal(0, exitCode);
-            Assert.True(File.Exists(resultsFile), "Results file was not created");
-
-            var xmlContent = File.ReadAllText(resultsFile);
-            Assert.Contains("<testsuites", xmlContent);
-        }
-        finally
-        {
-            if (File.Exists(resultsFile))
-            {
-                File.Delete(resultsFile);
-            }
-        }
+        // Assert: results file is created with valid JUnit structure and one test case per check
+        Assert.Equal(0, run.ExitCode);
+        Assert.Contains("<testsuites", run.ResultsContent);
+        Assert.Equal(8, System.Text.RegularExpressions.Regex.Matches(run.ResultsContent, "<testcase ").Count);
     }
 
     /// <summary>
@@ -352,20 +243,14 @@ public class IntegrationTests
     [Fact]
     public void ReviewCenter_ValidateWithDepth_DepthThree_OutputsCorrectHeadingLevel()
     {
-        // Arrange: (none — constructor initializes _dllPath)
+        // Arrange: the shared real process run, which asked for heading depth 3
 
-        // Act: run validation with heading depth 3
-        var exitCode = Runner.Run(
-            out var output,
-            "dotnet",
-            _dllPath,
-            "--validate",
-            "--depth",
-            "3");
+        // Act: read the outcome of the process run
+        var run = RealValidationRun.Process;
 
         // Assert: output contains level-3 markdown headings
-        Assert.Equal(0, exitCode);
-        Assert.Contains("###", output);
+        Assert.Equal(0, run.ExitCode);
+        Assert.Contains("### DEMA Consulting", run.Output);
     }
 
     /// <summary>

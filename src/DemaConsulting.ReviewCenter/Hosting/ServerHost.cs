@@ -101,11 +101,7 @@ internal static class ServerHost
 
         // Anchor the content root at the application directory rather than the working directory so
         // the server finds its static web asset manifest no matter where the operator launches it
-        var builder = WebApplication.CreateBuilder(new WebApplicationOptions
-        {
-            ApplicationName = typeof(ServerHost).Assembly.GetName().Name,
-            ContentRootPath = AppContext.BaseDirectory
-        });
+        var builder = CreateBuilder(options);
 
         // Listen where the operator asked; the default is loopback-only (see Context.DefaultUrls)
         builder.WebHost.UseUrls(context.Urls);
@@ -206,6 +202,44 @@ internal static class ServerHost
         app.Lifetime.ApplicationStarted.Register(() => LogStarted(logger, urls));
 
         return app;
+    }
+
+    /// <summary>
+    ///     Creates the web application builder: the normal one with all configuration sources, or, when the options
+    ///     carry <see cref="ServerHostOptions.IsolatedSettings"/>, one that reads nothing but those settings.
+    /// </summary>
+    /// <param name="options">The build adjustments. Must not be null.</param>
+    /// <returns>The builder, before any service of the application is registered.</returns>
+    /// <remarks>
+    ///     The content root is the application directory rather than the working directory, so the server finds its
+    ///     static web asset manifest no matter where the operator launches it. The isolated builder is the empty
+    ///     builder plus exactly what the shared registration needs and cannot add itself: Kestrel (without the
+    ///     configuration-loading parts), routing and logging.
+    /// </remarks>
+    private static WebApplicationBuilder CreateBuilder(ServerHostOptions options)
+    {
+        var applicationName = typeof(ServerHost).Assembly.GetName().Name;
+        if (options.IsolatedSettings is null)
+        {
+            return WebApplication.CreateBuilder(new WebApplicationOptions
+            {
+                ApplicationName = applicationName,
+                ContentRootPath = AppContext.BaseDirectory
+            });
+        }
+
+        // No default configuration source, no environment-driven environment name: everything is explicit
+        var isolated = WebApplication.CreateEmptyBuilder(new WebApplicationOptions
+        {
+            ApplicationName = applicationName,
+            ContentRootPath = AppContext.BaseDirectory,
+            EnvironmentName = Environments.Production
+        });
+        isolated.Configuration.AddInMemoryCollection(options.IsolatedSettings);
+        isolated.WebHost.UseKestrelCore();
+        isolated.Services.AddRouting();
+        isolated.Services.AddLogging();
+        return isolated;
     }
 
     /// <summary>

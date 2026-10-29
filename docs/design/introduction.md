@@ -108,8 +108,8 @@ The ReviewCenter system is divided as follows:
   access tokens (a bearer token, or the password of HTTP Basic credentials) that is limited to that API, its endpoints,
   including the evidence index for ReviewMark, and its OpenAPI document; contains the
   ApiTokenAuthentication, ApiEndpoints, and ApiDocument units
-- **SelfTest** (subsystem): self-validation; contains the Validation unit
-- **Utilities** (subsystem): shared helpers; contains the PathHelpers unit
+- **SelfTest** (subsystem): self-validation; contains the Validation and ValidationChecks units
+- **Utilities** (subsystem): shared helpers; contains the PathHelpers and TemporaryDirectory units
 
 The ReviewCenterPuppet system is a flat set of units that drive one persistent headless browser, one command per
 invocation, against a ReviewCenter server and write screenshots.

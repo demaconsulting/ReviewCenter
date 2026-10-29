@@ -185,7 +185,7 @@ internal static class TestWebApp
                 }
 
                 // Commits wait for no disk flush: the cost of arranging a review is dominated by them otherwise
-                FastCommitInterceptor.AddTo(builder.Services);
+                TestDatabase.UseFastCommit(builder.Services);
                 TestDatabase.EnsureAttestationKey();
                 configureServices?.Invoke(builder.Services);
             }
