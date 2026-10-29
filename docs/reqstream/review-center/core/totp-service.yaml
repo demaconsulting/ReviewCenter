@@ -60,6 +60,7 @@ sections:
           - TotpService_CompleteSignInAsync_BadChallenge_IsChallengeInvalid
           - TotpService_CompleteSignInAsync_ForeignClient_DoesNotSpendTheChallenge
           - TotpService_CompleteSignInAsync_FeatureDisabled_IsChallengeInvalidAndPasswordAloneSignsIn
+          - TotpService_CompleteSignInAsync_UserInvalidatedWhileCodeIsChecked_DoesNotResurrectTheChallenge
 
       - id: ReviewCenter-TotpService-Replay
         title: >-
@@ -137,6 +138,34 @@ sections:
           - TotpService_CompleteSignInAsync_PasswordAndCodeFailures_ShareOneCounter
           - TotpService_CompleteSignInAsync_RightPasswordBetweenWrongCodes_DoesNotResetTheCounter
           - TotpService_CompleteSignInAsync_Success_ClearsTheCounter
+          - TotpService_ChangeOwnPasswordAsync_FiveWrongCodes_LockTheAccount
+          - TotpService_ChangeOwnPasswordAsync_PasswordOnlyBetweenWrongCodes_DoesNotResetTheCounter
+
+      - id: ReviewCenter-TotpService-ChangePassword
+        title: >-
+          The TotpService class shall let a user whose second factor is on change their own password only with the
+          current password and a right code or an unused recovery code, enforced in the service and not only on the
+          page, with the same replay rule and the same shared failure counter as the sign-in, shall clear that counter
+          only after the whole proof succeeded, shall refuse a request that comes with an API token, and shall need no
+          code from a user without a second factor, with a temporary password, or while the feature is switched off.
+        justification: |
+          A password that can be changed with the old password alone would let a person who knows the password, or who
+          holds a stolen session, remove the protection of the second factor and take over the account. The proof must
+          be enforced where the rule lives, so that no page can leave it out, and a right password alone must never
+          give back the attempts that wrong codes used.
+        tests:
+          - TotpService_ChangeOwnPasswordAsync_NoCode_IsRefusedCountsAndKeepsTheHash
+          - TotpService_ChangeOwnPasswordAsync_WrongCodeOrWrongPassword_IsRefusedAndKeepsTheHash
+          - TotpService_ChangeOwnPasswordAsync_ReusedCode_IsRefused
+          - TotpService_ChangeOwnPasswordAsync_PasswordAndValidCode_ChangesAndClearsTheCounter
+          - TotpService_ChangeOwnPasswordAsync_RecoveryCode_WorksOnceAndIsAudited
+          - TotpService_ChangeOwnPasswordAsync_FiveWrongCodes_LockTheAccount
+          - TotpService_ChangeOwnPasswordAsync_PasswordOnlyBetweenWrongCodes_DoesNotResetTheCounter
+          - TotpService_ChangeOwnPasswordAsync_UnreadableSecret_RefusesCodesButRecoveryStillWorks
+          - TotpService_ChangeOwnPasswordAsync_ApiTokenActor_ThrowsActorNotAllowed
+          - TotpService_ChangeOwnPasswordAsync_NotEnrolledOrFeatureOff_PasswordAloneWorks
+          - TotpService_ChangeOwnPasswordAsync_TemporaryPassword_NeedsNoCode
+          - TotpService_ChangeOwnPasswordAsync_ConcurrentSameCode_ExactlyOneSucceeds
 
       - id: ReviewCenter-TotpService-Audit
         title: >-

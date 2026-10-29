@@ -229,7 +229,8 @@ sign-in event can be missing from the trail when the write fails. Null arguments
 - When an attacker fills the coalescing table with live keys, events of new keys are not recorded; the trail shows one
   `audit.events-suppressed` entry per minute and the host log shows a warning, but not which events were lost.
 - A wrong *current* password typed on the account page appears as `auth.sign-in-failed` and its refusals on a locked
-  account are not recorded: that path (`ChangeOwnPasswordAsync`) was not changed. A wrong password typed on the signing
+  account are not recorded: that path (`ChangeOwnPasswordAsync`) does not audit them. A wrong code typed there for a
+  user with a second factor is recorded as `auth.totp-failed`. A wrong password typed on the signing
   dialog is recorded as `signature.reauth-failed`.
 - The address of the client is not in the trail (see above).
 - The trail has no export and no retention or archiving function in this slice.

@@ -280,6 +280,168 @@ public class TotpChallengeStoreTests
     }
 
     /// <summary>
+    ///     Test that a challenge taken before its user was invalidated is not given back, so a code check that was in
+    ///     flight cannot bring the challenge back to life.
+    /// </summary>
+    [Fact]
+    public void TotpChallengeStore_Return_AfterInvalidateUser_IsRefusedAndNotStored()
+    {
+        // Arrange: a challenge that is taken (a code check starts), then the user is invalidated in another case
+        var store = new TotpChallengeStore(_clock);
+        var token = store.Issue("ann", "10.0.0.1", "/");
+        var challenge = store.Take(token, "10.0.0.1");
+        store.InvalidateUser("ANN");
+
+        // Act: the check ends with a wrong code and gives the challenge back
+        var kept = store.Return(challenge!);
+
+        // Assert: refused, nothing is stored, and the token is dead
+        Assert.False(kept);
+        Assert.Equal(0, store.Count());
+        Assert.Null(store.Peek(token, "10.0.0.1"));
+        Assert.Null(store.Take(token, "10.0.0.1"));
+    }
+
+    /// <summary>
+    ///     Test that invalidating another user leaves a taken challenge returnable.
+    /// </summary>
+    [Fact]
+    public void TotpChallengeStore_Return_AfterInvalidatingAnotherUser_StillStores()
+    {
+        // Arrange: ann's challenge is taken, then bob is invalidated
+        var store = new TotpChallengeStore(_clock);
+        var token = store.Issue("ann", "10.0.0.1", "/");
+        var challenge = store.Take(token, "10.0.0.1");
+        store.InvalidateUser("bob");
+
+        // Act: give it back
+        var kept = store.Return(challenge!);
+
+        // Assert: kept for another try
+        Assert.True(kept);
+        Assert.NotNull(store.Peek(token, "10.0.0.1"));
+    }
+
+    /// <summary>
+    ///     Test that a challenge taken after an invalidation is returnable: only older ones are refused.
+    /// </summary>
+    [Fact]
+    public void TotpChallengeStore_Return_ChallengeTakenAfterTheInvalidation_IsStored()
+    {
+        // Arrange: ann is invalidated, then a new challenge of ann is issued and taken
+        var store = new TotpChallengeStore(_clock);
+        store.InvalidateUser("ann");
+        var token = store.Issue("ann", "10.0.0.1", "/");
+        var challenge = store.Take(token, "10.0.0.1");
+
+        // Act: give it back
+        var kept = store.Return(challenge!);
+
+        // Assert: kept
+        Assert.True(kept);
+        Assert.NotNull(store.Peek(token, "10.0.0.1"));
+    }
+
+    /// <summary>
+    ///     Test that a returned challenge never makes the store exceed its cap: when the store filled up meanwhile and
+    ///     nothing has ended, the returned challenge is dropped.
+    /// </summary>
+    [Fact]
+    public void TotpChallengeStore_Return_WhenStoreFilledAfterTake_DropsInsteadOfExceedingTheCap()
+    {
+        // Arrange: a challenge is taken, then the store fills up to the cap with live challenges
+        var store = new TotpChallengeStore(_clock);
+        var token = store.Issue("ann", "10.0.0.1", "/");
+        var challenge = store.Take(token, "10.0.0.1");
+        for (var i = 0; i < TotpChallengeStore.MaxEntries; i++)
+        {
+            store.Issue("user" + i, "10.0.0.1", "/");
+        }
+
+        // Act: give the challenge back
+        var kept = store.Return(challenge!);
+
+        // Assert: dropped, and nobody else was evicted
+        Assert.False(kept);
+        Assert.Equal(TotpChallengeStore.MaxEntries, store.Count());
+    }
+
+    /// <summary>
+    ///     Test that a returned challenge into a full store makes room by dropping the ended challenges.
+    /// </summary>
+    [Fact]
+    public void TotpChallengeStore_Return_WhenFullOfEndedEntries_DropsEndedAndStores()
+    {
+        // Arrange: a full store of challenges that end at the lifetime; a later challenge is taken; one more is issued
+        var store = new TotpChallengeStore(_clock);
+        for (var i = 0; i < TotpChallengeStore.MaxEntries; i++)
+        {
+            store.Issue("filler" + i, "10.0.0.1", "/");
+        }
+
+        _clock.Advance(TimeSpan.FromMinutes(1));
+        var token = store.Issue("ann", "10.0.0.1", "/");
+        var challenge = store.Take(token, "10.0.0.1");
+        store.Issue("other", "10.0.0.1", "/");
+        _clock.Advance(TotpChallengeStore.Lifetime - TimeSpan.FromMinutes(1));
+
+        // Act: the fillers have ended; give the challenge back
+        var kept = store.Return(challenge!);
+
+        // Assert: kept, the ended ones were dropped, and the cap holds
+        Assert.True(kept);
+        Assert.Equal(2, store.Count());
+        Assert.NotNull(store.Peek(token, "10.0.0.1"));
+    }
+
+    /// <summary>
+    ///     Test that the remembered invalidations are pruned once no challenge they concern can live any more.
+    /// </summary>
+    [Fact]
+    public void TotpChallengeStore_InvalidateUser_TombstonesArePrunedAfterTheLifetime()
+    {
+        // Arrange: one user is invalidated
+        var store = new TotpChallengeStore(_clock);
+        store.InvalidateUser("ann");
+        Assert.Equal(1, store.TombstoneCount());
+
+        // Act: the lifetime passes, then another user is invalidated
+        _clock.Advance(TotpChallengeStore.Lifetime);
+        store.InvalidateUser("bob");
+
+        // Assert: only the newer note is left
+        Assert.Equal(1, store.TombstoneCount());
+    }
+
+    /// <summary>
+    ///     Test that the remembered invalidations stay bounded, and that overflowing them fails safe: a challenge that
+    ///     was taken before is refused, while one taken afterwards is kept.
+    /// </summary>
+    [Fact]
+    public void TotpChallengeStore_InvalidateUser_TombstonesAreBoundedAndOverflowFailsSafe()
+    {
+        // Arrange: ann's challenge is taken, then more users than the bound are invalidated at once
+        var store = new TotpChallengeStore(_clock);
+        var token = store.Issue("ann", "10.0.0.1", "/");
+        var inFlight = store.Take(token, "10.0.0.1");
+        for (var i = 0; i < TotpChallengeStore.MaxEntries; i++)
+        {
+            store.InvalidateUser("user" + i);
+            Assert.True(store.TombstoneCount() < TotpChallengeStore.MaxEntries);
+        }
+
+        var later = store.Take(store.Issue("ann", "10.0.0.1", "/"), "10.0.0.1");
+
+        // Act: give both back
+        var keptInFlight = store.Return(inFlight!);
+        var keptLater = store.Return(later!);
+
+        // Assert: the older one is refused although ann was never invalidated, the newer one is kept
+        Assert.False(keptInFlight);
+        Assert.True(keptLater);
+    }
+
+    /// <summary>
     ///     Test that null arguments are refused.
     /// </summary>
     [Fact]

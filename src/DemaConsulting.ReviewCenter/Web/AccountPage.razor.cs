@@ -150,6 +150,12 @@ public partial class AccountPage : ComponentBase
     private string ConfirmPassword { get; set; } = string.Empty;
 
     /// <summary>
+    ///     Gets or sets the authenticator code or recovery code typed into the change-password form (shown only
+    ///     while a second factor is on).
+    /// </summary>
+    private string ChangeCode { get; set; } = string.Empty;
+
+    /// <summary>
     ///     Gets the message of the last rejected attempt, or <c>null</c> when there is none.
     /// </summary>
     private string? ErrorMessage { get; set; }
@@ -653,7 +659,7 @@ public partial class AccountPage : ComponentBase
             }
 
             var actor = await AuthenticationState.GetActorAsync();
-            await UserService.ChangeOwnPasswordAsync(actor.Username, CurrentPassword, NewPassword);
+            await Totp.ChangeOwnPasswordAsync(actor, CurrentPassword, NewPassword, ChangeCode);
             Message = "Your password was changed.";
 
             // The old session still describes the temporary password, so the user signs in again with the new one
@@ -661,16 +667,27 @@ public partial class AccountPage : ComponentBase
             {
                 Navigation.NavigateTo("/login?changed=1", forceLoad: true);
             }
+            else
+            {
+                // A recovery code may have been used
+                await LoadTotpAsync();
+            }
         }
         catch (DomainRuleException ex)
         {
             ErrorMessage = ex.Message;
+            if (ex.Rule == DomainRule.TotpCodeIncorrect && !MustChangePassword)
+            {
+                // The page state may be stale: show the code field when a second factor was turned on elsewhere
+                await LoadTotpAsync();
+            }
         }
         finally
         {
             CurrentPassword = string.Empty;
             NewPassword = string.Empty;
             ConfirmPassword = string.Empty;
+            ChangeCode = string.Empty;
         }
     }
 }

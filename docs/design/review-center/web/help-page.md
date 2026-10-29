@@ -117,7 +117,9 @@ address, the first code, and the ten recovery codes shown once); how to sign in 
 works once, the step must be finished within 5 minutes); what to do after losing the phone (a recovery code instead of
 the code, each works once, new recovery codes, and the reset by a system administrator from the Users page); that
 signing a review needs the password and a current code, that recovery codes cannot sign, and that a code that was just
-used to sign in must be followed by the next code; how to turn it off or renew the recovery codes; and that wrong codes
+used to sign in must be followed by the next code; how to turn it off or renew the recovery codes; that changing the own
+password needs a current code too; that an administrator who only sets a new password leaves the factor on; and that
+wrong codes
 count like wrong passwords for the lockout, that sessions already open stay valid after a turn-off or a reset, that API
 tokens are not affected, that the setting `Identity:Totp:Enabled` can switch the feature off (then accounts that had it
 are protected by the password alone), and that the changes are audited, never the codes. It has one screenshot,

@@ -10,12 +10,18 @@ sections:
       - id: ReviewCenter-TotpStore-Pending
         title: >-
           The TotpStore class shall keep one enrollment for each user, store a pending enrollment and replace an
-          earlier pending one, refuse to replace a confirmed one, and remove only a pending one when asked to.
+          earlier pending one, also when many starts arrive at the same moment, without any of them failing and with
+          exactly one pending enrollment left, refuse to replace a confirmed one, and remove only a pending one when
+          asked to.
         justification: |
           A person who starts the setup again must get a new secret, and starting it must never be a way to remove or
-          replace a second factor that already works.
+          replace a second factor that already works. Two starts at the same moment, for example a double click, must
+          not end in an error.
         tests:
           - TotpStore_SavePendingAsync_RoundTripsAndReplacesAPendingEnrollment
+          - TotpStore_SavePendingAsync_ManyConcurrentStarts_NoExceptionAndOneCoherentPendingRow
+          - TotpStore_SavePendingAsync_ConfirmedRow_ConcurrentStarts_AllRefuseAndNeverOverwrite
+          - TotpStore_SavePendingAsync_ConcurrentWithConfirm_NoExceptionAndConfirmedStaysConfirmed
           - TotpStore_RemovePendingAsync_RemovesPendingOnly
 
       - id: ReviewCenter-TotpStore-ConfirmAtomic

@@ -455,7 +455,8 @@ sections:
       - id: ReviewCenter-Core-TotpSecondFactor
         title: >-
           The Core subsystem shall let a user of a local account turn on a second factor with a code of an authenticator
-          app and ten recovery codes, ask for the code after the password at sign-in and at every signature, accept
+          app and ten recovery codes, ask for the code after the password at sign-in, at every signature, and when the
+          own password is changed, accept
           each code only once, count wrong codes toward the lockout of the password, let the user and, for a lost
           phone, a system administrator turn it off, record every change in the audit trail, and never keep or show a
           secret or a code anywhere but in the answer that creates it.
@@ -472,6 +473,7 @@ sections:
           - ReviewCenter-TotpService-Disable
           - ReviewCenter-TotpService-AdminReset
           - ReviewCenter-TotpService-Lockout
+          - ReviewCenter-TotpService-ChangePassword
           - ReviewCenter-TotpService-Audit
           - ReviewCenter-TotpService-NoSecretLeak
           - ReviewCenter-TotpChallengeStore-SingleUse

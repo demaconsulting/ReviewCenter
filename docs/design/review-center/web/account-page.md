@@ -112,9 +112,13 @@ recovery codes `totp-recovery-box`, `totp-recovery-codes`, `totp-recovery-code-{
   case, so a password never stays in the page. For a user with a temporary password the service also refuses a new
   password equal to the temporary one and clears the flag; the page then navigates to `/login?changed=1` with a full
   page load, because the session of the change still carries the claim and is stale (see `SignIn.IsCurrent`), and the
-  login page shows a notice that the password was changed.
+  login page shows a notice that the password was changed. While the second factor is on (`TotpInfo.Enrolled`), the form
+  has a field for a code or a recovery code (`ChangeCode`), which is sent too and emptied in every case; a missing or
+  wrong code is shown as the general message of `TotpCodeIncorrect`, and the card is read again so that the recovery
+  code count and the field are current.
 
-The user name comes from `SignIn.GetActorAsync`, and the change is made by `UserService.ChangeOwnPasswordAsync`.
+The user name comes from `SignIn.GetActorAsync`, and the change is made by `TotpService.ChangeOwnPasswordAsync`, which
+enforces the code in Core and calls `UserService`.
 
 **OnAfterRenderAsync**: Marks the page interactive after the first render on a live connection, as `HomePage` does, and
 then reads the stored appearance with `reviewCenter.getTheme` to show it as selected.

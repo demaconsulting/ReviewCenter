@@ -26,7 +26,8 @@ N/A - standard test environment.
 - Five failures in a row lock the account for five minutes, and a success resets the count.
 - The last enabled system administrator cannot be disabled or demoted.
 - A user changes their own password only with the current password; an administrator sets a new password for any
-  user, which also ends a lockout.
+  user, which also ends a lockout. For a user with a second factor the password-only overload fails closed and keeps
+  the hash and the failure counter.
 - A user with a temporary password signs in but is refused (and audited) at a re-authentication for a signature; the
   change of the own password must differ from the temporary one and ends the temporary state; a password set by an
   administrator leaves the state unchanged.
@@ -113,6 +114,16 @@ replaces the password. This scenario is tested by `UserService_ChangeOwnPassword
 count as failures; a sixth with the right current password is then refused, and the old password does not sign in
 while the account is locked. This scenario is tested by
 `UserService_ChangeOwnPasswordAsync_RepeatedWrongPassword_LocksOut`.
+
+**UserService_ChangeOwnPasswordAsync_EnrolledUser_FailsClosedAndKeepsHashAndCounter**: For an enrolled user the
+password-only overload with the right current password throws `TotpCodeIncorrect`, the stored hash and the failure
+counter are unchanged, and the refusal is recorded. This scenario is tested by
+`UserService_ChangeOwnPasswordAsync_EnrolledUser_FailsClosedAndKeepsHashAndCounter`.
+
+**UserService_ChangeOwnPasswordAsync_EnrolledUser_WrongPasswordCountsAndFeatureOffChanges**: For an enrolled user a
+wrong current password still counts as a failure and is reported as `CurrentPasswordIncorrect`, and with the feature
+switched off the password-only change works. This scenario is tested by
+`UserService_ChangeOwnPasswordAsync_EnrolledUser_WrongPasswordCountsAndFeatureOffChanges`.
 
 **UserService_SetPasswordAsync_NewPassword_WorksAndEndsLockout**: A new password is set for a locked user; the user
 signs in with it at once, and the old password no longer works. This scenario is tested by

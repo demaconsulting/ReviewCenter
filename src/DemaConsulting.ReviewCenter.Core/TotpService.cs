@@ -115,7 +115,13 @@ public sealed class TotpService
     /// <summary>
     ///     The message of a wrong or reused code; the same for every cause.
     /// </summary>
-    private const string CodeIncorrectMessage = "The code is not valid or was already used.";
+    internal const string CodeIncorrectMessage = "The code is not valid or was already used.";
+
+    /// <summary>
+    ///     The message when a password change of a user with a second factor comes without a way to check it.
+    /// </summary>
+    internal const string PasswordChangeCodeMessage =
+        "A code from your authenticator app, or a recovery code, is needed to change the password.";
 
     /// <summary>
     ///     The persistence of enrollments and recovery codes.
@@ -483,6 +489,49 @@ public sealed class TotpService
     }
 
     /// <summary>
+    ///     Changes the password of the signed-in user; a user with a second factor must prove it as well.
+    /// </summary>
+    /// <param name="actor">The signed-in user. Must not be null.</param>
+    /// <param name="currentPassword">The current password.</param>
+    /// <param name="newPassword">The new password; same policy as for a new user.</param>
+    /// <param name="codeOrRecoveryCode">
+    ///     A current authenticator code, or an unused recovery code; ignored for a user without an active second factor.
+    /// </param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <returns>A task that completes when the new hash is stored.</returns>
+    /// <remarks>
+    ///     The rules are enforced in <see cref="UserService.ChangeOwnPasswordCoreAsync"/>: with an active second
+    ///     factor the password alone changes nothing, a wrong or reused code counts toward the shared lockout, and
+    ///     the failure counter is cleared only after the password and the code were both right. A user without a
+    ///     second factor (or with the feature switched off) changes the password as before.
+    /// </remarks>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="actor"/> is null.</exception>
+    /// <exception cref="DomainRuleException">
+    ///     Thrown with <see cref="DomainRule.ActorNotAllowed"/> for an API token, or the rules of
+    ///     <see cref="UserService.ChangeOwnPasswordAsync"/>, including <see cref="DomainRule.TotpCodeIncorrect"/>.
+    /// </exception>
+    public Task ChangeOwnPasswordAsync(
+        Actor actor,
+        string? currentPassword,
+        string? newPassword,
+        string? codeOrRecoveryCode,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(actor);
+        if (actor.ViaApiToken)
+        {
+            throw new DomainRuleException(DomainRule.ActorNotAllowed, "An API token can not change a password.");
+        }
+
+        return _users.ChangeOwnPasswordCoreAsync(
+            actor.Username,
+            currentPassword,
+            newPassword,
+            (user, token) => VerifyForPasswordChangeAsync(user, codeOrRecoveryCode, token),
+            cancellationToken);
+    }
+
+    /// <summary>
     ///     Removes the second factor of a user who lost the device and the recovery codes.
     /// </summary>
     /// <param name="administrator">The system administrator who resets it. Must not be null.</param>
@@ -656,6 +705,36 @@ public sealed class TotpService
 
         await _users.ClearFailuresAsync(user.Username, cancellationToken);
         return true;
+    }
+
+    /// <summary>
+    ///     Checks the code that proves the second factor when the password is changed.
+    /// </summary>
+    /// <param name="user">The user, whose password was right.</param>
+    /// <param name="code">The typed authenticator code or recovery code.</param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <returns>
+    ///     <c>true</c> when the code is right and was not used before. Nothing is counted or cleared here: the
+    ///     caller holds the gate of the failure counter and decides.
+    /// </returns>
+    private async Task<bool> VerifyForPasswordChangeAsync(User user, string? code, CancellationToken cancellationToken)
+    {
+        var row = await _store.GetAsync(user.Id, cancellationToken);
+        if (row is not { IsActive: true })
+        {
+            return false;
+        }
+
+        try
+        {
+            return await CheckCodeAsync(user, row, code, true, "recovery code used to change the password", cancellationToken)
+                   != CodeResult.Invalid;
+        }
+        catch (DomainRuleException exception) when (exception.Rule == DomainRule.TotpSecretUnreadable)
+        {
+            // An unreadable secret is a wrong code for the caller; the recovery codes still work
+            return false;
+        }
     }
 
     /// <summary>

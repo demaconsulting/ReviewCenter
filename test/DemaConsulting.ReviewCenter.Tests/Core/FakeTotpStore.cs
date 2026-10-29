@@ -58,6 +58,12 @@ internal sealed class FakeTotpStore : ITotpStore
     public int AdvanceCount { get; private set; }
 
     /// <summary>
+    ///     Gets or sets an action that runs once, at the next <see cref="GetAsync"/>, before it answers; lets a test
+    ///     change the world while a request is in flight.
+    /// </summary>
+    public Action? OnNextGet { get; set; }
+
+    /// <summary>
     ///     Gets a snapshot of the stored hashes of a user's recovery codes, used or not.
     /// </summary>
     /// <param name="userId">The identity of the user.</param>
@@ -73,6 +79,9 @@ internal sealed class FakeTotpStore : ITotpStore
     /// <inheritdoc />
     public Task<UserTotp?> GetAsync(int userId, CancellationToken cancellationToken = default)
     {
+        var hook = OnNextGet;
+        OnNextGet = null;
+        hook?.Invoke();
         lock (_lock)
         {
             return Task.FromResult(_rows.TryGetValue(userId, out var row) ? Copy(row) : null);

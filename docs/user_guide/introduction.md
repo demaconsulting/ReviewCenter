@@ -411,10 +411,12 @@ it and is remembered in this browser only: it is not an account setting, so anot
 **System** again.
 
 To change your password, enter the current password and the new
-password, and press the change button. A wrong current password counts as a failed sign-in for the lockout. The
-fields are cleared afterwards. If you signed in with a temporary password (an account that a project administrator
-created for you), the page shows only this form, asks for the temporary password as the current one, and sends you to
-the sign-in page with a notice when the password is changed; see
+password, and press the change button. If your account has a second factor (see
+[Two-Factor Sign-in](#two-factor-sign-in)), the form also asks for a current code of your authenticator app or a
+recovery code, and the password alone is not enough. A wrong current password or a wrong code counts as a failed
+sign-in for the lockout. The fields are cleared afterwards. If you signed in with a temporary password (an account
+that a project administrator created for you), the page shows only this form, asks for the temporary password as the
+current one, and sends you to the sign-in page with a notice when the password is changed; see
 [Managing Project Members](#managing-project-members).
 
 The **API tokens** card creates and revokes the personal access tokens that let a script or tool use the API as you
@@ -488,18 +490,30 @@ code of the current 30 second period to sign in you must **wait for the next cod
 says only that the password or the code is incorrect. Wrong codes count toward the lockout. A reviewer without a second
 factor, and a reviewer at an identity provider, sign as before.
 
+**Change your password.** With a second factor on, the form on the Account page that changes your password also asks
+for a current code (or a recovery code). A code works only once, also across the sign-in and this form, so after you
+signed in with the code of the current period, wait for the next code. A missing or wrong code is refused with one
+general message, counts toward the lockout like a wrong password, and changes nothing; the count is cleared only when
+the password and the code are both right. A person with a temporary password, and an account without a second factor,
+change the password as before.
+
 **Turn it off.** In the **Turn off two-factor sign-in** section of the card, type your password and a current code (or
 a recovery code) and press **Turn off**. The secret and the recovery codes are deleted.
 
 **Administrator reset.** A system administrator sees a **TOTP** badge on the Users page and can press **Reset
 two-factor** for a person who has neither the phone nor a recovery code. That removes the second factor and the
 recovery codes; the person signs in with the password alone and can set it up again. A project administrator cannot do
-this, and neither can an API token. The reset works also while the feature is off.
+this, and neither can an API token. The reset works also while the feature is off. Setting a new password for a person
+(see [Manage Users](#manage-users-system-administrators)) does **not** turn the second factor off: the person still
+needs a code
+at the next sign-in.
 
 **Good to know.**
 
 - Turning it off or an administrator reset does **not** sign anybody out: sessions that are already open stay valid.
   A sign-in that was waiting for its code is ended.
+- While the feature is off (`Identity:Totp:Enabled` is `false`), no code is asked for anywhere, also not when you
+  change your password; the stored secrets are kept.
 - The sign-in with an identity provider and the API tokens are not affected: a token never needs a code, and it still
   cannot sign.
 - The secret of a person is stored encrypted with the Data Protection key ring of the server (the
@@ -527,7 +541,8 @@ a **System admin** badge for system administrators. A system administrator can:
 2. Disable a user, which stops the user from signing in without deleting the record of what the user did, and enable
    the user again.
 3. Make a user a system administrator (**Make system admin**) or take that away (**Remove system admin**).
-4. Set a new password for a user, for example when the user has forgotten it. This also ends a lockout. An account
+4. Set a new password for a user, for example when the user has forgotten it. This also ends a lockout, but it does
+   not turn off the second factor of the user. An account
    of an identity provider (marked **OIDC**) has no password, so there is no such action for it.
 5. Reset the second factor of a user who lost the phone and the recovery codes (**Reset two-factor**; see
    [Two-Factor Sign-in](#two-factor-sign-in)).
@@ -1517,7 +1532,8 @@ head hash is a manual step, and it is most useful after important events such as
 - A wrong current password on the account page is recorded as `auth.sign-in-failed`, because it is checked in the same
   way as a sign-in and counts toward the same lockout; an attempt there on a locked account is not recorded. A wrong
   password at a signature is recorded as `signature.reauth-failed`. A wrong code at the second step of a sign-in is
-  recorded as `auth.totp-failed`; the codes themselves, the secrets, and the recovery codes are never recorded.
+  recorded as `auth.totp-failed`, as is a missing or wrong code when a person with a second factor changes the own
+  password; the codes themselves, the secrets, and the recovery codes are never recorded.
 - Comments, justifications, and the reason for marking a checklist section not applicable are recorded only as a short
   digest, never as text.
 - There is no export and no retention or archiving of the trail, and no external anchoring.

@@ -47,10 +47,16 @@
         <p>Open the <strong>Turn off two-factor sign-in</strong> section of the card, type your password and a current code
             (or a recovery code), and press <strong>Turn off</strong>. <strong>Get new recovery codes</strong> needs your
             password and a current code; the old recovery codes stop working. The new ones are shown once.</p>
+        <h2>Change your password</h2>
+        <p>With two-factor sign-in on, the form that changes your password on the <strong>Account</strong> page also asks
+            for a current code from the app (or a recovery code); the password alone is not enough. A code works only
+            once, so if you used the code of the current period to sign in, wait for the next one. A missing or wrong
+            code changes nothing and counts toward the lockout like a wrong password.</p>
         <h2>An administrator resets it</h2>
         <p>A system administrator can press <strong>Reset two-factor</strong> next to a user on the <strong>Users</strong>
             page. That removes the second factor and the recovery codes of that user, who can then sign in with the
-            password alone and set it up again. Project administrators cannot do this.</p>
+            password alone and set it up again. Project administrators cannot do this. When an administrator only sets
+            a new password for you, your second factor stays on and you still need a code.</p>
         <h2>Good to know</h2>
         <ul>
             <li>Wrong codes count like wrong passwords: by default, after 5 failed attempts the account is locked for 5 minutes.</li>
@@ -58,7 +64,8 @@
                 are already open stay valid.</li>
             <li>API tokens are not affected. They never need a code, and they still cannot sign.</li>
             <li>The server's settings can switch the whole feature off (<code>Identity:Totp:Enabled</code> set to
-                <code>false</code>). Then nobody is asked for a code, so <strong>accounts that had it turned on are
+                <code>false</code>). Then nobody is asked for a code, also not when you change your password, so
+                <strong>accounts that had it turned on are
                 protected by the password alone</strong> until it is switched on again. Tell the person who runs the
                 server if you rely on it.</li>
         </ul>

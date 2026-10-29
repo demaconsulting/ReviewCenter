@@ -34,9 +34,11 @@ page.
 
 - *Parameters*: The pending enrollment and a cancellation token.
 - *Returns*: False when the user already has a confirmed enrollment (nothing is changed); otherwise true.
-- *Postconditions*: An earlier pending enrollment of the user is replaced; a confirmed one is never touched. When the
-  insert fails because another request confirmed an enrollment in between, the result is false; any other failure
-  propagates.
+- *Postconditions*: The whole operation (delete the earlier pending row, check for a confirmed one, insert) runs in
+  one `AuditAppender.ExecuteAsync` transaction without an audit entry, so concurrent starts for one user are
+  serialized: the later one replaces the earlier pending enrollment, none of them fails, and exactly one pending row
+  is left. An earlier pending enrollment of the user is replaced; a confirmed one is never touched. A failure of the
+  database propagates unchanged.
 
 **ConfirmAsync**: Confirms a pending enrollment and stores its recovery codes.
 

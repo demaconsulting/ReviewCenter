@@ -106,13 +106,18 @@ sections:
         title: >-
           The UserService class shall change the password of a user only when the current password is given
           correctly and the new password follows the password rules, counting a wrong current password as a
-          failed sign-in for the lockout.
+          failed sign-in for the lockout, and shall, for a user whose second factor is on, refuse the change that
+          comes without the proof of the second factor, count that refusal and leave the password and the failure
+          counter as they were.
         justification: |
           Whoever sits at a signed-in session must not be able to take over the account without knowing the
-          password, and the change must not be a free way to guess it.
+          password, and the change must not be a free way to guess it. A change that needs the password alone must
+          not be a way round the second factor, so it fails closed.
         tests:
           - UserService_ChangeOwnPasswordAsync_NeedsCurrentPasswordAndPolicy
           - UserService_ChangeOwnPasswordAsync_RepeatedWrongPassword_LocksOut
+          - UserService_ChangeOwnPasswordAsync_EnrolledUser_FailsClosedAndKeepsHashAndCounter
+          - UserService_ChangeOwnPasswordAsync_EnrolledUser_WrongPasswordCountsAndFeatureOffChanges
 
       - id: ReviewCenter-UserService-SetPassword
         title: >-

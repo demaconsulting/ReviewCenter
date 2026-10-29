@@ -82,6 +82,15 @@
                        maxlength="@ReviewLimits.MaxPasswordLength"
                        data-testid="confirm-password-input" @bind="ConfirmPassword" @bind:event="oninput" />
             </div>
+            @if (TotpInfo is { Enrolled: true })
+            {
+                <div class="field">
+                    <label for="change-password-code">Code from your authenticator app, or a recovery code</label>
+                    <input id="change-password-code" type="text" maxlength="24" autocomplete="one-time-code"
+                           autocapitalize="characters" spellcheck="false"
+                           data-testid="change-password-code-input" @bind="ChangeCode" @bind:event="oninput" />
+                </div>
+            }
             @if (ErrorMessage is not null)
             {
                 <p class="error" role="alert" data-testid="account-error">@ErrorMessage</p>

@@ -1025,6 +1025,397 @@ public partial class TotpServiceTests
     }
 
     /// <summary>
+    ///     The new password the password-change tests choose.
+    /// </summary>
+    private const string NewPassword = "another long passphrase";
+
+    /// <summary>
+    ///     Gets a code that is wrong at every step the window accepts.
+    /// </summary>
+    /// <param name="world">The world.</param>
+    /// <param name="secret">The secret of the enrolled user.</param>
+    /// <returns>A six digit code that is not valid now.</returns>
+    private static string WrongCode(TotpTestWorld world, byte[] secret)
+    {
+        var valid = new[] { world.CodeNow(secret, -1), world.CodeNow(secret), world.CodeNow(secret, 1) };
+        return new[] { "000000", "000001" }.First(code => !valid.Contains(code));
+    }
+
+    /// <summary>
+    ///     Reads the failure counter of a user.
+    /// </summary>
+    /// <param name="world">The world.</param>
+    /// <param name="username">The user name.</param>
+    /// <returns>The counter.</returns>
+    private static async Task<int> FailuresAsync(TotpTestWorld world, string username)
+    {
+        return (await world.Users.GetByUsernameAsync(username, TestContext.Current.CancellationToken))!.FailedLoginCount;
+    }
+
+    /// <summary>
+    ///     Reads the stored password hash of a user.
+    /// </summary>
+    /// <param name="world">The world.</param>
+    /// <param name="username">The user name.</param>
+    /// <returns>The hash.</returns>
+    private static async Task<string> HashAsync(TotpTestWorld world, string username)
+    {
+        return (await world.Users.GetByUsernameAsync(username, TestContext.Current.CancellationToken))!.PasswordHash;
+    }
+
+    /// <summary>
+    ///     Test that an enrolled user cannot change the password with the password alone, or with a missing code: the
+    ///     change is refused, the hash stays, and the refusal counts as a failure.
+    /// </summary>
+    /// <param name="code">The missing code.</param>
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("   ")]
+    public async Task TotpService_ChangeOwnPasswordAsync_NoCode_IsRefusedCountsAndKeepsTheHash(string? code)
+    {
+        // Arrange: an enrolled user
+        var world = new TotpTestWorld();
+        await world.AddUserAsync("ann");
+        await world.EnrollAsync("ann");
+        var before = await HashAsync(world, "ann");
+
+        // Act: change with the right password and no code
+        var exception = await Assert.ThrowsAsync<DomainRuleException>(
+            () => world.Totp.ChangeOwnPasswordAsync(TestActors.Ann, TotpTestWorld.Password, NewPassword, code, TestContext.Current.CancellationToken));
+
+        // Assert: refused with the general message, nothing changed but the counter, and a failure is on record
+        Assert.Equal(DomainRule.TotpCodeIncorrect, exception.Rule);
+        Assert.Equal(before, await HashAsync(world, "ann"));
+        Assert.Equal(1, await FailuresAsync(world, "ann"));
+        Assert.Contains(world.AuditStore.Entries, e => e.Action == TotpService.FailedAction && e.Detail.Contains("password change", StringComparison.Ordinal));
+        Assert.DoesNotContain(world.Users.Audits, a => a.Action == "user.password-changed");
+    }
+
+    /// <summary>
+    ///     Test that a wrong code is refused and counted, and a wrong password is refused before the code is looked at.
+    /// </summary>
+    [Fact]
+    public async Task TotpService_ChangeOwnPasswordAsync_WrongCodeOrWrongPassword_IsRefusedAndKeepsTheHash()
+    {
+        // Arrange: an enrolled user
+        var world = new TotpTestWorld();
+        await world.AddUserAsync("ann");
+        var (secret, _) = await world.EnrollAsync("ann");
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var before = await HashAsync(world, "ann");
+
+        // Act: a wrong code, then a wrong password with a valid code
+        var wrongCode = await Assert.ThrowsAsync<DomainRuleException>(
+            () => world.Totp.ChangeOwnPasswordAsync(TestActors.Ann, TotpTestWorld.Password, NewPassword, WrongCode(world, secret), cancellationToken));
+        var wrongPassword = await Assert.ThrowsAsync<DomainRuleException>(
+            () => world.Totp.ChangeOwnPasswordAsync(TestActors.Ann, "not the password", NewPassword, world.CodeNow(secret, 1), cancellationToken));
+
+        // Assert: each is refused for its own reason, both counted, the valid code was not used up, and nothing changed
+        Assert.Equal(DomainRule.TotpCodeIncorrect, wrongCode.Rule);
+        Assert.Equal(DomainRule.CurrentPasswordIncorrect, wrongPassword.Rule);
+        Assert.Equal(2, await FailuresAsync(world, "ann"));
+        Assert.Equal(0, world.Store.AdvanceCount);
+        Assert.Equal(before, await HashAsync(world, "ann"));
+    }
+
+    /// <summary>
+    ///     Test that the code that confirmed the enrollment (an already accepted step) cannot change the password.
+    /// </summary>
+    [Fact]
+    public async Task TotpService_ChangeOwnPasswordAsync_ReusedCode_IsRefused()
+    {
+        // Arrange: an enrolled user; the confirming code is for the current step
+        var world = new TotpTestWorld();
+        await world.AddUserAsync("ann");
+        var (secret, _) = await world.EnrollAsync("ann");
+        var before = await HashAsync(world, "ann");
+
+        // Act: change with the already accepted code
+        var exception = await Assert.ThrowsAsync<DomainRuleException>(
+            () => world.Totp.ChangeOwnPasswordAsync(TestActors.Ann, TotpTestWorld.Password, NewPassword, world.CodeNow(secret), TestContext.Current.CancellationToken));
+
+        // Assert: refused as a replay
+        Assert.Equal(DomainRule.TotpCodeIncorrect, exception.Rule);
+        Assert.Equal(before, await HashAsync(world, "ann"));
+    }
+
+    /// <summary>
+    ///     Test that the right password and a fresh code change the password, clear the counter (only now), use the
+    ///     code up and record the change.
+    /// </summary>
+    [Fact]
+    public async Task TotpService_ChangeOwnPasswordAsync_PasswordAndValidCode_ChangesAndClearsTheCounter()
+    {
+        // Arrange: an enrolled user with three failures on record
+        var world = new TotpTestWorld();
+        await world.AddUserAsync("ann");
+        var (secret, _) = await world.EnrollAsync("ann");
+        var cancellationToken = TestContext.Current.CancellationToken;
+        for (var i = 0; i < 3; i++)
+        {
+            await world.UserService.AuthenticatePasswordAsync("ann", "wrong password", cancellationToken);
+        }
+
+        var code = world.CodeNow(secret, 1);
+
+        // Act: change with the password and the fresh code, then try the same code once more
+        await world.Totp.ChangeOwnPasswordAsync(TestActors.Ann, TotpTestWorld.Password, NewPassword, code, cancellationToken);
+        var replay = await Assert.ThrowsAsync<DomainRuleException>(
+            () => world.Totp.ChangeOwnPasswordAsync(TestActors.Ann, NewPassword, "yet another passphrase", code, cancellationToken));
+
+        // Assert: the new password works, the counter was cleared by the first change (the replay counts one), the step moved once
+        Assert.NotNull(await world.UserService.ConfirmPasswordAsync("ann", NewPassword, cancellationToken));
+        Assert.Equal(DomainRule.TotpCodeIncorrect, replay.Rule);
+        Assert.Equal(1, await FailuresAsync(world, "ann"));
+        Assert.Equal(1, world.Store.AdvanceCount);
+        Assert.Contains(world.Users.Audits, a => a.Action == "user.password-changed");
+    }
+
+    /// <summary>
+    ///     Test that a recovery code can change the password once and its use is audited without the code.
+    /// </summary>
+    [Fact]
+    public async Task TotpService_ChangeOwnPasswordAsync_RecoveryCode_WorksOnceAndIsAudited()
+    {
+        // Arrange: an enrolled user
+        var world = new TotpTestWorld();
+        await world.AddUserAsync("ann");
+        var (_, codes) = await world.EnrollAsync("ann");
+        var cancellationToken = TestContext.Current.CancellationToken;
+
+        // Act: change with a recovery code, then try to use it again
+        await world.Totp.ChangeOwnPasswordAsync(TestActors.Ann, TotpTestWorld.Password, NewPassword, codes[0], cancellationToken);
+        var again = await Assert.ThrowsAsync<DomainRuleException>(
+            () => world.Totp.ChangeOwnPasswordAsync(TestActors.Ann, NewPassword, "yet another passphrase", codes[0], cancellationToken));
+
+        // Assert: changed once, refused the second time, nine codes left, audited without the code
+        Assert.NotNull(await world.UserService.ConfirmPasswordAsync("ann", NewPassword, cancellationToken));
+        Assert.Equal(DomainRule.TotpCodeIncorrect, again.Rule);
+        Assert.Equal(9, await world.Store.CountUnusedRecoveryCodesAsync((await world.Users.GetByUsernameAsync("ann", cancellationToken))!.Id, cancellationToken));
+        var audit = Assert.Single(world.Store.Audits, a => a.Action == TotpService.RecoveryUsedAction);
+        Assert.Contains("change the password", audit.Detail, StringComparison.Ordinal);
+        Assert.DoesNotContain(codes[0].Replace("-", string.Empty, StringComparison.Ordinal), world.AllAuditText, StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
+    ///     Test that wrong codes at a password change share the lockout counter: five lock the account, and then even
+    ///     the right code is refused until the lockout ends.
+    /// </summary>
+    [Fact]
+    public async Task TotpService_ChangeOwnPasswordAsync_FiveWrongCodes_LockTheAccount()
+    {
+        // Arrange: an enrolled user
+        var world = new TotpTestWorld();
+        await world.AddUserAsync("ann");
+        var (secret, _) = await world.EnrollAsync("ann");
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var wrong = WrongCode(world, secret);
+
+        // Act: five wrong codes, then the right code while locked, then after the lockout
+        for (var i = 0; i < 5; i++)
+        {
+            await Assert.ThrowsAsync<DomainRuleException>(
+                () => world.Totp.ChangeOwnPasswordAsync(TestActors.Ann, TotpTestWorld.Password, NewPassword, wrong, cancellationToken));
+        }
+
+        var whileLocked = await Assert.ThrowsAsync<DomainRuleException>(
+            () => world.Totp.ChangeOwnPasswordAsync(TestActors.Ann, TotpTestWorld.Password, NewPassword, world.CodeNow(secret, 1), cancellationToken));
+        world.Clock.Advance(TimeSpan.FromMinutes(6));
+        await world.Totp.ChangeOwnPasswordAsync(TestActors.Ann, TotpTestWorld.Password, NewPassword, world.CodeNow(secret, 1), cancellationToken);
+
+        // Assert: locked on the fifth failure, refused while locked, and changed afterwards
+        Assert.Equal(DomainRule.CurrentPasswordIncorrect, whileLocked.Rule);
+        Assert.Contains(world.AuditStore.Entries, e => e.Action == "auth.locked-out");
+        Assert.NotNull(await world.UserService.ConfirmPasswordAsync("ann", NewPassword, cancellationToken));
+    }
+
+    /// <summary>
+    ///     Test that a right password does not reset the shared counter: password-only attempts between wrong codes
+    ///     still end in the lockout.
+    /// </summary>
+    [Fact]
+    public async Task TotpService_ChangeOwnPasswordAsync_PasswordOnlyBetweenWrongCodes_DoesNotResetTheCounter()
+    {
+        // Arrange: an enrolled user who failed four times with wrong codes at sign-in
+        var world = new TotpTestWorld();
+        await world.AddUserAsync("ann");
+        var (secret, _) = await world.EnrollAsync("ann");
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var wrong = WrongCode(world, secret);
+        for (var i = 0; i < 4; i++)
+        {
+            await world.Totp.CompleteSignInAsync(await world.BeginSignInAsync("ann"), "10.0.0.1", wrong, cancellationToken);
+        }
+
+        // Act: a password-only change (the password is right) through the Core service
+        var exception = await Assert.ThrowsAsync<DomainRuleException>(
+            () => world.Totp.ChangeOwnPasswordAsync(TestActors.Ann, TotpTestWorld.Password, NewPassword, null, cancellationToken));
+        var afterLockout = await Assert.ThrowsAsync<DomainRuleException>(
+            () => world.UserService.ChangeOwnPasswordAsync("ann", TotpTestWorld.Password, NewPassword, cancellationToken));
+
+        // Assert: the attempt was the fifth failure and locked the account, so the password is not changed
+        Assert.Equal(DomainRule.TotpCodeIncorrect, exception.Rule);
+        Assert.Equal(DomainRule.CurrentPasswordIncorrect, afterLockout.Rule);
+        Assert.Contains(world.AuditStore.Entries, e => e.Action == "auth.locked-out");
+        Assert.Equal("hash:" + TotpTestWorld.Password, await HashAsync(world, "ann"));
+    }
+
+    /// <summary>
+    ///     Test that an unreadable secret refuses codes at a password change while a recovery code still works.
+    /// </summary>
+    [Fact]
+    public async Task TotpService_ChangeOwnPasswordAsync_UnreadableSecret_RefusesCodesButRecoveryStillWorks()
+    {
+        // Arrange: an enrolled user whose secret can no longer be read
+        var world = new TotpTestWorld();
+        await world.AddUserAsync("ann");
+        var (secret, codes) = await world.EnrollAsync("ann");
+        var cancellationToken = TestContext.Current.CancellationToken;
+        world.Protector.Unreadable = true;
+
+        // Act: a six digit code, then a recovery code
+        var code = await Assert.ThrowsAsync<DomainRuleException>(
+            () => world.Totp.ChangeOwnPasswordAsync(TestActors.Ann, TotpTestWorld.Password, NewPassword, world.CodeNow(secret, 1), cancellationToken));
+        await world.Totp.ChangeOwnPasswordAsync(TestActors.Ann, TotpTestWorld.Password, NewPassword, codes[0], cancellationToken);
+
+        // Assert: the code is refused like a wrong one, the recovery code changes the password
+        Assert.Equal(DomainRule.TotpCodeIncorrect, code.Rule);
+        Assert.NotNull(await world.UserService.ConfirmPasswordAsync("ann", NewPassword, cancellationToken));
+    }
+
+    /// <summary>
+    ///     Test that a token actor can never change a password through this service.
+    /// </summary>
+    [Fact]
+    public async Task TotpService_ChangeOwnPasswordAsync_ApiTokenActor_ThrowsActorNotAllowed()
+    {
+        // Arrange: a user and an actor that arrives through a token
+        var world = new TotpTestWorld();
+        await world.AddUserAsync("ann");
+        var before = await HashAsync(world, "ann");
+
+        // Act: change the password
+        var exception = await Assert.ThrowsAsync<DomainRuleException>(
+            () => world.Totp.ChangeOwnPasswordAsync(
+                new Actor("ann", "Ann") { ApiTokenId = "K7M2QX9P" },
+                TotpTestWorld.Password,
+                NewPassword,
+                null,
+                TestContext.Current.CancellationToken));
+
+        // Assert: refused and unchanged
+        Assert.Equal(DomainRule.ActorNotAllowed, exception.Rule);
+        Assert.Equal(before, await HashAsync(world, "ann"));
+    }
+
+    /// <summary>
+    ///     Test that a user without a second factor, and an enrolled user while the feature is switched off, change
+    ///     the password with the password alone.
+    /// </summary>
+    /// <param name="case">Which of the two.</param>
+    [Theory]
+    [InlineData("not-enrolled")]
+    [InlineData("feature-off")]
+    public async Task TotpService_ChangeOwnPasswordAsync_NotEnrolledOrFeatureOff_PasswordAloneWorks(string @case)
+    {
+        // Arrange: ann is enrolled (a world with the feature off cannot enroll); services with the feature off share the stores
+        var world = new TotpTestWorld();
+        await world.AddUserAsync("ann");
+        var totp = world.Totp;
+        if (@case == "feature-off")
+        {
+            await world.EnrollAsync("ann");
+            var off = new TotpSettings(false, TotpSettings.DefaultIssuer);
+            var users = new UserService(world.Users, new FakePasswordHasher(), world.Clock, world.Audit, world.Store, off);
+            totp = new TotpService(world.Store, new TotpAlgorithm(), world.Protector, users, world.Challenges, world.Clock, off);
+        }
+
+        // Act: change with the password alone
+        await totp.ChangeOwnPasswordAsync(TestActors.Ann, TotpTestWorld.Password, NewPassword, null, TestContext.Current.CancellationToken);
+
+        // Assert: changed
+        Assert.NotNull(await world.UserService.ConfirmPasswordAsync("ann", NewPassword, TestContext.Current.CancellationToken));
+    }
+
+    /// <summary>
+    ///     Test that a user who has to replace a temporary password (and so can have no second factor) is not asked for a code.
+    /// </summary>
+    [Fact]
+    public async Task TotpService_ChangeOwnPasswordAsync_TemporaryPassword_NeedsNoCode()
+    {
+        // Arrange: a user with a temporary password
+        var world = new TotpTestWorld();
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await world.AddUserAsync("tim");
+        var tim = (await world.Users.GetByUsernameAsync("tim", cancellationToken))!;
+        tim.MustChangePassword = true;
+        await world.Users.UpdateAsync(tim, null, cancellationToken);
+
+        // Act: replace it without a code
+        await world.Totp.ChangeOwnPasswordAsync(new Actor("tim", "Tim"), TotpTestWorld.Password, NewPassword, null, cancellationToken);
+
+        // Assert: changed and no longer temporary
+        Assert.False((await world.Users.GetByUsernameAsync("tim", cancellationToken))!.MustChangePassword);
+    }
+
+    /// <summary>
+    ///     Test that many requests with the same valid code and password change the password exactly once.
+    /// </summary>
+    [Fact]
+    public async Task TotpService_ChangeOwnPasswordAsync_ConcurrentSameCode_ExactlyOneSucceeds()
+    {
+        // Arrange: an enrolled user
+        var world = new TotpTestWorld();
+        await world.AddUserAsync("ann");
+        var (secret, _) = await world.EnrollAsync("ann");
+        var code = world.CodeNow(secret, 1);
+
+        // Act: four requests with the same password, new password and code at once
+        var results = await Task.WhenAll(Enumerable.Range(0, 4).Select(_ => Task.Run(
+            async () =>
+            {
+                try
+                {
+                    await world.Totp.ChangeOwnPasswordAsync(TestActors.Ann, TotpTestWorld.Password, NewPassword, code, TestContext.Current.CancellationToken);
+                    return true;
+                }
+                catch (DomainRuleException)
+                {
+                    return false;
+                }
+            },
+            TestContext.Current.CancellationToken)));
+
+        // Assert: one succeeded, the code was used once
+        Assert.Equal(1, results.Count(r => r));
+        Assert.Equal(1, world.Store.AdvanceCount);
+    }
+
+    /// <summary>
+    ///     Test that a challenge whose user is invalidated while its code is being checked is not given back.
+    /// </summary>
+    [Fact]
+    public async Task TotpService_CompleteSignInAsync_UserInvalidatedWhileCodeIsChecked_DoesNotResurrectTheChallenge()
+    {
+        // Arrange: an enrolled user with a pending sign-in; the second factor is reset while the code is checked
+        var world = new TotpTestWorld();
+        await world.AddUserAsync("ann");
+        var (secret, _) = await world.EnrollAsync("ann");
+        var token = await world.BeginSignInAsync("ann");
+        world.Store.OnNextGet = () => world.Challenges.InvalidateUser("ann");
+
+        // Act: a wrong code
+        var result = await world.Totp.CompleteSignInAsync(token, "10.0.0.1", WrongCode(world, secret), TestContext.Current.CancellationToken);
+
+        // Assert: the attempt failed and the challenge is gone, so it can not be used again
+        Assert.Equal(TotpSignInOutcome.Failed, result.Outcome);
+        Assert.Null(world.Totp.PeekChallenge(token, "10.0.0.1"));
+        var retry = await world.Totp.CompleteSignInAsync(token, "10.0.0.1", world.CodeNow(secret, 1), TestContext.Current.CancellationToken);
+        Assert.Equal(TotpSignInOutcome.ChallengeInvalid, retry.Outcome);
+    }
+
+    /// <summary>
     ///     Test that the constructor and the public methods refuse null arguments.
     /// </summary>
     [Fact]
@@ -1044,5 +1435,6 @@ public partial class TotpServiceTests
         await Assert.ThrowsAsync<ArgumentNullException>(() => world.Totp.GetStatusAsync(null!, cancellationToken));
         await Assert.ThrowsAsync<ArgumentNullException>(() => world.Totp.ResetAsync(null!, "ann", cancellationToken));
         await Assert.ThrowsAsync<ArgumentNullException>(() => world.Totp.IsEnrolledAsync(null!, cancellationToken));
+        await Assert.ThrowsAsync<ArgumentNullException>(() => world.Totp.ChangeOwnPasswordAsync(null!, "a", "b", null, cancellationToken));
     }
 }

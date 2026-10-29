@@ -32,7 +32,8 @@ namespace DemaConsulting.ReviewCenter.Storage;
 ///     the answer (no entity is loaded and written back), so two requests that race can not both succeed; the
 ///     conditions use only equality, null checks and integer comparison because the SQLite provider cannot compare
 ///     <see cref="DateTimeOffset"/> values in a query. A change that is audited runs in one transaction together with
-///     its audit entry; the replay step is advanced without an entry (the sign-in records its own).
+///     its audit entry; the replay step is advanced without an entry (the sign-in records its own), and a pending
+///     enrollment is saved in the same serialized transaction (without an entry), so concurrent starts can not collide.
 /// </remarks>
 /// <param name="factory">The factory that creates a context per operation.</param>
 /// <param name="appender">The appender that runs each change together with its audit entry.</param>
@@ -60,40 +61,33 @@ internal sealed class TotpStore(IDbContextFactory<ReviewCenterDbContext> factory
     public async Task<bool> SavePendingAsync(UserTotp pending, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(pending);
-        await using var context = await factory.CreateDbContextAsync(cancellationToken);
 
-        // An earlier pending enrollment is replaced; a confirmed one is never touched
-        _ = await context.UserTotps
-            .Where(t => t.UserId == pending.UserId && t.ConfirmedAt == null)
-            .ExecuteDeleteAsync(cancellationToken);
-        if (await context.UserTotps.AnyAsync(t => t.UserId == pending.UserId, cancellationToken))
-        {
-            return false;
-        }
-
-        context.UserTotps.Add(new UserTotp
-        {
-            UserId = pending.UserId,
-            ProtectedSecret = pending.ProtectedSecret,
-            Created = pending.Created,
-            ConfirmedAt = null,
-            LastAcceptedStep = 0
-        });
-        try
-        {
-            await context.SaveChangesAsync(cancellationToken);
-            return true;
-        }
-        catch (DbUpdateException)
-        {
-            // Another request confirmed an enrollment between the check and the insert; anything else is a real failure
-            if (await context.UserTotps.AnyAsync(t => t.UserId == pending.UserId && t.ConfirmedAt != null, cancellationToken))
+        // One serialized transaction (the same gate and transaction as the audited changes), so concurrent starts
+        // can not both see "no row" and collide on the key: the later one replaces the earlier pending enrollment
+        return await appender.ExecuteAsync<bool>(
+            factory,
+            async context =>
             {
-                return false;
-            }
+                // An earlier pending enrollment is replaced; a confirmed one is never touched
+                _ = await context.UserTotps
+                    .Where(t => t.UserId == pending.UserId && t.ConfirmedAt == null)
+                    .ExecuteDeleteAsync(cancellationToken);
+                if (await context.UserTotps.AnyAsync(t => t.UserId == pending.UserId, cancellationToken))
+                {
+                    return (false, null);
+                }
 
-            throw;
-        }
+                context.UserTotps.Add(new UserTotp
+                {
+                    UserId = pending.UserId,
+                    ProtectedSecret = pending.ProtectedSecret,
+                    Created = pending.Created,
+                    ConfirmedAt = null,
+                    LastAcceptedStep = 0
+                });
+                return (true, null);
+            },
+            cancellationToken);
     }
 
     /// <inheritdoc />

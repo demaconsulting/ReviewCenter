@@ -110,6 +110,18 @@ feature is off, `Available` is false.
 - *Returns*: The ten new codes, shown once. The old codes stop working. A recovery code is not accepted here.
 - *Postconditions*: `auth.totp-recovery-regenerated` is recorded in the same transaction.
 
+**ChangeOwnPasswordAsync**: Changes the own password; with a second factor on it needs a code too.
+
+- *Parameters*: The `Actor`, the current password, the new password, a code or a recovery code (may be null), and a
+  cancellation token.
+- *Postconditions*: A personal access token actor is refused (`ActorNotAllowed`). The rule is enforced in
+  `UserService.ChangeOwnPasswordCoreAsync`, which gets a verifier from this service: for an active enrollment the code
+  is checked as at sign-in (replay rule, recovery codes allowed, an unreadable secret counts as a wrong code), a missing
+  or wrong code counts on the shared failure counter and is reported as `TotpCodeIncorrect`, and the counter is cleared
+  only after the password, the new password, and the code were all right. A recovery code that was spent is recorded as
+  `auth.totp-recovery-used`. A user without an enrollment, with a temporary password, or while the feature is switched
+  off changes the password as before, with no code.
+
 **ResetAsync**: Removes the factor of another user, for a person who lost the phone and the recovery codes.
 
 - *Parameters*: The administrator as `Actor`, the user name, and a cancellation token.
@@ -132,7 +144,8 @@ step.
   again: a missing, disabled, or external user, an inactive row, or a feature that is off gives `ChallengeInvalid`. A
   locked account gives `LockedOut` without counting. A wrong code is counted through
   `UserService.RegisterSecondFactorFailureAsync` and recorded as `auth.totp-failed` (sign-in); when it starts the
-  lockout the result is `LockedOut`, otherwise the challenge is returned (`Failed`). A right code clears the failure
+  lockout the result is `LockedOut`, otherwise the challenge is returned (`Failed`) unless the user was invalidated while
+  the code was checked (see `TotpChallengeStore.Return`). A right code clears the failure
   counter and gives `Success`.
 
 **Checking a code** (private): a code of exactly six digits is an authenticator code: the secret is decrypted, checked

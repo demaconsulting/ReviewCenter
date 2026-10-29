@@ -39,6 +39,11 @@ public class AccountTotpPageTests : PageTestBase
     private const string Password = "correct horse battery";
 
     /// <summary>
+    ///     The new password the change-password tests choose.
+    /// </summary>
+    private const string NewPassword = "another long passphrase";
+
+    /// <summary>
     ///     Initializes a new instance of the <see cref="AccountTotpPageTests"/> class; the page asks the browser for
     ///     the stored appearance, which these tests do not script.
     /// </summary>
@@ -376,12 +381,133 @@ public class AccountTotpPageTests : PageTestBase
     }
 
     /// <summary>
+    ///     Test that the change-password form asks for a code only while a second factor is on.
+    /// </summary>
+    /// <param name="case">The state of the account.</param>
+    /// <param name="shown">Whether the code field is expected.</param>
+    [Theory]
+    [InlineData("enrolled", true)]
+    [InlineData("not-enrolled", false)]
+    [InlineData("temporary-password", false)]
+    public async Task AccountPage_ChangePassword_CodeField_IsShownOnlyForAnEnrolledUser(string @case, bool shown)
+    {
+        // Arrange: a local user in the given state
+        await CreateAnnAsync();
+        if (@case == "enrolled")
+        {
+            await EnrollTotpAsync("ann", Password);
+        }
+
+        if (@case == "temporary-password")
+        {
+            SignInAsTemporaryPassword("ann", "Ann");
+        }
+
+        // Act: render the page
+        var cut = Render<AccountPage>();
+
+        // Assert: the field is there for the enrolled user only, and the form is always there
+        Assert.NotNull(cut.Find("[data-testid='change-password-form']"));
+        Assert.Equal(shown ? 1 : 0, cut.FindAll("[data-testid='change-password-code-input']").Count);
+    }
+
+    /// <summary>
+    ///     Test that an enrolled user who types only the password gets the generic error, nothing changes, the failure
+    ///     is counted and every field is emptied.
+    /// </summary>
+    [Fact]
+    public async Task AccountPage_ChangePassword_Enrolled_PasswordOnly_ShowsGenericErrorAndChangesNothing()
+    {
+        // Arrange: an enrolled user who types the right current password, a new one and no code
+        await CreateAnnAsync();
+        await EnrollTotpAsync("ann", Password);
+        var cut = Render<AccountPage>();
+        await FillChangeFormAsync(cut, Password, NewPassword, null);
+
+        // Act: submit
+        await cut.Find("[data-testid='change-password-form']").SubmitAsync();
+
+        // Assert: the generic error, the old password still works, the new one does not, the failure is counted
+        Assert.Equal("The code is not valid or was already used.", cut.Find("[data-testid='account-error']").TextContent);
+        Assert.Empty(cut.FindAll("[data-testid='account-message']"));
+        var token = TestContext.Current.CancellationToken;
+        Assert.Equal(1, (await Users.GetAsync("ann", token))!.FailedLoginCount);
+        Assert.NotNull(await Users.ConfirmPasswordAsync("ann", Password, token));
+        Assert.Null(await Users.ConfirmPasswordAsync("ann", NewPassword, token));
+        Assert.Equal(string.Empty, cut.Find("[data-testid='current-password-input']").GetAttribute("value") ?? string.Empty);
+        Assert.Equal(string.Empty, cut.Find("[data-testid='change-password-code-input']").GetAttribute("value") ?? string.Empty);
+    }
+
+    /// <summary>
+    ///     Test that the right password and a fresh code change the password and empty the fields.
+    /// </summary>
+    [Fact]
+    public async Task AccountPage_ChangePassword_Enrolled_RightCode_ChangesPasswordAndClearsFields()
+    {
+        // Arrange: an enrolled user; the code of the next time step, as the one of enrolling was used
+        await CreateAnnAsync();
+        var (secret, _) = await EnrollTotpAsync("ann", Password);
+        Time.Advance(TimeSpan.FromSeconds(30));
+        var cut = Render<AccountPage>();
+        await FillChangeFormAsync(cut, Password, NewPassword, TotpOracle.CodeAt(secret, Time.GetUtcNow()));
+
+        // Act: submit
+        await cut.Find("[data-testid='change-password-form']").SubmitAsync();
+
+        // Assert: the confirmation, the new password works, and the fields are empty
+        Assert.Equal("Your password was changed.", cut.Find("[data-testid='account-message']").TextContent);
+        Assert.NotNull(await Users.ConfirmPasswordAsync("ann", NewPassword, TestContext.Current.CancellationToken));
+        Assert.Equal(string.Empty, cut.Find("[data-testid='new-password-input']").GetAttribute("value") ?? string.Empty);
+        Assert.Equal(string.Empty, cut.Find("[data-testid='change-password-code-input']").GetAttribute("value") ?? string.Empty);
+    }
+
+    /// <summary>
+    ///     Test that a recovery code changes the password and the count of recovery codes left goes down.
+    /// </summary>
+    [Fact]
+    public async Task AccountPage_ChangePassword_Enrolled_RecoveryCode_ChangesPasswordAndRefreshesTheCount()
+    {
+        // Arrange: an enrolled user who types a recovery code
+        await CreateAnnAsync();
+        var (_, recovery) = await EnrollTotpAsync("ann", Password);
+        var cut = Render<AccountPage>();
+        await FillChangeFormAsync(cut, Password, NewPassword, recovery[0]);
+
+        // Act: submit
+        await cut.Find("[data-testid='change-password-form']").SubmitAsync();
+
+        // Assert: changed, and nine recovery codes are left
+        Assert.Equal("Your password was changed.", cut.Find("[data-testid='account-message']").TextContent);
+        Assert.NotNull(await Users.ConfirmPasswordAsync("ann", NewPassword, TestContext.Current.CancellationToken));
+        Assert.Contains("9 recovery codes left", cut.Find("[data-testid='totp-recovery-left']").TextContent, StringComparison.Ordinal);
+    }
+
+    /// <summary>
     ///     Creates the signed-in user as a local user with the test password.
     /// </summary>
     /// <returns>A task that completes when the user exists.</returns>
     private async Task CreateAnnAsync()
     {
         await Users.CreateAsync("ann", "Ann", UserRole.Reviewer, Password, TestContext.Current.CancellationToken);
+    }
+
+    /// <summary>
+    ///     Types the three password fields (and the code when there is one) of the change-password form.
+    /// </summary>
+    /// <param name="cut">The rendered page.</param>
+    /// <param name="current">The current password.</param>
+    /// <param name="newPassword">The new password, typed twice.</param>
+    /// <param name="code">The code or recovery code; <c>null</c> to leave the field empty.</param>
+    /// <returns>A task that completes when the fields are filled.</returns>
+    private static async Task FillChangeFormAsync(IRenderedComponent<AccountPage> cut, string current, string newPassword, string? code)
+    {
+        await cut.Find("[data-testid='current-password-input']").InputAsync(current);
+        await cut.Find("[data-testid='new-password-input']").InputAsync(newPassword);
+        await cut.Find("[data-testid='confirm-password-input']").InputAsync(newPassword);
+        if (code is not null)
+        {
+            await cut.Find("[data-testid='change-password-code-input']").InputAsync(code);
+        }
     }
 
     /// <summary>

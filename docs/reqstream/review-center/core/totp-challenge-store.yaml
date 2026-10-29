@@ -47,20 +47,31 @@ sections:
 
       - id: ReviewCenter-TotpChallengeStore-Bounded
         title: >-
-          The TotpChallengeStore class shall keep at most 10000 challenges and, when it is full, drop the ended ones
-          first and then the oldest.
+          The TotpChallengeStore class shall keep at most 10000 challenges, also when a challenge is given back after a
+          wrong code, and, when it is full, drop the ended ones first and then the oldest, or drop the challenge that
+          is given back and no other, and shall remember the invalidations of users only for a bounded time and in a
+          bounded number.
         justification: |
           Anybody who knows a name and password can make a challenge, so the memory that they take must have a limit
           that a flood cannot pass.
         tests:
           - TotpChallengeStore_Issue_BeyondTheCap_StaysWithinTheCapAndDropsTheOldest
+          - TotpChallengeStore_Return_WhenStoreFilledAfterTake_DropsInsteadOfExceedingTheCap
+          - TotpChallengeStore_Return_WhenFullOfEndedEntries_DropsEndedAndStores
+          - TotpChallengeStore_InvalidateUser_TombstonesArePrunedAfterTheLifetime
+          - TotpChallengeStore_InvalidateUser_TombstonesAreBoundedAndOverflowFailsSafe
 
       - id: ReviewCenter-TotpChallengeStore-Invalidate
         title: >-
           The TotpChallengeStore class shall drop every challenge of one user on request, without regard to the case of
-          the name, and leave the challenges of other users, and shall refuse missing arguments.
+          the name, and leave the challenges of other users, shall not take back a challenge that was taken before the
+          user was invalidated, however long the check took, and shall refuse missing arguments.
         justification: |
-          When the second factor of a user is removed or reset, a sign-in that was begun before must not be completed.
+          When the second factor of a user is removed or reset, a sign-in that was begun before must not be completed,
+          also not by a check that was already running and gives its challenge back afterwards.
         tests:
           - TotpChallengeStore_InvalidateUser_DropsOnlyThatUsersChallenges
+          - TotpChallengeStore_Return_AfterInvalidateUser_IsRefusedAndNotStored
+          - TotpChallengeStore_Return_AfterInvalidatingAnotherUser_StillStores
+          - TotpChallengeStore_Return_ChallengeTakenAfterTheInvalidation_IsStored
           - TotpChallengeStore_NullArguments_Throw

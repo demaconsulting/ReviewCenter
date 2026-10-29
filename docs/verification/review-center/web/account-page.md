@@ -46,6 +46,9 @@ N/A - standard test environment.
 - An enrolled user sees the status On, the number of recovery codes left, the forms to turn it off and to get new
   recovery codes, and no secret; a wrong code in either form shows the generic message, keeps the state, and empties the
   fields; a recovery code and the password turn it off; the right password and code show ten new codes once.
+- For an enrolled user the change-password form has a field for a code or a recovery code (no field for others); the
+  password alone is refused with the general message and changes nothing, and the right password with a code or a
+  recovery code changes the password and empties the fields.
 
 #### Test Scenarios
 
@@ -62,6 +65,23 @@ password works, the old one does not, and the fields are empty. This scenario is
 repeated password that differs, and a new password that is too short; an error naming the problem is shown, no
 confirmation is shown, and the old password still works. This scenario is tested by
 `AccountPage_ChangePassword_InvalidInput_ShowsErrorAndChangesNothing`.
+
+**AccountPage_ChangePassword_CodeField_IsShownOnlyForAnEnrolledUser**: A theory over an enrolled user, a user without a
+second factor, and a user with a temporary password; the field for the code is in the change-password form of the
+enrolled user only. This scenario is tested by `AccountPage_ChangePassword_CodeField_IsShownOnlyForAnEnrolledUser`.
+
+**AccountPage_ChangePassword_Enrolled_PasswordOnly_ShowsGenericErrorAndChangesNothing**: An enrolled user submits the
+right current password and a new one without a code; the general message is shown, the old password still works, the
+new one does not, the failure is counted, and the fields are empty. This scenario is tested by
+`AccountPage_ChangePassword_Enrolled_PasswordOnly_ShowsGenericErrorAndChangesNothing`.
+
+**AccountPage_ChangePassword_Enrolled_RightCode_ChangesPasswordAndClearsFields**: An enrolled user submits the password
+and a fresh code; the confirmation is shown, the new password works, and the password and code fields are empty. This
+scenario is tested by `AccountPage_ChangePassword_Enrolled_RightCode_ChangesPasswordAndClearsFields`.
+
+**AccountPage_ChangePassword_Enrolled_RecoveryCode_ChangesPasswordAndRefreshesTheCount**: An enrolled user submits a
+recovery code; the password changes and the card shows nine recovery codes left. This scenario is tested by
+`AccountPage_ChangePassword_Enrolled_RecoveryCode_ChangesPasswordAndRefreshesTheCount`.
 
 **AccountPage_Render_AppearanceCard_ShowsThreeOptionsWithSystemSelected**: With no stored choice the appearance card
 shows three radio options, and System is selected while Light and Dark are not. This scenario is tested by

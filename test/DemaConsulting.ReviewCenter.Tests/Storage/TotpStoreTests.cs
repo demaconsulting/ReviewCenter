@@ -126,6 +126,112 @@ public class TotpStoreTests
     }
 
     /// <summary>
+    ///     Runs an action many times at once, released together.
+    /// </summary>
+    /// <typeparam name="T">The result type.</typeparam>
+    /// <param name="count">How many parallel calls.</param>
+    /// <param name="action">The action; gets the index of the call.</param>
+    /// <returns>The results, or the first exception when any call fails.</returns>
+    private static async Task<T[]> ParallelAsync<T>(int count, Func<int, Task<T>> action)
+    {
+        using var start = new ManualResetEventSlim();
+        var tasks = Enumerable.Range(0, count).Select(i => Task.Run(
+            async () =>
+            {
+                start.Wait(Token);
+                return await action(i);
+            },
+            Token)).ToList();
+        start.Set();
+        return await Task.WhenAll(tasks);
+    }
+
+    /// <summary>
+    ///     Test that many concurrent starts of the same user never raise: all of them succeed, and exactly one
+    ///     coherent pending enrollment remains.
+    /// </summary>
+    [Fact]
+    public async Task TotpStore_SavePendingAsync_ManyConcurrentStarts_NoExceptionAndOneCoherentPendingRow()
+    {
+        // Arrange: a database; five rounds, each with a new user and 32 starts with distinct secrets
+        using var db = new TestStore();
+        for (var round = 0; round < 5; round++)
+        {
+            var userId = await AddUserAsync(db, "user" + round);
+            var secrets = Enumerable.Range(0, 32).Select(i => $"secret-{round}-{i}").ToList();
+
+            // Act: all start at once
+            var results = await ParallelAsync(
+                32,
+                i => db.Totp.SavePendingAsync(new UserTotp { UserId = userId, ProtectedSecret = secrets[i], Created = _now }, Token));
+
+            // Assert: none raised, all succeeded, and one pending row with one of the submitted secrets
+            Assert.All(results, Assert.True);
+            await using var context = await db.Factory.CreateDbContextAsync(Token);
+            var row = Assert.Single(await context.UserTotps.Where(t => t.UserId == userId).ToListAsync(Token));
+            Assert.Null(row.ConfirmedAt);
+            Assert.Equal(0, row.LastAcceptedStep);
+            Assert.Contains(row.ProtectedSecret, secrets);
+        }
+    }
+
+    /// <summary>
+    ///     Test that concurrent starts against a confirmed enrollment all refuse and never overwrite it.
+    /// </summary>
+    [Fact]
+    public async Task TotpStore_SavePendingAsync_ConfirmedRow_ConcurrentStarts_AllRefuseAndNeverOverwrite()
+    {
+        // Arrange: a confirmed enrollment with two recovery codes
+        using var db = new TestStore();
+        var userId = await AddUserAsync(db);
+        await EnrollAsync(db, userId, 42, Hash('a'), Hash('b'));
+
+        // Act: 32 starts at once
+        var results = await ParallelAsync(
+            32,
+            i => db.Totp.SavePendingAsync(new UserTotp { UserId = userId, ProtectedSecret = "other-" + i, Created = _now.AddHours(1) }, Token));
+
+        // Assert: all refused, and the enrollment is exactly as it was
+        Assert.All(results, Assert.False);
+        var row = await db.Totp.GetAsync(userId, Token);
+        Assert.NotNull(row);
+        Assert.Equal("protected-" + userId, row.ProtectedSecret);
+        Assert.Equal(_now, row.ConfirmedAt);
+        Assert.Equal(42, row.LastAcceptedStep);
+        Assert.Equal(2, await db.Totp.CountUnusedRecoveryCodesAsync(userId, Token));
+    }
+
+    /// <summary>
+    ///     Test that starts racing with a confirmation never raise and never overwrite the confirmed enrollment.
+    /// </summary>
+    [Fact]
+    public async Task TotpStore_SavePendingAsync_ConcurrentWithConfirm_NoExceptionAndConfirmedStaysConfirmed()
+    {
+        // Arrange: a pending enrollment
+        using var db = new TestStore();
+        var userId = await AddUserAsync(db);
+        Assert.True(await PendingAsync(db, userId));
+        var secrets = Enumerable.Range(0, 16).Select(i => "racing-" + i).Append("protected-" + userId).ToList();
+
+        // Act: 16 starts and one confirmation at once
+        var results = await ParallelAsync(
+            17,
+            async i => i < 16
+                ? await db.Totp.SavePendingAsync(new UserTotp { UserId = userId, ProtectedSecret = secrets[i], Created = _now }, Token)
+                : await db.Totp.ConfirmAsync(userId, 7, _now, [Hash('a'), Hash('b')], Draft("auth.totp-enrolled"), Token));
+
+        // Assert: the confirmation won (a pending row always exists), the final row is confirmed with its step and
+        // codes, and starts after it were refused
+        Assert.True(results[16]);
+        var row = await db.Totp.GetAsync(userId, Token);
+        Assert.NotNull(row);
+        Assert.True(row.IsActive);
+        Assert.Equal(7, row.LastAcceptedStep);
+        Assert.Contains(row.ProtectedSecret, secrets);
+        Assert.Equal(2, await db.Totp.CountUnusedRecoveryCodesAsync(userId, Token));
+    }
+
+    /// <summary>
     ///     Test that confirming activates the enrollment, stores the recovery codes and the audit entry together, and
     ///     that a second confirmation and a new pending enrollment are refused.
     /// </summary>

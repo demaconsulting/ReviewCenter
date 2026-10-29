@@ -231,4 +231,66 @@ public class UserServiceTotpTests
         // Assert: no user and no request for a code
         Assert.Equal(new PasswordStep(null, false), step);
     }
+
+    /// <summary>
+    ///     Test that the password-only change fails closed for an enrolled account: refused, the hash and the failure
+    ///     counter stay as they were, and the audit trail says a second factor is required.
+    /// </summary>
+    [Fact]
+    public async Task UserService_ChangeOwnPasswordAsync_EnrolledUser_FailsClosedAndKeepsHashAndCounter()
+    {
+        // Arrange: ann is enrolled with three failures on record
+        var world = new TotpTestWorld();
+        await world.AddUserAsync("ann");
+        await world.EnrollAsync("ann");
+        for (var i = 0; i < 3; i++)
+        {
+            await world.UserService.AuthenticatePasswordAsync("ann", "wrong password", Token);
+        }
+
+        var before = (await world.Users.GetByUsernameAsync("ann", Token))!.PasswordHash;
+
+        // Act: the legacy change with the right password
+        var exception = await Assert.ThrowsAsync<DomainRuleException>(
+            () => world.UserService.ChangeOwnPasswordAsync("ann", TotpTestWorld.Password, "another long passphrase", Token));
+
+        // Assert: refused, nothing changed (the counter is neither reset nor raised), and the reason is on record
+        var after = (await world.Users.GetByUsernameAsync("ann", Token))!;
+        Assert.Equal(DomainRule.TotpCodeIncorrect, exception.Rule);
+        Assert.Equal(before, after.PasswordHash);
+        Assert.Equal(3, after.FailedLoginCount);
+        Assert.Contains(world.AuditStore.Entries, e => e.Action == TotpService.FailedAction && e.Detail.Contains("second factor required", StringComparison.Ordinal));
+        Assert.DoesNotContain(world.Users.Audits, a => a.Action == "user.password-changed");
+    }
+
+    /// <summary>
+    ///     Test that the legacy change still counts a wrong current password for an enrolled account, and still works
+    ///     for an enrolled account while the feature is switched off.
+    /// </summary>
+    [Fact]
+    public async Task UserService_ChangeOwnPasswordAsync_EnrolledUser_WrongPasswordCountsAndFeatureOffChanges()
+    {
+        // Arrange: ann is enrolled; a second user service shares the stores but has the feature off
+        var world = new TotpTestWorld();
+        await world.AddUserAsync("ann");
+        await world.EnrollAsync("ann");
+        var off = new UserService(
+            world.Users,
+            new FakePasswordHasher(),
+            world.Clock,
+            world.Audit,
+            world.Store,
+            new TotpSettings(false, TotpSettings.DefaultIssuer));
+
+        // Act: a wrong current password, then the right one with the feature off
+        var wrong = await Assert.ThrowsAsync<DomainRuleException>(
+            () => world.UserService.ChangeOwnPasswordAsync("ann", "wrong password", "another long passphrase", Token));
+        var counted = (await world.Users.GetByUsernameAsync("ann", Token))!.FailedLoginCount;
+        await off.ChangeOwnPasswordAsync("ann", TotpTestWorld.Password, "another long passphrase", Token);
+
+        // Assert: the wrong password is a plain wrong password (counted), and the feature-off change went through
+        Assert.Equal(DomainRule.CurrentPasswordIncorrect, wrong.Rule);
+        Assert.Equal(1, counted);
+        Assert.NotNull(await off.ConfirmPasswordAsync("ann", "another long passphrase", Token));
+    }
 }

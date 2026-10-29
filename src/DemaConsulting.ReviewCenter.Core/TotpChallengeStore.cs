@@ -33,13 +33,17 @@ namespace DemaConsulting.ReviewCenter.Core;
 /// <param name="ReturnUrl">The local address to go to after the sign-in.</param>
 /// <param name="Expires">The moment the challenge ends.</param>
 /// <param name="Failures">How many wrong codes were tried with this challenge.</param>
+/// <param name="Generation">
+///     Set by <see cref="TotpChallengeStore.Take"/> to the invalidation count at that moment; 0 in the store.
+/// </param>
 public sealed record TotpChallenge(
     string TokenHash,
     string Username,
     string ClientAddress,
     string ReturnUrl,
     DateTimeOffset Expires,
-    int Failures);
+    int Failures,
+    long Generation = 0);
 
 /// <summary>
 ///     Remembers, for a short time, that a user has typed the right password and still owes the second factor,
@@ -96,6 +100,22 @@ public sealed class TotpChallengeStore
     ///     Guards <see cref="_challenges"/>.
     /// </summary>
     private readonly object _lock = new();
+
+    /// <summary>
+    ///     Counts the invalidations of users; a challenge records the value at <see cref="Take"/>.
+    /// </summary>
+    private long _sequence;
+
+    /// <summary>
+    ///     Challenges taken before this value are refused by <see cref="Return"/> (the fail-safe of a full <see cref="_invalidated"/>).
+    /// </summary>
+    private long _floor;
+
+    /// <summary>
+    ///     The last invalidation of each user, by upper-cased name: its sequence and moment. Bounded by
+    ///     <see cref="MaxEntries"/> and pruned after <see cref="Lifetime"/>.
+    /// </summary>
+    private readonly Dictionary<string, (long Sequence, DateTimeOffset At)> _invalidated = new(StringComparer.Ordinal);
 
     /// <summary>
     ///     Initializes a new instance of the <see cref="TotpChallengeStore"/> class.
@@ -206,7 +226,7 @@ public sealed class TotpChallengeStore
             }
 
             _challenges.Remove(hash);
-            return challenge;
+            return challenge with { Generation = _sequence };
         }
     }
 
@@ -219,7 +239,7 @@ public sealed class TotpChallengeStore
     public bool Return(TotpChallenge challenge)
     {
         ArgumentNullException.ThrowIfNull(challenge);
-        var failed = challenge with { Failures = challenge.Failures + 1 };
+        var failed = challenge with { Failures = challenge.Failures + 1, Generation = 0 };
         var now = _timeProvider.GetUtcNow();
         if (failed.Failures >= MaxFailures || failed.Expires <= now)
         {
@@ -228,6 +248,24 @@ public sealed class TotpChallengeStore
 
         lock (_lock)
         {
+            // A challenge taken before its user was invalidated is not given back, however long the check took
+            if (challenge.Generation < _floor
+                || (_invalidated.TryGetValue(UserKey(challenge.Username), out var invalidation)
+                    && invalidation.Sequence > challenge.Generation))
+            {
+                return false;
+            }
+
+            // The cap holds here too: ended challenges make room, otherwise this one is dropped (nobody else is evicted)
+            if (!_challenges.ContainsKey(failed.TokenHash) && _challenges.Count >= MaxEntries)
+            {
+                RemoveEnded(now);
+                if (_challenges.Count >= MaxEntries)
+                {
+                    return false;
+                }
+            }
+
             _challenges[failed.TokenHash] = failed;
         }
 
@@ -238,10 +276,15 @@ public sealed class TotpChallengeStore
     ///     Drops every challenge of a user, for example because the second factor was removed or replaced.
     /// </summary>
     /// <param name="username">The user name; compared without regard to case. Must not be null.</param>
+    /// <remarks>
+    ///     A challenge that was taken and is being checked is not in the store, so the invalidation is remembered
+    ///     (bounded, see <see cref="TombstoneCount"/>) and <see cref="Return"/> refuses such a challenge.
+    /// </remarks>
     /// <exception cref="ArgumentNullException">Thrown when <paramref name="username"/> is null.</exception>
     public void InvalidateUser(string username)
     {
         ArgumentNullException.ThrowIfNull(username);
+        var now = _timeProvider.GetUtcNow();
         lock (_lock)
         {
             foreach (var hash in _challenges
@@ -250,6 +293,22 @@ public sealed class TotpChallengeStore
                          .ToList())
             {
                 _challenges.Remove(hash);
+            }
+
+            _sequence++;
+
+            // A taken challenge ends at most Lifetime after it was issued, so older notes can not matter any more
+            foreach (var key in _invalidated.Where(pair => pair.Value.At + Lifetime <= now).Select(pair => pair.Key).ToList())
+            {
+                _invalidated.Remove(key);
+            }
+
+            _invalidated[UserKey(username)] = (_sequence, now);
+            if (_invalidated.Count >= MaxEntries)
+            {
+                // Fail safe: forget the notes and refuse every challenge taken so far instead
+                _invalidated.Clear();
+                _floor = _sequence;
             }
         }
     }
@@ -264,6 +323,28 @@ public sealed class TotpChallengeStore
         {
             return _challenges.Count;
         }
+    }
+
+    /// <summary>
+    ///     Gets the number of remembered invalidations; for tests of the bound.
+    /// </summary>
+    /// <returns>The number of users with a remembered invalidation.</returns>
+    internal int TombstoneCount()
+    {
+        lock (_lock)
+        {
+            return _invalidated.Count;
+        }
+    }
+
+    /// <summary>
+    ///     Builds the key of a user name for the remembered invalidations.
+    /// </summary>
+    /// <param name="username">The user name.</param>
+    /// <returns>The name without regard to case.</returns>
+    private static string UserKey(string username)
+    {
+        return username.ToUpperInvariant();
     }
 
     /// <summary>
@@ -293,14 +374,23 @@ public sealed class TotpChallengeStore
     /// <remarks>The caller holds the lock.</remarks>
     private void MakeRoom(DateTimeOffset now)
     {
-        foreach (var hash in _challenges.Where(pair => pair.Value.Expires <= now).Select(pair => pair.Key).ToList())
-        {
-            _challenges.Remove(hash);
-        }
-
+        RemoveEnded(now);
         if (_challenges.Count >= MaxEntries)
         {
             _challenges.Remove(_challenges.MinBy(pair => pair.Value.Expires).Key);
+        }
+    }
+
+    /// <summary>
+    ///     Drops the ended challenges.
+    /// </summary>
+    /// <param name="now">The current moment.</param>
+    /// <remarks>The caller holds the lock.</remarks>
+    private void RemoveEnded(DateTimeOffset now)
+    {
+        foreach (var hash in _challenges.Where(pair => pair.Value.Expires <= now).Select(pair => pair.Key).ToList())
+        {
+            _challenges.Remove(hash);
         }
     }
 }

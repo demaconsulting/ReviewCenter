@@ -445,7 +445,9 @@ backwards. A code is accepted once: the time step of an accepted code is stored 
 reused code and a race between two requests both fail. Recovery codes are stored as hashes and are never accepted for a
 signature. A wrong code counts toward the same lockout as a wrong password. With a second factor, the password alone
 signs nobody in: `UserService.AuthenticatePasswordAsync` reports that a code is required, the older password-only
-methods fail closed, and a signature needs the password and a current code. The audited changes are stored with their
+methods fail closed, and a signature needs the password and a current code. Changing the own password needs the code
+as well (`TotpService.ChangeOwnPasswordAsync`; the password-only overload of `UserService` fails closed), with the same
+replay rule and counter. The audited changes are stored with their
 entry by the store, which is why `TotpService` takes no `AuditService`. See the `TotpService`, `TotpChallengeStore`,
 `UserService`, and `SigningService` units.
 

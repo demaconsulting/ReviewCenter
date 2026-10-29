@@ -19,13 +19,20 @@ sections:
         title: >-
           The AccountPage unit shall change the password of the signed-in user when the current password is given
           correctly and the new password follows the password rules, clearing the password fields afterwards, and
-          shall show a violated rule as a message, changing nothing.
+          shall show a violated rule as a message, changing nothing. While the second factor is on it shall also ask
+          for a code or a recovery code, send it with the request, answer a missing or wrong code with a general
+          message, and empty that field too; it shall ask for no code otherwise.
         justification: |
           The current password is required so that somebody at an unattended session cannot take over the
-          account, and the fields are cleared so that no password stays on the page.
+          account, and the fields are cleared so that no password stays on the page. With a second factor the
+          password alone is not enough, so the page must offer the field for the code.
         tests:
           - AccountPage_ChangePassword_ValidInput_ChangesOwnPasswordAndClearsFields
           - AccountPage_ChangePassword_InvalidInput_ShowsErrorAndChangesNothing
+          - AccountPage_ChangePassword_CodeField_IsShownOnlyForAnEnrolledUser
+          - AccountPage_ChangePassword_Enrolled_PasswordOnly_ShowsGenericErrorAndChangesNothing
+          - AccountPage_ChangePassword_Enrolled_RightCode_ChangesPasswordAndClearsFields
+          - AccountPage_ChangePassword_Enrolled_RecoveryCode_ChangesPasswordAndRefreshesTheCount
 
       - id: ReviewCenter-AccountPage-TemporaryPassword
         title: >-

@@ -250,7 +250,9 @@ system administrator.
 Reports `UserNotFound` for an unknown user and `LastAdmin` when the change would remove the right from the last
 enabled system administrator.
 
-**ChangeOwnPasswordAsync**: Changes the password of a user who knows the current one.
+**ChangeOwnPasswordAsync**: Changes the password of a user who knows the current one. A user whose second factor is on
+needs the proof of it too; the public overload cannot give it and fails closed for such a user, and
+`TotpService.ChangeOwnPasswordAsync` is the way in with a code.
 
 - _Parameters_: `string username`, `string? currentPassword`, `string? newPassword`, and a cancellation token.
 - _Returns_: `Task`.
@@ -263,6 +265,14 @@ way to guess passwords, and is reported as `CurrentPasswordIncorrect`. While `Mu
 equal to the current (temporary) one is refused with `PasswordInvalid`; a successful change clears the flag, so the
 session that carried the must-change-password claim becomes stale and the user signs in again. Other sessions of the
 user are not ended.
+
+Both overloads run one internal method under the gate of the service. For a user with an active second factor (the
+feature is on and an enrollment is confirmed) it takes a verifier from `TotpService` (a delegate, because `TotpService`
+depends on `UserService`). Without a verifier it records a coalesced `auth.totp-failed` entry and reports
+`TotpCodeIncorrect`, without counting. With a verifier that rejects the code (wrong, reused, or empty) it counts the
+failure on the shared counter and reports `TotpCodeIncorrect`. The hash, the flag, the failure counter, and the lockout
+are written only after the whole proof succeeded, so a right password alone never clears the counter that wrong codes
+use. A user without a second factor, with a temporary password, or while the feature is off needs no code.
 
 **SetPasswordAsync**: Sets the password of a user without the current one (for an administrator). The password is
 checked (`PasswordInvalid`), an unknown user is reported as `UserNotFound`, and the failure counter and lockout of the
@@ -289,9 +299,9 @@ are bounded by the lockout and are recorded every time. The failures of `Reauthe
 `signature.reauth-failed` with the same details instead of `auth.sign-in-failed` and `auth.sign-in-locked`; the
 lockout entry stays `auth.locked-out`. These events change no data of their own and are recorded best-effort,
 awaited and logged on failure, so a broken trail can never block a sign-in. The update of the failure counter and the
-lockout state is itself not audited (no draft). One limit is known and deliberate: `ChangeOwnPasswordAsync` was not
-changed, so a wrong current password on the account page is recorded as `auth.sign-in-failed`, and a refusal there
-because the account is locked is not recorded. The address of the client is not known to this unit and is not
+lockout state is itself not audited (no draft). One limit is known and deliberate: `ChangeOwnPasswordAsync` does not
+audit a refusal because the account is locked, and a wrong current password on the account page is recorded as
+`auth.sign-in-failed`. The address of the client is not known to this unit and is not
 recorded. A wrong second factor code is recorded by `RegisterSecondFactorFailureAsync` under the action given by
 `TotpService` (`auth.totp-failed`, or `signature.reauth-failed` for a signature) with a fixed detail, every time, like a
 wrong password.

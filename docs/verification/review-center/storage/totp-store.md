@@ -17,7 +17,8 @@ N/A - standard test environment (a temporary SQLite database file is created by 
 #### Acceptance Criteria
 
 - All tests pass with zero failures.
-- A pending enrollment round-trips, is not active, is replaced by a newer one, and is listed nowhere.
+- A pending enrollment round-trips, is not active, is replaced by a newer one, and is listed nowhere; many concurrent
+  starts never throw, leave exactly one pending row, and never overwrite a confirmed enrollment.
 - Confirming makes the enrollment active, stores the recovery code hashes, and writes the audit entry in one
   transaction; a second confirmation, a restart of an active enrollment, and a confirmation without a pending
   enrollment change nothing and write no entry.
@@ -38,6 +39,19 @@ N/A - standard test environment (a temporary SQLite database file is created by 
 **TotpStore_SavePendingAsync_RoundTripsAndReplacesAPendingEnrollment**: A pending enrollment is saved and read back; it
 is not active, has no confirmation time, is replaced by a second save, and is not listed among the active users. This
 scenario is tested by `TotpStore_SavePendingAsync_RoundTripsAndReplacesAPendingEnrollment`.
+
+**TotpStore_SavePendingAsync_ManyConcurrentStarts_NoExceptionAndOneCoherentPendingRow**: In several rounds 32 starts
+for one user are released together; none of them throws, all report success, and exactly one pending row is left, with
+the secret of one of the starts. This scenario is tested by
+`TotpStore_SavePendingAsync_ManyConcurrentStarts_NoExceptionAndOneCoherentPendingRow`.
+
+**TotpStore_SavePendingAsync_ConfirmedRow_ConcurrentStarts_AllRefuseAndNeverOverwrite**: With a confirmed enrollment,
+many parallel starts are all refused without an exception and the confirmed row is unchanged. This scenario is tested
+by `TotpStore_SavePendingAsync_ConfirmedRow_ConcurrentStarts_AllRefuseAndNeverOverwrite`.
+
+**TotpStore_SavePendingAsync_ConcurrentWithConfirm_NoExceptionAndConfirmedStaysConfirmed**: Starts that race with a
+confirmation of the pending enrollment never throw, and the row stays confirmed once the confirmation succeeded. This
+scenario is tested by `TotpStore_SavePendingAsync_ConcurrentWithConfirm_NoExceptionAndConfirmedStaysConfirmed`.
 
 **TotpStore_ConfirmAsync_ActivatesStoresCodesAndAuditsOnce**: Confirming activates the enrollment with the step and
 the time, stores three recovery codes, lists the user as active, and writes one audit entry; a second confirmation and

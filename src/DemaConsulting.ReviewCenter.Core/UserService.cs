@@ -708,17 +708,52 @@ public sealed class UserService
     ///     A wrong current password counts as a failed sign-in (so this operation is no free way to guess
     ///     passwords), and a locked-out account is refused like a wrong password. A successful change clears
     ///     <see cref="User.MustChangePassword"/>; while it is set, the new password must differ from the current one.
+    ///     This overload can not check a second factor, so it fails closed for a user who has one: it is refused
+    ///     without changing anything, and <see cref="TotpService.ChangeOwnPasswordAsync"/> is the way to change
+    ///     the password of such a user.
     /// </remarks>
     /// <exception cref="DomainRuleException">
     ///     Thrown with <see cref="DomainRule.PasswordInvalid"/> when the new password breaks the policy,
-    ///     <see cref="DomainRule.UserNotFound"/> when there is no such user, or
-    ///     <see cref="DomainRule.CurrentPasswordIncorrect"/> when the current password is wrong or the account is locked out.
+    ///     <see cref="DomainRule.UserNotFound"/> when there is no such user,
+    ///     <see cref="DomainRule.CurrentPasswordIncorrect"/> when the current password is wrong or the account is locked out, or
+    ///     <see cref="DomainRule.TotpCodeIncorrect"/> when the user has a second factor.
     /// </exception>
-    public async Task ChangeOwnPasswordAsync(
+    public Task ChangeOwnPasswordAsync(
         string username,
         string? currentPassword,
         string? newPassword,
         CancellationToken cancellationToken = default)
+    {
+        return ChangeOwnPasswordCoreAsync(username, currentPassword, newPassword, null, cancellationToken);
+    }
+
+    /// <summary>
+    ///     Changes the password of a user who knows the current one and, when the user has a second factor, proves it.
+    /// </summary>
+    /// <param name="username">The user name; compared without regard to case.</param>
+    /// <param name="currentPassword">The current password.</param>
+    /// <param name="newPassword">The new password; same policy as for a new user.</param>
+    /// <param name="verifySecondFactor">
+    ///     Checks the second factor of the user and uses the code up; <c>null</c> when the caller can not check one.
+    ///     It runs inside the gate, so it must not call back into this service's gated members.
+    /// </param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <returns>A task that completes when the new hash is stored.</returns>
+    /// <remarks>
+    ///     With an active second factor the password alone is never enough: no verifier refuses without touching
+    ///     the failure counter, a verifier that returns <c>false</c> counts as a failure (same lockout as a wrong
+    ///     password), and the counter is cleared only after the password and the second factor were both right.
+    /// </remarks>
+    /// <exception cref="DomainRuleException">
+    ///     Thrown with <see cref="DomainRule.PasswordInvalid"/>, <see cref="DomainRule.UserNotFound"/>,
+    ///     <see cref="DomainRule.CurrentPasswordIncorrect"/> or <see cref="DomainRule.TotpCodeIncorrect"/>.
+    /// </exception>
+    internal async Task ChangeOwnPasswordCoreAsync(
+        string username,
+        string? currentPassword,
+        string? newPassword,
+        Func<User, CancellationToken, Task<bool>>? verifySecondFactor,
+        CancellationToken cancellationToken)
     {
         ValidatePassword(newPassword);
 
@@ -743,6 +778,31 @@ public sealed class UserService
                 throw new DomainRuleException(
                     DomainRule.PasswordInvalid,
                     "Choose a password different from the temporary one.");
+            }
+
+            // With a second factor the password alone never changes anything and never clears the counter that
+            // wrong codes share: the clearing below happens only after the whole proof succeeded
+            if (await HasActiveSecondFactorAsync(user, cancellationToken))
+            {
+                if (verifySecondFactor is null)
+                {
+                    await RecordCoalescedAsync(
+                        user,
+                        TotpService.FailedAction,
+                        "second factor required (password change)",
+                        cancellationToken);
+                    throw new DomainRuleException(DomainRule.TotpCodeIncorrect, TotpService.PasswordChangeCodeMessage);
+                }
+
+                if (!await verifySecondFactor(user, cancellationToken))
+                {
+                    _ = await RegisterFailureAsync(
+                        user,
+                        TotpService.FailedAction,
+                        "wrong or reused code (password change)",
+                        cancellationToken);
+                    throw new DomainRuleException(DomainRule.TotpCodeIncorrect, TotpService.CodeIncorrectMessage);
+                }
             }
 
             user.PasswordHash = _hasher.Hash(newPassword!);

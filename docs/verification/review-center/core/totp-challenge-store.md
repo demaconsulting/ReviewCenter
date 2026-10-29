@@ -22,7 +22,10 @@ N/A - standard test environment. The tests need no database, no files, and no ne
 - A pending sign-in ends after its lifetime, and ending removes it.
 - A pending sign-in given back after a failure is kept for fewer than the maximum number of failures, then ends.
 - Invalidating a user drops that user's pending sign-ins, without regard to case, and no others.
-- The number of pending sign-ins is capped, dropping ended ones first and then the oldest.
+- The number of pending sign-ins is capped, dropping ended ones first and then the oldest, and a pending sign-in
+  given back never takes the store over the cap.
+- A pending sign-in that is being checked when its user is invalidated is not given back, and the memory of
+  invalidations is bounded in time and number.
 - Missing arguments are refused.
 
 #### Test Scenarios
@@ -69,3 +72,32 @@ stays within the cap, keeps the newest, and drops the oldest. This scenario is t
 
 **TotpChallengeStore_NullArguments_Throw**: Null arguments raise `ArgumentNullException`. This scenario is tested by
 `TotpChallengeStore_NullArguments_Throw`.
+
+**TotpChallengeStore_Return_AfterInvalidateUser_IsRefusedAndNotStored**: A challenge is taken, its user is invalidated
+(in another case) while the code is being checked, and giving it back is refused and stores nothing. This scenario is
+tested by `TotpChallengeStore_Return_AfterInvalidateUser_IsRefusedAndNotStored`.
+
+**TotpChallengeStore_Return_AfterInvalidatingAnotherUser_StillStores**: Invalidating another user does not stop a taken
+challenge from being given back. This scenario is tested by
+`TotpChallengeStore_Return_AfterInvalidatingAnotherUser_StillStores`.
+
+**TotpChallengeStore_Return_ChallengeTakenAfterTheInvalidation_IsStored**: A challenge taken after the invalidation is
+given back and stored. This scenario is tested by
+`TotpChallengeStore_Return_ChallengeTakenAfterTheInvalidation_IsStored`.
+
+**TotpChallengeStore_Return_WhenStoreFilledAfterTake_DropsInsteadOfExceedingTheCap**: The store is filled to the cap
+with live challenges after a challenge was taken; giving it back is refused, the count stays at the cap, and no other
+challenge is evicted. This scenario is tested by
+`TotpChallengeStore_Return_WhenStoreFilledAfterTake_DropsInsteadOfExceedingTheCap`.
+
+**TotpChallengeStore_Return_WhenFullOfEndedEntries_DropsEndedAndStores**: When the full store holds ended challenges,
+they are dropped and the returned challenge is stored within the cap. This scenario is tested by
+`TotpChallengeStore_Return_WhenFullOfEndedEntries_DropsEndedAndStores`.
+
+**TotpChallengeStore_InvalidateUser_TombstonesArePrunedAfterTheLifetime**: The remembered invalidations are gone after
+the lifetime has passed on the test clock. This scenario is tested by
+`TotpChallengeStore_InvalidateUser_TombstonesArePrunedAfterTheLifetime`.
+
+**TotpChallengeStore_InvalidateUser_TombstonesAreBoundedAndOverflowFailsSafe**: Invalidating more users than the cap
+keeps the number of remembered invalidations below the cap, and a challenge taken before the overflow is still
+refused. This scenario is tested by `TotpChallengeStore_InvalidateUser_TombstonesAreBoundedAndOverflowFailsSafe`.

@@ -42,6 +42,12 @@ N/A - standard test environment. The tests need no database, no files, and no ne
 - Only an enabled system administrator who is not an API token actor can reset the second factor of another user;
   the reset is audited with the administrator and the target and ends pending sign-ins.
 - Neither a secret, a code, nor a recovery code reaches an audit entry or an error message.
+- Changing the own password with a second factor on needs the current password and a fresh code or an unused
+  recovery code, enforced in Core: a missing, wrong, or reused code is refused, counts on the shared counter, and
+  leaves the hash and the counter as they were; the counter is cleared only after the whole proof succeeded; an API
+  token actor is refused; users without a second factor, with a temporary password, or with the feature off need no
+  code.
+- A challenge whose user is invalidated while its code is checked is not given back.
 
 #### Test Scenarios
 
@@ -192,3 +198,56 @@ not available. This scenario is tested by `TotpService_GetStatusAsync_ApiTokenAc
 
 **TotpService_NullArguments_Throw**: Null arguments raise `ArgumentNullException`. This scenario is tested by
 `TotpService_NullArguments_Throw`.
+
+**TotpService_CompleteSignInAsync_UserInvalidatedWhileCodeIsChecked_DoesNotResurrectTheChallenge**: The user is
+invalidated while a wrong code is being checked (a hook of the in-memory store runs at that moment, so nothing waits);
+the challenge is not given back and a later try with it finds nothing. This scenario is tested by
+`TotpService_CompleteSignInAsync_UserInvalidatedWhileCodeIsChecked_DoesNotResurrectTheChallenge`.
+
+**TotpService_ChangeOwnPasswordAsync_NoCode_IsRefusedCountsAndKeepsTheHash**: A theory over a null, an empty, and a
+blank code; for an enrolled user the right password alone is refused with `TotpCodeIncorrect`, the stored hash is
+unchanged, and the failure counter is not cleared. This scenario is tested by
+`TotpService_ChangeOwnPasswordAsync_NoCode_IsRefusedCountsAndKeepsTheHash`.
+
+**TotpService_ChangeOwnPasswordAsync_WrongCodeOrWrongPassword_IsRefusedAndKeepsTheHash**: A wrong code raises
+`TotpCodeIncorrect` and counts as a failure; a wrong password raises `CurrentPasswordIncorrect`; neither changes the
+hash. This scenario is tested by
+`TotpService_ChangeOwnPasswordAsync_WrongCodeOrWrongPassword_IsRefusedAndKeepsTheHash`.
+
+**TotpService_ChangeOwnPasswordAsync_ReusedCode_IsRefused**: The code of a step that was already accepted is refused
+and the hash is unchanged. This scenario is tested by `TotpService_ChangeOwnPasswordAsync_ReusedCode_IsRefused`.
+
+**TotpService_ChangeOwnPasswordAsync_PasswordAndValidCode_ChangesAndClearsTheCounter**: The right password and a fresh
+code change the password, clear the failure counter, and the new password works. This scenario is tested by
+`TotpService_ChangeOwnPasswordAsync_PasswordAndValidCode_ChangesAndClearsTheCounter`.
+
+**TotpService_ChangeOwnPasswordAsync_RecoveryCode_WorksOnceAndIsAudited**: A recovery code changes the password once;
+its use is audited without the code, and a second use is refused. This scenario is tested by
+`TotpService_ChangeOwnPasswordAsync_RecoveryCode_WorksOnceAndIsAudited`.
+
+**TotpService_ChangeOwnPasswordAsync_FiveWrongCodes_LockTheAccount**: Five wrong codes lock the account, and a sixth
+try with the right code is refused while it is locked. This scenario is tested by
+`TotpService_ChangeOwnPasswordAsync_FiveWrongCodes_LockTheAccount`.
+
+**TotpService_ChangeOwnPasswordAsync_PasswordOnlyBetweenWrongCodes_DoesNotResetTheCounter**: Password-only attempts
+between wrong codes do not reset the shared counter, so the account is locked after five failures in total. This
+scenario is tested by `TotpService_ChangeOwnPasswordAsync_PasswordOnlyBetweenWrongCodes_DoesNotResetTheCounter`.
+
+**TotpService_ChangeOwnPasswordAsync_UnreadableSecret_RefusesCodesButRecoveryStillWorks**: With the protector unable
+to read the secret, a code is refused and a recovery code changes the password. This scenario is tested by
+`TotpService_ChangeOwnPasswordAsync_UnreadableSecret_RefusesCodesButRecoveryStillWorks`.
+
+**TotpService_ChangeOwnPasswordAsync_ApiTokenActor_ThrowsActorNotAllowed**: An API token actor is refused with
+`ActorNotAllowed` and nothing changes. This scenario is tested by
+`TotpService_ChangeOwnPasswordAsync_ApiTokenActor_ThrowsActorNotAllowed`.
+
+**TotpService_ChangeOwnPasswordAsync_NotEnrolledOrFeatureOff_PasswordAloneWorks**: A theory over a user without a
+second factor and a user with one while the feature is switched off; the password alone changes the password. This
+scenario is tested by `TotpService_ChangeOwnPasswordAsync_NotEnrolledOrFeatureOff_PasswordAloneWorks`.
+
+**TotpService_ChangeOwnPasswordAsync_TemporaryPassword_NeedsNoCode**: A user with a temporary password changes it with
+the password alone. This scenario is tested by `TotpService_ChangeOwnPasswordAsync_TemporaryPassword_NeedsNoCode`.
+
+**TotpService_ChangeOwnPasswordAsync_ConcurrentSameCode_ExactlyOneSucceeds**: Several changes with the same code are
+released together; exactly one succeeds. This scenario is tested by
+`TotpService_ChangeOwnPasswordAsync_ConcurrentSameCode_ExactlyOneSucceeds`.
