@@ -565,11 +565,13 @@ public class ReviewCenterSystemTests
         /// <returns>The error that the page shows; the number of slots must not have changed.</returns>
         public async Task<string> TryAddSlotAsync(string primary, string? alternate)
         {
+            // Draw the page again, so that the message of an earlier refusal cannot be taken for this one
+            await OpenReviewAsync();
             var before = await Browser.CountAsync("slot-status-");
             await FillSlotFormAsync(primary, alternate);
 
-            // A refusal leaves the page as it is, so give the server a moment and then check that nothing was added
-            await Task.Delay(1000, _cancellationToken);
+            // A refusal shows its message and leaves the slots as they are
+            await Browser.WaitUntilAsync(async () => (await Browser.TextOfAsync("new-slot-error")).Length > 0, "the refusal of the slot");
             Assert.Equal(before, await Browser.CountAsync("slot-status-"));
             return await Browser.TextOfAsync("new-slot-error");
         }
