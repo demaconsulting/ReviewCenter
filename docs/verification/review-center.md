@@ -16,6 +16,15 @@ finish. The operating system picks the port, so no fixed port is assumed; the te
 processes or change console state belong to the serial `Sequential` xUnit collection and run one at a time, while
 the in-memory test-server classes (which open no port and start no process) run in parallel.
 
+The review integrity, signing, evidence, and access promises are verified by the `ReviewCenterSystemTests` class of the
+`DemaConsulting.ReviewCenter.Puppet.Tests` project. Those tests start the real server of the tool on a free loopback
+port with a temporary SQLite database and a real git repository, and drive it through a real Chromium browser with the
+Puppet tool (sign-in, planning a review from the repository, naming reviewers, answering the checklist, signing) and
+through the HTTP API with a personal access token. They are skipped locally when Chromium or git is missing and fail
+in the CI pipeline, where `REVIEWCENTER_REQUIRE_CHROMIUM=true`, so the evidence cannot be skipped silently. The
+tamper detection of the audit trail is verified by a process test that edits the SQLite database behind the tool and
+runs `audit verify`.
+
 `Runner.Run` merges stdout and stderr into a single combined output string. Per-stream assertions
 (e.g., "standard error is empty") are not possible at this level; all assertions are made
 against the combined output.
@@ -75,14 +84,26 @@ loopback TCP ports.
 - Reviewer slots and signatures are presented by the review and project pages: a review is Approved only while every
   slot has a signature of the current record, a change of the record makes a signature out of date, and slots and
   signatures are kept after the database is reopened.
+- A review is named for reviewers beforehand: only members of the project are offered, one person fills one slot only,
+  an API token never signs or arranges slots, a review with an unanswered check offers no way to sign, and a signed slot
+  offers no way to change or remove it (`ReviewCenter-System-ReviewerIndependence`).
+- A signature needs the password of the signer again for that signature; a wrong password is refused, signs nothing,
+  and is audited without the password (`ReviewCenter-System-SignatureReauthentication`). The lockout count, the second
+  factor, and the provider proof are verified at the level of the child requirements.
+- A signature is bound to the record of the signer: it is refused when the checklist changed since the signer's page
+  was drawn, and a later comment ends the approval (`ReviewCenter-System-SignatureBinding`).
+- The reviewed content, posted comments, and signatures are not offered for editing, a change of the record after a
+  signature makes the review In review again with the signature kept, and an audit entry edited behind the tool is found
+  by `audit verify`; the tool does not lock the review against further work
+  (`ReviewCenter-System-RecordImmutability`).
 - Every change of data, and every sign-in, sign-out, failed sign-in, and lockout, is recorded in an audit trail whose
   entries are chained by hashes, and the change and its entry are stored together; the entries never contain a password
-  or the text of a comment or justification.
+  or the text of a comment or justification (verified at the level of the child requirements; the system tests show
+  the signature and failed proof entries without the password).
 - Every signed-in user sees the history of a review of a project the user may see, and only system administrators see
-  the whole audit trail, in pages of 50,
-  newest first.
+  the whole audit trail, in pages of 50, newest first (verified at the level of the child requirements).
 - The audit chain is verified on request, from the audit page and with the `audit verify` verb; an intact chain gives
-  exit code 0 and a broken chain, or an unreadable database, exit code 1.
+  exit code 0 and a broken chain gives exit code 1 and names the first broken entry.
 - The limits of the chain are stated to the user: it does not detect the removal of the newest entries or a complete
   rewrite by someone with write access to the database, unless the head hash was recorded elsewhere.
 - A database setting that cannot be used stops the server with an error and a non-zero exit code.
@@ -158,7 +179,7 @@ legacy `--result <path>.xml` alias; a results file was created at the specified 
 exited with code 0. This scenario is tested by
 `ReviewCenter_ResultAlias_LegacyFlag_WritesResultsFile`.
 
-The unsupported results extension (requirement `ReviewCenter-System-ValidateFailure`) is verified
+The unsupported results extension (part of requirement `ReviewCenter-System-Qualification`) is verified
 at the subsystem level by
 `SelfTestSubsystem_ValidationWorkflow_WithUnsupportedExtension_EmitsErrorAndNoFile`, which runs
 `Validation.Run` with stand-in checks, instead of a process run that would repeat the real
@@ -223,6 +244,41 @@ reports that the user already exists; the password appears in neither output. Th
 **ReviewCenter_UserAddVerb_NoPassword_ReturnsError**: The tool is run with `user add` and no password in the
 environment while standard input is closed; it exits with code 1 and reports "No password was provided." instead of
 waiting for input. This scenario is tested by `ReviewCenter_UserAddVerb_NoPassword_ReturnsError`.
+
+**ReviewCenter_ReviewerSlots_NonMemberAndSamePerson_AreNotAcceptedAsReviewers**: A real server runs with a temporary
+database and a git repository; a system administrator creates a project, adds the user names `puppet` and `second` as
+members (a third user, `outsider`, is not added), and plans a review from the repository. In the browser the list of
+reviewers offers the two members and not the outsider; a slot for the administrator is added; adding the
+administrator again as primary, or as the alternate of another slot, is refused with the message that the person is
+already in another slot; the second member is then added, giving exactly two slots. This scenario is tested by
+`ReviewCenter_ReviewerSlots_NonMemberAndSamePerson_AreNotAcceptedAsReviewers`.
+
+**ReviewCenter_Signing_FreshPasswordAndUnchangedRecord_ApprovesOnlyThen**: In the same setting, a review with a slot
+for the signer and an unanswered checklist shows its blockers and offers no form to sign. After every checklist
+section is answered as not applicable with a reason, the form is offered. A wrong password is refused with the generic
+message,
+the review stays In review, and the slot stays unsigned. A second browser session of the same person changes a reason
+of the checklist while the first page still shows the old record; signing on the old page with the right password is
+refused because the record changed. After the page is drawn again, the right password signs and the review is
+Approved. The audit page lists the failed proof and the signature but neither password, and its verification reports an
+intact chain. This scenario is tested by `ReviewCenter_Signing_FreshPasswordAndUnchangedRecord_ApprovesOnlyThen`.
+
+**ReviewCenter_ApprovedReview_EvidenceTokenAndLaterChange_BehaveAsPromised**: A personal access token of the signer is
+created in the browser. Through the API with the token, the review is not approved, the attestation is refused, and
+the evidence index is empty. After the signature in the browser the review is approved with the signer named, the
+attestation is a digitally signed PDF, and the index lists the review-set with the content fingerprint and the result.
+A client without credentials is refused both documents; the token does not open a web page and a request of the token to
+sign or to arrange slots finds no route; the signed slot offers no control to change or remove it. After a comment is
+added in the browser, the review is In review, its signature is out of date and kept, its approval digest differs and
+its content fingerprint is unchanged, the attestation is refused and the index is empty again, a posted comment has no
+control to edit it, and a link to the thread leads a signed-out user back to the thread after the sign-in. This scenario
+is tested by `ReviewCenter_ApprovedReview_EvidenceTokenAndLaterChange_BehaveAsPromised`.
+
+**ReviewCenter_AuditVerifyVerb_HistoryEditedInDatabase_ReportsFirstBrokenEntryWithExitCodeOne**: Three users are created
+with the `user add` verb on a temporary database, and `audit verify` reports an intact chain with exit code 0. One audit
+entry is then edited directly in the SQLite file, and `audit verify` reports that the chain is broken at that entry with
+exit code 1. This scenario is tested by
+`ReviewCenter_AuditVerifyVerb_HistoryEditedInDatabase_ReportsFirstBrokenEntryWithExitCodeOne`.
 
 The system requirements for reviews, restart persistence, and database failure are verified at subsystem level,
 where the same production pipeline can be exercised with real databases more precisely than through a child

@@ -47,12 +47,12 @@ public class PuppetEndToEndTests
     /// <summary>
     ///     The user name of the administrator that the test server is given.
     /// </summary>
-    private const string UserName = "puppet";
+    internal const string UserName = "puppet";
 
     /// <summary>
     ///     The password of the administrator that the test server is given.
     /// </summary>
-    private const string UserPassword = "correct horse battery";
+    internal const string UserPassword = "correct horse battery";
 
     /// <summary>
     ///     Test that Puppet can be started, driven one command at a time, and stopped again, while it signs in,
@@ -281,7 +281,7 @@ public class PuppetEndToEndTests
     /// <param name="run">Runs one Puppet command.</param>
     /// <param name="url">The base URL of the server.</param>
     /// <returns>The result of the start command (a failure other than a missing browser is returned, not thrown).</returns>
-    private static async Task<(int Code, string Output, string Error)> StartPuppetAsync(
+    internal static async Task<(int Code, string Output, string Error)> StartPuppetAsync(
         Func<string[], Task<(int Code, string Output, string Error)>> run,
         string url)
     {
@@ -302,7 +302,7 @@ public class PuppetEndToEndTests
     /// </summary>
     /// <param name="cancellationToken">Cancels the check.</param>
     /// <returns><c>true</c> when <c>git --version</c> succeeds.</returns>
-    private static async Task<bool> IsGitAvailableAsync(CancellationToken cancellationToken)
+    internal static async Task<bool> IsGitAvailableAsync(CancellationToken cancellationToken)
     {
         try
         {
@@ -322,7 +322,7 @@ public class PuppetEndToEndTests
     /// <param name="cancellationToken">Cancels the command.</param>
     /// <param name="arguments">The git arguments.</param>
     /// <returns>A task that completes when git succeeded.</returns>
-    private static async Task RunGitAsync(string workingDirectory, CancellationToken cancellationToken, params string[] arguments)
+    internal static async Task RunGitAsync(string workingDirectory, CancellationToken cancellationToken, params string[] arguments)
     {
         var info = new ProcessStartInfo("git")
         {
@@ -355,7 +355,7 @@ public class PuppetEndToEndTests
     ///     A temporary folder that is removed, best effort, when disposed.
     /// </summary>
     /// <param name="directory">The folder to remove.</param>
-    private sealed class TemporaryFolder(DirectoryInfo directory) : IDisposable
+    internal sealed class TemporaryFolder(DirectoryInfo directory) : IDisposable
     {
         /// <summary>
         ///     Removes the folder, including read-only git objects; errors are ignored (best effort).
@@ -381,7 +381,7 @@ public class PuppetEndToEndTests
     /// <summary>
     ///     The ReviewCenter server running as a separate process on a free loopback port.
     /// </summary>
-    private sealed class TestServer : IDisposable
+    internal sealed class TestServer : IDisposable
     {
         private readonly Process _process;
 
@@ -405,8 +405,13 @@ public class PuppetEndToEndTests
         /// <param name="cancellationToken">Cancels the wait.</param>
         /// <param name="seedUser">Whether to create an administrator (<c>UserName</c>) before the server starts.</param>
         /// <param name="gitCachePath">The folder for the server's clones of repositories, or <c>null</c> for the default.</param>
+        /// <param name="extraUsers">Ordinary users to create besides the administrator (with the same password), or <c>null</c> for none.</param>
         /// <returns>The running server; disposing it kills the process tree.</returns>
-        public static async Task<TestServer> StartAsync(CancellationToken cancellationToken, bool seedUser = false, string? gitCachePath = null)
+        public static async Task<TestServer> StartAsync(
+            CancellationToken cancellationToken,
+            bool seedUser = false,
+            string? gitCachePath = null,
+            IReadOnlyList<(string Name, string DisplayName)>? extraUsers = null)
         {
             using var listener = new TcpListener(IPAddress.Loopback, 0);
             listener.Start();
@@ -428,29 +433,40 @@ public class PuppetEndToEndTests
                 info.Environment["Git__CachePath"] = gitCachePath;
             }
 
-            // A signed-in flow needs a user: the command line creates the first administrator, as an operator would
+            // A signed-in flow needs a user: the command line creates the first administrator, as an operator would,
+            // and then the ordinary users the test asked for (all with the same password)
             if (seedUser)
             {
-                var add = new ProcessStartInfo(info.FileName)
+                var users = new List<(string Name, string DisplayName, bool Admin)> { (UserName, "Puppet Admin", true) };
+                users.AddRange((extraUsers ?? []).Select(user => (user.Name, user.DisplayName, false)));
+                foreach (var (name, displayName, admin) in users)
                 {
-                    RedirectStandardOutput = true,
-                    RedirectStandardError = true,
-                    WorkingDirectory = info.WorkingDirectory
-                };
-                add.Environment["Database__ConnectionString"] = info.Environment["Database__ConnectionString"];
-                add.Environment["REVIEWCENTER_PASSWORD"] = UserPassword;
-                foreach (var argument in new[] { dll, "user", "add", "--username", UserName, "--display-name", "Puppet Admin", "--system-admin" })
-                {
-                    add.ArgumentList.Add(argument);
-                }
+                    var add = new ProcessStartInfo(info.FileName)
+                    {
+                        RedirectStandardOutput = true,
+                        RedirectStandardError = true,
+                        WorkingDirectory = info.WorkingDirectory
+                    };
+                    add.Environment["Database__ConnectionString"] = info.Environment["Database__ConnectionString"];
+                    add.Environment["REVIEWCENTER_PASSWORD"] = UserPassword;
+                    foreach (var argument in new[] { dll, "user", "add", "--username", name, "--display-name", displayName })
+                    {
+                        add.ArgumentList.Add(argument);
+                    }
 
-                using var adding = Process.Start(add)!;
-                var addError = adding.StandardError.ReadToEndAsync(cancellationToken);
-                _ = await adding.StandardOutput.ReadToEndAsync(cancellationToken);
-                await adding.WaitForExitAsync(cancellationToken);
-                if (adding.ExitCode != 0)
-                {
-                    throw new InvalidOperationException("Creating the test user failed: " + await addError);
+                    if (admin)
+                    {
+                        add.ArgumentList.Add("--system-admin");
+                    }
+
+                    using var adding = Process.Start(add)!;
+                    var addError = adding.StandardError.ReadToEndAsync(cancellationToken);
+                    _ = await adding.StandardOutput.ReadToEndAsync(cancellationToken);
+                    await adding.WaitForExitAsync(cancellationToken);
+                    if (adding.ExitCode != 0)
+                    {
+                        throw new InvalidOperationException("Creating the test user failed: " + await addError);
+                    }
                 }
             }
 
