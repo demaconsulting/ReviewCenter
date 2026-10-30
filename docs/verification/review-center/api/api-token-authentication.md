@@ -107,10 +107,15 @@ page, as
 for a signed-out request. This scenario
 is tested by `ApiTokenAuthentication_Request_TokenOnWebPage_IsNotSignedIn`.
 
-**ApiTokenAuthentication_Request_TooManyRefusals_AnswersTooManyRequests**: With a limit of three, three refused tokens
-are answered with 401 and then a good token from the same address is answered with 429 as a problem document; a person
-can still sign in with a password. This scenario is tested by
+**ApiTokenAuthentication_Request_TooManyRefusals_AnswersTooManyRequests**: With an address limit of three and a window
+of 300 seconds, three refused tokens are answered with 401 and then a good token from the same address is answered with
+429 as a problem document with a `Retry-After` header of `300`. This scenario is tested by
 `ApiTokenAuthentication_Request_TooManyRefusals_AnswersTooManyRequests`.
+
+**ApiTokenAuthentication_Request_RefusalsBelowAddressLimit_AreNotThrottledByNameLimit**: With a name limit of two but an
+address limit of five, four refused tokens are all answered with 401 and a good token from the same address is then
+accepted, so only the address limit counts. This scenario is tested by
+`ApiTokenAuthentication_Request_RefusalsBelowAddressLimit_AreNotThrottledByNameLimit`.
 
 **ApiTokenAuthentication_Request_RefusedToken_IsAuditedOnceWithoutTheValue**: A revoked token is presented three times.
 The audit trail has one `token.use-failed` entry that names the reason and the display id, and no entry holds the token

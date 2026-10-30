@@ -153,7 +153,7 @@ public class ApiTokenAuthenticationTests
         await using var app = await StartAsync(new Dictionary<string, string?>
         {
             ["Identity:Throttle:MaxFailuresPerName"] = "3",
-            ["Identity:Throttle:MaxFailuresPerAddress"] = "1000"
+            ["Identity:Throttle:MaxFailuresPerAddress"] = "3"
         });
         var good = await CreateTokenAsync(app, "ann");
         var wrong = "rcpat_" + new string('A', 43);
@@ -425,17 +425,18 @@ public class ApiTokenAuthenticationTests
     }
 
     /// <summary>
-    ///     Test that too many refused tokens from one address are throttled with 429, even for a good token, and
-    ///     that the throttle does not stop people signing in with a password.
+    ///     Test that too many refused tokens from one address are throttled with 429 and a <c>Retry-After</c> header
+    ///     of the window length, even for a good token.
     /// </summary>
     [Fact(Timeout = 120000)]
     public async Task ApiTokenAuthentication_Request_TooManyRefusals_AnswersTooManyRequests()
     {
-        // Arrange: a limit of three attempts, a good token, and a person who can sign in
+        // Arrange: a limit of three attempts per address (and a window of 300 seconds) and a good token
         await using var app = await StartAsync(new Dictionary<string, string?>
         {
             ["Identity:Throttle:MaxFailuresPerName"] = "3",
-            ["Identity:Throttle:MaxFailuresPerAddress"] = "1000"
+            ["Identity:Throttle:MaxFailuresPerAddress"] = "3",
+            ["Identity:Throttle:WindowSeconds"] = "300"
         });
         var good = await CreateTokenAsync(app, "ann");
         using var bad = ClientFor(app, "rcpat_" + new string('A', 43));
@@ -450,14 +451,42 @@ public class ApiTokenAuthenticationTests
 
         var throttled = await goodClient.GetAsync("/api/projects", TestContext.Current.CancellationToken);
 
-        // Assert: three 401, then 429 as a problem document even for the good token
+        // Assert: three 401, then 429 as a problem document even for the good token, saying when to try again
         Assert.Equal([HttpStatusCode.Unauthorized, HttpStatusCode.Unauthorized, HttpStatusCode.Unauthorized], statuses);
         Assert.Equal(HttpStatusCode.TooManyRequests, throttled.StatusCode);
         Assert.Equal("application/problem+json", throttled.Content.Headers.ContentType?.MediaType);
+        Assert.Equal("300", Assert.Single(throttled.Headers.GetValues("Retry-After")));
+    }
 
-        // Assert: signing in with a password is not affected
-        using var browser = await TestBrowser.SignedInAsync(app, "ann");
-        Assert.Equal(HttpStatusCode.OK, (await browser.Client.GetAsync("/account", TestContext.Current.CancellationToken)).StatusCode);
+    /// <summary>
+    ///     Test that the API counts refused tokens against the limit of the address only: a per-name limit lower than
+    ///     the address limit does not throttle earlier, so an address may make as many refused attempts as documented.
+    /// </summary>
+    [Fact(Timeout = 120000)]
+    public async Task ApiTokenAuthentication_Request_RefusalsBelowAddressLimit_AreNotThrottledByNameLimit()
+    {
+        // Arrange: two attempts per name, but five per address, and a good token
+        await using var app = await StartAsync(new Dictionary<string, string?>
+        {
+            ["Identity:Throttle:MaxFailuresPerName"] = "2",
+            ["Identity:Throttle:MaxFailuresPerAddress"] = "5"
+        });
+        var good = await CreateTokenAsync(app, "ann");
+        using var bad = ClientFor(app, "rcpat_" + new string('A', 43));
+        using var goodClient = ClientFor(app, good.Value);
+        var statuses = new List<HttpStatusCode>();
+
+        // Act: four refused attempts, then the good token
+        for (var i = 0; i < 4; i++)
+        {
+            statuses.Add((await bad.GetAsync("/api/projects", TestContext.Current.CancellationToken)).StatusCode);
+        }
+
+        var accepted = await goodClient.GetAsync("/api/projects", TestContext.Current.CancellationToken);
+
+        // Assert: all four are plain 401, and the good token is still accepted
+        Assert.All(statuses, status => Assert.Equal(HttpStatusCode.Unauthorized, status));
+        Assert.Equal(HttpStatusCode.OK, accepted.StatusCode);
     }
 
     /// <summary>

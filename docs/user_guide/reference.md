@@ -186,7 +186,8 @@ create it again, because ReviewCenter has no migrations (see Database in the Adm
 configured and there is no database at the default location, the test is
 **skipped**: the report shows `SKIPPED`, the summary counts it under `Skipped`, the results file records it as not
 executed (TRX) or skipped (JUnit), and the run does not fail. `--check-config` is only valid together with
-`--validate`.
+`--validate`. A database file that does not exist yet (a fresh installation, which creates it at the first start) is
+also **skipped**, with that reason; a file that exists but is not a database of this version still fails.
 
 ## Silent Mode
 

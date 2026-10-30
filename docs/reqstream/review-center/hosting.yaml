@@ -130,7 +130,8 @@ sections:
         title: >-
           The Hosting subsystem shall verify the hash chain of the audit trail in the configured database when the
           audit verify verb is run, reporting the number of entries with exit code 0 for an intact chain and the
-          first broken entry or the failure to read the database with exit code 1, and shall give the server and
+          first broken entry, a database file that does not exist, or the failure to read the database with exit
+          code 1, and shall give the server and
           the command-line verbs the same audit services.
         justification: |
           Scripts and scheduled jobs must be able to check the trail without the web interface and to alert on the

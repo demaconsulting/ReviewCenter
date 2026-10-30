@@ -83,7 +83,8 @@ covers two requests that pass the check at the same time.
 The service is constructed with an optional `RepositoryService` and `IGitRepositoryProvider`; without them the
 method throws `InvalidOperationException`. The first check is that the actor may see the project (`ProjectNotFound`,
 as for a draft). The checks that need no I/O come next (identifier, title, the head and
-baseline revision names through `RevisionValidator`, the selection through `SelectionMatcher.Parse` and its
+baseline revision names through `RevisionValidator`, the selection (a `null` selection means every changed file and
+becomes `**/*`; empty or blank text is refused) through `SelectionMatcher.Parse` and its
 length limit `ReviewLimits.MaxSelectionLength` of 2000 characters), then the free identifier, then
 `RepositoryService.GetAccessAsync(projectId, repositoryId)` (which refuses a disabled repository, and an unknown
 repository or one that belongs to another project, with `RepositoryNotFound`). Inside one git session the

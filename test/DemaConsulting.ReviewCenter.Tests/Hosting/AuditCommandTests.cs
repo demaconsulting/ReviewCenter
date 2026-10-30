@@ -20,7 +20,9 @@
 
 using DemaConsulting.ReviewCenter.Cli;
 using DemaConsulting.ReviewCenter.Hosting;
+using DemaConsulting.ReviewCenter.Storage;
 using Microsoft.Data.Sqlite;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 
 namespace DemaConsulting.ReviewCenter.Tests.Hosting;
@@ -61,8 +63,9 @@ public class AuditCommandTests
     [Fact]
     public void AuditCommand_Run_EmptyTrail_ReportsIntactWithZeroEntries()
     {
-        // Arrange: a database location that does not exist yet
+        // Arrange: an existing database with the schema and no audit entries
         var connectionString = TestDatabase.NewConnectionString();
+        CreateEmptyDatabase(connectionString);
 
         // Act
         var (exitCode, output) = Verify(connectionString);
@@ -70,6 +73,27 @@ public class AuditCommandTests
         // Assert
         Assert.Equal(0, exitCode);
         Assert.Contains("Audit chain intact: 0 entries", output, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    ///     Test that a database file that does not exist is reported as an error, and that nothing is created.
+    /// </summary>
+    [Fact]
+    public void AuditCommand_Run_MissingDatabase_ReportsErrorAndCreatesNothing()
+    {
+        // Arrange: a database path in a folder that does not exist either
+        var folder = Path.Combine(Path.GetTempPath(), "ReviewCenterTests-" + Guid.NewGuid().ToString("N"));
+        var path = Path.Combine(folder, "wrong.db");
+
+        // Act
+        var (exitCode, output) = Verify($"Data Source={path};Pooling=False");
+
+        // Assert: an error that names the file, no "intact", and neither the file nor its folder was created
+        Assert.Equal(1, exitCode);
+        Assert.Contains("The database file does not exist", output, StringComparison.Ordinal);
+        Assert.DoesNotContain("intact", output, StringComparison.Ordinal);
+        Assert.False(File.Exists(path), "The command must never create the database");
+        Assert.False(Directory.Exists(folder), "The command must never create the folder of the database");
     }
 
     /// <summary>
@@ -116,17 +140,17 @@ public class AuditCommandTests
     }
 
     /// <summary>
-    ///     Test that a database that cannot be opened is reported as an error with exit code 1.
+    ///     Test that a database that cannot be read is reported as an error with exit code 1.
     /// </summary>
     [Fact]
-    public void AuditCommand_Run_UnreachableDatabase_ReportsErrorWithExitCodeOne()
+    public void AuditCommand_Run_UnreadableDatabase_ReportsErrorWithExitCodeOne()
     {
-        // Arrange: a database path below a file, which can never be a directory
-        var blocker = Path.Combine(Path.GetTempPath(), "ReviewCenterTests-" + Guid.NewGuid().ToString("N") + ".tmp");
-        File.WriteAllText(blocker, "not a directory");
+        // Arrange: a file at the database path that is not a SQLite database
+        var file = Path.Combine(Path.GetTempPath(), "ReviewCenterTests-" + Guid.NewGuid().ToString("N") + ".db");
+        File.WriteAllText(file, "this is not a database, only text that is long enough to be read as a broken header");
         try
         {
-            var connectionString = "Data Source=" + Path.Combine(blocker, "x.db");
+            var connectionString = $"Data Source={file};Pooling=False";
 
             // Act
             var (exitCode, output) = Verify(connectionString);
@@ -137,7 +161,7 @@ public class AuditCommandTests
         }
         finally
         {
-            File.Delete(blocker);
+            File.Delete(file);
         }
     }
 
@@ -151,6 +175,17 @@ public class AuditCommandTests
 
         // Act and assert: refused
         Assert.Throws<ArgumentNullException>(() => AuditCommand.Run(null!));
+    }
+
+    /// <summary>
+    ///     Creates a database with the current schema and no rows.
+    /// </summary>
+    /// <param name="connectionString">The connection string of the database.</param>
+    private static void CreateEmptyDatabase(string connectionString)
+    {
+        using var context = new ReviewCenterDbContext(
+            new DbContextOptionsBuilder<ReviewCenterDbContext>().UseSqlite(connectionString).Options);
+        context.Database.EnsureCreated();
     }
 
     /// <summary>

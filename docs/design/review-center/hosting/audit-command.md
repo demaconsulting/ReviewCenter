@@ -17,7 +17,8 @@ Database settings: the database it reads is chosen the same way as for the serve
 **Output**: an intact chain prints `Audit chain intact: N entries` (N is the number of entries) through
 `Context.WriteLine` and the exit code stays 0. A broken chain prints `Audit chain BROKEN at entry N` (N is the first bad
 entry) through `Context.WriteError`, which makes the exit code 1. A database that cannot be read prints
-`Failed to read the audit trail: {detail}` through `Context.WriteError`, exit code 1.
+`Failed to read the audit trail: {detail}` through `Context.WriteError`, exit code 1. A database file that does not exist
+prints `The database file does not exist: {path}` through `Context.WriteError`, exit code 1, and nothing is created.
 
 The command prints the number of entries but, unlike the `Audit` page, **not** the head hash. Scripts that anchor the
 head hash outside the database should read it from the page or from a database query; this slice does not record it
@@ -35,9 +36,11 @@ anywhere.
 
 The command builds its configuration and services the same way the server and `user add` do: the same `appsettings.json`
 and environment variables (for example `Database__ConnectionString`) and the same registration
-(`ServerHost.AddServices`), with the host logging switched off because the command reports through the context. It calls
-`DatabaseSetup.EnsureCreated`, so a database that does not exist yet is created empty (an empty trail is intact), and then
-`AuditService.VerifyAsync`, which streams the trail in batches (see `AuditService`). A database created before the
+(`ServerHost.AddServices`), with the host logging switched off because the command reports through the context. It first
+asks `DatabaseSetup.TryGetMissingDatabaseFile` whether the configured database file exists and, when it does not,
+reports the error and stops: the command never creates a database, so a wrong path cannot leave an empty database that
+would be reported as an intact trail. It then calls `AuditService.VerifyAsync`, which streams the trail in batches (see
+`AuditService`); an existing database with an empty trail is intact. A database created before the
 audit trail existed has no `AuditEntries` table and must be deleted and created again (see the `Storage` design).
 
 As documented for `AuditChain`, a successful result means that nothing in the stored history was changed, removed from
@@ -47,8 +50,9 @@ value recorded earlier outside the database for that.
 
 #### Error Handling
 
-A broken chain is not an exception: it is reported as an error with exit code 1. A database error, a file system
-error, or an access error while preparing or reading the database is reported as
+A broken chain is not an exception: it is reported as an error with exit code 1. A database file that does not exist is
+reported as "The database file does not exist: {path}" with exit code 1. A database error, a file system
+error, or an access error while reading the database is reported as
 "Failed to read the audit trail: {detail}" with exit code 1. Any other exception propagates to `Program.Main`. A null
 context is rejected with `ArgumentNullException`.
 
@@ -56,7 +60,7 @@ context is rejected with `ArgumentNullException`.
 
 - **Context** — receives the results and errors.
 - **ServerHost** — `AddServices` registers the persistence and the Core services for the command.
-- **DatabaseSetup** — creates the database when needed.
+- **DatabaseSetup** — tells whether the configured database file is missing (`TryGetMissingDatabaseFile`).
 - **AuditService** — verifies the chain.
 - **ASP.NET Core shared framework** — `Host.CreateApplicationBuilder` for the configuration and the services.
 - **Entity Framework Core** — the database context factory registration.
@@ -64,5 +68,5 @@ context is rejected with `ArgumentNullException`.
 #### Callers
 
 - **Program** — calls `Run` when the `audit verify` verb is present.
-- **Tests** — call `Run` with a temporary database that is intact, empty, edited, or missing an entry, and with an
-  unreachable database.
+- **Tests** — call `Run` with a temporary database that is intact, empty, edited, or missing an entry, with a database
+  file that does not exist, and with an unreadable database.

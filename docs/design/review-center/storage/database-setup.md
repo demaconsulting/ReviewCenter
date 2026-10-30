@@ -53,6 +53,17 @@ gets its own empty database, so the schema created at startup would be missing f
 - *Notes*: This and `EnsureCreated` are the places that name the provider. Adding PostgreSQL or SQL Server adds
   a case here, in the provider check, and in the duplicate-key translation of `ReviewStore`.
 
+**TryGetMissingDatabaseFile**: Tells, without any side effect, whether the configured database file is missing.
+
+- *Parameters*: `DatabaseOptions options`.
+- *Returns*: `string?` — the full path of the database file when the file does not exist; `null` when it exists, or
+  when the data source is a `file:` URI (which is not checked).
+- *Preconditions*: `options` is not null.
+- *Postconditions*: Nothing is created: no file, no folder.
+- *Notes*: Checks the provider first and resolves the connection string, so an unsupported provider or an in-memory
+  database raises `InvalidOperationException` as for `EnsureCreated`. `AuditCommand` uses it to refuse a wrong path
+  instead of creating an empty database.
+
 **EnsureCreated**: Creates the database when it is new.
 
 - *Parameters*: the context factory and `DatabaseOptions options`.
@@ -84,6 +95,7 @@ turns them into one start-up error. Null arguments raise `ArgumentNullException`
 
 - **ServerHost** — configures the context factory and calls `EnsureCreated` while building the application, and calls
   `ResolveDataDirectory` to place the git cache and the key ring.
-- **UserCommand** and **AuditCommand** — call `EnsureCreated` before they work, so the first system administrator can be
-  created in a new database. `AuditCommand` therefore creates an empty database when none exists at the configured
-  location.
+- **UserCommand** — calls `EnsureCreated` before it works, so the first system administrator can be created in a new
+  database.
+- **AuditCommand** — calls `TryGetMissingDatabaseFile` and stops with an error when the file is missing, so it never
+  creates a database.

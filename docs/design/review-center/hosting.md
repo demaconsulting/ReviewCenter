@@ -70,11 +70,11 @@ documented with `ServerHost` as a supporting type, `UserCommand`, and `AuditComm
 
 - *Type*: In-process .NET static method.
 - *Role*: Provider.
-- *Contract*: Takes the parsed `Context`, creates the database if needed, verifies the hash chain of the audit trail,
-  and reports an intact chain with its entry count (exit code 0), or the first broken entry, or the failure to read the
-  database, through `Context.WriteError` (exit code 1).
-- *Constraints*: The caller is `Program`. It never changes the trail. Because it creates a database that does not exist,
-  running it against a wrong location creates an empty database there.
+- *Contract*: Takes the parsed `Context`, checks that the configured database file exists, verifies the hash chain of
+  the audit trail, and reports an intact chain with its entry count (exit code 0), or the first broken entry, a database
+  file that does not exist, or the failure to read the database, through `Context.WriteError` (exit code 1).
+- *Constraints*: The caller is `Program`. It never changes the trail and never creates a database, so running it
+  against a wrong location only reports that the file does not exist.
 
 **Health endpoint**: The `/health` route of the running server.
 
@@ -262,7 +262,8 @@ the same way (`Git:CachePath`, or `git-cache` beside the database) and is create
 
 `UserCommand` does not start a server. It builds the configuration the same way (the same `appsettings.json` and
 environment), registers the services with `AddServices`, creates the database if needed, and calls
-`UserService.CreateAsync`; see its design. `AuditCommand` does the same and calls `AuditService.VerifyAsync`; see its
+`UserService.CreateAsync`; see its design. `AuditCommand` does the same, but never creates the database (it reports a
+missing file as an error), and calls `AuditService.VerifyAsync`; see its
 design.
 
 The composition is shared by production and tests. `ServerHostOptions` lets a test switch off

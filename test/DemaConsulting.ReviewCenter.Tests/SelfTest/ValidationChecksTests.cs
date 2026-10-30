@@ -249,10 +249,11 @@ public partial class ValidationChecksTests
     }
 
     /// <summary>
-    ///     Test that the opt-in check fails for a configured database file that does not exist, without creating it.
+    ///     Test that the opt-in check is skipped for a configured database file that does not exist yet (a fresh
+    ///     installation), without creating it.
     /// </summary>
     [Fact]
-    public async Task ValidationChecks_ConfiguredDatabase_MissingFile_FailsWithoutCreatingIt()
+    public async Task ValidationChecks_ConfiguredDatabase_MissingFile_IsSkippedWithoutCreatingIt()
     {
         // Arrange: a connection string to a file that does not exist
         using var folder = new TemporaryDirectory();
@@ -260,11 +261,11 @@ public partial class ValidationChecksTests
         using var configuration = new ConfiguredDatabaseEnvironment($"Data Source={path};Pooling=False");
 
         // Act: run the check
-        var exception = await Assert.ThrowsAsync<ValidationFailedException>(
+        var exception = await Assert.ThrowsAsync<ValidationSkippedException>(
             () => ConfiguredDatabaseCheck.RunAsync(CancellationToken.None));
 
-        // Assert: it fails, does not leak the path and does not create the file
-        Assert.Contains("does not exist", exception.Message);
+        // Assert: it is skipped with the reason, does not leak the path and does not create the file
+        Assert.Contains("does not exist yet", exception.Message);
         Assert.DoesNotContain(folder.DirectoryPath, exception.Message);
         Assert.False(File.Exists(path), "The check must never create the database");
     }

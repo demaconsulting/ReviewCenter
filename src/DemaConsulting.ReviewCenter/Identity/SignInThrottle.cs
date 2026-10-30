@@ -105,6 +105,11 @@ internal sealed class SignInThrottle
     }
 
     /// <summary>
+    ///     Gets the length of the throttle window, in seconds; the time after which a throttled client may try again.
+    /// </summary>
+    public int WindowSeconds => _options.WindowSeconds;
+
+    /// <summary>
     ///     Counts a sign-in attempt, unless the client has used up its attempts.
     /// </summary>
     /// <param name="clientAddress">The client address as text; <c>null</c> is counted as one unknown address.</param>

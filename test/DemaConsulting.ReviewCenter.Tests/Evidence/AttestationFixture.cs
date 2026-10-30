@@ -185,7 +185,7 @@ internal sealed class AttestationFixture
     {
         return Store.AddSlotAsync(
             new ReviewerSlot { ProjectId = ProjectId, ReviewId = ReviewId, PrimaryUserId = CydUserId },
-            stored => AuditDraft.By(new Actor("cyd", "Cyd"), "slot.added", $"slot {stored.Id}", ProjectId, ReviewId),
+            _ => AuditDraft.By(new Actor("cyd", "Cyd"), "slot.added", "slot 2", ProjectId, ReviewId),
             cancellationToken);
     }
 

@@ -172,13 +172,15 @@ sections:
         title: >-
           The SigningService class shall record adding, changing, and removing a slot and adding a signature in the
           audit trail, together with the change, so that a change is never saved without its entry and an entry is never
-          saved without its change, naming the actor, the slot, the reviewers, and for a signature the role and the
+          saved without its change, naming the actor, the slot (by its number on the review page, counted from 1, not
+          by its database identifier), the reviewers, and for a signature the role and the
           record digest, and shall record nothing for a change that is refused.
         justification: |
           The approval of a review is the most important event of its history, and the history must show who
-          arranged the reviewers and who signed which record.
+          arranged the reviewers and who signed which record. The slot number is the one the reader sees on the page.
         tests:
           - SigningService_SlotAndSignatureEvents_AreRecordedWithMembersAndDigest
+          - SigningService_SlotEvents_AfterEarlierSlotRemoved_UsePageNumberNotIdentity
           - SigningService_RemoveSlotAsync_RecordsSlotRemovedWithItsMembers
 
       - id: ReviewCenter-SigningService-ApiToken

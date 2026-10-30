@@ -36,8 +36,14 @@ N/A - standard test environment (a temporary database is created by each test). 
   evidence index and attestation operations and exactly two (bearer or Basic) on every other operation.
 - Two applications produce the same document.
 - The generated document equals the snapshot that is kept in the documentation.
+- The request schemas of a review and of a repository source list as required only the members that the API requires.
 
 #### Test Scenarios
+
+**ApiDocument_Get_RequestSchemas_RequireOnlyWhatTheApiRequires**: The document is requested without a token and parsed.
+The `required` list of `CreateReviewRequest` holds exactly `id` and `title`, and that of `RepositorySourceDto` holds
+exactly `headRevision` and `repositoryId`, so the files, the repository, the baseline revision, and the selection are
+optional for a client generator. This scenario is tested by `ApiDocument_Get_RequestSchemas_RequireOnlyWhatTheApiRequires`.
 
 **ApiDocument_Get_NoToken_DescribesTheApiWithBearerScheme**: The document is requested without a token and parsed. It is
 served with 200, has the version `1`, lists no server, has an HTTP bearer and an HTTP Basic security scheme, lists the

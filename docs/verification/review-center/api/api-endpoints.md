@@ -81,6 +81,11 @@ head revision, a baseline revision, and a selection. The review is from the repo
 the two changed files, and the audit entry names the token. This scenario is tested by
 `ApiEndpoints_CreateReview_Repository_CreatesReviewFromChanges`.
 
+**ApiEndpoints_CreateReview_Repository_NoSelection_ReviewsEveryChange**: A review is created from a registered
+repository with a request whose repository source leaves out the selection, and with a request whose selection is
+`null`. Both are answered with 201, the review has the two changed files, and its selection is `**/*`. This scenario is
+tested by `ApiEndpoints_CreateReview_Repository_NoSelection_ReviewsEveryChange`.
+
 **ApiEndpoints_CreateReview_BadRequestBody_Answers400NamingTheField**: Bodies with no source, with two sources, with a
 file that is not Base64, and with no body are sent. Each answer is a 400 problem document that names the field
 (`source`, `files[0].contentBase64`, or `body`), and no review is created. This scenario is tested by

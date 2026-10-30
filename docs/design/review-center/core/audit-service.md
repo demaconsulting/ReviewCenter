@@ -86,8 +86,8 @@ administrator is not throttled but is a trusted actor).
 | `project.member-add-failed` | `user name '<typed>'` (failed add or account creation; best-effort; project id apart) |
 | `project.evidence-settings-changed` | `AnonymousIndex off->on; IncludeThreads on->off` (changed keys; project apart) |
 | `review.created` | `review 'Title', fingerprint <64 hex>, N file(s)` |
-| `slot.added`, `slot.updated`, `slot.removed` | `slot {id}: primary ada, alternate bob` (`none` for no alternate) |
-| `signature.added` | `slot {slotId}, role {Primary or Alternate}, record digest <64 hex>` |
+| `slot.added`, `slot.updated`, `slot.removed` | `slot {number}: primary ada, alternate bob` (`none` for no alternate) |
+| `signature.added` | `slot {number}, role {Primary or Alternate}, record digest <64 hex>` |
 | `thread.started` | `thread {id} on {path} {anchor}; comment {cid}, text sha256 {8 hex}` |
 | `thread.replied` | `thread {id}, comment {cid}, text sha256 {8 hex}` |
 | `thread.resolved`, `thread.reopened` | `thread {id}` |

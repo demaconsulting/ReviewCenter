@@ -208,6 +208,37 @@ internal static class DatabaseSetup
     }
 
     /// <summary>
+    ///     Finds out whether the configured SQLite database is a plain file that does not exist yet.
+    /// </summary>
+    /// <param name="options">The configured options. Must not be null.</param>
+    /// <returns>
+    ///     The absolute path of the missing database file, or <c>null</c> when the file exists or the data source
+    ///     is not a plain file (a <c>file:</c> URI is not checked).
+    /// </returns>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="options"/> is null.</exception>
+    /// <exception cref="InvalidOperationException">
+    ///     Thrown when the provider is not supported or the connection string selects an in-memory database.
+    /// </exception>
+    /// <remarks>
+    ///     Commands that only read an existing database (<c>audit verify</c>, <c>--check-config</c>) use this to
+    ///     refuse or skip instead of creating an empty database at a mistyped path. Side effects: none.
+    /// </remarks>
+    internal static string? TryGetMissingDatabaseFile(DatabaseOptions options)
+    {
+        ArgumentNullException.ThrowIfNull(options);
+
+        RequireSupportedProvider(options);
+        var dataSource = new SqliteConnectionStringBuilder(ResolveConnectionString(options)).DataSource;
+        if (dataSource.StartsWith("file:", StringComparison.OrdinalIgnoreCase))
+        {
+            return null;
+        }
+
+        var path = Path.GetFullPath(dataSource);
+        return File.Exists(path) ? null : path;
+    }
+
+    /// <summary>
     ///     Makes sure the database folder and the schema exist.
     /// </summary>
     /// <param name="factory">The factory that creates database contexts. Must not be null.</param>

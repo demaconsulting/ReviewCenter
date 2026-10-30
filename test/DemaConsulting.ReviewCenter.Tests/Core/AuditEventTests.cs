@@ -282,6 +282,9 @@ public class AuditEventTests
             await fixture.Checklists.SetAnswerAsync(fixture.ProjectId, "rev-1", item.Id, ChecklistOutcome.Pass, null, TestActors.Ann, cancellationToken);
         }
 
+        // A slot that is added and removed again first, so the slot under test has the identity 2 but is slot 1 on the page
+        var placeholder = await fixture.Signing.AddSlotAsync(TestActors.Ann, fixture.ProjectId, "rev-1", fixture.UserIds["ann"], null, cancellationToken);
+        await fixture.Signing.RemoveSlotAsync(TestActors.Ann, fixture.ProjectId, "rev-1", placeholder.Id, cancellationToken);
         var before = fixture.Reviews.Audits.Count;
 
         // Act
@@ -300,10 +303,10 @@ public class AuditEventTests
         Assert.Equal(DomainRule.ReviewLocked, locked.Rule);
         var drafts = fixture.Reviews.Audits.Skip(before).ToList();
         Assert.Equal(["slot.added", "slot.updated", "slot.updated", "signature.added"], drafts.Select(d => d.Action));
-        Assert.Equal($"slot {slot.Id}: primary ann, alternate bob", drafts[0].Detail);
-        Assert.Equal($"slot {slot.Id}: primary bob, alternate none", drafts[1].Detail);
-        Assert.Equal($"slot {slot.Id}: primary ann, alternate bob", drafts[2].Detail);
-        Assert.Equal($"slot {slot.Id}, role Primary, record digest {digest}", drafts[3].Detail);
+        Assert.Equal("slot 1: primary ann, alternate bob", drafts[0].Detail);
+        Assert.Equal("slot 1: primary bob, alternate none", drafts[1].Detail);
+        Assert.Equal("slot 1: primary ann, alternate bob", drafts[2].Detail);
+        Assert.Equal($"slot 1, role Primary, record digest {digest}", drafts[3].Detail);
         Assert.Equal("Ann (ann)", drafts[3].ActorName);
         Assert.DoesNotContain(drafts, d => d.Detail.Contains(Password, StringComparison.Ordinal));
     }
@@ -324,8 +327,35 @@ public class AuditEventTests
         // Assert
         var draft = fixture.Reviews.Audits[^1];
         Assert.Equal("slot.removed", draft.Action);
-        Assert.Equal($"slot {slot.Id}: primary ann, alternate none", draft.Detail);
+        Assert.Equal("slot 1: primary ann, alternate none", draft.Detail);
         Assert.Equal("Bob (bob)", draft.ActorName);
+    }
+
+    /// <summary>
+    ///     Test that the audit entries of slot changes say the slot number the review page shows (the position among
+    ///     the slots), not the database identity of the slot.
+    /// </summary>
+    [Fact]
+    public async Task SigningService_SlotEvents_AfterEarlierSlotRemoved_UsePageNumberNotIdentity()
+    {
+        // Arrange: two slots, then the first is removed, so the second has the identity 2 but is slot 1 on the page
+        var fixture = await CreateAsync();
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var first = await fixture.Signing.AddSlotAsync(TestActors.Ann, fixture.ProjectId, "rev-1", fixture.UserIds["ann"], null, cancellationToken);
+        var second = await fixture.Signing.AddSlotAsync(TestActors.Ann, fixture.ProjectId, "rev-1", fixture.UserIds["bob"], null, cancellationToken);
+        await fixture.Signing.RemoveSlotAsync(TestActors.Bob, fixture.ProjectId, "rev-1", first.Id, cancellationToken);
+        var before = fixture.Reviews.Audits.Count;
+
+        // Act: change and then remove the remaining slot
+        await fixture.Signing.UpdateSlotAsync(TestActors.Bob, fixture.ProjectId, "rev-1", second.Id, fixture.UserIds["bob"], fixture.UserIds["ann"], cancellationToken);
+        await fixture.Signing.RemoveSlotAsync(TestActors.Bob, fixture.ProjectId, "rev-1", second.Id, cancellationToken);
+
+        // Assert: the identities differ from the page numbers, and the entries use the page number
+        Assert.NotEqual(1, second.Id);
+        var drafts = fixture.Reviews.Audits.Skip(before).ToList();
+        Assert.Equal(["slot.updated", "slot.removed"], drafts.Select(d => d.Action));
+        Assert.Equal("slot 1: primary bob, alternate ann", drafts[0].Detail);
+        Assert.Equal("slot 1: primary bob, alternate ann", drafts[1].Detail);
     }
 
     /// <summary>

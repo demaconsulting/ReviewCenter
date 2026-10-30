@@ -19,6 +19,7 @@
 // SOFTWARE.
 
 using System.Net;
+using System.Text;
 using DemaConsulting.ReviewCenter.Api;
 using DemaConsulting.ReviewCenter.Core;
 using DemaConsulting.ReviewCenter.Tests.Core;
@@ -329,6 +330,48 @@ public class ApiEndpointsTests
         Assert.Equal(2, review.GetProperty("counts").GetProperty("files").GetInt32());
         var entry = Assert.Single(await AuditAsync(app), e => e.Action == "review.created");
         Assert.Contains($"created via API token '{token.Token.DisplayId}'", entry.Detail, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    ///     Test that a review can be created from a repository when the request leaves out the baseline and the
+    ///     selection, or sends the selection as <c>null</c>: every changed file is reviewed.
+    /// </summary>
+    /// <param name="selectionJson">The selection member of the repository source, or empty to leave it out.</param>
+    [Theory(Timeout = 120000)]
+    [InlineData("")]
+    [InlineData(""","selection":null""")]
+    public async Task ApiEndpoints_CreateReview_Repository_NoSelection_ReviewsEveryChange(string selectionJson)
+    {
+        // Arrange: a registered repository with scripted changes
+        var git = new FakeGitRepositoryProvider();
+        git.Revisions["main"] = HeadSha;
+        git.Revisions["v1"] = BaseSha;
+        git.Script(
+            BaseSha,
+            HeadSha,
+            [
+                ("src/mod.txt", ChangeKind.Modified, "world\n", "hello\n"),
+                ("src/new.txt", ChangeKind.Added, null, "world\n")
+            ]);
+        await using var app = await StartAsync(configureServices: services => services.AddSingleton<IGitRepositoryProvider>(git));
+        var token = await CreateTokenAsync(app);
+        await EnsureUserAsync(app, "adm", UserRole.Admin);
+        var project = await app.Services.GetRequiredService<ProjectService>().CreateAsync("Apollo", null, TestContext.Current.CancellationToken);
+        var repository = await app.Services.GetRequiredService<RepositoryService>().CreateAsync(
+            project.Id, "main-repo", "https://example.com/org/repo.git", null, null, new Actor("adm", "Adm"), TestContext.Current.CancellationToken);
+        using var client = ClientFor(app, token.Value);
+        var body = $$$"""{"id":"REV-N","title":"T","repository":{"repositoryId":{{{repository.Id}}},"headRevision":"main","baselineRevision":"v1"{{{selectionJson}}}}}""";
+        using var content = new StringContent(body, Encoding.UTF8, "application/json");
+
+        // Act: create the review
+        var response = await client.PostAsync($"/api/projects/{project.Id}/reviews", content, TestContext.Current.CancellationToken);
+        using var json = await JsonAsync(response);
+
+        // Assert: created, and the files are the changed files, not a refusal of the missing selection
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        var review = json.RootElement.GetProperty("review");
+        Assert.Equal(2, review.GetProperty("counts").GetProperty("files").GetInt32());
+        Assert.Equal("**/*", review.GetProperty("selection").GetString());
     }
 
     /// <summary>

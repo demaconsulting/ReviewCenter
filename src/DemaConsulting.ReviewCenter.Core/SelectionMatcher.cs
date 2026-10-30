@@ -91,6 +91,11 @@ public static class SelectionMatcher
     public const int MaxPatternLength = 400;
 
     /// <summary>
+    ///     The selection that matches every changed file; it is the default when a client sends no selection.
+    /// </summary>
+    public const string AllFiles = "**/*";
+
+    /// <summary>
     ///     The segment text that matches any number of path segments.
     /// </summary>
     private const string GlobStar = "**";

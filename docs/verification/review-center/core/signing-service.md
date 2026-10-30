@@ -375,11 +375,18 @@ with an
 `ArgumentNullException`. This scenario is tested by `SigningService_Constructor_NullArguments_Throw`.
 
 **SigningService_SlotAndSignatureEvents_AreRecordedWithMembersAndDigest**: A slot is added, changed, and signed; the
-entries `slot.added`, `slot.updated`, and `signature.added` carry the members and the signed record digest, and no
+entries `slot.added`, `slot.updated`, and `signature.added` carry the members, the signed record digest, and the slot
+number as shown on the page ("slot 1", although the slot has the database identity 2 because an earlier slot was
+removed), and no
 password. This scenario is tested by `SigningService_SlotAndSignatureEvents_AreRecordedWithMembersAndDigest`. A refused
 add of an unknown user (`SlotUserInvalid`, before signing) and a refused add to the approved review (`ReviewLocked`,
 after signing) record nothing. The removal of a slot records `slot.removed` with its members, which is tested by
 `SigningService_RemoveSlotAsync_RecordsSlotRemovedWithItsMembers`. Both tests are defined in `AuditEventTests.cs`.
+
+**SigningService_SlotEvents_AfterEarlierSlotRemoved_UsePageNumberNotIdentity**: Two slots are added and the first one
+is removed; a change of the remaining slot and its removal are recorded as "slot 1", the number it has on the page
+now, and not with its database identity. This scenario is tested by
+`SigningService_SlotEvents_AfterEarlierSlotRemoved_UsePageNumberNotIdentity`.
 
 **SigningService_SignAsync_WrongPasswordThenLocked_RecordsReauthFailedEntriesWithoutPassword**: After four wrong
 passwords through `ReauthenticateAsync`, signing with a wrong password (the fifth failure, which locks the account)

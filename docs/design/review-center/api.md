@@ -78,7 +78,8 @@ policies.
   with
   no token, or with a token that is refused, gets 401 with `WWW-Authenticate` headers for `Bearer` and `Basic`, always
   with the
-  same answer; too many refusals from one address get 429. The two policies of the open routes accept, besides a valid
+  same answer; too many refusals from one address get 429 with a `Retry-After` header. The two policies of the open
+  routes accept, besides a valid
   token, a request with no `Authorization` header when the project switch of the route is on.
 - *Constraints*: The scheme is not the default scheme; the cookie stays the default for the pages. The policies apply to
   the route groups of the API and to nothing else, so a token never signs a user in on a page, and a cookie never
@@ -175,8 +176,9 @@ expired, owner disabled or locked out, owner with a temporary password), so the 
 token ever existed. The reason is
 recorded in the audit trail without the value of the token, as an event that is coalesced per client address, so that
 a script with a wrong token does not flood the trail. Attempts are counted by the same in-memory throttle as the web
-sign-in, under a key of their own, so a flood of wrong tokens answers 429 without locking out any user and without
-touching the limits of the web sign-in.
+sign-in, against the limit of the client address only (20 in 300 seconds by default; there is no per-name counter), so a
+flood of wrong tokens answers 429 with a `Retry-After` header without locking out any user. The address counter is
+shared with the web sign-in from the same address.
 
 **Errors**: Every failure of the endpoints is `application/problem+json`, so that a program can read the status and the
 message in one way. A broken domain rule is mapped to one status in one place (`ApiProblems.StatusOf`): not found
@@ -188,7 +190,10 @@ that names the field. An unexpected exception is the generic 500 of the host and
 
 **The description of the interface**: The OpenAPI document is generated from the endpoints, so it cannot describe a
 route that does not exist. The snapshot in `docs/api/` and a test that compares the two make every change of the
-interface a visible change in a review. The document needs no token, because tools that generate a client fetch it
+interface a visible change in a review. The request schemas list as required only the members that the API requires
+(the `id` and `title` of a review, and the `repositoryId` and `headRevision` of a repository source), because a client
+generator would otherwise force clients to send the optional ones. The document needs no token, because tools that
+generate a client fetch it
 before they have one. Its two operations that a project can open list the empty security alternative, so that a
 generated client knows that a call without credentials is possible there.
 

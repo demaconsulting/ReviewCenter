@@ -99,9 +99,12 @@ of the token, which is not secret).
     counted; the challenge answers 401. After this step Basic and Bearer take the same path: the same throttle, the same
     validation, the same audit events, and the same generic refusal, so a wrong Basic password is not distinguishable
     from a wrong bearer token.
-  - Otherwise the attempt is counted first, with the client address from `SignIn.ClientAddress` and the throttle name
-    `api-token:` followed by the address. The name is per address on purpose, so one client with a wrong token cannot
-    block the others. When the throttle refuses, the request is marked, nothing is checked, a
+  - Otherwise the attempt is counted first against the quota of the client address from `SignIn.ClientAddress`
+    (`SignInThrottle.TryBeginAddressOnly`): the limit is `MaxFailuresPerAddress` (20 in a window of 300 seconds by
+    default, as documented), with no per-name counter, so one client with a wrong token cannot block the others behind
+    other addresses, and a shared constant name cannot make five bad requests enough to block a whole address. The
+    address counter is the one that the web sign-in also uses for that address. When the throttle refuses, the request
+    is marked, nothing is checked, a
     `token.use-throttled` event is recorded, and the result is a failure that the challenge answers with 429.
   - The token is validated by `PersonalAccessTokenService.AuthenticateAsync`. On a refusal a `token.use-failed` event is
     recorded and the result is a failure (the attempt stays counted).
@@ -114,7 +117,8 @@ of the token, which is not secret).
 
 **HandleChallengeAsync**: Answers a request that needs a token and has none that was accepted.
 
-- *Postconditions*: A problem description with status 429 when the request was throttled; otherwise status 401 with the
+- *Postconditions*: A problem description with status 429 and a `Retry-After` header (the length of the throttle
+  window in seconds, `SignInThrottle.WindowSeconds`) when the request was throttled; otherwise status 401 with the
   two `WWW-Authenticate` headers, `Bearer` and `Basic realm="ReviewCenter", charset="UTF-8"` (a client such as
   ReviewMark does not answer a challenge, it only sends Basic in advance). The 401 is the same for every reason.
 

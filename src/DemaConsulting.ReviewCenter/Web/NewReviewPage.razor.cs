@@ -44,7 +44,7 @@ public partial class NewReviewPage : ComponentBase
     /// <summary>
     ///     The pattern the selection starts with: every changed file.
     /// </summary>
-    private const string DefaultSelection = "**/*";
+    private const string DefaultSelection = SelectionMatcher.AllFiles;
 
     /// <summary>
     ///     Backing field for <see cref="InteractiveMarker"/>; flips to <c>true</c> after the first render
