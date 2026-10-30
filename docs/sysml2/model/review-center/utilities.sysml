@@ -9,5 +9,6 @@ package ReviewCenter {
 
         part pathHelpers : PathHelpers;
         part temporaryDirectory : TemporaryDirectory;
+        part secretSource : SecretSource;
     }
 }

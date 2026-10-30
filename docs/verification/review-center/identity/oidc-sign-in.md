@@ -29,6 +29,9 @@ no external service and no network beyond the loopback address.
 - A password sign-in of an account of the provider is refused.
 - Settings are validated at start-up with messages that name the setting and never a value (also through the
   `ServerHost` tests); nothing is mapped when sign-in with a provider is off.
+- The client secret may be given in a file (`ClientSecretFile`): the trimmed contents are used, both forms at once are
+  refused, and a missing, empty, or oversized file stops the start with a message that names the setting and never the
+  secret.
 - A confirmation of identity asks for `prompt=login` and `max_age=0`, issues exactly one single-use proof for the
   right user only when `auth_time` (checked at the exact limits of its window), subject, issuer and the user of the
   session are right, and otherwise fails closed with a recorded reason.
@@ -135,9 +138,34 @@ message that names it and holds neither its value nor the secret. This scenario 
 `OidcOptionsValidator_Validate_InvalidSetting_FailsNamingTheSettingWithoutValues`.
 
 **OidcOptionsValidator_Validate_MissingClientSecret_FailsNamingTheSetting**: With sign-in on, a client secret that is
-null, empty, white space or a tab fails with a message that names `Identity:Oidc:ClientSecret` and says it is required;
-a public client without a secret is not accepted. This scenario is tested by
+null, empty, white space or a tab, with no secret file either, fails with a message that names
+`Identity:Oidc:ClientSecret` and `Identity:Oidc:ClientSecretFile` and says one is required; a public client without a
+secret is not accepted. This scenario is tested by
 `OidcOptionsValidator_Validate_MissingClientSecret_FailsNamingTheSetting`.
+
+**OidcOptionsValidator_Validate_ClientSecretFile_SucceedsAndResolvesTheTrimmedSecret**: With `ClientSecretFile` naming a
+file in a temporary directory whose contents end in a line break, the settings are valid and the resolved secret is the
+trimmed contents; the inline setting stays empty. This scenario is tested by
+`OidcOptionsValidator_Validate_ClientSecretFile_SucceedsAndResolvesTheTrimmedSecret`.
+
+**OidcOptionsValidator_Validate_ClientSecretAndFileBothSet_FailsNamingBothSettings**: With both `ClientSecret` and
+`ClientSecretFile` set, the settings are refused with a message that names both and holds neither secret. This
+scenario is tested by `OidcOptionsValidator_Validate_ClientSecretAndFileBothSet_FailsNamingBothSettings`.
+
+**OidcOptionsValidator_Validate_ClientSecretFileProblem_FailsNamingTheFileSettingWithoutTheSecret**: A secret file that
+is missing, empty, larger than 8 KB, too long as a secret, or holds a control character fails with a message that names
+`Identity:Oidc:ClientSecretFile` and does not contain the contents of the file. This scenario is tested by
+`OidcOptionsValidator_Validate_ClientSecretFileProblem_FailsNamingTheFileSettingWithoutTheSecret`.
+
+**ServerHost_CreateApplication_ClientSecretFileProblem_ThrowsClearErrorWithoutSecret**: With sign-in on, a missing
+secret file, or a secret set both inline and in a file, stops the start of the application with a message that names
+the settings and does not contain the secret. The test is in the `ServerHost` tests and is linked from the client
+secret file requirement of this unit. This scenario is tested by
+`ServerHost_CreateApplication_ClientSecretFileProblem_ThrowsClearErrorWithoutSecret`.
+
+**OidcSignIn_ClientSecretFile_SignsInAndHandlerUsesTheTrimmedSecret**: With the secret in a file, a sign-in through the
+fake provider succeeds and the configured handler of the framework holds the trimmed contents of the file as its client
+secret. This scenario is tested by `OidcSignIn_ClientSecretFile_SignsInAndHandlerUsesTheTrimmedSecret`.
 
 **OidcOptionsValidator_Validate_InvalidClientSecret_FailsWithoutEchoingTheSecret**: A secret that is too long or holds
 a control character fails with a message that names the setting and does not contain the secret. This scenario is

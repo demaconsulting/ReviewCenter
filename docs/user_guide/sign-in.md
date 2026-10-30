@@ -134,18 +134,23 @@ start when a value is not valid, and the message names the setting but never its
 | `Identity:Oidc:Enabled`              | `true` to turn it on (default `false`)          |
 | `Identity:Oidc:Authority`            | Address of the provider                         |
 | `Identity:Oidc:ClientId`             | The client id of ReviewCenter                   |
-| `Identity:Oidc:ClientSecret`         | The client secret (required)                    |
+| `Identity:Oidc:ClientSecret`         | The client secret (give this or the file below) |
+| `Identity:Oidc:ClientSecretFile`     | Path of a file that holds the client secret     |
 | `Identity:Oidc:Scopes`               | Scopes (default `openid profile email`)         |
 | `Identity:Oidc:DisplayName`          | Name on the button (default OpenID Connect)     |
 | `Identity:Oidc:UsernameClaim`        | Claim for the user name (`preferred_username`)  |
 | `Identity:Oidc:RequireEmailVerified` | Refuse an e-mail that is not verified (off)     |
 | `Identity:Oidc:ReauthMaxAgeSeconds`  | How recent a login for a signature must be      |
 
-Keep the client secret in the environment or in a secret store, never in a file in a repository (for example the
-environment variable `Identity__Oidc__ClientSecret`). The client secret is **required** when the sign-in is on:
+Keep the client secret in the environment, in a secret store, or in a file that only the service can read, never in a
+file in a repository (for example the environment variable `Identity__Oidc__ClientSecret`, or a file named by
+`Identity:Oidc:ClientSecretFile`). The client secret is **required** when the sign-in is on:
 ReviewCenter is a confidential client, so a public client that relies on PKCE alone is not supported, and the server
-does not start when the secret is missing, empty, or only white space. The message names the setting and never shows
-the value. The address of the
+does not start when the secret is missing, empty, or only white space. Give the secret in one form only: when both
+`ClientSecret` and `ClientSecretFile` are set, the server does not start. With `ClientSecretFile`, the server reads
+the file as UTF-8 text and removes the line break and the spaces around the secret; the file may be at most 8 KB, and
+the server does not start when it is missing, cannot be read, or is empty. The message names the setting (and the path
+of the file) and never shows the secret. A recipe is in the Identity Providers chapter. The address of the
 provider must use `https`; `http` is accepted only for a provider on the same machine (`localhost`) so that it can be
 tried. `ReauthMaxAgeSeconds` is the age that the login at the provider may have when a signature is confirmed (default
 120; 10 to 900).

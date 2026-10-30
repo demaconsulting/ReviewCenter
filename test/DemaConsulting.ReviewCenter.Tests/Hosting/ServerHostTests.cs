@@ -435,6 +435,54 @@ public class ServerHostTests
     }
 
     /// <summary>
+    ///     Test that a client secret file that is missing, or that is set together with an inline client secret, stops
+    ///     the build with an error that names the settings and never contains the secret.
+    /// </summary>
+    /// <param name="conflict">Whether both settings are set (otherwise the file does not exist).</param>
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void ServerHost_CreateApplication_ClientSecretFileProblem_ThrowsClearErrorWithoutSecret(bool conflict)
+    {
+        // Arrange: valid enabled settings, a secret file path, and a secret that must stay out of the message
+        const string secret = "top-secret-value";
+        using var folder = new TemporaryDirectory();
+        var path = folder.GetFilePath("client-secret.txt");
+        if (conflict)
+        {
+            File.WriteAllText(path, "secret-in-the-file");
+        }
+
+        using var context = Context.Create(["serve", "--silent"]);
+        var options = new ServerHostOptions
+        {
+            MapStaticAssets = false,
+            ConfigureBuilder = builder =>
+            {
+                builder.WebHost.UseTestServer();
+                builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
+                {
+                    ["Database:ConnectionString"] = TestDatabase.NewConnectionString(),
+                    ["Identity:Oidc:Enabled"] = "true",
+                    ["Identity:Oidc:Authority"] = "https://idp.example.com/",
+                    ["Identity:Oidc:ClientId"] = "reviewcenter",
+                    ["Identity:Oidc:ClientSecret"] = conflict ? secret : string.Empty,
+                    ["Identity:Oidc:ClientSecretFile"] = path
+                });
+            }
+        };
+
+        // Act: create the application
+        var exception = Assert.Throws<InvalidOperationException>(() => ServerHost.CreateApplication(context, options));
+
+        // Assert: the sign-in settings error names the file setting and holds no secret
+        Assert.Contains("Invalid OpenID Connect sign-in settings", exception.Message, StringComparison.Ordinal);
+        Assert.Contains("Identity:Oidc:ClientSecretFile", exception.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("top-secret", exception.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("secret-in-the-file", exception.Message, StringComparison.Ordinal);
+    }
+
+    /// <summary>
     ///     Test that an attestation provider that does not exist stops the build with an error naming the setting.
     /// </summary>
     [Fact]

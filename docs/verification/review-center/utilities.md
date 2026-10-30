@@ -3,10 +3,11 @@
 ### Verification Approach
 
 The `Utilities` subsystem is verified by integration tests defined in
-`UtilitiesSubsystemTests.cs`. Each test exercises `PathHelpers` or `TemporaryDirectory` through
+`UtilitiesSubsystemTests.cs`. Each test exercises `PathHelpers`, `TemporaryDirectory`, or `SecretSource` through
 realistic workflows to confirm that valid paths are resolved correctly, traversal attacks
-are rejected, the resulting paths can be used for actual directory creation, and a temporary
-directory with files in it is removed when it is disposed. `PathHelpers`
+are rejected, the resulting paths can be used for actual directory creation, a temporary
+directory with files in it is removed when it is disposed, and a secret in a file in a temporary directory is read
+trimmed. `PathHelpers`
 has no dependencies on other tool units, so no mocking is required.
 
 ### Test Environment
@@ -21,6 +22,7 @@ N/A - standard test environment.
 - Absolute paths supplied as the relative argument cause `ArgumentException` to be thrown.
 - Paths produced by `SafePathCombine` can be passed directly to `Directory.CreateDirectory`.
 - Files created through a `TemporaryDirectory`, including in nested folders, are gone after it is disposed.
+- A secret file written to a `TemporaryDirectory` is resolved by `SecretSource` as its trimmed contents.
 
 ### Test Scenarios
 
@@ -52,3 +54,8 @@ succeeds. This scenario is tested by
 passed to `Directory.CreateDirectory`; the directory is created at the expected location within
 the base directory. This scenario is tested by
 `UtilitiesSubsystem_DirectoryCreationWorkflow_ValidPaths_CreatesDirectories`.
+
+**UtilitiesSubsystem_SecretSourceWorkflow_FileInTemporaryDirectory_ResolvesTrimmedSecret**: A secret file with a
+trailing line break is written inside a `TemporaryDirectory`; `SecretSource.Resolve` returns the trimmed secret, and
+once the directory is gone the same call is refused with a message that names the file setting. This scenario is
+tested by `UtilitiesSubsystem_SecretSourceWorkflow_FileInTemporaryDirectory_ResolvesTrimmedSecret`.

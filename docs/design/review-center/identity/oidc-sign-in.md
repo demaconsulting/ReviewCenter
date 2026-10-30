@@ -29,14 +29,16 @@ slot. They are what the proof is bound to later.
 
 **OidcOptions** (supporting type): a settings object bound from the `Identity:Oidc` section, which comes from
 `appsettings.json` or from environment variables such as `Identity__Oidc__Authority`. The client secret belongs in an
-environment variable or a secret store. The type prints nothing. The settings are:
+environment variable, a secret store, or a file (`ClientSecretFile`), not in a file under source control. The type
+prints nothing. The settings are:
 
 | Setting                | Type   | Default                | Rule when enabled                                       |
 |------------------------|--------|------------------------|---------------------------------------------------------|
 | `Enabled`              | bool   | false                  | Everything below is read only when true                 |
 | `Authority`            | string | empty                  | Required, at most 512 characters, https                 |
 | `ClientId`             | string | empty                  | Required, at most 256 characters, no spaces             |
-| `ClientSecret`         | string | empty                  | Required (confidential client), at most 512             |
+| `ClientSecret`         | string | empty                  | Required unless a file is given, at most 512            |
+| `ClientSecretFile`     | string | empty                  | Path of the secret file; not with `ClientSecret`        |
 | `Scopes`               | string | `openid profile email` | Must hold `openid`, at most 20 scopes of 128 characters |
 | `DisplayName`          | string | `OpenID Connect`       | Required, at most 50 characters                         |
 | `UsernameClaim`        | string | `preferred_username`   | Required, at most 64 characters, no spaces              |
@@ -45,6 +47,12 @@ environment variable or a secret store. The type prints nothing. The settings ar
 
 The scopes together hold at most 512 printable ASCII characters. `Authority` may use http only for a loopback host
 (`localhost` or a loopback address) and has no user, query or fragment. Text settings have no control characters.
+
+The client secret is resolved by `OidcOptions.ResolveClientSecret`, which hands `ClientSecret` and `ClientSecretFile`
+to `SecretSource`: the inline value, or the trimmed contents of the file (at most 8 KB, UTF-8, not empty). Both set is
+an error; neither set is the "required" error. The 512-character bound and the rule about control characters apply to
+the resolved secret, whichever form it came from, and the message names the setting that was used. The file is read
+once by the start-up check and once when the handler of the framework is configured; the secret is never logged.
 
 #### Key Methods
 
@@ -129,7 +137,8 @@ refused. The tests pin one case of each class, so an upgrade that changes the wo
 **OidcOptionsValidator.Validate**: Does nothing while `Enabled` is false. Otherwise it reports only the first problem,
 checking in the order authority, client identifier, client secret, scopes, display name, user name claim and age. A
 message names the setting (for example `Identity:Oidc:Authority`) and the rule, and never a value, so the secret cannot
-reach a log. A null options object raises `ArgumentNullException`.
+reach a log. A missing, unreadable, empty or oversized secret file and a secret set both inline and in a file are
+reported by `SecretSource` and name the settings. A null options object raises `ArgumentNullException`.
 
 #### Error Handling
 
@@ -154,6 +163,7 @@ exceptions propagate to the framework.
 #### Dependencies
 
 - **OidcOptions** and **OidcOptionsValidator** (this unit) — the settings and their start-up check.
+- **SecretSource** (Utilities) — resolves the client secret from the inline setting or the file setting.
 - **UserService** (Core) — account matching by issuer and subject, account creation, and the audit records.
 - **SigningService** and **ReauthProofStore** (Core) — the check that a user may confirm a slot, and the single-use
   proof that the signing step spends.

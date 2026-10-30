@@ -102,6 +102,7 @@ This document covers the verification design for the following software items:
   - **Utilities** subsystem
     - **PathHelpers** — safe path combination utilities
     - **TemporaryDirectory** — uniquely named temporary directory that is removed on disposal
+    - **SecretSource** — resolves a secret from an inline value or a file, with messages that never hold the secret
 - **ReviewCenterPuppet** — a separate development-tool system with its own system and unit verification:
   - **PuppetProgram** — command-line parsing, start, and result printing
   - **ControlChannel** — control file and loopback protocol

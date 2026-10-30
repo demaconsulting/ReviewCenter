@@ -429,7 +429,7 @@ internal static class OidcSignIn
         handler.Authority = settings.Authority;
         handler.RequireHttpsMetadata = !settings.IsLoopbackHttp();
         handler.ClientId = settings.ClientId;
-        handler.ClientSecret = settings.ClientSecret;
+        handler.ClientSecret = settings.ResolveClientSecret();
         handler.SignInScheme = ExternalCookieScheme;
         handler.CallbackPath = CallbackPath;
 

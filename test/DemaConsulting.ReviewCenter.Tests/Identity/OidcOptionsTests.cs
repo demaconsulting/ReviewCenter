@@ -19,6 +19,7 @@
 // SOFTWARE.
 
 using DemaConsulting.ReviewCenter.Identity;
+using DemaConsulting.ReviewCenter.Utilities;
 
 namespace DemaConsulting.ReviewCenter.Tests.Identity;
 
@@ -194,6 +195,102 @@ public class OidcOptionsTests
         // Assert
         Assert.True(result.Failed);
         Assert.Contains("Identity:Oidc:ClientSecret", result.FailureMessage, StringComparison.Ordinal);
+        Assert.DoesNotContain(Secret, result.FailureMessage, StringComparison.Ordinal);
+        Assert.DoesNotContain("xxxx", result.FailureMessage, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    ///     Test that a client secret in a file is accepted: it is trimmed, it replaces the inline secret, and the
+    ///     inline setting may stay empty.
+    /// </summary>
+    [Fact]
+    public void OidcOptionsValidator_Validate_ClientSecretFile_SucceedsAndResolvesTheTrimmedSecret()
+    {
+        // Arrange: valid settings with the secret in a file (with the newline an editor adds) and none inline
+        using var directory = new TemporaryDirectory();
+        var path = directory.GetFilePath("client-secret.txt");
+        File.WriteAllText(path, Secret + "\n");
+        var options = Valid();
+        options.ClientSecret = string.Empty;
+        options.ClientSecretFile = path;
+
+        // Act
+        var result = Validate(options);
+        var resolved = options.ResolveClientSecret();
+
+        // Assert
+        Assert.True(result.Succeeded, result.FailureMessage);
+        Assert.Equal(Secret, resolved);
+    }
+
+    /// <summary>
+    ///     Test that a secret both inline and in a file is refused, naming both settings and no secret.
+    /// </summary>
+    [Fact]
+    public void OidcOptionsValidator_Validate_ClientSecretAndFileBothSet_FailsNamingBothSettings()
+    {
+        // Arrange: a file that exists, and the inline secret of the valid settings
+        using var directory = new TemporaryDirectory();
+        var path = directory.GetFilePath("client-secret.txt");
+        File.WriteAllText(path, "secret-in-the-file");
+        var options = Valid();
+        options.ClientSecretFile = path;
+
+        // Act
+        var result = Validate(options);
+
+        // Assert
+        Assert.True(result.Failed);
+        Assert.Contains("Identity:Oidc:ClientSecret ", result.FailureMessage, StringComparison.Ordinal);
+        Assert.Contains("Identity:Oidc:ClientSecretFile", result.FailureMessage, StringComparison.Ordinal);
+        Assert.DoesNotContain(Secret, result.FailureMessage, StringComparison.Ordinal);
+        Assert.DoesNotContain("secret-in-the-file", result.FailureMessage, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    ///     Test that a secret file that is missing or empty, or a secret in it that is out of bounds, is refused
+    ///     naming the file setting, without the secret in the message.
+    /// </summary>
+    /// <param name="problem">The kind of problem: <c>missing</c>, <c>empty</c>, <c>oversize</c>, <c>tooLong</c>
+    ///     or <c>control</c>.</param>
+    [Theory]
+    [InlineData("missing")]
+    [InlineData("empty")]
+    [InlineData("oversize")]
+    [InlineData("tooLong")]
+    [InlineData("control")]
+    public void OidcOptionsValidator_Validate_ClientSecretFileProblem_FailsNamingTheFileSettingWithoutTheSecret(
+        string problem)
+    {
+        // Arrange: valid settings whose secret comes from a file with the given problem
+        using var directory = new TemporaryDirectory();
+        var path = directory.GetFilePath("client-secret.txt");
+        switch (problem)
+        {
+            case "empty":
+                File.WriteAllText(path, "\n");
+                break;
+            case "oversize":
+                File.WriteAllText(path, Secret + new string('x', SecretSource.MaxFileBytes));
+                break;
+            case "tooLong":
+                File.WriteAllText(path, Secret + new string('x', OidcOptions.MaxClientSecretLength));
+                break;
+            case "control":
+                File.WriteAllText(path, Secret + "\u0007");
+                break;
+        }
+
+        var options = Valid();
+        options.ClientSecret = string.Empty;
+        options.ClientSecretFile = path;
+
+        // Act
+        var result = Validate(options);
+
+        // Assert
+        Assert.True(result.Failed);
+        Assert.Contains("Identity:Oidc:ClientSecretFile", result.FailureMessage, StringComparison.Ordinal);
         Assert.DoesNotContain(Secret, result.FailureMessage, StringComparison.Ordinal);
         Assert.DoesNotContain("xxxx", result.FailureMessage, StringComparison.Ordinal);
     }
