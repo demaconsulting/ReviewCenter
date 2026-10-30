@@ -11,6 +11,7 @@ input-files:
   - docs/user_guide/identity-providers.md
   - docs/user_guide/administration.md
   - docs/user_guide/reviewing.md
+  - docs/user_guide/review-practices.md
   - docs/user_guide/automation.md
   - docs/user_guide/reference.md
 template: template.html

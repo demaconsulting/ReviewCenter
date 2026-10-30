@@ -1,0 +1,128 @@
+# Review Practices
+
+This chapter suggests good practices for running a review in ReviewCenter. Each practice says why it helps. Most of
+them rest on what the product does today, and the *Reviewing* chapter describes that in full. Where a practice is only
+a convention that the product neither supports nor enforces, the text says so. Adapt them to your own process.
+
+## What the Product Enforces
+
+Know the hard rules first, because the practices build on them. A review can be signed only when:
+
+- every check of an applicable checklist section is answered;
+- no check is answered Fail; and
+- no comment thread is open.
+
+Signing asks the signer to confirm their identity again (the password, or a fresh sign-in at the identity provider),
+and a signature covers the whole record as it was at that moment. Any later change to the record, such as a new comment
+or a changed answer, makes the signatures out of date, and the review goes back to In review. Nothing else is enforced:
+who writes a comment, who resolves it, how it is worded, and who the reviewers are is up to the team.
+
+## Answering the Checklist
+
+- **Pass** when you looked at the files of the review and the check is met. A Pass needs no text and is saved at once,
+  so do not use it to move on quickly; an answer is recorded under your name and goes into the signed record.
+- **Fail** when the check is not met. A justification is required. State what is wrong and where, and point to the
+  thread that holds the details, because checklist answers are not linked to threads by the product.
+- **N/A** when the check cannot apply to the files of this review. A justification is required as well. Say why in a
+  way a later reader can verify, for example "No database code in this change set", not just "not relevant". If a whole
+  section does not apply, clear the switch of the section and give the reason once.
+
+Do not answer N/A to avoid a Fail. If the check should hold and does not, it is a Fail.
+
+## When a Check Fails
+
+A Fail is a valid, recorded answer, but a review with a Fail cannot be signed. The product has no signed "review
+failed" or "rejected" outcome yet: a review is either Approved or still In review, and the evidence index lists only
+complete reviews. A suggested path:
+
+1. Record the Fail with a justification, and start a thread on the lines concerned that explains why and what the
+   author should change.
+2. The author fixes the code in the repository. The files of an existing review never change, so the fix needs a new
+   review of the fixed revision.
+3. Create the new review, for example with **Plan reviews**, and ask the reviewers to check that the earlier
+   findings are fixed.
+4. Mention the earlier review in the title or in the first comment of the new one, for example "Follow-up to
+   review Core-12".
+
+The earlier review stays In review. Teams that need evidence of a failed review should keep that unsigned review, with
+its threads, answers, and its **History** (the audit trail of the review), and refer to it from the follow-up review.
+There is no attestation PDF for a review that is not Approved, so the review record and its history are the evidence.
+
+## Handling Minor Findings Without Blocking
+
+Every open thread blocks signing, so a nit-pick must be closed explicitly. Three ways keep the review moving and keep a
+record of the decision:
+
+- **Fix and resolve.** The author changes the code in a later revision, replies "Fixed in the next review", and
+  resolves the thread.
+- **Accept or decline.** Reply with a plain sentence such as "Accepted as is: the name matches the existing API" or
+  "Will not fix: the table is generated", and resolve the thread.
+- **Track it elsewhere.** Collect several minor findings in one ticket in your own tracker, reply "Tracked in PROJ-123",
+  and resolve the threads. ReviewCenter has no link to a tracker, so the reference is plain text.
+
+Resolution has no text of its own: the **Resolve** button only changes the state of the thread. Write the reason as a
+reply first, then resolve. A reply can also be added to a resolved thread (expand it first), and it does not reopen it.
+Remember that a reply posted after reviewers have signed makes their signatures out of date, so reply before signing.
+Say what was done and who decided, for example "Declined by the author after discussion with Alex: ...", because a
+resolved thread is shown collapsed, and the audit trail records who pressed the button but not why.
+
+## Writing Good Threads
+
+- **Anchor to the lines.** Start the thread on the exact line or range, not on the whole file, so the author sees what
+  you mean in the diff and the link of the thread opens the right place.
+- **One concern per thread.** A thread is resolved as a whole. Two concerns in one thread make it hard to resolve one
+  and keep the other.
+- **State the expected outcome.** Say what would resolve it: "Rename to match X", "Add a test for the empty case", or
+  "Explain why this is safe".
+- **Name the severity in words.** The product has no severity flag, so start the first comment with a word that your
+  team agrees on, such as "Blocking:", "Nit:", or "Question:". It tells the author what needs a fix before the review
+  can be signed and what can be answered or tracked.
+
+Posted comments cannot be edited or deleted. Think before you post, and correct yourself with a reply.
+
+## Who Resolves a Thread
+
+Prefer that the person who raised the thread resolves it, after the author has replied. If the author and the reviewer
+agree on an outcome, the reviewer who agrees with it can resolve it instead. Do not let the author resolve their own
+reviewers' threads without a reply that the reviewer has seen. The product does not enforce any of this: every member of
+the project can resolve or reopen any thread, so it is a convention to agree on in the team. Reopen a thread that was
+resolved too early.
+
+## Baselines and Scope
+
+- **Keep reviews small.** A review of a few related files can be read carefully, and a Fail or an open thread blocks
+  only that review.
+- **Review against the previous revision.** Give a repository review a baseline, so the diff shows what changed and the
+  reviewers do not read the unchanged code again. With **Plan reviews**, the default compares each review-set with its
+  last signed review, so changes of an unsigned (for example failed) review are not skipped.
+- **Know the trade-off with ReviewMark.** A review made from the changes since a baseline holds only the changed
+  files, so its fingerprint is not the one ReviewMark computes for the whole review-set, and ReviewMark reports it as
+  stale. If you enforce review-sets with the evidence index,   review all files of the set (see Use the Evidence Index
+    with ReviewMark in the Automation and API Tokens chapter).
+
+## Alternates
+
+A slot has a primary reviewer and, optionally, an alternate, and either one can sign the slot. Add an alternate when
+the primary may be away, so that a signature does not wait for one person. Choose someone with the same competence,
+because the signature records the role (primary or alternate) of the person who signed, and the alternate carries the
+same responsibility. Agree in the team who signs when both are available; usually it is the primary. A person can be in
+only one slot of a review, and a signed slot cannot be changed, so decide the reviewers before the first signature.
+Today the product does not stop the author of the change from being a reviewer, so keep the author out of the slots as
+a convention.
+
+## Signing Hygiene
+
+- **Sign only when the record you saw is final.** Before you sign, check that all threads and answers are as you
+  expect. Anything that changes afterward makes the signature out of date.
+- **A stale signature means review again.** When a slot says "Signature out of date", read what changed (the thread
+  list and the **History** of the review show it) before you sign the new record. Do not sign only because the
+  button is there.
+- **Never share an account.** The signature is bound to the person who confirmed their identity, and the audit trail
+  names that person. A shared account or a colleague typing your password makes the record untrue.
+- **Use the second factor** for reviewer accounts where your policy allows it, since it makes the confirmation at
+  signing stronger.
+
+## Project Settings
+
+Project administrators decide what the attestation PDFs contain and whether evidence can be read without signing in.
+Check those settings before the first review is signed; see Evidence Settings in the Administration chapter.

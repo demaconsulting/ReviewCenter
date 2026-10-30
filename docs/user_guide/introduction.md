@@ -37,7 +37,7 @@ Each chapter of this guide serves a group of readers:
   people sign in. *Administration* covers users, project members, evidence settings, the audit trail, the database,
   and repositories.
 - **Reviewers**: read *Users and Sign-in* for the account and the second factor, and *Reviewing* for projects,
-  reviews, comments, the checklist, and signatures.
+  reviews, comments, the checklist, and signatures, and *Review Practices* for suggested ways of working.
 - **Teams that automate**: read *Automation and API Tokens* for tokens, the JSON API, and the evidence index that
   ReviewMark reads.
 - **Everyone**: *Command-Line Reference* lists every command-line option, the self-validation, and the error

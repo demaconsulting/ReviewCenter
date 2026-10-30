@@ -95,6 +95,7 @@ The [User Guide][link-guide] describes everything in detail, including:
 - [Planning Reviews][link-guide-planning]: create the reviews of all review-sets of a repository in one go
 - [Review Signatures][link-guide-signatures]: reviewer slots, signing, and approval
 - [Signed Attestation][link-guide-attestation]: the PDF, its signing key, and what the signature proves
+- [Review Practices][link-guide-practices]: suggested good practices for running a review
 - [Evidence Settings][link-guide-evidence-settings]: anonymous access to the evidence and what the PDFs contain
 - [Audit Trail][link-guide-audit]: the hash chain, verification, and its limits
 - [Database][link-guide-database]: data location and database settings
@@ -149,6 +150,7 @@ By contributing to this project, you agree that your contributions will be licen
 [link-guide-planning]: https://github.com/demaconsulting/ReviewCenter/blob/main/docs/user_guide/reviewing.md#planning-reviews
 [link-guide-signatures]: https://github.com/demaconsulting/ReviewCenter/blob/main/docs/user_guide/reviewing.md#review-signatures
 [link-guide-attestation]: https://github.com/demaconsulting/ReviewCenter/blob/main/docs/user_guide/reviewing.md#signed-attestation
+[link-guide-practices]: https://github.com/demaconsulting/ReviewCenter/blob/main/docs/user_guide/review-practices.md
 [link-guide-evidence-settings]: https://github.com/demaconsulting/ReviewCenter/blob/main/docs/user_guide/administration.md#evidence-settings
 [link-guide-audit]: https://github.com/demaconsulting/ReviewCenter/blob/main/docs/user_guide/administration.md#audit-trail
 [link-guide-database]: https://github.com/demaconsulting/ReviewCenter/blob/main/docs/user_guide/administration.md#database
