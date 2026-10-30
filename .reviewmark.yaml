@@ -71,6 +71,7 @@ reviews:
       - "docs/verification/review-center.md"
       - "test/**/IntegrationTests.cs"
       - "test/**/Runner.cs"
+      - "test/**/ReviewCenterSystemTests.cs"
       - "test/**/ServerProcess.cs"
       - "test/**/AssemblyInfo.cs"
 
@@ -160,6 +161,7 @@ reviews:
       - "src/**/SelfTest/Validation.cs"
       - "src/**/SelfTest/ValidationRunner.cs"
       - "test/**/SelfTest/ValidationTests.cs"
+      - "test/**/ForcedGarbageCollection.cs"
 
   - id: ReviewCenter-SelfTest-ValidationChecks
     title: Review of ReviewCenter self-validation checks implementation
@@ -465,6 +467,7 @@ reviews:
       - "src/**/Web/HomePage.razor"
       - "test/**/Web/HomePageTests.cs"
       - "test/**/Web/PageTestBase.cs"
+      - "test/**/Web/SignedInUserAccess.cs"
 
   - id: ReviewCenter-Web-AboutPage
     title: Review of ReviewCenter AboutPage unit implementation
@@ -513,6 +516,7 @@ reviews:
       - "src/**/Web/NewProjectPage.razor.cs"
       - "test/**/Web/ProjectsPageTests.cs"
       - "test/**/Web/NewProjectPageTests.cs"
+      - "test/**/Web/ProjectAccessPageTests.cs"
 
   - id: ReviewCenter-Web-ProjectPage
     title: Review of ReviewCenter ProjectPage unit implementation
@@ -536,6 +540,7 @@ reviews:
       - "src/**/Web/NewMemberAccountPage.razor"
       - "src/**/Web/NewMemberAccountPage.razor.cs"
       - "test/**/Web/ProjectPageTests.cs"
+      - "test/**/Web/ProjectAccessPageTests.cs"
       - "test/**/Web/EvidenceSettingsPageTests.cs"
       - "test/**/Web/NewMemberPageTests.cs"
       - "test/**/Web/NewMemberAccountPageTests.cs"
@@ -733,6 +738,8 @@ reviews:
       - "test/**/Core/AllowAllProjectAccess.cs"
       - "test/**/Core/TestServices.cs"
       - "test/**/Core/TestContent.cs"
+      - "test/**/UserRole.cs"
+      - "test/**/ForcedGarbageCollection.cs"
 
   - id: ReviewCenter-Core-Fingerprint
     title: Review of ReviewCenter Fingerprint unit implementation
@@ -815,6 +822,7 @@ reviews:
       - "docs/design/review-center/core/review-service.md"
       - "docs/verification/review-center/core/review-service.md"
       - "src/DemaConsulting.ReviewCenter.Core/ReviewService.cs"
+      - "src/DemaConsulting.ReviewCenter.Core/RepositorySource.cs"
       - "src/DemaConsulting.ReviewCenter.Core/Review.cs"
       - "src/DemaConsulting.ReviewCenter.Core/ReviewFile.cs"
       - "src/DemaConsulting.ReviewCenter.Core/ReviewState.cs"
@@ -838,6 +846,7 @@ reviews:
       - "docs/design/review-center/core/thread-service.md"
       - "docs/verification/review-center/core/thread-service.md"
       - "src/DemaConsulting.ReviewCenter.Core/ThreadService.cs"
+      - "src/DemaConsulting.ReviewCenter.Core/ThreadAnchor.cs"
       - "src/DemaConsulting.ReviewCenter.Core/ReviewThread.cs"
       - "src/DemaConsulting.ReviewCenter.Core/ReviewComment.cs"
       - "src/DemaConsulting.ReviewCenter.Core/ReviewThreadState.cs"
@@ -1488,6 +1497,7 @@ reviews:
       - "docs/verification/review-center/api.md"
       - "docs/sysml2/model/review-center/api.sysml"
       - "test/**/Api/ApiSubsystemTests.cs"
+      - "test/**/Api/ApiProjectAccessTests.cs"
       - "test/**/Api/ApiTestSupport.cs"
 
   - id: ReviewCenter-Api-ApiTokenAuthentication
@@ -1525,6 +1535,7 @@ reviews:
       - "src/**/Api/ApiModels.cs"
       - "src/**/Api/ApiProblems.cs"
       - "test/**/Api/ApiEndpointsTests.cs"
+      - "test/**/Api/ApiProjectAccessTests.cs"
 
   - id: ReviewCenter-Api-ApiDocument
     title: Review of ReviewCenter ApiDocument unit implementation
