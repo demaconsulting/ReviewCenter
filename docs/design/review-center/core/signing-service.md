@@ -102,8 +102,11 @@ is.
   candidate; only a membership does.
 - A user occupies at most one slot of a review, as primary or as alternate. Otherwise one person could fill a review
   with their own approvals.
-- Any member of the project can add, change, and remove slots; the actor must be able to see the project
-  (`ProjectNotFound` otherwise) and have an enabled account. A slot that has any signature, current or out of date, can
+- Any actor who may see the project can add, change, and remove slots: a member, and also a system administrator who
+  is not a member; the actor must have an enabled account (`ActorNotAllowed` otherwise), and an actor who may not see
+  the project is refused as if it did not exist (`ProjectNotFound`). Membership is not required to arrange the slots,
+  only to be a reviewer in one (see the rule above) and to sign (step 1 of signing). A slot that has any signature,
+  current or out of date, can
   no longer be changed or removed, because a signature must always point to a slot that still describes who signed.
   A change of reviewers after a signature is therefore a new slot. While the review is approved (locked), slots cannot
   be added, changed, or removed at all (`ReviewLocked`).
@@ -164,8 +167,11 @@ is one.
 The checks of steps 2 to 6 come before the password is asked for, so a refused signing does not count as a failed
 password attempt in the typical case. For the same reason an external user's proof is spent only in step 7: a refusal
 in steps 1 to 6 (an API token, a changed record, a blocker) keeps it, so the person can correct the cause and sign
-within its lifetime. The proof is single use: once spent in step 7 it is gone, also when the store then refuses the
-signature. The password is never stored, logged, or put into a message.
+within its lifetime. The password check, the authenticator code, and the proof are spent in step 7 and not before: once
+spent, they are gone, also when step 8 then refuses the signature with `RecordChanged` because the record changed
+between step 4 and the store transaction. The password attempt has been counted (a right one clears the counter of
+failures), the authenticator code is marked as used for its time step, and the proof is consumed, so the signer has to
+start again, for an authenticator code with the next one. The password is never stored, logged, or put into a message.
 
 **External confirmation without spending**: `HasReauthProofAsync` (actor, project identity, review identifier, slot
 identity) answers whether an enabled external user has a live proof for exactly this slot, without spending it; it is
@@ -282,6 +288,10 @@ records `signature.added` with the slot, the role, and the record digest the rev
 `review.reopened` with the previous record digest and the reason (`previous digest {hex}; reason: {reason}`; the reason
 limit of 250 characters keeps it within the audit detail limit). Each draft is passed to
 the store and saved in the same transaction as the change, so a signature and its entry exist together or not at all.
+That atomicity is a property of the store (`ReviewStore`), not of this unit: this unit's part is to build the draft and
+pass it in the same store call as the change, and never to append it afterwards, which the unit tests check with a store
+that records the drafts it is given; the all-or-nothing behavior of the real transaction is verified with the tests of
+`ReviewStore`.
 Signing runs under the gate of this service; the audit gate of the `AuditAppender` is taken inside it (the lock order is
 the service gates first, the appender gate last). This is also what protects the signature history: the table of
 signatures can still be edited by someone with write access to the database, but the entry of each signature is in the
