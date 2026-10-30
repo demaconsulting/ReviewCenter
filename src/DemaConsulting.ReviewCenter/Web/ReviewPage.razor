@@ -217,6 +217,10 @@
                                     {
                                         <option value="@candidate.UserId">@candidate.DisplayName (@candidate.Username)</option>
                                     }
+                                    @if (!IsOffered(slot.Primary))
+                                    {
+                                        <option value="@slot.Primary.UserId" data-testid="slot-primary-unavailable-@slotId">@UnavailableLabel(slot.Primary)</option>
+                                    }
                                 </select>
                                 <select aria-label="Alternate reviewer of slot @slot.Number" data-testid="slot-alternate-select-@slotId"
                                         value="@AlternateChoice(slot)" @onchange="e => SlotAlternateChoices[slotId] = e.Value?.ToString() ?? string.Empty">
@@ -224,6 +228,10 @@
                                     @foreach (var candidate in VisibleCandidates)
                                     {
                                         <option value="@candidate.UserId">@candidate.DisplayName (@candidate.Username)</option>
+                                    }
+                                    @if (slot.Alternate is { } alternate && !IsOffered(alternate))
+                                    {
+                                        <option value="@alternate.UserId" data-testid="slot-alternate-unavailable-@slotId">@UnavailableLabel(alternate)</option>
                                     }
                                 </select>
                                 <button type="button" class="secondary" data-testid="slot-save-@slotId"
@@ -435,7 +443,7 @@
             // In the diff the threads are drawn under their lines; only whole-file threads are listed below it
             var hasLineDiff = HasLineDiff;
             var listedThreads = hasLineDiff ? fileThreads.Where(t => t.StartLine is null).ToList() : fileThreads;
-            var composerRange = hasLineDiff ? ComposerRange() : null;
+            var composerRange = hasLineDiff && !IsLocked ? ComposerRange() : null;
             var inlineComposer = composerRange is not null;
             ThreadSide? composerSide = inlineComposer ? NewSide : null;
 
@@ -498,20 +506,25 @@
                             <p class="comment-text" data-testid="comment-text-@threadId-@n">@comment.Text</p>
                         </div>
                     }
-                    <div class="reply">
-                        <textarea id="reply-text-@threadId" rows="2" maxlength="@ReviewLimits.MaxCommentLength"
-                                  aria-label="Reply to thread @threadId" placeholder="Reply"
-                                  data-testid="reply-text-@threadId" disabled="@IsLocked" data-locked="@LockedMarker" value="@ReplyTexts.GetValueOrDefault(threadId)"
-                                  @oninput="e => ReplyTexts[threadId] = e.Value?.ToString() ?? string.Empty"></textarea>
-                        @if (ReplyErrors.TryGetValue(threadId, out var replyError))
-                        {
-                            <p class="error" role="alert" data-testid="reply-error-@threadId">@replyError</p>
-                        }
-                        <button type="button" class="secondary" data-testid="reply-button-@threadId"
-                                disabled="@IsLocked" data-locked="@LockedMarker"
-                                aria-label="Post reply to thread @threadId"
-                                @onclick="() => ReplyAsync(threadId)">Reply</button>
-                    </div>
+                    @if (!IsLocked)
+                    {
+                        <div class="reply">
+                            <textarea id="reply-text-@threadId" rows="2" maxlength="@ReviewLimits.MaxCommentLength"
+                                      aria-label="Reply to thread @threadId" placeholder="Reply"
+                                      data-testid="reply-text-@threadId" data-locked="@LockedMarker" value="@ReplyTexts.GetValueOrDefault(threadId)"
+                                      data-ctrl-enter-submits="reply-button-@threadId"
+                                      @oninput="e => ReplyTexts[threadId] = e.Value?.ToString() ?? string.Empty"></textarea>
+                            @if (ReplyErrors.TryGetValue(threadId, out var replyError))
+                            {
+                                <p class="error" role="alert" data-testid="reply-error-@threadId">@replyError</p>
+                            }
+                            <button type="button" class="secondary" data-testid="reply-button-@threadId"
+                                    data-locked="@LockedMarker"
+                                    aria-label="Post reply to thread @threadId"
+                                    @onclick="() => ReplyAsync(threadId)">Reply</button>
+                            <span class="muted hint" data-testid="reply-submit-hint-@threadId">Ctrl+Enter to submit</span>
+                        </div>
+                    }
                 }
             </li>;
 
@@ -548,7 +561,7 @@
                 <div class="field">
                     <label for="thread-text">Comment</label>
                     <textarea id="thread-text" rows="3" maxlength="@ReviewLimits.MaxCommentLength"
-                              disabled="@IsLocked" data-locked="@LockedMarker"
+                              data-locked="@LockedMarker" data-ctrl-enter-submits="start-thread-button"
                               data-testid="thread-text-input" @bind="NewText" @bind:event="oninput"></textarea>
                 </div>
                 @if (NewThreadError is not null)
@@ -556,7 +569,8 @@
                     <p class="error" role="alert" data-testid="thread-error">@NewThreadError</p>
                 }
                 <div class="form-actions">
-                    <button type="submit" disabled="@IsLocked" data-locked="@LockedMarker" data-testid="start-thread-button">Start thread</button>
+                    <button type="submit" data-locked="@LockedMarker" data-testid="start-thread-button">Start thread</button>
+                    <span class="muted hint" data-testid="thread-submit-hint">Ctrl+Enter to submit</span>
                     @if (inlineComposer)
                     {
                         <button type="button" class="secondary" data-testid="thread-cancel-button" @onclick="CancelComment">Cancel</button>
@@ -713,7 +727,7 @@
                 </section>
             }
 
-            @if (!inlineComposer)
+            @if (!inlineComposer && !IsLocked)
             {
                 <section class="card">
                     <h2>@(CurrentView == FileView.Head ? "New thread" : "Comment on the whole file")</h2>
@@ -739,8 +753,6 @@
             <dl class="details">
                 <dt>Review id</dt>
                 <dd data-testid="review-id">@Review.Id</dd>
-                <dt>State</dt>
-                <dd><span class="badge" data-testid="review-state">@Review.State</span></dd>
                 <dt>Fingerprint</dt>
                 <dd class="hash" data-testid="review-fingerprint">@Review.ContentFingerprint</dd>
                 @if (Review.IsFromRepository)

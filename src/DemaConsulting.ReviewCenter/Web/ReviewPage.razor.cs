@@ -99,6 +99,12 @@ public partial class ReviewPage : ComponentBase, IDisposable
     private string? _scrollTarget;
 
     /// <summary>
+    ///     The test id of the element that gets the keyboard focus after the next render (the comment field of the
+    ///     composer that was just opened), or <c>null</c>.
+    /// </summary>
+    private string? _focusTarget;
+
+    /// <summary>
     ///     The scroll position that puts the element in the middle of the window.
     /// </summary>
     private const string ScrollCenter = "center";
@@ -722,6 +728,7 @@ public partial class ReviewPage : ComponentBase, IDisposable
         HighlightLine = null;
         DeepLinkMessage = null;
         _scrollTarget = null;
+        _focusTarget = null;
         _pendingUrl = null;
     }
 
@@ -1054,6 +1061,20 @@ public partial class ReviewPage : ComponentBase, IDisposable
             catch (JSDisconnectedException)
             {
                 // The browser went away; there is nothing left to scroll
+            }
+        }
+
+        if (_focusTarget is not null)
+        {
+            var target = _focusTarget;
+            _focusTarget = null;
+            try
+            {
+                await JS.InvokeVoidAsync("reviewCenter.focusTestId", target);
+            }
+            catch (JSDisconnectedException)
+            {
+                // The browser went away; there is nothing left to focus
             }
         }
     }
@@ -1454,6 +1475,7 @@ public partial class ReviewPage : ComponentBase, IDisposable
         NewStartLine = line.ToString(CultureInfo.InvariantCulture);
         NewEndLine = NewStartLine;
         _scrollTarget = "new-thread-form";
+        _focusTarget = "thread-text-input";
         _scrollBlock = ScrollCenter;
     }
 
@@ -1482,6 +1504,7 @@ public partial class ReviewPage : ComponentBase, IDisposable
 
         NewThreadError = null;
         _scrollTarget = "new-thread-form";
+        _focusTarget = "thread-text-input";
         _scrollBlock = ScrollCenter;
     }
 
@@ -1500,6 +1523,7 @@ public partial class ReviewPage : ComponentBase, IDisposable
     {
         ClearAnchor();
         _scrollTarget = "new-thread-form";
+        _focusTarget = "thread-text-input";
         _scrollBlock = ScrollCenter;
     }
 
@@ -1821,6 +1845,29 @@ public partial class ReviewPage : ComponentBase, IDisposable
     {
         return SlotAlternateChoices.GetValueOrDefault(slot.SlotId)
                ?? slot.Alternate?.UserId.ToString(CultureInfo.InvariantCulture) ?? string.Empty;
+    }
+
+    /// <summary>
+    ///     Tells whether a slot's reviewer is one of the users offered in the reviewer lists.
+    /// </summary>
+    /// <param name="member">The primary or alternate reviewer of a slot.</param>
+    /// <returns>
+    ///     <c>false</c> for a reviewer who is disabled or no longer a member, so the list needs an extra option for
+    ///     the current choice (otherwise the list would show nothing as selected).
+    /// </returns>
+    private bool IsOffered(SlotMember member)
+    {
+        return VisibleCandidates.Any(candidate => candidate.UserId == member.UserId);
+    }
+
+    /// <summary>
+    ///     Gets the text of the extra list option for a reviewer who cannot be chosen any more.
+    /// </summary>
+    /// <param name="member">The reviewer.</param>
+    /// <returns>The display name and user name, and why the reviewer is not in the list.</returns>
+    private static string UnavailableLabel(SlotMember member)
+    {
+        return $"{member.DisplayName} ({member.Username}), disabled or no longer a member";
     }
 
     /// <summary>

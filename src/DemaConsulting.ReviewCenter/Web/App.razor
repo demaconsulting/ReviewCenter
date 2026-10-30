@@ -6,7 +6,9 @@
    so everything outside a page stays cheap, static HTML. It also carries one tiny script: the scroll
    helper that the review page calls to bring a thread's lines into view (Blazor cannot scroll by itself) and the
    helper that replaces the address in the address bar by the link of the file or thread shown (history.replaceState:
-   no navigation and no history entry, so the page keeps its state) and the copy helper behind a thread's
+   no navigation and no history entry, so the page keeps its state), the focus helper that puts the keyboard focus
+   into the comment field when it opens, a Ctrl+Enter listener that presses the button named by a field's
+   data-ctrl-enter-submits attribute, and the copy helper behind a thread's
    "Copy link" button (clipboard API, with a textarea fallback outside secure contexts). A second script in the head applies the stored
    light/dark/system appearance before the first paint. *@
 <!DOCTYPE html>
@@ -69,6 +71,11 @@
                 var element = document.querySelector('[data-testid="' + id + '"]');
                 if (element) { element.scrollIntoView({ block: block }); }
             },
+            focusTestId: function (id) {
+                // Moves the keyboard focus (without scrolling; the scroll helper has already placed the element)
+                var element = document.querySelector('[data-testid="' + id + '"]');
+                if (element) { element.focus({ preventScroll: true }); }
+            },
             replaceUrl: function (url) {
                 // Same-origin relative links only; keeps the history state Blazor stores on the entry
                 if (typeof url === 'string' && url.charAt(0) === '/' && url.charAt(1) !== '/') {
@@ -98,6 +105,17 @@
                     return navigator.clipboard.writeText(text).then(function () { return true; }, function () { return fallback(); });
                 }
                 return Promise.resolve(fallback());
+            }
+        });
+        // Ctrl+Enter (Cmd+Enter on a Mac) in a field that names a button through data-ctrl-enter-submits presses that
+        // button, so a comment can be sent from the keyboard. It runs in the browser: no server round trip per key.
+        document.addEventListener('keydown', function (e) {
+            if (e.key !== 'Enter' || !(e.ctrlKey || e.metaKey) || e.isComposing || !e.target || !e.target.getAttribute) { return; }
+            var id = e.target.getAttribute('data-ctrl-enter-submits');
+            var button = id ? document.querySelector('[data-testid="' + id + '"]') : null;
+            if (button && !button.disabled) {
+                e.preventDefault();
+                button.click();
             }
         });
     </script>
