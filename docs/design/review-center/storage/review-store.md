@@ -41,8 +41,8 @@ is approved it raises `DomainRuleException` with `ReviewLocked` (the message of 
 transaction rolls back: nothing is stored and no audit entry is written. A review without slots is never approved, and
 the check returns early without loading the record. This is defense in depth behind the Core services and closes the
 race with a concurrent final signature: because the write transaction holds the database write lock, a signature
-cannot commit between the check and the change. `AddSignatureAsync` is unchanged (it already compares the digest inside
-its transaction), and reads are not affected.
+cannot commit between the check and the change. `AddSignatureAsync` compares the digest inside its own transaction, and
+reads are not affected.
 
 **AddProjectAsync**: Stores a project and returns it with the identity assigned by the database. The unit copies the
 name, description, and creation time into a new entity, so an identity supplied by the caller is ignored and can

@@ -236,6 +236,9 @@ sections:
         children:
           - ReviewCenter-ReviewStore-ApprovalLockInTransaction
           - ReviewCenter-ReviewStore-ReopenHistory
+          - ReviewCenter-ReviewStore-ReopenRefusal
+          - ReviewCenter-ReviewStore-ReopenCount
+          - ReviewCenter-ReviewStore-IndependentReviewers
           - ReviewCenter-DbContext-ReviewRules
           - ReviewCenter-DbContext-ReviewReopens
         tests:

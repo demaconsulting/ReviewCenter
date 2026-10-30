@@ -226,6 +226,7 @@ sections:
           - ReviewCenter-Storage-Signatures
           - ReviewCenter-Api-Isolation
           - ReviewCenter-Core-IndependentReviewers
+          - ReviewCenter-Storage-ReviewIntegrity
           - ReviewCenter-Web-ReviewRules
         tests:
           - ReviewCenter_ReviewerSlots_NonMemberAndSamePerson_AreNotAcceptedAsReviewers

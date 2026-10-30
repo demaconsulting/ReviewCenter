@@ -501,6 +501,7 @@ public class ReviewStoreSigningTests
         using var db = new TestStore();
         var projectId = await AddReviewAsync(db);
         var (thread, slot, digest) = await ApproveAsync(db, projectId);
+        var auditBefore = (await db.Audit.ReadAfterAsync(0, 10_000, cancellationToken)).Count;
         var answer = new ChecklistAnswer
         {
             ProjectId = projectId,
@@ -542,9 +543,18 @@ public class ReviewStoreSigningTests
             Assert.True(ex.Rule == DomainRule.ReviewLocked, $"{name} gave {ex.Rule}");
         }
 
+        // Assert: the record is exactly as approved: same digest, the one slot and the one thread with its one
+        // comment and state, no answer and no section state, and no audit entry was written by the refused writes
         Assert.Equal(digest, await DigestAsync(db, projectId));
-        Assert.Single(await db.Store.ListSlotsAsync(projectId, "REV-1", cancellationToken));
-        Assert.Single(await db.Store.ListThreadsAsync(projectId, "REV-1", cancellationToken));
+        var storedSlot = Assert.Single(await db.Store.ListSlotsAsync(projectId, "REV-1", cancellationToken));
+        Assert.Equal((slot.Id, 1, (int?)2), (storedSlot.Id, storedSlot.PrimaryUserId, storedSlot.AlternateUserId));
+        var storedThread = Assert.Single(await db.Store.ListThreadsAsync(projectId, "REV-1", cancellationToken));
+        Assert.Equal(thread.Id, storedThread.Id);
+        Assert.Equal(ReviewThreadState.Resolved, storedThread.State);
+        Assert.Equal("Looks odd", Assert.Single(storedThread.Comments).Text);
+        Assert.Empty(await db.Store.ListChecklistAnswersAsync(projectId, "REV-1", cancellationToken));
+        Assert.Empty(await db.Store.ListChecklistSectionStatesAsync(projectId, "REV-1", cancellationToken));
+        Assert.Equal(auditBefore, (await db.Audit.ReadAfterAsync(0, 10_000, cancellationToken)).Count);
 
         // Act: reopen, then write again
         await db.Store.ReopenReviewAsync(
@@ -561,13 +571,12 @@ public class ReviewStoreSigningTests
 
     /// <summary>
     ///     Test that a reopen stores its history row, raises the reopen count of the record (so the digest changes),
-    ///     keeps the old signature and writes its audit entry; and that an unapproved or unknown review cannot be
-    ///     reopened.
+    ///     keeps the old signature and writes exactly one audit entry of the review, and that the chain verifies.
     /// </summary>
     [Fact]
     public async Task ReviewStore_ReopenReviewAsync_Persists_AuditAndHistory()
     {
-        // Arrange: an approved review and a second review that is not approved
+        // Arrange: an approved review
         var cancellationToken = TestContext.Current.CancellationToken;
         using var db = new TestStore();
         var projectId = await AddReviewAsync(db);
@@ -577,10 +586,6 @@ public class ReviewStoreSigningTests
         // Act: reopen
         await db.Store.ReopenReviewAsync(
             projectId, "REV-1", new ReviewReopen(0, projectId, "REV-1", _time, "root", "Root", "Again", digest), draft, cancellationToken);
-        var notApproved = await Assert.ThrowsAsync<DomainRuleException>(() => db.Store.ReopenReviewAsync(
-            projectId, "REV-1", new ReviewReopen(0, projectId, "REV-1", _time, "root", "Root", "Twice", digest), draft, cancellationToken));
-        var unknown = await Assert.ThrowsAsync<DomainRuleException>(() => db.Store.ReopenReviewAsync(
-            projectId, "NOPE", new ReviewReopen(0, projectId, "NOPE", _time, "root", "Root", "Why", digest), draft, cancellationToken));
 
         // Assert: the history row, the record count and the digest
         var reopen = Assert.Single(await db.Store.ListReopensAsync(projectId, "REV-1", cancellationToken));
@@ -596,10 +601,244 @@ public class ReviewStoreSigningTests
         Assert.Equal(slot.Id, snapshot.Signatures[0].SlotId);
         Assert.False(ReviewLock.IsApproved(snapshot.Record, snapshot.Slots, snapshot.Signatures));
 
-        // Assert: exactly one audit entry was written, in the chain, and a second reopen is refused
-        Assert.Equal(1, (await db.Audit.ReadAfterAsync(0, 10_000, cancellationToken)).Count(e => e.Action == "review.reopened"));
-        Assert.Equal(DomainRule.ReviewNotLocked, notApproved.Rule);
+        // Assert: exactly one audit entry of the review was written, with the draft's content, and the chain verifies
+        var entries = await db.Audit.ReadAfterAsync(0, 10_000, cancellationToken);
+        var entry = Assert.Single(entries, e => e.Action == "review.reopened");
+        Assert.Equal((projectId, "REV-1", draft.Detail), (entry.ProjectId, entry.ReviewId, entry.Detail));
+        Assert.True(AuditChain.Verify(entries).IsIntact);
+    }
+
+    /// <summary>
+    ///     Test that the reopenings of a review are listed only for that review (not for another review of the same
+    ///     project, nor for the same review identifier of another project) and in the order in which they were made.
+    /// </summary>
+    [Fact]
+    public async Task ReviewStore_ListReopensAsync_SeveralReviewsAndReopens_AreScopedAndInCreationOrder()
+    {
+        // Arrange: three approved reviews, the same identifier in two projects and two identifiers in one project
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var db = new TestStore();
+        var projectA = await AddReviewAsync(db);
+        var projectB = await AddReviewAsync(db);
+        await AddSecondReviewAsync(db, projectA, "REV-2");
+        var slotA1 = await db.Store.AddSlotAsync(NewSlot(projectA), cancellationToken);
+        var slotA2 = await db.Store.AddSlotAsync(
+            new ReviewerSlot { ProjectId = projectA, ReviewId = "REV-2", PrimaryUserId = 1, AlternateUserId = 2 }, cancellationToken);
+        var slotB1 = await db.Store.AddSlotAsync(NewSlot(projectB), cancellationToken);
+        await ApproveReviewAsync(db, projectA, "REV-1", slotA1.Id);
+        await ApproveReviewAsync(db, projectA, "REV-2", slotA2.Id);
+        await ApproveReviewAsync(db, projectB, "REV-1", slotB1.Id);
+
+        // Act: approve, reopen and approve again, with the reopenings of the reviews interleaved
+        await ReopenReviewAsync(db, projectA, "REV-1", "A1 first");
+        await ReopenReviewAsync(db, projectB, "REV-1", "B1 first");
+        await ReopenReviewAsync(db, projectA, "REV-2", "A2 first");
+        await ApproveReviewAsync(db, projectA, "REV-1", slotA1.Id);
+        await ReopenReviewAsync(db, projectA, "REV-1", "A1 second");
+        await ApproveReviewAsync(db, projectA, "REV-1", slotA1.Id);
+        await ReopenReviewAsync(db, projectB, "REV-1", "B1 second", approveFirst: slotB1.Id);
+        await ReopenReviewAsync(db, projectA, "REV-1", "A1 third");
+
+        // Assert: each list holds the reopenings of its review only, oldest first, and the identities grow
+        var a1 = await db.Store.ListReopensAsync(projectA, "REV-1", cancellationToken);
+        var a2 = await db.Store.ListReopensAsync(projectA, "REV-2", cancellationToken);
+        var b1 = await db.Store.ListReopensAsync(projectB, "REV-1", cancellationToken);
+        Assert.Equal(["A1 first", "A1 second", "A1 third"], a1.Select(r => r.Reason).ToArray());
+        Assert.Equal(["A2 first"], a2.Select(r => r.Reason).ToArray());
+        Assert.Equal(["B1 first", "B1 second"], b1.Select(r => r.Reason).ToArray());
+        Assert.All(a1, r => Assert.Equal((projectA, "REV-1"), (r.ProjectId, r.ReviewId)));
+        Assert.All(a2, r => Assert.Equal((projectA, "REV-2"), (r.ProjectId, r.ReviewId)));
+        Assert.All(b1, r => Assert.Equal((projectB, "REV-1"), (r.ProjectId, r.ReviewId)));
+        Assert.Equal(a1.OrderBy(r => r.Id).Select(r => r.Id), a1.Select(r => r.Id));
+        Assert.Equal(b1.OrderBy(r => r.Id).Select(r => r.Id), b1.Select(r => r.Id));
+        Assert.Empty(await db.Store.ListReopensAsync(projectB, "REV-2", cancellationToken));
+        Assert.Equal(3, (await db.Store.GetRecordAsync(projectA, "REV-1", cancellationToken))!.Reopens);
+    }
+
+    /// <summary>
+    ///     Adds a second review to an existing project.
+    /// </summary>
+    /// <param name="db">The database.</param>
+    /// <param name="projectId">The project identity.</param>
+    /// <param name="reviewId">The review identifier.</param>
+    /// <returns>A task that completes when the review is stored.</returns>
+    private static Task AddSecondReviewAsync(TestStore db, int projectId, string reviewId)
+    {
+        return db.Store.AddReviewAsync(
+            new Review
+            {
+                ProjectId = projectId,
+                Id = reviewId,
+                Title = "Title",
+                State = ReviewState.Draft,
+                Created = _time,
+                ContentFingerprint = TestContent.FingerprintA,
+                Files =
+                [
+                    new ReviewFile
+                    {
+                        ProjectId = projectId,
+                        ReviewId = reviewId,
+                        Path = "a.txt",
+                        Content = TestContent.A,
+                        Size = TestContent.A.Length,
+                        Sha256 = TestContent.HashA
+                    }
+                ]
+            },
+            TestContext.Current.CancellationToken);
+    }
+
+    /// <summary>
+    ///     Signs the record of a review as it is stored now with the given slot, which approves the review.
+    /// </summary>
+    /// <param name="db">The database.</param>
+    /// <param name="projectId">The project identity.</param>
+    /// <param name="reviewId">The review identifier.</param>
+    /// <param name="slotId">The slot identity.</param>
+    /// <returns>A task that completes when the signature is stored.</returns>
+    private static async Task ApproveReviewAsync(TestStore db, int projectId, string reviewId, int slotId)
+    {
+        var record = await db.Store.GetRecordAsync(projectId, reviewId, TestContext.Current.CancellationToken);
+        var signature = new ReviewSignature
+        {
+            ProjectId = projectId,
+            ReviewId = reviewId,
+            SlotId = slotId,
+            UserId = 1,
+            DisplayName = "Ann",
+            Role = SlotRole.Alternate,
+            SignedAt = _time,
+            RecordDigest = RecordDigest.Compute(record!),
+            Meaning = SigningService.MeaningText
+        };
+        await db.Store.AddSignatureAsync(signature, TestContext.Current.CancellationToken);
+    }
+
+    /// <summary>
+    ///     Reopens an approved review with the given reason, optionally approving it first.
+    /// </summary>
+    /// <param name="db">The database.</param>
+    /// <param name="projectId">The project identity.</param>
+    /// <param name="reviewId">The review identifier.</param>
+    /// <param name="reason">The reason of the reopening.</param>
+    /// <param name="approveFirst">The slot that signs the review before it is reopened, if any.</param>
+    /// <returns>A task that completes when the review is reopened.</returns>
+    private static async Task ReopenReviewAsync(TestStore db, int projectId, string reviewId, string reason, int? approveFirst = null)
+    {
+        if (approveFirst is { } slotId)
+        {
+            await ApproveReviewAsync(db, projectId, reviewId, slotId);
+        }
+
+        var record = await db.Store.GetRecordAsync(projectId, reviewId, TestContext.Current.CancellationToken);
+        await db.Store.ReopenReviewAsync(
+            projectId,
+            reviewId,
+            new ReviewReopen(0, projectId, reviewId, _time, "root", "Root", reason, RecordDigest.Compute(record!)),
+            AuditDraft.By(TestActors.Ann, "review.reopened", reason, projectId, reviewId),
+            TestContext.Current.CancellationToken);
+    }
+
+    /// <summary>
+    ///     Test that a reopen of a review that is not approved (never approved, already reopened) or does not exist is
+    ///     refused with the rule, and stores no row and no audit entry.
+    /// </summary>
+    [Fact]
+    public async Task ReviewStore_ReopenReviewAsync_NotApprovedOrUnknown_IsRefusedAndStoresNothing()
+    {
+        // Arrange: a review with a slot that has not signed, and an approved review that is reopened once
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var db = new TestStore();
+        var unsignedProject = await AddReviewAsync(db);
+        await db.Store.AddSlotAsync(NewSlot(unsignedProject), cancellationToken);
+        var approvedProject = await AddReviewAsync(db);
+        var (_, _, digest) = await ApproveAsync(db, approvedProject);
+        var draft = AuditDraft.By(TestActors.Ann, "review.reopened", "reopened", approvedProject, "REV-1");
+        await db.Store.ReopenReviewAsync(
+            approvedProject, "REV-1", new ReviewReopen(0, approvedProject, "REV-1", _time, "root", "Root", "Once", digest), draft, cancellationToken);
+        var auditBefore = (await db.Audit.ReadAfterAsync(0, 10_000, cancellationToken)).Count;
+
+        // Act: reopen the unsigned review, the review that is already reopened, and an unknown review
+        var unsigned = await Assert.ThrowsAsync<DomainRuleException>(() => db.Store.ReopenReviewAsync(
+            unsignedProject, "REV-1", new ReviewReopen(0, unsignedProject, "REV-1", _time, "root", "Root", "Never", digest), draft, cancellationToken));
+        var twice = await Assert.ThrowsAsync<DomainRuleException>(() => db.Store.ReopenReviewAsync(
+            approvedProject, "REV-1", new ReviewReopen(0, approvedProject, "REV-1", _time, "root", "Root", "Twice", digest), draft, cancellationToken));
+        var unknown = await Assert.ThrowsAsync<DomainRuleException>(() => db.Store.ReopenReviewAsync(
+            approvedProject, "NOPE", new ReviewReopen(0, approvedProject, "NOPE", _time, "root", "Root", "Why", digest), draft, cancellationToken));
+
+        // Assert: the rules are named, and no row and no entry was added
+        Assert.Equal(DomainRule.ReviewNotLocked, unsigned.Rule);
+        Assert.Equal(DomainRule.ReviewNotLocked, twice.Rule);
         Assert.Equal(DomainRule.ReviewNotFound, unknown.Rule);
+        Assert.Empty(await db.Store.ListReopensAsync(unsignedProject, "REV-1", cancellationToken));
+        Assert.Equal("Once", Assert.Single(await db.Store.ListReopensAsync(approvedProject, "REV-1", cancellationToken)).Reason);
+        Assert.Equal(auditBefore, (await db.Audit.ReadAfterAsync(0, 10_000, cancellationToken)).Count);
+    }
+
+    /// <summary>
+    ///     Test that a reopen whose audit entry cannot be stored is rolled back as a whole: no history row, no change of
+    ///     the reopen count, the review stays approved, and the same reopen works once the audit entry can be stored.
+    /// </summary>
+    [Fact]
+    public async Task ReviewStore_ReopenReviewAsync_AuditInsertFails_RollsBackTheReopen()
+    {
+        // Arrange: an approved review, and a database that refuses every audit entry
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var db = new TestStore();
+        var projectId = await AddReviewAsync(db);
+        var (_, _, digest) = await ApproveAsync(db, projectId);
+        var draft = AuditDraft.By(TestActors.Ann, "review.reopened", "reopened", projectId, "REV-1");
+        var reopen = new ReviewReopen(0, projectId, "REV-1", _time, "root", "Root", "Again", digest);
+        var auditBefore = (await db.Audit.ReadAfterAsync(0, 10_000, cancellationToken)).Count;
+        Execute(db, "CREATE TRIGGER refuse_audit BEFORE INSERT ON AuditEntries BEGIN SELECT RAISE(ABORT, 'audit refused'); END;");
+
+        // Act: reopen
+        await Assert.ThrowsAnyAsync<Exception>(() => db.Store.ReopenReviewAsync(projectId, "REV-1", reopen, draft, cancellationToken));
+
+        // Assert: nothing was stored, and the review is still approved with the same digest
+        Assert.Empty(await db.Store.ListReopensAsync(projectId, "REV-1", cancellationToken));
+        Assert.Equal(0, (await db.Store.GetRecordAsync(projectId, "REV-1", cancellationToken))!.Reopens);
+        Assert.Equal(digest, await DigestAsync(db, projectId));
+        var snapshot = (await db.Store.GetSnapshotAsync(projectId, "REV-1", cancellationToken))!;
+        Assert.True(ReviewLock.IsApproved(snapshot.Record, snapshot.Slots, snapshot.Signatures));
+        Execute(db, "DROP TRIGGER refuse_audit");
+        Assert.Equal(auditBefore, (await db.Audit.ReadAfterAsync(0, 10_000, cancellationToken)).Count);
+
+        // Act, Assert: with the audit entry storable again, the same reopen succeeds
+        await db.Store.ReopenReviewAsync(projectId, "REV-1", reopen, draft, cancellationToken);
+        Assert.Single(await db.Store.ListReopensAsync(projectId, "REV-1", cancellationToken));
+    }
+
+    /// <summary>
+    ///     Test that two reopens of one approved review made at the same time cannot both succeed: one stores its row and
+    ///     entry, the other finds the review no longer approved and stores nothing.
+    /// </summary>
+    [Fact]
+    public async Task ReviewStore_ReopenReviewAsync_TwoAtOnce_ExactlyOneSucceeds()
+    {
+        // Arrange: an approved review
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var db = new TestStore();
+        var projectId = await AddReviewAsync(db);
+        var (_, _, digest) = await ApproveAsync(db, projectId);
+        var draft = AuditDraft.By(TestActors.Ann, "review.reopened", "reopened", projectId, "REV-1");
+
+        // Act: both administrators reopen at the same time
+        var results = await Task.WhenAll(
+            TryAsync(() => db.Store.ReopenReviewAsync(
+                projectId, "REV-1", new ReviewReopen(0, projectId, "REV-1", _time, "root", "Root", "First", digest), draft, cancellationToken)),
+            TryAsync(() => db.Store.ReopenReviewAsync(
+                projectId, "REV-1", new ReviewReopen(0, projectId, "REV-1", _time, "adm", "Adm", "Second", digest), draft, cancellationToken)));
+
+        // Assert: exactly one succeeded, the other was told the review is not locked, and only one row and entry exist
+        Assert.Single(results, r => r is null);
+        Assert.Equal(DomainRule.ReviewNotLocked, Assert.Single(results, r => r is not null)!.Rule);
+        Assert.Single(await db.Store.ListReopensAsync(projectId, "REV-1", cancellationToken));
+        Assert.Equal(1, (await db.Store.GetRecordAsync(projectId, "REV-1", cancellationToken))!.Reopens);
+        var entries = await db.Audit.ReadAfterAsync(0, 10_000, cancellationToken);
+        Assert.Single(entries, e => e.Action == "review.reopened");
+        Assert.True(AuditChain.Verify(entries).IsIntact);
     }
 
     /// <summary>
@@ -631,8 +870,200 @@ public class ReviewStoreSigningTests
     }
 
     /// <summary>
+    ///     Test that the lock check does not refuse a write to a review that does not exist with
+    ///     <see cref="DomainRule.ReviewLocked"/>: an unknown review is not locked, so each write ends the way it does
+    ///     without any lock (not found, or refused by the relationships of the database), and stores nothing.
+    /// </summary>
+    [Fact]
+    public async Task ReviewStore_WriteMethods_UnknownReview_AreNotRefusedAsLocked()
+    {
+        // Arrange: a project without the review "NOPE"
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var db = new TestStore();
+        var projectId = await AddReviewAsync(db);
+        var auditBefore = (await db.Audit.ReadAfterAsync(0, 10_000, cancellationToken)).Count;
+        var writes = new Dictionary<string, Func<Task>>
+        {
+            ["thread"] = () => db.Store.AddThreadAsync(
+                new ReviewThread
+                {
+                    ProjectId = projectId,
+                    ReviewId = "NOPE",
+                    FilePath = "a.txt",
+                    State = ReviewThreadState.Open,
+                    Created = _time,
+                    Comments = [new ReviewComment { Author = "Ann", AuthorUsername = "ann", Text = "Hi", Created = _time }]
+                },
+                cancellationToken),
+            ["comment"] = () => db.Store.AddCommentAsync(
+                projectId, "NOPE", 1, new ReviewComment { Author = "Ann", AuthorUsername = "ann", Text = "More", Created = _time }, cancellationToken),
+            ["state"] = () => db.Store.SetThreadStateAsync(projectId, "NOPE", 1, ReviewThreadState.Resolved, cancellationToken),
+            ["section"] = () => db.Store.SetChecklistSectionStateAsync(
+                new ChecklistSectionState
+                {
+                    ProjectId = projectId,
+                    ReviewId = "NOPE",
+                    SectionId = "REQ",
+                    Applicable = false,
+                    Reason = "Not relevant",
+                    SetBy = "Ann",
+                    SetByUsername = "ann",
+                    SetAt = _time
+                },
+                cancellationToken),
+            ["answer"] = () => db.Store.SetChecklistAnswerAsync(
+                new ChecklistAnswer
+                {
+                    ProjectId = projectId,
+                    ReviewId = "NOPE",
+                    ItemId = "REQ-01",
+                    Outcome = ChecklistOutcome.Pass,
+                    AnsweredBy = "Ann",
+                    AnsweredByUsername = "ann",
+                    AnsweredAt = _time
+                },
+                cancellationToken),
+            ["add slot"] = () => db.Store.AddSlotAsync(
+                new ReviewerSlot { ProjectId = projectId, ReviewId = "NOPE", PrimaryUserId = 1 }, cancellationToken),
+            ["update slot"] = () => db.Store.UpdateSlotAsync(projectId, "NOPE", 1, 3, null, cancellationToken),
+            ["remove slot"] = () => db.Store.RemoveSlotAsync(projectId, "NOPE", 1, cancellationToken)
+        };
+
+        // Act, Assert: no write is refused as locked (a refusal by the database or a not-found result is fine)
+        foreach (var (name, write) in writes)
+        {
+            var exception = await Record.ExceptionAsync(write);
+            Assert.False(exception is DomainRuleException { Rule: DomainRule.ReviewLocked }, $"{name} was refused as locked");
+        }
+
+        // Assert: nothing was stored and no audit entry was written
+        Assert.Empty(await db.Store.ListThreadsAsync(projectId, "NOPE", cancellationToken));
+        Assert.Empty(await db.Store.ListSlotsAsync(projectId, "NOPE", cancellationToken));
+        Assert.Empty(await db.Store.ListChecklistAnswersAsync(projectId, "NOPE", cancellationToken));
+        Assert.Empty(await db.Store.ListChecklistSectionStatesAsync(projectId, "NOPE", cancellationToken));
+        Assert.Equal(auditBefore, (await db.Audit.ReadAfterAsync(0, 10_000, cancellationToken)).Count);
+    }
+
+    /// <summary>
+    ///     Test that a store write racing with the final signature of a review ends in one consistent state, whichever
+    ///     comes first: when the signature is stored the write is refused as locked, otherwise the write is stored and
+    ///     the signature is refused as a changed record. The signature is started first.
+    /// </summary>
+    [Fact]
+    public Task ReviewStore_AddSignatureAsync_RacingWithWrite_SignatureStartedFirst_EndsConsistent()
+    {
+        return RaceFinalSignatureWithThreadAsync(signatureFirst: true);
+    }
+
+    /// <summary>
+    ///     Test that a store write racing with the final signature of a review ends in one consistent state, whichever
+    ///     comes first. The write is started first.
+    /// </summary>
+    [Fact]
+    public Task ReviewStore_AddSignatureAsync_RacingWithWrite_WriteStartedFirst_EndsConsistent()
+    {
+        return RaceFinalSignatureWithThreadAsync(signatureFirst: false);
+    }
+
+    /// <summary>
+    ///     Runs the final signature of a review and the addition of a thread at the same time, through the store, and
+    ///     checks that exactly one of them took effect and that the stored state is consistent with it.
+    /// </summary>
+    /// <param name="signatureFirst"><c>true</c> to start the signature before the write, <c>false</c> for the reverse.</param>
+    /// <returns>A task that completes when the checks are done.</returns>
+    private static async Task RaceFinalSignatureWithThreadAsync(bool signatureFirst)
+    {
+        // Arrange: a review with two slots, the first signed, so that the second signature approves it, and the
+        // digest the second signer saw
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var db = new TestStore();
+        var projectId = await AddReviewAsync(db);
+        var first = await db.Store.AddSlotAsync(NewSlot(projectId, 1, null), cancellationToken);
+        var second = await db.Store.AddSlotAsync(NewSlot(projectId, 2, null), cancellationToken);
+        var digest = await DigestAsync(db, projectId);
+        await db.Store.AddSignatureAsync(NewSignature(projectId, first.Id, digest), cancellationToken);
+        Task<DomainRuleException?> Sign() => TryAsync(() => db.Store.AddSignatureAsync(
+            NewSignature(projectId, second.Id, digest), cancellationToken));
+        Task<DomainRuleException?> Write() => TryAsync(() => AddThreadAsync(db, projectId, "Late remark"));
+
+        // Act: start both, in the stated order, and wait for both. Both queue for the audit gate, so the one started
+        // first normally wins, but the checks below hold for either order.
+        Task<DomainRuleException?> signing;
+        Task<DomainRuleException?> writing;
+        if (signatureFirst)
+        {
+            signing = Sign();
+            writing = Write();
+        }
+        else
+        {
+            writing = Write();
+            signing = Sign();
+        }
+
+        var signResult = await signing;
+        var writeResult = await writing;
+
+        // Assert: exactly one took effect, and the state agrees with the one that did
+        Assert.True((signResult is null) != (writeResult is null), $"sign: {signResult?.Rule}, write: {writeResult?.Rule}");
+        var threads = await db.Store.ListThreadsAsync(projectId, "REV-1", cancellationToken);
+        var signatures = await db.Store.ListSignaturesAsync(projectId, "REV-1", cancellationToken);
+        var snapshot = (await db.Store.GetSnapshotAsync(projectId, "REV-1", cancellationToken))!;
+        if (signResult is null)
+        {
+            Assert.Equal(DomainRule.ReviewLocked, writeResult!.Rule);
+            Assert.Empty(threads);
+            Assert.Equal(2, signatures.Count);
+            Assert.True(ReviewLock.IsApproved(snapshot.Record, snapshot.Slots, snapshot.Signatures));
+        }
+        else
+        {
+            Assert.Equal(DomainRule.RecordChanged, signResult.Rule);
+            Assert.Single(threads);
+            Assert.Single(signatures);
+            Assert.False(ReviewLock.IsApproved(snapshot.Record, snapshot.Slots, snapshot.Signatures));
+        }
+
+        // Assert: the audit chain is intact
+        Assert.True(AuditChain.Verify(await db.Audit.ReadAfterAsync(0, 10_000, cancellationToken)).IsIntact);
+    }
+
+    /// <summary>
+    ///     Runs a call and returns the domain rule exception it raises, if any.
+    /// </summary>
+    /// <param name="call">The call.</param>
+    /// <returns>The exception, or <c>null</c> when the call succeeded.</returns>
+    private static async Task<DomainRuleException?> TryAsync(Func<Task> call)
+    {
+        try
+        {
+            await call();
+            return null;
+        }
+        catch (DomainRuleException ex)
+        {
+            return ex;
+        }
+    }
+
+    /// <summary>
+    ///     Runs a SQL statement on the database file, for tests that need the database itself to misbehave.
+    /// </summary>
+    /// <param name="db">The test database.</param>
+    /// <param name="sql">The statement.</param>
+    private static void Execute(TestStore db, string sql)
+    {
+        using var connection = new SqliteConnection(db.ConnectionString);
+        connection.Open();
+        using var command = connection.CreateCommand();
+        command.CommandText = sql;
+        command.ExecuteNonQuery();
+    }
+
+    /// <summary>
     ///     Test that the transaction mode the store asks for takes the database write lock when it begins, so that
-    ///     no other writer can change the record between the digest check and the insert.
+    ///     no other writer can change the record between the digest check and the insert. This is the mechanism behind
+    ///     the store-level race tests above, shown at the level of the database.
     /// </summary>
     [Fact]
     public async Task ReviewStore_SerializableTransaction_TakesWriteLockAtBegin()
