@@ -296,6 +296,38 @@ public class OidcOptionsTests
     }
 
     /// <summary>
+    ///     Test that the resolver the provider registration uses applies the same bounds as the start-up check: a
+    ///     file that passes the check and then changes to an out-of-bounds secret is refused on the second read,
+    ///     naming the file setting and not holding the secret.
+    /// </summary>
+    /// <param name="change">The change made after the check: <c>tooLong</c> or <c>control</c>.</param>
+    [Theory]
+    [InlineData("tooLong")]
+    [InlineData("control")]
+    public void OidcOptions_ResolveClientSecret_FileChangedAfterValidation_RefusesOutOfBoundsSecret(string change)
+    {
+        // Arrange: settings that validate, with the secret in a file
+        using var directory = new TemporaryDirectory();
+        var path = directory.GetFilePath("client-secret.txt");
+        File.WriteAllText(path, Secret);
+        var options = Valid();
+        options.ClientSecret = string.Empty;
+        options.ClientSecretFile = path;
+        Assert.True(Validate(options).Succeeded);
+
+        // Act: the file changes, then the secret is read again as the provider registration does
+        var changed = change == "tooLong"
+            ? Secret + new string('x', OidcOptions.MaxClientSecretLength)
+            : Secret + "\u0007";
+        File.WriteAllText(path, changed);
+        var ex = Assert.Throws<InvalidOperationException>(() => options.ResolveClientSecret());
+
+        // Assert
+        Assert.Contains("Identity:Oidc:ClientSecretFile", ex.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain(Secret, ex.Message, StringComparison.Ordinal);
+    }
+
+    /// <summary>
     ///     Test that a value one past each limit is refused.
     /// </summary>
     /// <param name="setting">The setting under test.</param>

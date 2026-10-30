@@ -50,9 +50,11 @@ The scopes together hold at most 512 printable ASCII characters. `Authority` may
 
 The client secret is resolved by `OidcOptions.ResolveClientSecret`, which hands `ClientSecret` and `ClientSecretFile`
 to `SecretSource`: the inline value, or the trimmed contents of the file (at most 8 KB, UTF-8, not empty). Both set is
-an error; neither set is the "required" error. The 512-character bound and the rule about control characters apply to
-the resolved secret, whichever form it came from, and the message names the setting that was used. The file is read
-once by the start-up check and once when the handler of the framework is configured; the secret is never logged.
+an error; neither set is the "required" error. `ResolveClientSecret` itself applies the 512-character bound and the rule
+about control characters to the resolved secret, whichever form it came from, and the message names the setting that
+was used. The file is read once by the start-up check and once when the handler of the framework is configured; both
+reads go through the same method, so one contract applies to both and a file that changes in between cannot slip past
+the bounds. The secret is never logged.
 
 #### Key Methods
 

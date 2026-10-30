@@ -88,6 +88,7 @@ sections:
           - OidcOptionsValidator_Validate_ClientSecretFile_SucceedsAndResolvesTheTrimmedSecret
           - OidcOptionsValidator_Validate_ClientSecretAndFileBothSet_FailsNamingBothSettings
           - OidcOptionsValidator_Validate_ClientSecretFileProblem_FailsNamingTheFileSettingWithoutTheSecret
+          - OidcOptions_ResolveClientSecret_FileChangedAfterValidation_RefusesOutOfBoundsSecret
           - ServerHost_CreateApplication_ClientSecretFileProblem_ThrowsClearErrorWithoutSecret
           - OidcSignIn_ClientSecretFile_SignsInAndHandlerUsesTheTrimmedSecret
 

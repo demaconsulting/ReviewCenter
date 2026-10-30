@@ -157,6 +157,12 @@ is missing, empty, larger than 8 KB, too long as a secret, or holds a control ch
 `Identity:Oidc:ClientSecretFile` and does not contain the contents of the file. This scenario is tested by
 `OidcOptionsValidator_Validate_ClientSecretFileProblem_FailsNamingTheFileSettingWithoutTheSecret`.
 
+**OidcOptions_ResolveClientSecret_FileChangedAfterValidation_RefusesOutOfBoundsSecret**: A secret file that passes the
+start-up check and then changes to a secret that is too long or holds a control character is refused when the secret is
+read again, as the registration of the provider does, with a message that names `Identity:Oidc:ClientSecretFile` and
+does not contain the secret. This scenario is tested by
+`OidcOptions_ResolveClientSecret_FileChangedAfterValidation_RefusesOutOfBoundsSecret`.
+
 **ServerHost_CreateApplication_ClientSecretFileProblem_ThrowsClearErrorWithoutSecret**: With sign-in on, a missing
 secret file, or a secret set both inline and in a file, stops the start of the application with a message that names
 the settings and does not contain the secret. The test is in the `ServerHost` tests and is linked from the client

@@ -163,19 +163,32 @@ internal sealed class OidcOptions
     /// <returns>The secret; <c>null</c> when neither setting is set.</returns>
     /// <remarks>
     ///     The file is read at each call, so the start-up check and the registration of the provider both see the
-    ///     file as it is at that moment. The secret is never logged or put in a message.
+    ///     file as it is at that moment. Every read applies the same contract: the length and control-character
+    ///     bounds are checked here, so a file that changes after the start-up check cannot slip past them. The
+    ///     secret is never logged or put in a message.
     /// </remarks>
     /// <exception cref="InvalidOperationException">
-    ///     Thrown when both settings are set, or when the file cannot be used (see
-    ///     <see cref="SecretSource.Resolve"/>); the message names the setting and never holds the secret.
+    ///     Thrown when both settings are set, when the file cannot be used (see
+    ///     <see cref="SecretSource.Resolve"/>), or when the secret is longer than
+    ///     <see cref="MaxClientSecretLength"/> characters or holds a control character; the message names the
+    ///     setting and never holds the secret.
     /// </exception>
     internal string? ResolveClientSecret()
     {
-        return SecretSource.Resolve(
+        var useFile = !string.IsNullOrWhiteSpace(ClientSecretFile);
+        var secret = SecretSource.Resolve(
             ClientSecret,
             $"{SectionName}:{nameof(ClientSecret)}",
             ClientSecretFile,
             $"{SectionName}:{nameof(ClientSecretFile)}");
+        if (secret is not null && (secret.Length > MaxClientSecretLength || secret.Any(char.IsControl)))
+        {
+            var key = $"{SectionName}:{(useFile ? nameof(ClientSecretFile) : nameof(ClientSecret))}";
+            throw new InvalidOperationException(
+                $"{key} must be at most {MaxClientSecretLength} characters without control characters.");
+        }
+
+        return secret;
     }
 
     /// <summary>
@@ -289,9 +302,10 @@ internal sealed class OidcOptionsValidator : IValidateOptions<OidcOptions>
     /// <param name="options">The settings.</param>
     /// <returns>The message of the problem; <c>null</c> when the secret is usable.</returns>
     /// <remarks>
-    ///     Both settings at once, and a file that is missing, unreadable, empty or too large, are reported by
-    ///     <see cref="SecretSource"/> and end the start-up like any other invalid setting. The message of a secret
-    ///     that is too long or has a control character names the setting it came from and never holds the secret.
+    ///     Both settings at once, a file that is missing, unreadable, empty or too large, and a secret that is too
+    ///     long or has a control character are all reported by <see cref="OidcOptions.ResolveClientSecret"/>, the
+    ///     one resolver that the provider registration also uses, and end the start-up like any other invalid
+    ///     setting. No message holds the secret.
     /// </remarks>
     private static string? CheckClientSecret(OidcOptions options)
     {
