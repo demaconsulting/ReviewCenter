@@ -21,7 +21,7 @@ of their own. The service is a singleton, as `UserService` is.
 **ReviewerSlot**: a data class of `Id` (assigned by the store), `ProjectId`, `ReviewId`, `PrimaryUserId`, and
 `AlternateUserId` (`null` when there is no alternate). A review has any number of slots, including none. Either the
 primary or the alternate reviewer can sign the slot. A slot is addressed by its identity; the number shown to people
-is its position in creation order.
+is its position in creation order, counted from 1, and that position is the "slot N" in the audit entries.
 
 **SlotRole**: a closed enumeration with the values `Primary` and `Alternate`. It is stored by name.
 
@@ -284,7 +284,11 @@ The API has no route for these operations, so this check is the second, independ
 a route that is added later without the rule. Reading the approval is not restricted.
 
 **Audit**: Adding, updating, and removing a slot record `slot.added`, `slot.updated`, and `slot.removed`, and signing
-records `signature.added` with the slot, the role, and the record digest the reviewer signed, and a reopen records
+records `signature.added` with the slot, the role, and the record digest the reviewer signed. The slot is named by its
+number on the review page (its position in creation order, counted from 1, so after a removal the numbers of the later
+slots move down by one, as on the page), never by its database identifier: a slot is added as
+`slots.Count + 1`, and a changed, removed, or signed slot gets the count of the slots with a smaller identity plus one,
+computed before a removal. A reopen records
 `review.reopened` with the previous record digest and the reason (`previous digest {hex}; reason: {reason}`; the reason
 limit of 250 characters keeps it within the audit detail limit). Each draft is passed to
 the store and saved in the same transaction as the change, so a signature and its entry exist together or not at all.

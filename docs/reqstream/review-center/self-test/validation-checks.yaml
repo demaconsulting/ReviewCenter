@@ -129,16 +129,18 @@ sections:
         title: >-
           The ConfiguredDatabase check shall, only when asked for with `--check-config`, load the configuration the way
           the server does, open the configured database read-only, compare its tables and columns with the model of
-          this build, report differences by name only, never write, and be skipped when nothing is configured.
+          this build, report differences by name only, never write, be skipped when nothing is configured, and be
+          skipped, with the reason, when the configured database file does not exist yet.
         justification: |
           An operator upgrading a deployment wants to know, before starting the server, that the database can be
           opened and has the schema of the new build. The check must not change the database and must not reveal
-          the connection string or the path, which can hold secrets, in a report that is archived.
+          the connection string or the path, which can hold secrets, in a report that is archived. On a fresh
+          installation the file is created at the first start, so a missing file is not a failure.
         tests:
           - ValidationChecks_ConfiguredDatabase_NothingConfigured_IsSkipped
           - ValidationChecks_ConfiguredDatabase_CurrentSchema_PassesWithoutWriting
           - ValidationChecks_ConfiguredDatabase_MissingTable_FailsNamingTableOnly
-          - ValidationChecks_ConfiguredDatabase_MissingFile_FailsWithoutCreatingIt
+          - ValidationChecks_ConfiguredDatabase_MissingFile_IsSkippedWithoutCreatingIt
           - ValidationChecks_ConfiguredDatabase_UnsupportedProvider_Fails
 
       - id: ReviewCenter-ValidationChecks-Hermetic

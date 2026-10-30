@@ -154,6 +154,11 @@ the added and modified files; the deleted file does not take part. This scenario
 **ReviewService_CreateFromRepositoryAsync_Selection_ChoosesFiles**: Include and exclude patterns choose which changed
 files are reviewed. This scenario is tested by `ReviewService_CreateFromRepositoryAsync_Selection_ChoosesFiles`.
 
+**ReviewService_CreateFromRepositoryAsync_NullSelection_ReviewsEveryChangedFile**: A review is created without a
+selection (`null`); every changed file is reviewed and the stored selection is `**/*`, while empty text is still refused
+with `SelectionInvalid`. This scenario is tested by
+`ReviewService_CreateFromRepositoryAsync_NullSelection_ReviewsEveryChangedFile`.
+
 **ReviewService_CreateFromRepositoryAsync_SelectionOfDeletedFile_ReviewsIt**: A deleted file is matched by its path
 and reviewed. This scenario is tested by `ReviewService_CreateFromRepositoryAsync_SelectionOfDeletedFile_ReviewsIt`.
 

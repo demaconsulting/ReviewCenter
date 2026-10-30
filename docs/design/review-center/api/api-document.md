@@ -55,7 +55,11 @@ command.
   password), and the security requirements of every operation: bearer or basic, either one. The two operations that a
   project can open (`GetEvidenceIndex` and `GetAttestation`, named by constants of the class) get a third alternative,
   an empty security requirement (`{}`, which OpenAPI defines as "no credentials"), so a client generator can
-  see that a call without a token is possible and that it succeeds only when the project allows it.
+  see that a call without a token is possible and that it succeeds only when the project allows it. A schema
+  transformer removes the members that the API does not require from the `required` list of the two request schemas
+  (`CreateReviewRequest`: `files` and `repository`, one of which is chosen at run time; `RepositorySourceDto`:
+  `baselineRevision` and `selection`, which can be left out or `null`), because the generator would list every member
+  of a record without a default value as required. The response schemas are left as generated.
 
 **MapApiDocument**: Serves the document.
 

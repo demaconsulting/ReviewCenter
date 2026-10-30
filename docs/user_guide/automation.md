@@ -136,7 +136,7 @@ Limits to know about:
 `POST /api/projects/{projectId}/reviews` takes a JSON body with a review `id`, a `title`, and **exactly one** of
 `files` (uploaded files, each with a `path` and its `contentBase64`) or `repository` (a `repositoryId` of an enabled
 repository of that project, a `headRevision`, and optionally a `baselineRevision` and a `selection`, one pattern per
-line).
+line; without a `selection` (omitted or `null`) every changed file is reviewed, as with the pattern `**/*`).
 The same rules as on the web pages apply: the identifier and title rules, the upload limits, and the repository rules
 (see Projects and Reviews and Reviews from a Repository in the Reviewing chapter). The API refuses more than 200 `files`,
 or a `contentBase64` longer than the Base64 text of 2 MiB, with a **400** that names `files` or `files[i].contentBase64`,
@@ -163,11 +163,13 @@ Reviewing chapter).
   locked, always gets the same **401 Unauthorized** problem document with `WWW-Authenticate` headers for `Bearer` and
   `Basic`. The answer never says which of these it was, so it does not reveal which tokens exist. The reason is
   recorded in the audit trail.
-- Refused attempts are counted per client address with the same throttle as the sign-in (see Sign In and Out in the
-  Users and Sign-in chapter and its
-  `Identity:Throttle:*` settings), separately from the web sign-in. An address that has used up its attempts is
-  answered **429 Too many requests** for the rest of the window, even with a good token. A good token does not use up
-  attempts.
+- Refused attempts are counted per client address with the address limit of the sign-in (20 attempts in 300 seconds by
+  default; see Sign In and Out in the Users and Sign-in chapter and its `Identity:Throttle:*` settings). The count of an
+  address is shared with the password sign-in from that address, so many refused tokens also stop a person at that
+  address from signing in with a password for the rest of the window. An address that has used up its attempts is
+  answered **429 Too many requests** with a `Retry-After` header (the seconds to wait) for the rest of the window,
+  even with a good token. A good token does not use up attempts. Give each build agent its own address where you can,
+  so that one agent with a wrong token does not lock out the others.
 - A request that is not valid is answered **400** with the fields at fault; a project, review, or repository that does
   not exist (or that the token's owner cannot see) **404**; a review identifier that is already used, a disabled
   repository, an attestation of a review that is not complete, or a change that is refused because the review is

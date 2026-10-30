@@ -75,7 +75,9 @@ The opt-in tenth check is run only with `--validate --check-config`:
   (`appsettings.json` and the environment variables), recognizes the provider, opens the database read-only, and
   compares the tables and columns of the entity model (including the columns of the complex properties) with the
   database. It never writes, never creates the database, and reports problems by table and column name only. If
-  nothing is configured and no database exists at the default location, it throws `ValidationSkippedException`.
+  nothing is configured and no database exists at the default location, or if the configured database file does not
+  exist yet (a fresh installation creates it at the first start), it throws `ValidationSkippedException` with that
+  reason; a database file that exists but cannot be opened or has the wrong schema still fails.
   The database has no schema version number, so the comparison of tables and columns is the version check.
 
 **FastCommitInterceptor** (internal, `SelfTestServices`): an EF Core connection interceptor that sets

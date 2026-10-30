@@ -37,7 +37,8 @@ namespace DemaConsulting.ReviewCenter.SelfTest.Checks;
 ///     recognizes the provider, opens the database <b>read-only</b> and compares the tables and columns of the
 ///     entity model with the database. It never writes, never creates the database, and never prints the
 ///     connection string, the path or any secret: problems are reported by table and column name only. With no
-///     configuration and no database at the default location it is skipped. There is no schema version number in
+///     configuration and no database at the default location, or with a configured file that does not exist yet
+///     (it is created at the first start), it is skipped. There is no schema version number in
 ///     the database, so the comparison of the tables and columns is the version check. The class is stateless and
 ///     thread-safe.
 /// </remarks>
@@ -53,7 +54,7 @@ internal static class ConfiguredDatabaseCheck
     /// </summary>
     /// <param name="cancellationToken">Cancels the check.</param>
     /// <returns>The provider and the number of tables and columns that matched; never the connection string.</returns>
-    /// <exception cref="ValidationSkippedException">Thrown when no database is configured and none exists at the default location.</exception>
+    /// <exception cref="ValidationSkippedException">Thrown when no database is configured and none exists at the default location, or the configured file does not exist yet.</exception>
     /// <exception cref="ValidationFailedException">Thrown when the provider is unsupported, the database cannot be opened or the schema differs.</exception>
     public static async Task<string> RunAsync(CancellationToken cancellationToken)
     {
@@ -77,13 +78,19 @@ internal static class ConfiguredDatabaseCheck
         {
             DatabaseSetup.RequireSupportedProvider(options);
 
+            // A database that does not exist yet is not a defect: it is created at the first start
+            if (DatabaseSetup.TryGetMissingDatabaseFile(options) is not null)
+            {
+                throw new ValidationSkippedException(
+                    "The configured database file does not exist yet; it is created at the first start.");
+            }
+
             // Read-only and unpooled: the check can neither change the database nor keep it locked
             var connectionString = new SqliteConnectionStringBuilder(DatabaseSetup.ResolveConnectionString(options))
             {
                 Mode = SqliteOpenMode.ReadOnly,
                 Pooling = false
             };
-            RequireExistingFile(connectionString.DataSource);
 
             await using var connection = new SqliteConnection(connectionString.ToString());
             await connection.OpenAsync(cancellationToken);
@@ -104,23 +111,6 @@ internal static class ConfiguredDatabaseCheck
             // The SQLite message names the problem, not the path or the connection string
             throw new ValidationFailedException($"The configured database could not be read: {ex.Message}");
         }
-    }
-
-    /// <summary>
-    ///     Requires that the database file exists, so the check reports it instead of SQLite's generic error.
-    /// </summary>
-    /// <param name="dataSource">The data source of the connection; a <c>file:</c> URI is not checked.</param>
-    /// <exception cref="ValidationFailedException">Thrown when the file does not exist.</exception>
-    private static void RequireExistingFile(string dataSource)
-    {
-        if (dataSource.StartsWith("file:", StringComparison.OrdinalIgnoreCase))
-        {
-            return;
-        }
-
-        ValidationFailedException.ThrowUnless(
-            File.Exists(Path.GetFullPath(dataSource)),
-            "The configured database file does not exist.");
     }
 
     /// <summary>

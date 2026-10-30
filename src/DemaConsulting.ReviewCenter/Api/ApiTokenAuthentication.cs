@@ -18,6 +18,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
+using System.Globalization;
 using System.Net.Http.Headers;
 using System.Security.Claims;
 using System.Text;
@@ -43,7 +44,8 @@ namespace DemaConsulting.ReviewCenter.Api;
 ///     (no header, wrong, malformed, expired, revoked token, disabled or locked owner) answers the same generic
 ///     <c>401</c> problem document advertising <c>Bearer</c> and <c>Basic</c>, so a caller learns nothing about which
 ///     tokens exist; the audit trail records the reason (never the token). Attempts are counted per client address with
-///     <see cref="SignInThrottle"/>; an address over its limit is answered <c>429</c>. The static members are
+///     <see cref="SignInThrottle"/> (the address limit only, which the web sign-in shares for the same address); an
+///     address over its limit is answered <c>429</c> with <c>Retry-After</c>. The static members are
 ///     stateless and thread-safe; see <see cref="ApiTokenHandler"/> for the per-request work.
 /// </remarks>
 internal static class ApiTokenAuthentication
@@ -134,15 +136,6 @@ internal sealed class ApiTokenHandler : AuthenticationHandler<AuthenticationSche
     private const string ThrottledItem = "rc.api.throttled";
 
     /// <summary>
-    ///     The prefix of the pseudo user name that the throttle counts API attempts under, followed by the address.
-    /// </summary>
-    /// <remarks>
-    ///     The name is per address on purpose: one shared name would let anybody block every client's token use with a
-    ///     few bad attempts. The address counter of the throttle still limits one address that varies its attempts.
-    /// </remarks>
-    private const string ThrottleNamePrefix = "api-token:";
-
-    /// <summary>
     ///     The address text shown when the client address is not known.
     /// </summary>
     private const string UnknownAddress = "unknown";
@@ -201,10 +194,11 @@ internal sealed class ApiTokenHandler : AuthenticationHandler<AuthenticationSche
             return AuthenticateResult.NoResult();
         }
 
-        // Count the attempt before anything is checked; over the limit nothing is checked at all
+        // Count the attempt before anything is checked; over the limit nothing is checked at all. Only the address
+        // limit applies: a request has no user name to trust, so a per-name limit would be a limit of 5 per address
         var address = SignIn.ClientAddress(Context);
         var shownAddress = address ?? UnknownAddress;
-        var reservation = _throttle.TryBegin(address, ThrottleNamePrefix + shownAddress);
+        var reservation = _throttle.TryBeginAddressOnly(address);
         if (reservation is null)
         {
             Context.Items[ThrottledItem] = true;
@@ -293,13 +287,14 @@ internal sealed class ApiTokenHandler : AuthenticationHandler<AuthenticationSche
     /// <returns>A task that completes when the answer is written.</returns>
     /// <remarks>
     ///     One generic <c>401</c> problem document for every reason, advertising <c>Bearer</c> and <c>Basic</c>;
-    ///     <c>429</c>
-    ///     when the address is throttled.
+    ///     <c>429</c> with <c>Retry-After</c> (the length of the throttle window, in seconds) when the address is
+    ///     throttled.
     /// </remarks>
     protected override Task HandleChallengeAsync(AuthenticationProperties properties)
     {
         if (Context.Items.ContainsKey(ThrottledItem))
         {
+            Response.Headers.RetryAfter = _throttle.WindowSeconds.ToString(CultureInfo.InvariantCulture);
             return Results.Problem(
                 title: "Too many requests",
                 detail: "Too many attempts with an API token; try again later.",

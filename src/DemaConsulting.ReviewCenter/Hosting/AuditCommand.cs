@@ -22,7 +22,6 @@ using System.Data.Common;
 using DemaConsulting.ReviewCenter.Cli;
 using DemaConsulting.ReviewCenter.Core;
 using DemaConsulting.ReviewCenter.Storage;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 
 namespace DemaConsulting.ReviewCenter.Hosting;
@@ -50,9 +49,10 @@ internal static class AuditCommand
     /// </param>
     /// <exception cref="ArgumentNullException">Thrown when <paramref name="context"/> is null.</exception>
     /// <remarks>
-    ///     An intact chain prints <c>Audit chain intact: N entries</c>. A broken chain, and a database that cannot
-    ///     be opened, are reported with <see cref="Context.WriteError"/>, which makes the exit code 1. Side
-    ///     effects: creates the (empty) database when it does not exist.
+    ///     An intact chain prints <c>Audit chain intact: N entries</c>. A broken chain, a database file that does not
+    ///     exist, and a database that cannot be opened are reported with <see cref="Context.WriteError"/>, which makes
+    ///     the exit code 1. Side effects: none; the database is opened read-only, so the command never creates the
+    ///     database or its folder, not even when the file disappears while the command runs.
     /// </remarks>
     public static void Run(Context context, Action<ConfigurationManager>? configure = null)
     {
@@ -70,12 +70,21 @@ internal static class AuditCommand
         builder.Logging.ClearProviders();
         ServerHost.AddServices(builder.Services, builder.Configuration);
 
+        // The verification opens the database READ-ONLY, so the open itself can never create a file, whatever happens
+        // to the file after the check below (also for a "file:" URI such as "...?mode=rwc")
+        builder.Services.PostConfigure<DatabaseOptions>(options =>
+            options.ConnectionString = DatabaseSetup.ResolveReadOnlyConnectionString(options));
         try
         {
             using var host = builder.Build();
-            DatabaseSetup.EnsureCreated(
-                host.Services.GetRequiredService<IDbContextFactory<ReviewCenterDbContext>>(),
+            // A wrong path must not create an empty database that would then be reported as an intact trail
+            var missing = DatabaseSetup.TryGetMissingDatabaseFile(
                 host.Services.GetRequiredService<IOptions<DatabaseOptions>>().Value);
+            if (missing is not null)
+            {
+                context.WriteError($"The database file does not exist: {missing}");
+                return;
+            }
 
             var result = host.Services.GetRequiredService<AuditService>()
                 .VerifyAsync()

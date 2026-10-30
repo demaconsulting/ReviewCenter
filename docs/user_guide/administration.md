@@ -333,9 +333,11 @@ reviewcenter audit verify
 
 The command reads the configured database (the same settings as `serve`) and checks the chain. For an intact chain it
 prints `Audit chain intact: N entries` and exits with code 0. For a broken chain it prints
-`Audit chain BROKEN at entry N` to the error output and exits with code 1. If the audit trail cannot be read it prints
-an error and exits with code 1. This makes the command usable in a scheduled job. The command does not print the head
-hash; use the Audit page to see it. If the database file does not exist, the command creates an empty one.
+`Audit chain BROKEN at entry N` to the error output and exits with code 1. If the database file does not exist (for
+example, because the path or the environment is wrong), the command refuses with `The database file does not exist`
+and exits with code 1; it never creates a database. If the audit trail cannot be read it prints an error and exits
+with code 1. This makes the command usable in a scheduled job. The command does not print the head hash; use the Audit
+page to see it.
 
 ### What the Chain Proves, and What It Does Not
 

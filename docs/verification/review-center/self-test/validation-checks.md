@@ -109,9 +109,10 @@ the configured database; the check fails with a message that names the table, an
 neither the folder nor `Data Source`. This scenario is tested by
 `ValidationChecks_ConfiguredDatabase_MissingTable_FailsNamingTableOnly`.
 
-**ValidationChecks_ConfiguredDatabase_MissingFile_FailsWithoutCreatingIt**: The configured file does
-not exist; the check fails without the path in the message and the file is not created. This
-scenario is tested by `ValidationChecks_ConfiguredDatabase_MissingFile_FailsWithoutCreatingIt`.
+**ValidationChecks_ConfiguredDatabase_MissingFile_IsSkippedWithoutCreatingIt**: The configured file does
+not exist yet (a fresh installation); the check is skipped with the reason that the file is created at the first start,
+without the path in the message, and the file is not created. This
+scenario is tested by `ValidationChecks_ConfiguredDatabase_MissingFile_IsSkippedWithoutCreatingIt`.
 
 **ValidationChecks_ConfiguredDatabase_UnsupportedProvider_Fails**: The configured provider is not
 supported; the check fails and names the provider. This scenario is tested by

@@ -108,14 +108,14 @@ public class ReviewServiceRepositoryTests
     /// <param name="f">The fixture.</param>
     /// <param name="id">The review id.</param>
     /// <param name="baseline">The baseline revision, or <c>null</c>.</param>
-    /// <param name="selection">The selection text.</param>
+    /// <param name="selection">The selection text, or <c>null</c> for none (every changed file).</param>
     /// <param name="repositoryId">The repository, or <c>null</c> for the fixture's.</param>
     /// <returns>The result.</returns>
     private static Task<RepositoryReviewResult> CreateReviewAsync(
         Fixture f,
         string id = "rev-1",
         string? baseline = "v1",
-        string selection = "**/*",
+        string? selection = "**/*",
         int? repositoryId = null)
     {
         return f.Service.CreateFromRepositoryAsync(
@@ -206,6 +206,26 @@ public class ReviewServiceRepositoryTests
         // Assert: only the added file is reviewed, and the normalized selection text is stored
         Assert.Equal(["src/new.txt"], result.Review.Files.Select(file => file.Path));
         Assert.Equal("src/**\n!src/mod.txt", result.Review.Selection);
+    }
+
+    /// <summary>
+    ///     Test that no selection at all (<c>null</c>, as an API client that omits it) reviews every changed file and
+    ///     stores the selection <c>**/*</c>, while typed-in empty text is still refused.
+    /// </summary>
+    [Fact]
+    public async Task ReviewService_CreateFromRepositoryAsync_NullSelection_ReviewsEveryChangedFile()
+    {
+        // Arrange: the fixture
+        var f = await CreateAsync();
+
+        // Act: create the review without a selection, and try empty text
+        var result = await CreateReviewAsync(f, selection: null);
+        var empty = await Assert.ThrowsAsync<DomainRuleException>(() => CreateReviewAsync(f, id: "rev-2", selection: string.Empty));
+
+        // Assert: all three changes are reviewed, the stored selection is the match-everything pattern, empty is invalid
+        Assert.Equal(["docs/gone.md", "src/mod.txt", "src/new.txt"], result.Review.Files.Select(file => file.Path));
+        Assert.Equal("**/*", result.Review.Selection);
+        Assert.Equal(DomainRule.SelectionInvalid, empty.Rule);
     }
 
     /// <summary>

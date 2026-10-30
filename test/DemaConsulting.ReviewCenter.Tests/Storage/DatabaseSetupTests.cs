@@ -232,6 +232,78 @@ public class DatabaseSetupTests
     }
 
     /// <summary>
+    ///     Test that the missing-file check reports the full path of a database file that does not exist, nothing
+    ///     for an existing file or a <c>file:</c> URI, rejects an unsupported provider, and never creates anything.
+    /// </summary>
+    [Fact]
+    public void DatabaseSetup_TryGetMissingDatabaseFile_MissingExistingAndUnsupported_ReportsWithoutCreating()
+    {
+        // Arrange: a folder that does not exist yet, and the path of a database file inside it
+        var folder = Path.Combine(Path.GetTempPath(), "ReviewCenterTests-" + Guid.NewGuid().ToString("N"));
+        var file = Path.Combine(folder, "db.sqlite");
+        var missing = new DatabaseOptions { ConnectionString = $"Data Source={file};Pooling=False" };
+        var uri = new DatabaseOptions { ConnectionString = "Data Source=file:whatever.db?mode=memory" };
+        var unsupported = new DatabaseOptions { Provider = "Oracle", ConnectionString = file };
+
+        try
+        {
+            // Act and Assert: a missing file is reported by its path and nothing is created
+            Assert.Equal(Path.GetFullPath(file), DatabaseSetup.TryGetMissingDatabaseFile(missing));
+            Assert.False(Directory.Exists(folder));
+
+            // Assert: an existing file is not reported, and neither is a file: URI
+            Directory.CreateDirectory(folder);
+            File.WriteAllBytes(file, []);
+            Assert.Null(DatabaseSetup.TryGetMissingDatabaseFile(missing));
+            Assert.Null(DatabaseSetup.TryGetMissingDatabaseFile(uri));
+
+            // Assert: an unsupported provider is still an error
+            Assert.Throws<InvalidOperationException>(() => DatabaseSetup.TryGetMissingDatabaseFile(unsupported));
+        }
+        finally
+        {
+            if (Directory.Exists(folder))
+            {
+                Directory.Delete(folder, recursive: true);
+            }
+        }
+    }
+
+    /// <summary>
+    ///     Test that the read-only connection string forces the read-only mode, keeps the data source, and that opening
+    ///     it for a missing file fails without creating the file.
+    /// </summary>
+    [Fact]
+    public void DatabaseSetup_ResolveReadOnlyConnectionString_MissingFile_IsReadOnlyAndNeverCreates()
+    {
+        // Arrange: a connection string that asks for creation, for a file in an existing folder
+        var folder = Path.Combine(Path.GetTempPath(), "ReviewCenterTests-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(folder);
+        var file = Path.Combine(folder, "db.sqlite");
+        var options = new DatabaseOptions { ConnectionString = $"Data Source={file};Mode=ReadWriteCreate;Pooling=False" };
+
+        try
+        {
+            // Act
+            var resolved = DatabaseSetup.ResolveReadOnlyConnectionString(options);
+            var builder = new SqliteConnectionStringBuilder(resolved);
+            using var connection = new SqliteConnection(resolved);
+
+            // Assert: read-only, same file, and the open fails instead of creating the file
+            Assert.Equal(SqliteOpenMode.ReadOnly, builder.Mode);
+            Assert.Equal(file, builder.DataSource);
+            Assert.Throws<SqliteException>(connection.Open);
+            Assert.False(File.Exists(file));
+            Assert.Throws<InvalidOperationException>(() => DatabaseSetup.ResolveReadOnlyConnectionString(
+                new DatabaseOptions { Provider = "Oracle", ConnectionString = file }));
+        }
+        finally
+        {
+            Directory.Delete(folder, recursive: true);
+        }
+    }
+
+    /// <summary>
     ///     Test that an unsupported provider is rejected before any file is created.
     /// </summary>
     [Fact]

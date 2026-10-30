@@ -9,11 +9,12 @@ sections:
     requirements:
       - id: ReviewCenter-AuditCommand-Verify
         title: >-
-          The AuditCommand class shall verify the hash chain of the audit trail in the configured database, report
-          the number of entries with exit code 0 when the chain is intact (also for an empty trail), and report the
-          first broken entry with exit code 1 when it is not.
+          The AuditCommand class shall verify the hash chain of the audit trail in the configured, existing database
+          without creating or changing it, report the number of entries with exit code 0 when the chain is intact
+          (also for an empty trail), and report the first broken entry with exit code 1 when it is not.
         justification: |
-          Scripts and scheduled jobs check the trail without the web interface and alert on the exit code.
+          Scripts and scheduled jobs check the trail without the web interface and alert on the exit code. A check
+          that created an empty database at a wrong path would report an intact trail of nothing.
         tests:
           - AuditCommand_Run_IntactTrail_ReportsEntryCountWithExitCodeZero
           - AuditCommand_Run_EmptyTrail_ReportsIntactWithZeroEntries
@@ -22,10 +23,14 @@ sections:
 
       - id: ReviewCenter-AuditCommand-Errors
         title: >-
-          The AuditCommand class shall report a database that cannot be read as an error with exit code 1, and
-          shall reject a null context.
+          The AuditCommand class shall report a database file that does not exist, and a database that cannot be
+          read, as an error with exit code 1, opening the database read-only so that neither the file nor its folder
+          can be created (also not for a file URI that asks for creation), and shall reject a null context.
         justification: |
-          A check that cannot run must not look like a check that passed.
+          A check that cannot run must not look like a check that passed, and a wrong path must not leave a new empty
+          database behind, not even when the file disappears between the check and the open.
         tests:
-          - AuditCommand_Run_UnreachableDatabase_ReportsErrorWithExitCodeOne
+          - AuditCommand_Run_MissingDatabase_ReportsErrorAndCreatesNothing
+          - AuditCommand_Run_MissingFileUriWithCreateMode_ReportsErrorAndCreatesNothing
+          - AuditCommand_Run_UnreadableDatabase_ReportsErrorWithExitCodeOne
           - AuditCommand_Run_NullContext_ThrowsArgumentNullException

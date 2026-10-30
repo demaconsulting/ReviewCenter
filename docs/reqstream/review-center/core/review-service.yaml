@@ -133,6 +133,7 @@ sections:
           - ReviewService_CreateFromRepositoryAsync_Changes_FreezesFilesAndSource
           - ReviewService_CreateFromRepositoryAsync_Changes_FingerprintCoversHeadFilesOnly
           - ReviewService_CreateFromRepositoryAsync_Selection_ChoosesFiles
+          - ReviewService_CreateFromRepositoryAsync_NullSelection_ReviewsEveryChangedFile
           - ReviewService_CreateFromRepositoryAsync_SelectionOfDeletedFile_ReviewsIt
           - ReviewService_CreateFromRepositoryAsync_BlankBaseline_ReviewsAllHeadFilesAsAdded
           - ReviewService_CreateFromRepositoryAsync_BadRequests_AreRefusedWithTheirRule

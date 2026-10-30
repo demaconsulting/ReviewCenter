@@ -508,9 +508,7 @@
       "CreateReviewRequest": {
         "required": [
           "id",
-          "title",
-          "files",
-          "repository"
+          "title"
         ],
         "type": "object",
         "properties": {
@@ -723,9 +721,7 @@
       "RepositorySourceDto": {
         "required": [
           "repositoryId",
-          "headRevision",
-          "baselineRevision",
-          "selection"
+          "headRevision"
         ],
         "type": "object",
         "properties": {

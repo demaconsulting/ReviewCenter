@@ -64,6 +64,17 @@ by `DatabaseSetup_EnsureCreated_UnsupportedProvider_ThrowsAndCreatesNothing`.
 missing folder makes the folder, the file, and the tables. This scenario is tested by
 `DatabaseSetup_EnsureCreated_MissingFolder_CreatesFolderFileAndTables`.
 
+**DatabaseSetup_TryGetMissingDatabaseFile_MissingExistingAndUnsupported_ReportsWithoutCreating**: The check is made
+for a database file in a folder that does not exist: it returns the full path and creates neither the folder nor the
+file. After the file is created it returns `null`, it returns `null` for a `file:` URI, and an unsupported provider
+raises `InvalidOperationException`. This scenario is tested by
+`DatabaseSetup_TryGetMissingDatabaseFile_MissingExistingAndUnsupported_ReportsWithoutCreating`.
+
+**DatabaseSetup_ResolveReadOnlyConnectionString_MissingFile_IsReadOnlyAndNeverCreates**: A connection string that asks
+for `ReadWriteCreate` is resolved; the result has the mode `ReadOnly` and the same data source, opening it for a missing
+file throws a `SqliteException` and creates no file, and an unsupported provider raises `InvalidOperationException`.
+This scenario is tested by `DatabaseSetup_ResolveReadOnlyConnectionString_MissingFile_IsReadOnlyAndNeverCreates`.
+
 **DatabaseSetup_ResolveDataDirectory_Configured_IsFolderOfTheDatabaseFile**: A plain path and a full connection string
 give the folder of the database file; an empty setting and an in-memory data source give the default database folder; a
 null argument raises `ArgumentNullException`. This scenario is tested by

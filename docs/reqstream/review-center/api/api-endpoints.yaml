@@ -46,14 +46,17 @@ sections:
       - id: ReviewCenter-ApiEndpoints-Create
         title: >-
           The ApiEndpoints unit shall create a review draft from files that are sent in the request, or from the
-          changes of a repository that is registered with the project, with the same rules as the web pages, mark the
+          changes of a repository that is registered with the project (reviewing every changed file when the request
+          gives no selection), with the same rules as the web pages, mark the
           review as created through the API, and answer with the review and the files that were skipped.
         justification: |
           Creating a draft for every pull request from a pipeline is the main use of the API. The same rules keep
-          the record consistent, and the mark lets the reviewers see that a script made the draft.
+          the record consistent, and the mark lets the reviewers see that a script made the draft. The selection is
+          optional in the API, so a request that leaves it out must not be refused.
         tests:
           - ApiEndpoints_CreateReview_Upload_CreatesDraftFlaggedAsApi
           - ApiEndpoints_CreateReview_Repository_CreatesReviewFromChanges
+          - ApiEndpoints_CreateReview_Repository_NoSelection_ReviewsEveryChange
 
       - id: ReviewCenter-ApiEndpoints-Validation
         title: >-

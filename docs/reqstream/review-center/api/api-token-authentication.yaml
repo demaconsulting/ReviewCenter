@@ -57,12 +57,16 @@ sections:
       - id: ReviewCenter-ApiTokenAuthentication-Throttle
         title: >-
           The ApiTokenAuthentication unit shall answer a request from a client address that has had too many tokens
-          refused with status 429, whether the token was sent as a bearer token or as a Basic password.
+          refused (20 for the address in a window of 300 seconds, as the address limit of the sign-in throttle) with
+          status 429 and a Retry-After header that tells the length of the window, whether the token was sent as a
+          bearer token or as a Basic password.
         justification: |
           Guessing tokens must be slow for one client, even though a token has high entropy, and a limit by address
-          does not stop other clients.
+          does not stop other clients. The limit of the address, not the lower limit of a user name, is the one that
+          the documentation promises, and the header tells a script when it may try again.
         tests:
           - ApiTokenAuthentication_Request_TooManyRefusals_AnswersTooManyRequests
+          - ApiTokenAuthentication_Request_RefusalsBelowAddressLimit_AreNotThrottledByNameLimit
 
       - id: ReviewCenter-ApiTokenAuthentication-FailureAudit
         title: >-

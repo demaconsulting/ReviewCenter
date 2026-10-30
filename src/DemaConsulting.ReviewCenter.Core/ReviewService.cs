@@ -610,12 +610,16 @@ public sealed class ReviewService
     /// <summary>
     ///     Parses a file selection and normalizes it for storage.
     /// </summary>
-    /// <param name="selection">The selection text; <c>null</c> is treated as empty (which is invalid).</param>
+    /// <param name="selection">
+    ///     The selection text; <c>null</c> (no selection given) means every changed file
+    ///     (<see cref="SelectionMatcher.AllFiles"/>), whereas empty or blank text is invalid.
+    /// </param>
     /// <returns>The parsed patterns and the normalized text a review stores.</returns>
     /// <exception cref="DomainRuleException">Thrown with <see cref="DomainRule.SelectionInvalid"/> when the selection is not valid or the normalized text is too long.</exception>
     internal static (IReadOnlyList<SelectionPattern> Patterns, string Text) ParseSelection(string? selection)
     {
-        var patterns = SelectionMatcher.Parse(selection ?? string.Empty);
+        // Only a missing selection means "every changed file"; typed-in empty text stays an error
+        var patterns = SelectionMatcher.Parse(selection ?? SelectionMatcher.AllFiles);
         var text = SelectionMatcher.Normalize(patterns);
         if (text.Length > ReviewLimits.MaxSelectionLength)
         {

@@ -66,6 +66,20 @@ internal static class ApiDocument
     public const string AttestationOperation = "GetAttestation";
 
     /// <summary>
+    ///     The members of the request bodies that a client may leave out, by schema name of the body type (the names
+    ///     are those of the JSON properties).
+    /// </summary>
+    /// <remarks>
+    ///     <c>files</c> and <c>repository</c> are alternatives (exactly one is given), and a repository source needs
+    ///     no baseline revision (every file is then reviewed as added) and no selection (every changed file).
+    /// </remarks>
+    private static readonly Dictionary<Type, string[]> OptionalRequestMembers = new()
+    {
+        [typeof(CreateReviewRequest)] = ["files", "repository"],
+        [typeof(RepositorySourceDto)] = ["baselineRevision", "selection"]
+    };
+
+    /// <summary>
     ///     Registers the generator of the OpenAPI document.
     /// </summary>
     /// <param name="services">The service collection. Must not be null.</param>
@@ -83,6 +97,18 @@ internal static class ApiDocument
             options.AddDocumentTransformer((document, _, _) =>
             {
                 Describe(document);
+                return Task.CompletedTask;
+            });
+
+            // The generator lists every constructor parameter of a record as required, nullable ones included; the
+            // two request bodies have optional members, which must not be listed or clients refuse to omit them
+            options.AddSchemaTransformer((schema, context, _) =>
+            {
+                if (OptionalRequestMembers.TryGetValue(context.JsonTypeInfo.Type, out var optional))
+                {
+                    schema.Required?.ExceptWith(optional);
+                }
+
                 return Task.CompletedTask;
             });
         });

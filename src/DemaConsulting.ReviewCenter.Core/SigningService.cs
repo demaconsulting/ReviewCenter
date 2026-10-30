@@ -432,7 +432,13 @@ public sealed class SigningService
                     PrimaryUserId = primaryUserId,
                     AlternateUserId = alternateUserId
                 },
-                stored => AuditDraft.By(actor, "slot.added", $"slot {stored.Id}: {members}", projectId, reviewId),
+                _ => AuditDraft.By(
+                    actor,
+                    "slot.added",
+                    // The new slot is the last one, and the page numbers the slots in creation order
+                    $"slot {slots.Count + 1}: {members}",
+                    projectId,
+                    reviewId),
                 cancellationToken);
         }
         finally
@@ -481,7 +487,8 @@ public sealed class SigningService
                 projectId, reviewId, slots, slotId, primaryUserId, alternateUserId, cancellationToken);
             var members = await DescribeMembersAsync(primaryUserId, alternateUserId, cancellationToken);
 
-            var audit = AuditDraft.By(actor, "slot.updated", $"slot {slotId}: {members}", projectId, reviewId);
+            var audit = AuditDraft.By(
+                actor, "slot.updated", $"slot {SlotNumberOf(slots, slotId)}: {members}", projectId, reviewId);
             if (!await _store.UpdateSlotAsync(projectId, reviewId, slotId, primaryUserId, alternateUserId, audit, cancellationToken))
             {
                 throw SlotNotFound(slotId);
@@ -524,10 +531,11 @@ public sealed class SigningService
             await ReviewLock.EnsureUnlockedAsync(_store, projectId, reviewId, cancellationToken);
             var slots = await EnsureUnsignedSlotAsync(projectId, reviewId, slotId, cancellationToken);
 
-            // The entry describes the slot as it was before it goes
+            // The entry describes the slot as it was before it goes, including the number it had on the page
             var slot = slots.First(s => s.Id == slotId);
             var members = await DescribeMembersAsync(slot.PrimaryUserId, slot.AlternateUserId, cancellationToken);
-            var audit = AuditDraft.By(actor, "slot.removed", $"slot {slotId}: {members}", projectId, reviewId);
+            var audit = AuditDraft.By(
+                actor, "slot.removed", $"slot {SlotNumberOf(slots, slotId)}: {members}", projectId, reviewId);
             if (!await _store.RemoveSlotAsync(projectId, reviewId, slotId, audit, cancellationToken))
             {
                 throw SlotNotFound(slotId);
@@ -735,7 +743,7 @@ public sealed class SigningService
             // The signer must be a live account, a member of the project (an administrator who is not a member
             // cannot sign), and one of the two people of the slot
             var user = await EnsureActorAsync(actor, projectId, cancellationToken);
-            var (record, role) = await EnsureSignerOfSlotAsync(user, projectId, reviewId, slotId, cancellationToken);
+            var (record, role, slotNumber) = await EnsureSignerOfSlotAsync(user, projectId, reviewId, slotId, cancellationToken);
 
             // The author of the review may not sign it when the project requires independent reviewers; this is
             // checked here, not only when the slot is filled, so a slot assigned before the rule was switched on
@@ -767,7 +775,7 @@ public sealed class SigningService
                 AuditDraft.By(
                     actor,
                     "signature.added",
-                    $"slot {slotId}, role {role}, record digest {digest}",
+                    $"slot {slotNumber}, role {role}, record digest {digest}",
                     projectId,
                     reviewId),
                 cancellationToken);
@@ -786,12 +794,15 @@ public sealed class SigningService
     /// <param name="reviewId">The review identifier.</param>
     /// <param name="slotId">The slot to sign in.</param>
     /// <param name="cancellationToken">Cancels the operation.</param>
-    /// <returns>The record of the review and the role the signer has in the slot.</returns>
+    /// <returns>
+    ///     The record of the review, the role the signer has in the slot and the number of the slot as the review page
+    ///     shows it.
+    /// </returns>
     /// <exception cref="DomainRuleException">
     ///     Thrown when the signer is not a member, the review or slot does not exist, or the signer is not a reviewer
     ///     of the slot.
     /// </exception>
-    private async Task<(ReviewRecord Record, SlotRole Role)> EnsureSignerOfSlotAsync(
+    private async Task<(ReviewRecord Record, SlotRole Role, int SlotNumber)> EnsureSignerOfSlotAsync(
         User user,
         int projectId,
         string reviewId,
@@ -807,8 +818,8 @@ public sealed class SigningService
 
         var record = await _store.GetRecordAsync(projectId, reviewId, cancellationToken)
                      ?? throw ReviewNotFound(reviewId);
-        var slot = (await _store.ListSlotsAsync(projectId, reviewId, cancellationToken))
-            .FirstOrDefault(s => s.Id == slotId) ?? throw SlotNotFound(slotId);
+        var slots = await _store.ListSlotsAsync(projectId, reviewId, cancellationToken);
+        var slot = slots.FirstOrDefault(s => s.Id == slotId) ?? throw SlotNotFound(slotId);
         if (user.Id != slot.PrimaryUserId && user.Id != slot.AlternateUserId)
         {
             throw new DomainRuleException(
@@ -816,7 +827,22 @@ public sealed class SigningService
                 "You are not a reviewer of this slot.");
         }
 
-        return (record, user.Id == slot.PrimaryUserId ? SlotRole.Primary : SlotRole.Alternate);
+        return (record, user.Id == slot.PrimaryUserId ? SlotRole.Primary : SlotRole.Alternate, SlotNumberOf(slots, slotId));
+    }
+
+    /// <summary>
+    ///     Gets the number of a slot as the review page shows it: its position among the slots in creation order.
+    /// </summary>
+    /// <param name="slots">The slots of the review; must contain the slot.</param>
+    /// <param name="slotId">The slot identity.</param>
+    /// <returns>The 1-based position of the slot when the slots are ordered by identity.</returns>
+    /// <remarks>
+    ///     The audit trail says "slot N" with this number and never the database identity, so an entry reads the same
+    ///     as the page. The number is the position at the time of the entry.
+    /// </remarks>
+    private static int SlotNumberOf(IEnumerable<ReviewerSlot> slots, int slotId)
+    {
+        return slots.Count(s => s.Id < slotId) + 1;
     }
 
     /// <summary>

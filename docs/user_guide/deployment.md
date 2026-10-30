@@ -370,7 +370,9 @@ attestation, and a short start of the web server on a free loopback port, and la
 **read-only** and compares its tables and columns with what this version expects. On the Windows machine of the
 project it ended with `Passed: 10` and exit code 0, and the last line read `ReviewCenter_ConfiguredDatabase - Passed
 (...): provider Sqlite; opened read-only; schema matches (17 tables, 138 columns)`. A non-zero exit code means that a
-check failed; the message names the check (see Self-Validation in the Command-Line Reference chapter).
+check failed; the message names the check (see Self-Validation in the Command-Line Reference chapter). A fresh
+installation has no database file yet: the check is then **skipped** (the report shows `SKIPPED` and the run does not
+fail), and the server creates the file at the first start.
 
 Then start the server and check `/health`. A first start with a new database creates the data folder, the database,
 the key ring, and the attestation key. Create the first system administrator before anyone signs in, with the command
@@ -411,7 +413,8 @@ in the `-wal` file that the copy does not take together with the database file. 
 backup method that understands SQLite; the project did not test any online backup.
 
 To check a restored database, run `reviewcenter audit verify` (exit code 0 when the audit chain is intact, 1 when it is
-broken) with the same environment as the server. The project's test on a new database printed
+broken) with the same environment as the server; it never creates a database, so a wrong path is reported as an error
+with exit code 1. The project's test on a new database printed
 `Audit chain intact: 1 entries`.
 
 ## Upgrade

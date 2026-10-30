@@ -94,6 +94,29 @@ public class ApiDocumentTests
     }
 
     /// <summary>
+    ///     Test that the request schemas list as required only what the API really requires: a review needs an id and
+    ///     a title, while the files, the repository source, the baseline and the selection can be left out.
+    /// </summary>
+    [Fact(Timeout = 120000)]
+    public async Task ApiDocument_Get_RequestSchemas_RequireOnlyWhatTheApiRequires()
+    {
+        // Arrange: an application and a client without a token
+        await using var app = await StartAsync();
+        using var client = ClientFor(app, null);
+
+        // Act: fetch the document
+        var response = await client.GetAsync("/api/openapi.json", TestContext.Current.CancellationToken);
+        using var json = await JsonAsync(response);
+        var schemas = json.RootElement.GetProperty("components").GetProperty("schemas");
+        var review = schemas.GetProperty("CreateReviewRequest").GetProperty("required").EnumerateArray().Select(e => e.GetString()).ToList();
+        var source = schemas.GetProperty("RepositorySourceDto").GetProperty("required").EnumerateArray().Select(e => e.GetString()).ToList();
+
+        // Assert: the optional members are not required, the mandatory ones still are
+        Assert.Equal(["id", "title"], review.Order(StringComparer.Ordinal));
+        Assert.Equal(["headRevision", "repositoryId"], source.Order(StringComparer.Ordinal));
+    }
+
+    /// <summary>
     ///     Test that two applications generate byte-for-byte the same document, so the snapshot does not depend on
     ///     the machine, the host address or the run.
     /// </summary>

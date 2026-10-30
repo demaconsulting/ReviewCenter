@@ -511,7 +511,8 @@ retention, or archiving of the trail.
   `verify`. `audit verify` reads the database of the `Database` settings, verifies the hash chain of the audit trail,
   prints `Audit chain intact: N entries` and exits with 0 when it is intact, and prints
   `Audit chain BROKEN at entry N` on standard error and exits with 1 when it is not; an unreadable database is also
-  reported with exit code 1. It creates an empty database when none exists at the configured location. It does not
+  reported with exit code 1, and so is a database file that does not exist at the configured location (the command
+  never creates a database). It does not
   show the head hash, so the head hash must be taken from the audit page. `user add` never takes the
   password from the command line: it is read from the environment variable `REVIEWCENTER_PASSWORD`, otherwise from the
   first line of standard input when that is redirected, otherwise from a masked prompt that asks twice. When `serve`
@@ -602,7 +603,7 @@ is running.
   token may not see answers exactly like an unknown project), 409 for a conflict (including the removal or demotion of
   the last administrator of a project) or an
   attestation of a review that is not complete (a request without a token gets the 404 of a missing review instead),
-  429 when too many tokens were refused from one address or too many
+  429 when too many tokens were refused from one address (with a `Retry-After` header) or too many
   member additions failed, and 5xx for
   repository or key failures.
 - *Constraints*: A token acts with the current memberships and system administrator flag of its owner, read again at
@@ -803,7 +804,8 @@ that the review is approved, reads the record, has `AttestationRenderer` and `Pd
 `AttestationSigner` sign it with the key from `AttestationKeyProvider`, records the generation through `AuditService`,
 and the endpoint returns the signed bytes. A request under `/api` takes another way: the `ReviewCenterToken`
 scheme of `ApiTokenAuthentication` reads the token (a bearer token, or the password of HTTP Basic credentials),
-counts the attempt with `SignInThrottle`, asks `PersonalAccessTokenService` to validate the token (a hash lookup in
+counts the attempt with `SignInThrottle` (the address limit only), asks `PersonalAccessTokenService` to validate the
+token (a hash lookup in
 `PersonalAccessTokenStore`, then the checks of
 expiry, revocation, and the owner), and on success builds a principal with the owner's name and, for a system
 administrator, the `SystemAdmin` role, and a token
