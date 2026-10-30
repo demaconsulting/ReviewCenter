@@ -169,6 +169,11 @@ gives one error for the text as a whole. This scenario is tested by `ChecklistVa
 **ChecklistValidator_Validate_BadJson_GivesOneError**: A theory over text that is not JSON or not a definition; each
 gives one error and no exception. This scenario is tested by `ChecklistValidator_Validate_BadJson_GivesOneError`.
 
+**ChecklistValidator_Validate_ParserError_UsesTheCanonicalPath**: A theory over texts with a value of the wrong type at
+different positions and with member names in different cases; each gives one error whose path is the canonical one
+(`version`, `sections[0]`, `sections[0].items[0].id`, and so on), without `$`, and `json` for a list at the root. This
+scenario is tested by `ChecklistValidator_Validate_ParserError_UsesTheCanonicalPath`.
+
 **ChecklistValidator_Validate_TextSize_LimitsAtMaxBytes**: A text of exactly the size limit is accepted by the size
 rule; one byte more gives the size error alone, without being parsed. This scenario is tested by
 `ChecklistValidator_Validate_TextSize_LimitsAtMaxBytes`.

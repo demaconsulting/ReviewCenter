@@ -20,6 +20,7 @@
 
 using System.Text;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 
 namespace DemaConsulting.ReviewCenter.Core;
 
@@ -48,16 +49,31 @@ namespace DemaConsulting.ReviewCenter.Core;
 ///         them (<c>REQ-01</c>) and it must pass its own validator, so that the default can be exported and
 ///         imported unchanged. Uniqueness ignores case so two identifiers that differ only in case cannot
 ///         be confused. Paths in the messages use the lower-case names <c>version</c>, <c>sections</c>, <c>items</c>,
-///         <c>id</c>, <c>title</c>, <c>text</c> and <c>applicabilityHint</c> and zero-based indexes; the reader matches
+///         <c>id</c>, <c>title</c>, <c>text</c> and <c>applicabilityHint</c> and zero-based indexes, also for errors that
+///         the parser finds (a value of the wrong type is reported as <c>sections[0].items[1].id</c>, whatever the
+///         casing of the input); the reader matches
 ///         member names without regard to case. The validator is stateless and thread-safe.
 ///     </para>
 /// </remarks>
-public static class ChecklistValidator
+public static partial class ChecklistValidator
 {
     /// <summary>
     ///     The path of the text as a whole.
     /// </summary>
     private const string WholeText = "json";
+
+    /// <summary>
+    ///     The canonical member names of a definition, as they appear in the paths of the errors.
+    /// </summary>
+    private static readonly string[] MemberNames =
+        ["version", "sections", "items", "id", "title", "text", "applicabilityHint"];
+
+    /// <summary>
+    ///     Matches one step of a parser path: an index, a dotted member name, or a quoted member name.
+    /// </summary>
+    /// <returns>The regular expression.</returns>
+    [GeneratedRegex(@"\[(?<index>\d+)\]|\['(?<quoted>[^']*)'\]|\.(?<name>[^.\[]+)")]
+    private static partial Regex PathToken();
 
     /// <summary>
     ///     Checks the JSON text of a checklist definition.
@@ -96,7 +112,7 @@ public static class ChecklistValidator
         catch (JsonException ex)
         {
             return Fail(new ChecklistValidationError(
-                string.IsNullOrEmpty(ex.Path) || ex.Path == "$" ? WholeText : ex.Path,
+                CanonicalPath(ex.Path),
                 $"not a valid checklist definition: {ex.Message}"));
         }
 
@@ -125,6 +141,53 @@ public static class ChecklistValidator
     public static ChecklistDefinition ParseOrThrow(string? json)
     {
         return Validate(json).ThrowIfInvalid();
+    }
+
+    /// <summary>
+    ///     Converts the path of a parser error (<c>$.Sections[0].items[1].Id</c>) to the canonical path format of the
+    ///     structural errors (<c>sections[0].items[1].id</c>).
+    /// </summary>
+    /// <remarks>
+    ///     The parser keeps the casing of the input and uses JSON-path syntax. The leading <c>$</c> is removed, known
+    ///     member names get their canonical spelling (matched without regard to case, as the reader does), and
+    ///     unknown names are kept as written. A path that names no member is the text as a whole.
+    /// </remarks>
+    /// <param name="parserPath">The path of the exception; may be null or empty.</param>
+    /// <returns>The canonical path.</returns>
+    private static string CanonicalPath(string? parserPath)
+    {
+        if (string.IsNullOrEmpty(parserPath) || parserPath == "$")
+        {
+            return WholeText;
+        }
+
+        var builder = new StringBuilder();
+        foreach (var groups in PathToken().Matches(parserPath).Select(token => token.Groups))
+        {
+            if (groups["index"].Success)
+            {
+                builder.Append('[').Append(groups["index"].Value).Append(']');
+                continue;
+            }
+
+            // A member name: dotted ($.name) or quoted (['name'])
+            var name = groups["name"].Success ? groups["name"].Value : groups["quoted"].Value;
+            var canonical = Array.Find(MemberNames, known => string.Equals(known, name, StringComparison.OrdinalIgnoreCase));
+            if (builder.Length > 0)
+            {
+                builder.Append('.');
+            }
+
+            builder.Append(canonical ?? name);
+        }
+
+        // A path that starts with an index (a list at the root) still names the text as a whole first
+        if (builder.Length == 0)
+        {
+            return WholeText;
+        }
+
+        return builder[0] == '[' ? WholeText + builder : builder.ToString();
     }
 
     /// <summary>

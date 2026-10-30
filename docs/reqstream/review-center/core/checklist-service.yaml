@@ -50,7 +50,8 @@ sections:
           or digit and are unique across all sections and checks, section titles and check titles of 1 to 200
           characters, check wording of 1 to 1000 characters, and an applicability hint of at most 500 characters,
           and shall report every violation it finds, each with the path of the value in the definition, such as
-          sections[2].items[1].id, and not only the first.
+          sections[2].items[1].id, and not only the first, using the same canonical path format (lower-case member
+          names, no JSON-path prefix) for the errors found while reading the text as for the errors of the structure.
         justification: |
           A checklist is entered by a person and then frozen into every review. A definition that is too large,
           has the same identifier twice, or leaves a section empty would corrupt the answers or the page, so it is
@@ -61,6 +62,7 @@ sections:
           - ChecklistValidator_Validate_SmallDefinition_IsValid
           - ChecklistValidator_Validate_EmptyText_GivesOneError
           - ChecklistValidator_Validate_BadJson_GivesOneError
+          - ChecklistValidator_Validate_ParserError_UsesTheCanonicalPath
           - ChecklistValidator_Validate_TextSize_LimitsAtMaxBytes
           - ChecklistValidator_Validate_Version_BoundariesAndPresence
           - ChecklistValidator_Validate_NoSections_IsRefused

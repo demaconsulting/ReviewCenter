@@ -114,6 +114,11 @@ public sealed class ProjectChecklistService
     /// <summary>
     ///     Reads the checklist a project gives to its new reviews.
     /// </summary>
+    /// <remarks>
+    ///     Any actor who may see the project can read it, an API token included: the checklist is shown in every
+    ///     review of the project. Only <see cref="SetAsync"/> and <see cref="ResetAsync"/> need an administrator and a
+    ///     person.
+    /// </remarks>
     /// <param name="actor">The signed-in user; may be null, which is refused.</param>
     /// <param name="projectId">The project identity.</param>
     /// <param name="cancellationToken">Cancels the operation.</param>
@@ -168,6 +173,17 @@ public sealed class ProjectChecklistService
         // Strict validation: invalid text never reaches the store, and the store keeps the normal form of the text
         var definition = ChecklistValidator.Validate(json).ThrowIfInvalid();
         var newJson = definition.ToJson();
+
+        // The normal form can be longer than the text that was checked (the writer escapes characters such as '<' and
+        // non-ASCII letters), so the limit is applied to what is actually stored
+        var normalBytes = Encoding.UTF8.GetByteCount(newJson);
+        if (normalBytes > ReviewLimits.MaxChecklistBytes)
+        {
+            throw new DomainRuleException(
+                DomainRule.ChecklistDefinitionInvalid,
+                $"The checklist definition is not valid (1 error): json: the stored form is {normalBytes} bytes; " +
+                $"at most {ReviewLimits.MaxChecklistBytes} bytes (256 KiB) are allowed");
+        }
 
         var project = await GetProjectAsync(projectId, cancellationToken);
         RequireExpected(project, expectedHash);

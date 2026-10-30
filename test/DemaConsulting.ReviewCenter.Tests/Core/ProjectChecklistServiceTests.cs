@@ -169,6 +169,10 @@ public class ProjectChecklistServiceTests
         Assert.Equal(DomainRule.ActorNotAllowed, reset.Rule);
         Assert.Null((await world.Store.GetProjectAsync(world.Project, cancellationToken))!.ChecklistDefinition);
         Assert.DoesNotContain(world.Store.Audits, a => a.Action == ProjectChecklistService.ChangedAction);
+
+        // Reading is not a change: the same token may read the checklist
+        var read = await world.Service.GetAsync(viaApi, world.Project, cancellationToken);
+        Assert.True(read.IsDefault);
     }
 
     /// <summary>
@@ -238,6 +242,40 @@ public class ProjectChecklistServiceTests
         Assert.Equal(DomainRule.ChecklistDefinitionInvalid, exception.Rule);
         Assert.Contains("sections[0].title: is missing or empty", exception.Message, StringComparison.Ordinal);
         Assert.Contains("sections[0].items[0].id: duplicate \"a\"", exception.Message, StringComparison.Ordinal);
+        Assert.Null((await world.Store.GetProjectAsync(world.Project, TestContext.Current.CancellationToken))!.ChecklistDefinition);
+        Assert.DoesNotContain(world.Store.Audits, a => a.Action == ProjectChecklistService.ChangedAction);
+    }
+
+    /// <summary>
+    ///     Test that the size limit also applies to the stored (normal) form of a definition: a text just under the
+    ///     limit whose normal form is longer, because the writer escapes characters such as '&lt;', is refused and
+    ///     nothing is stored or recorded.
+    /// </summary>
+    [Fact]
+    public async Task ProjectChecklistService_SetAsync_NormalFormOverLimit_IsRefused()
+    {
+        // Arrange: 200 checks of 1000 '<' written unescaped are about 206 KB (under 256 KiB), but 1.2 MB once escaped
+        var world = await WorldAsync();
+        var items = Enumerable.Range(0, 200).Select(n => new ChecklistItem($"i{n}", new string('<', 1000))).ToArray();
+        var definition = new ChecklistDefinition("v2", [new ChecklistSection("big", "Big", string.Empty, items)]);
+        var json = System.Text.Json.JsonSerializer.Serialize(
+            definition,
+            new System.Text.Json.JsonSerializerOptions { Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping });
+        Assert.True(System.Text.Encoding.UTF8.GetByteCount(json) <= ReviewLimits.MaxChecklistBytes);
+        Assert.True(System.Text.Encoding.UTF8.GetByteCount(definition.ToJson()) > ReviewLimits.MaxChecklistBytes);
+
+        // Act
+        var exception = await Assert.ThrowsAsync<DomainRuleException>(
+            () => world.Service.SetAsync(
+                new Actor("pa", "pa"),
+                world.Project,
+                ProjectChecklistService.HashOf(null),
+                json,
+                TestContext.Current.CancellationToken));
+
+        // Assert
+        Assert.Equal(DomainRule.ChecklistDefinitionInvalid, exception.Rule);
+        Assert.Contains("stored form", exception.Message, StringComparison.Ordinal);
         Assert.Null((await world.Store.GetProjectAsync(world.Project, TestContext.Current.CancellationToken))!.ChecklistDefinition);
         Assert.DoesNotContain(world.Store.Audits, a => a.Action == ProjectChecklistService.ChangedAction);
     }

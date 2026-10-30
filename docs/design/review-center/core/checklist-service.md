@@ -39,6 +39,9 @@ without regard to case (the default's own identifiers use upper case, so the rul
 check title are not empty and at most 200 characters; the wording of a check is not empty and at most 1000 characters;
 the applicability hint has at most 500 characters. The names of the members are read without regard to case, because
 `ToJson` writes them in Pascal case; the paths use the lower-case names. A duplicate is reported at its later use.
+An error that the reader finds (a value of the wrong type) is reported at the same kind of path: the parser's path
+(`$.Sections[0].Items[1].Id`) is converted by removing the `$` prefix and spelling the known member names in their
+canonical form, so every consumer sees one path format; a path that names no member is `json`.
 `ParseOrThrow` returns the definition or raises `ChecklistDefinitionInvalid`, with the first ten errors in the message.
 The limits are in `ReviewLimits`. `FromJson` stays lenient: it is the reader of frozen copies and of stored text, and
 the strict rules apply only where a definition enters the system or is taken for a new review.

@@ -31,7 +31,9 @@ sections:
         title: >-
           The ProjectChecklistService class shall refuse to store a checklist definition that does not pass the
           strict validation of the ChecklistValidator class, reporting every error with its path in a domain rule
-          exception of the ChecklistDefinitionInvalid rule and storing nothing, and shall offer the same check as a
+          exception of the ChecklistDefinitionInvalid rule and storing nothing, including a definition whose stored
+          (normal) form is longer than the size limit although the text that was sent was not, and shall offer the
+          same check as a
           pure operation that reports every error with its path, or the parsed definition, without storing or
           recording anything.
         justification: |
@@ -41,20 +43,24 @@ sections:
           is saved.
         tests:
           - ProjectChecklistService_SetAsync_InvalidDefinition_IsRefusedWithAllErrors
+          - ProjectChecklistService_SetAsync_NormalFormOverLimit_IsRefused
           - ProjectChecklistService_Validate_ReportsAllErrorsAndStoresNothing
 
       - id: ReviewCenter-ProjectChecklistService-Access
         title: >-
           The ProjectChecklistService class shall return the checklist of a project to any actor who may see the
-          project, and replace or reset it only for a system administrator or a project administrator of that
-          project, checked again at every call, tell a plain member of the project that it may not, give every other
-          actor, including a user outside the project, an administrator of another project, a disabled user, and no
-          actor at all, the answer for a project that does not exist, refuse every change that comes through an
-          API token, and change and record nothing when it refuses.
+          project, including an actor that came through an API token, and replace or reset it only for a system
+          administrator or a project administrator of that project, checked again at every call, tell a plain member
+          of the project that it may not, give every other actor, including a user outside the project, an
+          administrator of another project, a disabled user, and no actor at all, the answer for a project that does
+          not exist, refuse every replace and reset that comes through an API token, and change and record nothing
+          when it refuses.
         justification: |
           The checklist decides what every later review of the project is answered against, so only the people who
           administer the project may change it, and only in person: a token that is leaked or scripted must not be
-          able to weaken the standard of a project. A project that the actor may not see must read like a missing
+          able to weaken the standard of a project. Reading is not restricted to administrators or to people: the
+          checklist is shown in every review of the project, so every viewer, a token for tooling included, may read
+          it. A project that the actor may not see must read like a missing
           one, so that its existence does not leak, and a right that was revoked while a page was open must not
           get a change through.
         tests:

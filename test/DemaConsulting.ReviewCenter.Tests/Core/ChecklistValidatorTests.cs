@@ -149,6 +149,32 @@ public class ChecklistValidatorTests
     }
 
     /// <summary>
+    ///     Test that the path of a parser error is written like the paths of the structural errors: without the
+    ///     <c>$.</c> prefix, with the canonical member names whatever the casing of the input, and with plain indexes.
+    /// </summary>
+    /// <param name="json">The text, with a value of the wrong type at the position named by the path.</param>
+    /// <param name="expectedPath">The canonical path.</param>
+    [Theory]
+    [InlineData("{\"version\": 5, \"sections\": []}", "version")]
+    [InlineData("{\"Version\": 5, \"Sections\": []}", "version")]
+    [InlineData("{\"version\": \"v\", \"sections\": 7}", "sections")]
+    [InlineData("{\"version\": \"v\", \"Sections\": [5]}", "sections[0]")]
+    [InlineData("{\"version\": \"v\", \"sections\": [{\"id\": \"a\", \"title\": \"T\", \"ITEMS\": [{\"Id\": 3}]}]}", "sections[0].items[0].id")]
+    [InlineData("{\"version\": \"v\", \"sections\": [{\"id\": \"a\", \"title\": \"T\", \"items\": [{\"id\": \"i\", \"TEXT\": []}]}]}", "sections[0].items[0].text")]
+    [InlineData("{\"version\": \"v\", \"sections\": [{\"id\": \"a\", \"title\": \"T\", \"ApplicabilityHint\": 4, \"items\": []}]}", "sections[0].applicabilityHint")]
+    [InlineData("[1, 2]", "json")]
+    public void ChecklistValidator_Validate_ParserError_UsesTheCanonicalPath(string json, string expectedPath)
+    {
+        // Act
+        var result = ChecklistValidator.Validate(json);
+
+        // Assert
+        var error = Assert.Single(result.Errors);
+        Assert.Equal(expectedPath, error.Path);
+        Assert.DoesNotContain("$", error.Path, StringComparison.Ordinal);
+    }
+
+    /// <summary>
     ///     Test that a text above 256 KiB is refused from its size alone, and that one exactly at the limit is read.
     /// </summary>
     [Fact]

@@ -32,7 +32,8 @@ N/A - standard test environment.
 - A system administrator and a project administrator of the project read and change the checklist; a plain member gets
   `ActorNotAllowed`; a user outside the project, an administrator of another project, a disabled member, a disabled
   administrator, and no actor at all get `ProjectNotFound`; a refusal changes nothing and records nothing.
-- A change, a replacement or a reset, that comes through an API token is refused with `ActorNotAllowed`.
+- A change, a replacement or a reset, that comes through an API token is refused with `ActorNotAllowed`; a read through
+  an API token is allowed for a project the token's user may see.
 - A change is stored in its normal form for its own project only and is recorded as one entry `project.checklist-changed`
   that carries the project and no review, names the actor, states the version, the number of sections and items, a short
   hash, and the previous version, never contains the wording, and is within the length limit of a detail.
@@ -67,7 +68,8 @@ has no definition and no entry `project.checklist-changed` exists. This scenario
 `ProjectChecklistService_GetAndSet_ActorKinds_AreAllowedOrRefused`.
 
 **ProjectChecklistService_SetAndReset_ApiToken_AreRefused**: A project administrator who came through an API token
-replaces and resets the checklist; both raise `ActorNotAllowed`, the project still has no definition, and no entry exists.
+replaces and resets the checklist; both raise `ActorNotAllowed`, the project still has no definition, and no entry exists;
+reading the checklist with the same token succeeds.
 This scenario is tested by `ProjectChecklistService_SetAndReset_ApiToken_AreRefused`.
 
 **ProjectChecklistService_SetAsync_Change_IsStoredAndAudited**: A project administrator replaces the default with a
@@ -81,6 +83,10 @@ This scenario is tested by `ProjectChecklistService_SetAsync_Change_IsStoredAndA
 section title and a duplicate identifier is saved; the call raises `ChecklistDefinitionInvalid`, the message names both
 paths, and nothing is stored or recorded. This scenario is tested by
 `ProjectChecklistService_SetAsync_InvalidDefinition_IsRefusedWithAllErrors`.
+
+**ProjectChecklistService_SetAsync_NormalFormOverLimit_IsRefused**: A definition of 200 checks of 1000 `<` characters is
+under 256 KiB as sent but over it once written in its normal form; the replacement raises `ChecklistDefinitionInvalid`
+and nothing is stored or recorded. This scenario is tested by `ProjectChecklistService_SetAsync_NormalFormOverLimit_IsRefused`.
 
 **ProjectChecklistService_Validate_ReportsAllErrorsAndStoresNothing**: The pure check is given a definition with a missing
 version and no sections, and a valid one; the first reports both errors with their paths, the second is valid, and the

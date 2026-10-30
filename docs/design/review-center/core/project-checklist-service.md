@@ -54,7 +54,9 @@ stored definition.
 
 - *Parameters*: the `Actor` (may be null), the project identity, and a cancellation token.
 - *Returns*: `Task<ProjectChecklist>` — the project's own definition, or the default.
-- *Preconditions*: The actor may see the project (`IProjectAccess.RequireViewAsync`). A project the actor may not see, a
+- *Preconditions*: The actor may see the project (`IProjectAccess.RequireViewAsync`). Reading is allowed for every
+  such actor, an actor that came through an API token included (the checklist is shown in every review of the project,
+  and tooling needs it); only replace and reset need an administrator and a person. A project the actor may not see, a
   project that does not exist, a disabled or unknown user, and a missing actor give `ProjectNotFound`.
 - *Postconditions*: Nothing is changed. A stored text that cannot be read gives `ChecklistDefinitionInvalid`; it is not
   replaced by the default.
@@ -71,7 +73,9 @@ stored definition.
   the stored definition no longer has `expectedHash`, nothing is stored and `RecordChanged` is raised.
 
 The service checks the right first, so a refused caller learns nothing about the validation or the current value. It
-then validates the text (all errors are reported in one `ChecklistDefinitionInvalid` exception), reads the project, and
+then validates the text (all errors are reported in one `ChecklistDefinitionInvalid` exception), builds the normal form
+(`ToJson`, which can be longer than the text because it escapes characters such as `<`) and applies the size limit to
+that stored form as well, reads the project, and
 compares the hash. The normal form of the new definition (`ToJson`) is compared with the current text: equal content
 returns `false` and records nothing. Different content must carry another version label than the current definition
 (the default's label when the project has none); otherwise `ChecklistDefinitionInvalid` names the label. Then the
