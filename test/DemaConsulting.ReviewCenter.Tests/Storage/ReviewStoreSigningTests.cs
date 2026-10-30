@@ -609,6 +609,138 @@ public class ReviewStoreSigningTests
     }
 
     /// <summary>
+    ///     Test that the reopenings of a review are listed only for that review (not for another review of the same
+    ///     project, nor for the same review identifier of another project) and in the order in which they were made.
+    /// </summary>
+    [Fact]
+    public async Task ReviewStore_ListReopensAsync_SeveralReviewsAndReopens_AreScopedAndInCreationOrder()
+    {
+        // Arrange: three approved reviews, the same identifier in two projects and two identifiers in one project
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var db = new TestStore();
+        var projectA = await AddReviewAsync(db);
+        var projectB = await AddReviewAsync(db);
+        await AddSecondReviewAsync(db, projectA, "REV-2");
+        var slotA1 = await db.Store.AddSlotAsync(NewSlot(projectA), cancellationToken);
+        var slotA2 = await db.Store.AddSlotAsync(
+            new ReviewerSlot { ProjectId = projectA, ReviewId = "REV-2", PrimaryUserId = 1, AlternateUserId = 2 }, cancellationToken);
+        var slotB1 = await db.Store.AddSlotAsync(NewSlot(projectB), cancellationToken);
+        await ApproveReviewAsync(db, projectA, "REV-1", slotA1.Id);
+        await ApproveReviewAsync(db, projectA, "REV-2", slotA2.Id);
+        await ApproveReviewAsync(db, projectB, "REV-1", slotB1.Id);
+
+        // Act: approve, reopen and approve again, with the reopenings of the reviews interleaved
+        await ReopenReviewAsync(db, projectA, "REV-1", "A1 first");
+        await ReopenReviewAsync(db, projectB, "REV-1", "B1 first");
+        await ReopenReviewAsync(db, projectA, "REV-2", "A2 first");
+        await ApproveReviewAsync(db, projectA, "REV-1", slotA1.Id);
+        await ReopenReviewAsync(db, projectA, "REV-1", "A1 second");
+        await ApproveReviewAsync(db, projectA, "REV-1", slotA1.Id);
+        await ReopenReviewAsync(db, projectB, "REV-1", "B1 second", approveFirst: slotB1.Id);
+        await ReopenReviewAsync(db, projectA, "REV-1", "A1 third");
+
+        // Assert: each list holds the reopenings of its review only, oldest first, and the identities grow
+        var a1 = await db.Store.ListReopensAsync(projectA, "REV-1", cancellationToken);
+        var a2 = await db.Store.ListReopensAsync(projectA, "REV-2", cancellationToken);
+        var b1 = await db.Store.ListReopensAsync(projectB, "REV-1", cancellationToken);
+        Assert.Equal(["A1 first", "A1 second", "A1 third"], a1.Select(r => r.Reason).ToArray());
+        Assert.Equal(["A2 first"], a2.Select(r => r.Reason).ToArray());
+        Assert.Equal(["B1 first", "B1 second"], b1.Select(r => r.Reason).ToArray());
+        Assert.All(a1, r => Assert.Equal((projectA, "REV-1"), (r.ProjectId, r.ReviewId)));
+        Assert.All(a2, r => Assert.Equal((projectA, "REV-2"), (r.ProjectId, r.ReviewId)));
+        Assert.All(b1, r => Assert.Equal((projectB, "REV-1"), (r.ProjectId, r.ReviewId)));
+        Assert.Equal(a1.OrderBy(r => r.Id).Select(r => r.Id), a1.Select(r => r.Id));
+        Assert.Equal(b1.OrderBy(r => r.Id).Select(r => r.Id), b1.Select(r => r.Id));
+        Assert.Empty(await db.Store.ListReopensAsync(projectB, "REV-2", cancellationToken));
+        Assert.Equal(3, (await db.Store.GetRecordAsync(projectA, "REV-1", cancellationToken))!.Reopens);
+    }
+
+    /// <summary>
+    ///     Adds a second review to an existing project.
+    /// </summary>
+    /// <param name="db">The database.</param>
+    /// <param name="projectId">The project identity.</param>
+    /// <param name="reviewId">The review identifier.</param>
+    /// <returns>A task that completes when the review is stored.</returns>
+    private static Task AddSecondReviewAsync(TestStore db, int projectId, string reviewId)
+    {
+        return db.Store.AddReviewAsync(
+            new Review
+            {
+                ProjectId = projectId,
+                Id = reviewId,
+                Title = "Title",
+                State = ReviewState.Draft,
+                Created = _time,
+                ContentFingerprint = TestContent.FingerprintA,
+                Files =
+                [
+                    new ReviewFile
+                    {
+                        ProjectId = projectId,
+                        ReviewId = reviewId,
+                        Path = "a.txt",
+                        Content = TestContent.A,
+                        Size = TestContent.A.Length,
+                        Sha256 = TestContent.HashA
+                    }
+                ]
+            },
+            TestContext.Current.CancellationToken);
+    }
+
+    /// <summary>
+    ///     Signs the record of a review as it is stored now with the given slot, which approves the review.
+    /// </summary>
+    /// <param name="db">The database.</param>
+    /// <param name="projectId">The project identity.</param>
+    /// <param name="reviewId">The review identifier.</param>
+    /// <param name="slotId">The slot identity.</param>
+    /// <returns>A task that completes when the signature is stored.</returns>
+    private static async Task ApproveReviewAsync(TestStore db, int projectId, string reviewId, int slotId)
+    {
+        var record = await db.Store.GetRecordAsync(projectId, reviewId, TestContext.Current.CancellationToken);
+        var signature = new ReviewSignature
+        {
+            ProjectId = projectId,
+            ReviewId = reviewId,
+            SlotId = slotId,
+            UserId = 1,
+            DisplayName = "Ann",
+            Role = SlotRole.Alternate,
+            SignedAt = _time,
+            RecordDigest = RecordDigest.Compute(record!),
+            Meaning = SigningService.MeaningText
+        };
+        await db.Store.AddSignatureAsync(signature, TestContext.Current.CancellationToken);
+    }
+
+    /// <summary>
+    ///     Reopens an approved review with the given reason, optionally approving it first.
+    /// </summary>
+    /// <param name="db">The database.</param>
+    /// <param name="projectId">The project identity.</param>
+    /// <param name="reviewId">The review identifier.</param>
+    /// <param name="reason">The reason of the reopening.</param>
+    /// <param name="approveFirst">The slot that signs the review before it is reopened, if any.</param>
+    /// <returns>A task that completes when the review is reopened.</returns>
+    private static async Task ReopenReviewAsync(TestStore db, int projectId, string reviewId, string reason, int? approveFirst = null)
+    {
+        if (approveFirst is { } slotId)
+        {
+            await ApproveReviewAsync(db, projectId, reviewId, slotId);
+        }
+
+        var record = await db.Store.GetRecordAsync(projectId, reviewId, TestContext.Current.CancellationToken);
+        await db.Store.ReopenReviewAsync(
+            projectId,
+            reviewId,
+            new ReviewReopen(0, projectId, reviewId, _time, "root", "Root", reason, RecordDigest.Compute(record!)),
+            AuditDraft.By(TestActors.Ann, "review.reopened", reason, projectId, reviewId),
+            TestContext.Current.CancellationToken);
+    }
+
+    /// <summary>
     ///     Test that a reopen of a review that is not approved (never approved, already reopened) or does not exist is
     ///     refused with the rule, and stores no row and no audit entry.
     /// </summary>

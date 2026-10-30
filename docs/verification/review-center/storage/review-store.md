@@ -351,6 +351,13 @@ entry and an approved review is reopened. The call fails, no reopen row exists, 
 0, the digest is as approved, and the review is still approved. With the refusal removed, the same reopen succeeds.
 This scenario is tested by `ReviewStore_ReopenReviewAsync_AuditInsertFails_RollsBackTheReopen`.
 
+**ReviewStore_ListReopensAsync_SeveralReviewsAndReopens_AreScopedAndInCreationOrder**: Three approved reviews are made:
+`REV-1` and `REV-2` in one project and `REV-1` in another. They are reopened in an interleaved order, and `REV-1` of
+the first project is approved again and reopened two more times. The listing of each review holds only the reopens of
+that review (the other review of the same project and the same identifier of the other project do not appear), in the
+order in which they were made, with growing identities, and the reopen count of the record is 3 for the review reopened
+three times. This scenario is tested by `ReviewStore_ListReopensAsync_SeveralReviewsAndReopens_AreScopedAndInCreationOrder`.
+
 **ReviewStore_ReopenReviewAsync_TwoAtOnce_ExactlyOneSucceeds**: Two reopens of one approved review are made at the same
 time; one succeeds and the other throws `ReviewNotLocked`; one row and one audit entry exist, the reopen count is 1, and
 the chain verifies. This scenario is tested by `ReviewStore_ReopenReviewAsync_TwoAtOnce_ExactlyOneSucceeds`.

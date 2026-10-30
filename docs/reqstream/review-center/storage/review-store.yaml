@@ -209,6 +209,7 @@ sections:
         tests:
           - ReviewStore_ReopenReviewAsync_Persists_AuditAndHistory
           - ReviewStore_ReopenReviewAsync_AuditInsertFails_RollsBackTheReopen
+          - ReviewStore_ListReopensAsync_SeveralReviewsAndReopens_AreScopedAndInCreationOrder
 
       - id: ReviewCenter-ReviewStore-ReopenRefusal
         title: >-
