@@ -173,6 +173,7 @@ sections:
         children:
           - ReviewCenter-OidcSignIn-Login
           - ReviewCenter-OidcSignIn-Settings
+          - ReviewCenter-OidcSignIn-SettingsValidation
           - ReviewCenter-OidcSignIn-Account
           - ReviewCenter-OidcSignIn-DisabledRefused
           - ReviewCenter-OidcSignIn-OpenRedirect
@@ -180,6 +181,7 @@ sections:
           - ReviewCenter-OidcSignIn-Audit
           - ReviewCenter-OidcSignIn-FailureAnswer
           - ReviewCenter-OidcSignIn-Reauth
+          - ReviewCenter-OidcSignIn-ReauthAnswer
           - ReviewCenter-OidcSignIn-LocalSession
           - ReviewCenter-OidcSignIn-NoPassword
           - ReviewCenter-OTS-OpenIdConnect-CodeFlow

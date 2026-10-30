@@ -629,7 +629,7 @@ public partial class OidcSignInTests : IClassFixture<IdentityProviderFixture>
 
     /// <summary>
     ///     Test that neither the client secret nor the code of the provider reaches the log or the audit trail, and
-    ///     that the provider was asked for the authorization code flow with PKCE.
+    ///     that the provider was asked for the authorization code flow with PKCE, with a state and a nonce.
     /// </summary>
     [Fact]
     public async Task OidcSignIn_Flow_NeverLogsSecretsAndUsesCodeFlowWithPkce()
@@ -654,10 +654,48 @@ public partial class OidcSignInTests : IClassFixture<IdentityProviderFixture>
         var request = _idp.AuthorizeRequests[^1];
         Assert.Equal("code", request["response_type"]);
         Assert.Equal("S256", request["code_challenge_method"]);
+        Assert.False(string.IsNullOrWhiteSpace(request["state"]));
+        Assert.False(string.IsNullOrWhiteSpace(request["nonce"]));
         Assert.False(request.ContainsKey("prompt"));
         foreach (var entry in await OidcTestApp.AuditAsync(app, "auth.oidc-sign-in-failed"))
         {
             Assert.DoesNotContain(ClientSecret, entry.Detail, StringComparison.Ordinal);
         }
+    }
+
+    /// <summary>
+    ///     Test that the sign-in form is refused without a valid antiforgery token (none, or one that is not valid):
+    ///     the provider receives no request, no cookie is set and nobody is signed in.
+    /// </summary>
+    /// <param name="invalidToken">
+    ///     <c>true</c> to send a token that is not valid (with a real antiforgery cookie); <c>false</c> to send none.
+    /// </param>
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task OidcSignIn_PostWithoutValidAntiforgeryToken_IsRefusedAndProviderIsNotCalled(bool invalidToken)
+    {
+        // Arrange: an application, and the number of requests the provider and the browser have seen
+        await using var app = await OidcTestApp.StartAsync(_idp);
+        using var browser = new TestBrowser(app);
+        List<KeyValuePair<string, string>> fields = [new("returnUrl", "/projects")];
+        if (invalidToken)
+        {
+            await browser.GetTokenAsync();
+            fields.Add(new("__RequestVerificationToken", "not-a-valid-token"));
+        }
+
+        var requests = _idp.AuthorizeRequests.Count;
+        var cookies = browser.SetCookieHeaders.Count;
+
+        // Act
+        var response = await browser.PostFormAsync(OidcSignIn.LoginEndpoint, fields, withToken: false);
+
+        // Assert: refused, nothing sent to the provider, no challenge or session cookie, nobody signed in
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Null(response.Headers.Location);
+        Assert.Equal(requests, _idp.AuthorizeRequests.Count);
+        Assert.Equal(cookies, browser.SetCookieHeaders.Count);
+        Assert.Empty(OidcTestApp.SessionCookies(browser));
     }
 }

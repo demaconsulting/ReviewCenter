@@ -84,7 +84,10 @@ answered like any unknown address.
 - *Redirect*: for a confirmation only, adds `prompt=login` and `max_age=0` to the request.
 - *Message received*: counts the callback with `SignInThrottle.TryBeginAddressOnly` (client address only, no name
   counter, so one shared address cannot block every person behind it before the address limit) and refuses it
-  with the reason `throttled`, without reading it, when the throttle refuses.
+  with the reason `throttled` when the throttle refuses. The handler has already read the message and unprotected its
+  state at this point (it does so before this event), but nothing more is done with it: no code is exchanged, no
+  token is requested or checked, and no claim is read. The refusal is answered and recorded like any other handler
+  failure (see *Remote failure*).
 - *Ticket received*: a normal sign-in is handed on to the complete endpoint and gives its throttle slot back. A
   confirmation is answered here, so the claims never replace the session. The stored user of the session cookie is
   read; when it is gone or disabled the reason is `session-ended`. Otherwise `VerifyReauth` decides; on success a proof
@@ -93,7 +96,13 @@ answered like any unknown address.
   `VerifyReauth`, unchanged) and the browser returns with `reauth=missing-auth-time` or `reauth=stale-auth-time` for
   those two reasons, and with `reauth=failed` for every other reason, so the page can say what an administrator has to
   fix without telling more about any other cause.
-- *Remote failure*: the failure text only selects a reason class, never stored or shown.
+- *Remote failure*: the failure text only selects a reason class, never stored or shown. A failure of the handler
+  (and a throttled callback) is answered by one routine that depends on whether the started request was a
+  confirmation of identity. For a confirmation it returns to the local address with `reauth=failed`; the reason is
+  recorded as `signature.reauth-failed` for the user of the session when that user is an account of the provider, and
+  as `auth.oidc-sign-in-failed` (the same reason class, the client address) when there is no such session, because
+  the session ended or the user is a local one and there is no user of the provider to record it for. For a normal
+  sign-in it goes to the login page with `error=oidc` and records `auth.oidc-sign-in-failed`.
 
 **VerifyReauth**: Decides whether a fresh sign-in is a confirmation of the user who asked.
 
@@ -102,13 +111,18 @@ answered like any unknown address.
 - *Returns*: `null` when every condition holds, otherwise the first reason class: `not-external`, `other` (no claims,
   or the binding is missing, is for another user or is not numeric), `issuer-mismatch`, `subject-mismatch`,
   `missing-auth-time` (absent, not a whole number, negative, or outside the range of dates) or `stale-auth-time`
-  (older than `ReauthMaxAgeSeconds`, or more
-  than 60 seconds in the future).
+  (older than `ReauthMaxAgeSeconds`, or more than 60 seconds in the future). Both ends of that window are inclusive.
+  A negative value is refused by the parse itself (only digits are accepted), so only the upper end of the range of
+  dates needs a separate check.
 - *Postconditions*: The issuer and the subject must equal the stored ones of the account, not just be valid ones. The
   method reads nothing else and changes nothing, so it fails closed on any doubt.
 
 **ClassifyFailure**: Maps a failure of the handler to one of the reason classes `provider-error`, `state-or-nonce`,
-`token-invalid` and `other`.
+`token-invalid` and `other`. Limitation: the framework handler reports most failures as exceptions without a type or
+code of their own, so the class is chosen by phrases in the message of the exception and by the type
+`SecurityTokenException`. A different wording after an upgrade of the package gives `other`, and an unrelated message
+that holds a phrase may give a wrong class; this changes only the recorded class, never whether the sign-in is
+refused. The tests pin one case of each class, so an upgrade that changes the wording is noticed.
 
 **WithReauth**: Sets exactly one `reauth` query value on a local address and drops any fragment.
 
@@ -128,8 +142,11 @@ through `UserService`: `auth.oidc-sign-in-failed` with
 `no-hand-over`, `email-not-verified`, `invalid-identity`, `throttled`, `session-ended` or a handler class, and
 `signature.reauth-failed` for a refused confirmation of a known user. Successful sign-ins are recorded as
 `auth.oidc-sign-in` and the first creation of an account as `account.oidc-created` (by `UserService`, with only the
-host of the issuer). No token, claim, error text, code or secret is ever logged or recorded. Return addresses are
-reduced to local ones when a sign-in starts and again when it ends, so the sign-in is no open redirect. Sign-out is
+host of the issuer). No token, claim, error text, code or secret is ever logged or recorded by the unit; the log of
+the framework handler, which the unit does not control, may name the issuer and the audience of an identity token it
+refused (values chosen by the sender of the token), and the tests allow that and nothing else from it. Return
+addresses are reduced to local ones when a sign-in starts and again when it ends, so the sign-in is no open redirect.
+Sign-out is
 local only: the provider is never called. The signing step spends the proof once (see `ReauthProofStore`); without
 one it is refused and recorded. A `DomainRuleException` of the start of a confirmation is handled locally; other
 exceptions propagate to the framework.

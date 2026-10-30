@@ -23,12 +23,15 @@ no external service and no network beyond the loopback address.
   the first sign-in, finds it again by issuer and subject, never links to a local account, and sanitizes names.
 - A failed state, a refused code, a provider error, an unverified e-mail address when required, a disabled account and
   too many callbacks end at the login page with one message and no session; the audit trail has the reason class only.
-- Foreign return addresses are replaced by a local one; sign-out is local only; no secret reaches the log or the trail.
+- Foreign return addresses are replaced by a local one; sign-out is local only; no secret reaches the log or the trail
+  (the framework handler's own log may name the issuer and audience of a refused token, nothing else).
+- Both forms that start a flow are refused without a valid antiforgery token and the provider is not called.
 - A password sign-in of an account of the provider is refused.
-- Settings are validated at start-up with messages that name the setting and never a value; nothing is mapped when
-  sign-in with a provider is off.
+- Settings are validated at start-up with messages that name the setting and never a value (also through the
+  `ServerHost` tests); nothing is mapped when sign-in with a provider is off.
 - A confirmation of identity asks for `prompt=login` and `max_age=0`, issues exactly one single-use proof for the
-  right user only when `auth_time`, subject and issuer are right, and otherwise fails closed with a recorded reason.
+  right user only when `auth_time` (checked at the exact limits of its window), subject, issuer and the user of the
+  session are right, and otherwise fails closed with a recorded reason.
 
 #### Test Scenarios
 
@@ -113,8 +116,13 @@ the display name beside the local form, the generic message, and the local retur
 tested by `OidcSignIn_Logout_IsLocalOnly`.
 
 **OidcSignIn_Flow_NeverLogsSecretsAndUsesCodeFlowWithPkce**: The authorization request asks for a code with an S256
-challenge and no prompt, and neither the client secret nor the code appears in the log or in the trail. This scenario is
-tested by `OidcSignIn_Flow_NeverLogsSecretsAndUsesCodeFlowWithPkce`.
+challenge, a non-empty state and a non-empty nonce, and no prompt, and neither the client secret nor the code appears in
+the log or in the trail. This scenario is tested by `OidcSignIn_Flow_NeverLogsSecretsAndUsesCodeFlowWithPkce`.
+
+**OidcSignIn_PostWithoutValidAntiforgeryToken_IsRefusedAndProviderIsNotCalled**: A post to the sign-in form without an
+antiforgery token, and one with a token that is not valid, is answered with 400, the provider sees no request, no cookie
+is set and nobody is signed in. This scenario is tested by
+`OidcSignIn_PostWithoutValidAntiforgeryToken_IsRefusedAndProviderIsNotCalled`.
 
 **OidcOptionsValidator_Validate_ValidSettings_Succeeds**: Valid settings and settings at every limit are accepted. This
 scenario is tested by `OidcOptionsValidator_Validate_ValidSettings_Succeeds`.
@@ -149,6 +157,36 @@ refused outside. This scenario is tested by `OidcOptionsValidator_Validate_Reaut
 
 **OidcOptionsValidator_Validate_Null_Throws**: A null settings object raises `ArgumentNullException`. This scenario is
 tested by `OidcOptionsValidator_Validate_Null_Throws`.
+
+**ServerHost_CreateApplication_InvalidOidcSettings_ThrowsClearErrorWithoutSecret**: With sign-in on, a wrong setting
+stops the application from being created with a message that names the setting and holds neither its value nor the
+secret. The test is in the `ServerHost` tests and is linked from the settings validation requirement of this unit. This
+scenario is tested by `ServerHost_CreateApplication_InvalidOidcSettings_ThrowsClearErrorWithoutSecret`.
+
+**ServerHost_CreateApplication_OidcOffOrValid_BuildsTheApplication**: With sign-in off, or with valid settings, the
+application is created. This scenario is tested by `ServerHost_CreateApplication_OidcOffOrValid_BuildsTheApplication`.
+
+**OidcReauth_MissingOrStaleAuthTime_ReviewPageNamesTheCause**: After a refused confirmation the review page names the
+cause when the provider sent no usable `auth_time` (absent, or present but negative): the text says the provider did not
+report a usable sign-in time, names `auth_time`, a whole number of seconds since 1970 and the administrator; and when the
+sign-in was too old it says it was not recent enough and does not name `auth_time`. In neither case is the general text
+"We could not confirm your identity" shown. This scenario is tested by
+`OidcReauth_MissingOrStaleAuthTime_ReviewPageNamesTheCause`.
+
+**OidcReauth_VerifyReauth_AuthTimeAtTheLimitsOfTheWindow_IsDecidedExactly**: With a fixed clock, an `auth_time` exactly
+the allowed age ago and one exactly 60 seconds in the future are accepted, and one second more in either direction is
+refused as `stale-auth-time`, for the default age and for the smallest (10) and the largest (900) age of the settings.
+This scenario is tested by `OidcReauth_VerifyReauth_AuthTimeAtTheLimitsOfTheWindow_IsDecidedExactly`.
+
+**OidcReauth_SessionUserDiffersFromConfirmedUser_IsRefusedAndGivesNoProof**: A confirmation that olive started is
+answered by the provider with olive's identity after another user of the provider has signed in in the same browser; it
+is refused with the reason class `other` recorded for the user of the session, no proof is issued, and the session is
+not replaced. This scenario is tested by `OidcReauth_SessionUserDiffersFromConfirmedUser_IsRefusedAndGivesNoProof`.
+
+**OidcReauth_PostWithoutValidAntiforgeryToken_IsRefusedAndProviderIsNotCalled**: A post to the confirmation form without
+an antiforgery token, and one with a token that is not valid, from a signed-in user who may confirm the slot, is answered
+with 400, the provider sees no request, no cookie is set, no proof is issued and nothing is recorded. This scenario is
+tested by `OidcReauth_PostWithoutValidAntiforgeryToken_IsRefusedAndProviderIsNotCalled`.
 
 **OidcReauth_FreshSignInOfSamePerson_AllowsExactlyOneSignature**: The provider is asked with `prompt=login` and
 `max_age=0`, a proof is issued, one signature without a password uses it up, and the slot is signed. This scenario is

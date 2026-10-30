@@ -45,9 +45,11 @@ namespace DemaConsulting.ReviewCenter.Identity;
 ///     because the handler does not check <c>auth_time</c>, <see cref="VerifyReauth"/> does, together with the
 ///     issuer and the subject, and every doubt refuses (the check fails closed). Only a verified confirmation
 ///     issues a single-use <see cref="ReauthProofStore"/> proof for exactly one user, review and slot, and the
-///     session is left as it was. Callbacks are counted per client address only, with no name counter, by <see cref="SignInThrottle"/>, so bad
-///     callbacks from one shared address cannot lock out another person behind it before the address limit. Only a
-///     fixed reason class is ever recorded for a failure, never a token, a claim, an error text or the secret, and
+///     session is left as it was. Callbacks are counted per client address only, with no name counter, by
+///     <see cref="SignInThrottle"/>, so bad callbacks from one shared address cannot lock out another person
+///     behind it before the address limit. Only a fixed reason class is ever recorded for a failure, never a
+///     token, a claim, an error text or the secret (the framework handler may name the issuer or audience of a
+///     token it refused in its own log; the unit adds nothing of the kind), and
 ///     every address a visitor can influence is reduced to a local one by <see cref="SignIn.SafeReturnUrl"/> both
 ///     when the sign-in starts and when it ends. The class is stateless and therefore thread-safe.
 /// </remarks>
@@ -588,8 +590,11 @@ internal static class OidcSignIn
     /// <param name="reason">The reason class; a fixed word.</param>
     /// <returns>A task that completes when the browser is redirected.</returns>
     /// <remarks>
-    ///     A failed confirmation goes back to the page of the signature and is recorded as a failed
-    ///     confirmation of that user. Every other failure goes to the login page with one generic message.
+    ///     A failure of a started confirmation goes back to the page of the signature with <c>reauth=failed</c>. It is
+    ///     recorded as <c>signature.reauth-failed</c> when the session user is a user of the provider; when there is
+    ///     no such session (it ended, or the user is local) it is recorded as <c>auth.oidc-sign-in-failed</c>, with
+    ///     the same redirect. A throttled callback is recorded in the same way. Every failure that does not belong
+    ///     to a confirmation goes to the login page with one generic message.
     /// </remarks>
     private static async Task FailAsync(HttpContext http, AuthenticationProperties? properties, string reason)
     {
@@ -623,6 +628,16 @@ internal static class OidcSignIn
     ///     does not match the one that was started, <c>token-invalid</c> when the identity token was refused, and
     ///     <c>other</c> for everything else.
     /// </returns>
+    /// <remarks>
+    ///     The framework handler reports most failures as an exception with no type or code of its own, so the class
+    ///     is chosen by phrases in the message of the exception ("Message contains error", "denied",
+    ///     "Correlation failed", "State", "nonce") and by
+    ///     <see cref="Microsoft.IdentityModel.Tokens.SecurityTokenException"/> for a refused token. This depends on
+    ///     the wording of the framework: a different wording after an upgrade
+    ///     gives <c>other</c> (and an unrelated message that holds one of the phrases may give a wrong class), which
+    ///     changes only the recorded class, never whether the sign-in is refused. A test pins each class (provider
+    ///     error, state, nonce, token) so an upgrade that changes the wording fails it.
+    /// </remarks>
     internal static string ClassifyFailure(Exception? failure)
     {
         var text = failure?.Message ?? string.Empty;
@@ -697,11 +712,12 @@ internal static class OidcSignIn
             return "subject-mismatch";
         }
 
-        // The value must be a whole number of seconds that a date can hold: outside that range converting it to a
-        // date would throw, so it is refused like a missing value and no exception can escape
+        // The value must be a whole number of seconds that a date can hold. NumberStyles.None accepts digits only,
+        // so a negative value (which is also below the smallest date) is refused by the parse itself and needs no
+        // lower-bound check; a value above the largest date would throw when converted to a date, so it is refused
+        // like a missing value and no exception can escape
         var authTime = claims.FindFirstValue("auth_time");
         if (!long.TryParse(authTime, NumberStyles.None, CultureInfo.InvariantCulture, out var seconds)
-            || seconds < DateTimeOffset.MinValue.ToUnixTimeSeconds()
             || seconds > DateTimeOffset.MaxValue.ToUnixTimeSeconds())
         {
             return ReauthMissingAuthTime;
