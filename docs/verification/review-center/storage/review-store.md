@@ -65,6 +65,18 @@ be loadable on the test platform.
 - A new project has the default evidence settings; a change of the settings is stored for its own project only, is read
   back with the project, and is stored with one audit entry of the project whose chain verifies; a change that names
   settings which are no longer stored, and a change of an unknown project, change nothing and write no entry.
+- A change of reviewed content (a thread, a comment, the state of a thread, a checklist answer, the applicability of a
+  section) and a change of the reviewer slots (add, update, remove) on an approved review is refused inside the write
+  transaction with `ReviewLocked`, whatever the caller did before, and stores no row and no audit entry; the same
+  change on a review that is not approved is stored.
+- A reopen of an approved review stores one row with the administrator, the display name, the time, the reason, and the
+  previous digest, together with one audit entry of the review; the history is listed in the order of the reopens, only
+  for its own review; the record of the review carries the number of reopens, so its digest changes; the reopen of a
+  review that is not approved is refused with `ReviewNotLocked` and a missing one with `ReviewNotFound`, both without a
+  row or an entry.
+- A new project requires independent reviewers; the setting is changed by a compare-and-set that is stored with one
+  audit entry, is read back with the project, and for an expected value that is not stored (or an unknown project)
+  reports `false` and changes nothing.
 
 #### Test Scenarios
 
@@ -296,6 +308,27 @@ scenario is tested by `ReviewStore_UpdateEvidenceSettingsAsync_Change_IsPersiste
 still names the defaults as the expected settings, and a change of a project that does not exist, both report `false`;
 the stored settings are those of the first change, and only the entry of the first change exists. This scenario is
 tested by `ReviewStore_UpdateEvidenceSettingsAsync_ExpectedDiffers_ChangesNothing`.
+
+**ReviewStore_WriteMethods_ApprovedReview_RefuseWithReviewLockedInTransaction**: A review is signed in every slot, so
+that it is approved, with the store called directly (the services and their lock check are not involved). Adding a
+thread, adding a comment, changing the state of a thread, answering a check, changing the applicability of a section,
+and adding, updating, and removing a slot are each refused with `ReviewLocked`; the threads, answers, sections, and
+slots are as they were and no audit entry was added. This scenario is defined in `ReviewStoreSigningTests.cs` and is
+tested by `ReviewStore_WriteMethods_ApprovedReview_RefuseWithReviewLockedInTransaction`.
+
+**ReviewStore_ReopenReviewAsync_Persists_AuditAndHistory**: An approved review is reopened with an audit draft. The
+history read back holds one reopen with the administrator, the display name, the time, the reason, and the previous
+digest; the record of the review has a reopen count of 1, so its digest differs from the approved one; one entry
+`review.reopened` of the review is stored and the chain verifies. A second reopen of the same review is refused with
+`ReviewNotLocked`, as is the reopen of a review that was never approved, and neither adds a row or an entry. This
+scenario is defined in `ReviewStoreSigningTests.cs` and is tested by
+`ReviewStore_ReopenReviewAsync_Persists_AuditAndHistory`.
+
+**ReviewStore_UpdateRequireIndependentReviewersAsync_CompareAndSet**: A new project requires independent reviewers.
+The setting is switched off with the expected value `true`; the call reports `true`, the new value is read back, and one
+audit entry is stored. A second call that still names `true` as the expected value, and a call for a project that does
+not exist, report `false` and change nothing. This scenario is defined in `ReviewStoreSigningTests.cs` and is tested
+by `ReviewStore_UpdateRequireIndependentReviewersAsync_CompareAndSet`.
 
 **Audit drafts**: Every mutation of the store takes an audit draft, and the tests of this unit pass one through
 the real `AuditAppender`; the helper `TestStore` builds the store and an `AuditStore` over the same database. The

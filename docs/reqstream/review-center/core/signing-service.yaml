@@ -225,3 +225,60 @@ sections:
           - SigningService_SignAsync_ExternalUser_IsNotAffectedByTheSecondFactor
           - SigningService_SignAsync_ApiTokenActorWithPasswordAndCode_IsRefusedAndKeepsTheCode
           - SigningService_SignAsync_AfterAdministratorReset_NeedsNoCode
+
+      - id: ReviewCenter-SigningService-ApprovalLock
+        title: >-
+          The SigningService class shall treat a review that is approved (every slot, at least one, has a signature
+          of the current record) as locked, shall refuse to add, change, or remove a slot and shall refuse to sign
+          while the review is locked, with the ReviewLocked rule and a message that says the review is approved and
+          has to be reopened first, and shall compute the lock from the signatures and the record each time and not
+          store it.
+        justification: |
+          A signature approves the review as it was. If the content, the checklist, or the people who have to sign
+          could still change after the approval, the approval would describe something other than what is on record.
+          Computing the lock from the current record means it can never be out of step with the signatures, and a
+          reviewer who tries to sign again is told the reason instead of a message about an earlier signature.
+        tests:
+          - SigningService_AddUpdateRemoveSlotAsync_ApprovedReview_ThrowsReviewLocked
+          - SigningService_SignAsync_ApprovedReview_ThrowsReviewLocked
+
+      - id: ReviewCenter-SigningService-Reopen
+        title: >-
+          The SigningService class shall let only an administrator of the project or a system administrator reopen a
+          locked review, never an actor that came through a personal access token, shall require a reason of one to
+          250 characters after trimming, shall refuse a review that is not locked with the ReviewNotLocked rule, shall
+          store the reopening with the user, the time, the reason, and the digest of the approved record, shall record
+          it in the audit trail as review.reopened, in the same transaction as the change, with the reason and the
+          digest, shall keep every earlier signature as history that is out of date, and shall need fresh signatures
+          from every slot before the review is approved again.
+        justification: |
+          Leaving the lock has to be a deliberate and accountable act that an ordinary reviewer or a script cannot
+          perform. The reason and the digest in the history show who reopened which approval and why, and keeping the
+          earlier signatures, which are out of date from then on, means the approval history stays complete while no
+          old signature can approve the changed record, not even when the content is changed back.
+        tests:
+          - SigningService_ReopenReviewAsync_NotAdmin_ThrowsActorNotAllowed
+          - SigningService_ReopenReviewAsync_InvalidReason_ThrowsReopenReasonInvalid
+          - SigningService_ReopenReviewAsync_NotLocked_ThrowsReviewNotLocked
+          - SigningService_ReopenReviewAsync_ApiToken_ThrowsActorNotAllowed
+          - SigningService_ReopenReviewAsync_Admin_ReturnsToInReviewKeepsSignaturesAndAudits
+          - SigningService_ReopenReviewAsync_ThenResign_ApprovesAgainWithBothSignatures
+
+      - id: ReviewCenter-SigningService-IndependentReviewers
+        title: >-
+          The SigningService class shall, when the project requires independent reviewers, refuse with the
+          ReviewerNotIndependent rule to put the user who created the review into a slot as primary reviewer or as
+          alternate, when a slot is added or changed, and shall refuse the signature of that user at the time of
+          signing, also for a slot that was filled before the setting was switched on, and shall enforce nothing when
+          the project does not require independent reviewers.
+        justification: |
+          A review is worth little when the person who made it also approves it. Checking at the assignment gives
+          early feedback, and checking again at signing closes the gap for slots that were filled while the setting
+          was off. The author is the user of Review Center who created the review, because the tool knows nothing
+          about the authors of the commits, which is stated to the users. A project in which one person has to do
+          both may switch the rule off.
+        tests:
+          - SigningService_AddSlotAsync_AuthorAsPrimaryOrAlternate_ThrowsReviewerNotIndependent
+          - SigningService_UpdateSlotAsync_AuthorAsPrimaryOrAlternate_ThrowsReviewerNotIndependent
+          - SigningService_AddSlotAsync_AuthorAndIndependenceOff_Succeeds
+          - SigningService_SignAsync_AuthorInPreexistingSlot_ThrowsReviewerNotIndependent

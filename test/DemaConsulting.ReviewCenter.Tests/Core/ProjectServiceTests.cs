@@ -40,6 +40,116 @@ public class ProjectServiceTests
     private static ProjectService CreateService(FakeReviewStore store) => TestServices.Projects(store, new FixedTimeProvider(_now));
 
     /// <summary>
+    ///     Test that a new project requires independent reviewers by default.
+    /// </summary>
+    [Fact]
+    public async Task ProjectService_SetRequireIndependentReviewersAsync_DefaultIsOn()
+    {
+        // Arrange: a service over an empty store
+        var store = new FakeReviewStore();
+        var service = CreateService(store);
+
+        // Act: create a project
+        var project = await service.CreateAsync("Apollo", null, TestContext.Current.CancellationToken);
+
+        // Assert: both the returned project and the stored one require independent reviewers
+        Assert.True(project.RequireIndependentReviewers);
+        Assert.True((await store.GetProjectAsync(project.Id, TestContext.Current.CancellationToken))!.RequireIndependentReviewers);
+    }
+
+    /// <summary>
+    ///     Test that an administrator switches the setting and that each change, and only a change, is audited with
+    ///     the old and the new value.
+    /// </summary>
+    [Fact]
+    public async Task ProjectService_SetRequireIndependentReviewersAsync_Admin_TogglesAndAudits()
+    {
+        // Arrange: a project that requires independent reviewers
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var store = new FakeReviewStore();
+        var service = CreateService(store);
+        var project = await service.CreateAsync("Apollo", null, cancellationToken);
+        var auditBefore = store.Audits.Count;
+
+        // Act: switch off, switch off again without a change, switch on
+        var off = await service.SetRequireIndependentReviewersAsync(TestActors.Ann, project.Id, true, false, cancellationToken);
+        var stored = (await store.GetProjectAsync(project.Id, cancellationToken))!.RequireIndependentReviewers;
+        var unchanged = await service.SetRequireIndependentReviewersAsync(TestActors.Ann, project.Id, false, false, cancellationToken);
+        var on = await service.SetRequireIndependentReviewersAsync(TestActors.Ann, project.Id, false, true, cancellationToken);
+
+        // Assert: two changes and exactly two audit entries, with the documented action and detail
+        Assert.True(off);
+        Assert.False(stored);
+        Assert.False(unchanged);
+        Assert.True(on);
+        var audits = store.Audits.Skip(auditBefore).ToList();
+        Assert.Equal(2, audits.Count);
+        Assert.All(audits, a => Assert.Equal("project.independent-reviewers-changed", a.Action));
+        Assert.Equal("RequireIndependentReviewers on->off", audits[0].Detail);
+        Assert.Equal("RequireIndependentReviewers off->on", audits[1].Detail);
+        Assert.Equal(project.Id, audits[0].ProjectId);
+    }
+
+    /// <summary>
+    ///     Test that somebody who does not administer the project, and an API token, cannot switch the setting.
+    /// </summary>
+    [Fact]
+    public async Task ProjectService_SetRequireIndependentReviewersAsync_NotAdminOrApiToken_IsRefused()
+    {
+        // Arrange: real access rules with an administrator and a plain member
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var clock = new FixedTimeProvider(_now);
+        var store = new FakeReviewStore();
+        var userStore = new FakeUserStore();
+        var users = new UserService(userStore, new FakePasswordHasher(), clock);
+        await users.CreateAsync("root", "Root", true, "correct horse battery", Actor.CommandLine, cancellationToken);
+        var member = await users.CreateAsync("mem", "Mem", false, "correct horse battery", Actor.CommandLine, cancellationToken);
+        var service = new ProjectService(store, userStore, new ProjectAccess(userStore, store), new FakePasswordHasher(), clock);
+        var root = new Actor("root", "Root");
+        var project = await service.CreateAsync("Apollo", null, root, cancellationToken);
+        await store.AddMembershipAsync(member.Id, project.Id, ProjectRole.User, cancellationToken);
+
+        // Act: a member, an administrator's token and a stranger try
+        var plain = await Assert.ThrowsAsync<DomainRuleException>(() => service.SetRequireIndependentReviewersAsync(
+            new Actor("mem", "Mem"), project.Id, true, false, cancellationToken));
+        var viaToken = await Assert.ThrowsAsync<DomainRuleException>(() => service.SetRequireIndependentReviewersAsync(
+            new Actor("root", "Root") { ApiTokenId = "K7M2QX9P" }, project.Id, true, false, cancellationToken));
+        var stranger = await Assert.ThrowsAsync<DomainRuleException>(() => service.SetRequireIndependentReviewersAsync(
+            new Actor("nobody", "Nobody"), project.Id, true, false, cancellationToken));
+
+        // Assert: refused each time, and the setting is unchanged
+        Assert.Equal(DomainRule.ActorNotAllowed, plain.Rule);
+        Assert.Equal(DomainRule.ActorNotAllowed, viaToken.Rule);
+        Assert.Equal(DomainRule.ProjectNotFound, stranger.Rule);
+        Assert.True((await store.GetProjectAsync(project.Id, cancellationToken))!.RequireIndependentReviewers);
+    }
+
+    /// <summary>
+    ///     Test that a change based on an outdated reading is refused with <see cref="DomainRule.RecordChanged"/>
+    ///     and does not overwrite the newer value.
+    /// </summary>
+    [Fact]
+    public async Task ProjectService_SetRequireIndependentReviewersAsync_StaleExpected_ThrowsRecordChanged()
+    {
+        // Arrange: a project whose setting somebody else switched off after the caller read "on"
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var store = new FakeReviewStore();
+        var service = CreateService(store);
+        var project = await service.CreateAsync("Apollo", null, cancellationToken);
+        await service.SetRequireIndependentReviewersAsync(TestActors.Bob, project.Id, true, false, cancellationToken);
+        var auditBefore = store.Audits.Count;
+
+        // Act: the caller still believes it is on and wants to switch it off
+        var ex = await Assert.ThrowsAsync<DomainRuleException>(() => service.SetRequireIndependentReviewersAsync(
+            TestActors.Ann, project.Id, true, false, cancellationToken));
+
+        // Assert: refused as changed by someone else, nothing more recorded
+        Assert.Equal(DomainRule.RecordChanged, ex.Rule);
+        Assert.Equal(ProjectService.IndependentReviewersChangedByOthersMessage, ex.Message);
+        Assert.Equal(auditBefore, store.Audits.Count);
+    }
+
+    /// <summary>
     ///     Test that a valid project is stored with trimmed text and the clock's creation time.
     /// </summary>
     [Fact]

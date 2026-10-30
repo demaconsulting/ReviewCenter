@@ -53,7 +53,11 @@ namespace DemaConsulting.ReviewCenter.Core;
 ///         <item>the sections that do not apply, sorted by section id: id and reason;</item>
 ///         <item>every thread rendered to one block (anchor with its side, state, creation time, and its comments in posting
 ///               order with author display name, author user name, text and time); the blocks are sorted, so
-///               the order of threads does not matter, while the order of comments does.</item>
+///               the order of threads does not matter, while the order of comments does;</item>
+///         <item>only for a review that an administrator reopened, a final <c>reopens {count}</c> line. A review that
+///               was never reopened has no such line, so its digest is exactly what it was before reopening existed
+///               and the version header is not bumped; after a reopen the digest differs from every earlier one,
+///               whatever the content, so a signature given before a reopen can never be current again.</item>
 ///     </list>
 ///     Strings are written as <c>{length}:{text}</c> (length in UTF-16 code units) and absent values as
 ///     <c>-</c>, so no text can imitate a delimiter; numbers use the invariant culture and times are written as
@@ -109,6 +113,13 @@ public static class RecordDigest
         var blocks = record.Threads.Select(ThreadBlock).ToList();
         blocks.Sort(StringComparer.Ordinal);
         lines.AddRange(blocks);
+
+        // A reopen changes the digest on purpose, so the signatures of the approval that was reopened stay history;
+        // the line is absent for a review never reopened, which keeps its digest as it was
+        if (record.Reopens > 0)
+        {
+            lines.Add("reopens " + record.Reopens.ToString(CultureInfo.InvariantCulture));
+        }
 
         return string.Join('\n', lines);
     }

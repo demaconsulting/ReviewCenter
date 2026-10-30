@@ -451,7 +451,14 @@ internal sealed class AttestationService
             now,
             people.Requester(actor),
             settings,
-            actor is null);
+            actor is null,
+            (approval.Reopens ?? [])
+                .Select(r => new AttestationReopen(
+                    r.ReopenedAt,
+                    people.Name(r.ReopenedByDisplayName, r.ReopenedBy, true),
+                    r.Reason,
+                    r.PreviousDigest))
+                .ToList());
     }
 
     /// <summary>

@@ -540,3 +540,47 @@ sections:
           - ReviewPage_Sign_EnrolledSignerWithWrongCode_ShowsGenericErrorAndSignsNothing
           - ReviewPage_Sign_CodeAlreadyUsedInStep_IsRefusedUntilTheNextCode
           - ReviewPage_Sign_RecoveryCodeInsteadOfCode_IsRefused
+
+      - id: ReviewCenter-ReviewPage-Locked
+        title: >-
+          The ReviewPage unit shall show a review that is approved as locked, with a Locked badge next to the approval
+          status and a banner that says why, shall disable every control that would change the review (starting a
+          thread, replying, resolving and reopening a thread, comments on lines, and adding, changing, and removing a
+          reviewer slot) and say that the reviewers cannot change, and shall keep reading, selecting a file, and
+          following links available.
+        justification: |
+          A user who sees a disabled control must also see the reason, or the page looks broken. Disabling the controls
+          is a courtesy to the user; the lock itself is enforced by the services, so a stale page that still sends a
+          change is refused with the message of the rule.
+        tests:
+          - ReviewPage_Render_ApprovedReview_ShowsLockedBadgeBannerAndDisabledControls
+
+      - id: ReviewCenter-ReviewPage-Reopen
+        title: >-
+          The ReviewPage unit shall show to an administrator of the project or a system administrator, and to nobody
+          else, on a review that is locked, a form with a field for the reason of at most 250 characters and a button
+          that reopens the review through the signing service, shall show the message of the rule and keep the review
+          locked when the service refuses, for example for an empty reason, shall show the review as In review after a
+          reopening, and shall list the reopenings, oldest first, each with who reopened, when, the reason, and the
+          short digest of the approved record.
+        justification: |
+          Reopening is the one way out of the lock, so it is offered only to those who may use it, it asks for the
+          reason that the history keeps, and it shows the history so that every reader of the review can see that an
+          approval was reopened and why.
+        tests:
+          - ReviewPage_Render_ApprovedReviewNonAdmin_HidesReopenForm
+          - ReviewPage_Reopen_AdminWithReason_ReturnsToInReviewAndShowsHistory
+          - ReviewPage_Reopen_EmptyReason_ShowsError
+
+      - id: ReviewCenter-ReviewPage-Independence
+        title: >-
+          The ReviewPage unit shall, when the project requires independent reviewers, leave the user who created the
+          review out of the lists of users that can be chosen for a slot, and show to that user, in the Reviewers card,
+          a hint that a different project member has to review and sign the review, and shall offer every user again
+          when the project does not require it.
+        justification: |
+          Offering a choice that the service will refuse only leads to an error message. The hint tells the author what
+          to do instead. The service remains the authority and refuses the author even when a stale page offers the
+          choice.
+        tests:
+          - ReviewPage_Render_IndependenceOn_HidesAuthorFromCandidates

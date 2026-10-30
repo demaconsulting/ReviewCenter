@@ -78,13 +78,19 @@ public sealed record ReviewSource(
 /// <param name="Answers">The stored checklist answers.</param>
 /// <param name="Threads">All threads of the review with their comments.</param>
 /// <param name="Source">Where the files came from; <see cref="ReviewSource.Upload"/> for an upload.</param>
+/// <param name="Reopens">
+///     How many times an administrator reopened the review after it was approved; zero for a review that was never
+///     reopened. It is part of the digest only when it is above zero (see <see cref="RecordDigest"/>), so a reopened
+///     review can never be approved again by old signatures.
+/// </param>
 public sealed record ReviewRecord(
     string ContentFingerprint,
     ReviewChecklist? Checklist,
     IReadOnlyList<ChecklistSectionState> SectionStates,
     IReadOnlyList<ChecklistAnswer> Answers,
     IReadOnlyList<ReviewThread> Threads,
-    ReviewSource Source);
+    ReviewSource Source,
+    int Reopens = 0);
 
 /// <summary>
 ///     One consistent read of a review for the approval status: the record a signature covers, together with the

@@ -35,8 +35,8 @@ domain types (`Project`, `EvidenceSettings`, `EvidenceSettingChange`, `Review`, 
 `UploadedFile`, `ReviewThread`, `ThreadSide`, `ThreadAnchor`,
 `ReviewComment`,
 `ReviewThreadState`, the checklist types, `User`, `Actor`, the access types `ProjectMembership`, `ProjectRole`, and
-`ProjectMember`, the signing types `ReviewerSlot`,
-`ReviewSignature`, `SlotRole`, `ReviewRecord`, and `ReviewApproval`, the audit types `AuditEntry`, `AuditDraft`,
+`ProjectMember`, the signing types `ReviewerSlot`, `ReviewSignature`, `SlotRole`, `ReviewRecord`, `ReviewApproval`,
+`ReviewLock`, and `ReviewReopen`, the audit types `AuditEntry`, `AuditDraft`,
 and `AuditVerificationResult`, and the repository types `SourceRepository`, `RepositorySummary`, `NewRepository`,
 `RepositoryUpdate`, `TokenChange`, and `TokenAction`, and the git contract types `RepositoryAccess`, `GitChange`,
 `ChangeKind`, `SkippedEntry`, and `GitChangeSet`, and the review-source types `ReviewSource`, `RepositorySource` (the
@@ -100,8 +100,13 @@ used by the `Web`, `Identity`, and `Api` subsystems and by the `Hosting` subsyst
   entered again, or, for a user of an identity provider, with a single-use proof of a fresh confirmation at the
   provider (members only), tell whether such a proof exists without spending it, read the
   approval status of a review (its slots, blockers, record digest, and next step), and list the enabled members of a
-  project, who can be chosen for a slot. `RecordDigest` calculates the digest of a record. Every operation that changes
-  data takes
+  project, who can be chosen for a slot. An approved review is locked: every change of its threads, checklist answers,
+  section applicability, or reviewer slots, and any further signature, is refused with `ReviewLocked`, until a project
+  admin or system administrator reopens it with a reason (`ReopenReviewAsync`; never with an API token), which keeps the
+  earlier signatures as history and requires fresh ones. A project admin switches the project rule "require independent
+  reviewers" (`ProjectService.SetRequireIndependentReviewersAsync`; on by default): the user who created a review can then
+  neither be chosen as a reviewer of it nor sign it. `RecordDigest` calculates the digest of a record. Every
+  operation that changes data takes
   the `Actor` and records the change in the audit trail; `AuditService` lists the trail newest first in pages
   and verifies its hash chain. Create a personal access token for the actor (the value is returned once), list the
   tokens of the actor, revoke one, and authenticate a presented token value into a token and its owner. Set up a second
@@ -123,11 +128,14 @@ used by the `Web`, `Identity`, and `Api` subsystems and by the `Hosting` subsyst
   its first comment; add a comment to a thread of a review; set the state of a thread; list the threads of a review
   with their comments; read the checklist snapshot, the section states, and the answers of a review; set the
   state of a section and the answer to a check; read the whole record of a review in one operation; add, list,
-  update, and remove reviewer slots; add and list signatures; and add, read, list (of a project, and of a user), change
+  update, and remove reviewer slots; add and list signatures; reopen an approved review and list its reopens (the store
+  re-checks that the review is approved inside the transaction); and add, read, list (of a project, and of a user), change
   the role of, and remove the memberships of users in projects (removing or demoting can require that another project
   admin remains, checked inside the transaction); and change the evidence settings of a project by compare-and-set
   (`UpdateEvidenceSettingsAsync`: the new settings are stored only if the stored ones still equal the expected ones,
-  and the project and its settings are read with every project). Every operation that changes data takes an
+  and the project and its settings are read with every project), and change the "require independent reviewers" setting
+  of a project by compare-and-set in the same way (`UpdateRequireIndependentReviewersAsync`). Every operation that
+  changes data takes an
   `AuditDraft` (or a function that builds one from the stored entity) that the store appends to the audit trail in the
   same transaction.
 - *Constraints*: A review is added with all its files, and its checklist snapshot, in one operation, and an attempt
@@ -136,7 +144,10 @@ used by the `Web`, `Identity`, and `Api` subsystems and by the `Hosting` subsyst
   added with its first comment in one operation. Setting a section state or an answer replaces the earlier one.
   There is no operation to change or delete a signature. A signature is added only if the digest of the record is
   still the digest it carries, checked inside one transaction, and fails with a `DomainRuleException` for
-  `RecordChanged` otherwise. A user is a member of a project at most once: adding a second membership fails with a
+  `RecordChanged` otherwise. The operations that change a thread, a comment, a checklist section or answer, or a
+  reviewer slot refuse with a `DomainRuleException` for `ReviewLocked` when the review is approved, checked inside the
+  same transaction as the change; nothing is stored then. A user is a member of a project at most once: adding a
+  second membership fails with a
   `DomainRuleException` for `MembershipExists`, and a change or removal of a membership that does not exist returns
   `false`, which the service reports as `MembershipNotFound`. A change of the evidence settings whose expected settings
   are no longer stored, or of a project that does not exist, returns `false` and stores nothing. The
@@ -361,7 +372,11 @@ message and keep the entered values, and there is a single, easily tested path f
 | `RepositoryNameTaken` | A repository with that name (without regard to case) exists in the project |
 | `SigningNotAllowed` | The slot is already signed for this record, or a blocker remains (checks, failures, threads) |
 | `ReauthenticationFailed` | The password given with a signature is wrong, or the user is locked out |
-| `RecordChanged` | The record changed after the signer saw it, so the digest differs |
+| `RecordChanged` | The record changed after the signer saw it (digest differs), or a setting was changed first |
+| `ReviewLocked` | The review is approved (locked) and content, a reviewer slot, or a signature would change |
+| `ReviewNotLocked` | A reopen is requested for a review that is not approved |
+| `ReopenReasonInvalid` | The reason for a reopen is empty after trimming or longer than 250 characters |
+| `ReviewerNotIndependent` | Independent reviewers are required and the review author would be, or signs as, one |
 | `RepositoryNameInvalid` | The name is not 1 to 40 of letters, digits, `.`, `_`, `-`, starting with a letter or digit |
 | `RepositoryLocationInvalid` | Location is empty, too long, or not an `https`, local `http`, or `file` URL or path |
 | `RepositoryCredentialInvalid` | Invalid credential, non-`https` location, or token contained in name/user/location |
@@ -399,6 +414,16 @@ that do not apply, and the threads with their comments) and is current only whil
 and signatures are never edited into a
 different meaning: a signed slot cannot be changed or removed, a signature is never changed or deleted, and the
 status of a review (Approved or In review) is computed from the record and the signatures each time and never stored.
+
+An approved review is also locked, and that too is computed, not stored: `ReviewLock.IsApproved` is the one definition
+(at least one slot, and every slot holds a signature of the current digest), used by the approval status, by the
+`ReviewLocked` check that `ThreadService`, `ChecklistService`, and `SigningService` make before every change, and by the
+`Storage` subsystem inside its write transactions. Reopening is the only way out: an audited action of a project or
+system administrator with a reason, stored as a `ReviewReopen`. The number of reopens enters the record digest only when
+it is above zero, so legacy digests do not change and the format version is not bumped, and after a reopen every earlier
+signature is kept as history but is out of date. The project rule `RequireIndependentReviewers` (on by default) keeps the
+user who created the review (for an API-token review, the token's owner) out of its slots and away from its signature;
+the authors of git commits are not matched.
 
 The audit trail is the third kind of record: an append-only, hash-chained list of everything that happens, kept in the
 same database. A change of data and its audit entry are stored in the same transaction by the store, so the services

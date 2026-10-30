@@ -98,6 +98,23 @@ sections:
           - AttestationService_GenerateAsync_NamesOff_ReplacesPeopleWithLabelsAndStillVerifies
           - AttestationService_GenerateAsync_AnonymousToggleOn_ReturnsPdfAndAuditsAnonymous
 
+      - id: ReviewCenter-AttestationService-ReopenHistory
+        title: >-
+          The AttestationService class shall still release the attestation of a review that is approved and therefore
+          locked, shall give the renderer the reopenings of the review, so that the document has a Reopen history
+          section with who reopened, when, the reason, and the short digest of the approved record, only for a review
+          that was reopened, and shall, when the evidence settings keep the names of people out of PDFs, leave the name
+          of the person who reopened out of that section.
+        justification: |
+          A reader of an attestation must be able to see that the approval it states followed an earlier approval that
+          was reopened, and why. A review that was never reopened has nothing to show, and a project that keeps names
+          out of its PDFs must not find the name of an administrator in this section.
+        tests:
+          - AttestationService_GenerateAsync_ReopenedReview_IncludesReopenHistory
+          - AttestationService_GenerateAsync_NeverReopened_OmitsReopenHistory
+          - AttestationService_GenerateAsync_ReopenedWithoutReviewerNames_OmitsReopenedByName
+          - AttestationService_GenerateAsync_LockedReview_StillRenders
+
       - id: ReviewCenter-AttestationService-KeyUnavailable
         title: >-
           The AttestationService class shall report that the key is unavailable, and record nothing in the audit trail,

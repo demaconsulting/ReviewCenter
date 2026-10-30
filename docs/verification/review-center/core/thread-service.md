@@ -44,6 +44,8 @@ N/A - standard test environment.
   checklist is complete and all threads are resolved.
 - The service cannot be constructed without a project access, which every change by an actor uses to refuse a
   project the actor may not see (the rule itself is verified with the `ProjectAccess` unit).
+- On an approved review, starting a thread, replying, resolving, and reopening a thread are each refused with
+  `ReviewLocked`, and nothing is stored.
 
 #### Test Scenarios
 
@@ -181,6 +183,12 @@ checks answered Fail, and open threads: a complete checklist with one failed che
 open threads, and four unanswered checks with one failed check each give the matching sentence, with the failed
 checks named before the open threads. This scenario is tested by
 `ThreadService_NextStep_WithFailedChecks_NamesThemBeforeThreads`.
+
+**ThreadService_Mutations_ApprovedReview_ThrowReviewLocked**: A theory over the four changes of a thread (start, reply,
+resolve, and reopen) on a review whose every slot holds a current signature; each is refused with `ReviewLocked`, the
+threads and comments are as they were, and the review is still approved with the same digest. The fake store does not
+judge the lock itself, so the test shows that the service does. This scenario is tested by
+`ThreadService_Mutations_ApprovedReview_ThrowReviewLocked`.
 
 **ThreadService_Constructor_NullArguments_Throws**: A null store, a null project access, and a null clock are rejected
 with `ArgumentNullException`, so the service cannot be built without the check that the actor may see the project.

@@ -86,15 +86,21 @@ loopback TCP ports.
   signatures are kept after the database is reopened.
 - A review is named for reviewers beforehand: only members of the project are offered, one person fills one slot only,
   an API token never signs or arranges slots, a review with an unanswered check offers no way to sign, and a signed slot
-  offers no way to change or remove it (`ReviewCenter-System-ReviewerIndependence`).
+  offers no way to change or remove it. While the project requires independent reviewers (the default), the author of
+  a review is refused as a reviewer of it and as its signer, and an administrator can turn the requirement off and on
+  with the change audited (`ReviewCenter-System-ReviewerIndependence`). The author is the user who created the review;
+  git commit authors are not matched.
 - A signature needs the password of the signer again for that signature; a wrong password is refused, signs nothing,
   and is audited without the password (`ReviewCenter-System-SignatureReauthentication`). The lockout count, the second
   factor, and the provider proof are verified at the level of the child requirements.
 - A signature is bound to the record of the signer: it is refused when the checklist changed since the signer's page
   was drawn, and a later comment ends the approval (`ReviewCenter-System-SignatureBinding`).
-- The reviewed content, posted comments, and signatures are not offered for editing, a change of the record after a
-  signature makes the review In review again with the signature kept, and an audit entry edited behind the tool is found
-  by `audit verify`; the tool does not lock the review against further work
+- The reviewed content, posted comments, and signatures are not offered for editing, an audit entry edited behind the
+  tool is found by `audit verify`, and a change of the record after a signature, made while the review is still open,
+  makes the review In review again with the signature kept. An approved review is locked: every change to it is
+  refused in the core services and in the database transaction, the review page shows it as Locked with its controls
+  disabled, and only a project or system administrator can reopen it, with a reason that is audited together with the
+  previous digest; the earlier signatures stay as history and fresh signatures are needed
   (`ReviewCenter-System-RecordImmutability`).
 - Every change of data, and every sign-in, sign-out, failed sign-in, and lockout, is recorded in an audit trail whose
   entries are chained by hashes, and the change and its entry are stored together; the entries never contain a password
@@ -246,33 +252,57 @@ environment while standard input is closed; it exits with code 1 and reports "No
 waiting for input. This scenario is tested by `ReviewCenter_UserAddVerb_NoPassword_ReturnsError`.
 
 **ReviewCenter_ReviewerSlots_NonMemberAndSamePerson_AreNotAcceptedAsReviewers**: A real server runs with a temporary
-database and a git repository; a system administrator creates a project, adds the user names `puppet` and `second` as
-members (a third user, `outsider`, is not added), and plans a review from the repository. In the browser the list of
-reviewers offers the two members and not the outsider; a slot for the administrator is added; adding the
-administrator again as primary, or as the alternate of another slot, is refused with the message that the person is
-already in another slot; the second member is then added, giving exactly two slots. This scenario is tested by
+database and a git repository; a system administrator (`puppet`) creates a project, adds the user names `puppet`,
+`second`, and `third` as members (a fourth user, `outsider`, is not added), and plans a review from the repository. In
+the browser the list of reviewers offers the two members other than the author and not the outsider; a slot for `second`
+is added; adding `second` again as primary, or as the alternate of another slot, is refused with the message that the
+person is already in another slot; `third` is then added, giving exactly two slots. This scenario is tested by
 `ReviewCenter_ReviewerSlots_NonMemberAndSamePerson_AreNotAcceptedAsReviewers`.
 
 **ReviewCenter_Signing_FreshPasswordAndUnchangedRecord_ApprovesOnlyThen**: In the same setting, a review with a slot
-for the signer and an unanswered checklist shows its blockers and offers no form to sign. After every checklist
+for `second` and an unanswered checklist shows `second` its blockers and offers no form to sign. After every checklist
 section is answered as not applicable with a reason, the form is offered. A wrong password is refused with the generic
 message,
-the review stays In review, and the slot stays unsigned. A second browser session of the same person changes a reason
-of the checklist while the first page still shows the old record; signing on the old page with the right password is
-refused because the record changed. After the page is drawn again, the right password signs and the review is
+the review stays In review, and the slot stays unsigned. The administrator changes a reason of the checklist in another
+browser session while the page of `second` still shows the old record; signing on the old page with the right password
+is refused because the record changed. After the page is drawn again, the right password signs and the review is
 Approved. The audit page lists the failed proof and the signature but neither password, and its verification reports an
 intact chain. This scenario is tested by `ReviewCenter_Signing_FreshPasswordAndUnchangedRecord_ApprovesOnlyThen`.
 
-**ReviewCenter_ApprovedReview_EvidenceTokenAndLaterChange_BehaveAsPromised**: A personal access token of the signer is
+**ReviewCenter_ApprovedReview_EvidenceTokenAndLaterChange_BehaveAsPromised**: A comment thread is started on the
+review and resolved, every checklist section is answered, and a personal access token of the signer (`second`) is
 created in the browser. Through the API with the token, the review is not approved, the attestation is refused, and
 the evidence index is empty. After the signature in the browser the review is approved with the signer named, the
 attestation is a digitally signed PDF, and the index lists the review-set with the content fingerprint and the result.
 A client without credentials is refused both documents; the token does not open a web page and a request of the token to
-sign or to arrange slots finds no route; the signed slot offers no control to change or remove it. After a comment is
-added in the browser, the review is In review, its signature is out of date and kept, its approval digest differs and
-its content fingerprint is unchanged, the attestation is refused and the index is empty again, a posted comment has no
-control to edit it, and a link to the thread leads a signed-out user back to the thread after the sign-in. This scenario
-is tested by `ReviewCenter_ApprovedReview_EvidenceTokenAndLaterChange_BehaveAsPromised`.
+sign or to arrange slots finds no route; the signed slot offers no control to change or remove it. The approved review
+is locked, so the only later change is its reopening by the administrator with a reason: afterwards the review is In
+review, its signature is out of date and kept, its approval digest differs and its content fingerprint is unchanged, the
+attestation is refused and the index is empty again, a posted comment has no control to edit it, and a link to the
+thread leads a signed-out user back to the thread after the sign-in. This scenario is tested by
+`ReviewCenter_ApprovedReview_EvidenceTokenAndLaterChange_BehaveAsPromised`.
+
+**ReviewCenter_ApprovedReview_IsLockedUntilAnAdministratorReopensItWithAReason**: A review that the administrator
+created is approved by the signature of `second`. The administrator's review page shows Approved and Locked, with the
+reviewer slot selectors and the Add slot button, the comment text box and the Start thread button, and the checklist
+controls disabled; the checklist page says that it is read-only. The review page of `second`, a member who is not an
+administrator, shows the lock but offers no reopen form. The administrator's attempt to reopen without a reason is
+refused with a message about the reason and leaves the review locked; with a reason the review shows In review and
+no longer Locked, lists the reopening with the administrator's name and the reason, shows the earlier signature of the
+slot as out of date, and enables the slot controls again. `second` is offered the form to sign again, and the fresh
+signature approves and locks the review again. The history page of the review lists both signatures and the
+`review.reopened` entry with its reason. This scenario is tested by
+`ReviewCenter_ApprovedReview_IsLockedUntilAnAdministratorReopensItWithAReason`.
+
+**ReviewCenter_IndependentReviewers_AuthorIsNotOfferedAndAdministratorCanSwitchTheRuleOff**: In the same setting, the
+review page of its author (the administrator) does not offer the author in the list of reviewers and tells the author
+that a different member has to review, while the project requires independent reviewers (the default). The
+administrator switches the rule off on the project page and the page confirms it; the author is then offered, the hint
+is gone, and the author is seated in a slot. After every checklist section is answered and the rule is switched on again,
+the author's attempt to sign with the right password is refused with the message that the author created the review
+and cannot be a reviewer of it, and the review stays In review. The audit page lists the
+`project.independent-reviewers-changed` entries. This scenario is tested by
+`ReviewCenter_IndependentReviewers_AuthorIsNotOfferedAndAdministratorCanSwitchTheRuleOff`.
 
 **ReviewCenter_AuditVerifyVerb_HistoryEditedInDatabase_ReportsFirstBrokenEntryWithExitCodeOne**: Three users are created
 with the `user add` verb on a temporary database, and `audit verify` reports an intact chain with exit code 0. One audit
@@ -368,6 +398,13 @@ by `WebSubsystem_SignedReview_ApprovalIsPresentedAndGoesOutOfDateWhenRecordChang
 its signature are stored over a real database; the database is closed and opened again, the signature is still
 current, and the review is approved. This scenario is tested by
 `StorageSubsystem_Signatures_PersistAcrossReopenAndStayCurrent`.
+
+**Approval lock and reopen**: On the running host with a real SQLite database, a review is created by one
+administrator and signed by a separate reviewer; the review is then approved and locked, a change to it is refused
+with `ReviewLocked`, and its attestation, downloaded with an API token, has no reopen history. An administrator
+reopens it with a reason; the review returns to In review under a new digest, and the reviewer signs the new digest.
+The review is approved and locked once more, the reopen is recorded with the reason and the previous digest, and the
+attestation now holds the reopen history. This scenario is tested by `IntegrationTests_ApprovalLockReopenResign_EndToEnd`.
 
 **Audit trail chain**: Changes are made at the same moment through the three stores (review, user, and audit), which
 share the process-wide gate; the resulting trail has consecutive sequence numbers and an intact chain, so the changes

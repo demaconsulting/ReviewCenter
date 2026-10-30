@@ -8,10 +8,13 @@
 records a signature after the signer has confirmed their identity (with the password and, for an account with a second
 factor, a current code, or for a user of an external
 identity provider with a fresh sign-in at the provider), and computes the approval status of a review. It
-is the one place where these rules live, so every caller (the pages, a later API) gets the same answer. It is also
+is the one place where these rules live, so every caller (the pages, a later API) gets the same answer. It also
+enforces the integrity of an approved review: an approved review is locked, only an administrator can reopen it, and
+(by default) the author of a review cannot review it. It is also
 the home of the supporting types of signing: `SlotRole`, `ReviewerSlot`, `ReviewSignature`, `ReviewRecord`,
-`ReviewApproval`, `SlotStatus`, `SlotMember`, and `SlotSignatureState`, together with the signing rules of
-`DomainRule`. The service is a singleton, as `UserService` is.
+`ReviewApproval`, `SlotStatus`, `SlotMember`, `SlotSignatureState`, `ReviewLock`, and `ReviewReopen`, together with
+the signing rules of `DomainRule`. `ReviewLock` and `ReviewReopen` live in the files of this unit; they are not units
+of their own. The service is a singleton, as `UserService` is.
 
 #### Data Model
 
@@ -31,11 +34,20 @@ approve it."
 
 **ReviewRecord**: the immutable snapshot of a review that the digest and the blockers are computed from: the content
 fingerprint, the frozen checklist (or `null`), the section decisions, the answers, and the threads with their
-comments. See `RecordDigest` for what the digest covers.
+comments, and `Reopens`, the number of times an administrator reopened the review (default `0`). See `RecordDigest`
+for what the digest covers.
+
+**ReviewReopen**: an immutable record of one reopen: `Id` (assigned by the store), `ProjectId`, `ReviewId`,
+`ReopenedAt` (UTC), `ReopenedBy` (user name), `ReopenedByDisplayName` (copied, so it stays readable), `Reason`
+(at most `ReviewLimits.MaxReopenReasonLength`, 250, characters), and `PreviousDigest` (the digest of the approved
+record that was reopened). A reopen is history: it is never changed or deleted.
 
 **ReviewApproval**: the computed status of a review: `IsApproved`, the current `Digest`, the `Slots` (one `SlotStatus`
-each), the `Blockers`, and the `NextStep` sentence. A `SlotStatus` holds the slot identity, its number, the primary and
-alternate as `SlotMember` (identity, user name, display name, and `IsMember`), the state, and, for a signed slot, the name
+each), the `Blockers`, the `NextStep` sentence, and `Reopens`, the reopen history, oldest first (`null` or empty for
+a review that was never reopened; it is read only when the record's reopen count is above zero). `IsApproved` is
+also the lock: there is no separate stored or computed "locked" flag. A `SlotStatus` holds the slot identity, its
+number, the primary and alternate as `SlotMember` (identity, user name, display name, and `IsMember`), the state,
+and, for a signed slot, the name
 of the signer and the signing time. `IsMember` is `false` when the user is no longer a member of the project (a slot
 keeps its assignee after a removal, so the status says who can no longer sign; step 1 of signing refuses such a user);
 the candidates of `ListCandidatesAsync` are members by definition. A placeholder for an unknown user keeps the flag too.
@@ -45,7 +57,42 @@ the candidates of `ListCandidatesAsync` are members by definition. A placeholder
 record now, `OutOfDate` when it has signatures but none of them is current, and `NotSigned` otherwise. A review is
 approved when it has at least one slot and every slot is `Signed`; a review without slots is "In review". A change to
 the record (a new comment, a changed answer, a changed state) therefore makes the approval go away by itself, and
-setting the record back restores it, because the signatures were never touched.
+setting the record back restores it, because the signatures were never touched. The one definition of "approved" is
+`ReviewLock.IsApproved(record, slots, signatures)`: at least one slot, and every slot holds a signature whose digest
+equals the current digest. `GetApprovalAsync`, the lock checks of all Core services, and the lock checks inside the
+store transactions all call it, so they cannot disagree.
+
+**Approval lock**: an approved review is locked, so that what the signatures cover cannot change silently. While the
+review is approved, every change of reviewed content is refused with `ReviewLocked` ("This review is approved and
+locked. A project administrator must reopen it before it can change."): starting, replying to, resolving, and reopening
+a thread (`ThreadService`), a checklist answer and the applicability of a section (`ChecklistService`), and adding,
+changing, and removing a slot and signing (this service). Locked is computed from the same snapshot as the approval,
+never stored. The Core check is `ReviewLock.EnsureUnlockedAsync(store, projectId, reviewId)`; the store repeats the
+check inside its write transactions (see `ReviewStore`), which closes the gap between the check and a concurrent final
+signature. A review that does not exist is not locked, so the not-found rule of the caller applies unchanged. Reading,
+the attestation, and the evidence index are not affected.
+
+**Reopen**: `ReopenReviewAsync` is the only way out of the lock. It needs a project administrator or a system
+administrator (anyone else: `ActorNotAllowed`; an API token is always refused) and a reason of 1 to 250 characters after
+trimming (`ReopenReasonInvalid`). It works only on an approved review (`ReviewNotLocked`: "The review is not locked, so
+there is nothing to reopen."). The reopen is stored as a `ReviewReopen` with the previous digest, and the number of reopens
+becomes part of the record digest (see `RecordDigest`). Consequently the earlier signatures are kept as history but are
+out of date and can never be current again, not even when the content is changed back; the review is "In review" and
+needs fresh signatures from the reviewers (each slot signed before is `OutOfDate`, and a slot with an out-of-date
+signature cannot be edited, as before).
+
+**Independent reviewers**: when the project's `RequireIndependentReviewers` setting is on (the default; see
+`ProjectService`), the author of the review cannot be the primary or the alternate reviewer of a slot
+(`ReviewerNotIndependent` when a slot is added or changed: "{name} created this review and cannot be one of its
+reviewers while independent reviewers are required.") and cannot sign it (`ReviewerNotIndependent`: "You created this
+review, so you cannot be a reviewer of it. A different project member must review and sign it, or a project administrator
+can switch off 'Require independent reviewers'."). The author is the `Review.CreatedBy` user name (compared ignoring case);
+for a review created with an API token that is the token's owner, and a review without an author (created from the
+command line) is not restricted. The signing check is repeated at signing time, so a slot that was filled while the
+setting was off cannot be signed by the author once it is on. The rule is not retroactive: it runs when a reviewer
+is chosen and when a review is signed, and existing signatures stay valid. Limitation: the authors of the git commits of
+the reviewed files are not known to Review Center and are not matched; only the user who created the review in the tool
+is.
 
 **Rules for slots**:
 
@@ -58,7 +105,8 @@ setting the record back restores it, because the signatures were never touched.
 - Any member of the project can add, change, and remove slots; the actor must be able to see the project
   (`ProjectNotFound` otherwise) and have an enabled account. A slot that has any signature, current or out of date, can
   no longer be changed or removed, because a signature must always point to a slot that still describes who signed.
-  A change of reviewers after a signature is therefore a new slot.
+  A change of reviewers after a signature is therefore a new slot. While the review is approved (locked), slots cannot
+  be added, changed, or removed at all (`ReviewLocked`).
 
 **Blockers**: a review can be signed only when it has a checklist, every check of an applicable section is answered,
 no check of an applicable section is answered Fail, and no thread is open. Otherwise the blockers are returned as
@@ -79,6 +127,9 @@ is one.
 2. The review and the slot exist (`ReviewNotFound`, `SlotNotFound`).
 3. The actor is the primary or the alternate reviewer of the slot (`ActorNotAllowed`: "You are not a reviewer of this
    slot."). The role is taken from the seat.
+   Then, when the project requires independent reviewers and the actor created the review, the signature is refused
+   (`ReviewerNotIndependent`); and when the review is already approved it is locked and the signature is refused
+   (`ReviewLocked`), which tells the signer why instead of "already signed".
 4. The digest of the record now equals `expectedDigest` (`RecordChanged`: "The record changed while you were signing.
    Review it and try again."), so nobody signs something they have not seen.
 5. The slot has no signature of the current digest yet (`SigningNotAllowed`).
@@ -131,11 +182,14 @@ as a singleton. The store transaction of step 8 covers changes of the record tha
 
 **DomainRule values** added for signing: `ReviewNotFound`, `SlotNotFound`, `SlotUserInvalid`, `SlotSigned`,
 `ActorNotAllowed`, `SigningNotAllowed`, `ReauthenticationFailed`, and `RecordChanged`. `ActorNotAllowed` is the rule
-that every change made by an actor is re-authorized by the service, whatever the caller showed.
+that every change made by an actor is re-authorized by the service, whatever the caller showed. The integrity rules add
+`ReviewLocked`, `ReviewNotLocked`, `ReopenReasonInvalid`, and `ReviewerNotIndependent`.
 
 **Interface additions of IReviewStore**: `GetRecordAsync`, `GetSnapshotAsync`, `ListSlotsAsync`, `AddSlotAsync`,
-`UpdateSlotAsync`, `RemoveSlotAsync`, `ListSignaturesAsync`, and `AddSignatureAsync`. The store has no operation that
-changes or deletes a signature. `UpdateSlotAsync` and `RemoveSlotAsync` return `false` when the slot is not found.
+`UpdateSlotAsync`, `RemoveSlotAsync`, `ListSignaturesAsync`, `AddSignatureAsync`, `ReopenReviewAsync`, and
+`ListReopensAsync`. The store has no operation that
+changes or deletes a signature or a reopen. `UpdateSlotAsync` and `RemoveSlotAsync` return `false` when the slot is
+not found.
 
 #### Key Methods
 
@@ -145,7 +199,8 @@ changes or deletes a signature. `UpdateSlotAsync` and `RemoveSlotAsync` return `
 - *Returns*: `Task<ReviewApproval?>` — the status, or `null` when the review does not exist.
 - *Postconditions*: Nothing is stored. The record, slots, and signatures come from one `GetSnapshotAsync` read, so a
   concurrent change cannot make the digest, the blockers, and the signature status describe different states. The
-  members of the project are read through `ListMembershipsAsync` to fill `SlotMember.IsMember`.
+  members of the project are read through `ListMembershipsAsync` to fill `SlotMember.IsMember`. The reopen history is
+  read through `ListReopensAsync` only when the record's reopen count is above zero.
 
 **GetApprovalsAsync**: Computes the status of several reviews of a project.
 
@@ -168,17 +223,31 @@ changes or deletes a signature. `UpdateSlotAsync` and `RemoveSlotAsync` return `
   identity or `null`.
 - *Returns*: `Task<ReviewerSlot>` — the stored slot.
 - *Preconditions*: The actor is not null.
-- *Postconditions*: Nothing is stored when a rule fails.
+- *Postconditions*: Nothing is stored when a rule fails. The review must not be locked (`ReviewLocked`), and neither
+  chosen user may be the author while independent reviewers are required (`ReviewerNotIndependent`).
 
 **UpdateSlotAsync**: Changes the primary and the alternate reviewer of a slot that has no signature.
 
 - *Parameters*: the actor, project identity, review identifier, slot identity, and the new user identities.
-- *Postconditions*: Nothing is stored when a rule fails.
+- *Postconditions*: Nothing is stored when a rule fails; the lock and independence rules of `AddSlotAsync` apply.
 
 **RemoveSlotAsync**: Removes a slot that has no signature.
 
 - *Parameters*: the actor, project identity, review identifier, and slot identity.
-- *Postconditions*: Nothing is removed when a rule fails.
+- *Postconditions*: Nothing is removed when a rule fails; a locked review refuses it (`ReviewLocked`).
+
+**ReopenReviewAsync**: Reopens an approved (locked) review.
+
+- *Parameters*: the actor, project identity, review identifier, the reason, and a cancellation token.
+- *Preconditions*: The actor and the review identifier are not null. The actor is not an API token, has an enabled
+  account, and administers the project (project administrator or system administrator); the reason, trimmed, has 1 to
+  250 characters.
+- *Algorithm*: under the gate, the checks above (`ActorNotAllowed`, `ProjectNotFound`, `ReopenReasonInvalid`), then
+  `ReviewNotFound` or `ReviewNotLocked` from one `GetSnapshotAsync` read, then `IReviewStore.ReopenReviewAsync` with a
+  `ReviewReopen` (previous digest, the actor's user name and display name, `TimeProvider` time) and the audit draft
+  `review.reopened`.
+- *Postconditions*: Nothing is stored when a rule fails. After success the record's reopen count is one higher, so the
+  digest differs, the review is "In review", and the earlier signatures are out of date.
 
 **SignAsync**: Signs the review in a slot as described above. A signer with a second factor uses
 `SignWithCredentialsAsync`, which has the same rules and takes the password and the code together.
@@ -199,8 +268,9 @@ factor; never stored, logged, or put into a message). `SignAsync` calls it with 
 - *Preconditions*: The actor, the expected digest and the credentials are not null.
 - *Postconditions*: Nothing is stored when a rule fails.
 
-**API tokens cannot sign**: The first statement of `SignAsync`, `AddSlotAsync`, `UpdateSlotAsync`, and
-`RemoveSlotAsync` refuses an actor that came in with a personal access token (`Actor.ViaApiToken`) with
+**API tokens cannot sign**: The first statement of `SignAsync`, `AddSlotAsync`, `UpdateSlotAsync`,
+`RemoveSlotAsync`, and `ReopenReviewAsync` refuses an actor that came in with a personal access token
+(`Actor.ViaApiToken`) with
 `ActorNotAllowed` and the message that reviewer slots and signatures cannot be changed with an API token. The check comes
 before the gate, the password check, and any read of the store, so a refused call has no effect and costs nothing. A
 signature records that a named person confirmed the review with the password, which a script holding a token cannot do.
@@ -208,7 +278,9 @@ The API has no route for these operations, so this check is the second, independ
 a route that is added later without the rule. Reading the approval is not restricted.
 
 **Audit**: Adding, updating, and removing a slot record `slot.added`, `slot.updated`, and `slot.removed`, and signing
-records `signature.added` with the slot, the role, and the record digest the reviewer signed. Each draft is passed to
+records `signature.added` with the slot, the role, and the record digest the reviewer signed, and a reopen records
+`review.reopened` with the previous record digest and the reason (`previous digest {hex}; reason: {reason}`; the reason
+limit of 250 characters keeps it within the audit detail limit). Each draft is passed to
 the store and saved in the same transaction as the change, so a signature and its entry exist together or not at all.
 Signing runs under the gate of this service; the audit gate of the `AuditAppender` is taken inside it (the lock order is
 the service gates first, the appender gate last). This is also what protects the signature history: the table of
@@ -223,8 +295,10 @@ never contain a password or a hash. An infrastructure failure of the store passe
 
 #### Dependencies
 
-- **IReviewStore** — reads the record, the slots, and the signatures, and stores slots and signatures.
-- **IProjectAccess** — requires that the actor may see the project and that the signer and the reviewers are members.
+- **IReviewStore** — reads the record, the slots, the signatures, the review, the project, and the reopen history, and
+  stores slots, signatures, and reopens.
+- **IProjectAccess** — requires that the actor may see the project, that the signer and the reviewers are members, and
+  (for a reopen) that the actor administers the project.
 - **UserService** — looks up users, describes the reviewers, re-authenticates the signer (`ReauthenticatePasswordAsync`),
   and records a refused confirmation of an external user.
 - **ReauthProofStore** — holds the single-use proofs of external users (optional, injected; without it an external
@@ -232,6 +306,7 @@ never contain a password or a hash. An infrastructure failure of the store passe
 - **TotpService** — tells whether the signer has a second factor and checks the code (optional, injected; without it a
   signer who needs a code cannot sign).
 - **RecordDigest** — calculates the digest of the record.
+- **ReviewLock** and **ReviewReopen** — the helper and the history record of this unit (see above).
 - **ThreadService** — `NextStep` words the next step when signing is blocked.
 - **ChecklistState** — decides which sections apply and what the answers are.
 - **.NET runtime library** — `TimeProvider` for the signing time and `SemaphoreSlim` for the serialization.
@@ -239,7 +314,13 @@ never contain a password or a hash. An infrastructure failure of the store passe
 #### Callers
 
 - **ReviewPage** and **ProjectPage** (`Web` subsystem) — show the approval, the slots, and the blockers, and make the
-  changes of the signed-in user; the review page also asks `HasReauthProofAsync` for an external user.
+  changes of the signed-in user; the review page also asks `HasReauthProofAsync` for an external user and offers the
+  reopen to an administrator.
+- **ThreadService** and **ChecklistService** (`Core` subsystem) — call `ReviewLock.EnsureUnlockedAsync` before they
+  change a thread or the checklist.
+- **ReviewStore** (`Storage` subsystem) — calls `ReviewLock.IsApproved` inside its write transactions.
+- **AttestationService** (`Evidence` subsystem) — reads the approval, including the reopen history.
+- **ReviewWorkflowCheck** (`SelfTest` subsystem) — signs, shows the lock, and reopens.
 - **OidcSignIn** (`Identity` subsystem) — asks `RequireConfirmableAsync` before it starts a confirmation at the provider.
 - **ApiEndpoints** (`Api` subsystem) — reads the approval of a review; it cannot change slots or signatures.
 - **ServerHost** (`Hosting` subsystem) — registers the service as a singleton.

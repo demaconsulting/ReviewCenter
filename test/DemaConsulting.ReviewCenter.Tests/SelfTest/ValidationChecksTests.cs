@@ -135,6 +135,27 @@ public partial class ValidationChecksTests
     }
 
     /// <summary>
+    ///     Test that the review workflow check signs with a separate reviewer and also shows that the author's
+    ///     signature is refused, that the approved review is locked and that an administrator's reopen unlocks it.
+    /// </summary>
+    [Fact]
+    public void ReviewWorkflowCheck_RunAsync_SeparateReviewerLockAndReopen_ReportsDetails()
+    {
+        // Arrange: the shared real run, in which the workflow check ran on a temporary embedded database
+
+        // Act: read its log
+        var log = RealValidationRun.Result.Log;
+
+        // Assert: the check passed and reports what it proved, in the order of the workflow
+        Assert.Equal("ReviewCenter_ReviewWorkflow", ReviewWorkflowCheck.Name);
+        Assert.Matches(
+            @"ReviewCenter_ReviewWorkflow - Passed \(\d+ ms\): embedded SQLite; review signed by a separate reviewer; "
+            + @"author signature refused; approved review locked and reopened by an administrator; "
+            + @"evidence index fingerprint \w+…, record digest \w+…",
+            log);
+    }
+
+    /// <summary>
     ///     Test that the real validation passes in a hostile environment and uses nothing of it: the program copy has
     ///     a broken <c>appsettings.json</c> (and so does the working directory), and the environment names all-interface
     ///     listen addresses, the Development environment and a database, key ring, git cache and attestation key

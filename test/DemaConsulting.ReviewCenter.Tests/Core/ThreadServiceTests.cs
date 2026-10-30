@@ -86,6 +86,44 @@ public class ThreadServiceTests
     }
 
     /// <summary>
+    ///     Test that every thread mutation is refused with <see cref="DomainRule.ReviewLocked"/> while the review is
+    ///     approved, and that no thread or comment changes.
+    /// </summary>
+    /// <param name="operation">The mutation to try: start, reply, resolve or reopen.</param>
+    [Theory]
+    [InlineData("start")]
+    [InlineData("reply")]
+    [InlineData("resolve")]
+    [InlineData("reopen")]
+    public async Task ThreadService_Mutations_ApprovedReview_ThrowReviewLocked(string operation)
+    {
+        // Arrange: a review with one resolved thread, approved by a separate reviewer
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var (store, service, projectId) = await CreateAsync();
+        var thread = await service.StartThreadAsync(projectId, "rev-1", new ThreadAnchor("a.txt", 1, 1), TestActors.Ann, "First", cancellationToken);
+        await service.ResolveAsync(projectId, "rev-1", thread.Id, TestActors.Ann, cancellationToken);
+        await AuditTestExtensions.ApproveReviewAsync(store, new FixedTimeProvider(_now), projectId, "rev-1", "approver", cancellationToken);
+        var before = await service.ListAsync(projectId, "rev-1", cancellationToken);
+
+        // Act: try the mutation
+        Task Mutate() => operation switch
+        {
+            "start" => service.StartThreadAsync(projectId, "rev-1", new ThreadAnchor("a.txt", 2, 2), TestActors.Ann, "Second", cancellationToken),
+            "reply" => service.ReplyAsync(projectId, "rev-1", thread.Id, TestActors.Ann, "More", cancellationToken),
+            "resolve" => service.ResolveAsync(projectId, "rev-1", thread.Id, TestActors.Ann, cancellationToken),
+            _ => service.ReopenAsync(projectId, "rev-1", thread.Id, TestActors.Ann, cancellationToken)
+        };
+        var ex = await Assert.ThrowsAsync<DomainRuleException>(Mutate);
+
+        // Assert: refused as locked, and the threads are exactly as they were
+        Assert.Equal(DomainRule.ReviewLocked, ex.Rule);
+        var after = await service.ListAsync(projectId, "rev-1", cancellationToken);
+        Assert.Equal(before.Count, after.Count);
+        Assert.Equal(before.Sum(t => t.Comments.Count), after.Sum(t => t.Comments.Count));
+        Assert.Equal(ReviewThreadState.Resolved, after.Single().State);
+    }
+
+    /// <summary>
     ///     Test that a comment on a deleted file must be whole-file: a line anchor is refused, no thread is stored.
     /// </summary>
     [Fact]

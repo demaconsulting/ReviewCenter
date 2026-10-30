@@ -172,3 +172,14 @@ sections:
           bypass the rule.
         tests:
           - ThreadService_Constructor_NullArguments_Throws
+
+      - id: ReviewCenter-ThreadService-ApprovalLock
+        title: >-
+          The ThreadService class shall refuse to start a thread, to reply, to resolve, and to reopen a thread in a
+          review that is approved and therefore locked, with the ReviewLocked rule, after the access check and before
+          anything is stored, and shall leave a review that does not exist to the existing not-found rule.
+        justification: |
+          A discussion is part of what a signature approves. Changing it after the approval would make the approval
+          describe a record that no longer exists, so the service refuses until an administrator reopens the review.
+        tests:
+          - ThreadService_Mutations_ApprovedReview_ThrowReviewLocked

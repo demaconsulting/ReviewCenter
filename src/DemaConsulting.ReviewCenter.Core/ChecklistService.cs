@@ -29,6 +29,8 @@ namespace DemaConsulting.ReviewCenter.Core;
 ///     apply and the answer to each check. A section that does not apply needs a reason; a failed or
 ///     not-applicable check needs a justification. The person answering is the signed-in <see cref="Actor"/>,
 ///     never free text.
+///     Every change is refused with <see cref="DomainRule.ReviewLocked"/> while the review is approved (see
+///     <see cref="ReviewLock"/>).
 ///     The service holds no state of its own and is safe for concurrent use as long as the injected
 ///     <see cref="IReviewStore"/> is.
 /// </remarks>
@@ -128,6 +130,9 @@ public sealed class ChecklistService
         // A section that applies has no reason; one that does not apply must say why
         var trimmedReason = applicable ? null : ValidateJustification(reason, required: true, "reason");
 
+        // An approved review is locked: the checklist is part of what the signatures cover
+        await ReviewLock.EnsureUnlockedAsync(_store, projectId, reviewId, cancellationToken);
+
         await _store.SetChecklistSectionStateAsync(
             new ChecklistSectionState
             {
@@ -195,6 +200,9 @@ public sealed class ChecklistService
 
         // Only a pass can go without a justification; an empty optional one is stored as none
         var trimmed = ValidateJustification(justification, outcome != ChecklistOutcome.Pass, "justification");
+
+        // An approved review is locked: the checklist is part of what the signatures cover
+        await ReviewLock.EnsureUnlockedAsync(_store, projectId, reviewId, cancellationToken);
 
         await _store.SetChecklistAnswerAsync(
             new ChecklistAnswer

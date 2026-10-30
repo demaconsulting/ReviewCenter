@@ -32,6 +32,22 @@ rules. It requires a signed-in user, and every comment, slot change, and signatu
 History button (`history-link`) leads to the history page of the review, where the audit entries of the review are
 listed.
 
+An approved review is locked. The page shows a Locked badge (`review-locked`) next to the approval badge and, above the
+reading, a banner (`review-locked-banner`) that says why: the review is approved, its content, checklist and reviewers
+can no longer change, and a project administrator can reopen it. While the review is locked every control that would
+change reviewed content or the
+reviewer slots is disabled with that explanation (the add-slot selects and button, the slot edit controls, the thread
+resolve and reopen toggle, the reply and new-thread fields and buttons, and the line-comment buttons of the diff, through
+the `CommentsDisabled` parameter of `DiffView`); reading, the attestation download, and the evidence index are not
+affected. For a project administrator or system administrator the banner is followed by the reopen form
+(`reopen-form`): a required reason (`reopen-reason`, at most `ReviewLimits.MaxReopenReasonLength` characters), the
+button `reopen-button` ("Reopen review"), and a message area `reopen-error`. When the review has been reopened before, a
+Reopen history card (`reopen-history`) lists every reopen with who, when, the reason, and the short previous digest. The
+Reviewers card also tells the review author, while the project requires independent reviewers, that the author cannot be
+a reviewer (`author-independence-hint`), and the Reviewers card does not offer the author as a candidate. The page
+holds none of these
+rules; Core decides, and the page only shows the result.
+
 #### Data Model
 
 The page instance is created per browser connection, so its state is per user.
@@ -77,6 +93,13 @@ that user is still a member of the project; the page shows a badge "No longer a 
 alternate who is not, with a hint under the names that such a reviewer cannot sign until added to the project again.
 **CurrentUsername**: the user name
 of the signed-in user, from the authentication state, used to tell which slots the user occupies.
+**IsLocked**: whether the review is locked, which is `Approval.IsApproved`; **LockedMarker**: the text `true` or `false`
+written to the `data-locked` attribute of the disabled controls, so that tests can tell a locked control.
+**RequireIndependent**: the `RequireIndependentReviewers` setting of the project, read with the project
+in `RefreshAsync`; **VisibleCandidates**: `Candidates` without the review author (`Review.CreatedBy`) when
+`RequireIndependent` is on. **CanReopen**: whether the signed-in user is a project administrator of the project or a
+system administrator, asked with `IProjectAccess.CanAdministerAsync` in `RefreshAsync`. **ReopenReason**,
+**ReopenError**: the text typed into the reopen form and its message.
 
 **AttestationKeys**: the `IAttestationKeyProvider` of the `Evidence` subsystem, injected so that the page can ask for the
 status of the signing key (`Describe`) without ever reading the key.
@@ -107,7 +130,10 @@ expanded. **FocusedThreadId**: the thread chosen in the index, whose lines and c
 keeps the test id to scroll to after the next render. All of these are cleared when the route parameters change.
 
 Test identifiers: `review-page` (root), `breadcrumb-projects-link`, `project-link`, `review-loading`,
-`review-not-found`, `review-title`, `review-approval`, `next-step`, `review-summary` (the summary strip),
+`review-not-found`, `review-title`, `review-approval`, `review-locked`, `review-locked-banner`, `reopen-form`,
+`reopen-reason`, `reopen-button`, `reopen-error`, `reopen-history`, and `reopen-entry-{n}`, `reopen-by-{n}`,
+`reopen-time-{n}`, `reopen-reason-{n}`, `reopen-digest-{n}` (by the position of the reopen, starting at 0),
+`author-independence-hint`, `slots-locked-hint`, `next-step`, `review-summary` (the summary strip),
 `checklist-card` (its checklist cell), `checklist-progress-summary`, `checklist-link`, `summary-reviewers`,
 `summary-threads`, `reviewers-card`, `slots-empty`, `slot-{id}`, `slot-label-{id}`, `slot-primary-{id}`,
 `slot-alternate-{id}`, `slot-primary-not-member-{id}`, `slot-alternate-not-member-{id}`, `slot-not-member-hint-{id}`,
@@ -159,8 +185,9 @@ the component when only the route changes, so following a link to another review
 the previous review, its file content, or a half-typed comment. Each file's `View` button has an `aria-label` of
 `View {path}` so that screen-reader users can tell the buttons apart.
 
-**RefreshAsync**: Reloads everything the record depends on: the threads, the checklist, the approval, the
-candidates for a slot, and the user name of the signed-in user. The user name is read straight from the authentication
+**RefreshAsync**: Reloads everything the record depends on: the threads, the checklist, the approval (with the reopen
+history), the candidates for a slot, the review rule and the administrator right for the reopen form, and the user name
+of the signed-in user. The user name is read straight from the authentication
 state, not through `GetActorAsync`, so that a reload that meets an ended sign-in state does not fail; the page is replaced
 by the session-ended message instead. It runs when the page loads and after every change
 made on the page (starting, replying, resolving, reopening, and every slot or signing action), and when a file is
@@ -223,7 +250,8 @@ Head view); a binary file shows the binary notice.
 `SelectedStart`, `SelectedEnd`, `ThreadTemplate` (how the page draws a thread, so the reply, resolve and reopen
 controls are the ones of the thread list), `Composer` (the new-thread form, drawn under the selected row), `CanReveal`
 (a check that the page runs before a collapsed run is expanded, so a user who lost the access is not shown loaded
-lines), and the event `OnComment`, which carries a `DiffCommentRequest(Side, Line, Extend)`. The control of a left
+lines), `CommentsDisabled` (true while the review is locked: the line-comment buttons are drawn disabled, with
+`data-locked`), and the event `OnComment`, which carries a `DiffCommentRequest(Side, Line, Extend)`. The control of a left
 cell asks for the
 Baseline side and its baseline line number (a removed line, or the baseline copy of an unchanged line); the control
 of a right cell asks for the Head side and its head line number. The control is a button in the gutter of every cell
@@ -320,7 +348,10 @@ with the signed-in user, the slot, the password typed (empty for an external use
 code typed (`SignerCredentials.TotpCode`, null without a second factor), and the
 record digest it displayed (`Approval.Digest`), so what
 is signed is exactly what the reader saw; a record that changed in the meantime is refused by Core, and the page shows
-that message. A `DomainRuleException` (wrong password, a user who is not in the slot, a locked-out user, a changed
+that message. If a slot holds the review author while the project requires independent reviewers (for example because
+the rule was switched on after the slot was filled), the sign form is still drawn, and Core refuses the signature with
+`ReviewerNotIndependent`; the page shows that message in `sign-error-{id}`. A `DomainRuleException` (wrong password,
+a user who is not in the slot, a locked-out user, a changed
 record) is shown in `sign-error-{id}`; the wrong-password message is the generic one Core produces, and a wrong or
 missing code gets the same message ("The password or the code is incorrect."). A reviewer who is no
 longer a member of the project (`SlotMember.IsMember` false) cannot sign: Core refuses, and the page shows that message
@@ -330,6 +361,20 @@ block removes both after every
 attempt, whatever the outcome, and increments `PasswordKey`, which is part of the `@key` of the field so that the
 browser builds a new, empty input. It is never rendered as a value, logged, or kept. After the attempt the page calls
 `RefreshAsync`, so a signature shows as signed, locks the slot, and may turn the badge to Approved.
+
+**ReopenAsync**: Reopens a locked review on behalf of the signed-in user through `SigningService.ReopenReviewAsync` with
+the typed reason. The form is drawn only for an administrator (`CanReopen`) of a locked review, and Core checks the same
+again (an API token is never involved, because the page works with the signed-in user). A violated rule (an empty or
+too long reason, a review that is no longer locked, a user who is no administrator) is a `DomainRuleException` shown in
+`reopen-error`, with the typed reason kept. Success clears the reason and reloads through `RefreshAsync`, so the badge
+turns to In review, the signatures show as out of date, and the history lists the reopen.
+
+**Locked controls**: When `IsLocked` is true the markup disables the add-slot selects and button and shows the hint
+`slots-locked-hint` with them, and disables the thread toggle, the reply field and button, the new-thread fields and
+button, and the line-comment buttons. The slot edit controls are drawn only for a slot with no signature, and a locked
+review has none. The handlers also stay correct if a stale page still fires one, because Core refuses the change with
+`ReviewLocked` and the message is shown in the usual place. A page that was loaded before another user signed the last
+slot learns about the lock at its next reload or change, and is refused, not corrupted, until then.
 
 **ShortDigest**: Shortens the record digest to its first 16 characters; the Details section shows the short value
 with the full 64 characters in the `title` attribute.
@@ -422,7 +467,7 @@ page.
 - **SessionGate** (App) — wraps the whole page content, so the page is replaced by a "Session ended" message when the
   sign-in state of the open page ends.
 - **IProjectAccess** (Core) — through `ProjectViewGuard`, asked before every handler whether the user may still see the
-  project.
+  project; also asked (`CanAdministerAsync`) whether the user may see the reopen form.
 - **ReviewService** — reads the review, the head and baseline bytes of a file, and the comparison of a file
   (`GetDiffAsync`).
 - **DiffView** — draws the Diff view; it is a part of this unit.
@@ -430,8 +475,9 @@ page.
 - **ThreadService** — starts (on the Head or the Baseline side), answers, resolves, reopens, and lists threads, and
   shapes them for the index.
 - **ChecklistService** — reads the checklist progress for the summary.
-- **SigningService** — computes the approval status (blockers, record digest, next step), lists the users that can
-  fill a slot, adds, changes, and removes slots, and signs; it holds every signing rule. It also tells
+- **SigningService** — computes the approval status (blockers, record digest, next step, lock, reopen history), lists
+  the users that can fill a slot, adds, changes, and removes slots, signs, and reopens a locked review; it holds every
+  signing, lock, and reopen rule. It also tells
   (`HasReauthProofAsync`) whether an external user has confirmed the identity for a slot.
 - **UserService** — tells whether the signed-in user is an account of an identity provider.
 - **TotpService** — tells whether the signed-in user has a second factor, so that the sign form asks for a code.

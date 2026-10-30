@@ -137,12 +137,9 @@ public class AttestationEndpointTests
             {
                 AfterRender = async cancellationToken =>
                 {
-                    var checklists = provider.GetRequiredService<ChecklistService>();
-                    foreach (var item in DefaultChecklist.Current.Sections.SelectMany(section => section.Items))
-                    {
-                        await checklists.SetAnswerAsync(
-                            projectId, "REV-1", item.Id, ChecklistOutcome.Fail, "Changed while rendering.", new Actor("ann", "Ann"), cancellationToken);
-                    }
+                    // An administrator reopens the approved review while the document is rendered
+                    await provider.GetRequiredService<SigningService>().ReopenReviewAsync(
+                        new Actor("ann", "Ann"), projectId, "REV-1", "Changed while rendering.", cancellationToken);
                 }
             }));
         projectId = await CreateReviewAsync(app, signed: true);
@@ -277,7 +274,7 @@ public class AttestationEndpointTests
     }
 
     /// <summary>
-    ///     Creates the project and the review <c>REV-1</c> with every check answered and one slot (ann, bob), signed or not.
+    ///     Creates the project and the review <c>REV-1</c> (created by zed) with every check answered and one slot (ann, bob), signed or not.
     /// </summary>
     /// <param name="app">The application.</param>
     /// <param name="signed">Whether ann signs the slot, which completes the review.</param>
@@ -363,7 +360,7 @@ public class AttestationEndpointTests
         var cancellationToken = TestContext.Current.CancellationToken;
         var users = app.Services.GetRequiredService<UserService>();
         var ids = new Dictionary<string, int>();
-        foreach (var (username, name, admin) in new[] { ("ann", "Ann", true), ("bob", "Bob", false) })
+        foreach (var (username, name, admin) in new[] { ("ann", "Ann", true), ("bob", "Bob", false), ("zed", "Zed", false) })
         {
             ids[username] = (await users.CreateAsync(username, name, admin, TestBrowser.Password, cancellationToken)).Id;
         }
@@ -372,8 +369,9 @@ public class AttestationEndpointTests
         var store = app.Services.GetRequiredService<IReviewStore>();
         await store.AddMembershipAsync(ids["ann"], project.Id, cancellationToken);
         await store.AddMembershipAsync(ids["bob"], project.Id, cancellationToken);
+        await store.AddMembershipAsync(ids["zed"], project.Id, cancellationToken);
         await app.Services.GetRequiredService<ReviewService>().CreateDraftAsync(
-            project.Id, "REV-1", "First review", [new UploadedFile("a.txt", "one\ntwo\n"u8.ToArray())], cancellationToken);
+            project.Id, "REV-1", "First review", [new UploadedFile("a.txt", "one\ntwo\n"u8.ToArray())], new Actor("zed", "Zed"), cancellationToken);
         var ann = new Actor("ann", "Ann");
         foreach (var item in DefaultChecklist.Current.Sections.SelectMany(section => section.Items))
         {

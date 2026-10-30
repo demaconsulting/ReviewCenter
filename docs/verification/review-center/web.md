@@ -35,7 +35,12 @@ N/A - standard test environment (temporary SQLite databases are created by the t
   through the Core service, also when requested again.
 - A review with a reviewer slot that was signed through the Core service is presented as Approved by the review page
   and the project page, with the signer and the record digest on the review page; when the record changes
-  afterwards, both pages present it as In review and the review page shows the signature as out of date.
+  afterwards (an administrator reopens the review), both pages present it as In review and the review page shows the
+  signature as out of date.
+- An approved review is presented as locked by the review page (badge, banner, disabled controls) and the checklist
+  page; an administrator can reopen it from the review page, which then lists the reopen history. The project page
+  presents the "Review rules" switch to an administrator, and a change of it changes which users the review page offers
+  as reviewers.
 - The `Web` subsystem's pages are presented to a signed-in user; the sign-in itself is verified in the `Identity`
   subsystem.
 - When the sign-in state of an open page ends, the page is replaced by the "Session ended" message and offers no
@@ -150,14 +155,26 @@ next step. This
 scenario is tested by `WebSubsystem_ChecklistPage_AnsweredChecksSurviveReload`.
 
 **WebSubsystem_SignedReview_ApprovalIsPresentedAndGoesOutOfDateWhenRecordChanges**: The pipeline is started in memory
-on a temporary database, and a second user, a project, and a review with every check answered Pass are created
-through the real Core services, with one reviewer slot of the signed-in user (primary) and the second user
-(alternate). The review page shows the badge "In review" and the sign form of the slot. The second user signs
-through `SigningService` with the digest read from the service; the review page then shows "Approved", the status
-"Signed by Bob on ..." and the full record digest in the title of the Details element, and the project page shows
-"Approved" for the review. A thread is then started, which changes the record; both pages show "In review" again
-and the review page shows "Signature out of date". This scenario is tested by
+on a temporary database, and a project and a review with every check answered Pass are created through the real Core
+services, with one reviewer slot of the signed-in user (primary, who is also a project administrator). The review
+page shows the badge "In review" and the sign form of the slot. The user signs through `SigningService` with the
+digest read from the service; the review page then shows "Approved", the Locked badge, the status "Signed by Ann on
+..." and the full record digest in the title of the Details element, and the project page shows "Approved" for the
+review. An administrator then reopens the review, which changes the record; both pages show "In review" again and
+the review page shows "Signature out of date". This scenario is tested by
 `WebSubsystem_SignedReview_ApprovalIsPresentedAndGoesOutOfDateWhenRecordChanges`.
+
+**WebSubsystem_ApprovedReview_ShowsLockedAndAdminCanReopen**: Through the real pipeline on a temporary database, a
+review is approved through the Core services (the author is an administrator, a separate reviewer signs). The review
+page shows the Locked badge and banner and the disabled slot controls, and the reopen form for the signed-in
+administrator but not for a plain member. The reopen is made through `SigningService` with a reason; the review page
+then shows "In review", no Locked badge, and the reopen history with the reason and the administrator. This scenario
+is tested by `WebSubsystem_ApprovedReview_ShowsLockedAndAdminCanReopen`.
+
+**WebSubsystem_ProjectAdmin_TogglesIndependentReviewers**: Through the real pipeline, the project page of a project
+administrator shows the Review rules card with the switch on (the default), and the page of a plain member has no
+such card. The setting is switched off through `ProjectService` and the project page then shows the switch off. This
+scenario is tested by `WebSubsystem_ProjectAdmin_TogglesIndependentReviewers`.
 
 **WebSubsystem_AllPages_EveryInteractiveElementHasTestId**: A system administrator is signed in, and every route
 (home, login, about, the help index, a help topic, an unknown help topic, account, users, the new user page,

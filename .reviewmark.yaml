@@ -922,6 +922,8 @@ reviews:
       - "src/DemaConsulting.ReviewCenter.Core/ReviewSignature.cs"
       - "src/DemaConsulting.ReviewCenter.Core/SlotRole.cs"
       - "src/DemaConsulting.ReviewCenter.Core/ReviewApproval.cs"
+      - "src/DemaConsulting.ReviewCenter.Core/ReviewLock.cs"
+      - "src/DemaConsulting.ReviewCenter.Core/ReviewReopen.cs"
       - "test/**/Core/SigningServiceTests.cs"
       - "test/**/Core/SigningServiceExternalTests.cs"
       - "test/**/Core/SigningServiceTotpTests.cs"

@@ -207,3 +207,30 @@ sections:
           local accounts, which have no such identity, must remain possible.
         tests:
           - UserStore_AddAsync_SameExternalIdentityTwice_IsRefused
+
+      - id: ReviewCenter-DbContext-ReviewRules
+        title: >-
+          The ReviewCenterDbContext class shall map the setting that requires independent reviewers to a boolean column
+          of the project table whose value comes from the project, on for a project that was not given another value,
+          so that a changed setting is stored in its own column. The schema is created from the model without a
+          migration, so a database that was created before the column existed has to be recreated.
+        justification: |
+          The setting belongs to exactly one project and is read with it. The value is not declared as a database
+          default, so the default of the project type is the only one and a stored false is never mistaken for an
+          unset value. The schema is not migrated while the product is not released, so development databases are
+          recreated.
+        tests:
+          - ReviewStore_UpdateRequireIndependentReviewersAsync_CompareAndSet
+
+      - id: ReviewCenter-DbContext-ReviewReopens
+        title: >-
+          The ReviewCenterDbContext class shall map the reopenings of a review to a table in which each row belongs to
+          a review and is deleted with it, holds the user name, display name, time, reason, and digest of the approved
+          record, and is found by project and review, so that the database refuses a reopening of a review that does
+          not exist. The schema is created from the model without a migration, so a database that was created before
+          the table existed has to be recreated.
+        justification: |
+          The history of reopenings is evidence that belongs to one review. Having the database enforce the
+          relationship keeps the record consistent when two requests overlap or a programming error occurs.
+        tests:
+          - ReviewStore_ReopenReviewAsync_Persists_AuditAndHistory

@@ -49,6 +49,12 @@ N/A - standard test environment.
 - An account created for a project is no system administrator, has a random temporary password of sixteen characters
   that is stored only as a hash and never audited, and must be changed; a taken or invalid name creates no account and
   no membership.
+- A new project requires independent reviewers by default. Only a project administrator (or a system administrator)
+  switches the rule, with the value the caller read as the expected value; the change and the audit entry
+  `project.independent-reviewers-changed` (detail `RequireIndependentReviewers on->off`) are stored together. A plain
+  member, a user who is no member, and an actor that came through a token are refused with `ActorNotAllowed`
+  (`ProjectNotFound` for a project that is hidden), and a call whose expected value does not match the stored one
+  changes and audits nothing.
 
 #### Test Scenarios
 
@@ -192,6 +198,24 @@ scenario is tested by `ProjectService_Members_UnknownDoubledAndMissing_ViolateTh
 another project, a non-member reading the project, and a system administrator reading a project that does not exist
 all get null; the project list of the member holds only the own project. This scenario is tested by
 `ProjectService_GetAsync_HiddenProject_ReadsAsMissing`.
+
+**ProjectService_SetRequireIndependentReviewersAsync_DefaultIsOn**: A project that is created through the service
+requires independent reviewers. This scenario is tested by `ProjectService_SetRequireIndependentReviewersAsync_DefaultIsOn`.
+
+**ProjectService_SetRequireIndependentReviewersAsync_Admin_TogglesAndAudits**: An administrator switches the rule off
+and on again; the project reads back each value, the call returns `true`, and the audit trail holds an entry
+`project.independent-reviewers-changed` with the project and the details `RequireIndependentReviewers on->off` and
+`RequireIndependentReviewers off->on`. This scenario is tested by
+`ProjectService_SetRequireIndependentReviewersAsync_Admin_TogglesAndAudits`.
+
+**ProjectService_SetRequireIndependentReviewersAsync_NotAdminOrApiToken_IsRefused**: A plain member of the project and
+an administrator whose identity arrives through a token are refused with `ActorNotAllowed`; the value is unchanged and
+no entry is audited. This scenario is tested by
+`ProjectService_SetRequireIndependentReviewersAsync_NotAdminOrApiToken_IsRefused`.
+
+**ProjectService_SetRequireIndependentReviewersAsync_StaleExpected_ThrowsRecordChanged**: A change whose expected value
+is no longer the stored one is refused with `RecordChanged`, does not overwrite the newer value, and adds no audit
+entry. This scenario is tested by `ProjectService_SetRequireIndependentReviewersAsync_StaleExpected_ThrowsRecordChanged`.
 
 The tests of the membership operations, of the system administrator rule for creation, and of the hidden project are
 defined in `ProjectAccessTests.cs`, which arranges the users they need.

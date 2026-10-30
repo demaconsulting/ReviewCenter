@@ -11,7 +11,7 @@ suite (they start git, a database, a signer and a web host):
 - The light checks (`Fingerprint`, `PasswordHash`, `Totp`) are run directly.
 - The checks that start git, a complete review workflow, a signer, or the web host, and the `AuditChain` check, are
   verified by the real run, whose log and results file must show each of them passed with the detail it
-  reports (for example `embedded SQLite` for the review workflow and `stopped cleanly` for the
+  reports (for example `review signed by a separate reviewer` for the review workflow and `stopped cleanly` for the
   host).
 - The real run is started once, eagerly, at the start of the test assembly (`RealValidationRunFixture`), so
   the slow checks run while the rest of the suite runs; it exists twice: in the test process and as a child process
@@ -78,9 +78,20 @@ a passed line that reports that the change of an entry was detected by the verif
 `ValidationChecks_AuditChain_Run_DetectsTamperedEntry`.
 
 **ValidationChecks_RealRun_HeavyChecks_ReportTheirDetails**: The log of the real run is read; the
-git, git round trip, review workflow (embedded SQLite), attestation PDF and host start (`/login`,
+git, git round trip, review workflow (`embedded SQLite; review signed by a separate reviewer; author signature refused;
+approved review locked and reopened by an administrator`), attestation PDF and host start (`/login`,
 `stopped cleanly`) checks each show a passed line with their detail. This scenario is tested by
 `ValidationChecks_RealRun_HeavyChecks_ReportTheirDetails`.
+
+**ReviewWorkflowCheck_RunAsync_SeparateReviewerLockAndReopen_ReportsDetails**: The review workflow check is run over its
+embedded database. It creates the review as the user `selftest` (the author) and seats a second user,
+`selftest-reviewer`, as reviewer. It shows that the author cannot be a slot reviewer or sign while independent
+reviewers are required, that the separate reviewer signs and the review is approved and locked, that a change to the
+locked review is refused with `ReviewLocked`, and that an administrator reopens it with a reason, which leaves it in
+review with one reopen. The check passes and its detail contains `review signed by a separate reviewer`,
+`author signature refused`, and `approved review locked and reopened by an administrator`, followed by the evidence
+index fingerprint and the record digest. This scenario is tested by
+`ReviewWorkflowCheck_RunAsync_SeparateReviewerLockAndReopen_ReportsDetails`.
 
 **ValidationChecks_ConfiguredDatabase_NothingConfigured_IsSkipped**: No connection string is
 configured and no database exists at the default location; the check reports that it is skipped

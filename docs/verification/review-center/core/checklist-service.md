@@ -30,6 +30,8 @@ N/A - standard test environment.
 - Progress is counted per section and overall; a not-applicable section counts as done and leaves the totals; the
   checklist is complete when every applicable check is answered; the next unanswered check and the first incomplete
   section are found.
+- On an approved review, answering a check and changing the applicability of a section are refused with
+  `ReviewLocked`, and nothing is stored.
 
 #### Test Scenarios
 
@@ -107,6 +109,12 @@ refused with an `ArgumentNullException` and nothing is stored. This scenario is 
 **ChecklistService_SetAnswer_StoresActorAndUtcTime**: An answer is stored as an actor; it holds the display name and
 the user name of the actor and the UTC time of the clock. This scenario is tested by
 `ChecklistService_SetAnswer_StoresActorAndUtcTime`.
+
+**ChecklistService_Mutations_ApprovedReview_ThrowReviewLocked**: A theory over the two changes of a checklist (an
+answer and the applicability of a section) on a review whose every slot holds a current signature; each is refused
+with `ReviewLocked` and the answers and sections are as they were. The fake store does not judge the lock itself, so
+the test shows that the service does. This scenario is tested by
+`ChecklistService_Mutations_ApprovedReview_ThrowReviewLocked`.
 
 **ChecklistService_Constructor_NullArguments_Throws**: The service is created with a missing store, project access, or
 clock; the constructor throws, so the service cannot exist without the check that the actor may see the project. This

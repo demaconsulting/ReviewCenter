@@ -41,6 +41,12 @@ namespace DemaConsulting.ReviewCenter.Core;
 ///     are returned as plain sentences. A signature is current only while its digest (see
 ///     <see cref="RecordDigest"/>) equals the digest of the record now. The status (Approved or In review) is
 ///     computed on demand and never stored.
+///     An approved review is locked: while every slot holds a current signature, the threads, checklist answers,
+///     applicability and the reviewer slots are refused with <see cref="DomainRule.ReviewLocked"/> (see
+///     <see cref="ReviewLock"/>), and signing is refused too. Only <see cref="ReopenReviewAsync"/>, which needs an
+///     administrator and a reason, unlocks it; the earlier signatures then stay as history and fresh ones are needed.
+///     When the project requires independent reviewers (the default), the user who created the review can neither
+///     be put in one of its slots nor sign it.
 ///     Every change is re-authorized here, whatever the caller showed, and all changes run one at a time under
 ///     one gate, which is sufficient because there is one service instance per process; the store additionally
 ///     rechecks the digest inside its transaction for record changes that bypass this gate. The service is safe
@@ -333,14 +339,20 @@ public sealed class SigningService
                 current?.SignedAt));
         }
 
-        var isApproved = statuses.Count > 0 && statuses.All(s => s.State == SlotSignatureState.Signed);
+        var isApproved = ReviewLock.IsApproved(record, slots, signatures);
         var (checklist, blockers, failed) = Assess(record);
+
+        // The history is read only for a review that was reopened, so the common case costs no extra query
+        var reopens = record.Reopens > 0
+            ? await _store.ListReopensAsync(projectId, reviewId, cancellationToken)
+            : null;
         return new ReviewApproval(
             isApproved,
             digest,
             statuses,
             blockers,
-            NextStepFor(isApproved, blockers, statuses.Count, record, checklist, failed));
+            NextStepFor(isApproved, blockers, statuses.Count, record, checklist, failed),
+            reopens);
     }
 
     /// <summary>
@@ -383,7 +395,10 @@ public sealed class SigningService
     /// <exception cref="ArgumentNullException">Thrown when <paramref name="actor"/> is null.</exception>
     /// <exception cref="DomainRuleException">
     ///     Thrown with <see cref="DomainRule.ActorNotAllowed"/>, <see cref="DomainRule.ReviewNotFound"/> or
-    ///     <see cref="DomainRule.SlotUserInvalid"/> when a rule is violated; nothing is stored then.
+    ///     <see cref="DomainRule.SlotUserInvalid"/> when a rule is violated; nothing is stored then. Also thrown with
+    ///     <see cref="DomainRule.ReviewLocked"/> when the review is approved and with
+    ///     <see cref="DomainRule.ReviewerNotIndependent"/> when a chosen user created the review and the project
+    ///     requires independent reviewers.
     /// </exception>
     public async Task<ReviewerSlot> AddSlotAsync(
         Actor actor,
@@ -400,8 +415,12 @@ public sealed class SigningService
         {
             await EnsureActorAsync(actor, projectId, cancellationToken);
             await EnsureReviewAsync(projectId, reviewId, cancellationToken);
+
+            // An approved review is locked: who may sign it can not change until it is reopened
+            await ReviewLock.EnsureUnlockedAsync(_store, projectId, reviewId, cancellationToken);
             var slots = await _store.ListSlotsAsync(projectId, reviewId, cancellationToken);
-            await ValidateMembersAsync(projectId, slots, null, primaryUserId, alternateUserId, cancellationToken);
+            await ValidateMembersAsync(
+                projectId, reviewId, slots, null, primaryUserId, alternateUserId, cancellationToken);
             var members = await DescribeMembersAsync(primaryUserId, alternateUserId, cancellationToken);
 
             return await _store.AddSlotAsync(
@@ -436,7 +455,9 @@ public sealed class SigningService
     /// <exception cref="DomainRuleException">
     ///     Thrown with <see cref="DomainRule.ActorNotAllowed"/>, <see cref="DomainRule.SlotNotFound"/>,
     ///     <see cref="DomainRule.SlotSigned"/> (the slot has any signature, current or out of date) or
-    ///     <see cref="DomainRule.SlotUserInvalid"/> when a rule is violated; nothing is stored then.
+    ///     <see cref="DomainRule.SlotUserInvalid"/> when a rule is violated; nothing is stored then. Also thrown with
+    ///     <see cref="DomainRule.ReviewLocked"/> when the review is approved and with
+    ///     <see cref="DomainRule.ReviewerNotIndependent"/> as <see cref="AddSlotAsync"/> does.
     /// </exception>
     public async Task UpdateSlotAsync(
         Actor actor,
@@ -453,8 +474,10 @@ public sealed class SigningService
         try
         {
             await EnsureActorAsync(actor, projectId, cancellationToken);
+            await ReviewLock.EnsureUnlockedAsync(_store, projectId, reviewId, cancellationToken);
             var slots = await EnsureUnsignedSlotAsync(projectId, reviewId, slotId, cancellationToken);
-            await ValidateMembersAsync(projectId, slots, slotId, primaryUserId, alternateUserId, cancellationToken);
+            await ValidateMembersAsync(
+                projectId, reviewId, slots, slotId, primaryUserId, alternateUserId, cancellationToken);
             var members = await DescribeMembersAsync(primaryUserId, alternateUserId, cancellationToken);
 
             var audit = AuditDraft.By(actor, "slot.updated", $"slot {slotId}: {members}", projectId, reviewId);
@@ -481,7 +504,8 @@ public sealed class SigningService
     /// <exception cref="ArgumentNullException">Thrown when <paramref name="actor"/> is null.</exception>
     /// <exception cref="DomainRuleException">
     ///     Thrown with <see cref="DomainRule.ActorNotAllowed"/>, <see cref="DomainRule.SlotNotFound"/> or
-    ///     <see cref="DomainRule.SlotSigned"/> when a rule is violated; nothing is removed then.
+    ///     <see cref="DomainRule.SlotSigned"/> when a rule is violated; nothing is removed then. Also thrown with
+    ///     <see cref="DomainRule.ReviewLocked"/> when the review is approved.
     /// </exception>
     public async Task RemoveSlotAsync(
         Actor actor,
@@ -496,6 +520,7 @@ public sealed class SigningService
         try
         {
             await EnsureActorAsync(actor, projectId, cancellationToken);
+            await ReviewLock.EnsureUnlockedAsync(_store, projectId, reviewId, cancellationToken);
             var slots = await EnsureUnsignedSlotAsync(projectId, reviewId, slotId, cancellationToken);
 
             // The entry describes the slot as it was before it goes
@@ -506,6 +531,100 @@ public sealed class SigningService
             {
                 throw SlotNotFound(slotId);
             }
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
+
+    /// <summary>
+    ///     Reopens an approved (locked) review so it can change again.
+    /// </summary>
+    /// <param name="actor">
+    ///     The signed-in user who reopens. Must not be null; must administer the project (or be a system
+    ///     administrator); an API token is refused.
+    /// </param>
+    /// <param name="projectId">The project identity.</param>
+    /// <param name="reviewId">The review identifier.</param>
+    /// <param name="reason">
+    ///     Why the review is reopened; leading and trailing white space is removed. Required, at most
+    ///     <see cref="ReviewLimits.MaxReopenReasonLength"/> characters.
+    /// </param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <returns>A task that completes when the reopen is stored.</returns>
+    /// <remarks>
+    ///     Reopening is the only way out of the lock. It is a deliberate, accountable act: it needs an administrator and
+    ///     a reason, and the audit entry <c>review.reopened</c> names who did it, why, and the digest of the approved
+    ///     record that was reopened. The reopen raises the reopen count of the record, so the digest changes: every
+    ///     earlier signature stays as history (out of date, never current again, not even when the content is
+    ///     changed back) and the review needs fresh signatures. Runs under the same gate as the other slot and
+    ///     signing changes.
+    /// </remarks>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="actor"/> is null.</exception>
+    /// <exception cref="DomainRuleException">
+    ///     Thrown with <see cref="DomainRule.ActorNotAllowed"/> (an API token, a disabled account or a user who does
+    ///     not administer the project), <see cref="DomainRule.ProjectNotFound"/>,
+    ///     <see cref="DomainRule.ReopenReasonInvalid"/>, <see cref="DomainRule.ReviewNotFound"/> or
+    ///     <see cref="DomainRule.ReviewNotLocked"/> (the review is not approved) when a rule is violated; nothing is
+    ///     stored then.
+    /// </exception>
+    public async Task ReopenReviewAsync(
+        Actor actor,
+        int projectId,
+        string reviewId,
+        string? reason,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(actor);
+        ArgumentNullException.ThrowIfNull(reviewId);
+        RejectApiToken(actor);
+        await _gate.WaitAsync(cancellationToken);
+        try
+        {
+            // Who: a live account that administers the project; asked again on every call
+            var user = await EnsureActorAsync(actor, projectId, cancellationToken);
+            await _access.RequireAdministerAsync(actor, projectId, cancellationToken);
+
+            // Why: a reason is mandatory and must fit in the audit entry together with the digest
+            var trimmed = reason?.Trim();
+            if (string.IsNullOrEmpty(trimmed) || trimmed.Length > ReviewLimits.MaxReopenReasonLength)
+            {
+                throw new DomainRuleException(
+                    DomainRule.ReopenReasonInvalid,
+                    $"A reason of at most {ReviewLimits.MaxReopenReasonLength} characters is required to reopen a review.");
+            }
+
+            // What: only an approved review is locked; the digest of that approval goes into the history
+            var snapshot = await _store.GetSnapshotAsync(projectId, reviewId, cancellationToken)
+                           ?? throw ReviewNotFound(reviewId);
+            if (!ReviewLock.IsApproved(snapshot.Record, snapshot.Slots, snapshot.Signatures))
+            {
+                throw new DomainRuleException(
+                    DomainRule.ReviewNotLocked,
+                    "The review is not locked, so there is nothing to reopen.");
+            }
+
+            var previousDigest = RecordDigest.Compute(snapshot.Record);
+            await _store.ReopenReviewAsync(
+                projectId,
+                reviewId,
+                new ReviewReopen(
+                    0,
+                    projectId,
+                    reviewId,
+                    _timeProvider.GetUtcNow(),
+                    user.Username,
+                    user.DisplayName,
+                    trimmed,
+                    previousDigest),
+                AuditDraft.By(
+                    actor,
+                    "review.reopened",
+                    $"previous digest {previousDigest}; reason: {trimmed}",
+                    projectId,
+                    reviewId),
+                cancellationToken);
         }
         finally
         {
@@ -541,7 +660,10 @@ public sealed class SigningService
     ///     Thrown with <see cref="DomainRule.ActorNotAllowed"/>, <see cref="DomainRule.ReviewNotFound"/>,
     ///     <see cref="DomainRule.SlotNotFound"/>, <see cref="DomainRule.SigningNotAllowed"/> (already signed, or
     ///     blocked by the checklist or threads), <see cref="DomainRule.ReauthenticationFailed"/> or
-    ///     <see cref="DomainRule.RecordChanged"/> when a rule is violated; nothing is stored then.
+    ///     <see cref="DomainRule.RecordChanged"/> when a rule is violated; nothing is stored then. Also thrown with
+    ///     <see cref="DomainRule.ReviewLocked"/> when the review is already approved and with
+    ///     <see cref="DomainRule.ReviewerNotIndependent"/> when the signer created the review and the project
+    ///     requires independent reviewers.
     /// </exception>
     public Task<ReviewSignature> SignAsync(
         Actor actor,
@@ -588,7 +710,10 @@ public sealed class SigningService
     ///     Thrown with <see cref="DomainRule.ActorNotAllowed"/>, <see cref="DomainRule.ReviewNotFound"/>,
     ///     <see cref="DomainRule.SlotNotFound"/>, <see cref="DomainRule.SigningNotAllowed"/> (already signed, or
     ///     blocked by the checklist or threads), <see cref="DomainRule.ReauthenticationFailed"/> or
-    ///     <see cref="DomainRule.RecordChanged"/> when a rule is violated; nothing is stored then.
+    ///     <see cref="DomainRule.RecordChanged"/> when a rule is violated; nothing is stored then. Also thrown with
+    ///     <see cref="DomainRule.ReviewLocked"/> when the review is already approved and with
+    ///     <see cref="DomainRule.ReviewerNotIndependent"/> when the signer created the review and the project
+    ///     requires independent reviewers.
     /// </exception>
     public async Task<ReviewSignature> SignWithCredentialsAsync(
         Actor actor,
@@ -611,6 +736,10 @@ public sealed class SigningService
             var user = await EnsureActorAsync(actor, projectId, cancellationToken);
             var (record, role) = await EnsureSignerOfSlotAsync(user, projectId, reviewId, slotId, cancellationToken);
 
+            // The author of the review may not sign it when the project requires independent reviewers; this is
+            // checked here, not only when the slot is filled, so a slot assigned before the rule was switched on
+            // is covered too, and it is refused before the password is asked for
+            await EnsureIndependentAsync(projectId, reviewId, user, cancellationToken);
             // The record must be the one the signer saw, and must be signable; both are refused before the
             // password is asked for
             var digest = await EnsureSignableAsync(
@@ -710,6 +839,9 @@ public sealed class SigningService
         string expectedDigest,
         CancellationToken cancellationToken)
     {
+        // An approved review is locked, so nobody signs it again; the message says why instead of "already signed"
+        await ReviewLock.EnsureUnlockedAsync(_store, projectId, reviewId, cancellationToken);
+
         var digest = RecordDigest.Compute(record);
         if (digest != expectedDigest)
         {
@@ -1003,6 +1135,7 @@ public sealed class SigningService
     ///     Checks the users chosen for a slot.
     /// </summary>
     /// <param name="projectId">The project the slot belongs to; the chosen users must be members of it.</param>
+    /// <param name="reviewId">The review the slot belongs to; its author may not be chosen while independence is required.</param>
     /// <param name="slots">The slots of the review now.</param>
     /// <param name="ownSlotId">The slot being changed, which does not count as "another slot"; <c>null</c> for a new slot.</param>
     /// <param name="primaryUserId">The chosen primary reviewer.</param>
@@ -1012,6 +1145,7 @@ public sealed class SigningService
     /// <exception cref="DomainRuleException">Thrown with <see cref="DomainRule.SlotUserInvalid"/> when the choice is not valid.</exception>
     private async Task ValidateMembersAsync(
         int projectId,
+        string reviewId,
         IReadOnlyList<ReviewerSlot> slots,
         int? ownSlotId,
         int primaryUserId,
@@ -1048,6 +1182,86 @@ public sealed class SigningService
         {
             throw SlotUserInvalid($"{enabled[taken[0]].DisplayName} is already in another slot of this review.");
         }
+
+        // The author of the review may not be one of its reviewers when the project requires independent ones
+        var (review, project) = await LoadForIndependenceAsync(projectId, reviewId, cancellationToken);
+        var authorChosen = new[] { primaryUserId, alternateUserId ?? 0 }
+            .Where(id => id != 0 && IsAuthorUnderIndependence(review, project, enabled[id]))
+            .ToList();
+        if (authorChosen.Count > 0)
+        {
+            throw new DomainRuleException(
+                DomainRule.ReviewerNotIndependent,
+                $"{enabled[authorChosen[0]].DisplayName} created this review and cannot be one of its reviewers " +
+                "while independent reviewers are required.");
+        }
+    }
+
+    /// <summary>
+    ///     Checks that a signer is not the author of the review while the project requires independent reviewers.
+    /// </summary>
+    /// <param name="projectId">The project identity.</param>
+    /// <param name="reviewId">The review identifier.</param>
+    /// <param name="user">The signer's account.</param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <returns>A task that completes when the signer is allowed.</returns>
+    /// <exception cref="DomainRuleException">
+    ///     Thrown with <see cref="DomainRule.ReviewerNotIndependent"/> when the signer created the review and the
+    ///     project requires independent reviewers.
+    /// </exception>
+    private async Task EnsureIndependentAsync(
+        int projectId,
+        string reviewId,
+        User user,
+        CancellationToken cancellationToken)
+    {
+        var (review, project) = await LoadForIndependenceAsync(projectId, reviewId, cancellationToken);
+        if (IsAuthorUnderIndependence(review, project, user))
+        {
+            throw new DomainRuleException(
+                DomainRule.ReviewerNotIndependent,
+                "You created this review, so you cannot be a reviewer of it. A different project member must " +
+                "review and sign it, or a project administrator can switch off 'Require independent reviewers'.");
+        }
+    }
+
+    /// <summary>
+    ///     Loads the review and its project, which together decide whether a user is the author of a review that
+    ///     needs independent reviewers.
+    /// </summary>
+    /// <param name="projectId">The project identity.</param>
+    /// <param name="reviewId">The review identifier.</param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <returns>The review and the project; each is <c>null</c> when it does not exist (nothing is then enforced).</returns>
+    private async Task<(Review? Review, Project? Project)> LoadForIndependenceAsync(
+        int projectId,
+        string reviewId,
+        CancellationToken cancellationToken)
+    {
+        var review = await _store.GetReviewAsync(projectId, reviewId, cancellationToken);
+        var project = await _store.GetProjectAsync(projectId, cancellationToken);
+        return (review, project);
+    }
+
+    /// <summary>
+    ///     Tells whether a user is the author of a review whose project requires independent reviewers.
+    /// </summary>
+    /// <param name="review">The review, or <c>null</c>.</param>
+    /// <param name="project">The project, or <c>null</c>.</param>
+    /// <param name="user">The user to test.</param>
+    /// <returns>
+    ///     <c>true</c> when the project requires independent reviewers and the review was created by the user. A review
+    ///     without a recorded author (for example one created from the command line) never matches.
+    /// </returns>
+    /// <remarks>
+    ///     The author is the Review Center user who created the review (for a review created with an API token, the
+    ///     owner of the token). The authors of git commits are not known to Review Center and are not matched.
+    /// </remarks>
+    private static bool IsAuthorUnderIndependence(Review? review, Project? project, User user)
+    {
+        return project is { RequireIndependentReviewers: true }
+               && !string.IsNullOrEmpty(review?.CreatedBy)
+               && string.Equals(review.CreatedBy, user.Username, StringComparison.OrdinalIgnoreCase);
     }
 
     /// <summary>

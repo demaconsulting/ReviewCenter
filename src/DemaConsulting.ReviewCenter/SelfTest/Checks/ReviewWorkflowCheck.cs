@@ -101,16 +101,20 @@ internal static class ReviewWorkflowCheck
     {
         try
         {
-            // A system administrator who is also the project member who signs; the password goes through the
-            // production hasher, so the later re-authentication is the real one
+            // A system administrator who is the project member who creates the review (its author), and a second
+            // project member who reviews and signs it: with independent reviewers required (the default) the author
+            // cannot sign. The passwords go through the production hasher, so the later re-authentication is the real one
             var users = provider.GetRequiredService<UserService>();
             var user = await users.CreateAsync(
                 "selftest", "Self Test", true, SelfTestServices.SelfTestSecret, Actor.CommandLine, cancellationToken);
+            var reviewer = await users.CreateAsync(
+                "selftest-reviewer", "Self Test Reviewer", false, SelfTestServices.SelfTestSecret, Actor.CommandLine, cancellationToken);
             var actor = new Actor(user.Username, user.DisplayName);
+            var reviewerActor = new Actor(reviewer.Username, reviewer.DisplayName);
             var projects = provider.GetRequiredService<ProjectService>();
             var project = await projects.CreateAsync("Self-test project", null, actor, cancellationToken);
             await projects.AddMemberAsync(actor, project.Id, user.Username, ProjectRole.User, cancellationToken);
-
+            await projects.AddMemberAsync(actor, project.Id, reviewer.Username, ProjectRole.User, cancellationToken);
             // A local repository registered like any other, then planned and created through the planner
             var origin = await originTask;
             await gitVersion;
@@ -131,8 +135,9 @@ internal static class ReviewWorkflowCheck
                 $"The review was not created: {created.Message}");
             var reviewId = created.ReviewId!;
 
-            // Answer every checklist item and sign with the password
-            await SignAsync(provider, project.Id, reviewId, user, actor, cancellationToken);
+            // Answer every checklist item, show that the author cannot be a reviewer, then sign with the password
+            // as the separate reviewer
+            await SignAsync(provider, projects, project.Id, reviewId, new People(user, actor, reviewer, reviewerActor), cancellationToken);
 
             // The signed review must be in the evidence index with its fingerprint and the record digest
             var review = await provider.GetRequiredService<ReviewService>().GetAsync(project.Id, reviewId, cancellationToken);
@@ -148,7 +153,12 @@ internal static class ReviewWorkflowCheck
                     && !string.IsNullOrEmpty(approval.Digest),
                 "The signed review was not found in the evidence index with its fingerprint and record digest.");
 
-            return $"embedded SQLite; review signed; evidence index fingerprint {Short(entry!.Fingerprint)}, " +
+            // An approved review is locked: a change is refused, and only an administrator's reopen (with a reason)
+            // takes it back to review
+            await CheckLockAndReopenAsync(provider, project.Id, reviewId, actor, cancellationToken);
+
+            return "embedded SQLite; review signed by a separate reviewer; author signature refused; " +
+                $"approved review locked and reopened by an administrator; evidence index fingerprint {Short(entry!.Fingerprint)}, " +
                 $"record digest {Short(approval!.Digest)}";
         }
         catch (DomainRuleException ex)
@@ -159,36 +169,121 @@ internal static class ReviewWorkflowCheck
     }
 
     /// <summary>
-    ///     Answers every checklist item with Pass and lets the user sign with a password re-authentication.
+    ///     The two people of the workflow: the author of the review and the separate reviewer.
+    /// </summary>
+    /// <param name="Author">The user who creates the review and answers its checklist.</param>
+    /// <param name="AuthorActor">The actor of the author.</param>
+    /// <param name="Reviewer">The user who reviews and signs.</param>
+    /// <param name="ReviewerActor">The actor of the reviewer.</param>
+    private sealed record People(User Author, Actor AuthorActor, User Reviewer, Actor ReviewerActor);
+
+    /// <summary>
+    ///     Answers every checklist item with Pass, shows that the author cannot be a reviewer, and lets the separate
+    ///     reviewer sign with a password re-authentication.
     /// </summary>
     /// <param name="provider">The service provider.</param>
+    /// <param name="projects">The project service, to switch the independence rule off and on again.</param>
     /// <param name="projectId">The project number.</param>
     /// <param name="reviewId">The review to sign.</param>
-    /// <param name="user">The user who signs.</param>
-    /// <param name="actor">The actor of the user.</param>
+    /// <param name="people">The author and the reviewer.</param>
     /// <param name="cancellationToken">Cancels the work.</param>
     /// <returns>A task that completes when the review is signed.</returns>
+    /// <exception cref="ValidationFailedException">Thrown when the author is not refused as reviewer and signer.</exception>
     private static async Task SignAsync(
         IServiceProvider provider,
+        ProjectService projects,
         int projectId,
         string reviewId,
-        User user,
-        Actor actor,
+        People people,
         CancellationToken cancellationToken)
     {
         var checklists = provider.GetRequiredService<ChecklistService>();
         foreach (var item in DefaultChecklist.Current.Sections.SelectMany(section => section.Items))
         {
             await checklists.SetAnswerAsync(
-                projectId, reviewId, item.Id, ChecklistOutcome.Pass, null, actor, cancellationToken);
+                projectId, reviewId, item.Id, ChecklistOutcome.Pass, null, people.AuthorActor, cancellationToken);
         }
 
         var signing = provider.GetRequiredService<SigningService>();
-        var slot = await signing.AddSlotAsync(actor, projectId, reviewId, user.Id, null, cancellationToken);
         var digest = (await signing.GetApprovalAsync(projectId, reviewId, cancellationToken))?.Digest
             ?? throw new ValidationFailedException("The review has no record digest to sign.");
+
+        // The author is refused as a reviewer. To show that the signature is refused as well, the rule is switched
+        // off just long enough to seat the author, then on again: the author's signature attempt must fail
+        await ExpectRefusedAsync(
+            DomainRule.ReviewerNotIndependent,
+            () => signing.AddSlotAsync(people.AuthorActor, projectId, reviewId, people.Author.Id, null, cancellationToken));
+        await projects.SetRequireIndependentReviewersAsync(people.AuthorActor, projectId, true, false, cancellationToken);
+        var authorSlot = await signing.AddSlotAsync(
+            people.AuthorActor, projectId, reviewId, people.Author.Id, null, cancellationToken);
+        await projects.SetRequireIndependentReviewersAsync(people.AuthorActor, projectId, false, true, cancellationToken);
+        await ExpectRefusedAsync(
+            DomainRule.ReviewerNotIndependent,
+            () => signing.SignAsync(
+                people.AuthorActor, projectId, reviewId, authorSlot.Id, digest, SelfTestServices.SelfTestSecret, cancellationToken));
+        await signing.RemoveSlotAsync(people.AuthorActor, projectId, reviewId, authorSlot.Id, cancellationToken);
+
+        // The separate reviewer holds the one slot and signs
+        var slot = await signing.AddSlotAsync(
+            people.AuthorActor, projectId, reviewId, people.Reviewer.Id, null, cancellationToken);
         await signing.SignAsync(
-            actor, projectId, reviewId, slot.Id, digest, SelfTestServices.SelfTestSecret, cancellationToken);
+            people.ReviewerActor, projectId, reviewId, slot.Id, digest, SelfTestServices.SelfTestSecret, cancellationToken);
+    }
+
+    /// <summary>
+    ///     Shows that an approved review refuses a change, and that an administrator's reopen takes it back to review.
+    /// </summary>
+    /// <param name="provider">The service provider.</param>
+    /// <param name="projectId">The project number.</param>
+    /// <param name="reviewId">The approved review.</param>
+    /// <param name="admin">The administrator who reopens the review.</param>
+    /// <param name="cancellationToken">Cancels the work.</param>
+    /// <returns>A task that completes when the review is reopened.</returns>
+    /// <exception cref="ValidationFailedException">Thrown when the change is not refused or the review stays approved.</exception>
+    private static async Task CheckLockAndReopenAsync(
+        IServiceProvider provider,
+        int projectId,
+        string reviewId,
+        Actor admin,
+        CancellationToken cancellationToken)
+    {
+        var firstItem = DefaultChecklist.Current.Sections.SelectMany(section => section.Items).First();
+        await ExpectRefusedAsync(
+            DomainRule.ReviewLocked,
+            () => provider.GetRequiredService<ChecklistService>().SetAnswerAsync(
+                projectId, reviewId, firstItem.Id, ChecklistOutcome.Fail, "Changed after approval", admin, cancellationToken));
+
+        var signing = provider.GetRequiredService<SigningService>();
+        await signing.ReopenReviewAsync(admin, projectId, reviewId, "Self-test reopen", cancellationToken);
+        var approval = await signing.GetApprovalAsync(projectId, reviewId, cancellationToken);
+        ValidationFailedException.ThrowUnless(
+            approval is { IsApproved: false, Reopens.Count: 1 },
+            "The review was still approved after the administrator reopened it.");
+    }
+
+    /// <summary>
+    ///     Runs an operation that must be refused with a given rule.
+    /// </summary>
+    /// <param name="rule">The rule the refusal must carry.</param>
+    /// <param name="operation">The operation, which must throw.</param>
+    /// <returns>A task that completes when the operation was refused as expected.</returns>
+    /// <exception cref="ValidationFailedException">Thrown when the operation succeeds or is refused for another reason.</exception>
+    private static async Task ExpectRefusedAsync(DomainRule rule, Func<Task> operation)
+    {
+        try
+        {
+            await operation();
+        }
+        catch (DomainRuleException ex) when (ex.Rule == rule)
+        {
+            return;
+        }
+        catch (DomainRuleException ex)
+        {
+            throw new ValidationFailedException($"Expected the refusal {rule} but got {ex.Rule}: {ex.Message}");
+        }
+
+        throw new ValidationFailedException($"Expected the refusal {rule} but the operation succeeded.");
     }
 
     /// <summary>

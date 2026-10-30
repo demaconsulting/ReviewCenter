@@ -63,6 +63,10 @@ namespace DemaConsulting.ReviewCenter.Evidence;
 ///     already the final text (see <see cref="AttestationService"/>).
 /// </param>
 /// <param name="IsAnonymousRequest">Whether the request that produced the document came without signing in.</param>
+/// <param name="Reopens">
+///     The times the review was reopened by an administrator after an earlier approval, oldest first; <c>null</c> or
+///     empty when it never was. The renderer prints the reopen history only when there is any.
+/// </param>
 internal sealed record AttestationDocument(
     int ProjectId,
     string ProjectName,
@@ -89,7 +93,15 @@ internal sealed record AttestationDocument(
     DateTimeOffset GeneratedAt,
     string GeneratedBy,
     EvidenceSettings Content,
-    bool IsAnonymousRequest);
+    bool IsAnonymousRequest,
+    IReadOnlyList<AttestationReopen>? Reopens = null);
+
+/// <summary>A time the review was reopened after an approval.</summary>
+/// <param name="ReopenedAt">The time of the reopen.</param>
+/// <param name="ReopenedBy">The administrator who reopened the review, as the evidence settings allow to name them.</param>
+/// <param name="Reason">The reason the administrator gave.</param>
+/// <param name="PreviousDigest">The digest of the approved record that was reopened.</param>
+internal sealed record AttestationReopen(DateTimeOffset ReopenedAt, string ReopenedBy, string Reason, string PreviousDigest);
 
 /// <summary>A file under review.</summary>
 /// <param name="Path">The path of the file.</param>

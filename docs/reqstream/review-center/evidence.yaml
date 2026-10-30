@@ -17,10 +17,12 @@ sections:
           The Evidence subsystem shall produce, for a completed review, a PDF document that states the review, its
           content fingerprint, its files, its checklist answers, its threads, its reviewer sign-offs, the head of the
           audit trail, and the key that signed it, in the same bytes for the same input, with the files, checklist
-          wording, threads, reviewer names, and git context left out as the evidence settings of the project say.
+          wording, threads, reviewer names, and git context left out as the evidence settings of the project say, and,
+          for a review that was reopened after an approval, the history of the reopenings.
         justification: |
           The approval of a review must be portable. A document that holds what was reviewed and who signed, and that
-          is the same when it is made again, can be filed, printed, and checked outside the tool.
+          is the same when it is made again, can be filed, printed, and checked outside the tool. A reader must also
+          be able to see that an approval followed one that was reopened.
         children:
           - ReviewCenter-PdfDocumentWriter-Structure
           - ReviewCenter-PdfDocumentWriter-Deterministic
@@ -31,6 +33,7 @@ sections:
           - ReviewCenter-AttestationRenderer-ThreadLimit
           - ReviewCenter-AttestationRenderer-SignOffs
           - ReviewCenter-AttestationRenderer-Output
+          - ReviewCenter-AttestationService-ReopenHistory
         tests:
           - EvidenceSubsystem_CompletedReview_IsOfferedAndDownloadedAsSignedPdf
 

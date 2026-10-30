@@ -229,7 +229,9 @@ public class ProjectAccessGuardTests
         var planner = new ReviewPlanner(store, reviews, repositories, git, signing, new FakeReviewSetParser(), access);
 
         var member = new Actor("usr", "usr");
-        await reviews.CreateDraftAsync(own.Id, "rev-1", "First", [new UploadedFile("a.txt", [1, 2, 3])], member, cancellationToken);
+
+        // The review is created by the administrator: its author cannot be a reviewer, and the member is the reviewer
+        await reviews.CreateDraftAsync(own.Id, "rev-1", "First", [new UploadedFile("a.txt", [1, 2, 3])], root, cancellationToken);
         var thread = await threads.StartThreadAsync(own.Id, "rev-1", new ThreadAnchor("a.txt"), member, "first", cancellationToken);
         var slot = await signing.AddSlotAsync(member, own.Id, "rev-1", ids["usr"], null, cancellationToken);
         return new World(

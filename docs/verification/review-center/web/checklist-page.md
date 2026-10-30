@@ -36,8 +36,10 @@ N/A - standard test environment.
   review once the whole checklist is complete.
 - Every interactive element has a kebab-case `data-testid`, and the interactive marker is `true` after the page has
   rendered on a live connection.
-
-#### Test Scenarios
+- A review that is approved is shown as locked: a notice (`checklist-locked`) says that the checklist is read-only and
+  that an administrator can reopen the review, and the Pass, Fail, and N/A buttons, the justification and reason boxes,
+  the save buttons, and the applicability switches are disabled and marked `data-locked="true"`, while the sections
+  can still be opened and read; a review that is not approved shows no notice and enabled controls.
 
 **ChecklistPage_Render_NewReview_ShowsProgressAndOpensFirstSection**: The page is rendered for a new review; the
 status line, the overall progress, all 14 sections with their progress, and exactly one open section are shown, and
@@ -114,6 +116,12 @@ button, input, and text area of the page has a kebab-case `data-testid`. This sc
 
 **ChecklistPage_AfterRender_Interactive_SetsMarker**: The page is rendered; the root element reports interactivity.
 This scenario is tested by `ChecklistPage_AfterRender_Interactive_SetsMarker`.
+
+**ChecklistPage_Render_ApprovedReview_ShowsLockedAndDisablesControls**: The page is rendered for a review whose every
+slot holds a current signature; the notice `checklist-locked` is shown, the check buttons, the justification boxes, the
+save buttons, and the applicability switches are disabled and marked `data-locked="true"`, and a section can still be
+opened. The same page for a review that is not approved shows no notice and no disabled control. This scenario is
+tested by `ChecklistPage_Render_ApprovedReview_ShowsLockedAndDisablesControls`.
 
 **ChecklistPage_Render_NonMember_LooksLikeAMissingReview**: A review is opened by a user who is no member of the
 project. The not-found text equals the text for a project that does not exist (apart from the project number), and no

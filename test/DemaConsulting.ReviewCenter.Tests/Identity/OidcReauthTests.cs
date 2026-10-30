@@ -569,7 +569,7 @@ public class OidcReauthTests : IClassFixture<IdentityProviderFixture>
         await world.AddMemberAsync("boss");
         await world.AddMemberAsync("olive");
         await app.Services.GetRequiredService<ReviewService>().CreateDraftAsync(
-            project.Id, ReviewId, "First review", [new("a.txt", TestContent.A)], cancellationToken);
+            project.Id, ReviewId, "First review", [new("a.txt", TestContent.A)], world.Boss, cancellationToken);
         await EvidenceTestSupport.AnswerAllPassAsync(
             app.Services.GetRequiredService<ChecklistService>(), project.Id, ReviewId);
         var olive = await OidcTestApp.UserAsync(app, "olive");

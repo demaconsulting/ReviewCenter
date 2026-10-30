@@ -19,6 +19,7 @@
 // SOFTWARE.
 
 using System.Net;
+using DemaConsulting.ReviewCenter.Api;
 using DemaConsulting.ReviewCenter.Core;
 using DemaConsulting.ReviewCenter.Tests.Core;
 using DemaConsulting.ReviewCenter.Tests.Evidence;
@@ -127,6 +128,48 @@ public class ApiSubsystemTests
         Assert.Equal(HttpStatusCode.OK, index.StatusCode);
         Assert.Equal("application/pdf", pdf.Content.Headers.ContentType?.MediaType);
         Assert.Equal(HttpStatusCode.Unauthorized, after.StatusCode);
+    }
+
+    /// <summary>
+    ///     Test that an approved (locked) review stays readable through the API with its attestation and evidence
+    ///     index, that a change of it is refused by the services and is answered as a 409 problem, and that after an
+    ///     administrator reopens it the API reports it as not approved.
+    /// </summary>
+    [Fact(Timeout = 120000)]
+    public async Task ApiSubsystem_LockedReview_StaysReadableAndMutationIsProblem409()
+    {
+        // Arrange: an approved review and a token
+        await using var app = await StartAsync();
+        var projectId = await AttestationEndpointTests.CreateReviewAsync(app, signed: true);
+        var token = await CreateTokenAsync(app);
+        using var client = ClientFor(app, token.Value);
+        var route = $"/api/projects/{projectId}/reviews/REV-1";
+
+        // Act: read the locked review, its attestation and the evidence index, and try to change it
+        var read = await client.GetAsync(route, TestContext.Current.CancellationToken);
+        using var readJson = await JsonAsync(read);
+        var pdf = await client.GetAsync($"{route}/attestation.pdf", TestContext.Current.CancellationToken);
+        var index = await client.GetAsync($"/api/projects/{projectId}/evidence/index.json", TestContext.Current.CancellationToken);
+        var refusal = await Assert.ThrowsAsync<DomainRuleException>(() => app.Services.GetRequiredService<ThreadService>().StartThreadAsync(
+            projectId, "REV-1", new ThreadAnchor("a.txt", 1, 1), TestActors.Ann, "Late remark", TestContext.Current.CancellationToken));
+        var problem = Assert.IsType<Microsoft.AspNetCore.Http.HttpResults.ProblemHttpResult>(ApiProblems.ToResult(refusal));
+
+        // Assert: readable, and the refused change maps to 409
+        Assert.Equal(HttpStatusCode.OK, read.StatusCode);
+        Assert.True(readJson.RootElement.GetProperty("approved").GetBoolean());
+        Assert.Equal(HttpStatusCode.OK, pdf.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, index.StatusCode);
+        Assert.Equal(DomainRule.ReviewLocked, refusal.Rule);
+        Assert.Equal(409, problem.StatusCode);
+
+        // Act: an administrator reopens the review
+        await app.Services.GetRequiredService<SigningService>().ReopenReviewAsync(
+            TestActors.Ann, projectId, "REV-1", "Found a gap", TestContext.Current.CancellationToken);
+        var reread = await client.GetAsync(route, TestContext.Current.CancellationToken);
+        using var rereadJson = await JsonAsync(reread);
+
+        // Assert: no longer approved
+        Assert.False(rereadJson.RootElement.GetProperty("approved").GetBoolean());
     }
 
     /// <summary>

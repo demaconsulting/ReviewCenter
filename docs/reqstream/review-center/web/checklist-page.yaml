@@ -98,3 +98,15 @@ sections:
           - ChecklistPage_Render_OpeningSection_ClosesOthers
           - ChecklistPage_Render_EveryInteractiveElementHasKebabCaseTestId
           - ChecklistPage_AfterRender_Interactive_SetsMarker
+
+      - id: ReviewCenter-ChecklistPage-Locked
+        title: >-
+          The ChecklistPage unit shall show a notice that the review is approved and locked, and disable the answer
+          buttons, the justification fields, the save buttons, and the applicability switches of the sections, while
+          the review is locked, and shall keep the checklist readable and the navigation available.
+        justification: |
+          The answers are part of what the signatures approved. A user who cannot change them must see why. The
+          lock itself is enforced by the checklist service, which refuses the change with the message of the rule if a
+          stale page still sends it.
+        tests:
+          - ChecklistPage_Render_ApprovedReview_ShowsLockedAndDisablesControls

@@ -93,6 +93,9 @@ N/A - standard test environment.
   nothing, records nothing, and shows the not-found message and none of the settings or messages; reusing the page for
   another project drops the choices and the project.
 - The interactive marker of the evidence settings page is `true` after it has rendered on a live connection.
+- The project page shows a project admin and a system administrator a "Review rules" card with the switch "Require
+  independent reviewers", on by default; saving a change stores it, confirms it, and records one audit entry
+  `project.independent-reviewers-changed`; a plain member sees no card.
 
 #### Test Scenarios
 
@@ -377,6 +380,16 @@ total-size error is shown and no selection is kept. This scenario is tested by
 
 **ProjectPage_AfterRender_Interactive_SetsMarker**: The project page is rendered; its root element has
 `data-interactive` equal to `true`. This scenario is tested by `ProjectPage_AfterRender_Interactive_SetsMarker`.
+
+**ProjectPage_ReviewRules_AdminSavesToggle**: A project admin opens the project page; the Review rules card
+(`review-rules-card`) shows the switch `independent-reviewers-switch` turned on. The switch is turned off and
+`independent-reviewers-save` is pressed; the status "Independent reviewers are no longer required." is shown, the
+project stores the new value, and one audit entry `project.independent-reviewers-changed` exists. Saving again
+without a change says that the rules were already set this way. This scenario is tested by
+`ProjectPage_ReviewRules_AdminSavesToggle`.
+
+**ProjectPage_ReviewRules_NonAdmin_HidesCard**: The project page of a plain member has no Review rules card, no
+switch, and no save button. This scenario is tested by `ProjectPage_ReviewRules_NonAdmin_HidesCard`.
 
 **Evidence settings** are verified in `EvidenceSettingsPageTests.cs`, with the real `EvidenceSettingsService` and the
 real access rules behind the page.

@@ -51,6 +51,12 @@ internal static class TestActors
     ///     User <c>eve</c>, displayed as <c>Eve</c>.
     /// </summary>
     public static Actor Eve { get; } = new("eve", "Eve");
+
+    /// <summary>
+    ///     User <c>author</c>, displayed as <c>Author</c>: creates reviews in tests and is never a project member
+    ///     or a reviewer, so that the independence of reviewers does not get in the way of unrelated tests.
+    /// </summary>
+    public static Actor Author { get; } = new("author", "Author");
 }
 
 /// <summary>

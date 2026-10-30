@@ -19,8 +19,10 @@
 // SOFTWARE.
 
 using System.Text.RegularExpressions;
+using DemaConsulting.ReviewCenter.Core;
 using DemaConsulting.ReviewCenter.Utilities;
 using Microsoft.Data.Sqlite;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace DemaConsulting.ReviewCenter.Tests;
 
@@ -260,6 +262,77 @@ public partial class IntegrationTests
         // Assert: output contains level-3 markdown headings
         Assert.Equal(0, run.ExitCode);
         Assert.Contains("### DEMA Consulting", run.Output);
+    }
+
+    /// <summary>
+    ///     Test the whole integrity journey on the running host with a real SQLite database: an author creates a
+    ///     review, a separate reviewer signs it so it is approved and locked, a change is refused, an administrator
+    ///     reopens it with a reason, the old signature no longer approves, a new signature approves it again, and the
+    ///     attestation PDF then shows the reopen history.
+    /// </summary>
+    [Fact(Timeout = 120000)]
+    public async Task IntegrationTests_ApprovalLockReopenResign_EndToEnd()
+    {
+        // Arrange: a host, two administrators (ann authors and reopens, cyd reviews), and a draft review of ann
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var app = await Api.ApiTestSupport.StartAsync();
+        await Api.ApiTestSupport.EnsureUserAsync(app, "ann");
+        await Api.ApiTestSupport.EnsureUserAsync(app, "cyd");
+        var users = app.Services.GetRequiredService<UserService>();
+        var cyd = (await users.GetAsync("cyd", cancellationToken))!;
+        var project = await app.Services.GetRequiredService<ProjectService>().CreateAsync("Apollo", null, cancellationToken);
+        var store = app.Services.GetRequiredService<IReviewStore>();
+        await store.AddMembershipAsync(cyd.Id, project.Id, cancellationToken);
+        await app.Services.GetRequiredService<ReviewService>().CreateDraftAsync(
+            project.Id, "rev-1", "First review", [new("a.txt", Core.TestContent.A)], Core.TestActors.Ann, cancellationToken);
+        var checklists = app.Services.GetRequiredService<ChecklistService>();
+        foreach (var item in DefaultChecklist.Current.Sections.SelectMany(section => section.Items))
+        {
+            await checklists.SetAnswerAsync(
+                project.Id, "rev-1", item.Id, ChecklistOutcome.Pass, null, Core.TestActors.Ann, cancellationToken);
+        }
+
+        var signing = app.Services.GetRequiredService<SigningService>();
+        var slot = await signing.AddSlotAsync(Core.TestActors.Ann, project.Id, "rev-1", cyd.Id, null, cancellationToken);
+        var reviewer = new Actor("cyd", "Cyd");
+
+        // Act: the separate reviewer signs; then a change is tried, and the attestation is read while locked
+        var first = (await signing.GetApprovalAsync(project.Id, "rev-1", cancellationToken))!;
+        await signing.SignAsync(reviewer, project.Id, "rev-1", slot.Id, first.Digest, Tests.TestBrowser.Password, cancellationToken);
+        var locked = (await signing.GetApprovalAsync(project.Id, "rev-1", cancellationToken))!;
+        var refusal = await Assert.ThrowsAsync<DomainRuleException>(() => app.Services.GetRequiredService<ThreadService>().StartThreadAsync(
+            project.Id, "rev-1", new ThreadAnchor("a.txt", 1, 1), reviewer, "Late remark", cancellationToken));
+        using var client = Api.ApiTestSupport.ClientFor(app, (await Api.ApiTestSupport.CreateTokenAsync(app)).Value);
+        var attestationRoute = $"/api/projects/{project.Id}/reviews/rev-1/attestation.pdf";
+        var lockedPdf = await client.GetAsync(attestationRoute, cancellationToken);
+
+        // Assert: approved and locked, the change refused, the attestation still available without a reopen history
+        Assert.True(first.Slots.All(s => s.SignedAt is null));
+        Assert.True(locked.IsApproved);
+        Assert.Equal(first.Digest, locked.Digest);
+        Assert.Equal(DomainRule.ReviewLocked, refusal.Rule);
+        Assert.Equal(System.Net.HttpStatusCode.OK, lockedPdf.StatusCode);
+        Assert.DoesNotContain("Reopen history", string.Join("\n", new Evidence.PdfInspector(await lockedPdf.Content.ReadAsByteArrayAsync(cancellationToken)).TextLines), StringComparison.Ordinal);
+
+        // Act: an administrator reopens it with a reason, then the reviewer signs the new digest
+        await signing.ReopenReviewAsync(Core.TestActors.Ann, project.Id, "rev-1", "Missed a case.", cancellationToken);
+        var reopened = (await signing.GetApprovalAsync(project.Id, "rev-1", cancellationToken))!;
+        await signing.SignAsync(reviewer, project.Id, "rev-1", slot.Id, reopened.Digest, Tests.TestBrowser.Password, cancellationToken);
+        var approvedAgain = (await signing.GetApprovalAsync(project.Id, "rev-1", cancellationToken))!;
+        var finalPdf = await client.GetAsync(attestationRoute, cancellationToken);
+
+        // Assert: reopened review was unsigned for the new digest, approved again by a fresh signature, with the history in the attestation
+        Assert.False(reopened.IsApproved);
+        Assert.NotEqual(locked.Digest, reopened.Digest);
+        Assert.True(approvedAgain.IsApproved);
+        Assert.Equal(reopened.Digest, approvedAgain.Digest);
+        var reopen = Assert.Single(approvedAgain.Reopens!);
+        Assert.Equal("Missed a case.", reopen.Reason);
+        Assert.Equal(locked.Digest, reopen.PreviousDigest);
+        Assert.Equal(System.Net.HttpStatusCode.OK, finalPdf.StatusCode);
+        var text = string.Join("\n", new Evidence.PdfInspector(await finalPdf.Content.ReadAsByteArrayAsync(cancellationToken)).TextLines);
+        Assert.Contains("Reopen history", text, StringComparison.Ordinal);
+        Assert.Contains("Missed a case.", text, StringComparison.Ordinal);
     }
 
     /// <summary>

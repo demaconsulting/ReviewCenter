@@ -160,6 +160,18 @@ internal static class AuditTestExtensions
     }
 
     /// <summary>
+    ///     Switches the independence of reviewers off for a project, as the default actor, for a test that has the
+    ///     creator of a review also review it.
+    /// </summary>
+    public static Task SetIndependentReviewersOffAsync(
+        this ProjectService service,
+        int projectId,
+        CancellationToken cancellationToken = default)
+    {
+        return service.SetRequireIndependentReviewersAsync(DefaultActor, projectId, true, false, cancellationToken);
+    }
+
+    /// <summary>
     ///     Builds the evidence index as the default actor.
     /// </summary>
     public static Task<IReadOnlyList<EvidenceIndexEntry>> BuildAsync(
@@ -284,8 +296,14 @@ internal static class AuditTestExtensions
     }
 
     /// <summary>
-    ///     Creates a draft review as the default actor.
+    ///     Creates a draft review as <see cref="TestActors.Author"/>, who is no project member and so can never be
+    ///     a reviewer of it.
     /// </summary>
+    /// <remarks>
+    ///     A test that goes through the real project access (a signed-in user, a real database) cannot use this,
+    ///     because the author must see the project: it creates the review as its user and switches the independence
+    ///     of reviewers off with <see cref="SetIndependentReviewersOffAsync"/>.
+    /// </remarks>
     public static Task<Review> CreateDraftAsync(
         this ReviewService service,
         int projectId,
@@ -294,7 +312,7 @@ internal static class AuditTestExtensions
         IReadOnlyList<UploadedFile> files,
         CancellationToken cancellationToken = default)
     {
-        return service.CreateDraftAsync(projectId, id, title, files, DefaultActor, cancellationToken);
+        return service.CreateDraftAsync(projectId, id, title, files, TestActors.Author, cancellationToken);
     }
 
     /// <summary>
@@ -476,5 +494,47 @@ internal static class AuditTestExtensions
         CancellationToken cancellationToken = default)
     {
         return store.UpdateAsync(user, Draft(), cancellationToken);
+    }
+
+    /// <summary>
+    ///     Approves (and so locks) a review: answers every check, seats a new user as the only reviewer and lets
+    ///     that user sign.
+    /// </summary>
+    /// <remarks>
+    ///     The reviewer is a new user (not the author of the review) with its own user store, so the helper works
+    ///     for any fake review store whose project allows the reviewer. The review must have no open thread.
+    /// </remarks>
+    /// <param name="store">The review store that holds the review.</param>
+    /// <param name="clock">The clock of the services.</param>
+    /// <param name="projectId">The project of the review.</param>
+    /// <param name="reviewId">The review to approve.</param>
+    /// <param name="reviewerName">The user name (and display name) of the new reviewer.</param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <returns>The digest the approval is for.</returns>
+    public static async Task<string> ApproveReviewAsync(
+        FakeReviewStore store,
+        TimeProvider clock,
+        int projectId,
+        string reviewId,
+        string reviewerName = "approver",
+        CancellationToken cancellationToken = default)
+    {
+        const string password = "correct horse battery";
+        var users = new UserService(new FakeUserStore(), new FakePasswordHasher(), clock);
+        var reviewer = await users.CreateAsync(reviewerName, reviewerName, UserRole.Reviewer, password, cancellationToken);
+        await store.AddMembershipAsync(reviewer.Id, projectId, cancellationToken);
+        var checklists = TestServices.Checklists(store, clock);
+        foreach (var item in DefaultChecklist.Current.Sections.SelectMany(section => section.Items))
+        {
+            await checklists.SetAnswerAsync(
+                projectId, reviewId, item.Id, ChecklistOutcome.Pass, null, TestActors.Ann, cancellationToken);
+        }
+
+        var signing = TestServices.Signing(store, users, clock);
+        var actor = new Actor(reviewerName, reviewerName);
+        var slot = await signing.AddSlotAsync(actor, projectId, reviewId, reviewer.Id, null, cancellationToken);
+        var digest = (await signing.GetApprovalAsync(projectId, reviewId, cancellationToken))!.Digest;
+        await signing.SignAsync(actor, projectId, reviewId, slot.Id, digest, password, cancellationToken);
+        return digest;
     }
 }

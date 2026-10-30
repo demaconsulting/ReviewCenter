@@ -100,6 +100,18 @@ refused, and links to the Evidence settings topic. The topic says that a signatu
 them again, with the password (and the code of the second factor, when there is one) or by signing in again at the
 identity provider.
 
+**Review integrity text**: Three topics explain the approval lock and the review rules, in static text. Reviewers and
+signing (`HelpSigningPage`) has two list items: an approved review is locked (nobody can add comments, change answers,
+change the files, or change the reviewers), a project admin or a system administrator can reopen it with a reason, the
+reopen is recorded in the audit trail, the old signatures are kept as history, and the reviewers must sign again; and,
+when the project requires independent reviewers (the default), the person who created a review cannot be one of its
+reviewers and cannot sign it, where only the person who created the review in ReviewCenter is checked and the authors
+of the commits are not. Reading a review (`HelpReadingReviewPage`) says that on an approved review the + buttons and the
+comment forms are disabled while every file and diff can still be read, and links to Reviewers and signing. Managing
+project members (`HelpMembersPage`) has a "Review rules" section that says the Review rules card of the project page is
+also only for a project admin or a system administrator, switches on or off whether the person who created a review may
+also be one of its reviewers, is on by default, and that every change is recorded in the audit trail.
+
 **Identity provider text**: Three topics mention sign-in with an OpenID Connect provider, in static text that does not
 depend on whether an administrator has turned it on (the pages have no access to the settings): Getting started
 (`HelpGettingStartedPage`) says that the sign-in page may offer a "Sign in with ..." button, that the account is

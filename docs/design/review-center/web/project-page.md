@@ -35,7 +35,11 @@ administrator and a project admin of the project, a "Repositories" button to `/p
 `/projects/{id}/evidence-settings`; when the project has
 no enabled repository, a short note says to add one with the Repositories button (to whoever manages the project) or
 to ask a project administrator (to anybody else). The rare actions sit on their own pages behind buttons, so the
-members section holds only a "+ Add member" button, and the page never loads a list of users.
+members section holds only a "+ Add member" button, and the page never loads a list of users. For an administrator
+`ProjectPage` also shows a "Review rules" card above the members: the switch "Require independent reviewers" with a
+hint that the person who created a review cannot be one of its reviewers and cannot sign it, that the switch can be
+turned off for a project where one person has to do both, and that ReviewCenter only knows who created the review in
+this tool and does not match the authors of commits, and a "Save review rules" button.
 
 Because `/projects/{id}/reviews/new` is the address of the form, the review identifier `new` (in any letter case) is
 reserved: `NewReviewPage` refuses it, so a review that could never be opened is never created.
@@ -89,7 +93,9 @@ users nor holds a form for adding one. **CanAdminister** (`ProjectPage`): whethe
 system administrator or a project admin), from `IProjectAccess`. **Members** (`ProjectPage`): the `ProjectMember` list
 from `ProjectService.ListMembersAsync`, loaded only when `CanAdminister`.
 **MemberError**, **MemberStatus**: the refusal (for example the last-project-admin message) or the outcome of the last
-membership change.
+membership change. **RequireIndependentChoice** (`ProjectPage`): the state of the switch as shown, which starts at the
+stored `Project.RequireIndependentReviewers`. **RulesError**, **RulesStatus**: the refusal or the outcome of the last
+save of the review rules.
 
 The remaining state belongs to `NewReviewPage`, `NewMemberPage`, `NewMemberAccountPage`, and `EvidenceSettingsPage`.
 
@@ -132,7 +138,10 @@ name) `member-row-{username}`, `member-name-{username}`, `member-role-{username}
 and `member-remove-{username}`, then `add-member-button` (the "+ Add member" link button to the add member page). Each
 review is one row
 of `reviews-list`: the identifier is the link, followed by the title, the state and approval badges, and the creation
-date. `evidence-settings-link` is the "Evidence settings" button, shown to whoever administers the project.
+date. `evidence-settings-link` is the "Evidence settings" button, shown to whoever administers the project. The Review
+rules card of an administrator has `review-rules-card`, `review-rule-independent-reviewers` (the row),
+`independent-reviewers-switch` (the checkbox), `independent-reviewers-save`, `review-rules-status`, and
+`review-rules-error`.
 
 Test identifiers of `EvidenceSettingsPage`: `evidence-settings-page` (root), `breadcrumb-projects-link`,
 `breadcrumb-project-link`, `evidence-settings-loading`, `project-not-found`, `evidence-settings-form`,
@@ -187,6 +196,16 @@ change, shows the outcome in `member-status` (only after the members were reload
 `DomainRuleException` in `member-error` (only when the guard, asked again, still allows it), and reloads the members.
 The page holds no membership rule; the refusal to remove or demote the last project administrator comes from
 `ProjectService` and is shown as the error of the section.
+
+**SaveReviewRulesAsync** (`ProjectPage`): Clears the two messages, runs `GuardMembersAsync`, asks for the current user,
+and calls `ProjectService.SetRequireIndependentReviewersAsync` with the user, the project, the value the page loaded as
+the expected value, and the switch as the new value. Core refuses it unless the user administers the project and refuses
+an API token, performs the compare-and-set, and appends the audit entry `project.independent-reviewers-changed` in the
+same step. The page then reloads the project and shows "Independent reviewers are now required.", "Independent
+reviewers are no longer required.", or, when the stored value already was the chosen one, "The review rules were
+already set this way." A `DomainRuleException` (for example the refusal of a save over a change by someone else) is shown
+in `review-rules-error` only when the guard, asked again, still passes, and the page loads the stored value again and
+shows it in the switch.
 
 **GuardMembersAsync** (`ProjectPage`): Asks `ProjectViewGuard.GuardViewAsync` whether the user still sees the project;
 when not, `ShowNoAccess` drops the project, the reviews, the approved set, the repositories, and the member state, and
@@ -308,7 +327,8 @@ the subsystem.
 - **SessionGate** (App) — wraps the whole content of each page, so the page is replaced by a "Session ended" message
   when the sign-in state of the open page ends.
 - **ProjectService** — reads the project for the actor, lists the members, adds a member by exact user name, creates a
-  member account with a temporary password, removes a member, and changes a role.
+  member account with a temporary password, removes a member, changes a role, and changes the review rule
+  `RequireIndependentReviewers`.
 - **ReviewService** — lists reviews (`ProjectPage`) and creates them (`NewReviewPage`).
 - **RepositoryService** — lists the enabled repositories of the project (names only, never a location or token), for
   the plan link and for the drop-down.

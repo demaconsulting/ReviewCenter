@@ -22,7 +22,12 @@
    id), and the data-interactive marker on the root flips to "true" once the live circuit is connected.
 
    The page body is inside SessionGate, which replaces it with a "Session ended" message when the user is no longer
-   valid while the page is open. *@
+   valid while the page is open.
+
+   An approved review is locked: a Locked badge and a banner explain it, and every control that would change the
+   review (new thread, reply, resolve, line comments, reviewer slots) is disabled. A project or system administrator
+   sees a reopen form (a reason of up to 250 characters is required); the reopen history is listed. When the project
+   requires independent reviewers the author of the review is not offered as a reviewer and is told so. *@
 @page "/projects/{ProjectId:int}/reviews/{ReviewId}"
 @page "/projects/{ProjectId:int}/reviews/{ReviewId}/files/{**FilePath}"
 @page "/projects/{ProjectId:int}/reviews/{ReviewId}/threads/{ThreadId:int}"
@@ -59,9 +64,59 @@
             @if (Approval is not null)
             {
                 <span class="badge @(Approval.IsApproved ? "approved" : null)" data-testid="review-approval">@(Approval.IsApproved ? "Approved" : "In review")</span>
+                @if (IsLocked)
+                {
+                    <span class="badge locked" data-testid="review-locked">Locked</span>
+                }
             }
             <a class="action outline" href="/projects/@ProjectId/reviews/@ReviewId/history" data-testid="history-link">History</a>
         </div>
+
+        @if (IsLocked)
+        {
+            <section class="card" data-testid="review-locked-banner">
+                <p class="notice" role="status">
+                    This review is approved and locked. Its content, checklist and reviewers can no longer change.
+                    A project administrator can reopen it; the signatures are then kept as history and the review
+                    must be signed again.
+                </p>
+                @if (CanReopen)
+                {
+                    <form data-testid="reopen-form" novalidate @onsubmit="ReopenAsync">
+                        <div class="field">
+                            <label for="reopen-reason">Reason for reopening <span class="required">* required</span></label>
+                            <textarea id="reopen-reason" rows="2" maxlength="@ReviewLimits.MaxReopenReasonLength"
+                                      data-testid="reopen-reason" value="@ReopenReason"
+                                      @oninput="e => ReopenReason = e.Value?.ToString() ?? string.Empty"></textarea>
+                        </div>
+                        @if (ReopenError is not null)
+                        {
+                            <p class="error" role="alert" data-testid="reopen-error">@ReopenError</p>
+                        }
+                        <button type="submit" data-testid="reopen-button">Reopen review</button>
+                    </form>
+                }
+            </section>
+        }
+
+        @if (Approval?.Reopens is { Count: > 0 } reopens)
+        {
+            <section class="card" data-testid="reopen-history">
+                <h2>Reopen history</h2>
+                <ul class="item-list">
+                    @for (var n = 0; n < reopens.Count; n++)
+                    {
+                        var reopen = reopens[n];
+                        <li data-testid="reopen-entry-@n">
+                            <strong data-testid="reopen-by-@n">@reopen.ReopenedByDisplayName</strong>
+                            <time class="muted" datetime="@reopen.ReopenedAt.UtcDateTime.ToString("O")" data-testid="reopen-time-@n">@FormatTime(reopen.ReopenedAt)</time>
+                            <p data-testid="reopen-reason-@n">@reopen.Reason</p>
+                            <p class="muted hint">Earlier record <span class="hash" data-testid="reopen-digest-@n">@ShortDigest(reopen.PreviousDigest)</span></p>
+                        </li>
+                    }
+                </ul>
+            </section>
+        }
 
         @if (Approval?.IsApproved == true)
         {
@@ -114,6 +169,12 @@
         {
             reviewersCard = @<section class="card" data-testid="reviewers-card">
                 <h2>Reviewers and signing</h2>
+                @if (ShowAuthorHint)
+                {
+                    <p class="notice" data-testid="author-independence-hint">
+                        You created this review, so a different project member has to review and sign it.
+                    </p>
+                }
                 @if (approval.Slots.Count == 0)
                 {
                     <p class="muted" data-testid="slots-empty">No reviewer slots yet.</p>
@@ -152,7 +213,7 @@
                                 <summary>Change reviewers</summary>
                                 <select aria-label="Primary reviewer of slot @slot.Number" data-testid="slot-primary-select-@slotId"
                                         value="@PrimaryChoice(slot)" @onchange="e => SlotPrimaryChoices[slotId] = e.Value?.ToString() ?? string.Empty">
-                                    @foreach (var candidate in Candidates)
+                                    @foreach (var candidate in VisibleCandidates)
                                     {
                                         <option value="@candidate.UserId">@candidate.DisplayName (@candidate.Username)</option>
                                     }
@@ -160,7 +221,7 @@
                                 <select aria-label="Alternate reviewer of slot @slot.Number" data-testid="slot-alternate-select-@slotId"
                                         value="@AlternateChoice(slot)" @onchange="e => SlotAlternateChoices[slotId] = e.Value?.ToString() ?? string.Empty">
                                     <option value="">No alternate</option>
-                                    @foreach (var candidate in Candidates)
+                                    @foreach (var candidate in VisibleCandidates)
                                     {
                                         <option value="@candidate.UserId">@candidate.DisplayName (@candidate.Username)</option>
                                     }
@@ -267,18 +328,24 @@
                 <form class="slot-add" data-testid="slot-add-form" novalidate @onsubmit="AddSlotAsync">
                     <details open="@(approval.Slots.Count == 0 || NewSlotError is not null)">
                     <summary>Add a slot</summary>
+                    @if (IsLocked)
+                    {
+                        <p class="muted hint" data-testid="slots-locked-hint">The reviewers cannot change while the review is locked.</p>
+                    }
                     <select aria-label="Primary reviewer of the new slot" data-testid="new-slot-primary-select"
+                            disabled="@IsLocked" data-locked="@LockedMarker"
                             value="@NewSlotPrimary" @onchange="e => NewSlotPrimary = e.Value?.ToString() ?? string.Empty">
                         <option value="">Choose a primary reviewer</option>
-                        @foreach (var candidate in Candidates)
+                        @foreach (var candidate in VisibleCandidates)
                         {
                             <option value="@candidate.UserId">@candidate.DisplayName (@candidate.Username)</option>
                         }
                     </select>
                     <select aria-label="Alternate reviewer of the new slot" data-testid="new-slot-alternate-select"
+                            disabled="@IsLocked" data-locked="@LockedMarker"
                             value="@NewSlotAlternate" @onchange="e => NewSlotAlternate = e.Value?.ToString() ?? string.Empty">
                         <option value="">No alternate</option>
-                        @foreach (var candidate in Candidates)
+                        @foreach (var candidate in VisibleCandidates)
                         {
                             <option value="@candidate.UserId">@candidate.DisplayName (@candidate.Username)</option>
                         }
@@ -287,7 +354,7 @@
                     {
                         <p class="error" role="alert" data-testid="new-slot-error">@NewSlotError</p>
                     }
-                    <button type="submit" class="@(approval.Slots.Count == 0 ? null : "secondary")" data-testid="new-slot-add-button">Add slot</button>
+                    <button type="submit" disabled="@IsLocked" data-locked="@LockedMarker" class="@(approval.Slots.Count == 0 ? null : "secondary")" data-testid="new-slot-add-button">Add slot</button>
                     </details>
                 </form>
             </section>;
@@ -413,6 +480,7 @@
                     @if (expanded)
                     {
                         <button type="button" class="secondary" data-testid="thread-toggle-@threadId"
+                                disabled="@IsLocked" data-locked="@LockedMarker"
                                 aria-label="@(resolved ? "Reopen" : "Resolve") thread @threadId"
                                 @onclick="() => ToggleThreadAsync(item)">@(resolved ? "Reopen" : "Resolve")</button>
                     }
@@ -433,13 +501,14 @@
                     <div class="reply">
                         <textarea id="reply-text-@threadId" rows="2" maxlength="@ReviewLimits.MaxCommentLength"
                                   aria-label="Reply to thread @threadId" placeholder="Reply"
-                                  data-testid="reply-text-@threadId" value="@ReplyTexts.GetValueOrDefault(threadId)"
+                                  data-testid="reply-text-@threadId" disabled="@IsLocked" data-locked="@LockedMarker" value="@ReplyTexts.GetValueOrDefault(threadId)"
                                   @oninput="e => ReplyTexts[threadId] = e.Value?.ToString() ?? string.Empty"></textarea>
                         @if (ReplyErrors.TryGetValue(threadId, out var replyError))
                         {
                             <p class="error" role="alert" data-testid="reply-error-@threadId">@replyError</p>
                         }
                         <button type="button" class="secondary" data-testid="reply-button-@threadId"
+                                disabled="@IsLocked" data-locked="@LockedMarker"
                                 aria-label="Post reply to thread @threadId"
                                 @onclick="() => ReplyAsync(threadId)">Reply</button>
                     </div>
@@ -479,6 +548,7 @@
                 <div class="field">
                     <label for="thread-text">Comment</label>
                     <textarea id="thread-text" rows="3" maxlength="@ReviewLimits.MaxCommentLength"
+                              disabled="@IsLocked" data-locked="@LockedMarker"
                               data-testid="thread-text-input" @bind="NewText" @bind:event="oninput"></textarea>
                 </div>
                 @if (NewThreadError is not null)
@@ -486,7 +556,7 @@
                     <p class="error" role="alert" data-testid="thread-error">@NewThreadError</p>
                 }
                 <div class="form-actions">
-                    <button type="submit" data-testid="start-thread-button">Start thread</button>
+                    <button type="submit" disabled="@IsLocked" data-locked="@LockedMarker" data-testid="start-thread-button">Start thread</button>
                     @if (inlineComposer)
                     {
                         <button type="button" class="secondary" data-testid="thread-cancel-button" @onclick="CancelComment">Cancel</button>
@@ -558,6 +628,7 @@
                                   ThreadTemplate="threadCard"
                                   Composer="newThreadForm"
                                   OnComment="request => GuardedAsync(() => CommentOnDiffLine(request))"
+                                  CommentsDisabled="IsLocked"
                                   CanReveal="GuardChildAsync" />
                     }
                 }
@@ -604,6 +675,7 @@
                             <div class="code-line @(anchoredLines.Contains(number) ? "anchored" : null) @(IsFocusedLine(focusedThread, number) || (HighlightLine == number && HighlightSide == ThreadSide.Head) ? "focused" : null)" data-testid="code-line-@number">
                                 <span class="gutter">
                                     <button type="button" class="line-comment" data-testid="line-comment-@number"
+                                            disabled="@IsLocked" data-locked="@LockedMarker"
                                             aria-label="Comment on line @number" title="Comment on line @number"
                                             @onclick="() => GuardedAsync(() => CommentOnLine(lineNumber))">+</button>
                                     <span class="line-no" data-testid="line-no-@number">@number</span>

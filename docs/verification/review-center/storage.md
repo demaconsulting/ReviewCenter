@@ -53,6 +53,11 @@ The native SQLite library must be loadable on the test platform (it is supplied 
 - The evidence settings of a project are stored with the project (the defaults for a new project), are changed only
   when the stored settings still equal the expected ones, and are stored with their audit entry or not at all; this is
   verified in the unit tests of `ReviewStore` on the real database.
+- The approval lock and the reopen history survive a restart: a review that was approved, reopened by an administrator,
+  and signed again is read back after the database is closed and opened again with its reopen (who, why, and the
+  previous digest), its old and new signatures, and the approval; the store itself refuses a thread, a checklist
+  answer, and a slot change on an approved review with `ReviewLocked`, without the services in between, and stores
+  nothing; the `RequireIndependentReviewers` setting of a project is stored with the project.
 - Personal access tokens written through the service, with one of them revoked, are still present after the database is
   closed and opened again: the value of the kept token still authenticates its owner, the revoked token is refused,
   and no
@@ -98,6 +103,15 @@ alternate reviewer signs it with the correct password; the database is closed an
 again: the review is approved, the single slot is signed by the alternate reviewer at the saved time, and the
 signature is current for the unchanged record. This scenario is tested by
 `StorageSubsystem_Signatures_PersistAcrossReopenAndStayCurrent`.
+
+**StorageSubsystem_ReopenAndLock_SurviveRestartAndRefuseWritesInTransaction**: Over a new database, a review created by
+one user is answered completely and signed by a second user through the services, so that it is approved. The store
+is then called directly (not through the services): adding a thread, answering a check, and adding a slot are each
+refused with `ReviewLocked` and store nothing. An administrator reopens the review with a reason, the reviewer signs the
+new record, and the database is closed and opened again. The review is read back approved, with one reopen that holds
+the administrator, the reason, and the previous digest, with the old signature (out of date) and the new one (current),
+and the `review.reopened` entry in the audit trail, whose chain verifies. This scenario is tested by
+`StorageSubsystem_ReopenAndLock_SurviveRestartAndRefuseWritesInTransaction`.
 
 **StorageSubsystem_Repositories_PersistAcrossReopen**: A system administrator is created over a new database, a
 project is created, and a private repository with a user name and a token is registered in it through

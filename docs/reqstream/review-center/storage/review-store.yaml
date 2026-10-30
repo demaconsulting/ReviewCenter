@@ -180,6 +180,39 @@ sections:
           - ReviewStore_UpdateEvidenceSettingsAsync_Change_IsPersistedAndAudited
           - ReviewStore_UpdateEvidenceSettingsAsync_ExpectedDiffers_ChangesNothing
 
+      - id: ReviewCenter-ReviewStore-ApprovalLockInTransaction
+        title: >-
+          The ReviewStore class shall refuse with the ReviewLocked rule, inside the same transaction that would store
+          the change, to store a thread, a comment, a thread state, a section state, a checklist answer, or the
+          addition, change, or removal of a reviewer slot, when the review is approved at that moment, using the same
+          definition of approved as the Core services, shall store nothing and no audit entry then, and shall not
+          refuse a change to a review that does not exist for this reason.
+        justification: |
+          The Core services check the lock before they write, but a final signature may be stored between that check
+          and the change. Repeating the check in the transaction of the change closes that gap, so that no
+          interleaving of two requests can change an approved review.
+        tests:
+          - ReviewStore_WriteMethods_ApprovedReview_RefuseWithReviewLockedInTransaction
+
+      - id: ReviewCenter-ReviewStore-ReopenHistory
+        title: >-
+          The ReviewStore class shall store the reopening of an approved review as an append-only row with the user,
+          the display name, the time, the reason, and the digest of the approved record, together with its audit
+          entry in one transaction, shall refuse with the ReviewNotLocked rule, storing nothing, a review that is not
+          approved at that moment, shall list the reopenings of one review in the order in which they were made, shall
+          include their number in the record that a signature covers, and shall change the setting that requires
+          independent reviewers of a project only through an atomic compare-and-set with its audit entry in the same
+          transaction, reporting a project that does not exist or a value that is no longer the expected one without
+          a change and without an entry.
+        justification: |
+          The history of who reopened which approval and why is evidence, so it must exist exactly when the reopening
+          took effect, and two administrators acting together must not both reopen the same approval. Including the
+          number in the record is what makes the earlier signatures out of date. The setting decides who may sign, so
+          it follows the same atomic rule as the other settings of a project.
+        tests:
+          - ReviewStore_ReopenReviewAsync_Persists_AuditAndHistory
+          - ReviewStore_UpdateRequireIndependentReviewersAsync_CompareAndSet
+
       - id: ReviewCenter-ReviewStore-Audit
         title: >-
           The ReviewStore class shall store every audited change (project, review, thread, comment, thread state,

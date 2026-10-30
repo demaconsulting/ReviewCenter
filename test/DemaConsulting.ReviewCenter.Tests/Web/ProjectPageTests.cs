@@ -817,6 +817,60 @@ public class ProjectPageTests : PageTestBase
     }
 
     /// <summary>
+    ///     Test that a project administrator sees the review rules with the default (independent reviewers
+    ///     required), switches the rule off and on again, and that each change is stored and audited.
+    /// </summary>
+    [Fact]
+    public async Task ProjectPage_ReviewRules_AdminSavesToggle()
+    {
+        // Arrange: a project administrator with the page open
+        var projectId = await ArrangeProjectAdminAsync(secondAdmin: false);
+        var cut = RenderProjectPage(projectId);
+        Assert.True(cut.Find("[data-testid='independent-reviewers-switch']").HasAttribute("checked"));
+
+        // Act: switch off and save
+        await cut.Find("[data-testid='independent-reviewers-switch']").ChangeAsync(new ChangeEventArgs { Value = false });
+        await cut.Find("[data-testid='independent-reviewers-save']").ClickAsync();
+
+        // Assert: stored, reported, and audited
+        Assert.Equal("Independent reviewers are no longer required.", cut.Find("[data-testid='review-rules-status']").TextContent);
+        var stored = await Projects.GetAsync(TestActors.Ann, projectId, TestContext.Current.CancellationToken);
+        Assert.False(stored!.RequireIndependentReviewers);
+        Assert.Contains(
+            Store.Audits,
+            e => e.Action == ProjectService.IndependentReviewersChangedAction
+                && e.ProjectId == projectId
+                && e.Detail.Contains("on->off", StringComparison.Ordinal));
+
+        // Act: switch on again and save
+        await cut.Find("[data-testid='independent-reviewers-switch']").ChangeAsync(new ChangeEventArgs { Value = true });
+        await cut.Find("[data-testid='independent-reviewers-save']").ClickAsync();
+
+        // Assert: required again
+        Assert.Equal("Independent reviewers are now required.", cut.Find("[data-testid='review-rules-status']").TextContent);
+        Assert.True((await Projects.GetAsync(TestActors.Ann, projectId, TestContext.Current.CancellationToken))!.RequireIndependentReviewers);
+    }
+
+    /// <summary>
+    ///     Test that a plain member does not see the review rules card.
+    /// </summary>
+    [Fact]
+    public async Task ProjectPage_ReviewRules_NonAdmin_HidesCard()
+    {
+        // Arrange: a plain member who is signed in
+        var projectId = await ArrangeProjectAdminAsync(secondAdmin: false);
+        SignInAs("mbr", "Zed Member", isSystemAdmin: false);
+
+        // Act: render the page
+        var cut = RenderProjectPage(projectId);
+
+        // Assert: no rules card, switch or save button
+        Assert.Empty(cut.FindAll("[data-testid='review-rules-card']"));
+        Assert.Empty(cut.FindAll("[data-testid='independent-reviewers-switch']"));
+        Assert.Empty(cut.FindAll("[data-testid='independent-reviewers-save']"));
+    }
+
+    /// <summary>
     ///     Test that with a second project administrator the first one may remove themselves.
     /// </summary>
     [Fact]

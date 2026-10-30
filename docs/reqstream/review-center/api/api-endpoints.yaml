@@ -150,6 +150,19 @@ sections:
         tests:
           - ApiEndpoints_Routes_NoSigningOrSlotRoutes
 
+      - id: ReviewCenter-ApiEndpoints-LockedReview
+        title: >-
+          The ApiEndpoints unit shall answer a request that a service refuses because the review is approved and
+          locked (ReviewLocked), or because it is not locked (ReviewNotLocked), with status 409 and a problem document
+          that carries the message of the rule, and shall keep a locked review readable, with its attestation and its
+          evidence index entry, and offer no route that reopens a review.
+        justification: |
+          A script that meets the lock must be able to tell it from a mistake in its request, which status 409 does,
+          and must be able to keep reading the approved review and its evidence. Reopening is a decision of a person
+          who administers the project, so the API has no way to do it with a token.
+        tests:
+          - ApiProblems_StatusOf_ReviewLockedAndNotLocked_Is409
+
       - id: ReviewCenter-ApiEndpoints-OpenRoutes
         title: >-
           The ApiEndpoints unit shall put exactly two routes, the evidence index and the attestation PDF, behind a

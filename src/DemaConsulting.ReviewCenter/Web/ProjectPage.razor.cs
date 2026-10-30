@@ -136,6 +136,21 @@ public partial class ProjectPage : ComponentBase
     private string? MemberStatus { get; set; }
 
     /// <summary>
+    ///     Gets the value of the independent reviewers switch as the user set it (not yet saved).
+    /// </summary>
+    private bool RequireIndependentChoice { get; set; } = true;
+
+    /// <summary>
+    ///     Gets the message of the last rejected review rule change, or <c>null</c> when there is none.
+    /// </summary>
+    private string? RulesError { get; set; }
+
+    /// <summary>
+    ///     Gets the message about the last stored review rule change, or <c>null</c> when there is none.
+    /// </summary>
+    private string? RulesStatus { get; set; }
+
+    /// <summary>
     ///     Gets the value rendered into the <c>data-interactive</c> attribute.
     /// </summary>
     /// <remarks>
@@ -154,6 +169,8 @@ public partial class ProjectPage : ComponentBase
         Loaded = false;
         MemberError = null;
         MemberStatus = null;
+        RulesError = null;
+        RulesStatus = null;
         var actor = await AuthenticationState.GetActorOrNullAsync();
         Project = await ProjectService.GetAsync(actor, ProjectId);
         if (actor is null || Project is null)
@@ -162,6 +179,7 @@ public partial class ProjectPage : ComponentBase
             return;
         }
 
+        RequireIndependentChoice = Project.RequireIndependentReviewers;
         Reviews = await ReviewService.ListAsync(ProjectId);
         Repositories = await RepositoryService.ListEnabledAsync(actor, ProjectId);
         CanAdminister = await Access.CanAdministerAsync(actor, ProjectId);
@@ -237,6 +255,57 @@ public partial class ProjectPage : ComponentBase
         Members = [];
         MemberError = null;
         MemberStatus = null;
+        RulesError = null;
+        RulesStatus = null;
+    }
+
+    /// <summary>
+    ///     Saves the review rules (today: whether independent reviewers are required).
+    /// </summary>
+    /// <returns>A task that completes when the rule is stored or the problem is shown.</returns>
+    /// <remarks>
+    ///     Only while the user may still view and administer the project. The change is a compare-and-set against the
+    ///     value the page loaded, so two administrators cannot silently overwrite each other; a stale value is shown
+    ///     as an error and the page reloads the stored value.
+    /// </remarks>
+    private async Task SaveReviewRulesAsync()
+    {
+        RulesError = null;
+        RulesStatus = null;
+        if (!await GuardMembersAsync())
+        {
+            return;
+        }
+
+        try
+        {
+            var actor = await AuthenticationState.GetActorAsync();
+            var expected = Project?.RequireIndependentReviewers ?? true;
+            var changed = await ProjectService.SetRequireIndependentReviewersAsync(
+                actor, ProjectId, expected, RequireIndependentChoice);
+            Project = await ProjectService.GetAsync(actor, ProjectId);
+            var message = "The review rules were already set this way.";
+            if (changed)
+            {
+                message = RequireIndependentChoice
+                    ? "Independent reviewers are now required."
+                    : "Independent reviewers are no longer required.";
+            }
+
+            RulesStatus = message;
+        }
+        catch (DomainRuleException ex)
+        {
+            // A refusal can also mean the right was lost during the call; ask again so that the error is shown only
+            // when the user may still see the section
+            if (await GuardMembersAsync())
+            {
+                RulesError = ex.Message;
+                var actor = await AuthenticationState.GetActorAsync();
+                Project = await ProjectService.GetAsync(actor, ProjectId);
+                RequireIndependentChoice = Project?.RequireIndependentReviewers ?? true;
+            }
+        }
     }
 
     /// <summary>

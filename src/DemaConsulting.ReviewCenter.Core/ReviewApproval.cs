@@ -77,14 +77,22 @@ public sealed record SlotStatus(
 ///     The status is computed on demand from the stored record, slots and signatures and is never stored, so it
 ///     cannot disagree with them. It is an immutable value holder and is safe to share between threads.
 /// </remarks>
-/// <param name="IsApproved"><c>true</c> when the review has at least one slot and every slot has a current signature.</param>
+/// <param name="IsApproved">
+///     <c>true</c> when the review has at least one slot and every slot has a current signature. An approved review is
+///     also locked (see <see cref="ReviewLock"/>); there is no separate locked flag, so the two can never differ.
+/// </param>
 /// <param name="Digest">The digest of the review record as it is now.</param>
 /// <param name="Slots">The slots in creation order.</param>
 /// <param name="Blockers">The plain-language reasons the review cannot be signed yet; empty when it can be.</param>
 /// <param name="NextStep">One short sentence that words what to do next.</param>
+/// <param name="Reopens">
+///     The history of reopens of the review, oldest first; <c>null</c> or empty for a review never reopened. It is
+///     filled by <see cref="SigningService.GetApprovalAsync"/> and <see cref="SigningService.GetApprovalsAsync"/>.
+/// </param>
 public sealed record ReviewApproval(
     bool IsApproved,
     string Digest,
     IReadOnlyList<SlotStatus> Slots,
     IReadOnlyList<string> Blockers,
-    string NextStep);
+    string NextStep,
+    IReadOnlyList<ReviewReopen>? Reopens = null);

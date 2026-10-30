@@ -800,6 +800,7 @@ public class ReviewDeepLinkTests : PageTestBase
             "REV-1",
             "Uploaded",
             [new UploadedFile(path, Encoding.UTF8.GetBytes("one\ntwo\nthree\n"))],
+            TestActors.Ann,
             TestContext.Current.CancellationToken);
         using var browser = new TestBrowser(app);
         var deepLink = ReviewLinks.ForFile(project.Id, "REV-1", path, 2);
@@ -834,7 +835,7 @@ public class ReviewDeepLinkTests : PageTestBase
         await using var app = await TestWebApp.StartAsync(new CapturingLoggerProvider(), "serve", "--silent");
         var project = await TestWebApp.CreateProjectAsync(app, "Apollo");
         await app.Services.GetRequiredService<ReviewService>().CreateDraftAsync(
-            project.Id, "REV-1", "Uploaded", [new UploadedFile(path, "one\ntwo\n"u8.ToArray())], TestContext.Current.CancellationToken);
+            project.Id, "REV-1", "Uploaded", [new UploadedFile(path, "one\ntwo\n"u8.ToArray())], TestActors.Ann, TestContext.Current.CancellationToken);
         using var browser = new TestBrowser(app);
 
         // Act: request the link signed out, log in with the offered return address, open where it leads
@@ -887,6 +888,7 @@ public class ReviewDeepLinkTests : PageTestBase
             "REV-1",
             "Uploaded",
             [new UploadedFile("x.txt", "one\ntwo\n"u8.ToArray()), new UploadedFile("y z.txt", "uno\ndos\n"u8.ToArray())],
+            TestActors.Ann,
             TestContext.Current.CancellationToken);
         var thread = await app.Services.GetRequiredService<ThreadService>().StartThreadAsync(
             project.Id, "REV-1", new ThreadAnchor("y z.txt", 2, 2, ThreadSide.Head), new Actor("ann", "Ann"), "Look", TestContext.Current.CancellationToken);

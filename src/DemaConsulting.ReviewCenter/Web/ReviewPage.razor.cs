@@ -394,6 +394,55 @@ public partial class ReviewPage : ComponentBase, IDisposable
     private IReadOnlyList<SlotMember> Candidates { get; set; } = [];
 
     /// <summary>
+    ///     Gets or sets a value indicating whether the project requires that the author of a review does not review it.
+    /// </summary>
+    private bool RequireIndependent { get; set; }
+
+    /// <summary>
+    ///     Gets or sets a value indicating whether the signed-in user may reopen a locked review (a project or system
+    ///     administrator).
+    /// </summary>
+    private bool CanReopen { get; set; }
+
+    /// <summary>
+    ///     Gets or sets the reason typed in the reopen form.
+    /// </summary>
+    private string ReopenReason { get; set; } = string.Empty;
+
+    /// <summary>
+    ///     Gets or sets the message shown when the review could not be reopened, or <c>null</c>.
+    /// </summary>
+    private string? ReopenError { get; set; }
+
+    /// <summary>
+    ///     Gets a value indicating whether the review is approved and therefore locked.
+    /// </summary>
+    private bool IsLocked => Approval?.IsApproved == true;
+
+    /// <summary>
+    ///     Gets the value of the <c>data-locked</c> attribute of a control that is disabled by the lock.
+    /// </summary>
+    private string LockedMarker => IsLocked ? "true" : "false";
+
+    /// <summary>
+    ///     Gets the users that are offered for a slot: every candidate, except the author of the review when the
+    ///     project requires independent reviewers.
+    /// </summary>
+    private IEnumerable<SlotMember> VisibleCandidates =>
+        RequireIndependent && Review is not null
+            ? Candidates.Where(c => !string.Equals(c.Username, Review.CreatedBy, StringComparison.OrdinalIgnoreCase))
+            : Candidates;
+
+    /// <summary>
+    ///     Gets a value indicating whether to tell the signed-in user that they cannot review their own review.
+    /// </summary>
+    private bool ShowAuthorHint =>
+        RequireIndependent
+        && Review is not null
+        && CurrentUsername.Length > 0
+        && string.Equals(CurrentUsername, Review.CreatedBy, StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>
     ///     Gets the user name of the signed-in user, used to tell which slots the user occupies.
     /// </summary>
     private string CurrentUsername { get; set; } = string.Empty;
@@ -557,6 +606,7 @@ public partial class ReviewPage : ComponentBase, IDisposable
         // A project the user may not see is treated like a missing one: nothing of its review is loaded
         var project = await ProjectService.GetAsync(await AuthenticationState.GetActorOrNullAsync(), ProjectId);
         ProjectName = project?.Name;
+        RequireIndependent = project?.RequireIndependentReviewers == true;
         Review = project is null ? null : await ReviewService.GetAsync(ProjectId, ReviewId);
         await RefreshAsync();
 
@@ -651,6 +701,10 @@ public partial class ReviewPage : ComponentBase, IDisposable
         Approval = null;
         Candidates = [];
         ClearNewThreadForm();
+        RequireIndependent = false;
+        CanReopen = false;
+        ReopenReason = string.Empty;
+        ReopenError = null;
         NewSlotPrimary = string.Empty;
         NewSlotAlternate = string.Empty;
         NewSlotError = null;
@@ -851,6 +905,7 @@ public partial class ReviewPage : ComponentBase, IDisposable
             Threads = await ThreadService.ListAsync(ProjectId, ReviewId);
             Checklist = await ChecklistService.GetAsync(ProjectId, ReviewId);
             Approval = await SigningService.GetApprovalAsync(ProjectId, ReviewId);
+            CanReopen = actor is not null && await Access.CanAdministerAsync(actor, ProjectId);
             try
             {
                 Candidates = actor is null ? [] : await SigningService.ListCandidatesAsync(actor, ProjectId);
@@ -1667,6 +1722,38 @@ public partial class ReviewPage : ComponentBase, IDisposable
         }
 
         SlotErrors.Remove(slotId);
+        await RefreshAsync();
+    }
+
+    /// <summary>
+    ///     Reopens the locked review with the typed reason.
+    /// </summary>
+    /// <returns>A task that completes when the review is reopened or the problem is shown.</returns>
+    /// <remarks>
+    ///     Only a project or system administrator is offered the form, and the service checks the same again. After a
+    ///     refusal the typed reason stays so it can be fixed; after success it is cleared and the page is reloaded, so
+    ///     the review shows as in review with its history.
+    /// </remarks>
+    private async Task ReopenAsync()
+    {
+        if (!await GuardAsync())
+        {
+            return;
+        }
+
+        try
+        {
+            await SigningService.ReopenReviewAsync(
+                await AuthenticationState.GetActorAsync(), ProjectId, ReviewId, ReopenReason);
+        }
+        catch (DomainRuleException ex)
+        {
+            ReopenError = ex.Message;
+            return;
+        }
+
+        ReopenError = null;
+        ReopenReason = string.Empty;
         await RefreshAsync();
     }
 

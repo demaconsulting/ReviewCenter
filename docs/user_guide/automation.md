@@ -9,7 +9,9 @@ pages, and the session cookie of the web pages is not accepted by the API.
 
 A token **never signs**. Signing a review, and adding, changing, or removing a reviewer slot, are not available in the
 API: there is no route for them, and the service refuses a token even if one existed. A signature always needs a
-person who enters the password again in the browser.
+person who enters the password again in the browser. For the same reason a token cannot **reopen** an approved review
+or change the review rules of a project (there is no route, and the service refuses a token); an administrator does
+both in the web pages (see Reopening an Approved Review and Review Rules in the Administration chapter).
 
 ## Create and Revoke a Token
 
@@ -111,7 +113,8 @@ The answer is a JSON object with a `reviews` list. Each entry has:
 What is listed:
 
 - Only **complete** reviews: every reviewer slot has signed the record that the review has now. A review that is not
-  complete, or that was changed after the signatures, is not listed, so it never satisfies a review-set.
+  complete, that was changed after the signatures, or that an administrator reopened and that is not signed again, is
+  not listed, so it never satisfies a review-set.
 - Only reviews that were **planned from a review-set**. A review that was created by uploading files, by choosing a
   repository by hand, or through the API has no review-set identifier and is not listed.
 - One entry for each identifier and fingerprint: the review that was completed last. The list is ordered by identifier
@@ -148,7 +151,11 @@ curl -X POST -H "Authorization: Bearer rcpat_YOUR_TOKEN" -H "Content-Type: appli
 The review starts as a **Draft**, like a review created on the web pages. It is flagged
 **created via API**: the review data of the API has `createdViaApi: true`, and its `review.created` audit entry names
 the token (by its short identifier, never its value). A person assigns the reviewers and the reviewers sign in the
-browser.
+browser. The **author** of the review is the owner of the token: in a project that requires independent reviewers (the
+default; see Review Rules in the Administration chapter), the owner of the token that created a review cannot be one of
+its reviewers and cannot sign it, just as if the owner had created it in the browser. A review that is approved is
+locked and cannot change until an administrator reopens it in the web pages (see Locked Reviews and Reopening in the
+Reviewing chapter).
 
 ## Errors, Refusals, and the Throttle
 
@@ -163,9 +170,15 @@ browser.
   attempts.
 - A request that is not valid is answered **400** with the fields at fault; a project, review, or repository that does
   not exist (or that the token's owner cannot see) **404**; a review identifier that is already used, a disabled
-  repository, or an attestation of a review that is not complete **409** (a request without a token, possible on the
+  repository, an attestation of a review that is not complete, or a change that is refused because the review is
+  approved and locked (or a reopen of a review that is not locked) **409** (a request without a token, possible on the
   anonymous attestation route, gets **404** instead); and a git repository that is not reachable
   **502**, **503**, or **504**.
+- A **locked review** stays readable. `GET` of the review shows `approved: true`, and its attestation PDF and the
+  evidence index keep working; the wire format has not changed. The API has no route that changes a thread, a checklist
+  answer, or a reviewer slot, so a token does not meet the lock today. If a refusal because of the lock is reported, it
+  is a **409** problem document whose detail is "This review is approved and locked. A project administrator must reopen
+  it before it can change.". There is no reopen route in the API.
 - Any other address under `/api` is answered with a JSON **404**, with or without a token, for every standard HTTP
   method (`GET`, `HEAD`, `POST`, `PUT`, `PATCH`, `DELETE`, `OPTIONS`).
 - The server behind a reverse proxy needs the setting described in Secure Cookie Behind a Reverse Proxy (in the

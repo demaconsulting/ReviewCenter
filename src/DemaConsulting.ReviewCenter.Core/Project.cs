@@ -58,4 +58,14 @@ public sealed class Project
     ///     <see cref="EvidenceSettings.Default"/> for a project that was never changed.
     /// </summary>
     public EvidenceSettings Evidence { get; init; } = EvidenceSettings.Default;
+
+    /// <summary>
+    ///     Gets a value indicating whether the person who created a review is kept out of its reviewer slots and
+    ///     cannot sign it; <c>true</c> (independent reviewers required) unless a project administrator switched it off.
+    /// </summary>
+    /// <remarks>
+    ///     "Created" means the Review Center user who created the review in this tool; the authors of the git
+    ///     commits of the reviewed files are not matched. See <see cref="SigningService"/> for where it is enforced.
+    /// </remarks>
+    public bool RequireIndependentReviewers { get; init; } = true;
 }

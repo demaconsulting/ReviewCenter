@@ -86,6 +86,13 @@ public partial class ChecklistPage : ComponentBase
     private ProjectService ProjectService { get; set; } = null!;
 
     /// <summary>
+    ///     Gets or sets the service that computes the approval status of a review, supplied by dependency injection;
+    ///     an approved review is locked and its checklist is shown read-only.
+    /// </summary>
+    [Inject]
+    private SigningService SigningService { get; set; } = null!;
+
+    /// <summary>
     ///     Gets or sets the browser script access used to scroll a check into view, supplied by dependency injection.
     /// </summary>
     [Inject]
@@ -122,6 +129,18 @@ public partial class ChecklistPage : ComponentBase
     ///     Gets the checklist state, or <c>null</c> when the review does not exist or has no checklist.
     /// </summary>
     private ChecklistState? State { get; set; }
+
+    /// <summary>
+    ///     Gets a value indicating whether the review is approved and therefore locked: the checklist is read-only until
+    ///     an administrator reopens the review.
+    /// </summary>
+    private bool IsLocked { get; set; }
+
+    /// <summary>
+    ///     Gets the value rendered into the <c>data-locked</c> attribute of a disabled control: <c>true</c> when the
+    ///     review is locked, otherwise <c>null</c> so the attribute is left out.
+    /// </summary>
+    private string? LockedMarker => IsLocked ? "true" : null;
 
     /// <summary>
     ///     Gets the identifier of the open section, or <c>null</c> when none is open.
@@ -184,7 +203,8 @@ public partial class ChecklistPage : ComponentBase
         ProjectName = project?.Name;
         Review = project is null ? null : await ReviewService.GetAsync(ProjectId, ReviewId);
         State = project is null ? null : await ChecklistService.GetAsync(ProjectId, ReviewId);
-
+        IsLocked = project is not null && State is not null
+            && (await SigningService.GetApprovalAsync(ProjectId, ReviewId))?.IsApproved == true;
         // Start where the work is: the first section with unanswered checks
         OpenSectionId = State?.FirstIncompleteSectionId();
         Loaded = true;
@@ -231,6 +251,7 @@ public partial class ChecklistPage : ComponentBase
     {
         Review = null;
         State = null;
+        IsLocked = false;
         ProjectName = null;
         OpenSectionId = null;
         PendingOutcomes.Clear();
@@ -428,6 +449,8 @@ public partial class ChecklistPage : ComponentBase
         }
         catch (DomainRuleException ex)
         {
+            // Somebody signed the last slot while the page was open: show the page as locked from now on
+            IsLocked |= ex.Rule == DomainRule.ReviewLocked;
             ItemErrors[itemId] = ex.Message;
             return;
         }
@@ -454,6 +477,7 @@ public partial class ChecklistPage : ComponentBase
         }
         catch (DomainRuleException ex)
         {
+            IsLocked |= ex.Rule == DomainRule.ReviewLocked;
             SectionErrors[sectionId] = ex.Message;
             return false;
         }

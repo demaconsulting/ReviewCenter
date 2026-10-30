@@ -118,6 +118,12 @@ public static class ReviewLimits
     public const int MaxCommentLength = 4000;
 
     /// <summary>
+    ///     The longest accepted reason for reopening an approved review, in characters; it is half of
+    ///     <see cref="AuditText.MaxDetailLength"/> so the reason and the previous digest fit in one audit entry.
+    /// </summary>
+    public const int MaxReopenReasonLength = 250;
+
+    /// <summary>
     ///     The longest accepted checklist justification or not-applicable reason, in characters.
     /// </summary>
     public const int MaxJustificationLength = 2000;

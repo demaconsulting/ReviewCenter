@@ -119,3 +119,18 @@ sections:
           - RecordDigest_Compute_SourceChange_ChangesDigest
           - RecordDigest_Compute_ChangeOrder_SameDigest
           - RecordDigest_Compute_ReviewSetId_IsCoveredAndDistinguishesNullFromEmpty
+
+      - id: ReviewCenter-RecordDigest-ReopenCount
+        title: >-
+          The RecordDigest class shall cover the number of times a review was reopened in the canonical text, as a
+          line that is written only when the number is greater than zero, shall give a different digest when the
+          number changes, and shall give for a review that was never reopened the same digest as before the reopening
+          existed, without a new format version.
+        justification: |
+          A reopened review must not accept its earlier signatures again, not even when the content is changed back to
+          what was signed. Counting the reopenings in the digest makes every earlier signature out of date for good,
+          while leaving the line out for a review that was never reopened keeps every existing signature and the
+          evidence index valid.
+        tests:
+          - RecordDigest_Compute_ZeroReopens_EqualsLegacyDigest
+          - RecordDigest_Compute_ReopensChangeDigest

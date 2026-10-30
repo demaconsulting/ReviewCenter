@@ -76,6 +76,12 @@ project (`IProjectAccess.RequireViewAsync`), so a user outside the project, like
 member of the project can answer. Reads (`GetAsync`) take no actor; the boundary guards them (every page and API
 handler first reads the project as the actor).
 
+**Approval lock**: the checklist is part of what the signatures cover, so while the review is approved (locked; see the
+`SigningService` unit) `SetAnswerAsync` and `SetSectionApplicabilityAsync` are refused with `ReviewLocked`. Each calls
+`ReviewLock.EnsureUnlockedAsync` after its input checks and before the store write, and the store repeats the check
+inside its write transaction. `GetAsync` is not affected. After an administrator reopens the review the checklist can
+change again.
+
 **GetAsync**: Reads the checklist of a review.
 
 - *Parameters*: `int projectId`, `string reviewId`, and a cancellation token.
@@ -88,7 +94,7 @@ handler first reads the project as the actor).
   `Actor actor`, and a cancellation token.
 - *Returns*: `Task`.
 - *Postconditions*: The section has one state; the reason is stored (trimmed) when the section does not apply and
-  cleared when it applies. Nothing is stored when a rule fails.
+  cleared when it applies. Nothing is stored when a rule fails (including `ReviewLocked`).
 
 **SetAnswerAsync**: Records the answer to one check.
 
@@ -97,11 +103,12 @@ handler first reads the project as the actor).
 - *Returns*: `Task`.
 - *Postconditions*: The check has exactly one answer, with the display name and user name of the actor and the UTC
   time from the clock; an
-  earlier answer is replaced. Nothing is stored when a rule fails.
+  earlier answer is replaced. Nothing is stored when a rule fails (including `ReviewLocked`).
 
 The rules are checked in this order, and the first violation is reported: that the review has a checklist
 (`ChecklistNotFound`); that the section or check is in the frozen checklist
-(`ChecklistItemNotFound`); and the justification or reason (`ChecklistJustificationInvalid`). An outcome that is not
+(`ChecklistItemNotFound`); the justification or reason (`ChecklistJustificationInvalid`); and that the review is not
+locked (`ReviewLocked`). An outcome that is not
 a defined value is a programming error and throws `ArgumentOutOfRangeException` before any rule is checked.
 
 **Audit**: Changing the applicability of a section records `checklist.applicability-changed`, and answering a check
@@ -118,6 +125,7 @@ construction, or a null actor, raises `ArgumentNullException`. Store failures pr
 
 - **IReviewStore** — reads the frozen checklist, section states and answers, and saves the changes (injected).
 - **IProjectAccess** — requires that the actor may see the project (injected).
+- **ReviewLock** (part of the `SigningService` unit) — refuses a change while the review is approved.
 - **TimeProvider** — supplies the answer times (injected).
 
 #### Callers
