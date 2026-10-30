@@ -20,20 +20,21 @@ N/A - standard test environment.
   or repository with its changes), the checklist wording, the answers with who answered, the sections that do not
   apply, and the threads with their comments, written as the design states.
 - The digest is the SHA-256 of the UTF-8 canonical text as 64 lowercase hexadecimal characters, and equals the known
-  values for the known records (an upload, a repository review, and an upload with a checklist), for the review-set
-  variants, and for the two thread sides.
-- Changing a covered value (the fingerprint, an answer, the reason of a section, a thread, the side of a thread, a
-  comment, the source
+  values for the known records (an upload, a repository review, an upload with a checklist, and a repository review with
+  the less common values), for the review-set variants, and for the two thread sides.
+- Changing a covered value (the fingerprint, an answer, the reason of a section, a thread, the side, either line, the
+  creation time, or the whole-file anchor of a thread, a comment and its author, user name, or time, the source
   kind, the repository, a commit, the selection, the review-set, or the path, kind, or hash of a change, or an added
   or removed change, or the wording of a check, a section title, or the checklist version) changes the digest.
 - Reordering the answers, sections, threads, and changes, the checklist sections and checks, or giving them other
   identities, does not change the digest; a different order of the comments of a thread does.
-- Who answered a check (display name or user name) changes the digest; when it was answered, and a section that
-  applies, do not.
+- Who answered a check (display name or user name) changes the digest; when it was answered, a section that applies,
+  and who marked a section as not applicable and when, do not.
 - A stored checklist definition that is not valid JSON, or is incomplete (a missing version, sections, section id,
   title or items, or item id or text), is not hidden: it raises a `JsonException`. A minimal complete definition
   still computes.
-- Text that contains the delimiters of the format cannot produce the digest of another record.
+- Text that contains the delimiters of the format, a path, title, or name that runs into the next value, and an absent
+  value versus the text `-` or the empty text, cannot produce the digest of another record.
 - A record that was never reopened (a reopen count of 0) has exactly the canonical text, and so the digest, that it had
   before reopening existed, with the same version line; a record that was reopened gets a final `reopens {count}` line,
   so its digest differs from that of the same record without reopens and from that of the same record with another
@@ -113,11 +114,23 @@ record. This scenario is tested by `RecordDigest_Compute_SourceChange_ChangesDig
 **RecordDigest_Compute_ChangeOrder_SameDigest**: The same changes in another order give the same digest. This
 scenario is tested by `RecordDigest_Compute_ChangeOrder_SameDigest`.
 
-**RecordDigest_Compute_CoveredChange_ChangesDigest**: A theory over a change of the fingerprint, the outcome or the
-justification of an answer, an added answer, a section that no longer applies, the reason of such a section, an added
-thread, a changed state, anchor, or path of a thread, the text or the author of a comment, and an added comment; each
+**RecordDigest_Compute_CoveredChange_ChangesDigest**: A theory over a change of the fingerprint, the outcome (to Fail,
+or to NotApplicable) or the justification of an answer (to another text, or from absent to empty), an added answer, a
+section that no longer applies, the reason of such a section, an added thread, a changed state, anchor (both lines, the
+start line alone, the end line alone, a removed start or end line, or the whole file), creation time, or path of a
+thread, the text, the author display name, the author user name, or the time of a comment, and an added comment; each
 gives a digest that differs from that of the unchanged record. This scenario is tested by
 `RecordDigest_Compute_CoveredChange_ChangesDigest`.
+
+**RecordDigest_Compute_CoveredFieldsRecord_MatchesDocumentedFormatAndKnownValue**: A repository record with an added
+file, a NotApplicable answer with an empty justification, and a resolved whole-file thread whose creation time differs
+from the time of its comment gives exactly the canonical text of the design and the known digests (without, and with
+one reopen) calculated with an independent script. This scenario is tested by
+`RecordDigest_Compute_CoveredFieldsRecord_MatchesDocumentedFormatAndKnownValue`.
+
+**RecordDigest_Compute_SectionSetterAndTime_NotCovered**: A section that does not apply, set by another person at
+another time, gives the same digest. This scenario is tested by
+`RecordDigest_Compute_SectionSetterAndTime_NotCovered`.
 
 **RecordDigest_Compute_ReorderedAndRenumbered_SameDigest**: The same answers, sections, and threads, listed in another
 order and with other row identities, give the same digest. This scenario is tested by
@@ -129,13 +142,22 @@ digest. This scenario is tested by `RecordDigest_Compute_CommentOrder_ChangesDig
 **RecordDigest_Compute_ApplicableSection_NotCovered**: A record with an additional section that applies has the same
 digest as the original. This scenario is tested by `RecordDigest_Compute_ApplicableSection_NotCovered`.
 
-**RecordDigest_Compute_TextWithDelimiters_DoesNotCollide**: A record with one comment whose text contains a line feed
-and a fake comment line, and a record with two real comments, give different digests. This scenario is tested by
-`RecordDigest_Compute_TextWithDelimiters_DoesNotCollide`.
+**RecordDigest_Compute_TextWithDelimiters_DoesNotCollide**: A theory over five pairs of different records that would
+have the very same text if strings were written without their length (values joined by a space, lines by a line
+feed): a comment whose text holds the next comment line versus two comments, a justification that runs into the
+display name of the answerer, an absent justification versus the text `-`, a path that runs into the change kind
+versus the shorter path with the kind and the baseline hash, and a checklist section title that holds an item line
+versus a title with a real item. Each pair gives different digests and different canonical texts; the test fails when
+the length prefix is removed. This scenario is tested by `RecordDigest_Compute_TextWithDelimiters_DoesNotCollide`.
+
+**RecordDigest_Compute_EmptyAndSplitValues_DoNotCollide**: Records whose justification and answerer split the same
+characters in different places, and records with an empty justification or an empty answerer, all give different
+digests. This scenario is tested by `RecordDigest_Compute_EmptyAndSplitValues_DoNotCollide`.
 
 **RecordDigest_Compute_ZeroReopens_EqualsLegacyDigest**: A record with a reopen count of 0 has the same canonical text
-(no `reopens` line) and the same digest as the known values of the records that were fixed before reopening existed.
-This scenario is tested by `RecordDigest_Compute_ZeroReopens_EqualsLegacyDigest`.
+(no `reopens` line) and the same digest as the known values of the records that were fixed before reopening existed:
+the upload, the repository, the checklist, and the head-side thread records, each with an explicit count of 0. This
+scenario is tested by `RecordDigest_Compute_ZeroReopens_EqualsLegacyDigest`.
 
 **RecordDigest_Compute_ReopensChangeDigest**: The same record with a reopen count of 1 and of 2 gives two digests that
 differ from each other and from the record without reopens, and the canonical text ends with the line `reopens 1`

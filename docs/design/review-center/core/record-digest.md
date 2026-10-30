@@ -52,6 +52,9 @@ text. Hashing is the only use of the text; it is never stored.
   vouches for the answer.
 - The hint of a checklist section that says when it can be skipped. It is display help, not wording of a check.
 - Sections that apply. Applying is the default and carries no reason, so only the exception is recorded.
+- Who marked a section as not applicable, and when (`SetBy`, `SetByUsername`, `SetAt`). Unlike an answer, whose
+  author is a statement the record makes, the section and its reason are the statement; leaving the setter out also
+  keeps the digest of every existing review as it was. The decision is pinned by a test.
 - The identities (row numbers) of answers, threads, and comments, and the order in which the store happens to return
   them or the changes, or the order the checklist definition lists its sections and checks in.
 - The name of the repository. It is a display copy made when the review was created; the identity of the repository
@@ -108,6 +111,15 @@ Notation and rules:
 - The header line holds the format version. Any change to this format, to what is covered, or to the way a value is
   written that alters the digest of an existing record must change the version, because it makes all earlier
   signatures out of date.
+- **Preconditions of the claims above**: (1) The order independence holds for lists whose sort keys are unique. They
+  are in a stored record: the store keys answers by check id, section states by section id, and files (and so changes)
+  by path within a review, and the checklist definition requires unique section and check identifiers. The sort is
+  stable, so records that broke this would be written in the order they were given. (2) The text is hashed as UTF-8.
+  A lone (unpaired) UTF-16 surrogate, which is malformed text and not valid user input, is encoded as U+FFFD, so two
+  strings that differ only in such characters (for example `"\uD800"` and `"\uD801"`, which also have the same length)
+  give the same digest. A strict encoding would instead make the digest throw for such a record, and any other
+  scheme changes the digest of existing records; the limitation is therefore accepted and documented rather than
+  removed.
 - **The reopens line**: `ReviewRecord.Reopens` is the number of times an administrator reopened the review. The line
   `reopens {count}` is appended after the last thread block only when the count is above zero. A review that was never
   reopened has no such line, so its canonical text and digest are exactly what they were before reopening existed:
@@ -196,12 +208,37 @@ The side vectors use the upload record with the fingerprint `abc`, no checklist,
 for lines 1 to 2, `Open`, created at the UTC time 2025-03-04 05:06:07 (ticks `638766615670000000`) with the
 comment by `Ann` (`ann`) with the text `Please fix` at the same time. With the side `Head` the digest is
 `fe1a3eea5aab9f90922ebdea3caa92b637333d4f082eb7a80b44eb1335acc896`, and with the side `Baseline` (written
-`8:Baseline`) it is `68acc67bebb0c5decad4669037cc3f7618844cf0e59919cb911aef79e525cf0d`. All answers were
+`8:Baseline`) it is `68acc67bebb0c5decad4669037cc3f7618844cf0e59919cb911aef79e525cf0d`. A last vector covers the less
+common values: a
+repository review (repository 7, baseline none, the commits above, selection `**/*`, no review-set) with one added file
+`c.txt` (no baseline hash, head hash `hs3`), one answer (check `REQ-01`, outcome `NotApplicable`, the empty
+justification, answered by `Bob` / `bob`), and one thread on `a.txt` (head side, no lines, `Resolved`, created at the
+time T above) with the comment by `Bob` (`bob`) with the text `Done` one hour after T. Its canonical text is
+
+```text
+ReviewCenter record v1
+fingerprint 3:abc
+source git 7 40:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa 40:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb 4:**/* -
+changes
+change 5:c.txt 5:Added - 3:hs3
+checklist -
+answers
+answer 6:REQ-01 13:NotApplicable 0: 3:Bob 3:bob
+sections
+threads
+thread 5:a.txt 4:Head - - 8:Resolved 638766615670000000
+comment 3:Bob 3:bob 4:Done 638766651670000000
+```
+
+and the digest is `cd2da19bd94a03706d356d3dbeb34261c8dc769fe4124eb2bd98c7b9c955f03e`; with a final line
+`reopens 1` it is `b934cbd343bcd2766bd778b1549b2c282f25d23f303d54530b4c3337db07f10e`. All answers were
 calculated independently of the implementation with a short script (SHA-256 of the canonical text as written
 above), not copied from the code under test.
 
-The tests check the digests of the first two vectors, of the two review-set variants, of the checklist vector, and of
-the two side vectors, and the exact canonical text of the second, the third, and the fourth.
+The tests check the digests of the first two vectors, of the two review-set variants, of the checklist vector, of
+the two side vectors, and of the last vector (without and with a reopen), the exact canonical text of the second, the
+third, the fourth, and the last, and that the first two, the checklist vector, and the head-side vector keep their
+digests with an explicit reopen count of 0.
 
 #### Key Methods
 
@@ -211,7 +248,9 @@ the two side vectors, and the exact canonical text of the second, the third, and
   checklist lines.
 - *Returns*: `string` — the canonical text described above.
 - *Preconditions*: The record is not null.
-- *Postconditions*: The text does not depend on the order of the lists in the record or on any identity.
+- *Postconditions*: The text does not depend on the identity of any row, on the order of the answers, sections,
+  threads, changes, or checklist definition lists, or on the storage order of the threads. It does depend on the order
+  of the comments inside a thread. The order independence assumes unique sort keys (see the preconditions above).
 
 **Compute**: Calculates the digest of a record.
 

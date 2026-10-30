@@ -50,7 +50,8 @@ namespace DemaConsulting.ReviewCenter.Core;
 ///         <item>every stored checklist answer, sorted by check id: id, outcome, justification, and who answered
 ///               (display name and user name). The moment of answering is deliberately not covered, so answering
 ///               the same value again as the same person does not invalidate a signature;</item>
-///         <item>the sections that do not apply, sorted by section id: id and reason;</item>
+///         <item>the sections that do not apply, sorted by section id: id and reason (not who marked the section or
+///               when, which unlike an answer is not a statement the record makes);</item>
 ///         <item>every thread rendered to one block (anchor with its side, state, creation time, and its comments in posting
 ///               order with author display name, author user name, text and time); the blocks are sorted, so
 ///               the order of threads does not matter, while the order of comments does;</item>
@@ -62,6 +63,14 @@ namespace DemaConsulting.ReviewCenter.Core;
 ///     Strings are written as <c>{length}:{text}</c> (length in UTF-16 code units) and absent values as
 ///     <c>-</c>, so no text can imitate a delimiter; numbers use the invariant culture and times are written as
 ///     UTC ticks. All sorting is ordinal. The class is stateless and thread-safe.
+///     <para>
+///         Two preconditions bound the claims above. Order independence holds because the keys of the sorted
+///         lists (check id, section id, change path, and the ids inside the checklist definition) are unique, which the
+///         store's keys and the definition's own rule guarantee; with duplicate keys the stable sort would keep the
+///         input order. And the text is hashed as UTF-8, where a lone UTF-16 surrogate (malformed text that valid
+///         user input does not contain) is replaced by U+FFFD, so two strings that differ only in such characters
+///         give the same digest; this is accepted rather than changing the digest of any record.
+///     </para>
 /// </remarks>
 public static class RecordDigest
 {
