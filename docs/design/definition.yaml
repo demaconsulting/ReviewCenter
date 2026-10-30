@@ -30,6 +30,7 @@ input-files:
   - docs/design/review-center/utilities.md
   - docs/design/review-center/utilities/path-helpers.md
   - docs/design/review-center/utilities/temporary-directory.md
+  - docs/design/review-center/utilities/secret-source.md
   - docs/design/review-center/hosting.md
   - docs/design/review-center/hosting/server-host.md
   - docs/design/review-center/hosting/user-command.md

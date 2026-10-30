@@ -53,7 +53,8 @@ internal static class SecretSource
     ///     The decoder for the contents of a file; it refuses bytes that are not UTF-8 instead of replacing them,
     ///     so a binary file cannot become a secret by accident.
     /// </summary>
-    private static readonly UTF8Encoding StrictUtf8 = new(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: true);
+    private static readonly UTF8Encoding StrictUtf8 =
+        new(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: true);
 
     /// <summary>
     ///     Resolves the secret from the inline setting or from the file setting.
@@ -150,7 +151,8 @@ internal static class SecretSource
         }
         catch (DecoderFallbackException)
         {
-            throw new InvalidOperationException($"{setting} refers to the file '{path}', which is not valid UTF-8 text.");
+            throw new InvalidOperationException(
+                $"{setting} refers to the file '{path}', which is not valid UTF-8 text.");
         }
 
         // Drop a byte order mark and the surrounding white space (usually the final newline) of the file

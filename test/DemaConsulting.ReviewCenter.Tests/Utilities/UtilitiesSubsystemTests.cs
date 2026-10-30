@@ -23,7 +23,8 @@ using DemaConsulting.ReviewCenter.Utilities;
 namespace DemaConsulting.ReviewCenter.Tests;
 
 /// <summary>
-///     Subsystem tests for the Utilities subsystem covering PathHelpers, TemporaryDirectory, and SecretSource integration workflows.
+///     Subsystem tests for the Utilities subsystem covering PathHelpers, TemporaryDirectory, and SecretSource
+///     integration workflows.
 /// </summary>
 [Collection("Sequential")]
 public class UtilitiesSubsystemTests
