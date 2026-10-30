@@ -552,6 +552,135 @@ public class OidcReauthTests : IClassFixture<IdentityProviderFixture>
     }
 
     /// <summary>
+    ///     Test that the window of <c>auth_time</c> is closed at its exact limits: a sign-in exactly the allowed age ago
+    ///     and one exactly a minute in the future are accepted, one second more is not, for the default age and for the
+    ///     smallest and the largest age the settings allow.
+    /// </summary>
+    /// <param name="maxAgeSeconds">The allowed age in the settings.</param>
+    /// <param name="ageSeconds">How long ago the sign-in was; negative for the future.</param>
+    /// <param name="reason">The expected reason class; <c>null</c> when the confirmation is accepted.</param>
+    [Theory]
+    [InlineData(120, 120, null)]
+    [InlineData(120, 121, "stale-auth-time")]
+    [InlineData(120, -60, null)]
+    [InlineData(120, -61, "stale-auth-time")]
+    [InlineData(10, 10, null)]
+    [InlineData(10, 11, "stale-auth-time")]
+    [InlineData(900, 900, null)]
+    [InlineData(900, 901, "stale-auth-time")]
+    public void OidcReauth_VerifyReauth_AuthTimeAtTheLimitsOfTheWindow_IsDecidedExactly(
+        int maxAgeSeconds,
+        int ageSeconds,
+        string? reason)
+    {
+        // Arrange: a confirmation that is right in every respect but the age of the sign-in
+        var user = new User
+        {
+            Id = 7,
+            Username = "olive",
+            DisplayName = "Olive",
+            ExternalIssuer = "https://idp.example/",
+            ExternalSubject = "sub-1"
+        };
+        var now = DateTimeOffset.UnixEpoch.AddDays(1);
+        var authTime = now.AddSeconds(-ageSeconds).ToUnixTimeSeconds().ToString(CultureInfo.InvariantCulture);
+        var claims = new ClaimsPrincipal(new ClaimsIdentity(
+        [
+            new Claim("iss", "https://idp.example/"),
+            new Claim("sub", "sub-1"),
+            new Claim("auth_time", authTime)
+        ]));
+        var properties = new AuthenticationProperties();
+        properties.Items["rc_user"] = "7";
+        properties.Items["rc_project"] = "1";
+        properties.Items["rc_review"] = ReviewId;
+        properties.Items["rc_slot"] = "2";
+
+        // Act
+        var result = OidcSignIn.VerifyReauth(
+            user, claims, properties, now, new OidcOptions { ReauthMaxAgeSeconds = maxAgeSeconds });
+
+        // Assert
+        Assert.Equal(reason, result);
+    }
+
+    /// <summary>
+    ///     Test that a confirmation that was started by one user is refused when another user of the provider is signed
+    ///     in by the time the answer arrives, even if the provider signs the first user in: no proof is issued for
+    ///     either, the failure is recorded for the user of the session, and the session is not replaced.
+    /// </summary>
+    [Fact]
+    public async Task OidcReauth_SessionUserDiffersFromConfirmedUser_IsRefusedAndGivesNoProof()
+    {
+        // Arrange: olive starts a confirmation, then another person of the provider signs in in the same browser
+        await using var app = await OidcTestApp.StartAsync(_idp);
+        using var browser = new TestBrowser(app);
+        var world = await ArrangeAsync(app, browser);
+        var start = await OidcTestApp.StartReauthAsync(browser, world.ProjectId, ReviewId, world.SlotId, world.Route);
+        await browser.PostFormAsync(SignIn.LogoutEndpoint, []);
+        _idp.Scenario = new IdpScenario { Subject = "subject-2", PreferredUsername = "other", Name = "Other Person" };
+        await OidcTestApp.SignInAsync(browser, _idp);
+
+        // Act: the provider answers the pending confirmation with the person it was started for
+        _idp.Scenario = new IdpScenario();
+        var landing = await OidcTestApp.FollowAsync(browser, _idp, start);
+
+        // Assert: refused as a binding that is not the user of the session, with no proof for the first user
+        await world.AssertRefusedAsync(landing, "other", "failed");
+        using var account = await browser.Client.GetAsync("/account", TestContext.Current.CancellationToken);
+        Assert.Equal(HttpStatusCode.OK, account.StatusCode);
+        var entry = Assert.Single(
+            await OidcTestApp.AuditAsync(app, "signature.reauth-failed"),
+            candidate => candidate.Detail == "oidc: other");
+        Assert.Equal("Other Person (other)", entry.ActorName);
+    }
+
+    /// <summary>
+    ///     Test that the confirmation form is refused without a valid antiforgery token (none, or one that is not
+    ///     valid): nothing is sent to the provider, no cookie is set and no proof is issued, so another site cannot
+    ///     start a confirmation for a signed-in user.
+    /// </summary>
+    /// <param name="invalidToken">
+    ///     <c>true</c> to send a token that is not valid (with a real antiforgery cookie); <c>false</c> to send none.
+    /// </param>
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task OidcReauth_PostWithoutValidAntiforgeryToken_IsRefusedAndProviderIsNotCalled(bool invalidToken)
+    {
+        // Arrange: a signed-in user who may confirm the slot
+        await using var app = await OidcTestApp.StartAsync(_idp);
+        using var browser = new TestBrowser(app);
+        var world = await ArrangeAsync(app, browser);
+        List<KeyValuePair<string, string>> fields =
+        [
+            new("projectId", world.ProjectId.ToString(CultureInfo.InvariantCulture)),
+            new("reviewId", ReviewId),
+            new("slotId", world.SlotId.ToString(CultureInfo.InvariantCulture)),
+            new("returnUrl", world.Route)
+        ];
+        if (invalidToken)
+        {
+            fields.Add(new("__RequestVerificationToken", "not-a-valid-token"));
+        }
+
+        var requests = _idp.AuthorizeRequests.Count;
+        var cookies = browser.SetCookieHeaders.Count;
+
+        // Act
+        var response = await browser.PostFormAsync(OidcSignIn.ReauthEndpoint, fields, withToken: false);
+
+        // Assert: refused, nothing sent to the provider, no challenge cookie, no proof, nothing recorded
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Null(response.Headers.Location);
+        Assert.Equal(requests, _idp.AuthorizeRequests.Count);
+        Assert.Equal(cookies, browser.SetCookieHeaders.Count);
+        Assert.False(await world.Signing.HasReauthProofAsync(
+            world.Actor, world.ProjectId, ReviewId, world.SlotId, TestContext.Current.CancellationToken));
+        Assert.Empty(await OidcTestApp.AuditAsync(app, "signature.reauth-failed"));
+    }
+
+    /// <summary>
     ///     Creates the scenario of a review: a user of the provider who signed in, a project the user is a member of,
     ///     and a review with every check answered and one slot that the user is the primary reviewer of.
     /// </summary>

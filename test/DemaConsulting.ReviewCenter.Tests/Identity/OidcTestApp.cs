@@ -243,8 +243,11 @@ internal static class OidcTestApp
         ];
         foreach (var value in values)
         {
-            // The framework's own handler names the issuer and audience it refused in its information log; every
-            // other value, and everything the application itself logs or audits, must stay out
+            // The framework's own handler (an OTS item, whose log the unit does not control) names the issuer and
+            // audience of a token it refused in its log. Both values are chosen by the sender of the token and
+            // are no secret. The exemption is limited to exactly those two values and that one log category: every
+            // other value (nonce, subject, e-mail address), and everything the application itself logs or audits,
+            // must stay out. The requirement of the unit is worded for what the unit itself logs and records
             var framework = value is FakeIdentityProvider.ForgedIssuer or FakeIdentityProvider.ForgedAudience;
             var own = logs.Entries.Where(entry => !framework || !entry.Category.StartsWith(
                 "Microsoft.AspNetCore.Authentication.OpenIdConnect", StringComparison.Ordinal)).ToList();

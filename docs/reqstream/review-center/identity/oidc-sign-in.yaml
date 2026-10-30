@@ -22,6 +22,7 @@ sections:
         tests:
           - OidcSignIn_FirstSignIn_CreatesPlainAccountAndSignsIn
           - OidcSignIn_Flow_NeverLogsSecretsAndUsesCodeFlowWithPkce
+          - OidcSignIn_PostWithoutValidAntiforgeryToken_IsRefusedAndProviderIsNotCalled
           - OidcSignIn_TamperedState_IsRefused
           - OidcSignIn_WrongIssuerAudienceOrNonce_FailsClosed
           - OidcSignIn_ProviderRefusesTheCode_EndsWithoutSession
@@ -31,11 +32,25 @@ sections:
         title: >-
           The OidcSignIn unit shall read the provider settings (address, client identifier, client secret, scopes,
           display name, user name claim, whether the e-mail address must be verified, and the age allowed for a
-          confirmation of identity) from the Identity:Oidc settings, shall register and map nothing while the sign-in is
-          off, and shall stop the server from starting, naming the setting and never its value, when an enabled
-          setting is missing (the client secret included, which is required and may not be empty or only white
-          space), too long, not https (http is accepted for a loopback address only), without the openid scope, or out
-          of its bounds.
+          confirmation of identity) from the Identity:Oidc settings, and shall register and map nothing while the
+          sign-in is off.
+        justification: |
+          The provider settings belong to the person who runs the server and are read from the settings and the
+          environment, where the client secret can be kept out of the files. Registering and mapping nothing while the
+          sign-in is off keeps an unused way in from existing at all, and keeps a server that does not use a provider
+          from needing any provider setting.
+        tests:
+          - OidcOptionsValidator_Validate_ValidSettings_Succeeds
+          - OidcOptionsValidator_Validate_Disabled_SucceedsWhateverTheValues
+          - OidcSignIn_Disabled_EndpointsAreNotMappedAndNoButtonIsShown
+          - ServerHost_CreateApplication_OidcOffOrValid_BuildsTheApplication
+
+      - id: ReviewCenter-OidcSignIn-SettingsValidation
+        title: >-
+          The OidcSignIn unit shall stop the server from starting, naming the setting and never its value, when an
+          enabled provider setting is missing (the client secret included, which is required and may not be empty or
+          only white space), too long, not https (http is accepted for a loopback address only), without the openid
+          scope, or out of its bounds.
         justification: |
           A wrong address or a missing value must be found when the server starts and not when the first person cannot
           sign in. Plain http to a provider would let somebody on the network read or change the answer, so it is
@@ -44,8 +59,6 @@ sections:
           a confidential client that proves itself at the token endpoint with its secret, so a missing secret is a
           wrong setting too and a public client with a proof key alone is not supported.
         tests:
-          - OidcOptionsValidator_Validate_ValidSettings_Succeeds
-          - OidcOptionsValidator_Validate_Disabled_SucceedsWhateverTheValues
           - OidcOptionsValidator_Validate_InvalidSetting_FailsNamingTheSettingWithoutValues
           - OidcOptionsValidator_Validate_MissingClientSecret_FailsNamingTheSetting
           - OidcOptionsValidator_Validate_InvalidClientSecret_FailsWithoutEchoingTheSecret
@@ -54,7 +67,7 @@ sections:
           - OidcOptionsValidator_Validate_ReauthMaxAgeSeconds_MustBeWithinBounds
           - OidcOptionsValidator_Validate_Scheme_HttpOnlyForLoopback
           - OidcOptionsValidator_Validate_Null_Throws
-          - OidcSignIn_Disabled_EndpointsAreNotMappedAndNoButtonIsShown
+          - ServerHost_CreateApplication_InvalidOidcSettings_ThrowsClearErrorWithoutSecret
 
       - id: ReviewCenter-OidcSignIn-Account
         title: >-
@@ -87,7 +100,7 @@ sections:
       - id: ReviewCenter-OidcSignIn-OpenRedirect
         title: >-
           The OidcSignIn unit shall use a return address after the sign-in or the confirmation of identity only when
-          it is a local path, and shall use the home page, or the review, for any other value.
+          it is a local path, and shall use the home page for any other value.
         justification: |
           A return address that could lead to another site would let an attacker use the sign-in to send people to a
           look-alike site after they have signed in at the real provider.
@@ -99,8 +112,8 @@ sections:
         title: >-
           The OidcSignIn unit shall count every answer of the provider that arrives at the callback address against
           the address quota of the sign-in throttle of the client address only, without a counter per name, shall hand
-          the attempt back when the answer is accepted, and shall refuse the answer without reading it when the
-          throttle refuses.
+          the attempt back when the answer is accepted, and shall refuse the answer, without exchanging the code or
+          checking a token, when the throttle refuses.
         justification: |
           The callback address can be called by anybody, so without a limit it could be used to make the server do the
           work of checking tokens without end. The address limit of the password sign-in keeps one rule for every way
@@ -117,7 +130,9 @@ sections:
           The OidcSignIn unit shall record a successful sign-in with a provider (auth.oidc-sign-in), a failed sign-in
           with only the class of the reason (auth.oidc-sign-in-failed), a refused confirmation of identity
           (signature.reauth-failed), and the creation of an account (account.oidc-created), and shall never log or
-          record a token, a claim, or the secret.
+          record a token, a claim, or the secret in its own logging and audit trail (the log of the framework
+          handler, an OTS item, is not under its control; the tests allow it to name only the issuer and the audience
+          of a token it refused, which the sender of the token chose and which are no secret).
         justification: |
           Who signed in, and which attempts failed, are part of the history. The class of the reason shows what went
           wrong without recording text that an attacker or the provider chose, and a token or a secret in a log or
@@ -144,30 +159,31 @@ sections:
           - OidcSignIn_TamperedState_IsRefused
           - OidcSignIn_WrongIssuerAudienceOrNonce_FailsClosed
           - OidcSignIn_DisabledAccount_IsRefusedLikeAnyFailure
+          - OidcSignIn_Enabled_SignInPageOffersButtonBesideLocalForm
 
       - id: ReviewCenter-OidcSignIn-Reauth
         title: >-
-          The OidcSignIn unit shall, for a signed-in user of a provider who is allowed to sign a slot, confirm the
-          identity for one signature by sending the browser to the provider with prompt=login and max_age=0, and shall
-          issue the confirmation only when the answer has an authentication time that is not older than the allowed
-          age and not in the future, the same subject as the account, and the same issuer; and shall in every other
-          case (an authentication time that is missing, not a whole number, negative or outside the range of dates
-          included) fail closed, issue nothing, and record the reason class; and shall send the browser back to the
-          review with a distinct answer when the authentication time was missing and when it was not recent enough
-          (and the general answer for every other reason), while the recorded reason class stays the same.
+          The OidcSignIn unit shall, for a signed-in user of a provider who is allowed to sign a slot, on a request
+          with a valid antiforgery token, confirm the identity for one signature by sending the browser to the
+          provider with prompt=login and max_age=0, and shall issue the confirmation only when the answer has an
+          authentication time that is not older than the allowed age and not more than a minute in the future, the
+          same subject as the account, the same issuer, and a session that belongs to the user the confirmation was
+          started for; and shall in every other case (an authentication time that is missing, not a whole number,
+          negative or outside the range of dates included) fail closed, issue nothing, and record the reason class.
         justification: |
           A person who is signed in on a shared computer must not be able to sign for somebody else, and a provider
           that does not ask for the password again would make the confirmation a click. Only a login that happened
           now, by the same person, at the same provider, proves that the person at the keyboard is the user. Anything
-          that cannot be checked is refused, because a signature that was not confirmed would be worthless. An
-          administrator can fix a provider that does not send the authentication time only if the person is told that
-          this is the cause, and the cause says nothing that helps an attacker.
+          that cannot be checked is refused, because a signature that was not confirmed would be worthless. Another
+          site must not be able to start a confirmation for a signed-in user, which the antiforgery token prevents.
         tests:
           - OidcReauth_FreshSignInOfSamePerson_AllowsExactlyOneSignature
+          - OidcReauth_PostWithoutValidAntiforgeryToken_IsRefusedAndProviderIsNotCalled
           - OidcReauth_AuthTimeNotInWindow_IsRefusedFailClosed
           - OidcReauth_AuthTimeOutsideTheRangeOfDates_IsRefusedWithoutError
-          - OidcReauth_MissingOrStaleAuthTime_ReviewPageNamesTheCause
+          - OidcReauth_VerifyReauth_AuthTimeAtTheLimitsOfTheWindow_IsDecidedExactly
           - OidcReauth_OtherSubject_IsRefusedAndCreatesNoAccount
+          - OidcReauth_SessionUserDiffersFromConfirmedUser_IsRefusedAndGivesNoProof
           - OidcReauth_ProviderRefuses_ReturnsToReviewWithoutProof
           - OidcReauth_WrongIssuerAudienceOrNonce_IsRefusedFailClosed
           - OidcReauth_SessionEndedAtTheProvider_IsRefusedWithoutProof
@@ -175,6 +191,23 @@ sections:
           - OidcReauth_NotAllowed_IsNeverSentToTheProvider
           - OidcReauth_VerifyReauth_ComparesIssuerAndSubjectOfTheAccount
           - OidcReauth_VerifyReauth_WrongBinding_IsRefusedAsOther
+
+      - id: ReviewCenter-OidcSignIn-ReauthAnswer
+        title: >-
+          The OidcSignIn unit shall, when a confirmation of identity is refused, send the browser back to the review
+          with a distinct answer when the authentication time was missing and when it was not recent enough, and with
+          the general answer for every other reason, while the recorded reason class stays the same.
+        justification: |
+          An administrator can fix a provider that does not send the authentication time only if the person is told that
+          this is the cause, and the cause says nothing that helps an attacker. Every other cause stays behind the
+          general answer, so the page does not help somebody who is probing the confirmation.
+        tests:
+          - OidcReauth_AuthTimeNotInWindow_IsRefusedFailClosed
+          - OidcReauth_AuthTimeOutsideTheRangeOfDates_IsRefusedWithoutError
+          - OidcReauth_MissingOrStaleAuthTime_ReviewPageNamesTheCause
+          - OidcReauth_OtherSubject_IsRefusedAndCreatesNoAccount
+          - OidcReauth_ProviderRefuses_ReturnsToReviewWithoutProof
+          - OidcReauth_WrongIssuerAudienceOrNonce_IsRefusedFailClosed
           - OidcReauth_ReviewPage_OffersConfirmationThenSigning
 
       - id: ReviewCenter-OidcSignIn-LocalSession
@@ -194,10 +227,11 @@ sections:
 
       - id: ReviewCenter-OidcSignIn-NoPassword
         title: >-
-          The OidcSignIn unit shall never offer, and the password sign-in shall refuse, a password for an account of a
-          provider, so that the account can be used only through the provider.
+          The OidcSignIn unit shall create the account of a provider without any password, so that the account can be
+          used only through the provider and no password, not even an empty one, signs it in.
         justification: |
           An account with an unknown password hash that could be guessed or set would be a second way in that the
           provider and its rules for passwords cannot control.
         tests:
+          - OidcSignIn_FirstSignIn_CreatesPlainAccountAndSignsIn
           - OidcSignIn_PasswordSignInOfExternalAccount_IsRefused
