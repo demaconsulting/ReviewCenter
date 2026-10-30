@@ -53,6 +53,8 @@ public class SigningServiceExternalTests
     /// <param name="ProjectId">The project.</param>
     /// <param name="SlotId">The slot of <c>olive</c>.</param>
     /// <param name="OliveId">The identity of <c>olive</c>.</param>
+    /// <param name="Store">The review store, to add members to the project.</param>
+    /// <param name="Trail">The audit trail that receives the failed confirmations.</param>
     private sealed record World(
         SigningService Signing,
         ReauthProofStore Proofs,
@@ -60,7 +62,9 @@ public class SigningServiceExternalTests
         UserService Users,
         int ProjectId,
         int SlotId,
-        int OliveId);
+        int OliveId,
+        FakeReviewStore Store,
+        FakeAuditStore Trail);
 
     /// <summary>
     ///     Creates a review that can be signed, with one slot whose primary reviewer is an external user.
@@ -72,7 +76,9 @@ public class SigningServiceExternalTests
         var cancellationToken = TestContext.Current.CancellationToken;
         var store = new FakeReviewStore();
         var clock = new MovableTimeProvider(new DateTimeOffset(2025, 3, 4, 5, 6, 7, TimeSpan.Zero));
-        var users = new UserService(new FakeUserStore(), new FakePasswordHasher(), clock);
+        var trail = new FakeAuditStore(clock);
+        var users = new UserService(
+            new FakeUserStore(), new FakePasswordHasher(), clock, new AuditService(trail, null, clock));
         var boss = await users.CreateAsync("boss", "Boss", UserRole.Reviewer, "correct horse battery", cancellationToken);
         var external = await users.SignInExternalAsync("https://idp.example/", "sub-1", "olive", "Olive", cancellationToken);
         var olive = external.User!;
@@ -92,7 +98,7 @@ public class SigningServiceExternalTests
         var signing = new SigningService(
             store, users, new AllowAllProjectAccess(store), clock, withProofs ? proofs : null);
         var slot = await signing.AddSlotAsync(Boss, project.Id, ReviewId, olive.Id, null, cancellationToken);
-        return new World(signing, proofs, clock, users, project.Id, slot.Id, olive.Id);
+        return new World(signing, proofs, clock, users, project.Id, slot.Id, olive.Id, store, trail);
     }
 
     /// <summary>
@@ -138,7 +144,8 @@ public class SigningServiceExternalTests
 
     /// <summary>
     ///     Test that a signature without a proof is refused whatever password is given, and that a proof that
-    ///     expired is refused too.
+    ///     expired is refused too, that the missing confirmation is recorded as a failed confirmation without any
+    ///     secret, and that nothing is signed.
     /// </summary>
     /// <param name="password">The password that is given.</param>
     /// <param name="expire">Whether the proof is issued and then left to expire.</param>
@@ -165,6 +172,9 @@ public class SigningServiceExternalTests
         var approval = (await world.Signing.GetApprovalAsync(
             world.ProjectId, ReviewId, TestContext.Current.CancellationToken))!;
         Assert.Equal(SlotSignatureState.NotSigned, Assert.Single(approval.Slots).State);
+        var recorded = Assert.Single(world.Trail.Entries, e => e.Action == "signature.reauth-failed");
+        Assert.Equal("oidc: no-proof", recorded.Detail);
+        Assert.DoesNotContain("correct horse battery", recorded.Detail, StringComparison.Ordinal);
     }
 
     /// <summary>
@@ -294,7 +304,7 @@ public class SigningServiceExternalTests
             Olive, world.ProjectId, ReviewId, world.SlotId + 1, cancellationToken));
         var viaApi = await Assert.ThrowsAsync<DomainRuleException>(() => world.Signing.RequireConfirmableAsync(
             new Actor("olive", "Olive") { ApiTokenId = "K7M2QX9P" }, world.ProjectId, ReviewId, world.SlotId, cancellationToken));
-        var unknown = await Assert.ThrowsAnyAsync<DomainRuleException>(() => world.Signing.RequireConfirmableAsync(
+        var unknown = await Assert.ThrowsAsync<DomainRuleException>(() => world.Signing.RequireConfirmableAsync(
             new Actor("nobody", "Nobody"), world.ProjectId, ReviewId, world.SlotId, cancellationToken));
 
         // Assert
@@ -302,26 +312,33 @@ public class SigningServiceExternalTests
         Assert.Equal(DomainRule.ActorNotAllowed, local.Rule);
         Assert.Equal(DomainRule.SlotNotFound, noSlot.Rule);
         Assert.Equal(DomainRule.ActorNotAllowed, viaApi.Rule);
-        Assert.NotNull(unknown);
+        Assert.Equal(DomainRule.ActorNotAllowed, unknown.Rule);
     }
 
     /// <summary>
-    ///     Test that an external user who is a member but not a reviewer of the slot cannot be asked to confirm.
+    ///     Test that an external user who is a member but not a reviewer of the slot cannot be asked to confirm, and
+    ///     that one who is not a member is refused for that reason.
     /// </summary>
     [Fact]
     public async Task SigningService_RequireConfirmableAsync_NotAReviewerOfTheSlot_IsRefused()
     {
-        // Arrange: a second external user who is a member of the project
+        // Arrange: a second external user, first not a member of the project, then a member
         var world = await CreateAsync();
         var cancellationToken = TestContext.Current.CancellationToken;
         var second = (await world.Users.SignInExternalAsync("https://idp.example/", "sub-2", "pat", "Pat", cancellationToken)).User!;
         var other = new Actor(second.Username, second.DisplayName);
 
         // Act
-        var failure = await Assert.ThrowsAnyAsync<DomainRuleException>(() => world.Signing.RequireConfirmableAsync(
+        var notMember = await Assert.ThrowsAsync<DomainRuleException>(() => world.Signing.RequireConfirmableAsync(
+            other, world.ProjectId, ReviewId, world.SlotId, cancellationToken));
+        await world.Store.AddMembershipAsync(second.Id, world.ProjectId, cancellationToken);
+        var notReviewer = await Assert.ThrowsAsync<DomainRuleException>(() => world.Signing.RequireConfirmableAsync(
             other, world.ProjectId, ReviewId, world.SlotId, cancellationToken));
 
-        // Assert: refused for the missing membership or for the slot, either way with a named rule
-        Assert.Equal(DomainRule.ActorNotAllowed, failure.Rule);
+        // Assert: each refusal names its own reason
+        Assert.Equal(DomainRule.ActorNotAllowed, notMember.Rule);
+        Assert.Contains("member of the project", notMember.Message, StringComparison.Ordinal);
+        Assert.Equal(DomainRule.ActorNotAllowed, notReviewer.Rule);
+        Assert.Equal("You are not a reviewer of this slot.", notReviewer.Message);
     }
 }

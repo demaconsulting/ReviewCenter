@@ -249,7 +249,9 @@ public class SigningServiceTotpTests
         Assert.Equal(SlotSignatureState.NotSigned, await StateAsync(world, world.AnnSlotId));
         var step = await world.Totp.UserService.AuthenticatePasswordAsync("ann", TotpTestWorld.Password, TestContext.Current.CancellationToken);
         Assert.Null(step.User);
-        Assert.Contains(world.Totp.AuditStore.Entries, e => e.Action == "signature.reauth-failed");
+        Assert.Contains(
+            world.Totp.AuditStore.Entries,
+            e => e.Action == "signature.reauth-failed" && e.Detail.Contains("wrong code", StringComparison.Ordinal));
     }
 
     /// <summary>

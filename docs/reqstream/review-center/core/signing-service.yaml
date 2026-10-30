@@ -55,17 +55,24 @@ sections:
 
       - id: ReviewCenter-SigningService-Actor
         title: >-
-          The SigningService class shall allow a slot to be added, changed, removed, or signed only for a
-          signed-in user that still exists and is enabled, shall allow a slot to be signed only by its primary
-          reviewer or its alternate who is still a member of the project, and shall refuse a system administrator who
-          is not a member the right to sign.
+          The SigningService class shall allow a slot to be added, changed, removed, or signed, and a review to be
+          reopened, only for a signed-in user that still exists and is enabled, shall refuse every one of them for a
+          project that does not exist or that the actor may not see with the ProjectNotFound rule, shall let any actor
+          who may see the project, a member or a system administrator who is not a member, add, change, and remove
+          slots, shall allow a slot to be signed only by its primary reviewer or its alternate who is still a member of
+          the project, and shall refuse a system administrator who is not a member the right to sign.
         justification: |
           The page shows who is signed in, but the rules must hold even if the page or a browser session is out of
           date. A user who has been disabled or removed from the project since signing in must not be able to
           change or approve a review, and a signature is only meaningful when the signer is the person the slot
-          names and belongs to the project.
+          names and belongs to the project. Arranging the slots needs no membership, so that a system administrator
+          can set up a review, because only a member can be named in a slot and only a member can sign, which keeps
+          the signatures with the members.
         tests:
           - SigningService_AddSlotAsync_ActorDisabledOrUnknown_ThrowsActorNotAllowed
+          - SigningService_UpdateRemoveAndReopen_ActorDisabledOrUnknown_ThrowsActorNotAllowed
+          - SigningService_SlotSignAndReopenCalls_ProjectNotFound_ThrowsProjectNotFound
+          - SigningService_SlotChanges_RealAccessRules_NeedViewAccessOnly
           - SigningService_SignAsync_ActorDisabled_ThrowsActorNotAllowed
           - SigningService_SignAsync_NotInSlot_ThrowsActorNotAllowed
           - SigningService_SignAsync_NotAMember_IsRefused
@@ -95,19 +102,23 @@ sections:
           - SigningService_SignAsync_PrimaryWithPassword_StoresSignatureAndApproves
           - SigningService_SignAsync_Alternate_RecordsAlternateRole
           - SigningService_SignAsync_RecordChangedAfterSigning_OutOfDateThenResignable
+          - SigningService_GetApprovalAsync_ContentChangedAfterSigning_OutOfDateThenResignable
 
       - id: ReviewCenter-SigningService-Reauthenticate
         title: >-
           The SigningService class shall store a signature only after the signer has given the password of the
-          account again, shall report a wrong password and a locked account in the same way, and shall count wrong
-          passwords toward the same lockout as signing in.
+          account again, shall ask for the password only after every other check has passed, so that a refusal for
+          another reason does not count as a wrong password, shall report a wrong password and a locked account in the
+          same way, and shall count wrong passwords toward the same lockout as signing in.
         justification: |
           A signature must come from the person, not from a session left open at a desk. Reusing the sign-in
           check gives the same protection against guessing, and one generic answer gives an attacker nothing more
-          than the login page does.
+          than the login page does. Checking the password last means a signer who is told that the record changed or
+          that a thread is open is not locked out for the password typed with the request.
         tests:
           - SigningService_SignAsync_WrongPassword_ThrowsReauthenticationFailed
           - SigningService_SignAsync_RepeatedWrongPassword_LocksOutLikeLogin
+          - SigningService_SignAsync_RefusedBeforePassword_DoesNotCountWrongPasswords
 
       - id: ReviewCenter-SigningService-ReauthAudit
         title: >-
@@ -150,6 +161,7 @@ sections:
         tests:
           - SigningService_GetApprovalAsync_TwoSlots_ApprovedOnlyWhenBothSigned
           - SigningService_SignAsync_RecordChangedAfterSigning_OutOfDateThenResignable
+          - SigningService_GetApprovalAsync_ContentChangedAfterSigning_OutOfDateThenResignable
           - SigningService_GetApprovalAsync_NoSlots_NotApprovedAndAsksForSlot
           - SigningService_GetApprovalAsync_MissingReview_ReturnsNull
           - SigningService_GetApprovalAsync_AssigneeRemovedFromProject_IsMarkedNotAMember
@@ -159,8 +171,9 @@ sections:
       - id: ReviewCenter-SigningService-Audit
         title: >-
           The SigningService class shall record adding, changing, and removing a slot and adding a signature in the
-          audit trail, in the same transaction as the change, naming the actor, the slot, the reviewers, and for a
-          signature the role and the record digest.
+          audit trail, together with the change, so that a change is never saved without its entry and an entry is never
+          saved without its change, naming the actor, the slot, the reviewers, and for a signature the role and the
+          record digest, and shall record nothing for a change that is refused.
         justification: |
           The approval of a review is the most important event of its history, and the history must show who
           arranged the reviewers and who signed which record.
@@ -171,7 +184,8 @@ sections:
       - id: ReviewCenter-SigningService-ApiToken
         title: >-
           The SigningService class shall refuse to sign, and to add, change, or remove a reviewer slot, for an actor
-          that came through a personal access token, before it checks anything else.
+          that came through a personal access token, with the ActorNotAllowed rule and a message that names the API
+          token, before it checks anything else, and without counting a password or recording an audit entry.
         justification: |
           A signature must prove that the person was present and knew their password, which a token held by a script
           does not. Refusing in the service, not only in the routes, keeps a later route or page from giving a token
@@ -185,7 +199,8 @@ sections:
           The SigningService class shall let a user of a provider sign a slot only when a confirmation of identity that
           was issued for this user, project, review, and slot is still valid, shall use that confirmation up only after
           every other check has passed, shall keep it when the signature is refused before for another reason, shall
-          refuse the signature, record it as a failed confirmation, and sign nothing when there is none, and shall let
+          refuse the signature, record it as a failed confirmation (a failed re-authentication in the audit trail with
+          the detail oidc: no-proof, without any secret), and sign nothing when there is none, and shall let
           the page ask whether a confirmation exists without using it up.
         justification: |
           A user of a provider has no password to type, so the confirmation that the person just signed in again takes
@@ -207,10 +222,11 @@ sections:
         title: >-
           The SigningService class shall require, for a signer with a second factor, a fresh code of the authenticator
           app in addition to the password, check the password first and keep the code when the password is wrong,
-          refuse a recovery code, an API token, and a code that was already used in the current step with the same
-          message as a wrong password, count wrong codes toward the lockout, fail closed when the second factor cannot
-          be checked, and need no code for a user without a second factor, for a user of a provider, or after an
-          administrator reset.
+          refuse a recovery code and a code that was already used in the current step with the same message as a wrong
+          password, refuse an actor that came through an API token with the ActorNotAllowed rule and the API token
+          message (see the ApiToken requirement) and keep the code, count wrong codes toward the lockout and record
+          them in the audit trail, fail closed when the second factor cannot be checked, and need no code for a user
+          without a second factor, for a user of a provider, or after an administrator reset.
         justification: |
           A signature is the strongest statement in the product and the person must prove that they are there. A code
           that was used to sign in cannot be used again, so the person waits for the next one, which is the cost of
@@ -262,6 +278,9 @@ sections:
           - SigningService_ReopenReviewAsync_NotLocked_ThrowsReviewNotLocked
           - SigningService_ReopenReviewAsync_ApiToken_ThrowsActorNotAllowed
           - SigningService_ReopenReviewAsync_Admin_ReturnsToInReviewKeepsSignaturesAndAudits
+          - SigningService_ReopenReviewAsync_MissingReview_ThrowsReviewNotFound
+          - SigningService_ReopenReviewAsync_ReasonAtLimitWithBlanks_IsAcceptedTrimmed
+          - SigningService_ReopenReviewAsync_RealAccessRules_ReopensOnlyForAdministrators
           - SigningService_ReopenReviewAsync_ThenResign_ApprovesAgainWithBothSignatures
 
       - id: ReviewCenter-SigningService-IndependentReviewers

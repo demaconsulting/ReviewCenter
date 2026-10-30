@@ -158,19 +158,33 @@ public class SigningServiceTests
         var (fixture, slot) = await CreateReadyAsync();
         var digest = (await ApprovalAsync(fixture)).Digest;
         var viaApi = new Actor("ann", "Ann") { ApiTokenId = "K7M2QX9P" };
+        var auditsBefore = fixture.Store.Audits.Count;
 
         // Act: sign with everything right
         var right = await Assert.ThrowsAsync<DomainRuleException>(() => fixture.Signing.SignAsync(
             viaApi, fixture.ProjectId, "rev-1", slot.Id, digest, Password, TestContext.Current.CancellationToken));
 
-        // Act: sign with everything wrong, which must give the same answer because nothing else is checked
-        var wrong = await Assert.ThrowsAsync<DomainRuleException>(() => fixture.Signing.SignAsync(
-            viaApi, fixture.ProjectId, "rev-999", 12345, "stale", "wrong password here", TestContext.Current.CancellationToken));
+        // Act: sign with everything wrong, more often than the lockout allows, which must give the same answer
+        // every time because nothing else is checked
+        DomainRuleException? wrong = null;
+        for (var attempt = 0; attempt < 6; attempt++)
+        {
+            wrong = await Assert.ThrowsAsync<DomainRuleException>(() => fixture.Signing.SignAsync(
+                viaApi, fixture.ProjectId, "rev-999", 12345, "stale", "wrong password here", TestContext.Current.CancellationToken));
+        }
 
-        // Assert: refused as not allowed both times, and the review is still unsigned
+        // Assert: refused as not allowed with the API-token message, and the review is still unsigned
         Assert.Equal(DomainRule.ActorNotAllowed, right.Rule);
-        Assert.Equal(DomainRule.ActorNotAllowed, wrong.Rule);
+        Assert.Equal(DomainRule.ActorNotAllowed, wrong!.Rule);
+        Assert.Equal(right.Message, wrong.Message);
+        Assert.Contains("API token", right.Message, StringComparison.Ordinal);
         Assert.All((await ApprovalAsync(fixture)).Slots, s => Assert.Equal(SlotSignatureState.NotSigned, s.State));
+
+        // Assert: nothing was recorded and the password was never counted, so the real person can still sign
+        Assert.Equal(auditsBefore, fixture.Store.Audits.Count);
+        var signature = await fixture.Signing.SignAsync(
+            TestActors.Ann, fixture.ProjectId, "rev-1", slot.Id, digest, Password, TestContext.Current.CancellationToken);
+        Assert.Equal(fixture.Ids["ann"], signature.UserId);
     }
 
     /// <summary>
@@ -308,6 +322,73 @@ public class SigningServiceTests
         Assert.Equal(DomainRule.ActorNotAllowed, disabled.Rule);
         Assert.Equal(DomainRule.ActorNotAllowed, unknown.Rule);
         Assert.Empty(await fixture.Store.ListSlotsAsync(fixture.ProjectId, "rev-1", TestContext.Current.CancellationToken));
+    }
+
+    /// <summary>
+    ///     Test that a user whose account is gone or disabled cannot change or remove a slot, nor reopen an approved
+    ///     review, and that nothing is stored or recorded by the attempt.
+    /// </summary>
+    [Fact]
+    public async Task SigningService_UpdateRemoveAndReopen_ActorDisabledOrUnknown_ThrowsActorNotAllowed()
+    {
+        // Arrange: an approved review with one signed slot, a disabled user and an unknown user
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var (fixture, slot, _) = await CreateApprovedAsync();
+        await fixture.Users.SetEnabledAsync("dee", false, cancellationToken);
+        var auditsBefore = fixture.Store.Audits.Count;
+        var failures = new List<DomainRuleException>();
+
+        // Act: each of them tries to change the slot, to remove it and to reopen the review
+        foreach (var actor in new[] { TestActors.Dee, TestActors.Eve })
+        {
+            failures.Add(await Assert.ThrowsAsync<DomainRuleException>(() => fixture.Signing.UpdateSlotAsync(
+                actor, fixture.ProjectId, "rev-1", slot.Id, fixture.Ids["cyd"], null, cancellationToken)));
+            failures.Add(await Assert.ThrowsAsync<DomainRuleException>(() => fixture.Signing.RemoveSlotAsync(
+                actor, fixture.ProjectId, "rev-1", slot.Id, cancellationToken)));
+            failures.Add(await Assert.ThrowsAsync<DomainRuleException>(() => fixture.Signing.ReopenReviewAsync(
+                actor, fixture.ProjectId, "rev-1", "Because.", cancellationToken)));
+        }
+
+        // Assert: every attempt was refused for the actor, and nothing changed or was recorded
+        Assert.Equal(6, failures.Count);
+        Assert.All(failures, failure => Assert.Equal(DomainRule.ActorNotAllowed, failure.Rule));
+        Assert.Equal(auditsBefore, fixture.Store.Audits.Count);
+        Assert.True((await ApprovalAsync(fixture)).IsApproved);
+        Assert.Empty(await fixture.Store.ListReopensAsync(fixture.ProjectId, "rev-1", cancellationToken));
+    }
+
+    /// <summary>
+    ///     Test that every slot and signature call for a project that does not exist is refused with
+    ///     <see cref="DomainRule.ProjectNotFound"/>, before anything about the review is looked at.
+    /// </summary>
+    [Fact]
+    public async Task SigningService_SlotSignAndReopenCalls_ProjectNotFound_ThrowsProjectNotFound()
+    {
+        // Arrange: a project identity that does not exist
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var fixture = await CreateAsync();
+        const int Missing = 9999;
+        var ann = fixture.Ids["ann"];
+
+        // Act: each call that needs the project
+        var failures = new[]
+        {
+            await Assert.ThrowsAsync<DomainRuleException>(() => fixture.Signing.AddSlotAsync(
+                Cyd, Missing, "rev-1", ann, null, cancellationToken)),
+            await Assert.ThrowsAsync<DomainRuleException>(() => fixture.Signing.UpdateSlotAsync(
+                Cyd, Missing, "rev-1", 1, ann, null, cancellationToken)),
+            await Assert.ThrowsAsync<DomainRuleException>(() => fixture.Signing.RemoveSlotAsync(
+                Cyd, Missing, "rev-1", 1, cancellationToken)),
+            await Assert.ThrowsAsync<DomainRuleException>(() => fixture.Signing.SignAsync(
+                TestActors.Ann, Missing, "rev-1", 1, "digest", Password, cancellationToken)),
+            await Assert.ThrowsAsync<DomainRuleException>(() => fixture.Signing.ReopenReviewAsync(
+                Cyd, Missing, "rev-1", "Because.", cancellationToken)),
+            await Assert.ThrowsAsync<DomainRuleException>(() => fixture.Signing.RequireConfirmableAsync(
+                TestActors.Ann, Missing, "rev-1", 1, cancellationToken))
+        };
+
+        // Assert: all refused as a missing project
+        Assert.All(failures, failure => Assert.Equal(DomainRule.ProjectNotFound, failure.Rule));
     }
 
     /// <summary>
@@ -687,8 +768,8 @@ public class SigningServiceTests
     }
 
     /// <summary>
-    ///     Test that a change of the record makes the signature out of date, which can be signed again, and that
-    ///     the history stays.
+    ///     Test that a reopening of the review, which changes the record, makes the old signature out of date, which
+    ///     can be signed again, and that the history stays.
     /// </summary>
     [Fact]
     public async Task SigningService_SignAsync_RecordChangedAfterSigning_OutOfDateThenResignable()
@@ -712,6 +793,85 @@ public class SigningServiceTests
         Assert.Equal("Bob", again.Slots.Single().SignerName);
         Assert.True(again.IsApproved);
         Assert.Equal(2, (await fixture.Store.ListSignaturesAsync(fixture.ProjectId, "rev-1", TestContext.Current.CancellationToken)).Count);
+    }
+
+    /// <summary>
+    ///     Test that a change of the content of a review that is not approved yet, a checklist answer or a comment,
+    ///     makes a current signature out of date and the review not approved, without removing the signature, and
+    ///     that the slot can be signed again for the new record.
+    /// </summary>
+    /// <param name="change">What changes: <c>answer</c> changes a checklist answer, <c>comment</c> adds a comment.</param>
+    [Theory]
+    [InlineData("answer")]
+    [InlineData("comment")]
+    public async Task SigningService_GetApprovalAsync_ContentChangedAfterSigning_OutOfDateThenResignable(string change)
+    {
+        // Arrange: two slots, so that the review is not approved and not locked when ann has signed the first
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var (fixture, first) = await CreateReadyAsync();
+        var second = await fixture.Signing.AddSlotAsync(
+            Cyd, fixture.ProjectId, "rev-1", fixture.Ids["cyd"], null, cancellationToken);
+        var signedDigest = (await ApprovalAsync(fixture)).Digest;
+        await fixture.Signing.SignAsync(TestActors.Ann, fixture.ProjectId, "rev-1", first.Id, signedDigest, Password, cancellationToken);
+        var current = await ApprovalAsync(fixture);
+
+        // Act: the content changes while the signature is current
+        ReviewThread? thread = null;
+        if (change == "answer")
+        {
+            await fixture.Checklists.SetAnswerAsync(
+                fixture.ProjectId,
+                "rev-1",
+                DefaultChecklist.Current.Sections[0].Items[0].Id,
+                ChecklistOutcome.NotApplicable,
+                "Does not apply to this change.",
+                TestActors.Bob,
+                cancellationToken);
+        }
+        else
+        {
+            thread = await fixture.Threads.StartThreadAsync(
+                fixture.ProjectId, "rev-1", new ThreadAnchor("a.txt"), TestActors.Bob, "A late remark", cancellationToken);
+        }
+
+        var outOfDate = await ApprovalAsync(fixture);
+
+        // Assert: the digest moved, the signature is kept but out of date, nothing else is signed, not approved
+        Assert.Equal(SlotSignatureState.Signed, current.Slots[0].State);
+        Assert.False(current.IsApproved);
+        Assert.NotEqual(signedDigest, outOfDate.Digest);
+        Assert.Equal(SlotSignatureState.OutOfDate, outOfDate.Slots[0].State);
+        Assert.Equal(SlotSignatureState.NotSigned, outOfDate.Slots[1].State);
+        Assert.False(outOfDate.IsApproved);
+        Assert.Single(await fixture.Store.ListSignaturesAsync(fixture.ProjectId, "rev-1", cancellationToken));
+
+        // Act: a comment opens a thread, which blocks signing until it is resolved; then the alternate signs the new record
+        if (thread is not null)
+        {
+            var blocked = await Assert.ThrowsAsync<DomainRuleException>(() => fixture.Signing.SignAsync(
+                TestActors.Bob, fixture.ProjectId, "rev-1", first.Id, outOfDate.Digest, Password, cancellationToken));
+            Assert.Equal(DomainRule.SigningNotAllowed, blocked.Rule);
+            await fixture.Threads.ResolveAsync(fixture.ProjectId, "rev-1", thread.Id, cancellationToken);
+        }
+
+        var ready = await ApprovalAsync(fixture);
+        await fixture.Signing.SignAsync(
+            TestActors.Bob, fixture.ProjectId, "rev-1", first.Id, ready.Digest, Password, cancellationToken);
+        var resigned = await ApprovalAsync(fixture);
+
+        // Assert: signed again for the new record, both signatures kept, and still waiting for the second slot
+        Assert.Equal(SlotSignatureState.Signed, resigned.Slots[0].State);
+        Assert.Equal("Bob", resigned.Slots[0].SignerName);
+        Assert.Equal(SlotSignatureState.NotSigned, resigned.Slots[1].State);
+        Assert.False(resigned.IsApproved);
+        Assert.Equal(2, (await fixture.Store.ListSignaturesAsync(fixture.ProjectId, "rev-1", cancellationToken)).Count);
+
+        // Act: the second slot signs
+        await fixture.Signing.SignAsync(
+            Cyd, fixture.ProjectId, "rev-1", second.Id, resigned.Digest, Password, cancellationToken);
+
+        // Assert: now the review is approved for the new record
+        Assert.True((await ApprovalAsync(fixture)).IsApproved);
     }
 
     /// <summary>
@@ -1218,11 +1378,140 @@ public class SigningServiceTests
         var audit = Assert.Single(fixture.Store.Audits, a => a.Action == "review.reopened");
         Assert.Equal($"previous digest {digest}; reason: Missed a case.", audit.Detail);
         Assert.Equal("rev-1", audit.ReviewId);
+        Assert.Equal("Cyd (cyd)", audit.ActorName);
     }
 
     /// <summary>
-    ///     Test that after a reopen the review needs a fresh signature to be approved again, that content reverting
-    ///     to what it was does not revive the old signature, and that the old signature stays in the history.
+    ///     Test that a reopen of a review that does not exist is refused with <see cref="DomainRule.ReviewNotFound"/>
+    ///     and records nothing.
+    /// </summary>
+    [Fact]
+    public async Task SigningService_ReopenReviewAsync_MissingReview_ThrowsReviewNotFound()
+    {
+        // Arrange: a project without that review
+        var fixture = await CreateAsync();
+
+        // Act
+        var ex = await Assert.ThrowsAsync<DomainRuleException>(() => fixture.Signing.ReopenReviewAsync(
+            Cyd, fixture.ProjectId, "nope", "Because.", TestContext.Current.CancellationToken));
+
+        // Assert
+        Assert.Equal(DomainRule.ReviewNotFound, ex.Rule);
+        Assert.DoesNotContain(fixture.Store.Audits, a => a.Action == "review.reopened");
+    }
+
+    /// <summary>
+    ///     Test that the limit of the reason is counted after trimming: a reason of exactly the limit with blanks
+    ///     around it is accepted and stored trimmed, and one character more is refused.
+    /// </summary>
+    [Fact]
+    public async Task SigningService_ReopenReviewAsync_ReasonAtLimitWithBlanks_IsAcceptedTrimmed()
+    {
+        // Arrange: an approved review
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var (fixture, _, _) = await CreateApprovedAsync();
+        var limit = new string('x', ReviewLimits.MaxReopenReasonLength);
+
+        // Act: one character too many (with blanks) is refused, the limit with blanks is accepted
+        var tooLong = await Assert.ThrowsAsync<DomainRuleException>(() => fixture.Signing.ReopenReviewAsync(
+            Cyd, fixture.ProjectId, "rev-1", $"  {limit}y\t", cancellationToken));
+        await fixture.Signing.ReopenReviewAsync(Cyd, fixture.ProjectId, "rev-1", $"  {limit}\t\n", cancellationToken);
+
+        // Assert: the refusal names the reason rule, and the stored reason is trimmed
+        Assert.Equal(DomainRule.ReopenReasonInvalid, tooLong.Rule);
+        var reopen = Assert.Single(await fixture.Store.ListReopensAsync(fixture.ProjectId, "rev-1", cancellationToken));
+        Assert.Equal(limit, reopen.Reason);
+        Assert.EndsWith($"reason: {limit}", Assert.Single(fixture.Store.Audits, a => a.Action == "review.reopened").Detail, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    ///     Test, with the real access rules, that the administrator of the project and a system administrator who is
+    ///     not a member can reopen an approved review, that the audit trail names who did it, and that a plain member
+    ///     and a user who cannot see the project cannot.
+    /// </summary>
+    /// <param name="username">The user who reopens.</param>
+    /// <param name="allowed">Whether the reopening is allowed.</param>
+    /// <param name="rule">The rule of the refusal, when it is not allowed.</param>
+    [Theory]
+    [InlineData("pro", true, null)]
+    [InlineData("root", true, null)]
+    [InlineData("mem", false, DomainRule.ActorNotAllowed)]
+    [InlineData("out", false, DomainRule.ProjectNotFound)]
+    public async Task SigningService_ReopenReviewAsync_RealAccessRules_ReopensOnlyForAdministrators(
+        string username,
+        bool allowed,
+        DomainRule? rule)
+    {
+        // Arrange: an approved review in a project with a system administrator, a project administrator,
+        // a member and an outsider
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var world = await CreateRealAccessWorldAsync();
+        var actor = new Actor(username, username);
+
+        // Act
+        var attempt = world.Signing.ReopenReviewAsync(actor, world.ProjectId, "rev-1", "Look again.", cancellationToken);
+
+        // Assert
+        if (allowed)
+        {
+            await attempt;
+            var audit = Assert.Single(world.Store.Audits, a => a.Action == "review.reopened");
+            Assert.Equal($"{username} ({username})", audit.ActorName);
+            Assert.False((await world.Signing.GetApprovalAsync(world.ProjectId, "rev-1", cancellationToken))!.IsApproved);
+            var reopen = Assert.Single(await world.Store.ListReopensAsync(world.ProjectId, "rev-1", cancellationToken));
+            Assert.Equal(username, reopen.ReopenedBy);
+        }
+        else
+        {
+            var failure = await Assert.ThrowsAsync<DomainRuleException>(() => attempt);
+            Assert.Equal(rule, failure.Rule);
+            Assert.DoesNotContain(world.Store.Audits, a => a.Action == "review.reopened");
+            Assert.True((await world.Signing.GetApprovalAsync(world.ProjectId, "rev-1", cancellationToken))!.IsApproved);
+        }
+    }
+
+    /// <summary>
+    ///     Test, with the real access rules, that whoever may see the project can add, change and remove a slot, so a
+    ///     system administrator who is not a member can too, while a user who cannot see the project is refused as if
+    ///     the project did not exist.
+    /// </summary>
+    [Fact]
+    public async Task SigningService_SlotChanges_RealAccessRules_NeedViewAccessOnly()
+    {
+        // Arrange: a project with a plain member as the only reviewer candidate, an unapproved review
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var world = await CreateRealAccessWorldAsync(approve: false);
+        var admin = new Actor("root", "root");
+        var outsider = new Actor("out", "out");
+        var auditsBefore = world.Store.Audits.Count;
+
+        // Act: the outsider tries every change; the system administrator, who is no member, makes them
+        var add = await Assert.ThrowsAsync<DomainRuleException>(() => world.Signing.AddSlotAsync(
+            outsider, world.ProjectId, "rev-1", world.MemberId, null, cancellationToken));
+        var update = await Assert.ThrowsAsync<DomainRuleException>(() => world.Signing.UpdateSlotAsync(
+            outsider, world.ProjectId, "rev-1", world.SlotId, world.MemberId, null, cancellationToken));
+        var remove = await Assert.ThrowsAsync<DomainRuleException>(() => world.Signing.RemoveSlotAsync(
+            outsider, world.ProjectId, "rev-1", world.SlotId, cancellationToken));
+        await world.Signing.UpdateSlotAsync(
+            admin, world.ProjectId, "rev-1", world.SlotId, world.MemberId, world.ProjectAdminId, cancellationToken);
+        await world.Signing.RemoveSlotAsync(admin, world.ProjectId, "rev-1", world.SlotId, cancellationToken);
+        var added = await world.Signing.AddSlotAsync(
+            admin, world.ProjectId, "rev-1", world.ProjectAdminId, null, cancellationToken);
+
+        // Assert: the outsider is told the project does not exist, and the administrator's changes are recorded
+        Assert.Equal(DomainRule.ProjectNotFound, add.Rule);
+        Assert.Equal(DomainRule.ProjectNotFound, update.Rule);
+        Assert.Equal(DomainRule.ProjectNotFound, remove.Rule);
+        var recorded = world.Store.Audits.Skip(auditsBefore).ToList();
+        Assert.Equal(["slot.updated", "slot.removed", "slot.added"], recorded.Select(a => a.Action));
+        Assert.All(recorded, a => Assert.Equal("root (root)", a.ActorName));
+        Assert.Equal(world.ProjectAdminId, added.PrimaryUserId);
+    }
+
+    /// <summary>
+    ///     Test that the old signature stays out of date after a reopen even when the content is changed back to what
+    ///     it was, that a fresh signature is needed to approve the review again, and that the old signature stays in
+    ///     the history.
     /// </summary>
     [Fact]
     public async Task SigningService_ReopenReviewAsync_ThenResign_ApprovesAgainWithBothSignatures()
@@ -1231,22 +1520,101 @@ public class SigningServiceTests
         var cancellationToken = TestContext.Current.CancellationToken;
         var (fixture, slot, oldDigest) = await CreateApprovedAsync();
         await fixture.Signing.ReopenReviewAsync(Cyd, fixture.ProjectId, "rev-1", "Look again.", cancellationToken);
-        var newDigest = (await ApprovalAsync(fixture)).Digest;
 
-        // Act: the old signature does not count; the primary reviewer signs the new digest
-        var stale = (await ApprovalAsync(fixture)).IsApproved;
+        // Act: change an answer and change it back, so the content is what it was when the old signature was made
+        var itemId = DefaultChecklist.Current.Sections[0].Items[0].Id;
+        await fixture.Checklists.SetAnswerAsync(
+            fixture.ProjectId, "rev-1", itemId, ChecklistOutcome.NotApplicable, "Not relevant.", TestActors.Ann, cancellationToken);
+        await fixture.Checklists.SetAnswerAsync(
+            fixture.ProjectId, "rev-1", itemId, ChecklistOutcome.Pass, null, TestActors.Ann, cancellationToken);
+        var reverted = await ApprovalAsync(fixture);
+        var newDigest = reverted.Digest;
         await fixture.Signing.SignAsync(TestActors.Ann, fixture.ProjectId, "rev-1", slot.Id, newDigest, Password, cancellationToken);
+
+        // Assert: the reverted content did not revive the old signature, which was out of date until the new one
+        Assert.False(reverted.IsApproved);
+        Assert.Equal(SlotSignatureState.OutOfDate, reverted.Slots.Single().State);
+        Assert.NotEqual(oldDigest, newDigest);
 
         // Assert: approved again for the new digest, with the old and the new signature both stored
         var approval = await ApprovalAsync(fixture);
-        Assert.False(stale);
-        Assert.NotEqual(oldDigest, newDigest);
         Assert.True(approval.IsApproved);
         Assert.Equal(newDigest, approval.Digest);
         var signatures = await fixture.Store.ListSignaturesAsync(fixture.ProjectId, "rev-1", cancellationToken);
         Assert.Equal(2, signatures.Count);
         Assert.Contains(signatures, s => s.RecordDigest == oldDigest);
         Assert.Contains(signatures, s => s.RecordDigest == newDigest);
+    }
+
+    /// <summary>
+    ///     Test that a signature is refused for the reasons that come before the password check without asking for
+    ///     the password: a wrong password given again and again neither counts toward the lockout nor hides the real
+    ///     reason, so the signer can still sign with the right password once the cause is gone.
+    /// </summary>
+    /// <param name="scenario">
+    ///     The reason: <c>stale</c> (the record changed), <c>blocker</c> (an open thread) or <c>notReviewer</c> (the
+    ///     signer is a member who is not in the slot).
+    /// </param>
+    [Theory]
+    [InlineData("stale")]
+    [InlineData("blocker")]
+    [InlineData("notReviewer")]
+    public async Task SigningService_SignAsync_RefusedBeforePassword_DoesNotCountWrongPasswords(string scenario)
+    {
+        // Arrange: a review that can be signed by ann, optionally with an open thread
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var (fixture, slot) = await CreateReadyAsync();
+        ReviewThread? thread = null;
+        if (scenario == "blocker")
+        {
+            thread = await fixture.Threads.StartThreadAsync(
+                fixture.ProjectId, "rev-1", new ThreadAnchor("a.txt"), TestActors.Bob, "Open remark", cancellationToken);
+        }
+
+        var digest = (await ApprovalAsync(fixture)).Digest;
+        var signer = scenario == "notReviewer" ? TestActors.Dee : TestActors.Ann;
+        var attempted = scenario == "stale" ? "stale-digest" : digest;
+        var expected = scenario switch
+        {
+            "stale" => DomainRule.RecordChanged,
+            "blocker" => DomainRule.SigningNotAllowed,
+            _ => DomainRule.ActorNotAllowed
+        };
+
+        // Act: more wrong passwords than the lockout allows, each refused for the real reason
+        var rules = new List<DomainRule>();
+        for (var attempt = 0; attempt < 6; attempt++)
+        {
+            var failure = await Assert.ThrowsAsync<DomainRuleException>(() => fixture.Signing.SignAsync(
+                signer, fixture.ProjectId, "rev-1", slot.Id, attempted, "wrong password here", cancellationToken));
+            rules.Add(failure.Rule);
+        }
+
+        // Act: the cause is removed, and the signer who was refused signs with the right password
+        if (thread is not null)
+        {
+            await fixture.Threads.ResolveAsync(fixture.ProjectId, "rev-1", thread.Id, cancellationToken);
+        }
+
+        if (scenario == "notReviewer")
+        {
+            // dee becomes the primary reviewer of the still unsigned slot
+            await fixture.Signing.UpdateSlotAsync(
+                Cyd, fixture.ProjectId, "rev-1", slot.Id, fixture.Ids["dee"], null, cancellationToken);
+        }
+
+        var signature = await fixture.Signing.SignAsync(
+            signer,
+            fixture.ProjectId,
+            "rev-1",
+            slot.Id,
+            (await ApprovalAsync(fixture)).Digest,
+            Password,
+            cancellationToken);
+
+        // Assert: the real reason every time, no lockout, and the signature of the refused signer is stored
+        Assert.All(rules, rule => Assert.Equal(expected, rule));
+        Assert.Equal(fixture.Ids[scenario == "notReviewer" ? "dee" : "ann"], signature.UserId);
     }
 
     /// <summary>
@@ -1266,6 +1634,70 @@ public class SigningServiceTests
         Assert.Throws<ArgumentNullException>(() => new SigningService(store, users, null!, TimeProvider.System));
         Assert.Throws<ArgumentNullException>(() => new SigningService(store, users, access, null!));
     }
+
+    /// <summary>
+    ///     Creates a project under the real access rules with a system administrator who is not a member (<c>root</c>),
+    ///     a project administrator (<c>pro</c>), a plain member (<c>mem</c>) and a user outside the project
+    ///     (<c>out</c>), and the review <c>rev-1</c> with one slot whose primary reviewer is <c>mem</c>.
+    /// </summary>
+    /// <param name="approve">Whether <c>mem</c> signs the slot, so that the review is approved and locked.</param>
+    /// <returns>The prepared world.</returns>
+    private static async Task<RealAccessWorld> CreateRealAccessWorldAsync(bool approve = true)
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var store = new FakeReviewStore();
+        var userStore = new FakeUserStore();
+        var clock = new MovableTimeProvider(_now);
+        var users = new UserService(userStore, new FakePasswordHasher(), clock);
+        await users.CreateAsync("root", "root", true, Password, Actor.CommandLine, cancellationToken);
+        var projectAdmin = await users.CreateAsync("pro", "pro", false, Password, Actor.CommandLine, cancellationToken);
+        var member = await users.CreateAsync("mem", "mem", false, Password, Actor.CommandLine, cancellationToken);
+        await users.CreateAsync("out", "out", false, Password, Actor.CommandLine, cancellationToken);
+        var access = new ProjectAccess(userStore, store);
+        var rootActor = new Actor("root", "root");
+        var project = await new ProjectService(store, userStore, access, new FakePasswordHasher(), clock)
+            .CreateAsync("Apollo", null, rootActor, cancellationToken);
+        await store.AddMembershipAsync(projectAdmin.Id, project.Id, ProjectRole.ProjectAdmin, cancellationToken);
+        await store.AddMembershipAsync(member.Id, project.Id, ProjectRole.User, cancellationToken);
+        await TestServices.Reviews(store, clock).CreateDraftAsync(
+            project.Id, "rev-1", "First", [new("a.txt", TestContent.A)], rootActor, cancellationToken);
+        var checklists = TestServices.Checklists(store, clock);
+        foreach (var item in DefaultChecklist.Current.Sections.SelectMany(section => section.Items))
+        {
+            await checklists.SetAnswerAsync(
+                project.Id, "rev-1", item.Id, ChecklistOutcome.Pass, null, rootActor, cancellationToken);
+        }
+
+        var signing = new SigningService(store, users, access, clock);
+
+        // The system administrator is not a member, and still arranges the slot
+        var slot = await signing.AddSlotAsync(rootActor, project.Id, "rev-1", member.Id, null, cancellationToken);
+        if (approve)
+        {
+            var digest = (await signing.GetApprovalAsync(project.Id, "rev-1", cancellationToken))!.Digest;
+            await signing.SignAsync(
+                new Actor("mem", "mem"), project.Id, "rev-1", slot.Id, digest, Password, cancellationToken);
+        }
+
+        return new RealAccessWorld(signing, store, project.Id, member.Id, projectAdmin.Id, slot.Id);
+    }
+
+    /// <summary>
+    ///     The services and identifiers of a test under the real access rules.
+    /// </summary>
+    /// <param name="Signing">The service under test.</param>
+    /// <param name="Store">The review store.</param>
+    /// <param name="ProjectId">The identity of the project.</param>
+    /// <param name="MemberId">The identity of <c>mem</c>.</param>
+    /// <param name="ProjectAdminId">The identity of <c>pro</c>.</param>
+    /// <param name="SlotId">The identity of the slot of <c>mem</c>.</param>
+    private sealed record RealAccessWorld(
+        SigningService Signing,
+        FakeReviewStore Store,
+        int ProjectId,
+        int MemberId,
+        int ProjectAdminId,
+        int SlotId);
 
     /// <summary>
     ///     The services and identifiers of one test.

@@ -25,11 +25,12 @@ namespace DemaConsulting.ReviewCenter.Core;
 /// </summary>
 /// <remarks>
 ///     The service is the single place where the signing rules live. A review has any number of slots; a slot
-///     has a primary reviewer and an optional alternate, and either may sign. Any signed-in user may add,
+///     has a primary reviewer and an optional alternate, and either may sign. Any actor who may see the project (a
+///     member, or a system administrator who is not a member) may add,
 ///     change and remove slots, but only while the slot has no signature at all (current or out of date),
 ///     because a signature must always point to a slot that still describes who signed. A user occupies at
 ///     most one slot of a review.
-///     Signing needs the signer's password again: it is checked by <see cref="UserService.ReauthenticateAsync"/>,
+///     Signing needs the signer's password again: it is checked by <see cref="UserService.ReauthenticatePasswordAsync"/>,
 ///     the same path the login uses, so the hasher, the lockout counting and the single generic failure are the
 ///     same as at login; a failure is recorded in the audit trail as <c>signature.reauth-failed</c>. A user of an
 ///     external identity provider has no password: that user confirms by signing in again at the provider, and

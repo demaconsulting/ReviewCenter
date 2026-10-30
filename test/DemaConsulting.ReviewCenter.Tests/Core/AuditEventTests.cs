@@ -268,31 +268,36 @@ public class AuditEventTests
     }
 
     /// <summary>
-    ///     Test that slot changes and the signature are recorded, the signature with the record digest.
+    ///     Test that slot changes and the signature are recorded, the signature with the record digest, and that a
+    ///     refused add of an unknown user, and a refused add to the approved review, record nothing.
     /// </summary>
     [Fact]
     public async Task SigningService_SlotAndSignatureEvents_AreRecordedWithMembersAndDigest()
     {
         // Arrange
         var fixture = await CreateAsync();
+        var cancellationToken = TestContext.Current.CancellationToken;
         foreach (var item in DefaultChecklist.Current.Sections.SelectMany(s => s.Items))
         {
-            await fixture.Checklists.SetAnswerAsync(fixture.ProjectId, "rev-1", item.Id, ChecklistOutcome.Pass, null, TestActors.Ann, TestContext.Current.CancellationToken);
+            await fixture.Checklists.SetAnswerAsync(fixture.ProjectId, "rev-1", item.Id, ChecklistOutcome.Pass, null, TestActors.Ann, cancellationToken);
         }
 
         var before = fixture.Reviews.Audits.Count;
 
         // Act
-        var slot = await fixture.Signing.AddSlotAsync(TestActors.Ann, fixture.ProjectId, "rev-1", fixture.UserIds["ann"], fixture.UserIds["bob"], TestContext.Current.CancellationToken);
-        await fixture.Signing.UpdateSlotAsync(TestActors.Bob, fixture.ProjectId, "rev-1", slot.Id, fixture.UserIds["bob"], null, TestContext.Current.CancellationToken);
-        await fixture.Signing.UpdateSlotAsync(TestActors.Bob, fixture.ProjectId, "rev-1", slot.Id, fixture.UserIds["ann"], fixture.UserIds["bob"], TestContext.Current.CancellationToken);
-        var digest = (await fixture.Signing.GetApprovalAsync(fixture.ProjectId, "rev-1", TestContext.Current.CancellationToken))!.Digest;
-        await fixture.Signing.SignAsync(TestActors.Ann, fixture.ProjectId, "rev-1", slot.Id, digest, Password, TestContext.Current.CancellationToken);
-        var second = await fixture.Signing.AddSlotAsync(TestActors.Ann, fixture.ProjectId, "rev-1", 0 + fixture.UserIds["bob"] + 100, null, TestContext.Current.CancellationToken).ContinueWith(
-            t => t.IsFaulted, TaskScheduler.Default);
+        var slot = await fixture.Signing.AddSlotAsync(TestActors.Ann, fixture.ProjectId, "rev-1", fixture.UserIds["ann"], fixture.UserIds["bob"], cancellationToken);
+        await fixture.Signing.UpdateSlotAsync(TestActors.Bob, fixture.ProjectId, "rev-1", slot.Id, fixture.UserIds["bob"], null, cancellationToken);
+        await fixture.Signing.UpdateSlotAsync(TestActors.Bob, fixture.ProjectId, "rev-1", slot.Id, fixture.UserIds["ann"], fixture.UserIds["bob"], cancellationToken);
+        var unknownUser = await Assert.ThrowsAsync<DomainRuleException>(() => fixture.Signing.AddSlotAsync(
+            TestActors.Ann, fixture.ProjectId, "rev-1", fixture.UserIds["bob"] + 100, null, cancellationToken));
+        var digest = (await fixture.Signing.GetApprovalAsync(fixture.ProjectId, "rev-1", cancellationToken))!.Digest;
+        await fixture.Signing.SignAsync(TestActors.Ann, fixture.ProjectId, "rev-1", slot.Id, digest, Password, cancellationToken);
+        var locked = await Assert.ThrowsAsync<DomainRuleException>(() => fixture.Signing.AddSlotAsync(
+            TestActors.Ann, fixture.ProjectId, "rev-1", fixture.UserIds["bob"], null, cancellationToken));
 
-        // Assert: the failed add of an unknown user records nothing
-        Assert.True(second);
+        // Assert: the two refused adds record nothing, each for its own rule
+        Assert.Equal(DomainRule.SlotUserInvalid, unknownUser.Rule);
+        Assert.Equal(DomainRule.ReviewLocked, locked.Rule);
         var drafts = fixture.Reviews.Audits.Skip(before).ToList();
         Assert.Equal(["slot.added", "slot.updated", "slot.updated", "signature.added"], drafts.Select(d => d.Action));
         Assert.Equal($"slot {slot.Id}: primary ann, alternate bob", drafts[0].Detail);
