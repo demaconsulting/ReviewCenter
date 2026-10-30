@@ -2,8 +2,9 @@
 # Software Unit Requirements for the RecordDigest Class
 #
 # The RecordDigest class calculates the digest of a review record: the value a signature binds itself to. The digest
-# is a SHA-256 hash of a canonical text of the fingerprint, the checklist answers, the sections that do not apply, and
-# the threads with their comments.
+# is a SHA-256 hash of a canonical text of the fingerprint, the source of the files, the checklist wording, the
+# checklist answers with who answered, the sections that do not apply, the threads with their comments and times,
+# and the number of reopenings.
 
 sections:
   - title: RecordDigest Unit Requirements
@@ -12,8 +13,7 @@ sections:
         title: >-
           The RecordDigest class shall calculate the digest of a review record as the SHA-256 hash, written as 64
           lowercase hexadecimal characters, of a canonical text that is built in one documented way and starts with
-          the version header ReviewCenter record v1, so that the same record always gives the same digest, and
-          shall reject a missing record.
+          the version header ReviewCenter record v1, so that the same record always gives the same digest.
         justification: |
           A signature is only evidence if the same record can be recognized later. Fixing the text that is hashed,
           and checking it against a known answer, means a change of the format cannot go unnoticed and make every
@@ -23,13 +23,25 @@ sections:
           - RecordDigest_Compute_SameRecord_IsStableSha256OfCanonicalText
           - RecordDigest_Compute_KnownRecord_MatchesKnownValue
           - RecordDigest_Compute_ThreadSide_IsWrittenAndMatchesKnownValue
+          - RecordDigest_Compute_CoveredFieldsRecord_MatchesDocumentedFormatAndKnownValue
+
+      - id: ReviewCenter-RecordDigest-NullRecord
+        title: >-
+          The RecordDigest class shall reject a missing record with an ArgumentNullException, both when it builds
+          the canonical text and when it calculates the digest.
+        justification: |
+          A missing record has no digest. Failing loudly stops a signature from binding to a digest of nothing.
+        tests:
           - RecordDigest_Compute_NullRecord_Throws
 
       - id: ReviewCenter-RecordDigest-Coverage
         title: >-
-          The RecordDigest class shall give a different digest when the content fingerprint, the outcome or
-          justification of a check, an answered check, a section marked as not applicable or its reason, a thread
-          or its file, side, range, or state, or the author, text, or order of a comment, or a new comment, changes.
+          The RecordDigest class shall give a different digest when the content fingerprint, the outcome
+          (Pass, Fail, or NotApplicable) or justification of a check (an absent justification being different from
+          an empty one), an answered check, a section marked as not applicable or its reason, a thread or its file,
+          side, start line, end line (a whole-file thread being different from one with lines), state, or creation
+          time, or the author display name, author user name, text, time, or order of a comment, or a new comment,
+          changes.
         justification: |
           A signature approves what the reviewer saw. Anything the reviewer relied on must change the digest, or a
           signature could stay current after the content, the answers, or the discussion it approved had changed.
@@ -37,22 +49,31 @@ sections:
           - RecordDigest_Compute_CoveredChange_ChangesDigest
           - RecordDigest_Compute_CommentOrder_ChangesDigest
           - RecordDigest_Compute_ThreadSideChange_ChangesDigest
+          - RecordDigest_Compute_CoveredFieldsRecord_MatchesDocumentedFormatAndKnownValue
 
       - id: ReviewCenter-RecordDigest-Checklist
         title: >-
           The RecordDigest class shall cover the checklist the review was created with in the canonical text: its
           version and, sorted by identifier, the identifier and title of every section and the identifier and
           question wording of every check (none for a review without a checklist), and shall give a different
-          digest when any of them changes, and the same digest whatever order the definition lists them in; a
-          stored definition that is invalid or incomplete shall be refused with a JSON error, not hidden.
+          digest when any of them changes, and the same digest whatever order the definition lists them in (assuming
+          the identifiers of its sections and checks are unique).
         justification: |
           A signed answer only has meaning together with the question it answers. If the wording were not covered,
-          a signature would not show which question the reviewer vouched for. Corrupted stored text must stop the
-          digest instead of being read as a different definition.
+          a signature would not show which question the reviewer vouched for.
         tests:
           - RecordDigest_Compute_ChecklistRecord_MatchesDocumentedFormatAndKnownValue
           - RecordDigest_Compute_ChecklistWordingChange_ChangesDigest
           - RecordDigest_Compute_ChecklistDefinitionOrder_SameDigest
+
+      - id: ReviewCenter-RecordDigest-ChecklistInvalid
+        title: >-
+          The RecordDigest class shall refuse a stored checklist definition that is invalid or incomplete with a
+          JSON error instead of hiding it, and shall still accept a minimal complete definition.
+        justification: |
+          Corrupted stored text must stop the digest instead of being read as a different definition, while a
+          valid definition must not be refused for being small.
+        tests:
           - RecordDigest_Canonicalize_MalformedChecklistDefinition_Throws
           - RecordDigest_Canonicalize_MinimalChecklistDefinition_Computes
 
@@ -67,6 +88,16 @@ sections:
         tests:
           - RecordDigest_Compute_AnsweredByChanged_ChangesDigestButAnsweredAtDoesNot
 
+      - id: ReviewCenter-RecordDigest-SectionSetter
+        title: >-
+          The RecordDigest class shall not cover who marked a section as not applicable or when, so that the digest
+          is the same whatever person or time is stored with the section.
+        justification: |
+          The section and its reason are what the record says; who recorded the exception is not a claim a
+          signature vouches for. Leaving it out also keeps the digest of every existing review as it was.
+        tests:
+          - RecordDigest_Compute_SectionSetterAndTime_NotCovered
+
       - id: ReviewCenter-RecordDigest-Independence
         title: >-
           The RecordDigest class shall give the same digest for the same record whatever the order in which its
@@ -74,7 +105,8 @@ sections:
           not change when a section that applies is recorded as applying.
         justification: |
           The digest describes the review, not how it is stored. Without this, reading the record in another order,
-          or recording the default of a section, would wrongly invalidate signatures.
+          or recording the default of a section, would wrongly invalidate signatures. The order holds for lists whose
+          keys are unique, which is assumed of the input: the store keeps them unique.
         tests:
           - RecordDigest_Compute_ReorderedAndRenumbered_SameDigest
           - RecordDigest_Compute_ApplicableSection_NotCovered
@@ -82,13 +114,15 @@ sections:
       - id: ReviewCenter-RecordDigest-Unambiguous
         title: >-
           The RecordDigest class shall give different digests for two records that differ only in where text
-          ends and the next value begins, so that no text of a comment, justification, or name can imitate the
-          structure of the digest.
+          ends and the next value begins, so that no text of a comment, a justification, a name, a path, a
+          checklist title, or any other string can imitate the structure of the digest, and an absent value shall
+          differ from every text.
         justification: |
           Comment text is typed by users. If a text could contain what looks like the next field, two different
           records could share a digest, and a signature could be reused for a record it never covered.
         tests:
           - RecordDigest_Compute_TextWithDelimiters_DoesNotCollide
+          - RecordDigest_Compute_EmptyAndSplitValues_DoNotCollide
 
       - id: ReviewCenter-RecordDigest-ThreadSide
         title: >-
@@ -108,8 +142,7 @@ sections:
           uploaded review, and for a review from a repository the repository
           identity, the baseline and head commit identifiers, the selection text, the identifier of the review-set
           the review was planned from (distinguishing none from the empty text), and every change with its path,
-          change kind, baseline hash, and head hash, and shall give a different digest when any of them changes,
-          and the same digest whatever the order of the changes.
+          change kind, baseline hash, and head hash, and shall give a different digest when any of them changes.
         justification: |
           A signature approves a review of specific commits and files. If the source were not covered, the same
           signature could stay current for another selection, another commit, or a changed file. The review-set is
@@ -117,8 +150,19 @@ sections:
         tests:
           - RecordDigest_Canonicalize_GitSource_MatchesDocumentedFormat
           - RecordDigest_Compute_SourceChange_ChangesDigest
-          - RecordDigest_Compute_ChangeOrder_SameDigest
           - RecordDigest_Compute_ReviewSetId_IsCoveredAndDistinguishesNullFromEmpty
+          - RecordDigest_Compute_CoveredFieldsRecord_MatchesDocumentedFormatAndKnownValue
+
+      - id: ReviewCenter-RecordDigest-SourceOrder
+        title: >-
+          The RecordDigest class shall give the same digest for the same changes of a review whatever the order
+          they are given in.
+        justification: |
+          The store does not promise an order for the changes. The digest must describe the review, not the order
+          they were read in, or a signature could look out of date for no reason. The order holds for changes
+          whose paths are unique, as they are within one review.
+        tests:
+          - RecordDigest_Compute_ChangeOrder_SameDigest
 
       - id: ReviewCenter-RecordDigest-ReopenCount
         title: >-
@@ -134,3 +178,4 @@ sections:
         tests:
           - RecordDigest_Compute_ZeroReopens_EqualsLegacyDigest
           - RecordDigest_Compute_ReopensChangeDigest
+          - RecordDigest_Compute_CoveredFieldsRecord_MatchesDocumentedFormatAndKnownValue
